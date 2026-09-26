@@ -1,0 +1,172 @@
+@model Kumunita.Web.Models.GroupEventDetailViewModel
+@using Kumunita.Core.Events
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Event.Title) ? "Event" : Model.Event.Title;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/groups/@Model.GroupId" class="btn btn-link p-0">
+                ← <kw-l key="groups.back">Back to</kw-l> <b>@Model.GroupDisplayName</b>
+            </a>
+        </p>
+
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @* The group badge — the audience is the group's membership (the
+               GE lane), so name the group, not a per-event audience. *@
+            <span class="badge text-bg-light border">@Model.GroupDisplayName</span>
+
+            @* ADR 0089 / GE·4 — a group event is ALWAYS a draft at create;
+               Publish is the author-only lever (lane NE·4, ADR 0080). The
+               badge + Publish surface are visible to the one viewer who may
+               act on it (the author). *@
+            @if (Model.Event.IsDraft)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public"><kw-l key="events.draft">Draft</kw-l></span>
+                @if (Model.IsAuthor)
+                {
+                    <form class="d-inline" method="post" action="/groups/@Model.GroupId/events/@Model.Event.Id/publish">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-success"><kw-l key="events.publish">Publish</kw-l></button>
+                    </form>
+                }
+            }
+
+            @* The author-only action surface — Edit (there is no Delete for
+               group events: GE excludes the soft-delete lane). The
+               service's write-lane re-check at POST is the real gate. *@
+            @if (Model.IsAuthor)
+            {
+                <div class="ms-auto">
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="/groups/@Model.GroupId/events/@Model.Event.Id/edit">
+                        <kw-l key="events.edit">Edit</kw-l>
+                    </a>
+                </div>
+            }
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                @* Shared metadata — author (the Directory pattern: the <img>
+                   links the audited serving lane and avatar.ts hides it on
+                   404, falling back to the initial monogram) + time + location. *@
+                @* Shared metadata — author + time + location (the Directory
+                   pattern: the author's <img> links the audited serving lane
+                   and avatar.ts hides it on 404, falling back to the initial
+                   monogram). *@
+                @{ var authorInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName) ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString() : string.Empty; }
+                <div class="text-muted mb-3 d-flex align-items-center gap-2 flex-wrap">
+                    <span class="d-inline-flex align-items-center">
+                        <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                             data-avatar-fallback>
+                        <span class="avatar-mono" style="display:none;">@authorInitial</span>
+                        <span class="ms-2">@Model.AuthorDisplayName</span>
+                    </span>
+                    <span>—</span>
+                    <span><kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to <kw-dt dt="@Model.Event.End" format="g"></kw-dt></span>
+                    @if (!string.IsNullOrWhiteSpace(Model.Event.Location))
+                    {
+                        <span>· @Model.Event.Location</span>
+                    }
+                </div>
+
+                @* GE has no per-event translations surface (a named deferral);
+                   the body is the authored text, rendered through the one
+                   MarkdownRenderer (R·1). *@
+                <h1 class="mb-1">
+                    @if (string.IsNullOrWhiteSpace(Model.Event.Title))
+                    {
+                        <span class="text-body-tertiary"><kw-l key="events.untitled">Untitled event</kw-l></span>
+                    }
+                    else
+                    {
+                        @Model.Event.Title
+                    }
+                </h1>
+                <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
+
+                @* Optional event details (Capacity / Color) — GE inherits them
+                   as-is (no capacity enforcement, the NE·5 shape). *@
+                <div class="text-muted small mt-3">
+                    @if (Model.Event.Capacity is not null)
+                    {
+                        <span><kw-l key="events.capacity">Capacity</kw-l>: @Model.Event.Capacity</span>
+                    }
+                    @if (Model.Event.Color is not null)
+                    {
+                        <span class="ms-2">
+                            <span class="badge border" style="background:@Model.Event.Color;"></span>
+                        </span>
+                    }
+                </div>
+
+                <div class="text-muted small mt-3">
+                    <kw-l key="events.created">Created</kw-l>
+                    <kw-dt dt="@Model.Event.Created" format="g"></kw-dt>
+                    @if (Model.Event.Modified is not null)
+                    {
+                        <span> · <kw-l key="events.edited">edited</kw-l>
+                            <kw-dt dt="@Model.Event.Modified.Value" format="g"></kw-dt></span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* The RSVP surface — the GE lane inherits the community RSVP +
+           reminder affordances (GE·7), keyed by EventId with no group
+           branch. The owner-only list (author) + the last-write-wins form. *@
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 mb-3"><kw-l key="events.rsvp">RSVP</kw-l></h2>
+
+                <form method="post" action="/groups/@Model.GroupId/events/@Model.Event.Id/rsvp" class="d-flex gap-2 align-items-center">
+                    @Html.AntiForgeryToken()
+                    @if (Model.MyRsvp is not null)
+                    {
+                        <span class="text-muted small me-2"><kw-l key="events.rsvp_you">You're going to:</kw-l>
+                            <b>@Model.MyRsvp.Status</b></span>
+                    }
+                    @foreach (var status in new[] { RsvpStatus.Going, RsvpStatus.Maybe, RsvpStatus.No })
+                    {
+                        var checkedMark = Model.MyRsvp is not null && Model.MyRsvp.Status == status ? "checked" : null;
+                        <input class="btn-check" type="radio" name="status" id="@($"rsvp-{status}")"
+                               value="@status" @checkedMark autocomplete="off" />
+                        <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@status</label>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm"><kw-l key="events.rsvp_update">Update</kw-l></button>
+                </form>
+
+                @if (Model.Rsvps.Count > 0)
+                {
+                    <hr class="my-3" />
+                    <h3 class="h6 mb-2 text-muted"><kw-l key="events.rsvp_responses">Responses</kw-l></h3>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var rsvp in Model.Rsvps)
+                        {
+                            var rsvpInitial = !string.IsNullOrWhiteSpace(rsvp.DisplayName)
+                                ? char.ToUpperInvariant(rsvp.DisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <li class="d-flex justify-content-between py-1 align-items-center">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <span class="ms-2">@rsvp.DisplayName</span>
+                                </span>
+                                <span>
+                                    <span class="badge @(rsvp.Rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
+                                        @rsvp.Rsvp.Status
+                                    </span>
+                                    <span class="text-muted small ms-2"><kw-dt dt="@rsvp.Rsvp.At" format="g"></kw-dt></span>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

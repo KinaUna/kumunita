@@ -63,6 +63,38 @@
                 <a href="/projects/boards" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
             </div>
         </form>
+
+        @* U08 (ADR 0086 §3.9) — the standalone set-project card (D10): a
+           separate POST (PUT /projects/boards/{id}/set-project) that keeps the
+           frozen UpdateBoardRequest DTO (C-PL·8: zero migrations) untouched.
+           The picker is a display surface, never a gate (C-PL·3); the empty
+           option clears the association. Hidden when the actor sees no
+           readable project (F10). *@
+        @if (Model.Projects.Count > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label fw-semibold" for="set-project-select">
+                        <kw-l key="pl.board.project_link">Project</kw-l>
+                    </label>
+                    <form method="post" action="@($"/projects/boards/{ViewData["boardId"]}/set-project")">
+                        @Html.AntiForgeryToken()
+                        <select class="form-select" id="set-project-select" name="ProjectId">
+                            <option value="">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.Projects)
+                            {
+                                <option value="@id" selected="@(id == Model.ProjectId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <kw-l key="pl.board.set_project">Set project</kw-l>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
     </div>
 </div>
 

@@ -1,6 +1,7 @@
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Marten;
 using Microsoft.Extensions.Options;
 
@@ -54,7 +55,14 @@ public static class EventReminderHandler
         IOptions<EventReminderOptions> options,
         IMailerStage mailer,
         ILocalizationService localization,
-        ITranslationProvider translationProvider)
+        ITranslationProvider translationProvider,
+        // M6 (U04, F4) — the frozen notification emitter (U03). The static
+        // EventReminderService takes it as an optional param; the production
+        // handler resolves the DI-registered instance and forwards it so the
+        // event.reminder *inbox row* complements M4's existing email (the
+        // design doc §6.4 per-recipient precedent). Wolverine resolves this
+        // from the host's DI container.
+        NotificationService notifications)
     {
         // `now` is passed explicitly to the service so the window boundary is
         // deterministic under Wolverine's test-time control; using UtcNow here
@@ -72,7 +80,8 @@ public static class EventReminderHandler
             DateTimeOffset.UtcNow,
             mailer,
             localization,
-            translationProvider);
+            translationProvider,
+            notifications: notifications);
 
         // Self-reschedule: return a fresh EventReminderTick so the recurring
         // schedule carries forward (the TimeoutMessage's 1-day delay is baked into

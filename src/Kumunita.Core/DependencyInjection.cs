@@ -43,6 +43,13 @@ public static class ServiceCollectionExtensions
     {
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
+        // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
+        // seam (the account.signup / account.verified admin-lane emitters) is
+        // resolved automatically by the container from the registered
+        // Notifications.NotificationService (the same way its `ITranslationProvider?`
+        // seam is already auto-injected here — the default value is only used when the
+        // type is unregistered, which is how the two direct-construction Core test
+        // harnesses omit it). No factory needed.
         services.AddTransient<IIdentityService, IdentityService>();
 
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
@@ -78,7 +85,12 @@ public static class ServiceCollectionExtensions
             // ADR 0006-D lane pin) — the PostService's new ctor param is a
             // new dependency on PostService, not a new seam on a frozen
             // interface (§2.6).
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            // M6 (U04) — the frozen notification emitter (U03). The PostService
+            // ctor param is optional (CS1736); production wiring passes the
+            // DI-registered instance so the post-reply / group-post emitters
+            // fire in production (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
@@ -87,7 +99,10 @@ public static class ServiceCollectionExtensions
         // (mirrors IEmailDeadLetterCounter's registration pattern; the
         // scope-vs-role split lives inside CreateAsync, not in a
         // separate IUserInfoService / IAuthorizationService pairing).
-        services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
+        services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
@@ -99,7 +114,8 @@ public static class ServiceCollectionExtensions
         // this unit is the seam + registration only).
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
@@ -128,7 +144,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Moderation.ModerationService>(sp => new Moderation.ModerationService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the report.filed / report.assigned /
+            // report.resolved emitters fire (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 
@@ -186,7 +207,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Events.IEventService>(sp => new Events.EventService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<IUserInfoService>()));
+            sp.GetRequiredService<IUserInfoService>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the event.rsvp emitter fires (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // M5 (ADR 0067, plan U04): the Projects bounded context's service seam
         // (bounded context Kumunita.Core.Projects — the "outcome" arrow: the
@@ -199,7 +224,47 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Projects.IProjectService>(sp => new Projects.ProjectService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<IUserInfoService>()));
+            sp.GetRequiredService<IUserInfoService>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the todo.assign emitter fires (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // The todo.assign email body's status / date labels (ADR 0061) +
+            // the platform default time zone / date-time format (ADR 0019 /
+            // 0020) — the recipient's effective zone/format floor (the kw-dt /
+            // EventReminderService resolution order).
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<Localization.ILocalizationService>()));
+
+        // M6 (ADR 0076, plan U03): the Notifications bounded context's service
+        // (bounded context Kumunita.Core.Notifications — the "shared awareness"
+        // arrow: the Notification + NotificationPreference documents, the
+        // EmitAsync writer + the inbox / unread / preference lanes). A
+        // concrete service — no INotificationService interface (the design
+        // doc §6.2 pin), composing **only** the frozen seams (D11 — no ADD on
+        // any of them; no IAuthorizationService — a personal read, not an
+        // AccessAction decision, D3). The host-registered
+        // Marten.IDocumentStore is injected the same way as the M4 / M5
+        // services above.
+        services.AddTransient<Notifications.NotificationService>(sp => new Notifications.NotificationService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<IMailerStage>(),
+            // ADR 0078 — the sample-account suppression flag (host-bound to
+            // !IsDevelopment() in Program.cs). GetService (nullable) so a
+            // test harness that doesn't register the option degrades to the
+            // permissive default (false) via the ctor's null default.
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Notifications.NotificationOptions>>(),
+            // ADR 0085 — the item-link lane: the instance BaseUrl (bound in
+            // Program.cs from the "Verification" section, the M1
+            // verification email's absolute-link precedent) is prefixed onto
+            // each notification's relative LinkPath to form the email's
+            // absolute view link. GetService (nullable) so a test harness
+            // that doesn't register the option degrades to an empty BaseUrl
+            // (the link still renders, just relative) via the ctor's null
+            // default.
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>()));
         return services;
     }
 }

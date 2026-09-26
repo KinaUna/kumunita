@@ -1,0 +1,58 @@
+@model Kumunita.Web.Models.NotificationSubscriptionsViewModel
+@using Kumunita.Core.Notifications
+@{
+    ViewData["Title"] = "Notification subscriptions";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/notifications/preferences" class="btn btn-link p-0">
+                ← <kw-l key="notifications.preferences.title">Notification preferences</kw-l>
+            </a>
+        </p>
+
+        <div class="card">
+            <div class="card-body">
+                <h1 class="h4" style="font-weight:600;">
+                    <kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l>
+                </h1>
+                <p class="text-muted">
+                    <kw-l key="notifications.subscriptions.intro">Choose which communities, groups, and pages notify you. Preferences decide which kinds you also get by email; these switches decide which targets notify you at all.</kw-l>
+                </p>
+
+                @* One form per toggle (POST /notifications/subscriptions,
+                   [ValidateAntiForgeryToken] — the token is the gate, the
+                   U05 preferences-form precedent). The hidden kind / targetId
+                   fields are the (recipient, kind, target) business key; the
+                   switch binds <c>enabled</c> (a checked box posts "true";
+                   an unchecked checkbox posts nothing → the form-bound bool
+                   defaults to false). *@
+                @foreach (var group in Model.Rows.GroupBy(r => r.Kind, StringComparer.Ordinal))
+                {
+                    var sectionKey = group.Key;
+                    <h2 class="h6 mt-4 mb-2">
+                        <kw-l key="@($"notifications.subscription.{sectionKey}.label")">@sectionKey</kw-l>
+                    </h2>
+                    <div class="d-grid gap-2" style="max-width: 24rem;">
+                        @foreach (var row in group)
+                        {
+                            var inputId = $"sub-{row.Kind}-{row.TargetId}";
+                            <form method="post" action="/notifications/subscriptions">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="kind" value="@row.Kind" />
+                                <input type="hidden" name="targetId" value="@row.TargetId" />
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           id="@inputId" name="enabled" value="true"
+                                           @(row.Enabled ? "checked" : null) />
+                                    <label class="form-check-label" for="@inputId">@row.Name</label>
+                                </div>
+                            </form>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

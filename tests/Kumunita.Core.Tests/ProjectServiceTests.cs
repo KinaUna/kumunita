@@ -1629,6 +1629,987 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(updated.Modified);
     }
 
+    // ── F — the PL goal lane (ADR 0086, design doc §9.6 pins) ───────────────
+
+    /// <summary>
+    /// <b>F1</b> (goal feed, both sides): a goal whose <see
+    /// cref="ProjectGoal.Audience"/> grants a specific user is **present** in
+    /// that user's <see cref="IProjectService.ListGoalsAsync"/> feed (branch
+    /// 6 MatchGroups) and **absent** from a stranger's feed (branch 7 Deny —
+    /// the <c>CanSeeAsync(Read)</c> pass excludes the row, not just hidden in
+    /// the view). The author is a third party so only the audience branch is
+    /// exercised.
+    /// </summary>
+    [Fact]
+    public async Task F1_GoalVisibleToAudienceMember_HiddenFromNonMember()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f1-author";
+        const string grantee = "u-pl-f1-grantee";
+        const string stranger = "u-pl-f1-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f1-goal",
+            AuthorId = author,
+            Title = "Audience goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        var granteeFeed = await svc.ListGoalsAsync(null, grantee, 1);
+        Assert.Contains("f1-goal", granteeFeed.Select(g => g.Id));
+
+        var strangerFeed = await svc.ListGoalsAsync(null, stranger, 1);
+        Assert.DoesNotContain("f1-goal", strangerFeed.Select(g => g.Id));
+    }
+
+    /// <summary>
+    /// <b>F2</b> (goal detail, the C3 404-vs-403 split): <see
+    /// cref="IProjectService.GetGoalAsync"/> on an **absent** id throws
+    /// <see cref="KeyNotFoundException"/> (404); on an **audience-restricted**
+    /// goal a stranger who may not <c>Read</c> it is denied with
+    /// <see cref="UnauthorizedAccessException"/> (403) — the resource exists,
+    /// the actor does not.
+    /// </summary>
+    [Fact]
+    public async Task F2_GoalDetail_404OnAbsent_403OnDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f2-author";
+        const string grantee = "u-pl-f2-grantee";
+        const string stranger = "u-pl-f2-stranger";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetGoalAsync("no-such-goal", author));
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f2-goal",
+            AuthorId = author,
+            Title = "Restricted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.GetGoalAsync("f2-goal", stranger));
+    }
+
+    /// <summary>
+    /// <b>F3</b> (create, F1 / C3): <see cref="IProjectService.CreateGoalAsync"/>
+    /// — the author becomes the standing owner (<see
+    /// cref="ProjectGoal.AuthorId"/> = the actor), the goal is **live on
+    /// creation** (<c>IsDeleted = false</c>, no <c>IsDraft</c>), the
+    /// <c>Created</c> stamp is set, the ADR 0018 language floor materializes
+    /// a null <c>LanguageCode</c> (the instance-default → <c>en</c> floor),
+    /// and one <see cref="AccessAudit"/> row is written: <c>goal.create</c>,
+    /// <c>TargetKind = "goal"</c>, <c>Via Owner</c>.
+    /// </summary>
+    [Fact]
+    public async Task F3_CreateGoal_AuthorIsStandingOwner_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f3-author";
+
+        var created = await svc.CreateGoalAsync(
+            author, MemberRoles,
+            new CreateGoalRequest { Title = "Neighborhood goal" });
+
+        Assert.Equal(author, created.AuthorId);
+        Assert.False(created.IsDeleted);
+        Assert.NotNull(created.Id);
+        Assert.Equal("en", created.LanguageCode);          // ADR 0018 floor (no LocaleSettings row planted).
+
+        var audits = await GoalAuditRows(store, created.Id);
+        var row = Assert.Single(audits);
+        Assert.Equal("goal.create", row.Action);
+        Assert.Equal("goal", row.TargetKind);
+        Assert.Equal(created.Id, row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F3</b> (update, C-PL·2): the **creator ∪ GlobalAdmin** standing
+    /// matrix, re-checked server-side — the creator <see
+    /// cref="IProjectService.UpdateGoalAsync"/>s successfully (a real change
+    /// stamps <see cref="ProjectGoal.Modified"/>; a blank
+    /// <c>Description</c> clears to <c>null</c> — the ADR 0070 full-update
+    /// shape), a GlobalAdmin who is **not** the creator also succeeds (the
+    /// override branch), and a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// One <c>goal.update</c> audit row per successful write (C3).
+    /// </summary>
+    [Fact]
+    public async Task F3_UpdateGoal_CreatorGlobalAdmin_StandingRechecked()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f3b-creator";
+        const string admin = "u-pl-f3b-admin";
+        const string stranger = "u-pl-f3b-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f3b-goal",
+            AuthorId = creator,
+            Title = "Original title",
+            Description = "Original description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch); the change is real —
+        // Modified is stamped — and the blank Description clears to null.
+        var updated = await svc.UpdateGoalAsync(
+            "f3b-goal", creator, MemberRoles,
+            new UpdateGoalRequest { Title = "Edited title", Description = "   " });
+        Assert.Equal("Edited title", updated.Title);
+        Assert.Null(updated.Description);
+        Assert.NotNull(updated.Modified);
+        Assert.Equal(creator, updated.AuthorId);           // AuthorId preserved untouched.
+
+        // The GlobalAdmin (not the creator) has standing (the ADR 0017 override).
+        var adminUpdated = await svc.UpdateGoalAsync(
+            "f3b-goal", admin, GlobalAdminRoles,
+            new UpdateGoalRequest { Title = "Admin edit" });
+        Assert.Equal("Admin edit", adminUpdated.Title);
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateGoalAsync("f3b-goal", stranger, MemberRoles,
+                new UpdateGoalRequest { Title = "Intrusion" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<ProjectGoal>("f3b-goal"))!;
+            Assert.Equal("Admin edit", reloaded.Title);
+            Assert.Equal(creator, reloaded.AuthorId);
+        }
+
+        // One goal.update row per successful write (C3); no row for the refusal.
+        var audits = await GoalAuditRows(store, "f3b-goal");
+        Assert.Equal(2, audits.Count(a => a.Action == "goal.update"));
+    }
+
+    // ── F — the PL project lane (ADR 0086, design doc §9.6 pins) ────────────
+
+    /// <summary>
+    /// <b>F5</b> (project feed, the <c>goalId</c> filter — standalone vs
+    /// under-goal): the <see cref="IProjectService.ListProjectsAsync"/> feed
+    /// with <c>goalId == null</c> returns only the **standalone** projects
+    /// (<c>GoalId == null</c>) and with a specific <c>goalId</c> returns only
+    /// that goal's projects — the <c>goalId</c> argument is a *filter, never
+    /// a gate* (C-PL·3 / the design doc D8 pin: the <c>goalId == null</c>
+    /// feed is the <c>/projects</c> landing's projects section).
+    /// </summary>
+    [Fact]
+    public async Task F5_ProjectFeed_GoalIdFilter_StandaloneVsUnderGoal()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f5-author";
+
+        await Plant(store, new Project
+        {
+            Id = "f5-standalone",
+            AuthorId = author,
+            Title = "Standalone project",
+            GoalId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-goal",
+            AuthorId = author,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f5-under-goal",
+            AuthorId = author,
+            Title = "Project under the goal",
+            GoalId = "f5-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The standalone feed (goalId == null — the /projects landing's projects section).
+        var standaloneFeed = await svc.ListProjectsAsync(null, null, author, 1);
+        Assert.Contains("f5-standalone", standaloneFeed.Select(p => p.Id));
+        Assert.DoesNotContain("f5-under-goal", standaloneFeed.Select(p => p.Id));
+
+        // The under-goal feed (goalId filter narrows to that goal's projects).
+        var underGoalFeed = await svc.ListProjectsAsync(null, "f5-goal", author, 1);
+        Assert.Contains("f5-under-goal", underGoalFeed.Select(p => p.Id));
+        Assert.DoesNotContain("f5-standalone", underGoalFeed.Select(p => p.Id));
+    }
+
+    /// <summary>
+    /// <b>F2</b> (project detail, the C3 404-vs-403 split): <see
+    /// cref="IProjectService.GetProjectAsync"/> on an **absent** id throws
+    /// <see cref="KeyNotFoundException"/> (404); on an
+    /// **audience-restricted** project a stranger who may not <c>Read</c>
+    /// it is denied with <see cref="UnauthorizedAccessException"/> (403) —
+    /// the resource exists, the actor does not.
+    /// </summary>
+    [Fact]
+    public async Task F2_ProjectDetail_404OnAbsent_403OnDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f2-author";
+        const string grantee = "u-pl-f2-grantee";
+        const string stranger = "u-pl-f2-stranger";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetProjectAsync("no-such-project", author));
+
+        await Plant(store, new Project
+        {
+            Id = "f2-project",
+            AuthorId = author,
+            Title = "Restricted project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.GetProjectAsync("f2-project", stranger));
+    }
+
+    /// <summary>
+    /// <b>F5</b> (create, the <c>GoalId</c> guard — the C3 split): <see
+    /// cref="IProjectService.CreateProjectAsync"/> with a non-null
+    /// <c>GoalId</c> pointing at a **soft-deleted** goal is refused with
+    /// <see cref="KeyNotFoundException"/> (404) and with an
+    /// **unreadable** goal is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) — in **both** cases
+    /// **nothing** is written (no project row, no <c>project.create</c>
+    /// audit row). A non-null <c>GoalId</c> pointing at a readable goal
+    /// succeeds and carries the association (the guard is the only refusal).
+    /// </summary>
+    [Fact]
+    public async Task F5_CreateProject_GoalIdGuard_RefusesDeletedOrUnreadableGoal()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f5-author";
+        const string grantee = "u-pl-f5-grantee";
+        const string stranger = "u-pl-f5-stranger";
+
+        // A readable goal (public) — the happy path carries the association.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-read-goal",
+            AuthorId = author,
+            Title = "Readable goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var created = await svc.CreateProjectAsync(
+            author, MemberRoles,
+            new CreateProjectRequest { Title = "Under a readable goal", GoalId = "f5-read-goal" });
+        Assert.Equal("f5-read-goal", created.GoalId);
+        Assert.Equal("project.create", (await ProjectAuditRows(store, created.Id)).Single().Action);
+
+        // A soft-deleted goal — the 404 side of the C3 split.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-deleted-goal",
+            AuthorId = author,
+            Title = "Deleted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateProjectAsync(author, MemberRoles,
+                new CreateProjectRequest { Title = "Refused (deleted goal)", GoalId = "f5-deleted-goal" }));
+
+        // An unreadable goal (audience-restricted; the author is a third
+        // party so only the audience branch is exercised) — the 403 side.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-restricted-goal",
+            AuthorId = grantee,
+            Title = "Restricted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateProjectAsync(stranger, MemberRoles,
+                new CreateProjectRequest { Title = "Refused (unreadable goal)", GoalId = "f5-restricted-goal" }));
+
+        // Nothing was written for either refusal: the total project count is
+        // still exactly one, and no project.update / project.create row
+        // references the refused attempts (the fresh-scratch-db isolation
+        // makes "all project rows" unambiguous).
+        await using (var q = store.QuerySession())
+        {
+            var allProjects = await q.Query<Project>().ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Single(allProjects);
+            Assert.Equal(created.Id, allProjects[0].Id);
+        }
+    }
+
+    /// <summary>
+    /// <b>F4</b> (update, the <c>ClearGoal</c> explicit un-goal + the ADR
+    /// 0079 partial-date semantics): <see
+    /// cref="IProjectService.UpdateProjectAsync"/> with
+    /// <c>ClearGoal = true</c> sets <see cref="Project.GoalId"/> to
+    /// <c>null</c> (the explicit un-goal — a non-null <c>GoalId</c> value in
+    /// the same request is **not** required to accompany it); setting
+    /// <c>StartAt</c> / <c>DueAt</c> to non-null values applies them, and a
+    /// follow-up request with both <c>null</c> **clears** them (the ADR 0079
+    /// optional-date shape — the edit form's blank <c>datetime-local</c>
+    /// field → <c>null</c>, C-PL·5); the creator ∪ GlobalAdmin standing
+    /// matrix is re-checked server-side in both writes (the
+    /// <see cref="ProjectService.CheckProjectStanding"/> shape — C-PL·2).
+    /// </summary>
+    [Fact]
+    public async Task F4_UpdateProject_ClearGoal_NullsGoalId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f4-creator";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f4-goal",
+            AuthorId = creator,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f4-project",
+            AuthorId = creator,
+            Title = "A project",
+            GoalId = "f4-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The clear-goal write: an explicit un-goal (ClearGoal = true) nulls
+        // the GoalId, and the ADR 0079 non-null StartAt / DueAt values are
+        // both applied in the same request.
+        var startAt = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero);
+        var unGoaled = await svc.UpdateProjectAsync(
+            "f4-project", creator, MemberRoles,
+            new UpdateProjectRequest { ClearGoal = true, StartAt = startAt, DueAt = dueAt });
+        Assert.Null(unGoaled.GoalId);
+        Assert.Equal(startAt, unGoaled.StartAt);
+        Assert.Equal(dueAt, unGoaled.DueAt);
+        Assert.NotNull(unGoaled.Modified);
+        Assert.Equal(creator, unGoaled.AuthorId);               // AuthorId preserved untouched.
+
+        // ADR 0079: a follow-up with both dates null clears them (the
+        // edit form's blank datetime-local → null shape).
+        var cleared = await svc.UpdateProjectAsync(
+            "f4-project", creator, MemberRoles,
+            new UpdateProjectRequest { StartAt = null, DueAt = null });
+        Assert.Null(cleared.StartAt);
+        Assert.Null(cleared.DueAt);
+
+        // One project.update row per successful write (C3).
+        var audits = await ProjectAuditRows(store, "f4-project");
+        Assert.Equal(2, audits.Count(a => a.Action == "project.update"));
+    }
+
+    // ── F8 — the PL delete lane (ADR 0086, design doc §9.6 pins) ────────────
+
+    /// <summary>
+    /// <b>F8</b> (goal soft-delete, the ADR 0024 author-lane shape): the
+    /// creator <see cref="IProjectService.DeleteGoalAsync"/>s successfully
+    /// (<c>IsDeleted = true</c>, <c>Modified</c> stamped, one
+    /// <c>goal.delete</c> audit row with <c>TargetKind = "goal"</c>,
+    /// <c>Via Owner</c>); a GlobalAdmin who is **not** the creator also
+    /// succeeds (the override branch); a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// **The D6 dangling-association rule (C-PL·6):** the goal's
+    /// <see cref="Project"/> is **kept** — its <see cref="Project.GoalId"/>
+    /// is **not** cleared (a *filter, never a gate* — C-M3·2); the association
+    /// simply dangles — the <see cref="IProjectService.GetGoalAsync"/> read
+    /// lane 404s on the now-soft-deleted goal (the read lane's filter).
+    /// </summary>
+    [Fact]
+    public async Task F8_DeleteGoal_SoftDeletes_ProjectsKept_GoalLinkDangles()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f8-goal-creator";
+        const string admin = "u-pl-f8-goal-admin";
+        const string stranger = "u-pl-f8-goal-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f8-goal",
+            AuthorId = creator,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f8-project",
+            AuthorId = creator,
+            Title = "A project under the goal",
+            GoalId = "f8-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteGoalAsync("f8-goal", stranger, MemberRoles));
+        await using (var q0 = store.QuerySession())
+        {
+            var untouched = (await q0.LoadAsync<ProjectGoal>("f8-goal"))!;
+            Assert.False(untouched.IsDeleted);
+        }
+        Assert.Empty(await GoalAuditRows(store, "f8-goal"));
+
+        // The GlobalAdmin (not the creator) has standing (the override branch).
+        await svc.DeleteGoalAsync("f8-goal", admin, GlobalAdminRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var goal = (await q.LoadAsync<ProjectGoal>("f8-goal"))!;
+            Assert.True(goal.IsDeleted);                 // ADR 0024 — the soft-delete flag.
+            Assert.NotNull(goal.Modified);
+
+            // **The D6 dangling-association rule (C-PL·6):** the project is
+            // kept and its GoalId is **not** cleared.
+            var project = (await q.LoadAsync<Project>("f8-project"))!;
+            Assert.False(project.IsDeleted);
+            Assert.Equal("f8-goal", project.GoalId);     // the link dangles.
+        }
+
+        // The read lane 404s on the now-soft-deleted goal (the read lane's
+        // filter — the dangling project's goal link is not rendered).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetGoalAsync("f8-goal", creator));
+
+        // One goal.delete row (C3), the creator's admin override.
+        var audits = await GoalAuditRows(store, "f8-goal");
+        var row = Assert.Single(audits, a => a.Action == "goal.delete");
+        Assert.Equal("goal", row.TargetKind);
+        Assert.Equal("f8-goal", row.TargetId);
+        Assert.Equal(AccessVia.Admin, row.Via);          // the admin override wrote it.
+    }
+
+    /// <summary>
+    /// <b>F8</b> (project soft-delete, the ADR 0024 author-lane shape): the
+    /// creator <see cref="IProjectService.DeleteProjectAsync"/>s successfully
+    /// (<c>IsDeleted = true</c>, <c>Modified</c> stamped, one
+    /// <c>project.delete</c> audit row with <c>TargetKind = "project"</c>,
+    /// <c>Via Owner</c>); a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// **The D6 dangling-association rule (C-PL·6):** the project's
+    /// <see cref="TodoItem"/> / <see cref="KanbanBoard"/> rows are **kept** —
+    /// their <see cref="TodoItem.ProjectId"/> / <see
+    /// cref="KanbanBoard.ProjectId"/> is **not** cleared (a *filter, never a
+    /// gate* — C-M3·2); the associations simply dangle — the <see
+    /// cref="IProjectService.GetProjectAsync"/> read lane 404s on the
+    /// now-soft-deleted project (the read lane's filter).
+    /// </summary>
+    [Fact]
+    public async Task F8_DeleteProject_SoftDeletes_TodosAndBoardsKept_ProjectLinkDangles()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f8-proj-creator";
+        const string stranger = "u-pl-f8-proj-stranger";
+
+        await Plant(store, new Project
+        {
+            Id = "f8-proj",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f8-proj-todo",
+            AuthorId = creator,
+            Title = "A to-do in the project",
+            ProjectId = "f8-proj",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f8-proj-board",
+            AuthorId = creator,
+            Title = "A board in the project",
+            ProjectId = "f8-proj",
+            Created = new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteProjectAsync("f8-proj", stranger, MemberRoles));
+        await using (var q0 = store.QuerySession())
+        {
+            var untouched = (await q0.LoadAsync<Project>("f8-proj"))!;
+            Assert.False(untouched.IsDeleted);
+        }
+        Assert.Empty(await ProjectAuditRows(store, "f8-proj"));
+
+        // The creator has standing (the Owner branch).
+        await svc.DeleteProjectAsync("f8-proj", creator, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var project = (await q.LoadAsync<Project>("f8-proj"))!;
+            Assert.True(project.IsDeleted);              // ADR 0024 — the soft-delete flag.
+            Assert.NotNull(project.Modified);
+
+            // **The D6 dangling-association rule (C-PL·6):** the to-do + the
+            // board are kept and their ProjectId is **not** cleared.
+            var todo = (await q.LoadAsync<TodoItem>("f8-proj-todo"))!;
+            Assert.False(todo.IsDeleted);
+            Assert.Equal("f8-proj", todo.ProjectId);     // the link dangles.
+
+            var board = (await q.LoadAsync<KanbanBoard>("f8-proj-board"))!;
+            Assert.False(board.IsDeleted);
+            Assert.Equal("f8-proj", board.ProjectId);    // the link dangles.
+        }
+
+        // The read lane 404s on the now-soft-deleted project (the read lane's
+        // filter — the dangling to-do/board's project link is not rendered).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetProjectAsync("f8-proj", creator));
+
+        // One project.delete row (C3), the creator (the Owner branch).
+        var audits = await ProjectAuditRows(store, "f8-proj");
+        var row = Assert.Single(audits, a => a.Action == "project.delete");
+        Assert.Equal("project", row.TargetKind);
+        Assert.Equal("f8-proj", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);          // the creator wrote it.
+    }
+
+    // ── F — the PL association lane (ADR 0086, design doc §9.6 pins) ────────
+
+    /// <summary>
+    /// <b>F7</b> (to-do association, the standing matrix + the C3 project
+    /// guard): <see cref="IProjectService.SetTodoProjectAsync"/> with a
+    /// readable project **succeeds** for a member with standing (the creator —
+    /// <c>todo.set_project</c>, <c>TargetKind = "todo"</c>, <c>Via Owner</c>,
+    /// <c>Modified</c> stamped); for a **stranger** (no standing) it is
+    /// refused with <see cref="UnauthorizedAccessException"/> (403) with
+    /// **nothing written**; and pointing at a **soft-deleted** project it is
+    /// refused with <see cref="KeyNotFoundException"/> (404) — the C3 split,
+    /// checked **before** the write (the <see cref="ProjectService"/>
+    /// <c>GoalId</c> guard shape, the project side).
+    /// </summary>
+    [Fact]
+    public async Task F7_SetTodoProject_StandingRechecked_RefusesDeletedProject()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7-creator";
+        const string stranger = "u-pl-f7-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7-todo",
+            AuthorId = creator,
+            Title = "A to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A readable project (public) — the happy path.
+        await Plant(store, new Project
+        {
+            Id = "f7-project",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch): the association
+        // writes, Modified is stamped, AuthorId / Created preserved.
+        var set = await svc.SetTodoProjectAsync(
+            "f7-todo", creator, MemberRoles, "f7-project");
+        Assert.Equal("f7-project", set.ProjectId);
+        Assert.NotNull(set.Modified);
+        Assert.Equal(creator, set.AuthorId);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            Assert.Equal("f7-project", reloaded.ProjectId);
+        }
+
+        var audits = await TodoAuditRows(store, "f7-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_project");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("f7-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+
+        // The stranger (no standing — not the creator, not the assignee,
+        // not a GlobalAdmin) is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoProjectAsync("f7-todo", stranger, MemberRoles, "f7-project"));
+
+        // A soft-deleted project — the 404 side of the C3 split (the guard is
+        // checked before the write, so the standing creator is still refused).
+        await Plant(store, new Project
+        {
+            Id = "f7-deleted-project",
+            AuthorId = creator,
+            Title = "Deleted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.SetTodoProjectAsync("f7-todo", creator, MemberRoles, "f7-deleted-project"));
+
+        // The refused attempts left the stored row's ProjectId untouched.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            Assert.Equal("f7-project", reloaded.ProjectId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (board association, the standing matrix + the C3 project
+    /// guard): <see cref="IProjectService.SetBoardProjectAsync"/> with a
+    /// readable project **succeeds** for the board's creator (
+    /// <c>board.set_project</c>, <c>TargetKind = "board"</c>, <c>Via Owner</c>,
+    /// <c>Modified</c> stamped); for a **stranger** (no standing — the
+    /// creator ∪ GlobalAdmin matrix has no assignee branch, ADR 0070) it is
+    /// refused with <see cref="UnauthorizedAccessException"/> (403) with
+    /// **nothing written**; and pointing at a **soft-deleted** project it is
+    /// refused with <see cref="KeyNotFoundException"/> (404) — the C3 split,
+    /// checked **before** the write.
+    /// </summary>
+    [Fact]
+    public async Task F7_SetBoardProject_StandingRechecked_RefusesDeletedProject()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7b-creator";
+        const string stranger = "u-pl-f7b-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7b-board",
+            AuthorId = creator,
+            Title = "A board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A readable project (public) — the happy path.
+        await Plant(store, new Project
+        {
+            Id = "f7b-project",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch): the association
+        // writes, Modified is stamped, AuthorId / Created preserved.
+        var set = await svc.SetBoardProjectAsync(
+            "f7b-board", creator, MemberRoles, "f7b-project");
+        Assert.Equal("f7b-project", set.ProjectId);
+        Assert.NotNull(set.Modified);
+        Assert.Equal(creator, set.AuthorId);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            Assert.Equal("f7b-project", reloaded.ProjectId);
+        }
+
+        var audits = await BoardAuditRows(store, "f7b-board");
+        var row = Assert.Single(audits, a => a.Action == "board.set_project");
+        Assert.Equal("board", row.TargetKind);
+        Assert.Equal("f7b-board", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+
+        // The stranger (no standing — not the creator, not a GlobalAdmin;
+        // the assignee branch does not apply to a board) is refused (403);
+        // nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetBoardProjectAsync("f7b-board", stranger, MemberRoles, "f7b-project"));
+
+        // A soft-deleted project — the 404 side of the C3 split (the guard is
+        // checked before the write, so the standing creator is still refused).
+        await Plant(store, new Project
+        {
+            Id = "f7b-deleted-project",
+            AuthorId = creator,
+            Title = "Deleted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.SetBoardProjectAsync("f7b-board", creator, MemberRoles, "f7b-deleted-project"));
+
+        // The refused attempts left the stored row's ProjectId untouched.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            Assert.Equal("f7b-project", reloaded.ProjectId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (unassociate): <see cref="IProjectService.SetTodoProjectAsync"/>
+    /// with <c>projectId = null</c> **clears** the to-do's
+    /// <see cref="TodoItem.ProjectId"/> (the <see cref="ProjectService"/>
+    /// <c>AssignTodoAsync</c> null-unassign shape) — the guard is skipped,
+    /// <see cref="TodoItem.Modified"/> is stamped, and one
+    /// <c>todo.set_project</c> audit row is written (C3).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoProject_Null_Unassociates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7c-creator";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7c-todo",
+            AuthorId = creator,
+            Title = "An associated to-do",
+            ProjectId = "f7c-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var unset = await svc.SetTodoProjectAsync("f7c-todo", creator, MemberRoles, null);
+        Assert.Null(unset.ProjectId);
+        Assert.NotNull(unset.Modified);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7c-todo"))!;
+            Assert.Null(reloaded.ProjectId);
+        }
+
+        var audits = await TodoAuditRows(store, "f7c-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_project");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("f7c-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F7</b> (project guard, 403 side — to-do): a non-null
+    /// <paramref name="projectId"/> pointing at an **unreadable** project
+    /// (audience-restricted; the author is a third party) is refused with
+    /// <see cref="UnauthorizedAccessException"/> (403) even for a standing
+    /// creator — the resource exists, the actor may not read it (the C3
+    /// split); **nothing** is written.
+    /// </summary>
+    [Fact]
+    public async Task SetTodoProject_ProjectDenied_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7d-creator";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7d-todo",
+            AuthorId = creator,
+            Title = "A to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // An unreadable project (audience-restricted to someone else; the
+        // actor is the to-do's creator — standing is irrelevant to the guard).
+        await Plant(store, new Project
+        {
+            Id = "f7d-project",
+            AuthorId = "u-pl-f7d-project-author",
+            Title = "Restricted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, "u-pl-f7d-grantee"),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoProjectAsync("f7d-todo", creator, MemberRoles, "f7d-project"));
+
+        // Nothing was written.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7d-todo"))!;
+            Assert.Null(reloaded.ProjectId);
+        }
+        Assert.Empty(await TodoAuditRows(store, "f7d-todo"));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (feed filter, to-do side): the <see
+    /// cref="IProjectService.ListTodosAsync"/> additive
+    /// <paramref name="projectId"/> filter narrows the candidate set to the
+    /// to-dos whose <see cref="TodoItem.ProjectId"/> matches — a *filter,
+    /// never a gate* (C-M3·2 / C-PL·3): an unreadable to-do is **still**
+    /// excluded from a stranger's feed by the audience decision even when it
+    /// matches the filter.
+    /// </summary>
+    [Fact]
+    public async Task Todo_Feed_ProjectIdFilter_Narrows()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7e-author";
+        const string grantee = "u-pl-f7e-grantee";
+        const string stranger = "u-pl-f7e-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-in-project",
+            AuthorId = author,
+            Title = "Associated to-do",
+            ProjectId = "f7e-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-out-of-project",
+            AuthorId = author,
+            Title = "Unassociated to-do",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A public to-do that matches the filter but that the actor may not
+        // see (audience-restricted) — the filter must not open the gate.
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-restricted",
+            AuthorId = author,
+            Title = "Restricted to-do",
+            ProjectId = "f7e-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 45, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        // The filter narrows to the ProjectId-matching to-dos: the
+        // out-of-project to-do is excluded for everyone (the filter), and the
+        // in-project + restricted to-dos are candidates — the audience
+        // decision then admits each actor its own slice.
+        var authorFiltered = await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project");
+        Assert.Contains("f7e-in-project", authorFiltered.Select(t => t.Id));
+        Assert.DoesNotContain("f7e-out-of-project", authorFiltered.Select(t => t.Id));
+        Assert.Contains("f7e-restricted", authorFiltered.Select(t => t.Id)); // the author may read it.
+
+        // The audience decision stays the access boundary (C-M5·3 /
+        // C-PL·3): the filter does **not** open the gate for the stranger —
+        // the restricted to-do (which matches the filter) is still hidden,
+        // while the public in-project to-do is visible to everyone.
+        var strangerFiltered = await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project");
+        Assert.Contains("f7e-in-project", strangerFiltered.Select(t => t.Id));   // public — visible.
+        Assert.DoesNotContain("f7e-out-of-project", strangerFiltered.Select(t => t.Id)); // the filter.
+        Assert.DoesNotContain("f7e-restricted", strangerFiltered.Select(t => t.Id)); // the gate.
+    }
+
+    /// <summary>
+    /// <b>F7</b> (feed filter, board side): the <see
+    /// cref="IProjectService.ListBoardsAsync"/> additive
+    /// <paramref name="projectId"/> filter narrows the candidate set to the
+    /// boards whose <see cref="KanbanBoard.ProjectId"/> matches — a
+    /// *filter, never a gate* (C-M3·2 / C-PL·3).
+    /// </summary>
+    [Fact]
+    public async Task Board_Feed_ProjectIdFilter_Narrows()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7f-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7f-in-project",
+            AuthorId = author,
+            Title = "Associated board",
+            ProjectId = "f7f-project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7f-out-of-project",
+            AuthorId = author,
+            Title = "Unassociated board",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var filtered = await svc.ListBoardsAsync(null, author, 1, "f7f-project");
+        Assert.Contains("f7f-in-project", filtered.Select(b => b.Id));
+        Assert.DoesNotContain("f7f-out-of-project", filtered.Select(b => b.Id));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (additive-surface pin): the <see
+    /// cref="IProjectService.ListTodosAsync"/> feed with the default
+    /// <paramref name="projectId"/> (<c>null</c>) is **unchanged** — the
+    /// existing M5 feed behavior (the C-PL·8 additive pin: every existing
+    /// call site compiles and behaves unchanged).
+    /// </summary>
+    [Fact]
+    public async Task Todo_Feed_ProjectIdNull_DefaultUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7g-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7g-in-project",
+            AuthorId = author,
+            Title = "Associated to-do",
+            ProjectId = "f7g-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f7g-standalone",
+            AuthorId = author,
+            Title = "Standalone to-do",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The existing 5-arg call shape (default projectId = null): both
+        // to-dos are in the author's feed — the M5 behavior is intact.
+        var feed = await svc.ListTodosAsync(null, null, author, 1);
+        Assert.Contains("f7g-in-project", feed.Select(t => t.Id));
+        Assert.Contains("f7g-standalone", feed.Select(t => t.Id));
+    }
+
     // ── C — the claim lane (ADR 0073) ────────────────────────────────────────
 
     /// <summary>
@@ -1856,6 +2837,94 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Contains("c5-assigned", all.Select(t => t.Id));
     }
 
+    // ── F11 — optional start/due dates (ADR 0079) ───────────────────────────
+
+    /// <summary>
+    /// <b>F11</b> (C-M5·11): <see cref="ProjectService.CreateTodoAsync"/>
+    /// writes the author's <see cref="TodoItem.StartAt"/> /
+    /// <see cref="TodoItem.DueAt"/> verbatim — the optional dates are stored
+    /// as the author posted them (the ADR 0079 create lane). A <c>null</c>
+    /// date is stored as <c>null</c> (no date), so the "leave blank for no
+    /// date" form contract round-trips.
+    /// </summary>
+    [Fact]
+    public async Task F11_CreateTodo_SetsOptionalStartAndDueDates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11-author";
+
+        var startAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 5, 17, 0, 0, TimeSpan.Zero);
+
+        var created = await svc.CreateTodoAsync(
+            author, MemberRoles,
+            new CreateTodoRequest
+            {
+                Title = "Dated to-do",
+                StartAt = startAt,
+                DueAt = dueAt,
+                Audience = null, // public
+            });
+
+        Assert.Equal(startAt, created.StartAt);
+        Assert.Equal(dueAt, created.DueAt);
+
+        // A second to-do with no dates stores both as null (no date).
+        var undated = await svc.CreateTodoAsync(
+            author, MemberRoles,
+            new CreateTodoRequest
+            {
+                Title = "Undated to-do",
+                Audience = null,
+            });
+
+        Assert.Null(undated.StartAt);
+        Assert.Null(undated.DueAt);
+    }
+
+    /// <summary>
+    /// <b>F11</b> (C-M5·11, update lane): <see cref="ProjectService.UpdateTodoAsync"/>
+    /// sets both dates and stamps <see cref="TodoItem.Modified"/> (a changed
+    /// to-do), then a **blank** request (both dates <c>null</c>) **clears**
+    /// them back to no-date (ADR 0079's null=clear rule) — the edit form's
+    /// always-present <c>datetime-local</c> field posts blank as null.
+    /// </summary>
+    [Fact]
+    public async Task F11_UpdateTodo_SetsThenClearsOptionalDates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f11-todo",
+            AuthorId = author,
+            Title = "Dated to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var startAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 5, 17, 0, 0, TimeSpan.Zero);
+
+        // Setting both dates is a change → the dates are applied + Modified stamped.
+        var set = await svc.UpdateTodoAsync(
+            "f11-todo", author, MemberRoles,
+            new UpdateTodoRequest { StartAt = startAt, DueAt = dueAt });
+        Assert.Equal(startAt, set.StartAt);
+        Assert.Equal(dueAt, set.DueAt);
+        Assert.NotNull(set.Modified);
+
+        // Blank (null) request clears both → back to no-date.
+        var cleared = await svc.UpdateTodoAsync(
+            "f11-todo", author, MemberRoles,
+            new UpdateTodoRequest { StartAt = null, DueAt = null });
+        Assert.Null(cleared.StartAt);
+        Assert.Null(cleared.DueAt);
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
@@ -1881,6 +2950,581 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await using var q = store.QuerySession();
         return await q.Query<AccessAudit>()
             .Where(a => a.TargetKind == "todo" && a.TargetId == todoId)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database whose <c>TargetId</c> is the given goal (the fresh-
+    /// postgres-per-test isolation makes "all rows for this goal"
+    /// unambiguous — the <see cref="BoardAuditRows"/> shape).</summary>
+    // ── TBD — the "waiting on" dependency lane (ADR 0087 / the design doc §7.5) ──
+
+    /// <summary>
+    /// <b>F4</b> (C-TBD·2): <c>blockedOnly = true</c> narrows the candidate set
+    /// to to-dos with <c>BlockedByTodoId != null</c> **before** the audience
+    /// pass — the unblocked to-do A is excluded, the blocked to-do B is
+    /// included, and the filter does not change the audience decision (a
+    /// denied blocked to-do is still dropped — the "filter, never a gate" pin).
+    /// </summary>
+    [Fact]
+    public async Task ListTodos_BlockedOnly_ReturnsOnlyToDosWithBlockedByTodoId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f4-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f4-a", AuthorId = author, Title = "Unblocked",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f4-b", AuthorId = author, Title = "Blocked",
+            BlockedByTodoId = "tbd-f4-a",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var blockedFeed = await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true);
+        Assert.Contains("tbd-f4-b", blockedFeed.Select(t => t.Id));
+        Assert.DoesNotContain("tbd-f4-a", blockedFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
+    /// <b>F1</b> (C-TBD·4): a to-do whose <c>BlockedByTodoId</c> points at a
+    /// readable blocker resolves the chip — title + status + link path
+    /// (the <c>/projects/todos/{id}</c> shape).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithReadableBlocker_ResolvesBlockerChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f1-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f1-blocker", AuthorId = author, Title = "The blocker",
+            Status = "In Progress",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f1-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f1-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f1-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.False(detail.Blocker!.Generic);
+        Assert.Equal("tbd-f1-blocker", detail.Blocker.TodoId);
+        Assert.Equal("The blocker", detail.Blocker.Title);
+        Assert.Equal("In Progress", detail.Blocker.Status);
+        Assert.Equal("/projects/todos/tbd-f1-blocker", detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F2</b> (C-TBD·4): a to-do whose blocker is **unreadable** to the
+    /// actor degrades to the generic chip — <c>Generic = true</c>, and the
+    /// blocker's title / status / link are **not leaked** (all null).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithUnreadableBlocker_ReturnsGenericChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f2-author";
+        const string stranger = "u-tbd-f2-stranger";
+
+        // The blocker is audience-restricted to a third party — the actor (author
+        // of the waiting to-do) may read the to-do itself but not the blocker.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2-blocker", AuthorId = "u-tbd-f2-blocker-author", Title = "Restricted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, stranger),
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f2-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f2-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.True(detail.Blocker!.Generic);
+        Assert.Equal("tbd-f2-blocker", detail.Blocker.TodoId);
+        Assert.Null(detail.Blocker.Title);
+        Assert.Null(detail.Blocker.Status);
+        Assert.Null(detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F2</b> (C-TBD·4): a to-do whose blocker has been **soft-deleted**
+    /// degrades to the generic chip — the read lane never surfaces a
+    /// deleted blocker's title / link.
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithSoftDeletedBlocker_ReturnsGenericChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f2c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2c-blocker", AuthorId = author, Title = "Deleted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2c-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f2c-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f2c-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.True(detail.Blocker!.Generic);
+        Assert.Null(detail.Blocker.Title);
+        Assert.Null(detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F3</b> (C-TBD·3): setting a to-do's <c>BlockedByTodoId</c> to
+    /// **itself** is refused (the self-cycle guard) —
+    /// <see cref="InvalidOperationException"/>, **nothing is written** (the
+    /// to-do's <c>BlockedByTodoId</c> stays null).
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_SetBlockedBy_SelfRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f3-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3-todo", AuthorId = author, Title = "Self",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateTodoAsync("tbd-f3-todo", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3-todo" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f3-todo"))!;
+            Assert.Null(todo.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F3</b> (C-TBD·3): setting a to-do's <c>BlockedByTodoId</c> to a
+    /// target **downstream** of it (the target's own <c>BlockedByTodoId</c>
+    /// chain reaches the to-do) closes a cycle — refused (the transitive
+    /// guard). A→B→C: setting A's blocker to C would make A a blocker of
+    /// itself (A→C→B→A).
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_SetBlockedBy_TransitiveRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f3c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-a", AuthorId = author, Title = "A",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // B is blocked by A; C is blocked by B — the chain A ← B ← C.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-b", AuthorId = author, Title = "B",
+            BlockedByTodoId = "tbd-f3c-a",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-c", AuthorId = author, Title = "C",
+            BlockedByTodoId = "tbd-f3c-b",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 2, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // Setting A's blocker to C closes A → C → B → A.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateTodoAsync("tbd-f3c-a", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3c-c" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var a = (await q.LoadAsync<TodoItem>("tbd-f3c-a"))!;
+            Assert.Null(a.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F5</b>: <c>ClearBlockedBy = true</c> is an explicit un-block — the
+    /// to-do's <c>BlockedByTodoId</c> is set to null, and a real change stamps
+    /// <c>Modified</c>.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_ClearBlockedBy_Allowed()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f5-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f5-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f5-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f5-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var updated = await svc.UpdateTodoAsync(
+            "tbd-f5-todo", author, MemberRoles,
+            new UpdateTodoRequest { ClearBlockedBy = true });
+
+        Assert.Null(updated.BlockedByTodoId);
+        Assert.NotNull(updated.Modified);
+    }
+
+    /// <summary>
+    /// <b>F6</b> (C-TBD·5): a stranger who is neither the author, the assignee,
+    /// nor a GlobalAdmin is **denied** a <c>BlockedByTodoId</c> write — the
+    /// standing matrix refuses with <see cref="UnauthorizedAccessException"/>
+    /// (403, not 404), and the to-do is untouched.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_DeniedActor_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f6-author";
+        const string stranger = "u-tbd-f6-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6-todo", AuthorId = author, Title = "Author's to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateTodoAsync("tbd-f6-todo", stranger, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6-todo" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f6-todo"))!;
+            Assert.Null(todo.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F6</b> (C3 404-vs-403 split): setting a to-do's <c>BlockedByTodoId</c>
+    /// to an id that is **soft-deleted** is refused with <see
+    /// cref="KeyNotFoundException"/> (the 404 — the target does not exist for
+    /// read), not a 403 — the target is an access boundary, the association is
+    /// not.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_NonNullTargetAtSoftDeletedRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f6c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6c-todo", AuthorId = author, Title = "To-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6c-blocker", AuthorId = author, Title = "Deleted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.UpdateTodoAsync("tbd-f6c-todo", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6c-blocker" }));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (C-TBD·2): moving a to-do (relocating its placement to another
+    /// board) **never clears** <c>BlockedByTodoId</c> — the hint persists (the
+    /// human lifts it explicitly), and the blocker is untouched.
+    /// </summary>
+    [Fact]
+    public async Task MoveTodoToDoneLane_NeverClearsBlockedByTodoId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f7-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f7-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // Source board + lane (the to-do's current placement).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-f7-source", AuthorId = author, Title = "Source",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-f7-source-lane", BoardId = "tbd-f7-source", Title = "In Progress",
+            Status = "In Progress", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-f7-p-src", TodoItemId = "tbd-f7-todo", BoardId = "tbd-f7-source",
+            LaneId = "tbd-f7-source-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+        // Target board + its single lane (a "Done"-statused lane).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-f7-target", AuthorId = author, Title = "Target",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-f7-target-lane", BoardId = "tbd-f7-target", Title = "Done",
+            Status = "Done", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var moved = await svc.MoveTodoToBoardAsync("tbd-f7-todo", "tbd-f7-target", author, MemberRoles);
+        Assert.Equal("tbd-f7-target", moved.BoardId); // the placement relocated
+
+        // The BlockedByTodoId persists — moving never clears the hint.
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7-todo"))!;
+            Assert.Equal("tbd-f7-blocker", todo.BlockedByTodoId);
+
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7-blocker"))!;
+            Assert.False(blocker.IsDeleted); // the blocker is untouched
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (C-TBD·2): soft-deleting a to-do **never clears** its
+    /// <c>BlockedByTodoId</c> (and does not cascade to the blocker) — the
+    /// hint persists on the soft-deleted row, and the blocker itself is
+    /// untouched (still present, not deleted).
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodo_WithBlockedBy_SoftDeleteUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f7c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7c-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7c-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f7c-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await svc.DeleteTodoAsync("tbd-f7c-todo", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7c-todo"))!;
+            Assert.True(todo.IsDeleted);
+            Assert.Equal("tbd-f7c-blocker", todo.BlockedByTodoId); // the hint persists
+
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7c-blocker"))!;
+            Assert.False(blocker.IsDeleted); // the blocker is untouched
+        }
+    }
+
+    /// <summary>
+    /// <b>D4 board-card surface</b> (C-TBD·4): a card whose
+    /// <c>BlockedByTodoId</c> points at a **readable** blocker resolves the
+    /// chip on the **board card** — the <see cref="BoardDetailResult
+    /// .CardBlockers"/> map carries the card's id → a non-generic chip with
+    /// title + status + link path (the to-do *detail* <c>Blocker</c> and the
+    /// board *card* chip are the same D4 surface, now both present).
+    /// </summary>
+    [Fact]
+    public async Task GetBoard_WithReadableBlocker_ResolvesCardChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-b1-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b1-blocker", AuthorId = author, Title = "The blocker",
+            Status = "In Progress",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b1-card", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-b1-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-b1-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-b1-lane", BoardId = "tbd-b1-board", Title = "L1", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-b1-p1", TodoItemId = "tbd-b1-card", BoardId = "tbd-b1-board",
+            LaneId = "tbd-b1-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var board = await svc.GetBoardAsync("tbd-b1-board", author);
+        Assert.True(board.CardBlockers.ContainsKey("tbd-b1-card"));
+        var chip = board.CardBlockers["tbd-b1-card"];
+        Assert.False(chip.Generic);
+        Assert.Equal("tbd-b1-blocker", chip.TodoId);
+        Assert.Equal("The blocker", chip.Title);
+        Assert.Equal("In Progress", chip.Status);
+        Assert.Equal("/projects/todos/tbd-b1-blocker", chip.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>D4 board-card surface</b> (C-TBD·4): a card whose blocker is
+    /// **unreadable** to the actor degrades the **board card** chip to the
+    /// generic label — the card itself is visible (the author owns the board
+    /// + the public card), but the blocker's title / status / link are
+    /// **not leaked** on the card.
+    /// </summary>
+    [Fact]
+    public async Task GetBoard_WithUnreadableBlocker_ResolvesGenericCardChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-b2-author";
+        const string stranger = "u-tbd-b2-stranger";
+
+        // The blocker is audience-restricted to a third party — the author
+        // (board + card owner) reads the board and the card but not the
+        // blocker, so the card chip degrades to Generic.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b2-blocker", AuthorId = "u-tbd-b2-blocker-author", Title = "Restricted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, stranger),
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b2-card", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-b2-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-b2-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-b2-lane", BoardId = "tbd-b2-board", Title = "L1", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-b2-p1", TodoItemId = "tbd-b2-card", BoardId = "tbd-b2-board",
+            LaneId = "tbd-b2-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var board = await svc.GetBoardAsync("tbd-b2-board", author);
+        Assert.True(board.CardBlockers.ContainsKey("tbd-b2-card"));
+        var chip = board.CardBlockers["tbd-b2-card"];
+        Assert.True(chip.Generic);
+        Assert.Equal("tbd-b2-blocker", chip.TodoId);
+        Assert.Null(chip.Title);
+        Assert.Null(chip.Status);
+        Assert.Null(chip.LinkPath);
+    }
+
+    private static async Task<IReadOnlyList<AccessAudit>> GoalAuditRows(IDocumentStore store, string goalId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "goal" && a.TargetId == goalId)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database whose <c>TargetId</c> is the given project (the fresh-
+    /// postgres-per-test isolation makes "all rows for this project"
+    /// unambiguous — the <see cref="GoalAuditRows"/> shape).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> ProjectAuditRows(IDocumentStore store, string projectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "project" && a.TargetId == projectId)
             .ToListAsync(ct);
     }
 

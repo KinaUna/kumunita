@@ -1,0 +1,164 @@
+@model Kumunita.Web.Models.GoalDetailViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Goal" : Model.Title;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/projects" class="btn btn-link p-0 kanban-back"><kw-l key="pl.index.title">Projects</kw-l></a>
+        </p>
+
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
+           idiom) — the goal detail is part of the /projects section; placed
+           at the top of the page (after the back link), not the bottom. *@
+        <partial name="_ProjectsTabs" />
+
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>
+                        @if (string.IsNullOrWhiteSpace(Model.Title))
+                        {
+                            <span class="text-body-tertiary"><kw-l key="pl.goal.new_heading">New goal</kw-l></span>
+                        }
+                        else
+                        {
+                            @Model.Title
+                        }
+                    </h1>
+                    <div class="text-muted small mt-1">
+                        @Model.AuthorDisplayName
+                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                        <kw-dt dt="@Model.Created" format="g"></kw-dt></span>
+                        @if (Model.Modified is not null)
+                        {
+                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                            <kw-dt dt="@Model.Modified" format="g"></kw-dt></span>
+                        }
+                        @if (Model.ComponentDisplayName is not null)
+                        {
+                            <span class="badge text-bg-light border ms-2">@Model.ComponentDisplayName</span>
+                        }
+                    </div>
+                    @* The audience line (the goal's Audience is `null` = public
+                       — ADR 0001-B / 0036). A display surface, never a gate —
+                       the audience decision already ran in the service's
+                       GetGoalAsync entry gate. *@
+                    <div class="text-muted small mt-1">
+                        @if (Model.IsPublicAudience)
+                        {
+                            <kw-l key="pl.goal.audience_public">Visible to everyone on the instance.</kw-l>
+                        }
+                        else
+                        {
+                            <kw-l key="pl.goal.audience_restricted">Restricted to the audience grants below.</kw-l>
+                        }
+                    </div>
+                </div>
+                @* The goal's actions (the ADR 0070 board-edit precedent): an
+                   Edit link + a Delete form, both gated by the CanEdit
+                   standing preview (creator ∪ GlobalAdmin — the display-only
+                   affordance; the service's UpdateGoalAsync /
+                   DeleteGoalAsync re-check is the enforcement). The delete
+                   form is the BoardDetail.cshtml delete-button shape: a
+                   <form data-confirm="…"> (SECURITY.md §6 no-inline-script —
+                   the confirm.ts module intercepts the submit), never an
+                   onclick on the button. U09 soft-delete lane: the goal's
+                   projects stay in place (D6 — the dangling-association
+                   rule; the goal link simply stops showing). *@
+                <div class="d-flex align-items-center gap-2">
+                    @* The goal's "New project" entry point (the ProjectsIndex
+                       header-button idiom) — any signed-in resident can create
+                       a project; the composer is a standalone page, and the
+                       goal association happens afterwards via the project's
+                       goal picker (D10). *@
+                    <a class="btn btn-sm btn-outline-primary" href="/projects/projects/new"><kw-l key="pl.index.new_project">New project</kw-l></a>
+                    @if (Model.CanEdit)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/goals/{Model.Id}/edit")"><kw-l key="pl.goal.edit">Edit goal</kw-l></a>
+                        <form method="post" action="@($"/projects/goals/{Model.Id}/delete")"
+                              data-confirm="@("Delete this goal? Its projects stay in place — the link to this goal simply stops showing.")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="pl.goal.delete">Delete goal</kw-l></button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </header>
+
+        @* The goal's body — pre-rendered through the one MarkdownRenderer
+           (ADR 0025; the rendered detail body, not the WYSIWYG rc-editor).
+           A blank description shows the empty-description hint instead. *@
+        <div class="card mb-4">
+            <div class="card-body rc-body">
+                @if (Model.DescriptionHtml is not null)
+                {
+                    @Html.Raw(Model.DescriptionHtml)
+                }
+                else
+                {
+                    <p class="text-muted mb-0"><kw-l key="pl.goal.empty_description">This goal has no description yet.</kw-l></p>
+                }
+            </div>
+        </div>
+
+        @* The projects in this goal (the U03 per-parent seam — a denied
+           project is dropped, not the whole set; **unpaged** — the small
+           per-parent list precedent). Each card links to the U07 route —
+           the register's deliberate adjacent-unit relaxation: the href ships
+           now, the target with U07. *@
+        <section class="mb-5">
+            <h2><kw-l key="pl.goal.projects_heading">Projects in this goal</kw-l></h2>
+            @if (Model.Projects.Count == 0)
+            {
+                <div class="kanban-board-empty p-4 text-muted border rounded">
+                    <kw-l key="pl.goal.projects_empty">No projects under this goal yet — create one to start managing the shared work.</kw-l>
+                </div>
+            }
+            else
+            {
+                <div class="airy-ann-list">
+                    @foreach (var card in Model.Projects)
+                    {
+                        <div class="airy-ann-row">
+                            <div>
+                                <h3 class="airy-ann-title">
+                                    <a href="@($"/projects/projects/{card.Id}")">@card.Title</a>
+                                </h3>
+                                <div class="text-muted small mb-1">
+                                    @card.AuthorDisplayName
+                                    <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                                    <kw-dt dt="@card.Created" format="g"></kw-dt></span>
+                                    @if (card.StartAt is not null)
+                                    {
+                                        <span> · <kw-l key="pl.index.start">Start</kw-l>
+                                        <kw-dt dt="@card.StartAt" format="d"></kw-dt></span>
+                                    }
+                                    @if (card.DueAt is not null)
+                                    {
+                                        <span> · <kw-l key="pl.index.due">Due</kw-l>
+                                        <kw-dt dt="@card.DueAt" format="d"></kw-dt></span>
+                                    }
+                                    @if (card.ComponentDisplayName is not null)
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@card.ComponentDisplayName</span>
+                                    }
+                                    @if (card.Status is not null)
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@card.Status</span>
+                                    }
+                                </div>
+                                @if (card.DescriptionHtml is not null)
+                                {
+                                    <div class="markdown mb-2">@Html.Raw(card.DescriptionHtml)</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+</div>

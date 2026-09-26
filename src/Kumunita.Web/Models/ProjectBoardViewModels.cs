@@ -33,7 +33,12 @@ public sealed record BoardRow(
     string? ComponentDisplayName,
     string LanguageCode,
     DateTimeOffset Created,
-    DateTimeOffset? Modified);
+    DateTimeOffset? Modified,
+    // ADR 0086 D9 — the board's **project association** as stored (may
+    // dangle — the row is a display surface, never a gate, C-PL·3). The
+    // "Add to Project…" dropdown item preselects the current choice so the
+    // modal's picker opens on it (the BoardEdit set-project card idiom).
+    string? ProjectId = null);
 
 /// <summary>
 /// The <b>board feed</b> view model (the <c>GET /projects/boards</c> read
@@ -52,7 +57,13 @@ public sealed record BoardIndexViewModel(
     IReadOnlyList<BoardRow> Boards,
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0086 D9 — the row dropdown's **project picker** options (the
+    // <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…" modal —
+    // a **display** surface, never a gate (C-PL·3). Empty ⇒ the item and
+    // the modal hide (a picker with no options is a noise surface, not a
+    // control — the BoardEdit F10 rule).
+    IReadOnlyList<(string Id, string Name)>? Projects = null);
 
 /// <summary>
 /// One <see cref="KanbanLane"/> of a board, enriched with its visible
@@ -109,7 +120,21 @@ public sealed record TodoCardRow(
     string? Status,
     string? AssigneeId,
     string? AssigneeDisplayName,
-    int Order);
+    int Order,
+    // ADR 0079 — the optional dates (the Event Start/End shape, but OPTIONAL):
+    // `null` = no date. Display metadata only — the board card renders the
+    // due date so a kanban view shows the deadline at a glance (the <kw-dt>
+    // TagHelper renders it in the effective timezone; null renders empty,
+    // the card gates the line on non-null).
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt,
+    // ADR 0087 D4 — the card's **waiting-on chip** (the D4 surface): the
+    // access-scoped `BlockerChip` the service resolved for this card's
+    // `BlockedByTodoId` (an unreadable / absent / soft-deleted blocker
+    // degrades to `Generic`, no title / link — C-TBD·4). `null` = the card
+    // has no blocker, so the chip is omitted entirely (the TodoDetail chip
+    // idiom). A **hint** — it never gates the card (D2).
+    Kumunita.Core.Projects.BlockerChip? Blocker = null);
 
 /// <summary>
 /// The <b>board detail</b> view model (the <c>GET /projects/boards/{id}</c>
@@ -129,7 +154,30 @@ public sealed record TodoCardRow(
 public sealed record BoardDetailViewModel(
     BoardRow Board,
     IReadOnlyList<LaneDetailRow> Lanes,
-    bool CanEdit = false);
+    bool CanEdit = false,
+    // ADR 0086 D9 — the **project link** on the board detail (the D6
+    // dangling-association rule: both fields are `null` when the board has
+    // no `ProjectId`, or the target project is soft-deleted / unreadable by
+    // the actor — the link is then omitted entirely, never a 404/403 for the
+    // board itself; the `pl.board.project_link` kw-l key labels it).
+    string? ProjectId = null,
+    string? ProjectTitle = null,
+    // ADR 0086 D9 — the board-head ⋮ menu's **project picker** options
+    // (the <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…"
+    // modal — a **display** surface, never a gate (C-PL·3). Empty ⇒ the
+    // item and the modal hide (the BoardEdit F10 rule).
+    IReadOnlyList<(string Id, string Name)>? Projects = null,
+    // ADR 0088 — the board's user-added translations (the ADR 0027 chip-swap +
+    // ADR 0049 default-visible-variant + ADR 0022 add-form shape; the
+    // <see cref="Kumunita.Core.Projects.BoardTranslation"/> rows), the
+    // enabled-catalog language set the chips / add-form render from, the
+    // display pin (creator ∪ Translator ∪ GlobalAdmin — the real gate is the
+    // server-side re-check in the write lanes), and the authored-in language
+    // code.
+    IReadOnlyList<Kumunita.Core.Projects.BoardTranslation>? Translations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "");
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +
@@ -208,6 +256,21 @@ public sealed class BoardEditorModel
     [BindNever]
     public IReadOnlyList<(string Id, string Name)> Components { get; set; } = [];
 
+    /// <summary>The board's **project association** (ADR 0086 D4 / D9) —
+    /// the <see cref="KanbanBoard.ProjectId"/>: a feed filter, never a gate
+    /// (C-PL·3). Bound from the <c>name="ProjectId"</c> picker on the new-form
+    /// lane; optional — a board is usable project-less. The U04
+    /// <c>SetBoardProjectAsync</c> seam is the enforcement.</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>The composer's **project picker** options — the actor's
+    /// readable, non-deleted <see cref="Kumunita.Core.Projects.Project"/> set
+    /// (the <c>SeedProjectPickerAsync</c> seed). A **display** surface, never
+    /// a gate (C-PL·3). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="ProjectId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
+
     /// <summary>
     /// true when the model is well-formed for a round-trip. <see
     /// cref="Title"/> is required (a board with no title is a malformed
@@ -248,6 +311,20 @@ public sealed class BoardUpdateModel
     /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/>, edited by the
     /// one <c>bindRichEditor</c>; a blank value clears it).</summary>
     public string? Description { get; set; }
+
+    /// <summary>The board's **project association** (ADR 0086 D4 / D9) —
+    /// the <see cref="KanbanBoard.ProjectId"/>: a feed filter, never a gate
+    /// (C-PL·3). Prefills the standalone set-project form's select; the U04
+    /// <c>SetBoardProjectAsync</c> seam is the enforcement.</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>The edit form's **project picker** options — the actor's
+    /// readable, non-deleted <see cref="Kumunita.Core.Projects.Project"/> set
+    /// (the <c>SeedProjectPickerAsync</c> seed). A **display** surface, never
+    /// a gate (C-PL·3). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="ProjectId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
 
     /// <summary>true when the model is well-formed for a round-trip.
     /// <see cref="Title"/> is required (a board with no title is a

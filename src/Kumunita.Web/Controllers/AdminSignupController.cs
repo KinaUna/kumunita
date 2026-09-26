@@ -55,7 +55,8 @@ public sealed class AdminSignupController(
     {
         var model = new SignupAdminViewModel
         {
-            IsOpen = await identity.IsSignupOpenAsync()
+            IsOpen = await identity.IsSignupOpenAsync(),
+            NotifyAdmins = await identity.IsNotifyAdminsOnSignupAsync()
         };
 
         return View(model);
@@ -80,10 +81,32 @@ public sealed class AdminSignupController(
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// <c>POST /admin/signup/notify</c> (ADR 0077) — sets the notify-admins gate
+    /// (whether the account lane notifies GlobalAdmins on sign-up and
+    /// verification). An independent toggle from the open / invitation-only gate
+    /// (the two are distinct admin-settled instance values; each has its own
+    /// audited write lane — the ADR 0019 / ADR 0020 singleton-toggle shape).
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveNotify(bool notifyAdmins)
+    {
+        var actor = ActorId(User) ?? string.Empty;
+        await identity.SetNotifyAdminsOnSignupAsync(notifyAdmins, actor);
+        TempData["info"] = notifyAdmins
+            ? "Admins will now be notified when a resident signs up or verifies their account."
+            : "Admins will no longer be notified when a resident signs up or verifies their account.";
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── View model (public nested type so the Razor view can bind to it) ──
 
     public sealed class SignupAdminViewModel
     {
         public bool IsOpen { get; init; } = true;
+
+        /// <summary>ADR 0077 — the notify-admins gate (the <c>true</c> floor).</summary>
+        public bool NotifyAdmins { get; init; } = true;
     }
 }

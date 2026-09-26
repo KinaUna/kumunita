@@ -1,17 +1,26 @@
 @* The /projects section sub-nav (the _AdminNav.cshtml Bootstrap nav-tabs
-   idiom, ADR 0062). Two tabs — To-dos and Boards — so a resident can jump
-   between the to-do feed and the board feed without scrolling back to the
-   nav. The active tab is derived from the current action name (the
-   ProjectsController owns both GET actions: TodosIndex and BoardsIndex). *@
+   idiom, ADR 0062). Three tabs — Projects, To-dos, Boards — so a resident
+   can jump between the goals + projects landing, the to-do feed, and the
+   board feed without scrolling back to the nav. The active tab is derived
+   from the current action name (the ProjectsController owns all three GET
+   index actions: ProjectsIndex — the PL lane landing, ADR 0086, U05 — and
+   the M5 TodosIndex / BoardsIndex). The two M5 tabs keep their exact
+   labels + routes + `projects.*` keys (the frozen M5-route pin, C-PL·7);
+   the new Projects tab is the first entry — the page the lane is named for
+   — and uses its own `pl.tabs.projects` key (the lane boundary). *@
 @{
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "TodosIndex";
     var tabs = new (string LabelKey, string Label, string Href)[]
     {
-        ("projects.todo.title",  "To-dos", "/projects/todos"),
-        ("projects.board.title", "Boards", "/projects/boards"),
+        ("pl.tabs.projects",     "Projects", "/projects"),
+        ("projects.todo.title",  "To-dos",   "/projects/todos"),
+        ("projects.board.title", "Boards",   "/projects/boards"),
     };
     var activeLabel = action switch
     {
+        // the PL landing (U05) + the goal + project authoring actions (U06/U07)
+        "ProjectsIndex" or "GoalDetail" or "GoalNew" or "GoalEdit" or
+        "ProjectDetail" or "ProjectNew" or "ProjectEdit" => "Projects",
         "BoardsIndex" => "Boards",
         _             => "To-dos",
     };

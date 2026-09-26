@@ -9,10 +9,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace Kumunita.Web.Controllers;
 
 /// <summary>
-/// The resident's settings page (ADR 0005 B; M·5, M7 FACES) — one page, two
-/// sections: **Language** and **Time zone** (ADR 0019's resident surface,
-/// folded into this page 2026-09-13; the standalone <c>/settings/timezone</c>
-/// page + nav link were removed in the same change).
+/// The resident's settings surface (ADR 0005 B; M·5, M7 FACES) — four
+/// linkable section pages (ADR 0080): **Language** (<c>/settings/language</c>),
+/// **Time zone** (<c>/settings/timezone</c>, ADR 0019's resident surface,
+/// folded in 2026-09-13 and split back out 2026-09-25), **Date &amp; time
+/// format** (<c>/settings/dateformat</c>, ADR 0020) and **Email &amp;
+/// notification language** (<c>/settings/email-language</c>, ADR 0061).
+/// Each page is its own GET action rendering one section of the same
+/// <see cref="LocaleSettingsViewModel"/>; the four POST save lanes are
+/// unchanged and redirect back to the section that owns them.
 /// The <see cref="LocaleCookie"/> read/write/clear trio is consumed **here** —
 /// this is the settings-page save (M7: the cookie is written → the **next**
 /// request renders in the new language). The cookie is **never** a claim
@@ -69,6 +74,22 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// Resolve a flash-message template in an **explicit** effective language
+    /// code (the language the resident just selected — not the request's
+    /// current one) and apply the {0}/{1} placeholders. Same floor discipline
+    /// as <see cref="FlashAsync"/>.
+    /// </summary>
+    private async Task<string> FlashAsyncIn(string key, string lang, params object?[] args)
+    {
+        var template = translationProvider is null
+            ? KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key
+            : await translationProvider.GetAsync(key, lang);
+        return args.Length > 0
+            ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
+            : template;
+    }
+
+    /// <summary>
     /// <c>GET /settings/language</c> — the resident's settings page: the
     /// language section (the enabled catalog picker + the instance default
     /// marker, echoing the current cookie value — M·1's "preference if
@@ -78,6 +99,55 @@ public sealed class LocaleController(
     /// </summary>
     [HttpGet("/settings/language")]
     public async Task<IActionResult> Index()
+    {
+        return View(await BuildModel());
+    }
+
+    /// <summary>
+    /// <c>GET /settings/timezone</c> — the resident's time-zone settings
+    /// section (ADR 0019) on its own linkable page (ADR 0080). The model is
+    /// the full <see cref="LocaleSettingsViewModel"/>; the view renders only
+    /// the time-zone section.
+    /// </summary>
+    [HttpGet("/settings/timezone")]
+    public async Task<IActionResult> SettingsTimezone()
+    {
+        return View("Timezone", await BuildModel());
+    }
+
+    /// <summary>
+    /// <c>GET /settings/dateformat</c> — the resident's date-time format
+    /// settings section (ADR 0020) on its own linkable page (ADR 0080). The
+    /// model is the full <see cref="LocaleSettingsViewModel"/>; the view
+    /// renders only the date-format section.
+    /// </summary>
+    [HttpGet("/settings/dateformat")]
+    public async Task<IActionResult> SettingsDateFormat()
+    {
+        return View("DateFormat", await BuildModel());
+    }
+
+    /// <summary>
+    /// <c>GET /settings/email-language</c> — the resident's email &amp;
+    /// notification language settings section (ADR 0061) on its own linkable
+    /// page (ADR 0080). The model is the full
+    /// <see cref="LocaleSettingsViewModel"/>; the view renders only the
+    /// email-language section.
+    /// </summary>
+    [HttpGet("/settings/email-language")]
+    public async Task<IActionResult> SettingsEmailLanguage()
+    {
+        return View("EmailLanguage", await BuildModel());
+    }
+
+    /// <summary>
+    /// Builds the full <see cref="LocaleSettingsViewModel"/> (all four
+    /// sections populated) — shared by the four settings GET actions (Index
+    /// + the three section actions). Extracted so each section view renders
+    /// its slice without re-reading the catalog / profile / platform
+    /// defaults.
+    /// </summary>
+    private async Task<LocaleSettingsViewModel> BuildModel()
     {
         var catalog = await localization.ListLanguagesAsync();
 
@@ -114,7 +184,7 @@ public sealed class LocaleController(
             .Select(l => new LocaleOption(l.Id, l.NativeName))
             .ToList();
 
-        var model = new LocaleSettingsViewModel
+        return new LocaleSettingsViewModel
         {
             Languages = languageOptions,
             CurrentCode = saved,
@@ -145,8 +215,6 @@ public sealed class LocaleController(
                     DefaultCode = defaultCode,
                 },
         };
-
-        return View(model);
     }
 
     /// <summary>Seeds the time-zone section of <see cref="LocaleSettingsViewModel"/>.
@@ -213,15 +281,41 @@ public sealed class LocaleController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(string? code, string? clear)
     {
-        // Resolve the flash text in the resident's **current** language
-        // (before the write) — the message explains that the change takes
-        // effect on the *next* request, so the language they're reading right
-        // now is the language it belongs in. (ResolveAsync reads the request
-        // cookie, not the response we're about to set, so this is correct even
-        // though the write follows.)
-        string? info = clear == "1"
-            ? await FlashAsync("locale.flash_reset")
-            : (!string.IsNullOrWhiteSpace(code) ? await FlashAsync("locale.flash_set", code) : null);
+        // Resolve the flash text in the language the resident **selects** —
+        // the toast is shown on the *next* request, which already renders in
+        // the new language, and that is the language the user is most likely
+        // to understand (the old behavior resolved it in the previous
+        // language; the message landed on a page written in the new one).
+        // A "reset to instance default" has no explicit code — fall back to
+        // the request's current effective language.
+        string? effectiveCode;
+        if (!string.IsNullOrWhiteSpace(code))
+            effectiveCode = code;
+        else if (translationProvider is not null)
+            effectiveCode = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+        else
+            effectiveCode = null;
+
+        string? lang = translationProvider is not null
+            ? await translationProvider.ResolveEffectiveLanguageAsync(effectiveCode)
+            : effectiveCode;
+        string? info;
+        if (clear == "1")
+        {
+            info = lang is not null
+                ? await FlashAsyncIn("locale.flash_reset", lang)
+                : await FlashAsync("locale.flash_reset");
+        }
+        else if (!string.IsNullOrWhiteSpace(code))
+        {
+            info = lang is not null
+                ? await FlashAsyncIn("locale.flash_set", lang, code)
+                : await FlashAsync("locale.flash_set", code);
+        }
+        else
+        {
+            info = null; // no language change requested
+        }
 
         if (clear == "1")
             LocaleCookie.Clear(Response);
@@ -253,7 +347,7 @@ public sealed class LocaleController(
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(SettingsTimezone));
 
         try
         {
@@ -278,7 +372,7 @@ public sealed class LocaleController(
             TempData["error"] = "Your profile is not available — sign out and back in.";
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(SettingsTimezone));
     }
 
     /// <summary>
@@ -300,7 +394,7 @@ public sealed class LocaleController(
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(SettingsDateFormat));
 
         // The select posts the preset's format string as `format`; when "Custom…"
         // is chosen it posts `customFormat` = the free-text value (and `format`
@@ -334,7 +428,7 @@ public sealed class LocaleController(
             TempData["error"] = "Your profile is not available — sign out and back in.";
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(SettingsDateFormat));
     }
 
     /// <summary>
@@ -355,7 +449,7 @@ public sealed class LocaleController(
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(SettingsEmailLanguage));
 
         try
         {
@@ -380,7 +474,7 @@ public sealed class LocaleController(
             TempData["error"] = "Your profile is not available — sign out and back in.";
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(SettingsEmailLanguage));
     }
 
     // ── View model (public nested type so the Razor view can bind to it) ──

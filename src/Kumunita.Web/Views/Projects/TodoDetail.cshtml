@@ -122,10 +122,10 @@
                                        selected default. *@
                                     <select class="form-select" name="Status" id="subtask-modal-status">
                                         <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
-                                        @foreach (var code in KanbanStatuses.Known)
+                                        @foreach (var statusCode in KanbanStatuses.Known)
                                         {
-                                            <option value="@code">
-                                                <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                            <option value="@statusCode">
+                                                <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
                                             </option>
                                         }
                                     </select>
@@ -160,17 +160,190 @@
 
         <div class="card mb-4">
             <div class="card-body">
-                <h1 class="mb-1">
-                    @if (string.IsNullOrWhiteSpace(Model.Todo.Title))
-                    {
-                        <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
-                    }
-                    else
-                    {
-                        @Model.Todo.Title
-                    }
-                </h1>
+                @* ADR 0088 — user-added translations of the to-do (the ADR 0059
+                   chip-swap: the original + one variant per translation, the
+                   td-swap JS shows the viewer's current-language variant
+                   default — ADR 0049). The title is the to-do's surface; a
+                   translation's title (if any) swaps in. The add/edit/remove
+                   management is gated on Model.CanTranslate (the service's
+                   display pin — the standing is re-pinned server-side). *@
+                <div data-td-group="todo" class="mb-1">
+                    <div class="td-variant" data-td-variant="@(Model.Todo.LanguageCode)">
+                        <h1 class="mb-1">
+                            @if (string.IsNullOrWhiteSpace(Model.Todo.Title))
+                            {
+                                <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
+                            }
+                            else
+                            {
+                                @Model.Todo.Title
+                            }
+                        </h1>
+                    </div>
 
+                    @if (Model.Translations is { Count: > 0 })
+                    {
+                        foreach (var tr in Model.Translations)
+                        {
+                            <div class="td-variant" data-td-variant="@tr.LanguageCode">
+                                <h1 class="mb-1">
+                                    @if (string.IsNullOrWhiteSpace(tr.Title))
+                                    {
+                                        <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
+                                    }
+                                    else
+                                    {
+                                        @tr.Title
+                                    }
+                                </h1>
+                            </div>
+                        }
+
+                        <div class="td-chips btn-group mt-1">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    data-translation-chip data-td-group="todo"
+                                    data-td-variant="@(Model.Todo.LanguageCode)">@Model.Todo.LanguageCode</button>
+                            @foreach (var tr in Model.Translations)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        data-translation-chip data-td-group="todo"
+                                        data-td-variant="@tr.LanguageCode">@tr.LanguageCode</button>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @* ADR 0088 — the translation management (add / edit / remove),
+                   gated on the standing (the same shape as the ADR 0059 /
+                   ADR 0027 / ADR 0039 translation sections). *@
+                @if (Model.CanTranslate)
+                {
+                    @* The add surface (one <details> per enabled language that
+                       does not yet have a translation, the ADR 0027 / ADR 0048
+                       shape — the <kw-l> fallback is the English gloss; the
+                       posts.translation_* keys are the Event lane's). The
+                       rich editor uses the canonical rc-editor markup
+                       (data-rich-editor + data-rich-editor-preview). *@
+                    <div class="card mb-3">
+                        <div class="card-body p-2">
+                            <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
+
+                            @foreach (var opt in (Model.Languages ?? []))
+                            {
+                                bool hasTranslation = Model.Translations is not null
+                                    && Model.Translations.Any(t => t.LanguageCode == opt.Code);
+                                if (hasTranslation) continue;
+
+                                <details class="mb-1 mt-2">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_add">Add</kw-l> <b>@opt.NativeName</b>
+                                    </summary>
+                                    <form class="ms-2" method="post"
+                                          action="@($"/projects/todos/{Model.Todo.Id}/translations")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@opt.Code" />
+                                        <label class="form-label small" for="todo-t-title-@opt.Code">
+                                            @opt.NativeName <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" id="todo-t-title-@opt.Code"
+                                               name="title" value="@Model.Todo.Title" />
+                                        <label class="form-label small" for="todo-t-body-@opt.Code">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <div class="rc-editor">
+                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                <partial name="_RichEditorToggle" />
+                                            </div>
+                                            <textarea class="form-control form-control-sm mb-2" id="todo-t-body-@opt.Code"
+                                                      name="body" rows="3" placeholder="…" data-rich-editor></textarea>
+                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                </details>
+                            }
+                        </div>
+                    </div>
+
+                    @if (Model.Translations is { Count: > 0 })
+                    {
+                        <div class="card mb-3">
+                            <div class="card-body p-2">
+                                <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
+                                @foreach (var tr in Model.Translations)
+                                {
+                                    <details class="mb-1 border rounded p-2">
+                                        <summary class="small"><b>@tr.LanguageCode</b>
+                                            @if (!string.IsNullOrWhiteSpace(tr.Title))
+                                            {
+                                                <span class="text-body-tertiary"> — @tr.Title</span>
+                                            }
+                                        </summary>
+                                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/update")" class="mt-2">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
+                                            <div class="mb-2">
+                                                <label class="form-label small"><kw-l key="common.title">Title</kw-l></label>
+                                                <input type="text" name="title" value="@tr.Title" class="form-control" maxlength="120" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small"><kw-l key="posts.translation_body_label">Body</kw-l></label>
+                                                <div class="rc-editor">
+                                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                        <partial name="_RichEditorToggle" />
+                                                    </div>
+                                                    <textarea class="form-control form-control-sm mb-2" name="body" rows="3" placeholder="…" data-rich-editor>@tr.Body</textarea>
+                                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-outline-primary"><kw-l key="posts.translation_save">Save translation</kw-l></button>
+                                        </form>
+                                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
+                                              class="mt-2 d-inline"
+                                              onsubmit="return confirm('Remove this translation?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="posts.translation_remove">Remove</kw-l></button>
+                                        </form>
+                                    </details>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+
+                @* The assignee avatar (the BoardDetail card pattern, the same
+                   fail-closed contract every other avatar <img> uses: the
+                   <img> links the audited serving lane (GET
+                   /profile/avatar/{subjectId}) and avatar.ts hides it on
+                   the 404 it fails closed to, showing the monogram sibling). *@
+                @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeId))
+                {
+                    string assigneeInitial = !string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName)
+                        ? char.ToUpperInvariant(Model.Todo.AssigneeDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <div class="mb-2">
+                        <span class="d-inline-flex align-items-center">
+                            <img class="avatar avatar-sm" src="/profile/avatar/@Model.Todo.AssigneeId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                        </span>
+                    </div>
+                }
                 <div class="text-muted small mt-2 mb-3">
                     @Model.Todo.AuthorDisplayName
                     @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
@@ -190,6 +363,20 @@
                     }
                 </div>
 
+                @* U08 (ADR 0086 §3.9) — the Project link (D9): the to-do's
+                   project association (F3) rendered as a link to the project
+                   detail (ADR 0086 D4). The controller's read surface resolved
+                   the title (a dangling / unreadable association — F6 / F8 —
+                   yields null fields and the whole line is hidden: the link is
+                   a display surface, not an error for the to-do). *@
+                @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+                {
+                    <div class="text-muted small mt-2 mb-3">
+                        <kw-l key="pl.todo.project_link">Project</kw-l>:
+                        <a href="@($"/projects/projects/{Model.ProjectId}")">@Model.ProjectTitle</a>
+                    </div>
+                }
+
                 @* F9 — the parent link (a subtask is a full to-do shown under
                    its parent; the service's read surface, the view renders it). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))
@@ -197,6 +384,58 @@
                     <div class="mb-3">
                         <span class="text-muted small"><kw-l key="projects.todo.parent">Parent</kw-l> · </span>
                         <a href="@($"/projects/todos/{Model.Todo.ParentId}")">@Model.Todo.ParentTitle</a>
+                    </div>
+                }
+
+                @* ADR 0087 — the "waiting on" chip (the D4 surface). The
+                   service resolved the blocker over the existing
+                   TodoItemToAuditableResource; a to-do the actor may not read,
+                   or one that is absent/soft-deleted, is a **Generic** chip
+                   (no title, no link, no leak — C-TBD·4). A resolved chip is
+                   a link to the blocker's detail (LinkPath non-null). The
+                   blocker is purely informational — it never gates the to-do
+                   itself (D2). *@
+                @if (Model.Blocker is not null)
+                {
+                    <div class="mb-3">
+                        <span class="text-muted small"><kw-l key="todo.blocked_by">Waiting on</kw-l> · </span>
+                        @if (Model.Blocker.Generic)
+                        {
+                            <span class="badge text-bg-secondary"><kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l></span>
+                        }
+                        else
+                        {
+                            <a href="@Model.Blocker.LinkPath">@Model.Blocker.Title</a>
+                            @if (!string.IsNullOrWhiteSpace(Model.Blocker.Status))
+                            {
+                                <span class="text-muted small"> · @Model.Blocker.Status</span>
+                            }
+                        }
+                    </div>
+                }
+
+                @* ADR 0079 — the optional start / due dates (the <kw-dt>
+                   TagHelper renders null as empty; the label is gated on the
+                   value so an unset date shows nothing at all). Shown to
+                   viewers in their own timezone (the kw-dt effective-timezone
+                   conversion). *@
+                @if (Model.Todo.StartAt is not null || Model.Todo.DueAt is not null)
+                {
+                    <div class="mb-3">
+                        @if (Model.Todo.StartAt is not null)
+                        {
+                            <span class="text-muted small"><kw-l key="projects.todo.start">Start</kw-l> · </span>
+                            <kw-dt dt="@Model.Todo.StartAt" format="g"></kw-dt>
+                        }
+                        @if (Model.Todo.StartAt is not null && Model.Todo.DueAt is not null)
+                        {
+                            <span class="text-muted small mx-2">·</span>
+                        }
+                        @if (Model.Todo.DueAt is not null)
+                        {
+                            <span class="text-muted small"><kw-l key="projects.todo.due">Due</kw-l> · </span>
+                            <kw-dt dt="@Model.Todo.DueAt" format="g"></kw-dt>
+                        }
                     </div>
                 }
 

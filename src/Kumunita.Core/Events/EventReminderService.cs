@@ -1,5 +1,6 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -88,6 +89,12 @@ public static class EventReminderService
     /// When <c>null</c> (e.g. the test harness) the English subject/body are kept verbatim, so the
     /// frozen English fallback is preserved and the 7 direct call sites in
     /// <c>EventReminderServiceTests</c> keep compiling unchanged.</param>
+    /// <param name="notifications">Optional (M6, ADR 0076, plan U04) — the F4 inbox-row
+    /// complement. When non-null, each recipient also gets a <c>Notification</c> inbox row
+    /// (the durable record, C-M6·5) with the §6.3
+    /// <c>notification:event.reminder:{eventId}:{date}</c> key. When <c>null</c> (the test
+    /// harness + the pre-M6 call sites), only the M4 email is staged — the 7 direct call
+    /// sites in <c>EventReminderServiceTests</c> keep compiling + passing unchanged.</param>
     /// <param name="ct">Cancellation.</param>
     public static async Task SendRemindersAsync(
         IDocumentStore store,
@@ -96,7 +103,8 @@ public static class EventReminderService
         IMailerStage mailer,
         ILocalizationService localization,
         ITranslationProvider? translationProvider = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Notifications.NotificationService? notifications = null)
     {
         if (store is null) throw new ArgumentNullException(nameof(store));
         if (options is null) throw new ArgumentNullException(nameof(options));
@@ -191,6 +199,15 @@ public static class EventReminderService
                         continue;                                  // already sent this tick
                     if (!profiles.TryGetValue(userId, out var profile) || string.IsNullOrWhiteSpace(profile?.Email))
                         continue;                                  // no delivery address
+                    // The "when" (ADR 0019 / 0020 — the recipient's effective time zone +
+                    // date-time format) is resolved once and shared by the email body and
+                    // the M6 inbox row's idempotency key (the §6.3
+                    // `notification:event.reminder:{eventId}:{date}` shape, the stable
+                    // source id being the event + the reminder's date).
+                    var when = FormatEventInstant(
+                        ev.Start,
+                        profile.TimeZone, defaultZoneId,
+                        profile.DateFormat, defaultFormat);
                     // ADR 0061: the subject/body are resolved in the recipient's
                     // EmailLanguage (→ platform default → en floor) when a provider is wired in;
                     // otherwise the frozen English fallback is used verbatim (the test-harness path).
@@ -206,6 +223,28 @@ public static class EventReminderService
                         body: body,
                         ct: ct);
                     staged++;
+
+                    // M6 (ADR 0076, plan U04) — the F4 inbox-row complement. The M4 email
+                    // above is the *nudge*; the inbox row is the *durable record* (C-M6·5).
+                    // The idempotency key is the §6.3 `notification:event.reminder:{eventId}
+                    // :{date}` shape (D4, F10) — distinct from the M4 email key
+                    // `remind:{eventId}:{userId}`, so the two coexist and each dedups
+                    // independently. `EmitAsync` runs on the same session and does **not**
+                    // commit — the `SaveChangesAsync` below is the single commit (C3). The
+                    // inbox row is stored **unconditionally** (C-M6·7); the conditional
+                    // email is already staged by the M4 path above (the email is the M4
+                    // nudge, not the M6 inbox — the C-M6·5 split). A recipient without a
+                    // profile / email is skipped (no delivery address — the M4 precedent).
+                    if (notifications is not null)
+                    {
+                        await notifications.EmitAsync(
+                            session,
+                            recipientId: userId,
+                            kind: NotificationKinds.EventReminder,
+                            idempotencyKey: $"notification:event.reminder:{ev.Id}:{when}",
+                            body: ev.Title,
+                            ct: ct).ConfigureAwait(false);
+                    }
                 }
             }
 

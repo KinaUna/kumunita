@@ -1,0 +1,75 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
+@inject Kumunita.Core.Pages.IPageService Pages
+@{
+    ViewData["Title"] = "Settings — Email & notification language";
+}
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+@await Html.PartialAsync("_SettingsTabs.cshtml")
+
+@if (Model.EmailLanguage is var el && el is not null)
+{
+    @* ADR 0061 — the email & notification language section: the resident's
+       outbound-channel language override. Same shape as the other sections,
+       but the picker offers the enabled catalog and "instance default" is
+       the null (reset) state, not a concrete code. *@
+    <h2 class="mt-1"><kw-l key="settings.email_title">Email &amp; notification language</kw-l></h2>
+    <p class="text-muted">
+        <kw-l key="settings.email_lede">Pick the language the platform writes to you in — account emails and event reminders. Your choice is saved on your account.</kw-l>
+    </p>
+
+    <form method="post" action="/settings/email-language">
+        @Html.AntiForgeryToken()
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-8">
+                <label for="emailLanguage" class="form-label"><kw-l key="settings.email_label">Email &amp; notification language</kw-l></label>
+                <select class="form-select" name="code" id="emailLanguage">
+                    @foreach (var lang in el.Languages)
+                    {
+                        var selected = lang.Code == el.SelectedCode;
+                        <option value="@lang.Code" selected="@(selected ? "selected" : null)">
+                            @lang.NativeName (@lang.Code)
+                            @if (lang.Code == el.DefaultCode)
+                            {
+                                <span class="text-muted small"><kw-l key="locale.instance_default">— instance default</kw-l></span>
+                            }
+                        </option>
+                    }
+                </select>
+                <div class="form-text small">
+                    <kw-l key="settings.email_note">If you choose a language, your emails and reminders are sent in it. If you reset it, the instance default is used.</kw-l>
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <button type="submit" class="btn btn-primary"><kw-l key="settings.email_save">Save</kw-l></button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" action="/settings/email-language" class="mt-3"
+          data-confirm="Reset your email &amp; notification language to the instance default?">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="clear" value="1" />
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.email_reset">Reset to instance default</kw-l></button>
+    </form>
+}
+
+@* ADR 0039 §3.8 — the help/account mount slot (the account-help page): the page
+   mounted at this slot renders as a link; an unmounted slot renders nothing.
+   Display, not access — the Show action is the Read decision. Resolved via the
+   same PageMountResolver the footer/community slot uses (_Layout). Lives on
+   the last settings tab (ADR 0080) so it stays out of the way of the sections. *@
+@{
+    var accountHelp = await PageMountResolver.ResolveAsync(Pages, "help/account");
+}
+@if (accountHelp is not null)
+{
+    <h2 class="mt-4"><kw-l key="settings.help_heading">Help with your account</kw-l></h2>
+    <p class="text-muted">
+        <kw-l key="settings.help_lede">Stuck on your account — a password, your access, or anything else? This guide walks you through it.</kw-l>
+    </p>
+    <p>
+        <a href="@accountHelp.Value.Href" class="btn btn-outline-primary">@accountHelp.Value.Title</a>
+    </p>
+}

@@ -13,7 +13,7 @@
 > drift-guard) follows in the "Seams & contracts" section below. The
 > sealed-unit register is `docs/plans-milestones/plan-m5-projects.md`; the
 > scratch log is
-> `docs/plans-milestones/in-progress/projects/projects-handoff-notes.md`.
+> `docs/plans-milestones/done/projects/projects-handoff-notes.md`.
 >
 > **Scope of this file (Part 1):** what this milestone is; the existing
 > surface it reuses — *verified against the actual files*; the design

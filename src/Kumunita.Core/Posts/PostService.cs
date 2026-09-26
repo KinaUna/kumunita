@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -50,13 +51,23 @@ public sealed class PostService
     // explicitly.
     private readonly ITagService? _tags;
 
+    // M6 (ADR 0076, plan U04) — the M6 notification emitter seam (F1 post-reply +
+    // F2 group-post). **Optional** (nullable default) so the existing test call
+    // sites that construct `PostService` positionally (userInfo, authz, store,
+    // [tags]) keep compiling unchanged — the same CS1736 shape as `_tags` above.
+    // The DI registration passes the live `Notifications.NotificationService`;
+    // the frozen service's `EmitAsync` surface is untouched (unit-series rule 4).
+    private readonly NotificationService? _notifications;
+
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
-        ITagService? tags = null)
+        ITagService? tags = null,
+        NotificationService? notifications = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
+        _notifications = notifications;
     }
 
     /// <summary>
@@ -315,6 +326,37 @@ public sealed class PostService
         };
 
         session.Store(post);
+
+        // ADR 0084 — the community-post emitter (opt-OUT kind: the kind is on
+        // by default — every member of the community is notified; the resident
+        // can store an Enabled=false subscription row for the target community
+        // id to opt out). Recipient universe: the community's members (via
+        // ComponentMembership), excluding the author. The IsDraft pin is the
+        // ADR 0037 intake-honesty gate (a draft is invisible to all but the
+        // author, so a notification for it would leak intake). One
+        // SaveChangesAsync commits the post + the inbox rows atomically (C3).
+        if (_notifications is not null && !(draft.IsDraft ?? false))
+        {
+            var members = await session.Query<UserInfo.ComponentMembership>()
+                .Where(m => m.ComponentId == draft.ComponentId)
+                .Select(m => m.UserId)
+                .ToListAsync().ConfigureAwait(false);
+            foreach (var member in members)
+            {
+                if (string.Equals(member, actorId, StringComparison.Ordinal))
+                    continue;                                   // the post's author does not notify themselves
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: member,
+                    kind: NotificationKinds.CommunityPost,
+                    idempotencyKey: $"notification:community.post:{post.Id}:{member}",
+                    body: UgcSnippets.Truncate(post.Body),
+                    linkPath: $"/posts/{post.Id}",
+                    targetId: draft.ComponentId,
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
@@ -575,8 +617,54 @@ public sealed class PostService
         };
 
         session.Store(reply);
+
+        // M6 (ADR 0076, plan U04) — the F1 post-reply emitter. The **parent
+        // post's** author is the recipient (the reply's author is the *sender*);
+        // the UGC snippet is the reply's own body in the reply's authored language
+        // (ADR 0018 — the content's own language, not the recipient's). The
+        // idempotency key is the §6.3 `notification:post.reply:{replyId}` shape
+        // (D4, F10). `EmitAsync` runs on the caller's session and does **not**
+        // commit — the `SaveChangesAsync` below is the single commit (C3). The
+        // parent post is loaded from the caller's session (the reply's parent
+        // must exist for the reply to be meaningful — a missing parent is a
+        // caller error, surfaced as a 404 via the Web layer's exception mapping).
+        if (_notifications is not null)
+        {
+            var parentPost = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+            if (parentPost is not null && !string.IsNullOrWhiteSpace(parentPost.AuthorId)
+                && !string.Equals(parentPost.AuthorId, actorId, StringComparison.Ordinal))
+            {
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: parentPost.AuthorId,
+                    kind: NotificationKinds.PostReply,
+                    idempotencyKey: $"notification:post.reply:{reply.Id}",
+                    body: TruncateUgcSnippet(reply.Body),
+                    targetId: null,
+                    linkPath: $"/posts/{postId}#reply-{reply.Id}",
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
         return reply;
+    }
+
+    // ─── M6 (ADR 0076) — the UGC-snippet truncation (U04 deliverable) ──────
+
+    /// <summary>
+    /// The M6 UGC snippet (the U04 deliverable — "truncated to ~200 chars"). The
+    /// snippet is the **sender's** authored content (ADR 0018 — the content's own
+    /// language, not the recipient's); it is appended to the recipient's
+    /// localized template by <c>NotificationService.EmitAsync</c> (C-M6·6). A
+    /// long body is trimmed to ~200 chars + an ellipsis so the email / inbox row
+    /// does not carry the whole message.
+    /// </summary>
+    private static string TruncateUgcSnippet(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+        text = text.Trim();
+        return text.Length <= 200 ? text : text[..200] + "…";
     }
 
     // ─── ADR 0016 — author-only reply-edit lane (body-only) ──────────────
@@ -1224,6 +1312,46 @@ public sealed class PostService
         };
 
         session.Store(post);
+
+        // M6 (ADR 0076, plan U04) — the F2 group-post emitter. **Per-member**
+        // emission (the M4 §6.4 "per-recipient" precedent — one inbox row + one
+        // conditional email per member, excluding the post's author). Each
+        // member's idempotency key is the §6.3 shape `notification:group.post:
+        // {postId}:{member}` (D4, F10) — stable + content-derived, so a
+        // re-emission of the same post to the same member is a no-op. `EmitAsync`
+        // runs on the caller's session and does **not** commit — the
+        // `SaveChangesAsync` below is the single commit (C3). The members are
+        // read from the caller's session (the same-transaction lane; strong
+        // consistency, invariant C4).
+        //
+        // A draft (ADR 0037 — invisible to all but the author) must **not**
+        // notify members: they could not yet see the content, so an inbox
+        // row + email for it would leak intake they did not consent to
+        // reading (intake honesty). Notification is deferred to the publish
+        // lane (the moment the post becomes visible to members).
+        if (_notifications is not null && !(draft.IsDraft ?? false))
+        {
+            var members = await session.Query<GroupMembership>()
+                .Where(m => m.GroupId == draft.GroupId)
+                .Select(m => m.UserId)
+                .ToListAsync()
+                .ConfigureAwait(false);
+            foreach (var member in members)
+            {
+                if (string.IsNullOrWhiteSpace(member) || string.Equals(member, actorId, StringComparison.Ordinal))
+                    continue;                                   // the post's author does not notify themselves
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: member,
+                    kind: NotificationKinds.GroupPost,
+                    idempotencyKey: $"notification:group.post:{post.Id}:{member}",
+                    body: TruncateUgcSnippet(post.Body),
+                    linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
+                    targetId: draft.GroupId,
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+
         // One SaveChangesAsync — the C3 same-transaction lane (ADR 0006-E): the
         // gate decision row + the new post commit atomically.
         await session.SaveChangesAsync().ConfigureAwait(false);

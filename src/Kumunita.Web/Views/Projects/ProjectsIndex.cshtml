@@ -1,0 +1,138 @@
+@model Kumunita.Web.Models.ProjectsIndexViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Projects";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="pl.index.title">Projects</kw-l></h1>
+                    <p class="lede">
+                        <kw-l key="pl.index.lede">The neighborhood's goals and projects — the higher-level work on top of the to-dos and boards.</kw-l>
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-primary" href="/projects/goals/new"><kw-l key="pl.index.new_goal">New goal</kw-l></a>
+                    <a class="btn btn-outline-primary" href="/projects/projects/new"><kw-l key="pl.index.new_project">New project</kw-l></a>
+                </div>
+            </div>
+        </header>
+
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml idiom):
+           the landing is the first-class entry point of the /projects section *@
+        <partial name="_ProjectsTabs" />
+
+        @if (Model.ComponentPickerOptions.Count > 0)
+        {
+            <form method="get" action="/projects" class="mb-4">
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value=""><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.ComponentPickerOptions)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+                </div>
+            </form>
+        }
+
+        @* The goals section (the design doc §5 order — goals first). Each card
+           links to its detail (the /projects/goals/{id} route — U06, the
+           deliberate adjacent-unit relaxation: the href ships now, the target
+           with U06). *@
+        <section class="mb-5">
+            <h2><kw-l key="pl.index.goals_heading">Goals</kw-l></h2>
+            <div class="airy-ann-list">
+                @if (Model.Goals.Count == 0)
+                {
+                    <div class="p-4 text-muted"><kw-l key="pl.index.goals_empty">No goals yet — create one to give the shared work a direction.</kw-l></div>
+                }
+                @foreach (var card in Model.Goals)
+                {
+                    <div class="airy-ann-row">
+                        <div>
+                            <h3 class="airy-ann-title">
+                                <a href="@($"/projects/goals/{card.Id}")">@card.Title</a>
+                            </h3>
+                            <div class="text-muted small mb-1">
+                                @card.AuthorDisplayName
+                                <span>· <kw-dt dt="@card.Created" format="g"></kw-dt></span>
+                                @if (card.ComponentDisplayName is not null)
+                                {
+                                    <span class="badge text-bg-light border ms-2">@card.ComponentDisplayName</span>
+                                }
+                            </div>
+                            @if (card.DescriptionHtml is not null)
+                            {
+                                @* The goal's body — pre-rendered through the one
+                                   MarkdownRenderer (ADR 0025; the card surface,
+                                   not the WYSIWYG rc-editor). *@
+                                <div class="markdown mb-2">@Html.Raw(card.DescriptionHtml)</div>
+                            }
+                        </div>
+                        <div class="d-flex align-items-start">
+                            <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/goals/{card.Id}")"><kw-l key="pl.index.view_projects">View projects →</kw-l></a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @* The standalone-projects section (the `GoalId == null` feed). Each
+           card links to its detail (the /projects/projects/{id} route — U07,
+           the same adjacent-unit relaxation). *@
+        <section>
+            <h2><kw-l key="pl.index.projects_heading">Projects</kw-l></h2>
+            <div class="airy-ann-list">
+                @if (Model.StandaloneProjects.Count == 0)
+                {
+                    <div class="p-4 text-muted"><kw-l key="pl.index.projects_empty">No standalone projects yet — create one to start managing the shared work.</kw-l></div>
+                }
+                @foreach (var card in Model.StandaloneProjects)
+                {
+                    <div class="airy-ann-row">
+                        <div>
+                            <h3 class="airy-ann-title">
+                                <a href="@($"/projects/projects/{card.Id}")">@card.Title</a>
+                            </h3>
+                            <div class="text-muted small mb-1">
+                                @card.AuthorDisplayName
+                                <span>· <kw-dt dt="@card.Created" format="g"></kw-dt></span>
+                                @if (card.StartAt is not null)
+                                {
+                                    <span>· <kw-l key="pl.index.start">Start</kw-l> <kw-dt dt="@card.StartAt" format="g"></kw-dt></span>
+                                }
+                                @if (card.DueAt is not null)
+                                {
+                                    <span>· <kw-l key="pl.index.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(card.Status))
+                                {
+                                    @* C-PL·4 — a free string, not an enum: rendered
+                                       verbatim as a badge (the M5 status-badge shape). *@
+                                    <span class="badge text-bg-light border ms-2">@card.Status</span>
+                                }
+                                @if (card.ComponentDisplayName is not null)
+                                {
+                                    <span class="badge text-bg-light border ms-2">@card.ComponentDisplayName</span>
+                                }
+                            </div>
+                            @if (card.DescriptionHtml is not null)
+                            {
+                                <div class="markdown mb-2">@Html.Raw(card.DescriptionHtml)</div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    </div>
+</div>

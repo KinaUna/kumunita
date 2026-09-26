@@ -70,12 +70,18 @@ public sealed class KwLRegistryConsistencyTests
         // failure reports exactly where the unregistered key was used — not just
         // that one is missing.
         //
-        // A key whose value starts with '@' is a Razor expression (e.g.
-        // key="@link.Key" on the RepositoryInfo.Links foreach on home / about /
-        // footer) — resolved at runtime from C# data, not a static literal. Those
-        // are not checkable by a text scan; they are pinned separately by
-        // RepositoryInfoTests.Repository_Link_Keys_Are_Registered (and render the
-        // provider floor's English if unregistered, so a typo degrades gracefully).
+        // A key whose value **contains** a '@' is a Razor expression — either
+        // wholly dynamic (e.g. key="@link.Key" on the RepositoryInfo.Links
+        // foreach on home / about / footer) or a *prefix + dynamic suffix*
+        // (e.g. key="notifications.kind.@n.Kind" on the M6 Notifications inbox
+        // badge — the static "notifications.kind." prefix is a U07-shipped key
+        // set, and the @n.Kind suffix resolves to one of the nine code-owned
+        // kind constants at runtime). Those are not checkable by a text scan;
+        // they are pinned separately (RepositoryInfoTests.
+        // Repository_Link_Keys_Are_Registered for the whole-dynamic case; the
+        // Notifications kind set is the closed NotificationKinds.Known
+        // vocabulary U07 registered, and the view renders the en floor if a
+        // kind were ever unregistered, so a typo degrades gracefully).
         var usages = new List<(string File, string Key)>();
         foreach (var file in views.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
         {
@@ -83,9 +89,9 @@ public sealed class KwLRegistryConsistencyTests
             foreach (Match m in KeyAttr.Matches(File.ReadAllText(file.FullName)))
             {
                 var key = m.Groups[1].Value;
-                if (key.StartsWith('@'))
+                if (key.Contains('@'))
                 {
-                    continue;   // dynamic key (a C# expression), not a static literal
+                    continue;   // dynamic key (a C# expression, whole or embedded), not a static literal
                 }
                 usages.Add((relative, key));
             }

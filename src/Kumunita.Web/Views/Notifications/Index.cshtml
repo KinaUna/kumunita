@@ -1,0 +1,225 @@
+@model Kumunita.Web.Models.NotificationsInboxViewModel
+@using Kumunita.Core.Notifications
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Notifications";
+    int unread = Model.Notifications.Count(n => n.ReadAt is null);
+    // ADR 0069 — the fixed status vocabulary's label keys (the same closed set
+    // the TodoDetail view + the Kanban lane's Set-status select offer: None +
+    // the four codes). A status outside the known set renders the "None" key.
+    static string StatusLabelKey(string? code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <h1><kw-l key="notifications.inbox">Notifications</kw-l></h1>
+                <div class="d-flex gap-2 flex-wrap">
+                    @* The preferences editor page (U07 ships the view; the route
+                       is U05's pinned GET /notifications/preferences). *@
+                    <a class="btn btn-outline-secondary" href="/notifications/preferences">
+                        <kw-l key="notifications.preferences">Preferences</kw-l>
+                    </a>
+                    @* U05's POST /notifications/mark-all-read
+                       ([ValidateAntiForgeryToken] — the token is the gate).
+                       The exact route path is the §6.4 pin (not a
+                       convention-resolved name), so the action is the
+                       literal path string. *@
+                    @if (unread > 0)
+                    {
+                        <form method="post" action="/notifications/mark-all-read" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-primary">
+                                <kw-l key="notifications.mark_all_read">Mark all as read</kw-l>
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </header>
+
+        @if (Model.Count == 0)
+        {
+            @* The empty state — the M3 posts-feed precedent (alert alert-info
+               + a single kw-l string). *@
+            <div class="alert alert-info">
+                <kw-l key="notifications.empty">Nothing yet — things that happen to you will show up here.</kw-l>
+            </div>
+        }
+        else
+        {
+            @* The flat, newest-first list (C-M6·8 — the 50-row cap is the
+               service's; this view renders exactly what it handed over).
+               Row shape per the U06 pin: a kind badge (the
+               notifications.kind.{kind} key), the stored body (already in
+               the recipient's language, D6), the kw-dt timestamp
+               (ADR 0019/0020), and text-muted when ReadAt != null. *@
+            <ul class="list-group">
+                @foreach (var n in Model.Notifications)
+                {
+                    <li class="list-group-item p-3 @(n.ReadAt is null ? "border-start border-4 border-primary" : "text-muted")">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            @* The kind badge — a dynamic kw-l key
+                               (notifications.kind.{kind}); the key set is
+                               U07's deliverable (a missing key renders its
+                               en floor, never a blank — the TagHelper
+                               contract). *@
+                            <span class="badge text-bg-light text-dark">
+                                <kw-l key="notifications.kind.@n.Kind">@n.Kind</kw-l>
+                            </span>
+                            <span class="ms-auto small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
+                        </div>
+
+                        @* todo.assign rows (SourceId = the TodoItem.Id) carry a
+                           structured card — the controller enriched them at
+                           read time (the to-do's title / status / start / due
+                           + the subtasks and boards the *recipient* may
+                           actually read, ADR 0006-D: the access decision is
+                           made in Core, not here). A row that could not be
+                           enriched (the to-do was later deleted, or the
+                           recipient may no longer read it) falls through to
+                           the plain subject + body below — the inbox never
+                           404s on an old notification. *@
+                        @if (n.Kind == NotificationKinds.TodoAssign
+                                && n.SourceId is not null
+                                && Model.TodoCards.TryGetValue(n.SourceId, out var card))
+                        {
+                            var todo = card.Todo;
+                            <div class="mt-2">
+                                @* The to-do title, linked to its detail page
+                                   (the /projects/todos/{id} route, the same
+                                   link the TodoDetail / feed use). *@
+                                <p class="mb-1 fw-semibold">
+                                    <a href="@($"/projects/todos/{todo.Id}")">@todo.Title</a>
+                                </p>
+
+                                @* Status badge (the same StatusLabelKey the
+                                   TodoDetail view uses — a status outside the
+                                   known set still renders a label, never a
+                                   blank) + start / due dates (gated on the
+                                   value, the ADR 0079 kw-dt shape). *@
+                                <div class="d-flex align-items-center gap-2 flex-wrap small">
+                                    @if (!string.IsNullOrWhiteSpace(todo.Status))
+                                    {
+                                        <span class="badge text-bg-light border">
+                                            <kw-l key="@StatusLabelKey(todo.Status)">@todo.Status</kw-l>
+                                        </span>
+                                    }
+                                    @if (todo.StartAt is not null)
+                                    {
+                                        <span class="text-muted">
+                                            <kw-l key="projects.todo.start">Start</kw-l> · <kw-dt dt="@todo.StartAt" format="g"></kw-dt>
+                                        </span>
+                                    }
+                                    @if (todo.DueAt is not null)
+                                    {
+                                        <span class="text-muted">
+                                            <kw-l key="projects.todo.due">Due</kw-l> · <kw-dt dt="@todo.DueAt" format="g"></kw-dt>
+                                        </span>
+                                    }
+                                </div>
+
+                                @* The body — the recipient's own to-do, so it
+                                   is safe to render here; the platform's single
+                                   Markdown engine (the TodoDetail view's
+                                   render mode, XSS-safe by construction). *@
+                                @if (!string.IsNullOrWhiteSpace(todo.Body))
+                                {
+                                    <div class="markdown mt-2">@Html.Raw(MarkdownRenderer.RenderHtml(todo.Body))</div>
+                                }
+
+                                @* The boards this to-do sits on, **only** the
+                                   ones the recipient may read (the controller
+                                   ran ListBoardsForTodoAsync — the access-gated
+                                   set); links to the /projects/boards/{id}
+                                   route. *@
+                                @if (card.Boards.Count > 0)
+                                {
+                                    <div class="mt-2">
+                                        <span class="text-muted small"><kw-l key="projects.todo.boards">Boards</kw-l> · </span>
+                                        @for (var bi = 0; bi < card.Boards.Count; bi++)
+                                        {
+                                            var board = card.Boards[bi];
+                                            @if (bi > 0)
+                                            {
+                                                <span class="text-muted">, </span>
+                                            }
+                                            <a href="@($"/projects/boards/{board.Id}")">@(string.IsNullOrWhiteSpace(board.Title) ? board.Id : board.Title)</a>
+                                        }
+                                    </div>
+                                }
+
+                                @* The subtasks the recipient may read (the
+                                   controller ran the access-filtered
+                                   GetTodoAsync); each linked to its own
+                                   detail page. *@
+                                @if (card.Subtasks.Count > 0)
+                                {
+                                    <div class="mt-2">
+                                        <span class="text-muted small"><kw-l key="projects.todo.subtasks">Subtasks</kw-l></span>
+                                        <ul class="mb-0 ms-3">
+                                            @foreach (var sub in card.Subtasks)
+                                            {
+                                                <li>
+                                                    <a href="@($"/projects/todos/{sub.Id}")">@sub.Title</a>
+                                                    @if (!string.IsNullOrWhiteSpace(sub.Status))
+                                                    {
+                                                        <span class="badge text-bg-light border ms-1">
+                                                            <kw-l key="@StatusLabelKey(sub.Status)">@sub.Status</kw-l>
+                                                        </span>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            @if (!string.IsNullOrWhiteSpace(n.Subject))
+                            {
+                                <p class="mt-2 mb-1 fw-semibold">@n.Subject</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(n.Body))
+                            {
+                                @* Platform-resolved text with the UGC snippet —
+                                   rendered as stored (never re-wrapped: the kw-l
+                                   TagHelper is platform-copy-only, M·3). *@
+                                <p class="mb-0">@n.Body</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(n.LinkPath))
+                            {
+                                @* ADR 0085 — the item link (the content/reply
+                                   lane): the stored <c>LinkPath</c> (a same-origin
+                                   relative path like <c>/posts/{id}#reply-{id}</c>)
+                                   rendered as a clickable "View" link. The email
+                                   carries the same link BaseUrl-prefixed
+                                   (absolute); the inbox carries it relative
+                                   (same-origin). Gated on the field being set — a
+                                   kind with no <c>LinkPath</c> (reports, to-dos,
+                                   group add/invite, the account lanes) renders
+                                   nothing here. *@
+                                <p class="mb-0 mt-2">
+                                    <a href="@n.LinkPath" class="small">
+                                        <kw-l key="notifications.view">View</kw-l>
+                                        <span class="text-muted" aria-hidden="true">→</span>
+                                    </a>
+                                </p>
+                            }
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

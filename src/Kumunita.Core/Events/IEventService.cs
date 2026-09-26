@@ -1,3 +1,5 @@
+using Marten;
+
 namespace Kumunita.Core.Events;
 
 /// <summary>
@@ -123,6 +125,66 @@ public interface IEventService
     /// stored in the caller's session (C3).
     /// </summary>
     Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default);
+
+    // --- Group events lane (ADR 0089) — the ADR 0013 membership lane applied to
+    //     the M4 event surface. Reuses the frozen group seams verbatim (zero new
+    //     authorization surface); publish / RSVP / translations reuse the existing
+    //     lane-neutral seams (PublishAsync / RsvpAsync / the ADR 0059 translation
+    //     seams — all keyed by EventId, no group branch). -------------------------
+
+    /// <summary>
+    /// The group's upcoming **published** events, membership-scoped (ADR 0089 GE·1/GE·5):
+    /// the candidate set is <c>GroupId == groupId &amp;&amp; !IsDeleted &amp;&amp;
+    /// !IsDraft</c>, ordered by <c>Start</c> ascending, paged. One standalone
+    /// <c>CanSeeGroupFeedAsync(actorId, groupId)</c> call — Allow ⇒ the events
+    /// (aggregate row, TargetKind <c>"grouppost"</c>), Deny ⇒ empty +
+    /// <see cref="GroupEventFeedResult.HiddenCount"/> (the Deny row survives, GE·5).
+    /// **Zero** candidates ⇒ an empty result, **no** row (a non-member's empty feed
+    /// is the same shape, distinguished only by the audit row).
+    /// </summary>
+    Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page, CancellationToken ct = default);
+
+    /// <summary>
+    /// One group event, **fail-closed** (ADR 0089 GE·1/GE·4): <c>null</c> for a
+    /// non-existent event, an empty/mismatched <c>GroupId</c>, a non-member, or a
+    /// draft the actor did not author (the ADR 0037 draft gate runs **before** the
+    /// membership check — a pure <c>AuthorId == actorId</c> ordinal, **no** audit
+    /// row). A member (or an in-scope <c>read</c> delegate acting with the owner's
+    /// standing, GE·6) gets the event with one
+    /// <c>CanSeeGroupAsync(actorId, groupId, eventId)</c> decision row (GE·5).
+    /// </summary>
+    Task<Event?> GetGroupEventAsync(string groupId, string eventId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Create a group event — the create gate **is** the group-lane decision
+    /// (ADR 0089 GE·3): Allow ⇒ the event is written; Deny ⇒
+    /// <see cref="UnauthorizedAccessException"/> **after** the gate's audit row is
+    /// committed (so the Deny row survives, C3). Runs in the **caller's**
+    /// <paramref name="session"/> (the standalone-forms commit themselves; the
+    /// session-forms commit in the caller's transaction — the
+    /// <c>PostService.CreateGroupPostAsync</c> precedent). Pins the write shape
+    /// (GE·8): <see cref="Event.GroupId"/> = the lane marker,
+    /// <c>ComponentId = string.Empty</c>, <c>Audience = new Audience()</c>,
+    /// <c>IsDraft = true</c>. Stores the <c>event.create</c> row (TargetKind
+    /// <c>"event"</c>, <c>Via Owner</c>) in the session (GE·5).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">The actor is not a member (the
+    /// Deny audit row is committed before the throw).</exception>
+    Task<Event> CreateGroupEventAsync(GroupEventDraft draft, string actorId, IDocumentSession session, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit a group event — **author-only** (ADR 0089 GE·4, the ADR 0016 / 0037
+    /// group-lane precedent — a non-author, even a GlobalAdmin, is denied): stamps
+    /// only the editable surface (<see cref="GroupEventUpdate"/>), re-stamps
+    /// <c>Modified</c>, leaves the lane markers (<c>GroupId</c> / <c>ComponentId</c>
+    /// / <c>Audience</c> / <c>AuthorId</c> / <c>Created</c> / <c>IsDraft</c> /
+    /// <c>IsDeleted</c>) untouched, and stores **no** audit row (the ADR 0016
+    /// author-lane precedent). Runs in the **caller's** <paramref name="session"/>.
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, or it is not
+    /// a group event (empty <c>GroupId</c>).</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the author.</exception>
+    Task<Event> UpdateGroupEventAsync(string eventId, string actorId, GroupEventUpdate update, IDocumentSession session, CancellationToken ct = default);
 
     /// <summary>
     /// Edit an event — **author ∪ GlobalAdmin** (the ADR 0014 / 0016 / 0017

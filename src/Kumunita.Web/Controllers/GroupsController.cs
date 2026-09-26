@@ -1,3 +1,4 @@
+using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
@@ -40,13 +41,21 @@ public sealed class GroupsController(
     PostService posts,
     ILocalizationService localization,
     IDocumentStore store,
+    // Group events (ADR 0089) — the M4 event surface's group lane. The
+    // group-event actions' write + read seams (CreateGroupEventAsync /
+    // UpdateGroupEventAsync / PublishAsync / RsvpAsync / GetMyRsvpAsync /
+    // GetRsvpsAsync / ListGroupEventsAsync) resolve through this; the
+    // create/edit/publish/RSVP gates are the authoritative denies (GE·3/GE·4)
+    // and the group-lane membership read runs at Core. Appended **before** the
+    // optional translationProvider so the test-construction site (which now
+    // passes a null for it) keeps the required-params shape.
+    IEventService events,
     // Back-link display name (the group name on the post-detail page's
     // "back to the group" link) — the per-request translation read seam,
     // used to resolve the group's stored name into the viewer's current
     // language when a user-added name translation exists (the ADR 0026
-    // floor). **Optional** so the existing test-construction site (which
-    // builds this controller with four arguments) keeps compiling; DI
-    // always supplies the live ITranslationProvider in the app.
+    // floor). **Optional** so the existing test-construction site keeps
+    // compiling; DI always supplies the live ITranslationProvider in the app.
     ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -290,6 +299,37 @@ public sealed class GroupsController(
         // the live membership read; a display convenience that drives the
         // composer's visibility (the POST gate is the authoritative deny).
         var canPost = (await userInfo.GetGroupIdsAsync(actor)).Contains(group.Id);
+
+        // ── Group events (ADR 0089) — the membership-scoped events feed stays
+        //    on the detail page (the group-posts lane's shape carried to the M4
+        //    event surface). ListGroupEventsAsync is the single access decision
+        //    + the aggregate AccessAudit row (GE·1/GE·5); the create gate is the
+        //    authoritative deny (GE·3), so the "New event" button reuses the
+        //    same live membership read as CanPost. The detail page is
+        //    member-scoped by its owner ∪ member gate, so every viewer here is a
+        //    member and sees the feed + the button. ──
+        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: 1);
+
+        var groupEvents = new List<GroupEventListItem>(eventFeed.Visible.Count);
+        foreach (var ev in eventFeed.Visible)
+        {
+            var authorProfile = await userInfo.GetProfileAsync(ev.AuthorId);
+            var preview = MarkdownRenderer.PlainTextPreview(ev.Body, 200);
+            groupEvents.Add(new GroupEventListItem(
+                ev.Id,
+                ev.Title,
+                preview,
+                ev.Start,
+                authorProfile?.DisplayName ?? ev.AuthorId,
+                ev.AuthorId));
+        }
+
+        // CanCreateEvent: the SAME rule the CreateGroupEvent gate enforces
+        // (GE·3) — the live membership read; a display convenience that drives
+        // the "New event" button's visibility (the POST gate is the
+        // authoritative deny). Reuses the canPost membership read (one read
+        // serves both affordances — the detail page is already member-scoped).
+        var canCreateEvent = canPost;
         // canPost gates the "New post" button (the standalone compose page
         // at /groups/{id}/posts/new) — the POST gate is the authoritative deny.
         // m2b read lane #3 — the group's pending invitations (the owner's
@@ -359,6 +399,9 @@ public sealed class GroupsController(
             GroupPosts = groupPosts,
             GroupPostsTotal = feed.Total,
             CanPost = canPost,
+            GroupEvents = groupEvents,
+            GroupEventsTotal = eventFeed.Total,
+            CanCreateEvent = canCreateEvent,
             GroupTranslations = groupTranslations,
             Languages = groupLanguages,
             CanTranslate = canTranslate,
@@ -1686,6 +1729,450 @@ public sealed class GroupsController(
 
         TempData["info"] = "Reply deleted.";
         return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Group events (ADR 0089) — the ADR 0013 membership lane applied to the
+    //    M4 event surface. The read/write lanes resolve through <see
+    //    cref="IEventService"/>'s group seams (CreateGroupEventAsync /
+    //    UpdateGroupEventAsync / PublishAsync / RsvpAsync / GetMyRsvpAsync /
+    //    GetRsvpsAsync); the group-lane membership gate is the authoritative
+    //    deny (GE·3), edit/publish are author-only (GE·4), and RSVP + the
+    //    author-only RSVP list reuse the M4 lane keyed by EventId (GE·7 — no
+    //    group branch). Every 404 is the non-leaky fail-closed shape (a 403 on
+    //    a POST would advertise a gate the UI doesn't offer, the G·3/G·4 pin). ──
+
+    /// <summary>
+    /// A group event's <b>detail</b> page (ADR 0089, GE·1/GE·3):
+    /// <c>GET /groups/{id}/events/{eventId}</c>. The single detail decision
+    /// (GE·5, TargetId = the event id) runs at Core via
+    /// <see cref="IEventService.GetGroupEventAsync"/>; a denied, missing, or
+    /// lane-mismatched event (a draft the actor did not author included) is a
+    /// 404 (the group lane's fail-closed shape — G·3/G·4, this file's "a
+    /// non-visible group 404s" precedent). On success the RSVP surface is
+    /// assembled from the M4 lane reused as-is (GE·7: the author sees the full
+    /// <c>GetRsvpsAsync</c> list; every member sees their own
+    /// <c>GetMyRsvpAsync</c> RSVP). The Edit / Publish affordances are the
+    /// author's (GE·4, author-only — <b>no</b> GlobalAdmin override).
+    /// </summary>
+    [HttpGet("{id}/events/{eventId}")]
+    public async Task<IActionResult> GroupEventDetail(string id, string eventId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(eventId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        var @event = await events.GetGroupEventAsync(id, eventId, actor);
+        if (@event is null)
+            return NotFound(); // non-member / lane mismatch / non-author draft (GE·3/GE·4)
+
+        var isAuthor = @event.AuthorId == actor;
+
+        var authorProfile = await userInfo.GetProfileAsync(@event.AuthorId);
+
+        // The RSVP surface (GE·7 — the M4 lane reused as-is, keyed by EventId):
+        // the author's full list + the viewer's own RSVP.
+        var myRsvp = default(EventRsvp);
+        try
+        {
+            myRsvp = await events.GetMyRsvpAsync(eventId, actor, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException) { myRsvp = null; }
+        catch (UnauthorizedAccessException) { myRsvp = null; }
+
+        var rsvpRows = default(IReadOnlyList<EventRsvp>);
+        if (isAuthor)
+        {
+            try
+            {
+                rsvpRows = await events.GetRsvpsAsync(eventId, HttpContext.RequestAborted);
+            }
+            catch (KeyNotFoundException) { rsvpRows = []; }
+        }
+        rsvpRows ??= [];
+
+        var rsvps = new List<EventRsvpEntry>(rsvpRows.Count);
+        foreach (var rsvp in rsvpRows)
+        {
+            var p = await userInfo.GetProfileAsync(rsvp.UserId);
+            var name = p?.DisplayName is not null && p.DisplayName.Length > 0 ? p.DisplayName : rsvp.UserId;
+            rsvps.Add(new EventRsvpEntry(rsvp, name));
+        }
+
+        // The group's display name (the ADR 0026 floor, the group-post detail's
+        // back-link idiom): the stored name, resolved into the viewer's
+        // language when a user-added name translation exists.
+        var groupName = group.Name;
+        if (translationProvider is not null)
+        {
+            string gLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            var gTranslations = await userInfo.GetGroupTranslationsAsync(id);
+            var gMatch = gTranslations.FirstOrDefault(t => String.Equals(t.LanguageCode, gLang, StringComparison.OrdinalIgnoreCase));
+            if (gMatch is not null && !string.IsNullOrWhiteSpace(gMatch.Name))
+                groupName = gMatch.Name;
+        }
+
+        return View("EventDetail", new GroupEventDetailViewModel
+        {
+            GroupId = id,
+            GroupDisplayName = groupName,
+            Event = @event,
+            AuthorDisplayName = authorProfile?.DisplayName ?? @event.AuthorId,
+            AuthorSubjectId = @event.AuthorId,
+            IsAuthor = isAuthor,
+            MyRsvp = myRsvp,
+            Rsvps = rsvps,
+        });
+    }
+
+    /// <summary>
+    /// The group-event <b>composer's page</b> (ADR 0089, GE·3):
+    /// <c>GET /groups/{id}/events/new</c>. Returns an empty
+    /// <see cref="GroupEventComposeViewModel"/> for the standalone compose page
+    /// (the failure re-render view, the group-post <c>New.cshtml</c> analog).
+    /// The group's identity is the route's <c>{id}</c>; the membership lane that
+    /// reaches this page is the same owner ∪ member projection as the group's
+    /// <see cref="Detail"/> (the paired POST's gate is the authoritative deny,
+    /// GE·3) — no separate re-gate here.
+    /// </summary>
+    [HttpGet("{id}/events/new")]
+    public async Task<IActionResult> NewGroupEvent(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        return View("EventNew", new GroupEventComposeViewModel
+        {
+            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            // Pre-select the instance default (the ADR 0018 idiom) so the
+            // picker highlights the right option and a no-change submit is a
+            // concrete BCP-47 code (never an empty row).
+            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+            // Default the time range to the actor's *current* local date/time
+            // (the M4 CreateGet idiom: now rounded to the minute, End one hour
+            // after Start — the author adjusts both on the form).
+            Start = DateTime.Now,
+            End = DateTime.Now.AddHours(1),
+        });
+    }
+
+    /// <summary>
+    /// The group-event <b>composer's POST</b> (ADR 0089, GE·3):
+    /// <c>POST /groups/{id}/events</c>. The form carries the event's editable
+    /// surface (title + body + time + location + capacity + color + the
+    /// authored-in language + the save-as-draft toggle); the group's identity
+    /// is the route's <c>{id}</c>, never a form field (a form-bound group id
+    /// would be a lane-bypass hole). The create gate <b>is</b> the group-lane
+    /// membership decision (GE·3): <see
+    /// cref="IEventService.CreateGroupEventAsync"/> runs in the controller's
+    /// <c>LightweightSession</c> (C3 same-transaction shape — the gate row +
+    /// the new event commit atomically). A non-member (including a non-member
+    /// moderator or GlobalAdmin — GE·4, no skip on this lane) hits the
+    /// <see cref="UnauthorizedAccessException"/> wall — mapped to a 404 (the
+    /// register's "Web renders 404" pin). The write pins GE·2/GE·8
+    /// (server-side: <c>GroupId</c> = the lane marker,
+    /// <c>ComponentId = string.Empty</c>, non-null empty <c>Audience</c>,
+    /// <c>IsDraft = true</c>) regardless of anything on this form.
+    /// </summary>
+    [HttpPost("{id}/events")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateGroupEvent(string id, [FromForm] GroupEventComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to create an event.");
+            return View("EventNew", model);
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+
+        if (!model.IsValid)
+        {
+            // Re-render the standalone compose page, prefilled with what the
+            // actor typed (the GET /groups/{id}/events/new shape).
+            if (string.IsNullOrWhiteSpace(model.Body))
+                ModelState.AddModelError(nameof(model.Body), "An event needs some text.");
+            if (model.Start == default || model.End == default)
+                ModelState.AddModelError(string.Empty, "An event needs a start and an end time.");
+            if (model.End <= model.Start)
+                ModelState.AddModelError(nameof(model.End), "The end must be after the start.");
+            return View("EventNew", model);
+        }
+
+        var draft = new GroupEventDraft(
+            GroupId: id,
+            Title: string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title,
+            Body: model.Body.Trim(),
+            StartUtc: model.Start,
+            EndUtc: model.End,
+            Location: string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
+            Capacity: model.Capacity,
+            Color: string.IsNullOrWhiteSpace(model.Color) ? null : model.Color,
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            ReminderEnabled: true); // ADR 0037 §6.4 floor — the §6.4 job's default.
+
+        // C3 same-transaction lane: the controller opens the
+        // <c>IDocumentStore.LightweightSession()</c>, the service's
+        // <c>SaveChangesAsync</c> is the single write (the group-post create
+        // precedent) — the gate's audit row and the new event commit atomically.
+        await using var session = store.LightweightSession();
+
+        Kumunita.Core.Events.Event @event;
+        try
+        {
+            @event = await events.CreateGroupEventAsync(draft, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // GE·3/GE·4 — only group members may create events for the channel;
+            // the gate's Deny row was persisted before the throw (GE6 FACES).
+            // 404: the register's "Web renders 404" pin (a 403 on a POST would
+            // advertise a gate the UI doesn't offer).
+            return NotFound();
+        }
+
+        TempData["info"] = $"Event added to “{group.Name}”.";
+        return Redirect($"/groups/{id}/events/{@event.Id}");
+    }
+
+    /// <summary>
+    /// The group-event <b>editor's page</b> (ADR 0089, GE·4):
+    /// <c>GET /groups/{id}/events/{eventId}/edit</c>. The author-only edit
+    /// lane's GET (the ADR 0016 group-post edit idiom carried to the M4 event
+    /// surface): the actor must be the event's own author (a non-author, even a
+    /// GlobalAdmin, 404s — GE·4), and the event must be a **group** event of
+    /// this group (the group-lane identity check, GE·2). The form is the event's
+    /// editable surface — the group lane has no audience slot (GE·8) and no
+    /// component picker (GE·2 lane exclusivity).
+    /// </summary>
+    [HttpGet("{id}/events/{eventId}/edit")]
+    public async Task<IActionResult> EditGroupEvent(string id, string eventId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(eventId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        // The group-lane identity check + the author gate (GE·4) before render:
+        // a non-author or a non-group event is a 404 (the group-post edit GET's
+        // fail-closed shape). The POST's gate is the authoritative deny.
+        var @event = await events.GetGroupEventAsync(id, eventId, actor);
+        if (@event is null || !string.Equals(@event.AuthorId, actor, StringComparison.Ordinal))
+            return NotFound();
+
+        return View("EventEdit", new GroupEventComposeViewModel
+        {
+            Title = @event.Title,
+            Body = @event.Body,
+            Start = @event.Start,
+            End = @event.End,
+            Location = @event.Location,
+            Capacity = @event.Capacity,
+            Color = @event.Color,
+            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            LanguageCode = @event.LanguageCode,          // ADR 0018 (amended) — the authored-in tag.
+        });
+    }
+
+    /// <summary>
+    /// The group-event <b>editor's POST</b> (ADR 0089, GE·4, author-only):
+    /// <c>POST /groups/{id}/events/{eventId}/edit</c>. Re-writes the event's
+    /// editable surface via <see cref="IEventService.UpdateGroupEventAsync"/> —
+    /// the service is the decision: a non-author (even a GlobalAdmin) is denied
+    /// with <see cref="UnauthorizedAccessException"/>, and a non-group event or a
+    /// missing id is a <see cref="KeyNotFoundException"/> — both mapped to the
+    /// 404 fail-closed shape (GE·2/GE·4, the group lane's register pin). The
+    /// lane markers (<c>GroupId</c> / <c>ComponentId</c> / <c>Audience</c> /
+    /// <c>AuthorId</c> / <c>Created</c> / <c>IsDraft</c>) are untouched.
+    /// </summary>
+    [HttpPost("{id}/events/{eventId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroupEvent(
+        string id, string eventId, [FromForm] GroupEventComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(eventId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to edit.");
+            return Redirect($"/groups/{id}/events/{eventId}");
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        if (!model.IsValid)
+        {
+            // Re-render the editor, prefilled with what the actor typed.
+            model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+            if (string.IsNullOrWhiteSpace(model.Body))
+                ModelState.AddModelError(nameof(model.Body), "An event needs some text.");
+            if (model.Start == default || model.End == default)
+                ModelState.AddModelError(string.Empty, "An event needs a start and an end time.");
+            if (model.End <= model.Start)
+                ModelState.AddModelError(nameof(model.End), "The end must be after the start.");
+            return View("EventEdit", model);
+        }
+
+        var update = new GroupEventUpdate(
+            Title: string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title,
+            Body: model.Body.Trim(),
+            StartUtc: model.Start,
+            EndUtc: model.End,
+            Location: string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
+            Capacity: model.Capacity,
+            Color: string.IsNullOrWhiteSpace(model.Color) ? null : model.Color,
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            ReminderEnabled: null); // null = leave the event's stored value (the ADR 0016 shape).
+
+        // C3 same-transaction lane (the group-post edit POST precedent).
+        await using var session = store.LightweightSession();
+
+        Kumunita.Core.Events.Event @event;
+        try
+        {
+            @event = await events.UpdateGroupEventAsync(
+                eventId, actor, update, session, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Missing id or a non-group event (GE·2 lane check failed): the
+            // 404 fail-closed shape (non-leaky about which ids are real).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (GE·3/GE·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Event updated.";
+        return Redirect($"/groups/{id}/events/{@event.Id}");
+    }
+
+    /// <summary>
+    /// Publishes a group event's <b>draft</b> (ADR 0089, GE·4, author-only;
+    /// ADR 0037): <c>POST /groups/{id}/events/{eventId}/publish</c>. The event's
+    /// single group-lane decision (via
+    /// <see cref="IEventService.GetGroupEventAsync"/>) is the pre-write gate: a
+    /// non-member, a missing event, a lane mismatch, or a draft the actor is not
+    /// the author of all 404. On success the author-only
+    /// <see cref="IEventService.PublishAsync"/> lane (the M4
+    /// <c>EventService.PublishAsync</c> reused as-is, GE·7) flips
+    /// <c>IsDraft = false</c> — a non-author is denied and 404s (the group
+    /// lane's non-leaky shape, the <see cref="PublishGroupPost"/> precedent).
+    /// </summary>
+    [HttpPost("{id}/events/{eventId}/publish")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PublishGroupEvent(string id, string eventId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(eventId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The event's single group-lane decision (GE·7) is the pre-write gate:
+        // a non-member, a missing event, a lane mismatch, or a draft the actor
+        // is not the author of all 404 (the group lane's non-leaky fail-closed
+        // shape, the ADR 0037 author-only draft gate).
+        var @event = await events.GetGroupEventAsync(id, eventId, actor);
+        if (@event is null)
+            return NotFound();
+
+        try
+        {
+            await events.PublishAsync(eventId, actor, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (GE·3/GE·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Event published.";
+        return Redirect($"/groups/{id}/events/{eventId}");
+    }
+
+    /// <summary>
+    /// A group event's <b>RSVP</b> (ADR 0089, GE·7 — the M4 RSVP lane reused
+    /// as-is, keyed by <c>EventId</c>, no group branch):
+    /// <c>POST /groups/{id}/events/{eventId}/rsvp</c>. The event's single
+    /// group-lane decision (via <see
+    /// cref="IEventService.GetGroupEventAsync"/>) is the pre-write gate: a
+    /// non-member, a missing event, or a lane mismatch is a 404. A signed-out
+    /// actor cannot RSVP (404 — the group lane's non-leaky shape). The
+    /// <see cref="IEventService.RsvpAsync"/> write (last-write-wins, no audit
+    /// row — the M4 §3.2 pin) upserts the actor's <c>(EventId, UserId)</c> row
+    /// with the latest <see cref="RsvpStatus"/>.
+    /// </summary>
+    [HttpPost("{id}/events/{eventId}/rsvp")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GroupEventRsvp(string id, string eventId, [FromForm] RsvpStatus status)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(eventId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The event's single group-lane decision (GE·7) is the pre-write gate:
+        // a non-member, a missing event, or a lane mismatch is a 404.
+        var @event = await events.GetGroupEventAsync(id, eventId, actor);
+        if (@event is null)
+            return NotFound();
+
+        try
+        {
+            await events.RsvpAsync(eventId, actor, status, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        return Redirect($"/groups/{id}/events/{eventId}");
     }
 
     // ── Translations (ADR 0022, group lane) ────────────────────────────────

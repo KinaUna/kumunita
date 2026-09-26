@@ -185,4 +185,30 @@ public interface IIdentityService
     /// this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetSignupOpenAsync(bool open, string adminSubjectId);
+
+    // ── Admin account notifications (ADR 0077 — the admin-lane signup/verify
+    //    notify gate) ──
+
+    /// <summary>
+    /// Whether the account lane notifies the GlobalAdmins when a resident signs
+    /// up and when a resident verifies their account (ADR 0077). A read (no audit
+    /// row); the <c>true</c> floor — a missing singleton or an unset value both
+    /// yield <c>true</c>, so a fresh instance ships with the admin notification
+    /// on (the M6 lean-default posture, the <see cref="IsSignupOpenAsync"/>
+    /// <c>true</c> floor).
+    /// </summary>
+    Task<bool> IsNotifyAdminsOnSignupAsync();
+
+    /// <summary>
+    /// Set whether the account lane notifies the GlobalAdmins on sign-up and
+    /// verification (ADR 0077): a GlobalAdmin flips the instance-wide gate —
+    /// <c>true</c> enables the <c>account.signup</c> / <c>account.verified</c>
+    /// emitters, <c>false</c> disables them. Writes the
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings.NotifyAdminsOnSignup"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"signup.set-notify"</c>, target "signup") in
+    /// the same session (C3 — no silent, unaudited access). Only a GlobalAdmin
+    /// may call this; the Web's <c>AdminSignupController</c> enforces the gate.
+    /// </summary>
+    Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId);
 }

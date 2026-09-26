@@ -1,19 +1,26 @@
 @model Kumunita.Web.Models.TodoEditorModel
 @using Kumunita.Web.Security
-@inject Kumunita.Core.Localization.ITranslationProvider Translation
-@inject Kumunita.Core.Localization.ILocalizationService Localization
+@using Kumunita.Core.Projects
 @{
     ViewData["Title"] = "Edit to-do";
     string[] modes = { "Any", "All" };
-    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     var assigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
-    // The Edit view is rendered only by the frozen UpdatePost's failed-POST
-    // re-render (no GET /projects/todos/{id}/edit route exists — U07 froze the
-    // controller without one). In that scenario Request.Path is exactly
-    // /projects/todos/{id} — the correct re-POST target. The frozen
-    // TodoEditorModel carries no Id, so the path is the id source.
-    var editPath = ViewContext.HttpContext?.Request?.Path.Value ?? "/projects/todos";
+    // The fixed status vocabulary's label keys (the same closed set the
+    // Kanban lane's Set-status select offers: None + the four codes, ADR 0069).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
+    // The form POSTs to /projects/todos/{id} (the UpdatePost lane). When
+    // rendered via the GET /projects/todos/{id}/edit route the path carries
+    // the "/edit" suffix — strip it to get the correct POST target. When
+    // re-rendered after a failed POST the path is already /projects/todos/{id}.
+    var rawPath = ViewContext.HttpContext?.Request?.Path.Value ?? "/projects/todos";
+    var editPath = rawPath.EndsWith("/edit") ? rawPath[..^"/edit".Length] : rawPath;
 }
 
 <div class="row justify-content-center">
@@ -54,8 +61,25 @@
                     <div class="row g-2 align-items-end">
                         <div class="col-sm-6">
                             <label class="form-label" for="status" style="font-weight:600;"><kw-l key="projects.todo.status">Status</kw-l></label>
-                            <input class="form-control" type="text" id="status" name="Status"
-                                   placeholder="@optionalPlaceholder" value="@Model.Status" />
+                            @* The fixed status vocabulary (ADR 0069) — None +
+                               the four known codes, the same <c>
+                               KanbanStatuses.Known</c> set the Kanban lane's
+                               Set-status select offers. A pre-ADR-0069
+                               free-text status is preserved as an extra option
+                               so editing never loses it (C3). *@
+                            <select class="form-control" id="status" name="Status">
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                @if (!string.IsNullOrWhiteSpace(Model.Status) && !KanbanStatuses.Known.Contains(Model.Status))
+                                {
+                                    <option value="@Model.Status" selected>@Model.Status</option>
+                                }
+                                @foreach (var statusCode in KanbanStatuses.Known)
+                                {
+                                    <option value="@statusCode" selected="@(Model.Status == statusCode)">
+                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                    </option>
+                                }
+                            </select>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label" for="assignee" style="font-weight:600;"><kw-l key="projects.todo.assignee">Assignee</kw-l></label>
@@ -97,6 +121,66 @@
                     </div>
                     <div class="text-muted small mt-2">
                         <kw-l key="projects.todo.reparent_hint">A subtask is a full to-do with its own status, assignee, and board placement. Reparenting to a descendant is refused (cycle guard).</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            @* ADR 0087 — the "waiting on" picker (D7): the actor's readable,
+               non-deleted to-dos (a display surface, never a gate — C-TBD·4;
+               the cycle guard is the service's, C-TBD·3). A leading "No
+               blocker" option + a "no blocker" checkbox post the clear
+               (the ClearParent idiom). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="blocked-by" style="font-weight:600;"><kw-l key="todo.blocked_by">Waiting on</kw-l></label>
+                            <select class="form-control" id="blocked-by" name="BlockedByTodoId">
+                                <option value=""><kw-l key="todo.blocked_by_none">No blocker</kw-l></option>
+                                @foreach (var (id, title) in Model.BlockerOptions)
+                                {
+                                    <option value="@id" selected="@(id == Model.BlockedByTodoId ? "selected" : null)">@title</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-6 d-flex align-items-end pb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="clear-blocked-by"
+                                       name="ClearBlockedBy" value="true" @(Model.ClearBlockedBy ? "checked" : null) />
+                                <input type="hidden" name="ClearBlockedBy" value="false" />
+                                <label class="form-check-label" for="clear-blocked-by">
+                                    <kw-l key="todo.blocked_by_none">No blocker</kw-l>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="todo.blocked_by">Waiting on</kw-l> — purely informational: a blocker never blocks this to-do itself, and a reference back to a to-do already in its own chain is refused (cycle guard).
+                    </div>
+                </div>
+            </div>
+
+            @* ADR 0079 — the optional start / due dates (the Event Start/End
+               `datetime-local` shape, but OPTIONAL). On the edit lane a blank
+               field posts null, which *clears* the stored date (the
+               UpdateTodoRequest partial shape) — the prefill above shows the
+               stored value. *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="start-at" style="font-weight:600;"><kw-l key="projects.todo.start">Start</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="start-at" name="StartAt"
+                                   value="@Model.StartAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="due-at" style="font-weight:600;"><kw-l key="projects.todo.due">Due</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="due-at" name="DueAt"
+                                   value="@Model.DueAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="projects.todo.dates_hint">Both are optional — leave blank for no date. Shown to viewers in their own timezone.</kw-l>
                     </div>
                 </div>
             </div>
@@ -212,6 +296,38 @@
                 <a href="@editPath" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
             </div>
         </form>
+
+        @* U08 (ADR 0086 §3.9) — the standalone set-project card (D10): a
+           separate POST (PUT /projects/todos/{id}/set-project) that keeps the
+           frozen UpdateTodoRequest DTO (C-PL·8: zero migrations) untouched. The
+           picker is a display surface, never a gate (C-PL·3): the to-do exists
+           with or without the association, and the empty option clears it. The
+           card is hidden when the actor sees no readable project (F10). *@
+        @if (Model.Projects.Count > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label fw-semibold" for="set-project-select">
+                        <kw-l key="pl.todo.project_link">Project</kw-l>
+                    </label>
+                    <form method="post" action="@($"{editPath}/set-project")">
+                        @Html.AntiForgeryToken()
+                        <select class="form-select" id="set-project-select" name="ProjectId">
+                            <option value="">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.Projects)
+                            {
+                                <option value="@id" selected="@(id == Model.ProjectId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <kw-l key="pl.todo.set_project">Set project</kw-l>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
     </div>
 </div>
 

@@ -1,16 +1,23 @@
 @model Kumunita.Web.Models.TodoEditorModel
 @using Kumunita.Web.Security
-@inject Kumunita.Core.Localization.ITranslationProvider Translation
-@inject Kumunita.Core.Localization.ILocalizationService Localization
+@using Kumunita.Core.Projects
 @{
     ViewData["Title"] = "New to-do";
     string[] modes = { "Any", "All" };
-    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     // The assignee picker draws on the same option list the _GrantPickers
     // partial draws on (the M2/M3/M4 shared shape, seeded by the controller's
     // SeedGrantPickerOptionsAsync) — display + standing, never a gate (C-M5·6).
     var assigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+    // The fixed status vocabulary's label keys (the same closed set the
+    // Kanban lane's Set-status select offers: None + the four codes, ADR 0069).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
 }
 
 <div class="row justify-content-center">
@@ -52,8 +59,26 @@
                     <div class="row g-2 align-items-end">
                         <div class="col-sm-6">
                             <label class="form-label" for="status" style="font-weight:600;"><kw-l key="projects.todo.status">Status</kw-l></label>
-                            <input class="form-control" type="text" id="status" name="Status"
-                                   placeholder="@optionalPlaceholder" value="@Model.Status" />
+                            @* The fixed status vocabulary (ADR 0069) — None +
+                               the four known codes, the same <c>
+                               KanbanStatuses.Known</c> set the Kanban lane's
+                               Set-status select offers. A new to-do starts
+                               with no status, so "None" is the default; a
+                               free-text value (pre-ADR-0069) is preserved as
+                               an extra option so editing never loses it (C3). *@
+                            <select class="form-control" id="status" name="Status">
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                @if (!string.IsNullOrWhiteSpace(Model.Status) && !KanbanStatuses.Known.Contains(Model.Status))
+                                {
+                                    <option value="@Model.Status" selected>@Model.Status</option>
+                                }
+                                @foreach (var statusCode in KanbanStatuses.Known)
+                                {
+                                    <option value="@statusCode" selected="@(Model.Status == statusCode)">
+                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                    </option>
+                                }
+                            </select>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label" for="assignee" style="font-weight:600;"><kw-l key="projects.todo.assignee">Assignee</kw-l></label>
@@ -68,6 +93,29 @@
                     </div>
                     <div class="text-muted small mt-2">
                         <kw-l key="projects.todo.status_assignee_hint">Status is a free-text label (a string, not a fixed list). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            @* ADR 0079 — the optional start / due dates (the Event Start/End
+               `datetime-local` shape, but OPTIONAL: a blank field posts null,
+               which on the create lane means "no date"). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="start-at" style="font-weight:600;"><kw-l key="projects.todo.start">Start</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="start-at" name="StartAt"
+                                   value="@Model.StartAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="due-at" style="font-weight:600;"><kw-l key="projects.todo.due">Due</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="due-at" name="DueAt"
+                                   value="@Model.DueAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="projects.todo.dates_hint">Both are optional — leave blank for no date. Shown to viewers in their own timezone.</kw-l>
                     </div>
                 </div>
             </div>
@@ -87,6 +135,50 @@
                         <div class="text-muted small mt-2">
                             <kw-l key="projects.todo.parent_hint">Pick a parent to create this to-do as a subtask of it — a subtask is a full to-do with its own status, assignee, and board placement.</kw-l>
                         </div>
+                    </div>
+                </div>
+            }
+
+            @* ADR 0087 — the "waiting on" picker (D7): the actor's readable,
+               non-deleted to-dos (a display surface, never a gate — C-TBD·4;
+               the cycle guard is the service's, C-TBD·3). A leading "No
+               blocker" option; a blank selection posts as "no blocker". *@
+            @if (Model.BlockerOptions.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="blocked-by" style="font-weight:600;"><kw-l key="todo.blocked_by">Waiting on</kw-l></label>
+                        <select class="form-control" id="blocked-by" name="BlockedByTodoId">
+                            <option value=""><kw-l key="todo.blocked_by_none">No blocker</kw-l></option>
+                            @foreach (var (id, title) in Model.BlockerOptions)
+                            {
+                                <option value="@id" selected="@(id == Model.BlockedByTodoId ? "selected" : null)">@title</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="todo.blocked_by">Waiting on</kw-l> — purely informational: a blocker never blocks this to-do itself, and a reference back into the blocker's own chain is refused (cycle guard).
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* U08 (ADR 0086 §3.9) — the project picker (D10): posts the optional
+               ProjectId with the create. The association is a display surface,
+               never a gate (C-PL·3); the controller applies it post-create via
+               the frozen SetTodoProjectAsync seam (C-PL·8: no DTO change). The
+               empty option is the unassociated case. *@
+            @if (Model.Projects.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="project" style="font-weight:600;"><kw-l key="pl.todo.project_link">Project</kw-l></label>
+                        <select class="form-control" id="project" name="ProjectId">
+                            <option value="">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.Projects)
+                            {
+                                <option value="@id" selected="@(id == Model.ProjectId ? "selected" : null)">@name</option>
+                            }
+                        </select>
                     </div>
                 </div>
             }

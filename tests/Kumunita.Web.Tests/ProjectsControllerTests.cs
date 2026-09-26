@@ -65,7 +65,8 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         };
         projects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns([todo]);
 
         // The feed's copy-to / move-to pickers read each to-do's placement
@@ -85,18 +86,71 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("todo-1", vm.Todos[0].Id);
         Assert.Equal("subj-author", vm.Todos[0].AuthorDisplayName); // no profile → raw id
         await projects.Received(1).ListTodosAsync(
-            null, null, actor, 1, false, Arg.Any<CancellationToken>());
+            null, null, actor, 1, false, null, false, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
         var deniedProjects = Substitute.For<IProjectService>();
         deniedProjects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<TodoItem>>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(
             await deniedController.TodosIndex(null, null, page: 1));
+    }
+
+    // ── ADR 0079 — the editor model's date-coherence rule ──────────────────
+
+    /// <summary>
+    /// The <see cref="TodoEditorModel.IsValid"/> date-coherence rule (ADR
+    /// 0079): a due date **before** the start date is rejected — the form
+    /// posts a coherent pair or neither. Blank dates (both null) are valid
+    /// ("no date"), and a due on the same instant as the start is allowed
+    /// (the Event's "on or after" shape, not strictly-after). This pins the
+    /// Web-boundary validation the controller surfaces as the
+    /// "The due date must be on or after the start." form error.
+    /// </summary>
+    [Fact]
+    public void TodoEditorModel_DueBeforeStart_IsInvalid()
+    {
+        var startAt = new DateTimeOffset(2026, 9, 5, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+
+        // A well-formed audience ("Any" mode, empty grants) so the assertion
+        // isolates the date-coherence rule — the <see cref="AudienceEditorModel"/>
+        // default (no mode) would fail IsValid independently of the dates.
+        static AudienceEditorModel ValidAudience()
+            => new() { Mode = "Any" };
+
+        var beforeStart = new TodoEditorModel
+        {
+            Title = "Dated",
+            StartAt = startAt,
+            DueAt = dueAt,
+            Audience = ValidAudience(),
+        };
+        Assert.False(beforeStart.IsValid);
+
+        // Blank dates are valid (no date) — the "leave blank for no date" rule.
+        var undated = new TodoEditorModel
+        {
+            Title = "Undated",
+            Audience = ValidAudience(),
+        };
+        Assert.True(undated.IsValid);
+
+        // Due == Start is allowed (on-or-after, not strictly-after — the
+        // Event precedent's "on or after the start").
+        var equal = new TodoEditorModel
+        {
+            Title = "Equal",
+            StartAt = startAt,
+            DueAt = startAt,
+            Audience = ValidAudience(),
+        };
+        Assert.True(equal.IsValid);
     }
 
     // ── 2 — Todo_Detail_SubtasksRendered (real store) ────────────────────────
@@ -754,6 +808,1077 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("Full lane", limitController.TempData["error"] as string);
     }
 
+    // ── U06 — the goal authoring surface (the PL lane, ADR 0086) ────────────
+
+    /// <summary>
+    /// <c>GET /projects/goals/{id}</c>: the detail view model is the goal's
+    /// fields + its non-deleted projects resolved from the frozen seam's
+    /// <see cref="IProjectService.ListProjectsForGoalAsync"/> (the per-parent
+    /// list — a denied project is dropped, not the whole set); the author
+    /// display name resolves as a *read* (falling back to the raw id when the
+    /// profile row is absent — the Build() default); the <see cref="ForbidResult"/>
+    /// / <see cref="NotFoundResult"/> C3 split is the controller's (a denied
+    /// actor 403, a missing goal 404 — not a 500).
+    /// </summary>
+    [Fact]
+    public async Task GoalDetail_ProjectsInThisGoal_ListRendered()
+    {
+        const string actor = "subj-goal-detail";
+        const string goalId = "goal-detail";
+        const string projectId = "project-detail";
+
+        var goal = new ProjectGoal
+        {
+            Id = goalId, Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+        var project = new Project
+        {
+            Id = projectId, Title = "Project", AuthorId = actor, GoalId = goalId,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
+        projects.ListProjectsForGoalAsync(goalId, actor, Arg.Any<CancellationToken>())
+            .Returns(new List<Project> { project });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.GoalDetail(goalId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<GoalDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(goalId, vm.Id);
+        Assert.Equal("Goal", vm.Title);
+        Assert.True(vm.CanEdit); // the actor is the creator — the standing preview.
+        Assert.Single(vm.Projects);
+        Assert.Equal(projectId, vm.Projects[0].Id);
+        Assert.Equal(actor, vm.Projects[0].AuthorDisplayName); // profile absent → raw id fallback.
+        await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
+        await projects.Received(1).ListProjectsForGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing goal is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.GoalDetail(goalId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.GoalDetail(goalId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/goals</c>: a valid shape writes through the frozen
+    /// seam's <see cref="IProjectService.CreateGoalAsync"/> (the audience
+    /// <see cref="AudienceEditorModel.BuildAudience()"/> is the single
+    /// deserialization site) and redirects to the new goal's detail with
+    /// <c>TempData["info"] = "Goal created."</c>; a blank title is a form
+    /// error (the seam is never called — a malformed shape, not a silent
+    /// blank row); a denied actor is a form error re-rendering the composer.
+    /// </summary>
+    [Fact]
+    public async Task Goal_Create_RedirectsToDetail()
+    {
+        const string actor = "subj-goal-create";
+        var created = new ProjectGoal
+        {
+            Id = "goal-created", Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.CreateGoalAsync(
+                actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
+            .Returns(created);
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new GoalComposerViewModel
+        {
+            Title = "Goal",
+            Description = "body",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var result = await controller.GoalCreate(model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/goals/{created.Id}", redirect.Url);
+        Assert.Equal("Goal created.", controller.TempData["info"] as string);
+        await projects.Received(1).CreateGoalAsync(
+            actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: actor);
+        var blankModel = new GoalComposerViewModel
+        {
+            Title = "   ",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var blankResult = await blankController.GoalCreate(blankModel);
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .CreateGoalAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>());
+
+        // A denied actor is a form error (the C3 403 → re-render split), not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.CreateGoalAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateGoalRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedModel = new GoalComposerViewModel
+        {
+            Title = "Goal",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        Assert.IsType<ViewResult>(await deniedController.GoalCreate(deniedModel));
+    }
+
+    /// <summary>
+    /// <c>GET /projects/goals/{id}/edit</c>: the edit form is the goal's
+    /// <c>Title</c> + <c>Description</c> round-tripped (the ADR 0070
+    /// full-update shape — the audience / component / language are
+    /// creation-time choices, not editable here); the <see cref="NotFoundResult"/>
+    /// / <see cref="ForbidResult"/> C3 split is the controller's.
+    /// </summary>
+    [Fact]
+    public async Task Goal_Edit_RendersTitleAndDescription()
+    {
+        const string actor = "subj-goal-edit";
+        const string goalId = "goal-edit";
+
+        var goal = new ProjectGoal
+        {
+            Id = goalId, Title = "Goal", Description = "the body", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.GoalEdit(goalId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<GoalComposerViewModel>(view.ViewData.Model);
+        Assert.Equal("Goal", vm.Title);
+        Assert.Equal("the body", vm.Description);
+        Assert.Equal(goalId, (string)view.ViewData["goalId"]!);
+        await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing goal is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new KeyNotFoundException("no goal")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.GoalEdit(goalId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.GoalEdit(goalId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/goals/{id}</c>: a valid full update (Title +
+    /// Description) writes through the frozen seam's <see
+    /// cref="IProjectService.UpdateGoalAsync"/> and redirects back to the
+    /// goal with <c>TempData["info"] = "Goal updated."</c>; a blank title is a
+    /// form error (the seam is never called — the ADR 0070 required-field
+    /// shape); a **non-creator** actor is a clean <see cref="ForbidResult"/>
+    /// (the C3 403 split — the standing gate is the service's, the controller
+    /// surfaces it as the ForbidResult).
+    /// </summary>
+    [Fact]
+    public async Task Goal_Update_RedirectsOr403()
+    {
+        const string creator = "subj-goal-upd-creator";
+        const string other = "subj-goal-upd-other";
+        const string goalId = "goal-upd";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateGoalAsync(
+                goalId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ProjectGoal { Id = goalId, Title = "New title" });
+        var controller = Build(projects, subjectId: creator);
+
+        var model = new GoalComposerViewModel { Title = "New title", Description = "new body" };
+        var result = await controller.GoalUpdate(goalId, model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/goals/{goalId}", redirect.Url);
+        Assert.Equal("Goal updated.", controller.TempData["info"] as string);
+        await projects.Received(1).UpdateGoalAsync(
+            goalId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: creator);
+        var blankResult = await blankController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "   " });
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .UpdateGoalAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>());
+
+        // A non-creator (no GlobalAdmin role) is a clean ForbidResult — the
+        // service's standing gate, surfaced by the controller as the C3 403.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.UpdateGoalAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateGoalRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ProjectGoal>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: other, roles: []);
+        var deniedResult = await deniedController.GoalUpdate(goalId, new GoalComposerViewModel { Title = "New title" });
+        Assert.IsType<ForbidResult>(deniedResult);
+    }
+
+    /// <summary>
+    /// <c>GET /projects/projects/{id}</c>: the detail loads the project
+    /// (audience gate = the service's <see cref="IProjectService
+    /// .GetProjectAsync"/>), the D10 goal link (only when <c>GoalId</c> is set
+    /// and the goal is readable + non-deleted), and the associated to-dos /
+    /// boards (the U04 <c>projectId</c> feed filter, C-PL·3). A missing project
+    /// is a clean <see cref="NotFoundResult"/> (C3 404), a denied actor a clean
+    /// <see cref="ForbidResult"/> (C3 403).
+    /// </summary>
+    [Fact]
+    public async Task ProjectDetail_AssociatedTodosAndBoards_ListRendered()
+    {
+        const string actor = "subj-project-detail";
+        const string projectId = "project-detail";
+        const string goalId = "goal-detail";
+
+        var goal = new ProjectGoal
+        {
+            Id = goalId, Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+        var project = new Project
+        {
+            Id = projectId, Title = "Project", AuthorId = actor, GoalId = goalId,
+            Status = "In progress",
+            StartAt = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero),
+            DueAt = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero),
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+        var todo = new TodoItem
+        {
+            Id = "todo-detail", Title = "Task", AuthorId = actor, ProjectId = projectId,
+            Created = new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+        };
+        var board = new KanbanBoard
+        {
+            Id = "board-detail", Title = "Board", AuthorId = actor, ProjectId = projectId,
+            Created = new DateTimeOffset(2026, 1, 3, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
+        projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
+        projects.ListTodosAsync(null, null, actor, 1, unassignedOnly: false, projectId: projectId, ct: Arg.Any<CancellationToken>())
+            .Returns(new List<TodoItem> { todo });
+        projects.ListBoardsAsync(null, actor, 1, projectId: projectId, ct: Arg.Any<CancellationToken>())
+            .Returns(new List<KanbanBoard> { board });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectDetail(projectId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.Id);
+        Assert.Equal("Project", vm.Title);
+        Assert.Equal("In progress", vm.Status);
+        Assert.True(vm.CanEdit); // the actor is the creator — the standing preview.
+        // D10 goal link — the readable, non-deleted goal is linked.
+        Assert.Equal(goalId, vm.GoalId);
+        Assert.Equal("Goal", vm.GoalTitle);
+        // The U04 associated items (the projectId feed filter).
+        Assert.Single(vm.Todos);
+        Assert.Equal("todo-detail", vm.Todos[0].Id);
+        Assert.Equal("Task", vm.Todos[0].Title);
+        Assert.Single(vm.Boards);
+        Assert.Equal("board-detail", vm.Boards[0].Id);
+        Assert.Equal("Board", vm.Boards[0].Title);
+
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+        await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
+        await projects.Received(1).ListTodosAsync(null, null, actor, 1, unassignedOnly: false, projectId: projectId, ct: Arg.Any<CancellationToken>());
+        await projects.Received(1).ListBoardsAsync(null, actor, 1, projectId: projectId, ct: Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectDetail(projectId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectDetail(projectId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects</c>: a valid shape writes through the frozen
+    /// seam's <see cref="IProjectService.CreateProjectAsync"/> (the audience
+    /// <see cref="AudienceEditorModel.BuildAudience()"/> is the single
+    /// deserialization site) and redirects to the new project's detail with
+    /// <c>TempData["info"] = "Project created."</c>; a blank title is a form
+    /// error (the seam is never called — a malformed shape, not a silent blank
+    /// row); a denied actor is a form error re-rendering the composer.
+    /// </summary>
+    [Fact]
+    public async Task Project_Create_RedirectsToDetail()
+    {
+        const string actor = "subj-project-create";
+        var created = new Project
+        {
+            Id = "project-created", Title = "Project", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.CreateProjectAsync(
+                actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(created);
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new ProjectComposerViewModel
+        {
+            Title = "Project",
+            Description = "body",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var result = await controller.ProjectCreate(model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/projects/{created.Id}", redirect.Url);
+        Assert.Equal("Project created.", controller.TempData["info"] as string);
+        await projects.Received(1).CreateProjectAsync(
+            actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: actor);
+        var blankModel = new ProjectComposerViewModel
+        {
+            Title = "   ",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var blankResult = await blankController.ProjectCreate(blankModel);
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .CreateProjectAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A denied actor is a form error (the C3 403 → re-render split), not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.CreateProjectAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedModel = new ProjectComposerViewModel
+        {
+            Title = "Project",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        Assert.IsType<ViewResult>(await deniedController.ProjectCreate(deniedModel));
+    }
+
+    /// <summary>
+    /// <c>GET /projects/projects/{id}/edit</c>: the edit form round-trips the
+    /// project's <c>Title</c> / <c>Description</c> (the ADR 0070 full-update
+    /// shape) + the D10 <c>GoalId</c> / <c>Status</c> / <c>StartAt</c> /
+    /// <c>DueAt</c> (the audience / component / language are creation-time
+    /// choices, not editable here); the <see cref="NotFoundResult"/> /
+    /// <see cref="ForbidResult"/> C3 split is the controller's.
+    /// </summary>
+    [Fact]
+    public async Task Project_Edit_RendersFields()
+    {
+        const string actor = "subj-project-edit";
+        const string projectId = "project-edit";
+        var start = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        var due = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero);
+
+        var project = new Project
+        {
+            Id = projectId, Title = "Project", Description = "the body", AuthorId = actor,
+            GoalId = "goal-edit", Status = "Doing", StartAt = start, DueAt = due,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.ProjectEdit(projectId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectComposerViewModel>(view.ViewData.Model);
+        Assert.Equal("Project", vm.Title);
+        Assert.Equal("the body", vm.Description);
+        Assert.Equal("goal-edit", vm.GoalId);
+        Assert.Equal("Doing", vm.Status);
+        Assert.Equal(start, vm.StartAt);
+        Assert.Equal(due, vm.DueAt);
+        Assert.Equal(projectId, (string)view.ViewData["projectId"]!);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectEdit(projectId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectEdit(projectId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}</c>: a valid update (Title +
+    /// Description + the D10 GoalId / Status / dates) writes through the
+    /// frozen seam's <see cref="IProjectService.UpdateProjectAsync"/> and
+    /// redirects back to the project with
+    /// <c>TempData["info"] = "Project updated."</c>; a blank title is a form
+    /// error (the seam is never called); a **non-creator** actor is a clean
+    /// <see cref="ForbidResult"/> (the C3 403 split — the standing gate is the
+    /// service's, the controller surfaces it as the ForbidResult).
+    /// </summary>
+    [Fact]
+    public async Task Project_Update_RedirectsOr403()
+    {
+        const string creator = "subj-project-upd-creator";
+        const string other = "subj-project-upd-other";
+        const string projectId = "project-upd";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateProjectAsync(
+                projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new Project { Id = projectId, Title = "New title" });
+        var controller = Build(projects, subjectId: creator);
+
+        var model = new ProjectComposerViewModel { Title = "New title", Description = "new body", Status = "Done" };
+        var result = await controller.ProjectUpdate(projectId, model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/projects/{projectId}", redirect.Url);
+        Assert.Equal("Project updated.", controller.TempData["info"] as string);
+        await projects.Received(1).UpdateProjectAsync(
+            projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: creator);
+        var blankResult = await blankController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "   " });
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .UpdateProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A non-creator (no GlobalAdmin role) is a clean ForbidResult — the
+        // service's standing gate, surfaced by the controller as the C3 403.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.UpdateProjectAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: other, roles: []);
+        var deniedResult = await deniedController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "New title" });
+        Assert.IsType<ForbidResult>(deniedResult);
+    }
+
+    // ── U08 (ADR 0086) — the project picker + the project link (D9 / D10) ───
+
+    /// <summary>
+    /// U08 / F10 (C-PL·3) — <c>GET /projects/todos/{id}/edit</c> seeds the
+    /// actor's **readable, non-deleted** project options for the standalone
+    /// set-project card (D10) and prefills the current association (F3). The
+    /// options come from the frozen <see cref="IProjectService.ListProjectsAsync"/>
+    /// read (a display surface, never a gate), and the picker's prefill posts
+    /// the stored <c>ProjectId</c> (blank = clear).
+    /// </summary>
+    [Fact]
+    public async Task TodoEdit_ProjectPickerSeeded_ReadableNonDeleted()
+    {
+        const string actor = "subj-todo-edit-actor";
+        const string todoId = "todo-edit";
+        const string projectId = "proj-edit";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Editable to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>
+            {
+                new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
+                new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.TodoEditGet(todoId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<TodoEditorModel>(view.ViewData.Model);
+        // The picker is seeded (F10) — the readable, non-deleted projects,
+        // sorted by name (Alpha before Beta).
+        Assert.Equal(2, vm.Projects.Count);
+        Assert.Equal("Alpha project", vm.Projects[0].Name);
+        Assert.Equal(projectId, vm.Projects[0].Id);
+        Assert.Equal("proj-b", vm.Projects[1].Id);
+        // The current association is prefilled (F3 — the post blank = clear).
+        Assert.Equal(projectId, vm.ProjectId);
+        await projects.Received(1).ListProjectsAsync(
+            null, null, actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// U08 / F6 + F8 (D9) — <c>GET /projects/todos/{id}</c> renders the
+    /// to-do's project association (F3) as a **link** to the project detail
+    /// (the controller's read surface resolves the title via the frozen
+    /// <see cref="IProjectService.GetProjectAsync"/>). A **dangling**
+    /// association (the project is gone / denied) is a display surface, not an
+    /// error: the fields are left null and the link is hidden (F6 / F8).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_ProjectLink_RendersWhenReadable()
+    {
+        const string actor = "subj-todo-detail-actor";
+        const string todoId = "todo-detail";
+        const string projectId = "proj-detail";
+
+        // Readable: the association resolves to a project title.
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Detail to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(new Project
+            {
+                Id = projectId, Title = "The Project", AuthorId = actor, Created = default,
+            });
+
+        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var result = await controller.TodoDetail(todoId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<TodoDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.ProjectId);
+        Assert.Equal("The Project", vm.ProjectTitle);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // Dangling: the association points at a project the actor can no longer
+        // read (the soft-deleted / denied case — F6 / F8) → the link fields are
+        // null (the view hides the line) and the detail is still 200.
+        var danglingProjects = Substitute.For<IProjectService>();
+        danglingProjects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Detail to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        danglingProjects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("gone")));
+
+        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingResult = await danglingController.TodoDetail(todoId);
+
+        var danglingView = Assert.IsType<ViewResult>(danglingResult);
+        var danglingVm = Assert.IsType<TodoDetailViewModel>(danglingView.ViewData.Model);
+        Assert.Null(danglingVm.ProjectId);
+        Assert.Null(danglingVm.ProjectTitle);
+    }
+
+    /// <summary>
+    /// U08 / F10 (C-PL·3) — <c>GET /projects/boards/{id}/edit</c> seeds the
+    /// actor's **readable, non-deleted** project options for the standalone
+    /// set-project card (D10) and prefills the current association (F3). The
+    /// options come from the frozen <see cref="IProjectService.ListProjectsAsync"/>
+    /// read; the prefill posts the stored <c>ProjectId</c> (blank = clear).
+    /// </summary>
+    [Fact]
+    public async Task BoardEdit_ProjectPickerSeeded_ReadableNonDeleted()
+    {
+        const string actor = "subj-board-edit-actor";
+        const string boardId = "board-edit";
+        const string projectId = "proj-edit";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Editable board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>
+            {
+                new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
+                new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.BoardEditGet(boardId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<BoardUpdateModel>(view.ViewData.Model);
+        Assert.Equal(2, vm.Projects.Count);
+        Assert.Equal("Alpha project", vm.Projects[0].Name);
+        Assert.Equal(projectId, vm.Projects[0].Id);
+        Assert.Equal("proj-b", vm.Projects[1].Id);
+        Assert.Equal(projectId, vm.ProjectId);
+        await projects.Received(1).ListProjectsAsync(
+            null, null, actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// U08 / F6 + F8 (D9) — <c>GET /projects/boards/{id}</c> renders the
+    /// board's project association (F3) as a **link** to the project detail
+    /// (the controller's read surface resolves the title via the frozen
+    /// <see cref="IProjectService.GetProjectAsync"/>). A **dangling**
+    /// association (the project is gone / denied) is a display surface, not an
+    /// error: the fields are left null and the link is hidden (F6 / F8).
+    /// </summary>
+    [Fact]
+    public async Task BoardDetail_ProjectLink_RendersWhenReadable()
+    {
+        const string actor = "subj-board-detail-actor";
+        const string boardId = "board-detail";
+        const string projectId = "proj-detail";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Detail board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(new Project
+            {
+                Id = projectId, Title = "The Project", AuthorId = actor, Created = default,
+            });
+
+        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var result = await controller.BoardDetail(boardId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<BoardDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.ProjectId);
+        Assert.Equal("The Project", vm.ProjectTitle);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // Dangling → the link fields are null and the detail is still 200.
+        var danglingProjects = Substitute.For<IProjectService>();
+        danglingProjects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Detail board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        danglingProjects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("gone")));
+
+        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingResult = await danglingController.BoardDetail(boardId);
+
+        var danglingView = Assert.IsType<ViewResult>(danglingResult);
+        var danglingVm = Assert.IsType<BoardDetailViewModel>(danglingView.ViewData.Model);
+        Assert.Null(danglingVm.ProjectId);
+        Assert.Null(danglingVm.ProjectTitle);
+    }
+
+    // ── PL delete lanes (U09 — ADR 0086 / the design doc §9.6 Web names) ─────
+
+    /// <summary>
+    /// <c>POST /projects/goals/{id}/delete</c>: the thin-HTTP boundary (ADR
+    /// 0006-D) — the controller passes the actor's real role set to the frozen
+    /// <c>IProjectService.DeleteGoalAsync</c> seam verbatim, maps the service's
+    /// <see cref="KeyNotFoundException"/> to a clean <see
+    /// cref="NotFoundResult"/> (the C3 404) and its <see
+    /// cref="UnauthorizedAccessException"/> to a clean <see
+    /// cref="ForbidResult"/> (the C3 403), and on success sets
+    /// <c>TempData["info"] = "Goal deleted."</c> + redirects to the U05
+    /// landing (<c>/projects</c>). The D6 dangling-association rule (the
+    /// goal's projects keep their <c>GoalId</c>) is a **service-level**
+    /// concern pinned in Core — this layer only pins the redirect /
+    /// call-log / C3-split mapping.
+    /// </summary>
+    [Fact]
+    public async Task GoalDelete_SoftDeletes_DanglingProjectKept()
+    {
+        const string actor = "subj-goal-delete-actor";
+        const string goalId = "goal-delete";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.GoalDelete(goalId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/projects", redirect.Url);
+        Assert.Equal("Goal deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteGoalAsync(
+            goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing / soft-deleted goal is a clean
+        // NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no goal")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.GoalDelete(goalId));
+
+        // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
+        // clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        Assert.IsType<ForbidResult>(await deniedController.GoalDelete(goalId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}/delete</c>: the thin-HTTP boundary
+    /// (ADR 0006-D) — the controller passes the actor's real role set to the
+    /// frozen <c>IProjectService.DeleteProjectAsync</c> seam verbatim, maps
+    /// the service's <see cref="KeyNotFoundException"/> to a clean <see
+    /// cref="NotFoundResult"/> (the C3 404) and its <see
+    /// cref="UnauthorizedAccessException"/> to a clean <see
+    /// cref="ForbidResult"/> (the C3 403), and on success sets
+    /// <c>TempData["info"] = "Project deleted."</c> + redirects to the U05
+    /// landing (<c>/projects</c>). The D6 dangling-association rule (the
+    /// project's to-dos / boards keep their <c>ProjectId</c>) is a
+    /// **service-level** concern pinned in Core — this layer only pins the
+    /// redirect / call-log / C3-split mapping.
+    /// </summary>
+    [Fact]
+    public async Task ProjectDelete_SoftDeletes_AssociatedTodosBoardsKept()
+    {
+        const string actor = "subj-project-delete-actor";
+        const string projectId = "project-delete";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.ProjectDelete(projectId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/projects", redirect.Url);
+        Assert.Equal("Project deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteProjectAsync(
+            projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing / soft-deleted project is a clean
+        // NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectDelete(projectId));
+
+        // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
+        // clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectDelete(projectId));
+    }
+
+    // ── ADR 0087 — the "waiting on" dependency lane (U03's 6 Web pins) ─────
+
+    /// <summary>
+    /// ADR 0087 D6 — <c>GET /projects/todos?blockedOnly=true</c>: the
+    /// <c>blockedOnly</c> feed filter is passed to the frozen seam verbatim
+    /// (it **narrows the candidate set, never the audience decision**) and
+    /// the view model carries the toggle's current state back so the switch
+    /// renders checked.
+    /// </summary>
+    [Fact]
+    public async Task TodosIndex_BlockedOnlyTrue_PassesFilterToService()
+    {
+        const string actor = "subj-tbd-index-actor";
+        var projects = Substitute.For<IProjectService>();
+        projects.ListTodosAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        var store = await BuildRealStoreAsync();
+        var controller = Build(projects, store: store, subjectId: actor);
+
+        var result = await controller.TodosIndex(
+            componentId: null, assigneeId: null, blockedOnly: true, page: 1);
+
+        var vm = Assert.IsType<TodoIndexViewModel>(
+            Assert.IsType<ViewResult>(result).ViewData.Model);
+        Assert.True(vm.BlockedOnly);
+        // blockedOnly=true is the 7th positional argument (before ct).
+        await projects.Received(1).ListTodosAsync(
+            null, null, actor, 1, false, null, true, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D4 — <c>GET /projects/todos/{id}</c>: a **resolved** blocker
+    /// (exists, !IsDeleted, and passes its own <c>CanAsync(Read)</c>) carries
+    /// the blocker's title + status + detail link into the view model, so the
+    /// chip renders a link (C-TBD·4 — access-scoped, non-leaky).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_RendersBlockerChip_WhenReadable()
+    {
+        const string actor = "subj-tbd-detail-actor";
+        const string todoId = "tbd-detail";
+
+        // The detail read lane runs a live Marten placement query — a real
+        // scratch store (empty placements = an empty list).
+        var store = await BuildRealStoreAsync();
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Waiting to-do", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+                Blocker = new BlockerChip
+                {
+                    TodoId = "tbd-detail-blocker",
+                    Title = "The blocker",
+                    Status = "In Progress",
+                    LinkPath = $"/projects/todos/tbd-detail-blocker",
+                },
+            });
+
+        var controller = Build(projects, store: store, subjectId: actor);
+        var vm = Assert.IsType<TodoDetailViewModel>(
+            Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
+
+        Assert.NotNull(vm.Blocker);
+        Assert.False(vm.Blocker!.Generic);
+        Assert.Equal("The blocker", vm.Blocker.Title);
+        Assert.Equal("In Progress", vm.Blocker.Status);
+        Assert.Equal($"/projects/todos/tbd-detail-blocker", vm.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// ADR 0087 D4 — <c>GET /projects/todos/{id}</c>: a blocker the actor may
+    /// not read (or that is absent / soft-deleted) is a **Generic** chip —
+    /// <c>Generic</c> true and <c>Title</c> / <c>Status</c> / <c>LinkPath</c>
+    /// all null, so nothing is leaked (the C3 404-vs-403 split idiom).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_RendersGenericChip_WhenUnreadable()
+    {
+        const string actor = "subj-tbd-detail-generic-actor";
+        const string todoId = "tbd-detail-generic";
+
+        // The detail read lane runs a live Marten placement query — a real
+        // scratch store (empty placements = an empty list).
+        var store = await BuildRealStoreAsync();
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Waiting to-do", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+                Blocker = new BlockerChip { TodoId = "tbd-detail-generic-blocker", Generic = true },
+            });
+
+        var controller = Build(projects, store: store, subjectId: actor);
+        var vm = Assert.IsType<TodoDetailViewModel>(
+            Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
+
+        Assert.NotNull(vm.Blocker);
+        Assert.True(vm.Blocker!.Generic);
+        Assert.Null(vm.Blocker.Title);
+        Assert.Null(vm.Blocker.Status);
+        Assert.Null(vm.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// ADR 0087 D7 — <c>GET /projects/todos/new</c>: the create form seeds the
+    /// **blocker picker** (the actor's readable, non-deleted to-dos from
+    /// <c>ListPickerTodosAsync</c>, sorted by title — a display surface, never
+    /// a gate; C-TBD·4). A blank prefill posts as "no blocker".
+    /// </summary>
+    [Fact]
+    public async Task CreateGet_SeedBlockerPicker()
+    {
+        const string actor = "subj-tbd-create-actor";
+
+        var projects = Substitute.For<IProjectService>();
+        // The parent picker (F9) reads ListTodosAsync — an empty candidate set
+        // (a valid shape) so the lane doesn't NRE.
+        projects.ListTodosAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        projects.ListPickerTodosAsync(
+                Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<TodoItem>
+            {
+                new() { Id = "tbd-opt-b", Title = "Beta blocker", AuthorId = actor, Created = default },
+                new() { Id = "tbd-opt-a", Title = "Alpha blocker", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor); // no real store needed (all reads are substituted)
+        var vm = Assert.IsType<TodoEditorModel>(
+            Assert.IsType<ViewResult>(await controller.CreateGet()).ViewData.Model);
+
+        // Sorted by title (Alpha before Beta).
+        Assert.Equal(2, vm.BlockerOptions.Count);
+        Assert.Equal("tbd-opt-a", vm.BlockerOptions[0].Id);
+        Assert.Equal("Alpha blocker", vm.BlockerOptions[0].Title);
+        Assert.Equal("tbd-opt-b", vm.BlockerOptions[1].Id);
+        // A new to-do has no blocker yet.
+        Assert.Null(vm.BlockedByTodoId);
+        await projects.Received(1).ListPickerTodosAsync(
+            actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D5 — <c>POST /projects/todos/{id}</c>: a non-blank
+    /// <c>BlockedByTodoId</c> posts through to the frozen seam's
+    /// <c>UpdateTodoRequest.BlockedByTodoId</c> verbatim (the service's C-TBD·3
+    /// cycle guard is the enforcement — not this layer's), while
+    /// <c>ClearBlockedBy</c> stays false (no clear intent on a set).
+    /// </summary>
+    [Fact]
+    public async Task UpdatePost_BlockedByTodoId_PassesFieldToService()
+    {
+        const string actor = "subj-tbd-update-actor";
+        const string todoId = "tbd-update";
+        const string blockerId = "tbd-update-blocker";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new TodoEditorModel
+        {
+            Title = "Edited title",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            BlockedByTodoId = blockerId,
+        };
+
+        Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
+
+        await projects.Received(1).UpdateTodoAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+            Arg.Is<UpdateTodoRequest>(r =>
+                r.BlockedByTodoId == blockerId && !r.ClearBlockedBy),
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D5 — <c>POST /projects/todos/{id}</c>: a "no blocker"
+    /// selection (blank <c>BlockedByTodoId</c>) with the <c>ClearBlockedBy</c>
+    /// checkbox posts <c>ClearBlockedBy = true</c> (an explicit un-block — the
+    /// service sets <c>BlockedByTodoId = null</c>; always safe, never a cycle).
+    /// </summary>
+    [Fact]
+    public async Task UpdatePost_ClearBlockedBy_PassesFlagToService()
+    {
+        const string actor = "subj-tbd-clear-actor";
+        const string todoId = "tbd-clear";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new TodoEditorModel
+        {
+            Title = "Edited title",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            BlockedByTodoId = null,
+            ClearBlockedBy = true,
+        };
+
+        Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
+
+        await projects.Received(1).UpdateTodoAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+            Arg.Is<UpdateTodoRequest>(r =>
+                r.BlockedByTodoId == null && r.ClearBlockedBy),
+            Arg.Any<CancellationToken>());
+    }
+
     // ── Shared scaffolding ────────────────────────────────────────────────────
 
     /// <summary>
@@ -777,6 +1902,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         // the component picker is empty.
         userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
         userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+        // The goal composer (U06) seeds the shared _GrantPickers option lists
+        // via SeedGrantPickerOptionsAsync — these two reads are null-safe
+        // defaults (empty candidate sets — a valid shape) so the new/create
+        // goal lanes don't NRE on the .Where/.Select projection.
+        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
+        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
 
         var controller = new ProjectsController(
             projects, userInfo, DefaultLocalization(), store ?? Substitute.For<IDocumentStore>());
@@ -844,5 +1975,99 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         {
             // no-op — the assertion target is the redirect / the call log, not the bag
         }
+    }
+
+    // ── §9.6 pinned tests — the PL lane's Web pins (ADR 0086) ──────────────
+
+    /// <summary>
+    /// <c>GET /projects</c>: the landing renders the **goals** feed (from the
+    /// frozen seam's <see cref="IProjectService.ListGoalsAsync"/>) and the
+    /// **standalone-projects** feed (from
+    /// <see cref="IProjectService.ListProjectsAsync"/> with
+    /// <c>goalId = null</c> — the D8 / design doc §5 second section). Both
+    /// resolve author display names as *reads* (falling back to the raw id
+    /// when the profile row is absent — the Build() default). A denied actor
+    /// is a clean <see cref="ForbidResult"/> (C3 403).
+    /// </summary>
+    [Fact]
+    public async Task ProjectsIndex_GoalsPlusStandaloneProjects_Render()
+    {
+        const string actor = "subj-projects-index";
+        var goal = new ProjectGoal
+        {
+            Id = "goal-idx", Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+        var project = new Project
+        {
+            Id = "proj-idx", Title = "Project", AuthorId = actor, GoalId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProjectGoal> { goal });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project> { project });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectsIndex(componentId: null, page: 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectsIndexViewModel>(view.ViewData.Model);
+        Assert.Single(vm.Goals);
+        Assert.Equal("goal-idx", vm.Goals[0].Id);
+        Assert.Equal("Goal", vm.Goals[0].Title);
+        Assert.Equal(actor, vm.Goals[0].AuthorDisplayName); // no profile → raw id
+        Assert.Single(vm.StandaloneProjects);
+        Assert.Equal("proj-idx", vm.StandaloneProjects[0].Id);
+        Assert.Equal("Project", vm.StandaloneProjects[0].Title);
+        Assert.Equal(actor, vm.StandaloneProjects[0].AuthorDisplayName); // no profile → raw id
+
+        await projects.Received(1).ListGoalsAsync(null, actor, 1, Arg.Any<CancellationToken>());
+        await projects.Received(1).ListProjectsAsync(null, null, actor, 1, Arg.Any<CancellationToken>());
+
+        // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<ProjectGoal>>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectsIndex(null, page: 1));
+    }
+
+    /// <summary>
+    /// <c>GET /projects</c>: the <see cref="ProjectsController.ProjectsIndex"/>
+    /// action returns a <see cref="ViewResult"/> whose <c>ViewName</c> is
+    /// <c>"ProjectsIndex"</c> — the same name the <c>_ProjectsTabs</c>
+    /// partial's <c>action switch</c> maps to the active <c>"Projects"</c>
+    /// tab (the F9 / C-PL·7 tab contract). The partial is a shared Razor
+    /// view (no view-rendering test infra in this repo — the same convention
+    /// as <c>Todos_List_AudienceFiltered</c> / <c>Board_Detail_LanesAndCards</c>:
+    /// the seam boundary is the view name + view model, not the rendered HTML);
+    /// the tab-active behavior is verified in the browser harness.
+    /// </summary>
+    [Fact]
+    public async Task ProjectsTabs_ProjectsTab_ActiveOnIndex()
+    {
+        const string actor = "subj-tabs-active";
+        var projects = Substitute.For<IProjectService>();
+        projects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProjectGoal>());
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>());
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectsIndex(componentId: null, page: 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        // The view name is the action name — the _ProjectsTabs partial's
+        // action switch maps "ProjectsIndex" → active "Projects" tab (F9).
+        Assert.Equal("ProjectsIndex", view.ViewName);
+        Assert.IsType<ProjectsIndexViewModel>(view.ViewData.Model);
     }
 }

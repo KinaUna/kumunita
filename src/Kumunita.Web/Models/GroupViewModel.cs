@@ -261,6 +261,26 @@ public sealed record GroupDetailViewModel(
     public IReadOnlyList<LanguageOption> Languages { get; init; } = [];
 
     public bool CanTranslate { get; init; }
+
+    // ── Group events (ADR 0089) — the membership-scoped events feed lives on
+    //    the same detail page (the group-posts lane's shape, carried to the M4
+    //    event surface): the feed rows + total + the "New event" button's
+    //    visibility pin. The Detail action loads the feed from
+    //    <c>IEventService.ListGroupEventsAsync</c> (the single access decision
+    //    + aggregate AccessAudit row, GE·5) and reuses the same
+    //    <c>GetGroupIdsAsync</c> membership read that drives <see cref="CanPost"/>
+    //    — the detail page is member-scoped by its owner ∪ member gate, so every
+    //    viewer here is a member and sees the feed + the "New event" button.
+    //    Object-initializer properties (not positional params) for the same
+    //    non-constant-default + shape-pinning reasons as the group-post slots. ──
+    public IReadOnlyList<GroupEventListItem> GroupEvents { get; init; } = [];
+
+    public int GroupEventsTotal { get; init; }
+
+    /// <summary>Whether the actor is a member of this group (the "New event"
+    /// button's visibility pin — the <see cref="CanPost"/> analog for the M4
+    /// event surface; the POST create gate is the authoritative deny, GE·3).</summary>
+    public bool CanCreateEvent { get; init; }
 }
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
@@ -453,4 +473,173 @@ public sealed class GroupPostComposeViewModel
     /// the M3 <see cref="PostComposeViewModel.IsValid"/> body pin, minus the
     /// component/audience slots that do not exist on this lane).</summary>
     public bool IsValid => !string.IsNullOrWhiteSpace(Body);
+}
+
+// ── Group events (ADR 0089) — the ADR 0013 membership lane applied to the M4
+//    event surface. Three view types: a feed row (on the group's Detail page,
+//    the group-post <see cref="PostListItem"/> analog), a composer/edit form
+//    model (the M4 <c>EventEditorModel</c> minus the audience + component slots
+//    — the group's membership is the audience proxy, the service pins a non-null
+//    empty <c>Audience</c> + <c>ComponentId = string.Empty</c>, GE·8), and a
+//    detail surface (the M4 <c>EventDetailViewModel</c> analog: the event +
+//    author + the viewer's RSVP + the author-only RSVP list). The group's
+//    identity is the route's <c>{id}</c> — never a form field. ──
+
+/// <summary>
+/// One <b>group-event feed row</b> on the group's detail page (ADR 0089, the
+/// <see cref="PostListItem"/> group-post feed analog). The low-entropy
+/// projection: the event's <c>Id</c> (the detail link), <c>Title</c>, a
+/// <see cref="BodyPreview"/> (truncated body), the <see cref="Start"/> instant
+/// (the feed's ordering key — the event idiom, contrast the group-post feed's
+/// <c>Created</c>), and the author's <see cref="AuthorDisplayName"/> (a
+/// <c>GetProfileAsync</c> read, not a decision). No <c>Audience</c> /
+/// <c>ComponentId</c> (the lane is already group-scoped, GE·2 — the group is
+/// the feed's *label*, not a per-row gate).
+/// </summary>
+/// <param name="Id">The <see cref="Kumunita.Core.Events.Event.Id"/> (the detail
+/// link's target).</param>
+/// <param name="Title">The event's <see cref="Kumunita.Core.Events.Event.Title"/>.</param>
+/// <param name="BodyPreview">A truncated <see cref="Kumunita.Core.Events.Event.Body"/> (the
+/// row's one-line "what's it about").</param>
+/// <param name="Start">The event's <see cref="Kumunita.Core.Events.Event.Start"/> (rendered
+/// by the one <c>kw-dt</c> tag helper).</param>
+/// <param name="AuthorDisplayName">The author's display name (a read convenience,
+/// the avatar's audited serving lane, never a gate).</param>
+/// <param name="AuthorSubjectId">The author's subject id (the avatar link's target).</param>
+public sealed record GroupEventListItem(
+    string Id,
+    string Title,
+    string BodyPreview,
+    DateTimeOffset Start,
+    string AuthorDisplayName,
+    string AuthorSubjectId);
+
+/// <summary>
+/// The <b>group-event composer / editor</b> form-bound model (ADR 0089, GE·2/GE·8)
+/// — <c>POST /groups/{id}/events</c> (create) and
+/// <c>POST /groups/{id}/events/{eventId}/edit</c> (edit). The M4
+/// <see cref="EventEditorModel"/> **minus** the audience editor and the
+/// component picker: the group's membership is the audience proxy (there is no
+/// audience to choose — the service writes a non-null <b>empty</b>
+/// <c>Audience</c>, GE·8), and the lane is group-exclusive (the service pins
+/// <c>ComponentId = string.Empty</c>, GE·2). The group's identity is the route's
+/// <c>{id}</c> — never form-bound (a form-bound group id would be a lane-bypass
+/// hole; the create gate's membership decision is the authoritative deny, GE·3).
+/// The time fields are <see cref="DateTimeOffset"/>s the browser posts as
+/// <c>datetime-local</c> (the M4 <see cref="EventEditorModel.Start"/> shape).
+/// </summary>
+public sealed class GroupEventComposeViewModel
+{
+    public string? Title { get; set; }
+
+    public string Body { get; set; } = string.Empty;
+
+    /// <summary>The event's start instant (the form's <c>datetime-local</c>
+    /// <c>Start</c> field; the M4 <see cref="EventEditorModel.Start"/> shape —
+    /// a <c>DateTimeOffset</c> the browser posts as <c>datetime-local</c>).</summary>
+    [Required(ErrorMessage = "A start time is required.")]
+    public DateTimeOffset Start { get; set; }
+
+    /// <summary>The event's end instant (the form's <c>datetime-local</c>
+    /// <c>End</c> field; the M4 <see cref="EventEditorModel.End"/> shape).</summary>
+    [Required(ErrorMessage = "An end time is required.")]
+    public DateTimeOffset End { get; set; }
+
+    public string? Location { get; set; }
+
+    /// <summary>The (display-only) capacity — **not** a gate (the M4
+    /// <see cref="Kumunita.Core.Events.Event.Capacity"/> pin).</summary>
+    public int? Capacity { get; set; }
+
+    /// <summary>The author's picked chip color (display metadata, <c>null</c> = the
+    /// theme default; the M4 <see cref="Kumunita.Core.Events.Event.Color"/> pin).</summary>
+    public string? Color { get; set; }
+
+    /// <summary>
+    /// The composer's <b>authored-in language</b> picker (ADR 0018, ADR 0005 B) —
+    /// the BCP-47 code the author is writing this group event in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time (the M4
+    /// <c>EventService</c> language-resolution precedent).
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The composer's language *picker* options — the instance's **enabled**
+    /// language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>.
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="LanguageCode"/>, not a
+    /// catalog-list shape.
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
+
+    /// <summary>
+    /// The composer's <b>save-as-draft</b> toggle (ADR 0037). A group event is
+    /// always written as a <b>draft</b> by <see cref="Kumunita.Core.Events.IEventService.CreateGroupEventAsync"/>
+    /// (the ADR 0037 pin — <c>IsDraft = true</c> regardless of this toggle: the
+    /// create seam has no published shortcut, and publish is the author's explicit
+    /// lane). Carried for the form's checkbox shape; the create seam's draft pin
+    /// is authoritative.
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = true;
+
+    /// <summary>The composer's shape is well-formed for a <c>POST</c>:
+    /// <see cref="Body"/> must be non-empty (a bodyless event is a dead row) and
+    /// <see cref="End"/> after <see cref="Start"/> (an event is a content-
+    /// <i>with-time</i> document — a missing or inverted time is a dead row).
+    /// The M4 <see cref="EventEditorModel"/> Start/End required + ordered pin,
+    /// minus the audience slot that does not exist on this lane.</summary>
+    public bool IsValid =>
+        !string.IsNullOrWhiteSpace(Body)
+        && End > Start;
+}
+
+/// <summary>
+/// The <b>group-event detail</b> surface (ADR 0089, the M4
+/// <see cref="EventDetailViewModel"/> analog) —
+/// <c>GET /groups/{id}/events/{eventId}</c>. A *projection* of
+/// <see cref="Kumunita.Core.Events.IEventService.GetGroupEventAsync"/>'s
+/// <see cref="Kumunita.Core.Events.Event"/>: the single detail decision row
+/// (GE·5, TargetId = the event id) is already written at the Core layer, and a
+/// denied/missing event is mapped by the controller to a 404 (the group lane's
+/// fail-closed shape — GE·3/GE·4, the GroupsController "a non-visible group 404s"
+/// precedent). The <b>RSVP surface</b> is the M4 lane reused as-is (GE·7: RSVP +
+/// reminders inherit the event's single group-lane decision — the author sees
+/// the full RSVP list, every member sees their own RSVP; the lane is keyed by
+/// <c>EventId</c>, no group branch). The author's standing gates the Edit /
+/// Publish affordances (GE·4, author-only — <b>no</b> GlobalAdmin override).
+/// </summary>
+public sealed class GroupEventDetailViewModel
+{
+    public string GroupId { get; set; } = string.Empty;
+
+    /// <summary>The group's <b>display name</b> (the <see cref="GroupId"/>'s
+    /// stored <c>Group.Name</c>, resolved into the viewer's language when a
+    /// user-added name translation exists — the ADR 0026 floor, exactly the
+    /// community-name idiom the group-post detail uses), feeding the "back to
+    /// the group" link's label. A display pin, not a gate: the event's single
+    /// group-lane decision already ran in <c>GetGroupEventAsync</c>.</summary>
+    public string GroupDisplayName { get; set; } = string.Empty;
+
+    public Kumunita.Core.Events.Event Event { get; set; } = null!;
+
+    public string AuthorDisplayName { get; set; } = string.Empty;
+
+    /// <summary>The author's subject id (the <see cref="Kumunita.Core.Events.Event.AuthorId"/>)
+    /// — a display convenience: the avatar links the audited serving lane
+    /// <c>GET /profile/avatar/{subjectId}</c>.</summary>
+    public string AuthorSubjectId { get; set; } = string.Empty;
+
+    /// <summary>Whether the signed-in actor authored the event (a display pin,
+    /// not a gate — the GE·4 author-only edit/publish affordances).</summary>
+    public bool IsAuthor { get; set; }
+
+    /// <summary>The viewer's own RSVP (the M4 <c>GetMyRsvpAsync</c> read; null
+    /// when the actor has not RSVP'd yet).</summary>
+    public Kumunita.Core.Events.EventRsvp? MyRsvp { get; set; }
+
+    /// <summary>The author-only RSVP list (the M4 <c>GetRsvpsAsync</c> read,
+    /// populated only for the author — a non-author sees an empty list; GE·7).</summary>
+    public IReadOnlyList<EventRsvpEntry> Rsvps { get; set; } = [];
 }

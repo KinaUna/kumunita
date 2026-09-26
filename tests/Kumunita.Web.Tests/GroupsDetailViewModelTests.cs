@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Sixteen_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Nineteen_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -83,9 +83,12 @@ public sealed class GroupsDetailViewModelTests
         Assert.Equal(
             new[]
             {
+                "CanCreateEvent",
                 "CanPost",
                 "CanTranslate",
                 "Description",
+                "GroupEvents",
+                "GroupEventsTotal",
                 "GroupId",
                 "GroupPosts",
                 "GroupPostsTotal",

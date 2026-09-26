@@ -124,6 +124,15 @@ var marten = builder.Services.AddMarten(opts =>
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
     M5DocTypes.Configure(opts);
+
+    // M6 (ADR 0076 D1, plan U02): the Notifications bounded context's documents
+    // (Notification + NotificationPreference, ADR 0004 §B.1 — the (RecipientId,
+    // Created) feed-ordering index on Notification and the IdempotencyKey
+    // re-emission dedup anchor (F10)). Without this call the docs are invisible
+    // to Marten (the M3/Media/Page/Tag/M4/M5 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M6DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -332,6 +341,13 @@ builder.Services.Configure<SeedAdminOptions>(
 // never carry it, so the seeder is unreachable by construction.
 builder.Services.Configure<SampleDataOptions>(
     builder.Configuration.GetSection(SampleDataOptions.SectionName));
+// ADR 0078 — sample-account notification suppression: in Development the flag
+// stays false (Mailpit collects the mail, sample accounts behave like real
+// residents); in Production / Staging it is true and the
+// NotificationService.EmitAsync writer is a no-op for any recipient whose
+// profile e-mail is in SampleDataSeeder.SampleAccountEmails.
+builder.Services.Configure<Kumunita.Core.Notifications.NotificationOptions>(o =>
+    o.SuppressForSampleAccountsInProduction = !builder.Environment.IsDevelopment());
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP

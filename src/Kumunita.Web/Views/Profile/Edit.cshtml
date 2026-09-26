@@ -196,5 +196,11 @@
        user-friendly UX) in two-way sync. The textarea is the only
        element posted; the pickers are display-only (no name=). *@
     <partial name="_GrantPickerScripts" />
+    @* The simple image editor (ADR 0075, client/lib/image-editor.ts, tsc-built).
+       This page has no rich editor, so load the module directly; it self-wires
+       the data-avatar-upload form to offer crop + resize before the native
+       POST to /profile/avatar. On editor pages rich-editor.js already imports
+       it, so this is a no-op there (idempotent, guarded self-wire). *@
+    <script type="module" src="~/js/lib/image-editor.js"></script>
 }
 

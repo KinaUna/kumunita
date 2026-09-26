@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -41,11 +42,34 @@ public sealed class ProjectService : IProjectService
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
 
-    public ProjectService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo)
+    // M6 (U04) — the notification emitter (frozen surface, U03). Optional so
+    // the existing (pre-M6) positional call sites keep compiling (CS1736, the
+    // TG-lane precedent); production wiring passes the DI-registered instance.
+    private readonly NotificationService? _notifications;
+
+    // The todo.assign email body's status / date labels + the recipient's
+    // effective time zone + date-time format (ADR 0019 / 0020 — the same
+    // resolution order the <c>kw-dt</c> TagHelper and the M4
+    // <see cref="Events.EventReminderService"/> use): the ADR 0061
+    // <see cref="ITranslationProvider"/> (status labels in the recipient's
+    // <c>EmailLanguage</c>) + the platform default <c>TimeZone</c> /
+    // <c>DateFormat</c> (the per-recipient profile override → the platform
+    // default → the <c>UTC</c> / <see cref="DateFormat.FloorFormat"/> floor).
+    // Optional so the existing (pre-M6) 3-arg call sites keep compiling;
+    // production wiring passes the DI-registered instances.
+    private readonly ITranslationProvider? _translator;
+    private readonly ILocalizationService? _localization;
+
+    public ProjectService(
+        IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
+        NotificationService? notifications = null, ITranslationProvider? translator = null, ILocalizationService? localization = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _notifications = notifications;
+        _translator = translator;
+        _localization = localization;
     }
 
     // --- Read lanes (U04) -------------------------------------------------------
@@ -72,8 +96,18 @@ public sealed class ProjectService : IProjectService
     /// pagination, it does **not** change the audience decision (a to-do still
     /// only appears if the actor passes the <c>CanSeeAsync(Read)</c> pass).
     /// </para>
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/> / <paramref name="assigneeId"/> /
+    /// <paramref name="unassignedOnly"/>). When non-null, only to-dos with
+    /// <see cref="TodoItem.ProjectId"/> equal to it are in the candidate set
+    /// (the <c>ProjectId == projectId</c> row set); when <c>null</c> (the
+    /// default), no filter — it narrows candidates before pagination, it does
+    /// **not** change the audience decision (C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -86,6 +120,17 @@ public sealed class ProjectService : IProjectService
             q = q.Where(t => t.AssigneeId == assigneeId);
         if (unassignedOnly)
             q = q.Where(t => t.AssigneeId == null);
+        // The project association filter (ADR 0086 / U04): a feed filter,
+        // never a gate (C-M3·2 / C-PL·3) — the to-do's own Audience decision
+        // stays the access boundary (C-M5·3).
+        if (projectId is not null)
+            q = q.Where(t => t.ProjectId == projectId);
+        // The TBD "waiting on" filter (ADR 0087 D6): a feed filter, never a
+        // gate (C-TBD·2) — narrows the candidates to the blocked to-dos
+        // (the `unassignedOnly` shape), it does not change the audience
+        // decision (C-M5·3).
+        if (blockedOnly)
+            q = q.Where(t => t.BlockedByTodoId != null);
         var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -155,7 +200,75 @@ public sealed class ProjectService : IProjectService
                 subtasks.Add(sub);
         }
 
-        return new TodoDetailResult { Todo = todo, Subtasks = subtasks };
+        // ADR 0087 D4 — the "waiting on" chip, access-scoped (C-TBD·4). The
+        // blocker's read is an *access decision* within the same session (the
+        // ListBoardsForTodoAsync per-parent precedent), not a separate audit
+        // event (C3 — the single aggregate row is preserved). An absent /
+        // soft-deleted / unreadable blocker degrades to the generic label; the
+        // C3 404-vs-403 split idiom — an unreadable blocker's title / status
+        // are not leaked.
+        BlockerChip? blocker = null;
+        if (todo.BlockedByTodoId is not null)
+        {
+            var blockerTodo = await session.LoadAsync<TodoItem>(todo.BlockedByTodoId, ct).ConfigureAwait(false);
+            if (blockerTodo is null || blockerTodo.IsDeleted)
+            {
+                blocker = new BlockerChip { TodoId = todo.BlockedByTodoId, Generic = true };
+            }
+            else
+            {
+                var blockerDecision = await _authorization
+                    .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(blockerTodo))
+                    .ConfigureAwait(false);
+                blocker = blockerDecision.Allowed
+                    ? new BlockerChip
+                    {
+                        TodoId = blockerTodo.Id,
+                        Title = blockerTodo.Title,
+                        Status = blockerTodo.Status,
+                        LinkPath = $"/projects/todos/{blockerTodo.Id}"
+                    }
+                    : new BlockerChip { TodoId = blockerTodo.Id, Generic = true };
+            }
+        }
+
+        return new TodoDetailResult { Todo = todo, Subtasks = subtasks, Blocker = blocker };
+    }
+
+    /// <summary>
+    /// The **blocker picker** read lane (ADR 0087 D7) — the actor's readable,
+    /// non-deleted to-dos: the candidate set is <c>!IsDeleted</c>, ordered by
+    /// <see cref="TodoItem.Created"/> descending, paged; the survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3, the
+    /// single aggregate <see cref="AccessAudit"/> row with <c>TargetKind =
+    /// "todo"</c>) over the <see cref="TodoItemToAuditableResource"/> (U03).
+    /// A **display** surface, never a gate (C-TBD·4) — it does not pre-check
+    /// cycles (the write lane does — C-TBD·3).
+    /// </summary>
+    public async Task<IReadOnlyList<TodoItem>> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        var candidates = await session.Query<TodoItem>()
+            .Where(t => !t.IsDeleted)
+            .OrderByDescending(t => t.Created)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<TodoItem>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "todo"), from that single call (the ListTodosAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(t => new TodoItemToAuditableResource(t)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(t => visibleIds.Contains(t.Id)).ToList();
     }
 
     /// <summary>
@@ -168,8 +281,17 @@ public sealed class ProjectService : IProjectService
     /// matching pass; C3, the single aggregate <see cref="AccessAudit"/> row
     /// with <c>TargetKind = "board"</c> via the
     /// <see cref="KanbanBoardToAuditableResource"/>, U03).
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/>). When non-null, only boards with
+    /// <see cref="KanbanBoard.ProjectId"/> equal to it are in the candidate
+    /// set (the <c>ProjectId == projectId</c> row set); when <c>null</c> (the
+    /// default), no filter — it narrows candidates before pagination, it does
+    /// **not** change the audience decision (C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -178,6 +300,11 @@ public sealed class ProjectService : IProjectService
             .Where(b => !b.IsDeleted);
         if (componentId is not null)
             q = q.Where(b => b.ComponentId == componentId);
+        // The project association filter (ADR 0086 / U04): a feed filter,
+        // never a gate (C-M3·2 / C-PL·3) — the board's own Audience decision
+        // stays the access boundary (C-M5·3).
+        if (projectId is not null)
+            q = q.Where(b => b.ProjectId == projectId);
         var candidates = await q.OrderByDescending(b => b.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -185,6 +312,56 @@ public sealed class ProjectService : IProjectService
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "board"), from that single call (the ListTodosAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(b => new KanbanBoardToAuditableResource(b)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(b => visibleIds.Contains(b.Id)).ToList();
+    }
+
+    /// <summary>
+    /// The boards the actor may <c>Read</c> on which this to-do is placed
+    /// (the "link(s) to the Kanban board(s) it is associated with, **if the
+    /// user has access to them**" surface, used by the notification inbox card):
+    /// the <see cref="BoardItemPlacement"/> rows for <paramref name="todoItemId"/>
+    /// resolve to their <see cref="KanbanBoard"/> (non-deleted); the survivors
+    /// are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3,
+    /// the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "board"</c>) over the
+    /// <see cref="KanbanBoardToAuditableResource"/> (U03) — the denied boards
+    /// are dropped, **not** the whole set. A to-do with no placements, or whose
+    /// boards the actor may not see, returns an **empty** list (never null).
+    /// Ordered by board <c>Created</c> ascending. A plain read (the
+    /// <see cref="ListBoardsAsync"/> shape) — no in-flight caller transaction.
+    /// </summary>
+    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsForTodoAsync(string todoItemId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            return Array.Empty<KanbanBoard>();
+
+        await using var session = _store.QuerySession();
+        var boardIds = await session.Query<BoardItemPlacement>()
+            .Where(p => p.TodoItemId == todoItemId)
+            .Select(p => p.BoardId)
+            .Distinct()
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (boardIds.Count == 0)
+            return Array.Empty<KanbanBoard>();
+
+        var candidates = await session.Query<KanbanBoard>()
+            .Where(b => boardIds.Contains(b.Id) && !b.IsDeleted)
+            .OrderBy(b => b.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<KanbanBoard>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "board"), from that single call (the ListBoardsAsync shape).
         var visibleSet = await _authorization
             .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(b => new KanbanBoardToAuditableResource(b)))
             .ConfigureAwait(false);
@@ -278,7 +455,61 @@ public sealed class ProjectService : IProjectService
             laneDetails.Add(new LaneDetail { Lane = lane, Cards = cards });
         }
 
-        return new BoardDetailResult { Board = board, Lanes = laneDetails };
+        // ADR 0087 D4 — the board **card** chip (the D4 surface): resolve the
+        // access-scoped `BlockerChip` for each *visible* card that has a
+        // `BlockedByTodoId` (a denied card is not returned, so it is not
+        // resolved — the two-level decision already ran). Each card's blocker
+        // is its **own** read (the `GetTodoAsync` chip precedent, C-TBD·4):
+        // an absent / soft-deleted / unreadable blocker degrades to
+        // `Generic` (no title / link — no leak). **Additive** — `Cards` is
+        // untouched; the chip lives on the `CardBlockers` map (D9).
+        var cardBlockers = new Dictionary<string, BlockerChip>();
+        foreach (var card in laneDetails.SelectMany(l => l.Cards))
+        {
+            if (card.BlockedByTodoId is null)
+                continue;
+            var chip = await ResolveBlockerChipAsync(session, actorId, card.BlockedByTodoId, ct).ConfigureAwait(false);
+            cardBlockers[card.Id] = chip;
+        }
+
+        return new BoardDetailResult { Board = board, Lanes = laneDetails, CardBlockers = cardBlockers };
+    }
+
+    /// <summary>
+    /// Resolves the access-scoped <see cref="BlockerChip"/> for a card's /
+    /// to-do's <see cref="TodoItem.BlockedByTodoId"/> target (ADR 0087 D4,
+    /// C-TBD·4) — the **single** resolution path shared by the to-do detail
+    /// (<see cref="GetTodoAsync"/>'s <c>Blocker</c>) and the board card
+    /// (<see cref="GetBoardAsync"/>'s <c>CardBlockers</c>). A to-do the actor
+    /// may not read, or one that is absent / soft-deleted, degrades to
+    /// <see cref="BlockerChip.Generic"/> (<c>true</c>) — no title, no link,
+    /// no leak (the C3 404-vs-403 split idiom). Reuses the **existing**
+    /// <see cref="TodoItemToAuditableResource"/> (D9 — no new adapter /
+    /// <c>AccessAction</c> / <c>AccessVia</c>).
+    /// </summary>
+    private async Task<BlockerChip> ResolveBlockerChipAsync(
+        IQuerySession session, string actorId, string blockerTodoId, CancellationToken ct)
+    {
+        var blockerTodo = await session.LoadAsync<TodoItem>(blockerTodoId, ct).ConfigureAwait(false);
+        if (blockerTodo is null || blockerTodo.IsDeleted)
+            return new BlockerChip { TodoId = blockerTodoId, Generic = true };
+
+        // The blocker's **own** read decision (C-TBD·4) — within the caller's
+        // session, not a separate audit event (C3 — the aggregate row is
+        // preserved: the blocker's read is within the to-do / board's read).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(blockerTodo))
+            .ConfigureAwait(false);
+
+        return decision.Allowed
+            ? new BlockerChip
+            {
+                TodoId = blockerTodo.Id,
+                Title = blockerTodo.Title,
+                Status = blockerTodo.Status,
+                LinkPath = $"/projects/todos/{blockerTodo.Id}"
+            }
+            : new BlockerChip { TodoId = blockerTodo.Id, Generic = true };
     }
 
     // --- Write lanes (U05) — standing re-checked server-side (C-M5·6, C3) ---
@@ -381,6 +612,65 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// The **goal** mutation standing (ADR 0086 / design doc §9.3, C-PL·2):
+    /// the actor is allowed iff **creator**
+    /// (<see cref="ProjectGoal.AuthorId"/> == actor, the <c>Owner</c> branch)
+    /// ∪ **GlobalAdmin** (<paramref name="actorRoles"/> carries the role —
+    /// the ADR 0017 override branch). The **assignee branch does not apply**
+    /// to a goal (a goal is not assignable the way a to-do is — the ADR 0070
+    /// board-edit precedent — C-PL·2). A null goal is a
+    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
+    /// actor is an <see cref="UnauthorizedAccessException"/> (the Web layer's
+    /// 403).
+    /// </summary>
+    public static void CheckGoalStanding(string actorId, IReadOnlySet<string> actorRoles, ProjectGoal? goal)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (goal is null)
+            throw new KeyNotFoundException("A goal is required for the standing check.");
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to mutate a goal.");
+
+        if (string.Equals(goal.AuthorId, actorId, StringComparison.Ordinal))
+            return;                                        // creator (Owner branch)
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return;                                        // GlobalAdmin (ADR 0017 override)
+
+        throw new UnauthorizedAccessException(
+            "Only the creator or a GlobalAdmin may mutate this goal.");
+    }
+
+    /// <summary>
+    /// The **project** mutation standing (ADR 0086 / design doc §9.3, C-PL·2):
+    /// the actor is allowed iff **creator**
+    /// (<see cref="Project.AuthorId"/> == actor, the <c>Owner</c> branch)
+    /// ∪ **GlobalAdmin** (<paramref name="actorRoles"/> carries the role —
+    /// the ADR 0017 override branch). The **assignee branch does not apply**
+    /// to a project (a project is not assignable the way a to-do is — the
+    /// ADR 0070 board-edit precedent — C-PL·2; the
+    /// <see cref="CheckGoalStanding"/> shape). A null project is a
+    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
+    /// actor is an <see cref="UnauthorizedAccessException"/> (the Web layer's
+    /// 403).
+    /// </summary>
+    public static void CheckProjectStanding(string actorId, IReadOnlySet<string> actorRoles, Project? project)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (project is null)
+            throw new KeyNotFoundException("A project is required for the standing check.");
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to mutate a project.");
+
+        if (string.Equals(project.AuthorId, actorId, StringComparison.Ordinal))
+            return;                                        // creator (Owner branch)
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return;                                        // GlobalAdmin (ADR 0017 override)
+
+        throw new UnauthorizedAccessException(
+            "Only the creator or a GlobalAdmin may mutate this project.");
+    }
+
+    /// <summary>
     /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
     /// audit tag for a **to-do** mutation (design doc §2.5): the creator
     /// (<see cref="AccessVia.Owner"/>); the assignee or a GlobalAdmin (both
@@ -403,6 +693,32 @@ public sealed class ProjectService : IProjectService
     /// </summary>
     private static AccessVia BoardAuditViaFor(string actorId, KanbanBoard board)
         => string.Equals(board.AuthorId, actorId, StringComparison.Ordinal)
+            ? AccessVia.Owner
+            : AccessVia.Admin;
+
+    /// <summary>
+    /// Maps the branch the actor qualified under to the <see
+    /// cref="AccessVia"/> audit tag for a **goal** mutation (ADR 0086 /
+    /// design doc §9.3): the creator (<see cref="AccessVia.Owner"/>); a
+    /// GlobalAdmin (<see cref="AccessVia.Admin"/> — the <see
+    /// cref="BoardAuditViaFor"/> shape; the assignee branch does not apply,
+    /// C-PL·2).
+    /// </summary>
+    private static AccessVia GoalAuditViaFor(string actorId, ProjectGoal goal)
+        => string.Equals(goal.AuthorId, actorId, StringComparison.Ordinal)
+            ? AccessVia.Owner
+            : AccessVia.Admin;
+
+    /// <summary>
+    /// Maps the branch the actor qualified under to the <see
+    /// cref="AccessVia"/> audit tag for a **project** mutation (ADR 0086 /
+    /// design doc §9.3): the creator (<see cref="AccessVia.Owner"/>); a
+    /// GlobalAdmin (<see cref="AccessVia.Admin"/> — the
+    /// <see cref="GoalAuditViaFor"/> shape; the assignee branch does not
+    /// apply, C-PL·2).
+    /// </summary>
+    private static AccessVia ProjectAuditViaFor(string actorId, Project project)
+        => string.Equals(project.AuthorId, actorId, StringComparison.Ordinal)
             ? AccessVia.Owner
             : AccessVia.Admin;
 
@@ -436,6 +752,9 @@ public sealed class ProjectService : IProjectService
             AuthorId = actorId,                            // C-M5·6 — the author becomes the standing owner.
             AssigneeId = request.AssigneeId,               // display + standing, never a gate (C-M5·3 / C-M5·6).
             ParentId = request.ParentId,                   // C-M5·7 — the sole hierarchy mechanism; `null` = top-level.
+            BlockedByTodoId = request.BlockedByTodoId,      // ADR 0087 D5 — the "waiting on" pointer; written verbatim, a hint never a gate (C-TBD·2).
+            StartAt = request.StartAt,                     // ADR 0079 — the optional start (`null` = no date); the Event Start/End shape, but optional.
+            DueAt = request.DueAt,                         // ADR 0079 — the optional due date (`null` = no date).
             Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
             IsDeleted = false,                             // published on creation (D8a — no draft lane).
             LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below (instance default floor).
@@ -449,6 +768,25 @@ public sealed class ProjectService : IProjectService
         // EventService.ResolveLanguageCodeAsync shape).
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
         todo.LanguageCode = await ResolveLanguageCodeAsync(todo.LanguageCode, session, ct).ConfigureAwait(false);
+
+        // ADR 0087 D5 / the C3 404-vs-403 split — a non-null BlockedByTodoId must
+        // point at a to-do that exists and is not soft-deleted (the actor's
+        // read of the blocker is an *access decision* in the same session, not a
+        // write refusal — the unreadable-blocker case degrades to the generic
+        // chip at read time, C-TBD·4). A self-reference is also refused (the
+        // to-do is new, so it cannot yet be its own blocker — the C-TBD·3 guard's
+        // trivial branch).
+        if (!string.IsNullOrEmpty(todo.BlockedByTodoId))
+        {
+            if (todo.BlockedByTodoId == todo.Id)
+                throw new InvalidOperationException(
+                    $"To-do '{todo.Id}' cannot block itself.");
+
+            var blocker = await session.LoadAsync<TodoItem>(todo.BlockedByTodoId, ct).ConfigureAwait(false);
+            if (blocker is null || blocker.IsDeleted)
+                throw new KeyNotFoundException(
+                    $"To-do '{todo.BlockedByTodoId}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
+        }
 
         session.Store(todo);
         StoreAuditRow(session, actorId, "todo.create", todo.Id, TargetKindTodo, AccessVia.Owner);
@@ -549,6 +887,51 @@ public sealed class ProjectService : IProjectService
             newParentId = wouldBeParent;
         }
 
+        // **The "waiting on" association (ADR 0087 D5 / C-TBD·3)** — resolved
+        // **before** any write (the guard runs before the store, so a refused
+        // set writes nothing):
+        //   * `ClearBlockedBy == true`  → un-block (BlockedByTodoId = null) —
+        //     always safe (removing a blocker can never create a cycle).
+        //   * `BlockedByTodoId != null` → the **cycle guard**: if the target is
+        //     the to-do itself or the to-do is reachable by following the
+        //     BlockedByTodoId chain **up** from the target, the association
+        //     would create a cycle — refuse (C-TBD·3). The target must also
+        //     exist and not be soft-deleted (C3 404-vs-403 split).
+        //   * neither                   → no-op on the association.
+        string? newBlockedByTodoId = todo.BlockedByTodoId;
+        if (request.ClearBlockedBy)
+        {
+            newBlockedByTodoId = null;
+        }
+        else if (!string.IsNullOrEmpty(request.BlockedByTodoId))
+        {
+            var wouldBeBlocker = request.BlockedByTodoId;
+            if (wouldBeBlocker == todoItemId)
+                throw new InvalidOperationException(
+                    $"To-do '{todoItemId}' cannot be blocked by itself.");
+
+            // The target must exist and not be soft-deleted (C3 split).
+            var blocker = await session.LoadAsync<TodoItem>(wouldBeBlocker, ct).ConfigureAwait(false);
+            if (blocker is null || blocker.IsDeleted)
+                throw new KeyNotFoundException(
+                    $"To-do '{wouldBeBlocker}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
+
+            // The cycle guard: walk the BlockedByTodoId chain UP from the target.
+            // Each to-do has at most ONE blocker (BlockedByTodoId), so this is
+            // a linear chain — if the chain reaches todoItemId, setting this
+            // to-do's blocker to the target would close the cycle (C-TBD·3).
+            var current = blocker;
+            while (current.BlockedByTodoId is not null)
+            {
+                if (current.BlockedByTodoId == todoItemId)
+                    throw new InvalidOperationException(
+                        $"To-do '{todoItemId}' cannot be blocked by '{blocker.Title ?? wouldBeBlocker}': following the blocker chain would create a cycle.");
+                current = (await session.LoadAsync<TodoItem>(current.BlockedByTodoId, ct).ConfigureAwait(false))!;
+            }
+
+            newBlockedByTodoId = wouldBeBlocker;
+        }
+
         // ADR 0018 — resolve the authored-in tag on **both** sides before
         // comparing (the EventService.UpdateAsync shape): a no-op re-save that
         // leaves the picker at the instance default must compare as
@@ -560,12 +943,18 @@ public sealed class ProjectService : IProjectService
 
         // A "real change" is any of the editable fields differing from the
         // stored row (the EventService.UpdateAsync `changed` shape — a no-op
-        // re-save leaves the stamp untouched).
+        // re-save leaves the stamp untouched). ADR 0079 — the optional dates
+        // differ in value (null vs value, or a different instant): unlike the
+        // other partial fields, a `null` here is the *clear* intent (the edit
+        // form's blank field), so the comparison is the plain `!=`.
         var changed = request.Title is not null && todo.Title != request.Title
             || request.Body is not null && todo.Body != request.Body
             || request.ComponentId is not null && !string.Equals(todo.ComponentId, request.ComponentId, StringComparison.Ordinal)
             || request.Status is not null && !string.Equals(todo.Status, request.Status, StringComparison.Ordinal)
             || newParentId != todo.ParentId
+            || newBlockedByTodoId != todo.BlockedByTodoId
+            || todo.StartAt != request.StartAt
+            || todo.DueAt != request.DueAt
             || (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
             || (request.TagIds is not null && !ListsEqual(todo.TagIds, request.TagIds));
 
@@ -582,7 +971,14 @@ public sealed class ProjectService : IProjectService
             todo.ComponentId = request.ComponentId;
         if (request.Status is not null)
             todo.Status = request.Status;
+        // ADR 0079 — the optional dates are *always* assigned (not gated on
+        // non-null): a `null` in the request is the *clear* intent (the edit
+        // form posts a blank `datetime-local` as null), so the stored value is
+        // overwritten verbatim — value or clear, both land.
+        todo.StartAt = request.StartAt;
+        todo.DueAt = request.DueAt;
         todo.ParentId = newParentId;                       // C-M5·7 — the resolved hierarchy (no-op when unchanged).
+        todo.BlockedByTodoId = newBlockedByTodoId;         // ADR 0087 D5 — the resolved "waiting on" (no-op when unchanged; C-TBD·3 cycle guard applied above).
         if (request.LanguageCode is not null)
             todo.LanguageCode = updatedLanguageCode;       // ADR 0018
         if (request.TagIds is not null)
@@ -636,6 +1032,37 @@ public sealed class ProjectService : IProjectService
 
         session.Store(todo);
         StoreAuditRow(session, actorId, "todo.assign", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+
+        // M6 (U04, F8) — todo-assign emitter (design doc §6.3): the
+        // assignee is notified. `null` = unassign (no recipient); skip the
+        // self-assign case (actor == assignee — no self-notification).
+        // Staged into the caller's session and committed by the single
+        // SaveChangesAsync below (C3).
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(assigneeId)
+            && !string.Equals(assigneeId, actorId, StringComparison.Ordinal))
+        {
+            // The email + the inbox row's UGC snippet (EmitAsync composes
+            // bodyTemplate + " " + body) carry the to-do's title + status +
+            // start / due (each "if set") + the description. The **rich** card
+            // — title, description, status, dates, the link to the to-do, the
+            // access-gated board links, and the subtasks' titles + links — is
+            // built at **read time** by the notification inbox (the controller
+            // + Index.cshtml): a per-recipient access decision and a live
+            // subtask/board set can't be captured in a one-shot email (the
+            // board links are gated on the *recipient's* Read access, ADR
+            // 0006-D, and the email is plain text, ADR 0061). See
+            // BuildTodoAssignBodyAsync.
+            var body = await BuildTodoAssignBodyAsync(todo, assigneeId, ct).ConfigureAwait(false);
+            await _notifications.EmitAsync(
+                session,
+                recipientId: assigneeId,
+                kind: NotificationKinds.TodoAssign,
+                idempotencyKey: $"notification:todo.assign:{todo.Id}",
+                body: body,
+                ct: ct).ConfigureAwait(false);
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -741,6 +1168,145 @@ public sealed class ProjectService : IProjectService
 
         throw new UnauthorizedAccessException(
             "Only a member of the to-do's group or community may claim it.");
+    }
+
+    /// <summary>
+    /// The <c>todo.assign</c> email + inbox-row UGC snippet (the
+    /// <see cref="NotificationService.EmitAsync"/>'s <c>body</c> argument — the
+    /// part appended after the localized <c>notification.todo.assign.body</c>
+    /// template). It carries the to-do's **title**, its **status** (a status
+    /// label in the recipient's <c>EmailLanguage</c> — ADR 0061, the ADR 0069
+    /// closed status vocabulary), its **start** and **due** instants (each
+    /// "if set", rendered in the recipient's effective time zone + date-time
+    /// format — ADR 0019 / 0020, the <c>kw-dt</c> /
+    /// <see cref="Events.EventReminderService"/> resolution order), and its
+    /// **description** (the <see cref="TodoItem.Body"/>). A plain-text,
+    /// escape-free string (the <c>SmtpSender</c> sets <c>IsBodyHtml = false</c>)
+    /// — no links: the access-gated board links and the subtasks' titles +
+    /// links are a **read-time** surface (the notification inbox card; a
+    /// one-shot email can't gate the board links on the *recipient's*
+    /// <c>Read</c> access, ADR 0006-D, nor carry a live subtask set). When the
+    /// optional seams are absent (a pre-M6 test harness), degrades to the
+    /// title alone — the same text <see cref="NotificationService.EmitAsync"/>
+    /// composed before this enrichment existed (the F8 invariant: it does not
+    /// assert on the body content).
+    /// </summary>
+    private async Task<string> BuildTodoAssignBodyAsync(TodoItem todo, string recipientId, CancellationToken ct)
+    {
+        var parts = new List<string> { todo.Title };
+
+        // The recipient's profile (ADR 0061 — the EmailLanguage for the label
+        // words; ADR 0019 / 0020 — the TimeZone / DateFormat override) is
+        // loaded **once** and shared by every label + instant below. The
+        // platform defaults (the per-recipient override's floor) are resolved
+        // once too.
+        var profile = await _userInfo.GetProfileAsync(recipientId).ConfigureAwait(false);
+        var defaultZone = _localization is null ? null : await _localization.GetDefaultTimezoneAsync().ConfigureAwait(false);
+
+        // The status label — the recipient's EmailLanguage (ADR 0061), the
+        // ADR 0069 closed vocabulary's label key (the same StatusLabelKey the
+        // TodoDetail view + the inbox card use). A null / unknown status is
+        // skipped ("if set").
+        if (!string.IsNullOrWhiteSpace(todo.Status) && _translator is not null)
+        {
+            var label = await _translator.GetAsync(
+                $"projects.board.status.{StatusLabelKey(todo.Status)}",
+                profile?.EmailLanguage)
+                .ConfigureAwait(false);
+            parts.Add($"[{label}]");
+        }
+
+        // The start / due instants (each "if set"), rendered in the recipient's
+        // effective time zone + date-time format (ADR 0019 / 0020). The label
+        // words are the platform-copy (Start / Due), resolved in the recipient's
+        // EmailLanguage like the status label; the instant itself is
+        // localized to the recipient's zone/format.
+        var defaultFormat = _localization is null ? null : await _localization.GetDefaultDateFormatAsync().ConfigureAwait(false);
+
+        if (todo.StartAt is not null && _translator is not null)
+        {
+            var startLabel = await _translator.GetAsync("projects.todo.start", profile?.EmailLanguage).ConfigureAwait(false);
+            parts.Add($"{startLabel} {FormatTodoInstant(todo.StartAt.Value, profile?.TimeZone, defaultZone, profile?.DateFormat, defaultFormat)}");
+        }
+        if (todo.DueAt is not null && _translator is not null)
+        {
+            var dueLabel = await _translator.GetAsync("projects.todo.due", profile?.EmailLanguage).ConfigureAwait(false);
+            parts.Add($"{dueLabel} {FormatTodoInstant(todo.DueAt.Value, profile?.TimeZone, defaultZone, profile?.DateFormat, defaultFormat)}");
+        }
+
+        // The description (the to-do's own authored body, ADR 0018 — its own
+        // language, appended after the localized labels).
+        if (!string.IsNullOrWhiteSpace(todo.Body))
+            parts.Add(todo.Body);
+
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// The ADR 0069 closed status vocabulary → its label key (the same mapping
+    /// the <c>TodoDetail</c> view's <c>StatusLabelKey</c> and the inbox card
+    /// use): the four known codes map to their <c>projects.board.status.*</c>
+    /// key; a null / unknown code maps to the <c>none</c> key (which the
+    /// callers skip via their "if set" gate).
+    /// </summary>
+    private static string StatusLabelKey(string? code) => code switch
+    {
+        KanbanStatuses.NotStarted => "not_started",
+        KanbanStatuses.InProgress => "in_progress",
+        KanbanStatuses.Done => "done",
+        KanbanStatuses.Cancelled => "cancelled",
+        _ => "none",
+    };
+
+    /// <summary>
+    /// Renders <paramref name="instant"/> in <paramref name="profileZoneId"/>
+    /// → the platform <paramref name="defaultZoneId"/> → <c>UTC</c>, and
+    /// formats it with <paramref name="profileFormat"/> → the platform
+    /// <paramref name="defaultFormat"/> → <see cref="DateFormat.FloorFormat"/>
+    /// — the exact resolution order the <c>kw-dt</c> TagHelper and
+    /// <see cref="Events.EventReminderService"/> use (ADR 0019 / 0020). The
+    /// instant is converted to the zone's wall-clock **first**, then the format
+    /// is applied with the invariant culture (the zone/format, not the host
+    /// locale, is what the resident sees). Never throws — an unknown zone id
+    /// or an unusable format degrades to the next tier.
+    /// </summary>
+    private static string FormatTodoInstant(
+        DateTimeOffset instant,
+        string? profileZoneId, string? defaultZoneId,
+        string? profileFormat, string? defaultFormat)
+    {
+        var zone = TryResolveZone(profileZoneId)
+                  ?? TryResolveZone(defaultZoneId)
+                  ?? System.TimeZoneInfo.FindSystemTimeZoneById("UTC");
+
+        string fmt;
+        if (DateFormat.IsValid(profileFormat)) fmt = profileFormat!;
+        else if (DateFormat.IsValid(defaultFormat)) fmt = defaultFormat!;
+        else fmt = DateFormat.FloorFormat;
+
+        var utc = instant.UtcDateTime;
+        var wallTime = utc + zone.GetUtcOffset(utc);
+        return wallTime.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// An IANA zone id → a <see cref="System.TimeZoneInfo"/>, or <c>null</c>
+    /// when the id is blank / not present on the OS (the
+    /// <see cref="Events.EventReminderService"/> "fall through" rule — never a
+    /// throw).
+    /// </summary>
+    private static System.TimeZoneInfo? TryResolveZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+        try
+        {
+            return System.TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -991,6 +1557,688 @@ public sealed class ProjectService : IProjectService
         // lanes never rely on dirty-tracking of a loaded row.
         session.Store(board);
         StoreAuditRow(session, actorId, "board.update", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return board;
+    }
+
+    // --- PL goal lanes (U02) — ADR 0086, the design doc §9.3 surface ---------
+    //
+    // The goal read lanes (design doc §9.3) mirror the <see
+    // cref="ListBoardsAsync"/> / <see cref="GetBoardAsync"/> shapes on the
+    // <see cref="ProjectGoal"/> surface: <c>CanSeeAsync(Read)</c> over the
+    // <see cref="ProjectGoalToAuditableResource"/> (C6, one shared matching
+    // pass; C3, one aggregate audit row per feed pass) for the feed,
+    // <c>CanAsync(Read)</c> for the detail (the 404-vs-403 split). The goal
+    // write lanes mirror the <see cref="CreateBoardAsync"/> /
+    // <see cref="UpdateBoardAsync"/> shapes: the author's choice written
+    // verbatim (ADR 0001-B), the **creator ∪ GlobalAdmin** standing
+    // re-checked server-side (the <see cref="CheckGoalStanding"/> shape —
+    // C-PL·2, the ADR 0070 board-edit precedent), the ADR 0018 language
+    // floor, one <see cref="AccessAudit"/> row per write (C3,
+    // <c>TargetKind = "goal"</c>).
+
+    /// <summary>
+    /// The goal feed (design doc §9.3) — mirrors <see
+    /// cref="ListBoardsAsync"/> on the <see cref="ProjectGoal"/> surface:
+    /// the candidate set is the non-deleted goals, filtered by the optional
+    /// <paramref name="componentId"/> (a *filter, never a gate* — C-M3·2),
+    /// ordered by <see cref="ProjectGoal.Created"/> descending, paged; the
+    /// survivors are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared
+    /// matching pass; C3, the single aggregate <see cref="AccessAudit"/> row
+    /// with <c>TargetKind = "goal"</c> via the
+    /// <see cref="ProjectGoalToAuditableResource"/>, U01).
+    /// </summary>
+    public async Task<IReadOnlyList<ProjectGoal>> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        IQueryable<ProjectGoal> q = session.Query<ProjectGoal>()
+            .Where(g => !g.IsDeleted);
+        if (componentId is not null)
+            q = q.Where(g => g.ComponentId == componentId);
+        var candidates = await q.OrderByDescending(g => g.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<ProjectGoal>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "goal"), from that single call (the ListBoardsAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(g => new ProjectGoalToAuditableResource(g)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(g => visibleIds.Contains(g.Id)).ToList();
+    }
+
+    /// <summary>
+    /// One goal (design doc §9.3) — a single <see
+    /// cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
+    /// decision over the <see cref="ProjectGoalToAuditableResource"/> (C6,
+    /// one matching pass; C3, the single decision audit row). <see
+    /// cref="KeyNotFoundException"/> (404) on a missing / soft-deleted id,
+    /// <see cref="UnauthorizedAccessException"/> (403) on a Deny — the
+    /// <see cref="GetBoardAsync"/> 404-vs-403 split (C3).
+    /// </summary>
+    public async Task<ProjectGoal> GetGoalAsync(string goalId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+
+        await using var session = _store.QuerySession();
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        if (goal.IsDeleted)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        // C3 — one decision row from this single call; C6 — one matching pass.
+        // Standalone form (no IDocumentSession overload): this is a plain read
+        // with no in-flight caller transaction (the M2 GetAsync precedent).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new ProjectGoalToAuditableResource(goal))
+            .ConfigureAwait(false);
+
+        if (!decision.Allowed)
+            throw new UnauthorizedAccessException($"Actor may not read goal '{goalId}'.");
+
+        return goal;
+    }
+
+    /// <summary>
+    /// **Create** a goal (design doc §9.3): the author's choices are written
+    /// **verbatim** (ADR 0001-B — <see cref="ProjectGoal.Audience"/> is
+    /// copied as-is, never re-derived), the goal is **live on creation** (no
+    /// <c>IsDraft</c> — D8a), and the author becomes the standing owner
+    /// (<see cref="ProjectGoal.AuthorId"/> = <paramref name="actorId"/>).
+    /// Standing (server-side, C3): **any signed-in resident** — a null/empty
+    /// actor is a 403 (the <see cref="CreateBoardAsync"/> shape). One <see
+    /// cref="AccessAudit"/> row (<c>goal.create</c>, <c>TargetKind =
+    /// "goal"</c>, <c>Via Owner</c>) is stored in the same session (C3) and
+    /// commits atomically with the write.
+    /// </summary>
+    public async Task<ProjectGoal> CreateGoalAsync(string actorId, IReadOnlySet<string> actorRoles, CreateGoalRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to create a goal.");
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A goal title is required.", nameof(request));
+
+        var now = DateTimeOffset.UtcNow;
+        var goal = new ProjectGoal
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = request.Title,
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description, // blank → null (the create-path normalization).
+            ComponentId = request.ComponentId,             // a filter, never a gate (C-M3·2) — written verbatim.
+            AuthorId = actorId,                            // C-PL·2 — the author becomes the standing owner.
+            Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
+            IsDeleted = false,                             // live on creation (D8a — no draft lane).
+            LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below.
+            Created = now
+        };
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        goal.LanguageCode = await ResolveLanguageCodeAsync(goal.LanguageCode, session, ct).ConfigureAwait(false);
+
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.create", goal.Id, TargetKindGoal, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return goal;
+    }
+
+    /// <summary>
+    /// **Update** a goal's own <c>Title</c> + <c>Description</c> (ADR 0086 —
+    /// the goal edit lane; the <see cref="UpdateBoardAsync"/> ADR 0070 shape).
+    /// A **full update** of those two fields (the edit page posts both; a
+    /// blank <c>Description</c> clears it to <c>null</c> — the
+    /// <see cref="UpdateGoalRequest"/> shape). The goal's standing, audience,
+    /// component, and language are creation-time choices — **not** editable
+    /// here (ADR 0070). <see cref="ProjectGoal.Modified"/> is stamped **only
+    /// on a real change** (the <see cref="UpdateLaneAsync"/> no-op shape — a
+    /// no-op re-save leaves the stamp untouched). Standing (server-side, C3):
+    /// **creator ∪ GlobalAdmin** over the goal (the
+    /// <see cref="CheckGoalStanding"/> shape — C-PL·2). A missing goal is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403); a blank <c>Title</c> is
+    /// <see cref="ArgumentException"/> (the write shape's 400). One <see
+    /// cref="AccessAudit"/> row (<c>goal.update</c>, <c>TargetKind =
+    /// "goal"</c>, the goal's id as the target — creator <c>Via Owner</c>,
+    /// otherwise <c>Via Admin</c>, the <see cref="GoalAuditViaFor"/> shape)
+    /// commits atomically with the write (C3).
+    /// </summary>
+    public async Task<ProjectGoal> UpdateGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, UpdateGoalRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to update a goal.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A goal title is required.", nameof(request));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to update.");
+
+        // Standing re-check (server-side, C3 single-source) over the **goal**
+        // (C-PL·2): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a goal (the CheckBoardStanding shape).
+        CheckGoalStanding(actorId, actorRoles, goal);
+
+        // A "real change" is either field differing from the stored row (the
+        // UpdateBoardAsync `changed` shape — a no-op re-save leaves the stamp
+        // untouched). A blank Description clears it to null (full-update
+        // semantics — the edit page always posts both fields).
+        var normalizedDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        var changed = goal.Title != request.Title
+            || !string.Equals(goal.Description, normalizedDescription, StringComparison.Ordinal);
+
+        goal.Title = request.Title;
+        goal.Description = normalizedDescription;
+        if (changed)
+            goal.Modified = DateTimeOffset.UtcNow;
+
+        // Track the loaded document for save explicitly (the UpdateBoardAsync
+        // `session.Store(...)` shape) — the sibling write lanes never rely on
+        // dirty-tracking of a loaded row.
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.update", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return goal;
+    }
+
+    // --- PL project lanes (U03) — ADR 0086, the design doc §9.3 surface ------
+    //
+    // The project read lanes (design doc §9.3) mirror the goal read lanes on
+    // the <see cref="Project"/> surface: <c>CanSeeAsync(Read)</c> over the
+    // <see cref="ProjectToAuditableResource"/> (C6, one shared matching pass;
+    // C3, one aggregate audit row per feed pass) for the feed,
+    // <c>CanAsync(Read)</c> for the detail (the 404-vs-403 split). The
+    // project write lanes mirror the goal write lanes: the author's choice
+    // written verbatim (ADR 0001-B), the **creator ∪ GlobalAdmin** standing
+    // re-checked server-side (the <see cref="CheckProjectStanding"/> shape —
+    // C-PL·2, the ADR 0070 board-edit precedent), the ADR 0018 language
+    // floor, one <see cref="AccessAudit"/> row per write (C3,
+    // <c>TargetKind = "project"</c>). The **<c>GoalId</c> guard**
+    // (design doc §9.3): a non-null <c>GoalId</c> pointing at a soft-deleted
+    // or unreadable goal is refused (the C3 split) — enforced before the
+    // project write on both the create and the update paths.
+
+    /// <summary>
+    /// The project feed (design doc §9.3) — mirrors <see
+    /// cref="ListGoalsAsync"/> on the <see cref="Project"/> surface: the
+    /// candidate set is the non-deleted projects, filtered by the optional
+    /// <paramref name="componentId"/> (a *filter, never a gate* — C-M3·2)
+    /// **and** the <paramref name="goalId"/> association filter —
+    /// <c>goalId == null</c> is the **standalone-projects** feed (the
+    /// <c>GoalId == null</c> row set, the <c>/projects</c> landing page's
+    /// projects section — the design doc D8 pin), and a specific
+    /// <paramref name="goalId"/> narrows to that goal's projects (the
+    /// <c>GoalId == goalId</c> row set); ordered by
+    /// <see cref="Project.Created"/> descending, paged; the survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3,
+    /// the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "project"</c> via the
+    /// <see cref="ProjectToAuditableResource"/>, U01).
+    /// </summary>
+    public async Task<IReadOnlyList<Project>> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        IQueryable<Project> q = session.Query<Project>()
+            .Where(p => !p.IsDeleted);
+        if (componentId is not null)
+            q = q.Where(p => p.ComponentId == componentId);
+        // The goalId association filter (the design doc D8 / U03 pin):
+        // null → the standalone-projects feed (GoalId == null); a value →
+        // that goal's projects (GoalId == goalId). A feed filter, never a
+        // gate (C-PL·3) — the audience decision is the access boundary.
+        q = goalId is null
+            ? q.Where(p => p.GoalId == null)
+            : q.Where(p => p.GoalId == goalId);
+        var candidates = await q.OrderByDescending(p => p.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<Project>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "project"), from that single call (the ListGoalsAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(p => new ProjectToAuditableResource(p)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
+    }
+
+    /// <summary>
+    /// One project (design doc §9.3) — a single <see
+    /// cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
+    /// decision over the <see cref="ProjectToAuditableResource"/> (C6, one
+    /// matching pass; C3, the single decision audit row). <see
+    /// cref="KeyNotFoundException"/> (404) on a missing / soft-deleted id,
+    /// <see cref="UnauthorizedAccessException"/> (403) on a Deny — the
+    /// <see cref="GetGoalAsync"/> 404-vs-403 split (C3).
+    /// </summary>
+    public async Task<Project> GetProjectAsync(string projectId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId)) throw new KeyNotFoundException("A project id is required.");
+
+        await using var session = _store.QuerySession();
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+        if (project.IsDeleted)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+        // C3 — one decision row from this single call; C6 — one matching pass.
+        // Standalone form (no IDocumentSession overload): this is a plain read
+        // with no in-flight caller transaction (the M2 GetAsync precedent).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new ProjectToAuditableResource(project))
+            .ConfigureAwait(false);
+
+        if (!decision.Allowed)
+            throw new UnauthorizedAccessException($"Actor may not read project '{projectId}'.");
+
+        return project;
+    }
+
+    /// <summary>
+    /// The goal's projects (design doc §9.3, the U03-added per-parent seam —
+    /// the M5 <see cref="ListBoardsForTodoAsync"/> per-parent precedent):
+    /// the goal itself is loaded first (<see cref="KeyNotFoundException"/>
+    /// (404) on absent / soft-deleted) and <c>CanAsync(Read)</c>-gated
+    /// (<see cref="UnauthorizedAccessException"/> (403) on denied — the C3
+    /// split); then the goal's <see cref="Project"/> rows
+    /// (<c>GoalId == goalId</c>, <c>!IsDeleted</c>) are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3,
+    /// the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "project"</c>) over the
+    /// <see cref="ProjectToAuditableResource"/> (a denied project is
+    /// dropped, **not** the whole set); ordered by <c>Created</c>
+    /// descending; **unpaged** (the small per-parent list precedent — the
+    /// M5 lane-per-todo list is the same).
+    /// </summary>
+    public async Task<IReadOnlyList<Project>> ListProjectsForGoalAsync(string goalId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+
+        await using var session = _store.QuerySession();
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        if (goal.IsDeleted)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        // The goal's single Read decision is the entry gate (the
+        // ListBoardsForTodoAsync per-parent guard shape, the goal-side twin).
+        var goalDecision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new ProjectGoalToAuditableResource(goal))
+            .ConfigureAwait(false);
+
+        if (!goalDecision.Allowed)
+            throw new UnauthorizedAccessException($"Actor may not read goal '{goalId}'.");
+
+        var candidates = await session.Query<Project>()
+            .Where(p => p.GoalId == goalId && !p.IsDeleted)
+            .OrderByDescending(p => p.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<Project>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "project"), from that single call (the ListBoardsForTodoAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(p => new ProjectToAuditableResource(p)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
+    }
+
+    /// <summary>
+    /// **Create** a project (design doc §9.3): the author's choices are
+    /// written **verbatim** (ADR 0001-B — <see cref="Project.Audience"/> is
+    /// copied as-is, never re-derived), the project is **live on creation**
+    /// (no <c>IsDraft</c> — D8a), and the author becomes the standing owner
+    /// (<see cref="Project.AuthorId"/> = <paramref name="actorId"/>). The
+    /// **<c>GoalId</c> guard**: a non-null <c>request.GoalId</c> is resolved
+    /// first — <see cref="KeyNotFoundException"/> (404) on absent /
+    /// soft-deleted, <see cref="UnauthorizedAccessException"/> (403) on a
+    /// denied <c>Read</c> (the C3 split) — **before** the project is
+    /// written. Standing (server-side, C3): **any signed-in resident** — a
+    /// null/empty actor is a 403 (the <see cref="CreateGoalAsync"/> shape).
+    /// One <see cref="AccessAudit"/> row (<c>project.create</c>,
+    /// <c>TargetKind = "project"</c>, <c>Via Owner</c>) is stored in the
+    /// same session (C3) and commits atomically with the write.
+    /// </summary>
+    public async Task<Project> CreateProjectAsync(string actorId, IReadOnlySet<string> actorRoles, CreateProjectRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to create a project.");
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A project title is required.", nameof(request));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        // The GoalId guard (design doc §9.3): a non-null GoalId must point at
+        // a goal that exists (404 otherwise), is not soft-deleted (404), and
+        // that the actor may Read (403) — all **before** the project write.
+        if (request.GoalId is not null)
+        {
+            var goal = await session.LoadAsync<ProjectGoal>(request.GoalId, ct).ConfigureAwait(false);
+            if (goal is null)
+                throw new KeyNotFoundException($"Goal '{request.GoalId}' was not found.");
+            if (goal.IsDeleted)
+                throw new KeyNotFoundException($"Goal '{request.GoalId}' was not found.");
+
+            var goalDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectGoalToAuditableResource(goal))
+                .ConfigureAwait(false);
+            if (!goalDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read goal '{request.GoalId}'.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var project = new Project
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = request.Title,
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description, // blank → null (the create-path normalization).
+            GoalId = request.GoalId,                          // the optional goal (the C3 GoalId guard applied above); `null` = standalone.
+            Status = request.Status,                          // a string, not an enum (C-PL·4) — written verbatim.
+            StartAt = request.StartAt,                        // ADR 0079 — `null` = no date (C-PL·5).
+            DueAt = request.DueAt,                            // ADR 0079 — `null` = no date (C-PL·5).
+            ComponentId = request.ComponentId,                // a filter, never a gate (C-M3·2) — written verbatim.
+            AuthorId = actorId,                               // C-PL·2 — the author becomes the standing owner.
+            Audience = request.Audience,                      // ADR 0001-B — written verbatim; never mutated.
+            IsDeleted = false,                                // live on creation (D8a — no draft lane).
+            LanguageCode = request.LanguageCode ?? "",        // ADR 0018 — materialized below.
+            Created = now
+        };
+
+        project.LanguageCode = await ResolveLanguageCodeAsync(project.LanguageCode, session, ct).ConfigureAwait(false);
+
+        session.Store(project);
+        StoreAuditRow(session, actorId, "project.create", project.Id, TargetKindProject, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return project;
+    }
+
+    /// <summary>
+    /// **Update** a project (ADR 0086 — the project edit lane; the
+    /// <see cref="UpdateGoalAsync"/> ADR 0070 standing shape, the ADR 0079
+    /// partial-date shape). A **partial update** of
+    /// <c>Title</c> / <c>Description</c> (a blank <c>Description</c> clears
+    /// it to <c>null</c> — the ADR 0070 shape) / <c>GoalId</c> (a non-null
+    /// value **re-associates** the project to that goal — the **<c>GoalId</c>
+    /// guard** applies: the goal is loaded, 404 on absent / soft-deleted,
+    /// 403 on a denied <c>Read</c>, **before** the write; <c>ClearGoal =
+    /// true</c> is an explicit un-goal — sets <c>GoalId = null</c>, no guard
+    /// needed) / <c>Status</c> (non-null applied, <c>null</c> clears — the
+    /// C-M5·4 string shape) / <c>StartAt</c> / <c>DueAt</c> (ADR 0079 —
+    /// non-null applied, <c>null</c> clears). The project's audience,
+    /// component, and language are creation-time choices — **not** editable
+    /// here (ADR 0070). <see cref="Project.Modified"/> is stamped **only on
+    /// a real change** (the <see cref="UpdateGoalAsync"/> no-op shape).
+    /// Standing (server-side, C3): **creator ∪ GlobalAdmin** over the
+    /// project (the <see cref="CheckProjectStanding"/> shape — C-PL·2). A
+    /// missing project is <see cref="KeyNotFoundException"/> (404); a denied
+    /// actor is <see cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>project.update</c>, <c>TargetKind =
+    /// "project"</c>, the project's id as the target — creator
+    /// <c>Via Owner</c>, otherwise <c>Via Admin</c>, the
+    /// <see cref="ProjectAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<Project> UpdateProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, UpdateProjectRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId)) throw new KeyNotFoundException("A project id is required.");
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to update a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to update.");
+
+        // Standing re-check (server-side, C3 single-source) over the
+        // **project** (C-PL·2): creator ∪ GlobalAdmin — the assignee branch
+        // does not apply to a project (the CheckGoalStanding shape).
+        CheckProjectStanding(actorId, actorRoles, project);
+
+        // The GoalId guard on re-association (design doc §9.3): a non-null
+        // GoalId must point at a goal that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — **before**
+        // the project write. ClearGoal = true is an explicit un-goal (no
+        // guard needed).
+        var newGoalId = project.GoalId;
+        if (request.GoalId is not null)
+        {
+            var goal = await session.LoadAsync<ProjectGoal>(request.GoalId, ct).ConfigureAwait(false);
+            if (goal is null)
+                throw new KeyNotFoundException($"Goal '{request.GoalId}' was not found.");
+            if (goal.IsDeleted)
+                throw new KeyNotFoundException($"Goal '{request.GoalId}' was not found.");
+
+            var goalDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectGoalToAuditableResource(goal))
+                .ConfigureAwait(false);
+            if (!goalDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read goal '{request.GoalId}'.");
+
+            newGoalId = request.GoalId;
+        }
+        else if (request.ClearGoal)
+        {
+            newGoalId = null;
+        }
+
+        // A "real change" is any applied field differing from the stored row
+        // (the UpdateGoalAsync `changed` shape — a no-op re-save leaves the
+        // stamp untouched). Non-null request values are applied; null clears
+        // (the ADR 0079 / C-M5·4 partial shape). A blank Description clears
+        // it to null (the ADR 0070 shape).
+        var newTitle = request.Title ?? project.Title;
+        var newDescription = request.Description is null ? project.Description
+            : (string.IsNullOrWhiteSpace(request.Description) ? null : request.Description);
+        var newStatus = request.Status;                       // `null` = clear (C-PL·4).
+        var newStartAt = request.StartAt;                     // ADR 0079 — `null` = clear (C-PL·5).
+        var newDueAt = request.DueAt;                         // ADR 0079 — `null` = clear (C-PL·5).
+
+        var changed = newTitle != project.Title
+            || !string.Equals(newDescription, project.Description, StringComparison.Ordinal)
+            || !string.Equals(newGoalId, project.GoalId, StringComparison.Ordinal)
+            || newStatus != project.Status
+            || newStartAt != project.StartAt
+            || newDueAt != project.DueAt;
+
+        project.Title = newTitle;
+        project.Description = newDescription;
+        project.GoalId = newGoalId;
+        project.Status = newStatus;
+        project.StartAt = newStartAt;
+        project.DueAt = newDueAt;
+        if (changed)
+            project.Modified = DateTimeOffset.UtcNow;
+
+        // Track the loaded document for save explicitly (the UpdateGoalAsync
+        // `session.Store(...)` shape) — the sibling write lanes never rely on
+        // dirty-tracking of a loaded row.
+        session.Store(project);
+        StoreAuditRow(session, actorId, "project.update", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return project;
+    }
+
+    // ─── PL association lanes (U04 — ADR 0086 / design doc §9.3) ────────────
+    //
+    // **Seam shape (design doc §9.3, the <see cref="AssignTodoAsync"/> /
+    // <see cref="UpdateBoardAsync"/> write-lane shape mirrored):** each lane
+    // carries <c>actorId</c> + the principal's real role set (<c>actorRoles</c>)
+    // and opens its **own** write session, storing the domain write + the
+    // <see cref="AccessAudit"/> row in that one session, committing atomically
+    // (C3). Standing is enforced server-side via the **same** pure helpers the
+    // tests pin (<see cref="CheckTodoStanding"/> /
+    // <see cref="CheckBoardStanding"/>) — the C3 single-source pin. The
+    // **project guard** (design doc §9.3): a non-null <c>projectId</c> must
+    // point at a project that exists (404 otherwise), is not soft-deleted
+    // (404), and that the actor may <c>Read</c> (403) — **before** the write
+    // (the <see cref="CreateProjectAsync"/> <c>GoalId</c> guard shape on the
+    // project side). A <c>null</c> <c>projectId</c> is the unassociate path —
+    // it skips the guard. **No new <c>AccessAction</c>, no new
+    // <c>AccessVia</c>, no new branch in <c>Decide()</c>** (C-PL·1) — the
+    // lanes reuse the frozen <c>Read</c> action and the existing per-resource
+    // standing matrix.
+
+    /// <summary>
+    /// **Associate a to-do with a project** (design doc §9.3): sets
+    /// <see cref="TodoItem.ProjectId"/> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate — the <see cref="AssignTodoAsync"/> null-
+    /// unassign shape). Standing (server-side, C3): **creator ∪ assignee ∪
+    /// GlobalAdmin** over the **to-do** (the <see cref="CheckTodoStanding"/>
+    /// shape — C-M5·6). The **project guard**: a non-null
+    /// <paramref name="projectId"/> pointing at a **soft-deleted** project is
+    /// <see cref="KeyNotFoundException"/> (404) and at an **unreadable**
+    /// project is <see cref="UnauthorizedAccessException"/> (403) — the C3
+    /// split, checked **before** the write (the <see
+    /// cref="CreateProjectAsync"/> <c>GoalId</c> guard shape, the project
+    /// side). A missing / soft-deleted to-do is
+    /// <see cref="KeyNotFoundException"/> (404). <see
+    /// cref="TodoItem.AuthorId"/> / <see cref="TodoItem.Created"/> preserved
+    /// untouched; <see cref="TodoItem.Modified"/> is stamped. One
+    /// <see cref="AccessAudit"/> row (<c>todo.set_project</c>,
+    /// <c>TargetKind = "todo"</c>, the to-do's id as the target — the
+    /// association points **at** the project, the audit target is the
+    /// mutated row; creator <c>Via Owner</c>, otherwise <c>Via Admin</c>,
+    /// the <see cref="TodoAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a to-do with a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6).
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // The project guard (design doc §9.3): a non-null projectId must
+        // point at a project that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — all
+        // **before** the to-do write (the CreateProjectAsync GoalId guard
+        // shape). `null` = unassociate — no guard.
+        if (projectId is not null)
+        {
+            var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+            if (project is null)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+            if (project.IsDeleted)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+            var projectDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectToAuditableResource(project))
+                .ConfigureAwait(false);
+            if (!projectDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read project '{projectId}'.");
+        }
+
+        todo.ProjectId = projectId;                      // `null` = unassociate.
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        StoreAuditRow(session, actorId, "todo.set_project", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return todo;
+    }
+
+    /// <summary>
+    /// **Associate a board with a project** (design doc §9.3): sets
+    /// <see cref="KanbanBoard.ProjectId"/> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate). Standing (server-side, C3): **creator ∪
+    /// GlobalAdmin** over the **board** (the <see
+    /// cref="CheckBoardStanding"/> shape — the ADR 0070 board-edit precedent;
+    /// the assignee branch does not apply to a board, C-M5·6). The **project
+    /// guard**: a non-null <paramref name="projectId"/> pointing at a
+    /// **soft-deleted** project is <see cref="KeyNotFoundException"/> (404)
+    /// and at an **unreadable** project is <see
+    /// cref="UnauthorizedAccessException"/> (403) — the C3 split, checked
+    /// **before** the write (the <see cref="CreateProjectAsync"/>
+    /// <c>GoalId</c> guard shape, the project side). A missing / soft-deleted
+    /// board is <see cref="KeyNotFoundException"/> (404). <see
+    /// cref="KanbanBoard.AuthorId"/> / <see cref="KanbanBoard.Created"/>
+    /// preserved untouched; <see cref="KanbanBoard.Modified"/> is stamped.
+    /// One <see cref="AccessAudit"/> row (<c>board.set_project</c>,
+    /// <c>TargetKind = "board"</c>, the board's id as the target — the
+    /// association points **at** the project, the audit target is the
+    /// mutated row; creator <c>Via Owner</c>, otherwise <c>Via Admin</c>,
+    /// the <see cref="BoardAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<KanbanBoard> SetBoardProjectAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId)) throw new KeyNotFoundException("A board id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a board with a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** board: creator ∪ GlobalAdmin (the ADR 0070 board-edit
+        // precedent) — the assignee branch does not apply to a board.
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // The project guard (design doc §9.3): a non-null projectId must
+        // point at a project that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — all
+        // **before** the board write (the CreateProjectAsync GoalId guard
+        // shape). `null` = unassociate — no guard.
+        if (projectId is not null)
+        {
+            var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+            if (project is null)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+            if (project.IsDeleted)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+            var projectDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectToAuditableResource(project))
+                .ConfigureAwait(false);
+            if (!projectDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read project '{projectId}'.");
+        }
+
+        board.ProjectId = projectId;                     // `null` = unassociate.
+        board.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(board);
+        StoreAuditRow(session, actorId, "board.set_project", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }
@@ -1653,6 +2901,120 @@ public sealed class ProjectService : IProjectService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // --- PL delete lanes (U09) — ADR 0086, the design doc §9.3 surface -------
+    //
+    // The delete lanes mirror the <see cref="DeleteTodoAsync"/> /
+    // <see cref="DeleteBoardAsync"/> shapes on the <see cref="ProjectGoal"/> /
+    // <see cref="Project"/> surface: load (404 on absent / soft-deleted), the
+    // **creator ∪ GlobalAdmin** standing re-check (the
+    // <see cref="CheckGoalStanding"/> / <see cref="CheckProjectStanding"/>
+    // shapes — C-PL·2, the ADR 0070 board-edit precedent), set
+    // <c>IsDeleted = true</c>, stamp <c>Modified</c>, one <see
+    // cref="AccessAudit"/> row per write (C3, <c>TargetKind = "goal"</c> /
+    // <c>"project"</c>). **The D6 dangling-association rule (C-PL·6):** there
+    // is **no cascade** — the goal's projects keep their <c>GoalId</c>, the
+    // project's to-dos / boards keep their <c>ProjectId</c> (the
+    // associations simply dangle; the read lane's
+    // 404-on-soft-deleted behavior is the filter).
+
+    /// <summary>
+    /// **Soft-delete** a goal (the ADR 0024 author-lane shape): sets
+    /// <see cref="ProjectGoal.IsDeleted"/> to <c>true</c>. **The D6
+    /// dangling-association rule (C-PL·6):** the goal's <see cref="Project"/>
+    /// rows are **kept** — their <see cref="Project.GoalId"/> is **not**
+    /// cleared (a *filter, never a gate* — C-M3·2); the association simply
+    /// dangles — the project's goal link is not rendered (the
+    /// <see cref="GetGoalAsync"/> 404-on-soft-deleted behavior is the read
+    /// lane's filter). Standing (server-side, C3): **creator ∪ GlobalAdmin**
+    /// over the goal (the <see cref="CheckGoalStanding"/> shape — C-PL·2;
+    /// the assignee branch does not apply, the ADR 0070 board-edit
+    /// precedent). A missing / soft-deleted goal is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>goal.delete</c>, <c>TargetKind =
+    /// "goal"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task DeleteGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a goal.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to delete.");
+
+        if (goal.IsDeleted)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the **goal**
+        // (C-PL·2): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a goal (the CheckBoardStanding shape).
+        CheckGoalStanding(actorId, actorRoles, goal);
+
+        // **No cascade (D6 / C-PL·6):** the goal's Project rows are kept
+        // intact — their GoalId is not cleared (the dangling-association
+        // rule). Their goal link simply stops rendering: the read lane's
+        // GetGoalAsync 404-on-soft-deleted behavior is the filter.
+        goal.IsDeleted = true;                             // ADR 0024 — the soft-delete flag.
+        goal.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.delete", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// **Soft-delete** a project (the ADR 0024 author-lane shape): sets
+    /// <see cref="Project.IsDeleted"/> to <c>true</c>. **The D6
+    /// dangling-association rule (C-PL·6):** the project's <see
+    /// cref="TodoItem"/> / <see cref="KanbanBoard"/> rows are **kept** —
+    /// their <see cref="TodoItem.ProjectId"/> / <see
+    /// cref="KanbanBoard.ProjectId"/> is **not** cleared (a *filter, never a
+    /// gate* — C-M3·2); the associations simply dangle — a to-do's / board's
+    /// project link is not rendered (the <see cref="GetProjectAsync"/>
+    /// 404-on-soft-deleted behavior is the read lane's filter). Standing
+    /// (server-side, C3): **creator ∪ GlobalAdmin** over the project (the
+    /// <see cref="CheckProjectStanding"/> shape — C-PL·2; the assignee branch
+    /// does not apply, the ADR 0070 board-edit precedent). A missing /
+    /// soft-deleted project is <see cref="KeyNotFoundException"/> (404); a
+    /// denied actor is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <see cref="AccessAudit"/> row (<c>project.delete</c>, <c>TargetKind =
+    /// "project"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task DeleteProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId)) throw new KeyNotFoundException("A project id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to delete.");
+
+        if (project.IsDeleted)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the
+        // **project** (C-PL·2): creator ∪ GlobalAdmin — the assignee branch
+        // does not apply to a project (the CheckBoardStanding shape).
+        CheckProjectStanding(actorId, actorRoles, project);
+
+        // **No cascade (D6 / C-PL·6):** the project's TodoItem / KanbanBoard
+        // rows are kept intact — their ProjectId is not cleared (the
+        // dangling-association rule). Their project link simply stops
+        // rendering: the read lane's GetProjectAsync 404-on-soft-deleted
+        // behavior is the filter.
+        project.IsDeleted = true;                          // ADR 0024 — the soft-delete flag.
+        project.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(project);
+        StoreAuditRow(session, actorId, "project.delete", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // ─── Write-lane helpers (C3 audit row + ADR 0018 language floor) ───
 
     /// <summary>The <see cref="AccessAudit"/> <c>TargetKind</c> for to-do rows — the exact
@@ -1664,6 +3026,16 @@ public sealed class ProjectService : IProjectService
     /// string the <see cref="KanbanBoardToAuditableResource"/> discriminator carries
     /// (U03).</summary>
     private const string TargetKindBoard = "board";
+
+    /// <summary>The <see cref="AccessAudit"/> <c>TargetKind</c> for goal rows — the exact
+    /// string the <see cref="ProjectGoalToAuditableResource"/> discriminator carries
+    /// (U01, ADR 0086).</summary>
+    private const string TargetKindGoal = "goal";
+
+    /// <summary>The <see cref="AccessAudit"/> <c>TargetKind</c> for project rows — the exact
+    /// string the <see cref="ProjectToAuditableResource"/> discriminator carries
+    /// (U01, ADR 0086).</summary>
+    private const string TargetKindProject = "project";
 
     /// <summary>
     /// Appends the single <see cref="AccessAudit"/> row for a write lane
@@ -1717,6 +3089,586 @@ public sealed class ProjectService : IProjectService
     /// shape).</summary>
     private static bool ListsEqual(IReadOnlyList<string> a, IReadOnlyList<string> b)
         => new HashSet<string>(a, StringComparer.Ordinal).SetEquals(b);
+
+    // ─── Translation lanes (ADR 0088 — the ADR 0059 `EventTranslation` lane
+    // carried to the three M5/PL parent surfaces) ───
+    //
+    // Mirrors the EventService translation lanes (ADR 0059) / the PostService /
+    // AnnouncementService lanes (ADR 0022 / 0029 / 0048) on the **M5/PL
+    // self-composed-session convention** (ADR 0067 §4 — no caller
+    // IDocumentSession; this service opens its own write session). Standing is
+    // enforced server-side via the **same** pure helpers the write lanes use
+    // (<see cref="ResolveTodoTranslationStanding"/> /
+    // <see cref="ResolveBoardTranslationStanding"/> /
+    // <see cref="ResolveProjectTranslationStanding"/>) — the C3 single-source
+    // pin (no second copy of the matrix). **Body is optional here** (the one
+    // deliberate deviation from the ADR 0059 required-body shape — M5 to-dos /
+    // boards / projects are title-usable without a body): a row with **both**
+    // title and body blank is a caller error (ArgumentException).
+    // Audit-row shape: TargetKind = "todo" / "board" / "project" (the exact
+    // strings — the U03 adapters' discriminators), Action =
+    // todotranslation.* / boardtranslation.* / projecttranslation.*, Via =
+    // Owner (creator) or Admin (assignee / Translator / GlobalAdmin), Outcome
+    // = Allow.
+
+    // ─── Translation standing resolvers (ADR 0088 D3 — pure, no store) ───
+    //
+    // The C3 server-side re-check pattern (the <see cref="Events.EventService"/>
+    // ResolveTranslationStanding shape): each helper is a **pure** decision
+    // (no DB access) returning the <see cref="AccessVia"/> the actor qualified
+    // under, or <c>null</c> to deny — directly testable, and the single source
+    // of the matrix both the display pin (the <c>CanAdd*Translation</c>
+    // helpers) and the three write lanes consult. **Broader than the M5 *edit*
+    // standing** (the <see cref="CheckTodoStanding"/> /
+    // <see cref="CheckBoardStanding"/> / <see cref="CheckProjectStanding"/>
+    // helpers exclude the Translator) — the ADR 0059 "translate without
+    // editing" precedent, the ADR 0021 / 0030 translation matrix.
+
+    /// <summary>
+    /// The **to-do translation** standing (ADR 0088 D3): the <see
+    /// cref="AccessVia"/> the actor qualifies under, or <c>null</c> to deny.
+    /// Precedence (most specific standing first, so the audit row records the
+    /// narrowest right that applied): the to-do's <b>creator</b>
+    /// (<see cref="AccessVia.Owner"/>); the to-do's <b>assignee</b> (the ADR
+    /// 0067 collaborator branch, <see cref="AccessVia.Admin"/>); a
+    /// <see cref="Roles.Translator"/> (ADR 0021, <see cref="AccessVia.Admin"/>);
+    /// or a <see cref="Roles.GlobalAdmin"/> (ADR 0030, <see
+    /// cref="AccessVia.Admin"/>).
+    /// </summary>
+    private static AccessVia? ResolveTodoTranslationStanding(
+        string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(todoAuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
+        if (!string.IsNullOrEmpty(todoAssigneeId)
+            && string.Equals(todoAssigneeId, actorId, StringComparison.Ordinal))
+            return AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.Translator))
+            return AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return AccessVia.Admin;
+
+        return null;
+    }
+
+    /// <summary>
+    /// The **board translation** standing (ADR 0088 D3): the <see
+    /// cref="AccessVia"/> the actor qualifies under, or <c>null</c> to deny.
+    /// Precedence (most specific standing first): the board's <b>creator</b>
+    /// (<see cref="AccessVia.Owner"/>); a <see cref="Roles.Translator"/> (ADR
+    /// 0021, <see cref="AccessVia.Admin"/>); or a <see cref="Roles.GlobalAdmin"/>
+    /// (ADR 0030, <see cref="AccessVia.Admin"/>). The assignee branch does
+    /// **not** apply (a board is not assignable the way a to-do is — the ADR
+    /// 0070 board-edit precedent).
+    /// </summary>
+    private static AccessVia? ResolveBoardTranslationStanding(
+        string boardAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(boardAuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
+        if (actorRoles.Contains(Roles.Translator))
+            return AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return AccessVia.Admin;
+
+        return null;
+    }
+
+    /// <summary>
+    /// The **project translation** standing (ADR 0088 D3): the <see
+    /// cref="AccessVia"/> the actor qualifies under, or <c>null</c> to deny.
+    /// Precedence (most specific standing first): the project's <b>creator</b>
+    /// (<see cref="AccessVia.Owner"/>); a <see cref="Roles.Translator"/> (ADR
+    /// 0021, <see cref="AccessVia.Admin"/>); or a <see cref="Roles.GlobalAdmin"/>
+    /// (ADR 0030, <see cref="AccessVia.Admin"/>). The assignee branch does
+    /// **not** apply (a project is not assignable the way a to-do is — the ADR
+    /// 0070 board-edit precedent, the <see cref="CheckGoalStanding"/> shape).
+    /// </summary>
+    private static AccessVia? ResolveProjectTranslationStanding(
+        string projectAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(projectAuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
+        if (actorRoles.Contains(Roles.Translator))
+            return AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return AccessVia.Admin;
+
+        return null;
+    }
+
+    // ─── Translation display pins (ADR 0027 shape — the <c>CanAdd*Translation</c>
+    // precedent: a display pin, not a gate; the real deny is the write-lane
+    // standing check, which re-runs the same rule server-side) ───
+
+    /// <summary>
+    /// The **to-do translation** display pin (ADR 0088, the
+    /// <see cref="Events.EventService.CanAddTranslation"/> shape): <c>true</c>
+    /// when <paramref name="actorId"/> may add / edit / remove a translation
+    /// of the to-do authored by <paramref name="todoAuthorId"/>
+    /// (assigned-to <paramref name="todoAssigneeId"/>). A <b>display</b> pin,
+    /// not a gate — the real deny is the
+    /// <see cref="AddTodoTranslationAsync"/> /
+    /// <see cref="UpdateTodoTranslationAsync"/> /
+    /// <see cref="RemoveTodoTranslationAsync"/> standing check, which re-runs
+    /// the same rule server-side. Delegates to the same
+    /// <see cref="ResolveTodoTranslationStanding"/> the write lanes use, so the
+    /// display and the three gates can never drift apart.
+    /// </summary>
+    public static bool CanAddTodoTranslation(
+        string todoAuthorId, string? todoAssigneeId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveTodoTranslationStanding(todoAuthorId, todoAssigneeId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The **board translation** display pin (ADR 0088, the
+    /// <see cref="Events.EventService.CanAddTranslation"/> shape): <c>true</c>
+    /// when <paramref name="actorId"/> may add / edit / remove a translation
+    /// of the board authored by <paramref name="boardAuthorId"/>. A
+    /// <b>display</b> pin, not a gate — the real deny is the write-lane
+    /// standing check. Delegates to the same
+    /// <see cref="ResolveBoardTranslationStanding"/> the write lanes use, so
+    /// the display and the three gates can never drift apart.
+    /// </summary>
+    public static bool CanAddBoardTranslation(
+        string boardAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveBoardTranslationStanding(boardAuthorId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The **project translation** display pin (ADR 0088, the
+    /// <see cref="Events.EventService.CanAddTranslation"/> shape): <c>true</c>
+    /// when <paramref name="actorId"/> may add / edit / remove a translation
+    /// of the project authored by <paramref name="projectAuthorId"/>. A
+    /// <b>display</b> pin, not a gate — the real deny is the write-lane
+    /// standing check. Delegates to the same
+    /// <see cref="ResolveProjectTranslationStanding"/> the write lanes use, so
+    /// the display and the three gates can never drift apart.
+    /// </summary>
+    public static bool CanAddProjectTranslation(
+        string projectAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveProjectTranslationStanding(projectAuthorId, actorId, actorRoles) is not null;
+
+    // ─── Translation write + read lanes (ADR 0088) ───
+
+    /// <inheritdoc cref="IProjectService.GetTodoTranslationsAsync"/>
+    public async Task<IReadOnlyList<TodoTranslation>> GetTodoTranslationsAsync(string todoItemId)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<TodoTranslation>()
+            .Where(t => t.TodoItemId == todoItemId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IProjectService.AddTodoTranslationAsync"/>
+    public async Task<TodoTranslation> AddTodoTranslationAsync(
+        string todoItemId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
+                "may add a translation of it.");
+
+        var translation = new TodoTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TodoItemId = todoItemId,
+            LanguageCode = languageCode,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title,
+            Body = string.IsNullOrWhiteSpace(body) ? null : body,
+            AuthorId = actorId,
+            Created = DateTimeOffset.UtcNow
+        };
+
+        session.Store(translation);
+        StoreAuditRow(session, actorId, "todotranslation.add", todoItemId, TargetKindTodo, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc cref="IProjectService.UpdateTodoTranslationAsync"/>
+    public async Task<TodoTranslation> UpdateTodoTranslationAsync(
+        string todoItemId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrWhiteSpace(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to edit.");
+
+        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
+                "may edit a translation of it.");
+
+        var row = await session.Query<TodoTranslation>()
+            .Where(t => t.TodoItemId == todoItemId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' has no translation for '{languageCode}'; nothing to edit.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+        row.AuthorId = actorId;
+        row.Created = DateTimeOffset.UtcNow;
+
+        session.Store(row);
+        StoreAuditRow(session, actorId, "todotranslation.update", todoItemId, TargetKindTodo, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc cref="IProjectService.RemoveTodoTranslationAsync"/>
+    public async Task RemoveTodoTranslationAsync(
+        string todoItemId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            throw new ArgumentException("A to-do id is required.", nameof(todoItemId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to remove.");
+
+        var via = ResolveTodoTranslationStanding(todo.AuthorId, todo.AssigneeId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the to-do's creator, its assignee, a Translator, or a GlobalAdmin " +
+                "may remove a translation of it.");
+
+        var row = await session.Query<TodoTranslation>()
+            .Where(t => t.TodoItemId == todoItemId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' has no translation for '{languageCode}'; nothing to remove.");
+
+        session.Delete(row);
+        StoreAuditRow(session, actorId, "todotranslation.remove", todoItemId, TargetKindTodo, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IProjectService.GetBoardTranslationsAsync"/>
+    public async Task<IReadOnlyList<BoardTranslation>> GetBoardTranslationsAsync(string boardId)
+    {
+        if (string.IsNullOrEmpty(boardId))
+            throw new ArgumentException("A board id is required.", nameof(boardId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<BoardTranslation>()
+            .Where(t => t.BoardId == boardId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IProjectService.AddBoardTranslationAsync"/>
+    public async Task<BoardTranslation> AddBoardTranslationAsync(
+        string boardId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId))
+            throw new ArgumentException("A board id is required.", nameof(boardId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the board's creator, a Translator, or a GlobalAdmin " +
+                "may add a translation of it.");
+
+        var translation = new BoardTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            BoardId = boardId,
+            LanguageCode = languageCode,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title,
+            Body = string.IsNullOrWhiteSpace(body) ? null : body,
+            AuthorId = actorId,
+            Created = DateTimeOffset.UtcNow
+        };
+
+        session.Store(translation);
+        StoreAuditRow(session, actorId, "boardtranslation.add", boardId, TargetKindBoard, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc cref="IProjectService.UpdateBoardTranslationAsync"/>
+    public async Task<BoardTranslation> UpdateBoardTranslationAsync(
+        string boardId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId))
+            throw new ArgumentException("A board id is required.", nameof(boardId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to edit.");
+
+        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the board's creator, a Translator, or a GlobalAdmin " +
+                "may edit a translation of it.");
+
+        var row = await session.Query<BoardTranslation>()
+            .Where(t => t.BoardId == boardId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Board '{boardId}' has no translation for '{languageCode}'; nothing to edit.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+        row.AuthorId = actorId;
+        row.Created = DateTimeOffset.UtcNow;
+
+        session.Store(row);
+        StoreAuditRow(session, actorId, "boardtranslation.update", boardId, TargetKindBoard, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc cref="IProjectService.RemoveBoardTranslationAsync"/>
+    public async Task RemoveBoardTranslationAsync(
+        string boardId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId))
+            throw new ArgumentException("A board id is required.", nameof(boardId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to remove.");
+
+        var via = ResolveBoardTranslationStanding(board.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the board's creator, a Translator, or a GlobalAdmin " +
+                "may remove a translation of it.");
+
+        var row = await session.Query<BoardTranslation>()
+            .Where(t => t.BoardId == boardId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Board '{boardId}' has no translation for '{languageCode}'; nothing to remove.");
+
+        session.Delete(row);
+        StoreAuditRow(session, actorId, "boardtranslation.remove", boardId, TargetKindBoard, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IProjectService.GetProjectTranslationsAsync"/>
+    public async Task<IReadOnlyList<ProjectTranslation>> GetProjectTranslationsAsync(string projectId)
+    {
+        if (string.IsNullOrEmpty(projectId))
+            throw new ArgumentException("A project id is required.", nameof(projectId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<ProjectTranslation>()
+            .Where(t => t.ProjectId == projectId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IProjectService.AddProjectTranslationAsync"/>
+    public async Task<ProjectTranslation> AddProjectTranslationAsync(
+        string projectId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId))
+            throw new ArgumentException("A project id is required.", nameof(projectId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the project's creator, a Translator, or a GlobalAdmin " +
+                "may add a translation of it.");
+
+        var translation = new ProjectTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            ProjectId = projectId,
+            LanguageCode = languageCode,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title,
+            Body = string.IsNullOrWhiteSpace(body) ? null : body,
+            AuthorId = actorId,
+            Created = DateTimeOffset.UtcNow
+        };
+
+        session.Store(translation);
+        StoreAuditRow(session, actorId, "projecttranslation.add", projectId, TargetKindProject, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc cref="IProjectService.UpdateProjectTranslationAsync"/>
+    public async Task<ProjectTranslation> UpdateProjectTranslationAsync(
+        string projectId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId))
+            throw new ArgumentException("A project id is required.", nameof(projectId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a title or a body.", nameof(title));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to edit.");
+
+        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the project's creator, a Translator, or a GlobalAdmin " +
+                "may edit a translation of it.");
+
+        var row = await session.Query<ProjectTranslation>()
+            .Where(t => t.ProjectId == projectId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Project '{projectId}' has no translation for '{languageCode}'; nothing to edit.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = string.IsNullOrWhiteSpace(body) ? null : body;
+        row.AuthorId = actorId;
+        row.Created = DateTimeOffset.UtcNow;
+
+        session.Store(row);
+        StoreAuditRow(session, actorId, "projecttranslation.update", projectId, TargetKindProject, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc cref="IProjectService.RemoveProjectTranslationAsync"/>
+    public async Task RemoveProjectTranslationAsync(
+        string projectId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId))
+            throw new ArgumentException("A project id is required.", nameof(projectId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to remove.");
+
+        var via = ResolveProjectTranslationStanding(project.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the project's creator, a Translator, or a GlobalAdmin " +
+                "may remove a translation of it.");
+
+        var row = await session.Query<ProjectTranslation>()
+            .Where(t => t.ProjectId == projectId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Project '{projectId}' has no translation for '{languageCode}'; nothing to remove.");
+
+        session.Delete(row);
+        StoreAuditRow(session, actorId, "projecttranslation.remove", projectId, TargetKindProject, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 
     // --- Placement + reorder lanes (U06) — standing re-checked server-side ----
     //

@@ -1,0 +1,30 @@
+@* The /events section sub-nav (the _ProjectsTabs.cshtml Bootstrap nav-tabs
+   idiom, ADR 0062). Two tabs — Events (the feed) and Calendar — so a
+   resident can jump between the list and the calendar view without
+   hunting for a button in the page header. The active tab is derived
+   from the current action name (the EventController owns both GET
+   actions: Index and Calendar). *@
+@{
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
+    var tabs = new (string LabelKey, string Label, string Href)[]
+    {
+        ("events.title",          "Events",   "/events"),
+        ("events.calendar.title", "Calendar", "/events/calendar"),
+    };
+    var activeLabel = action switch
+    {
+        "Calendar" => "Calendar",
+        _          => "Events",
+    };
+}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    @foreach (var tab in tabs)
+    {
+        var isActive = tab.Label == activeLabel;
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
+                <kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+            </a>
+        </li>
+    }
+</ul>

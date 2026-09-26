@@ -73,6 +73,13 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="unassigned-filter" name="unassignedOnly" value="true" checked="@(Model.UnassignedOnly ? "checked" : null)" />
                     <label class="form-check-label" for="unassigned-filter"><kw-l key="projects.todo.filter_unassigned">Unassigned only</kw-l></label>
                 </div>
+                @* ADR 0087 — the "waiting on" feed filter (D6, the D8 key):
+                   narrows the candidate set to to-dos with a blocker; it
+                   never narrows the audience decision. *@
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="blocked-filter" name="blockedOnly" value="true" checked="@(Model.BlockedOnly ? "checked" : null)" />
+                    <label class="form-check-label" for="blocked-filter"><kw-l key="todo.blocked_filter">Waiting on something</kw-l></label>
+                </div>
                 <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
             </div>
         </form>
@@ -89,6 +96,26 @@
                         <h3 class="airy-ann-title">
                             <a href="@($"/projects/todos/{row.Id}")">@row.Title</a>
                         </h3>
+                        @* The assignee avatar (the BoardDetail card pattern): the
+                           <img> links the audited serving lane (GET
+                           /profile/avatar/{subjectId}) and avatar.ts hides it
+                           on the 404 it fails closed to (no avatar set),
+                           showing the monogram sibling — the assignee's
+                           initial. The board already carries one on each
+                           card; this row is the todo-list parity. *@
+                        @if (!string.IsNullOrWhiteSpace(row.AssigneeId))
+                        {
+                            string assigneeInitial = !string.IsNullOrWhiteSpace(row.AssigneeDisplayName)
+                                ? char.ToUpperInvariant(row.AssigneeDisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <div class="mb-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar avatar-sm" src="/profile/avatar/@row.AssigneeId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                </span>
+                            </div>
+                        }
                         <div class="text-muted small mb-1">
                             @row.AuthorDisplayName
                             @if (!string.IsNullOrWhiteSpace(row.AssigneeDisplayName))
@@ -100,6 +127,20 @@
                                 <span>· <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
                             }
                             <span>· <kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                            @if (row.StartAt is not null || row.DueAt is not null)
+                            {
+                                @* ADR 0079 — the optional dates (the <kw-dt>
+                                   effective-timezone render; gated on non-null
+                                   so an unset date shows nothing). *@
+                                @if (row.StartAt is not null)
+                                {
+                                    <span>· <kw-l key="projects.todo.start">Start</kw-l> <kw-dt dt="@row.StartAt" format="g"></kw-dt></span>
+                                }
+                                @if (row.DueAt is not null)
+                                {
+                                    <span>· <kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@row.DueAt" format="g"></kw-dt></span>
+                                }
+                            }
                             @if (!string.IsNullOrWhiteSpace(row.Status))
                             {
                                 <span class="badge text-bg-light border ms-2">@row.Status</span>
@@ -266,10 +307,10 @@
                                                so "None" is the selected default. *@
                                             <select class="form-select" name="Status" id="@($"subtask-status-{row.Id}")">
                                                 <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
-                                                @foreach (var code in KanbanStatuses.Known)
+                                                @foreach (var statusCode in KanbanStatuses.Known)
                                                 {
-                                                    <option value="@code">
-                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                    <option value="@statusCode">
+                                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
                                                     </option>
                                                 }
                                             </select>

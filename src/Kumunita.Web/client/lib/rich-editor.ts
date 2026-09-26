@@ -37,6 +37,7 @@
  */
 import { apiFetch } from './api.js';
 import { toMarkdown, sanitizeHtml } from './dom-to-markdown.js';
+import { openImageEditor } from './image-editor.js';
 
 // ── Private helpers (not exported — internal to the module) ───────────────
 
@@ -1440,8 +1441,25 @@ export function bindRichEditor(root: HTMLElement): void {
           const file = fileInput.files?.[0];
           if (!file) return;
           try {
+            // ADR 0075 — offer the simple editor (crop + resize). **Optional**:
+            // `openImageEditor` resolves the edited `Blob` on Apply, or `null`
+            // on "Use original" / close — in which case the unedited file is
+            // uploaded. The edited blob is the payload we append, so the
+            // store's content-addressing (id = SHA-256 of the bytes) yields a
+            // fresh MediaObject with zero server / renderer / serializer change.
+            const edited = await openImageEditor({
+              title: 'Edit image',
+              blob: file,
+              mime: file.type || 'image/png',
+              aspect: null,
+              targetWidth: 800,
+              presets: [400, 800, 1200],
+            });
+            const payload = edited ?? file;
             const fd = new FormData();
-            fd.append('file', file);
+            // Append with the original file name so the store records a
+            // sensible extension and the allow-list guard sees the right type.
+            fd.append('file', payload, file.name);
             const { id } = await apiFetch<{ id: string }>(
               '/content-image',
               { method: 'POST', body: fd },
@@ -1462,13 +1480,15 @@ export function bindRichEditor(root: HTMLElement): void {
             // until a SAVED post references the id, so the canonical URL is
             // not yet fetchable inside the pre-save editor — a plain
             // <img src="/content-image/{id}"> would render as a broken icon.
-            // Display a local preview of the file the resident just chose
+            // Display a local preview of the payload the resident just chose
             // (a blob: URL, same-origin, always loads) and carry the
             // canonical route in data-cid. serializeImage (dom-to-markdown)
             // reads data-cid as the value, so the submitted body is still the
             // byte-identical ![alt](/content-image/{id}) form (RC R·3) — the
-            // preview is never emitted and never 404s the value.
-            const displaySrc = URL.createObjectURL(file);
+            // preview is never emitted and never 404s the value. The preview
+            // shows the *edited* payload when the editor was applied, so what
+            // the resident sees is what will be stored.
+            const displaySrc = URL.createObjectURL(payload);
             img.setAttribute('src', displaySrc);
             img.setAttribute('data-cid', canonical);
             img.setAttribute('alt', alt);

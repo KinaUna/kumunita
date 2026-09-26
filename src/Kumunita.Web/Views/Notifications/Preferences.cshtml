@@ -1,0 +1,77 @@
+@model Kumunita.Web.Models.NotificationPreferencesViewModel
+@using Kumunita.Core.Notifications
+@{
+    ViewData["Title"] = "Notification preferences";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/notifications" class="btn btn-link p-0">
+                ← <kw-l key="notifications.inbox">Notifications</kw-l>
+            </a>
+        </p>
+
+        <div class="card">
+            <div class="card-body">
+                <h1 class="h4" style="font-weight:600;"><kw-l key="notifications.preferences.title">Notification preferences</kw-l></h1>
+                @* The C-M6·7 pin rendered in the UI — the preference governs
+                   the *email*, not the *inbox* (the inbox is the durable
+                   record; disabling a kind never stops the row). *@
+                <p class="text-muted">
+                    <kw-l key="notifications.preferences.intro">Choose which notifications you also get by email. The inbox always records every notification.</kw-l>
+                </p>
+
+                @* U05's frozen POST /notifications/preferences ([ValidateAntiForgeryToken]
+                   — the token is the gate); the bound property is
+                   <c>KindsEnabled</c> (one <c>value</c> per checked toggle;
+                   an unbound/absent list = the lean-default <c>null</c>,
+                   C-M6·9). The route path is the §6.4 pin (a literal string,
+                   the U06 mark-all-read <c>form action</c> precedent). *@
+                <form method="post" action="/notifications/preferences">
+                    @Html.AntiForgeryToken()
+                    <div class="d-grid gap-2" style="max-width: 24rem;">
+                        @foreach (var kind in Model.AllKinds)
+                        {
+                            @* C-M6·2 — <c>post.mention</c> is reserved, not wired:
+                               the toggle ships **present but disabled** (no
+                               emitter calls the kind in M6 — a disabled
+                               checkbox is not submitted, so it can never
+                               enter the bound <c>KindsEnabled</c> list; the
+                               "coming soon" badge is the UI signal).
+                               C-M6·9 — the lean-default: <c>null</c> (no
+                               preference yet) renders every toggle checked. *@
+                            var reserved = kind == NotificationKinds.PostMention;
+                            var isChecked = Model.KindsEnabled is null || Model.KindsEnabled.Contains(kind);
+                            <div class="form-check form-switch @(reserved ? "opacity-50" : null)">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="@($"pref-{kind}")"
+                                       name="KindsEnabled" value="@kind"
+                                       @(isChecked && !reserved ? "checked" : null)
+                                       @(reserved ? "disabled" : null) />
+                                <label class="form-check-label" for="@($"pref-{kind}")">
+                                    @* The per-kind label key (the frozen dotted shape —
+                                       <c>notifications.preference.{kind}.label</c>);
+                                       the kw-l fallback text is inert (all nine are
+                                       registered, U07). *@
+                                    <kw-l key="@($"notifications.preference.{kind}.label")">@kind</kw-l>
+                                    @if (reserved)
+                                    {
+                                        <span class="badge text-bg-light text-dark ms-1">
+                                            <kw-l key="notifications.preferences.coming_soon">coming soon</kw-l>
+                                        </span>
+                                    }
+                                </label>
+                            </div>
+                        }
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <kw-l key="notifications.preferences.save">Save preferences</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

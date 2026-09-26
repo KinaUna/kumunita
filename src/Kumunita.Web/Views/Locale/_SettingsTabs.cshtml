@@ -1,0 +1,33 @@
+@* The /settings section sub-nav (the _EventsTabs.cshtml Bootstrap nav-tabs idiom,
+   ADR 0062 / ADR 0080). Four tabs — one per settings section page — so a resident
+   can jump between sections without scrolling. The active tab is derived from
+   the current action name (LocaleController owns all four GET actions: Index,
+   SettingsTimezone, SettingsDateFormat, SettingsEmailLanguage). *@
+@{
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
+    var tabs = new (string LabelKey, string Label, string Href)[]
+    {
+        ("locale.language_heading",   "Language",                    "/settings/language"),
+        ("settings.timezone_title",   "Time zone",                   "/settings/timezone"),
+        ("settings.dateformat_title", "Date & time format",          "/settings/dateformat"),
+        ("settings.email_title",      "Email & notification language", "/settings/email-language"),
+    };
+    var activeLabel = action switch
+    {
+        "SettingsTimezone"      => "Time zone",
+        "SettingsDateFormat"    => "Date & time format",
+        "SettingsEmailLanguage" => "Email & notification language",
+        _                       => "Language",
+    };
+}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    @foreach (var tab in tabs)
+    {
+        var isActive = tab.Label == activeLabel;
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
+                <kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+            </a>
+        </li>
+    }
+</ul>

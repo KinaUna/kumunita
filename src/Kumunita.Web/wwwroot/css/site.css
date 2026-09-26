@@ -425,6 +425,16 @@ body.kmb-page-fullbleed .navbar {
   color: #1c4532;
   font-weight: 600;
 }
+/* Vertically center each nav item in the bar so an icon-only item (the
+   notification bell — its anchor is ~4.5px shorter than a text nav-link
+   because only the 18px SVG is in-flow) sits on the same line as the text
+   links instead of reading high. Both nav <ul>s stretch to the same
+   height, so centering their <li> children puts every anchor's center on
+   one shared line (the icon is unaffected — it is already centered in its
+   own anchor). */
+.navbar .navbar-nav {
+  align-items: center;
+}
 
 /* --- Pinned announcement (Views/Shared/_PinnedAnnouncement.cshtml) --------
    Full-bleed banner above the navbar: warm cream band, amber left accent. */
@@ -888,6 +898,26 @@ body.kmb-page-fullbleed .navbar {
   font-size: 0.875rem;
   line-height: 1.5;
 }
+
+/* ADR 0085 — the reply-highlight: a notification link's #reply-{id} fragment
+   scrolls the matched <li> into view (Detail.cshtml's inline script) and
+   flashes this tinted background + a soft primary outline, fading back to the
+   row's normal appearance over ~1.5s. The class is removed after 4s by the
+   same script (belt-and-suspenders), so a second visit to the same link
+   re-triggers the flash (the transition restarts on re-add). A reduced-motion
+   user sees the static tint (the animation is gated, the color still lands). */
+.reply-highlight {
+  animation: reply-highlight-fade 4s ease-out;
+  border-radius: var(--bs-border-radius, 0.375rem);
+}
+@keyframes reply-highlight-fade {
+  0%   { background-color: rgba(13, 110, 253, 0.18); box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.45); }
+  60%  { background-color: rgba(13, 110, 253, 0.10); box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.20); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reply-highlight { animation: none; background-color: rgba(13, 110, 253, 0.10); box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.20); }
+}
 /* --- Inline editor (IE U1) — the source is hidden by default (IE·1) ---
    Hiding is a CSS class (display: none), never `disabled` (which would
    break form binding) and never the `hidden` attribute (which would
@@ -896,6 +926,57 @@ body.kmb-page-fullbleed .navbar {
 .rc-editor textarea.rc-editor-source-hidden {
   display: none;
 }
+
+/* --- Simple image editor (ADR 0075) — crop + resize modal --------------
+   Boring: no shadows, site tokens, no new palette. The `.ie-*` namespace
+   is reserved for this module (no other rule uses it). The stage holds the
+   fitted preview canvas; the crop rect is an absolutely-positioned overlay
+   the resident drags to move and grabs the corner to resize. */
+.ie-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0; /* drop the inline-canvas baseline gap */
+  border: 1px solid var(--kmb-border, var(--bs-border-color, #dee2e6));
+  background: var(--kmb-tint-a, var(--bs-tertiary-bg, #f8f9fa));
+  border-radius: var(--bs-border-radius, 0.375rem);
+  overflow: hidden;
+  touch-action: none; /* let pointer events own the drag, not the page scroll */
+  cursor: crosshair;
+}
+.ie-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.ie-rect {
+  position: absolute;
+  border: 2px solid var(--bs-primary, #0d6efd);
+  background: rgba(13, 110, 253, 0.12);
+  border-radius: 2px;
+  box-sizing: border-box;
+  pointer-events: none; /* the stage owns pointerdown; the rect is drawn only */
+}
+/* Resize handle lives on the bottom-right corner, but pointer math is driven
+   by the stage, so we only need a visible affordance, not its own handler. */
+.ie-rect::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 10px;
+  height: 10px;
+  background: var(--bs-primary, #0d6efd);
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+.ie-size {
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color, #6c757d);
+  font-variant-numeric: tabular-nums;
+}
+.ie-field { min-width: 6rem; }
+.ie-presets .ie-preset { font-size: 0.75rem; }
 
 
 /* --- Kumunita page layouts ("Airy" A for announcements / community /
@@ -1105,6 +1186,58 @@ body.kmb-page-fullbleed .navbar {
 }
 .airy-page-list a:hover { color: var(--bs-primary); }
 
+/* Collapsible branches (native <details>/<summary>, no JS — _PageTreeItem).
+   Children render in a nested <ul>, so the leaf-row padding above still owns
+   the indentation at every depth; the branch rows themselves are flush, with
+   the row separator provided by the <li> they live in (and, for nested
+   branches, the nested <ul>'s own rows). */
+.airy-page-list .kmb-page-branch { display: block; }
+.airy-page-list .kmb-page-branch > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  list-style: none;               /* hide the default marker; we draw our own chevron */
+  user-select: none;
+}
+.airy-page-list .kmb-page-branch > summary::-webkit-details-marker { display: none; }
+.airy-page-list .kmb-page-branch > summary::before {
+  content: "\203a";              /* single guillemet ≈ right chevron, like Bootstrap's caret */
+  flex: 0 0 auto;
+  font-family: var(--bs-body-font-family);
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--kmb-muted);
+  transition: transform 0.15s ease-in-out;
+}
+.airy-page-list .kmb-page-branch[open] > summary::before { transform: rotate(90deg); }
+.airy-page-list .kmb-page-branch > summary a { flex: 1 1 auto; }
+.kmb-page-branch-count {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--kmb-muted);
+  background: var(--kmb-border-soft);
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+}
+/* Children list: keeps the row separators without double borders (the
+   parent row's <li> border already closes the gap above it), and the
+   borderless nested <ul> keeps the bordered-ledger silhouette intact. */
+.airy-page-list .kmb-page-branch > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 1.5rem; }
+/* Depth cue: the old flat list encoded tree depth as 1.25rem of extra
+   padding-left per level — keep that visual language, now carried by
+   each branch's own summary row (a branch's children are never rendered
+   unless it is open, so indenting only *open* branches' rows is safe
+   and unambiguous; no :has() needed). */
+.airy-page-list .kmb-page-branch[open] > summary { padding-left: 2.75rem; }
+
 /* C: directory — the cards grid (the "bigger avatars" overview). */
 .dir-cards {
   display: grid;
@@ -1140,6 +1273,8 @@ body.kmb-page-fullbleed .navbar {
   .airy-side-note { display: none; } /* the mandatory badge reappears in the head */
   .airy-group-grid { grid-template-columns: 1fr; }
   .airy-page-list li { padding: 0.75rem 1rem; }
+  .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
+  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 1rem; }
 }
 
 /* The shared base for the Month chip (.event-chip) and the Day/Week block
@@ -1184,26 +1319,47 @@ body.kmb-page-fullbleed .navbar {
   color: var(--bs-primary);
 }
 
-/* EV-DWM (ADR 0064) — the Month chip grid: a fixed 7-column CSS grid so
-   every day-cell is the same width (a true calendar lattice) regardless of
-   viewport. A `minmax(0, 1fr)` track keeps long chips from blowing a column
-   out; the shared gap is what used to come from the `.row g-2` gutters. */
+/* EV-DWM (ADR 0064), reshaped by ADR 0081 — the Month chip grid: a fixed
+   7-column CSS grid so every day-cell is the same width (a true calendar
+   lattice) regardless of viewport. A `minmax(0, 1fr)` track keeps long chips
+   from blowing a column out. The grid itself carries one outer border +
+   radius (ADR 0081: no gaps, single-line separators between cells — the
+   cells draw their inner lines with top/right borders only, and the edge
+   cells drop the outer edge's border so nothing doubles up against the
+   grid's own border). */
 .events-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-/* EV-DWM (ADR 0064) — the Month chip grid's cells: a soft border on each
-   day-cell so the 7-column × 5–6-week grid reads as a calendar (a visible
-   lattice) even when a cell is empty, plus a shared min-height so empty and
-   chip-filled cells line up in equal rows (uniform cell sizing). */
-.events-calendar-day {
   border: 1px solid var(--kmb-border-soft);
   border-radius: var(--kmb-radius-chip);
+  overflow: hidden;
+}
+
+/* EV-DWM (ADR 0064), reshaped by ADR 0081 — the Month chip grid's cells:
+   a soft top + right border on each day-cell (the single-line lattice
+   separators — the grid's outer border supplies the bottom + left edges),
+   no per-cell radius (the grid's radius + overflow:hidden shape the outer
+   corners), plus a shared min-height so empty and chip-filled cells line up
+   in equal rows (uniform cell sizing). */
+.events-calendar-day {
+  border: 0;
+  border-top: 1px solid var(--kmb-border-soft);
+  border-right: 1px solid var(--kmb-border-soft);
   background: #fff;
   min-height: 4.5rem;
   min-width: 0;
+  padding: 0.375rem 0.5rem;
+}
+/* The last column's cells drop their right border (the grid's own border
+   supplies that edge — a doubled line would read heavier than the inner
+   separators). */
+.events-calendar-day:nth-child(7n) {
+  border-right: 0;
+}
+/* The first row's cells (the grid's first 7 children) drop their top
+   border (same reason — the grid's border is the top edge). */
+.events-calendar-day:nth-child(-n+7) {
+  border-top: 0;
 }
 
 /* EV-DWM (ADR 0064, U03) — Month as a true calendar month (D4): the
@@ -1770,5 +1926,59 @@ body.kmb-page-fullbleed .navbar {
   .kanban-lane-new {
     min-width: 10rem;
   }
+}
+
+/* ── M6 (U08) — the notification bell: badge + dropdown ──
+   The bell anchor (U06's _AccountNav markup) ships the .badge with
+   `position-absolute top-0 start-100 translate-middle` (Bootstrap
+   utilities) — that already puts it at the bell's top-right corner;
+   these rules only tighten its size + offset so it reads as a
+   notification badge (the U08 unit file's shape), and give the
+   client-built dropdown (.notifications-dropdown, the
+   client/lib/notifications-bell.ts module's class) a fixed width, a
+   scrollable height, and a compact item density. */
+
+/* The unread-count badge — a slightly larger tap/reading target than
+   the default .badge, tucked at the bell's top-right corner. */
+#notifications-badge {
+  top: -0.25rem;
+  right: -0.5rem;
+  left: auto; /* override `start-100` (Bootstrap sets `left`) so the
+                 `right` offset is what positions it — same corner */
+  font-size: 0.625rem;
+  min-width: 1rem;
+  height: 1rem;
+  line-height: 1rem;
+  padding: 0 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The dropdown — the notifications-bell.ts module creates + appends
+   this <ul> to the bell's <li>; fixed width + scrollable height
+   (the M2/M3/M4 nav-dropdown shape). The module does NOT run the
+   Bootstrap Dropdown plugin (no data-bs-toggle on the bell), so the
+   [data-bs-popper] top/left + .dropdown-menu-end right rules never apply —
+   we set the anchor here. The bell's <li> is position:relative (see
+   _AccountNav.cshtml), so top:100% / right:0 drop the menu below the
+   bell and right-align it to the bell (the dropdown-menu-end behavior),
+   keeping it on-screen instead of spilling past the viewport edge. */
+.notifications-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  z-index: 1000; /* the Bootstrap .dropdown-menu default — above page content */
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* The compact list-item density — the dropdown's items are
+   .dropdown-item elements (the module builds them), tighter than
+   the default dropdown padding so a five-item list reads at a
+   glance. */
+.notifications-dropdown .dropdown-item {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
 }
 

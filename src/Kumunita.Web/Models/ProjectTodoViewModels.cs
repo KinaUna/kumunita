@@ -55,6 +55,12 @@ public sealed record TodoRow(
     string LanguageCode,
     DateTimeOffset Created,
     DateTimeOffset? Modified,
+    // ADR 0079 — the optional dates (the Event Start/End shape, but
+    // OPTIONAL): `null` = no date. Display metadata only (the <kw-dt>
+    // TagHelper renders them in the effective timezone; null renders
+    // empty — the views gate the label on non-null).
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt,
     IReadOnlyList<string> GroupNames,
     bool CanClaim,
     // The to-do's board-placement board ids (a read lookup — the feed's
@@ -88,7 +94,10 @@ public sealed record TodoIndexViewModel(
     string? CurrentComponentId,
     string? CurrentAssigneeId,
     bool UnassignedOnly,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0087 D6 — the "blocked only" feed filter (a filter, never a gate —
+    // C-TBD·2); the toggle link toggles this.
+    bool BlockedOnly = false);
 
 /// <summary>
 /// One <see cref="BoardItemPlacement"/> of the to-do, enriched with the
@@ -127,7 +136,30 @@ public sealed record TodoPlacementRow(
 public sealed record TodoDetailViewModel(
     TodoRow Todo,
     IReadOnlyList<TodoRow> Subtasks,
-    IReadOnlyList<TodoPlacementRow> Placements);
+    IReadOnlyList<TodoPlacementRow> Placements,
+    // ADR 0086 D9 — the **project link** on the to-do detail (the D6
+    // dangling-association rule: both fields are `null` when the to-do has
+    // no `ProjectId`, or the target project is soft-deleted / unreadable by
+    // the actor — the link is then omitted entirely, never a 404/403 for the
+    // to-do itself; the `pl.todo.project_link` kw-l key labels it).
+    string? ProjectId = null,
+    string? ProjectTitle = null,
+    // ADR 0088 — the to-do's user-added translations (the ADR 0027 chip-swap +
+    // ADR 0049 default-visible-variant + ADR 0022 add-form shape; the
+    // <see cref="Kumunita.Core.Projects.TodoTranslation"/> rows), the
+    // enabled-catalog language set the chips / add-form render from, the
+    // display pin (creator ∪ assignee ∪ Translator ∪ GlobalAdmin — the real
+    // gate is the server-side re-check in the write lanes), and the authored-in
+    // language code.
+    IReadOnlyList<Kumunita.Core.Projects.TodoTranslation>? Translations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "",
+    // ADR 0087 D4 — the "waiting on" chip (the service's
+    // <see cref="Kumunita.Core.Projects.TodoDetailResult.Blocker"/> —
+    // access-scoped: an unreadable / absent / soft-deleted blocker degrades to
+    // the generic label). `null` = the to-do is not blocked (no chip).
+    Kumunita.Core.Projects.BlockerChip? Blocker = null);
 
 /// <summary>
 /// The **compose / edit** form model (the <c>GET /projects/todos/new</c>
@@ -205,9 +237,35 @@ public sealed class TodoEditorModel
     /// invalid-POST re-renders.</summary>
     public bool ClearParent { get; set; }
 
+    /// <summary>The "waiting on" to-do's id (ADR 0087 D5) — a non-null value
+    /// sets the <c>BlockedByTodoId</c> (a hint, never a gate — C-TBD·2);
+    /// <c>null</c> = not blocked. Picked from <see cref="BlockerOptions"/>
+    /// (the actor's readable, non-deleted to-dos — the C-TBD·4 display
+    /// surface; the C-TBD·3 cycle guard is the service's).</summary>
+    public string? BlockedByTodoId { get; set; }
+
+    /// <summary>Explicit un-block (the edit lane only — sets
+    /// <c>BlockedByTodoId = null</c>; <see cref="Kumunita.Core.Projects
+    /// .UpdateTodoRequest.ClearBlockedBy"/>). <see cref="ClearParent"/>
+    /// idiom — the flag survives invalid-POST re-renders.</summary>
+    public bool ClearBlockedBy { get; set; }
+
     /// <summary>The feed organizer (a <c>Component</c> id) — a
     /// <b>filter, never a gate</b> (C-M3·2).</summary>
     public string? ComponentId { get; set; }
+
+    /// <summary>The optional **start** (ADR 0079 — the Event Start/End
+    /// shape, but optional). Model-bound from the <c>datetime-local</c>
+    /// form field; null (a blank field) = no date, which on the edit
+    /// lane *clears* the stored value (the <c>UpdateTodoRequest</c>
+    /// partial-update shape).</summary>
+    public DateTimeOffset? StartAt { get; set; }
+
+    /// <summary>The optional **due date** (ADR 0079). Same binding +
+    /// clearing shape as <see cref="StartAt"/>; <see cref="IsValid"/>
+    /// requires it to not precede the start when both are set (the Event
+    /// "the end time must be after the start" precedent).</summary>
+    public DateTimeOffset? DueAt { get; set; }
 
     /// <summary>The to-do's **audience** editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the single-source pin; the
@@ -241,6 +299,33 @@ public sealed class TodoEditorModel
     [BindNever]
     public IReadOnlyList<(string Id, string Title)> ParentOptions { get; set; } = [];
 
+    /// <summary>The **blocker picker** options — the actor's **readable,
+    /// non-deleted** to-dos (<see cref="Kumunita.Core.Projects.IProjectService
+    /// .ListPickerTodosAsync"/>, audience-filtered by the service's
+    /// <c>CanSeeAsync(Read)</c>). A **display** surface, never a gate
+    /// (C-TBD·4). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="BlockedByTodoId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Title)> BlockerOptions { get; set; } = [];
+
+    /// <summary>The to-do's **project association** (ADR 0086 D4 / D9) —
+    /// the <see cref="Kumunita.Core.Projects.TodoItem.ProjectId"/>: a feed
+    /// filter, never a gate (C-PL·3). Bound from the <c>name="ProjectId"</c>
+    /// picker on the new-form lane; on the **edit** lane it is the current
+    /// association the standalone set-project form prefills (the U04
+    /// <c>SetTodoProjectAsync</c> seam is the enforcement — a blank choice is
+    /// <c>null</c> = clear). Optional — a to-do is usable project-less.</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>The composer's **project picker** options — the actor's
+    /// readable, non-deleted <see cref="Kumunita.Core.Projects.Project"/> set
+    /// (the <c>SeedProjectPickerAsync</c> seed, the
+    /// <see cref="SeedGoalPickerAsync"/> shape). A **display** surface, never
+    /// a gate (C-PL·3). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="ProjectId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
+
     /// <summary>The composer's **tag** input — a <see cref="string"/>
     /// form field (JSON array of labels or a CSV fallback), parsed
     /// server-side by <see cref="Kumunita.Web.Security.TagSlugs.Parse"/>
@@ -253,7 +338,11 @@ public sealed class TodoEditorModel
     /// is a malformed shape, not a silent blank card); <see
     /// cref="Audience"/> is well-formed (the editor's
     /// <see cref="AudienceEditorModel.IsValid"/> — a missing mode is a
-    /// malformed post, not a silent default — C1).
+    /// malformed post, not a silent default — C1); and the optional dates
+    /// (ADR 0079) are coherent — when both <see cref="StartAt"/> and
+    /// <see cref="DueAt"/> are set, the due date must not precede the
+    /// start (the Event Start ≤ End shape; the controller adds the
+    /// localized error message).
     /// </summary>
     public bool IsValid
     {
@@ -262,6 +351,10 @@ public sealed class TodoEditorModel
             if (string.IsNullOrWhiteSpace(Title))
                 return false;
             if (Audience is null || !Audience.IsValid)
+                return false;
+            // ADR 0079 — the due date must not precede the start (the
+            // EventController `End < Start` shape refusal).
+            if (StartAt is not null && DueAt is not null && DueAt < StartAt)
                 return false;
             return true;
         }

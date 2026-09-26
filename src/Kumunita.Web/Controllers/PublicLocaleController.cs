@@ -48,6 +48,22 @@ public sealed class PublicLocaleController(
             ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
             : template;
     }
+
+    /// <summary>
+    /// Resolve a flash-message template in an **explicit** effective language
+    /// code (the language the visitor just selected — not the request's
+    /// current one) and apply the {0} placeholder. Same floor discipline as
+    /// <see cref="FlashAsync"/>.
+    /// </summary>
+    private async Task<string> FlashAsyncIn(string key, string lang, params object?[] args)
+    {
+        var template = translationProvider is null
+            ? KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key
+            : await translationProvider.GetAsync(key, lang);
+        return args.Length > 0
+            ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
+            : template;
+    }
     /// <summary>
     /// <c>GET /language</c> — the compact picker. Builds the <em>same</em> model
     /// shape as <see cref="LocaleController.Index"/> (the enabled catalog in
@@ -94,15 +110,41 @@ public sealed class PublicLocaleController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save(string? code, string? clear, string? returnUrl = null)
     {
-        // Resolve the flash text in the visitor's **current** language
-        // (before the write) — the message explains that the change takes
-        // effect on the *next* request, so the language they're reading right
-        // now is the language it belongs in. (ResolveAsync reads the request
-        // cookie, not the response we're about to set, so this is correct even
-        // though the write follows.)
-        string? info = clear == "1"
-            ? await FlashAsync("locale.flash_reset")
-            : (!string.IsNullOrWhiteSpace(code) ? await FlashAsync("locale.flash_set", code) : null);
+        // Resolve the flash text in the language the visitor **selects** —
+        // the toast is shown on the *next* request, which already renders in
+        // the new language, and that is the language the user is most likely
+        // to understand (the old behavior resolved it in the previous
+        // language; the message landed on a page written in the new one).
+        // A "reset to instance default" has no explicit code — fall back to
+        // the request's current effective language.
+        string? effectiveCode;
+        if (!string.IsNullOrWhiteSpace(code))
+            effectiveCode = code;
+        else if (translationProvider is not null)
+            effectiveCode = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+        else
+            effectiveCode = null;
+
+        string? lang = translationProvider is not null
+            ? await translationProvider.ResolveEffectiveLanguageAsync(effectiveCode)
+            : effectiveCode;
+        string? info;
+        if (clear == "1")
+        {
+            info = lang is not null
+                ? await FlashAsyncIn("locale.flash_reset", lang)
+                : await FlashAsync("locale.flash_reset");
+        }
+        else if (!string.IsNullOrWhiteSpace(code))
+        {
+            info = lang is not null
+                ? await FlashAsyncIn("locale.flash_set", lang, code)
+                : await FlashAsync("locale.flash_set", code);
+        }
+        else
+        {
+            info = null; // no language change requested
+        }
 
         if (clear == "1")
             LocaleCookie.Clear(Response);

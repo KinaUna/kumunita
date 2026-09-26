@@ -348,8 +348,8 @@ public sealed class EventController : Controller
     /// access input** (C-DWM·3): <c>day</c> (the anchor day), <c>week</c>
     /// (the anchor's **Monday-start** week, C-DWM·5), or <c>month</c> (the
     /// anchor's calendar month) — missing / invalid / out-of-set values fall
-    /// back to <c>month</c> (the backward-compatible EV-CAL default,
-    /// C-DWM·8; a display fallback, not an error). The <paramref name="from"/>
+    /// back to <c>week</c> (the default view, ADR 0081 amending C-DWM·8;
+    /// a display fallback, not an error). The <paramref name="from"/>
     /// query is the anchor **date in the viewer's effective zone** (C-EV·5;
     /// default: the zone's today) — each window bound is that date's
     /// zone-local midnight as a UTC instant; the *span* (1d / 7d /
@@ -376,15 +376,15 @@ public sealed class EventController : Controller
 
         // `view` = the EV-DWM display selector (ADR 0064 §6.2 step 1):
         // exactly {"day","week","month"} (case-insensitive); missing /
-        // invalid / out-of-set falls back to "month" (the backward-compatible
-        // EV-CAL default — C-DWM·3 / C-DWM·8; a display fallback, not an
-        // error). Never an access input (C-DWM·3).
+        // invalid / out-of-set falls back to "week" (the default view —
+        // ADR 0081 amends the original C-DWM·8 "month" default; a display
+        // fallback, not an error — C-DWM·3). Never an access input (C-DWM·3).
         var resolvedView = view?.Trim()?.ToLowerInvariant() switch
         {
             "day" => "day",
             "week" => "week",
             "month" => "month",
-            _ => "month",
+            _ => "week",
         };
 
         // Anchor = the `from` query parsed as a date in the viewer's effective
@@ -792,6 +792,18 @@ public sealed class EventController : Controller
         {
             ModelState.AddModelError(string.Empty, "You must sign in to create an event.");
             return View("Create", model);
+        }
+
+        // ADR 0081 — the quick-create marker (the calendar's quick-create
+        // modal's hidden QuickCreate=true field): a **shape signal only**,
+        // read before the IsValid gate. When set and no body was typed, the
+        // title seeds the body — a title-only quick-create is a well-formed
+        // shape, and the full composer's "a body is required" rule (and its
+        // re-render path) is untouched for non-quick-create posts.
+        if (model.QuickCreate && string.IsNullOrWhiteSpace(model.Body)
+            && !string.IsNullOrWhiteSpace(model.Title))
+        {
+            model.Body = model.Title;
         }
 
         // Re-seed the pickers so a failed-shape re-render below still shows the

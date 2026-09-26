@@ -1,5 +1,6 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -43,11 +44,19 @@ public sealed class AnnouncementService : IAnnouncementService
 {
     private readonly IDocumentStore _store;
     private readonly IUserInfoService _userInfo;
+    // ADR 0084 — the M6 notification emitter seam (optional nullable default
+    // so existing test call sites that construct AnnouncementService
+    // positionally (store, userInfo) keep compiling unchanged — the same
+    // CS1736 shape as PostService._notifications). The DI registration
+    // passes the live Notifications.NotificationService.
+    private readonly NotificationService? _notifications;
 
-    public AnnouncementService(IDocumentStore store, IUserInfoService userInfo)
+    public AnnouncementService(IDocumentStore store, IUserInfoService userInfo,
+        NotificationService? notifications = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _notifications = notifications;
     }
 
     /// <summary>
@@ -204,6 +213,61 @@ public sealed class AnnouncementService : IAnnouncementService
         announcement.LanguageCode = await ResolveLanguageCodeAsync(announcement.LanguageCode, session).ConfigureAwait(false); // ADR 0018
 
         session.Store(announcement);
+
+        // ADR 0084 — the announcement emitter (opt-IN kind: the resident must
+        // have stored an Enabled=true subscription row for the target;
+        // IsSubscriptionEnabledForAsync short-circuits the emission for
+        // unsubscribed recipients — no inbox row, no email, no side effects).
+        // The recipient universe is the target community's members when
+        // CommunityId is set, else every verified resident (the flat/public
+        // "platform-wide" audience). The author is excluded (intake honesty:
+        // the author already knows the announcement exists). One
+        // SaveChangesAsync commits the announcement + the inbox rows
+        // atomically (C3).
+        if (_notifications is not null && !announcement.IsDraft)
+        {
+            if (announcement.CommunityId is { } communityId)
+            {
+                var members = await session.Query<UserInfo.ComponentMembership>()
+                    .Where(m => m.ComponentId == communityId)
+                    .Select(m => m.UserId)
+                    .ToListAsync().ConfigureAwait(false);
+                foreach (var member in members)
+                {
+                    if (string.Equals(member, actorId, StringComparison.Ordinal))
+                        continue;                                   // the author does not notify themselves
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: member,
+                        kind: NotificationKinds.Announcement,
+                        idempotencyKey: $"notification:announcement:{announcement.Id}:{member}",
+                        body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
+                        targetId: communityId,
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                const string targetId = "announcements";           // the flat/public sentinel (ADR 0084)
+                foreach (var p in all)
+                {
+                    if (string.Equals(p.SubjectId, actorId, StringComparison.Ordinal))
+                        continue;                                   // the author does not notify themselves
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: p.SubjectId,
+                        kind: NotificationKinds.Announcement,
+                        idempotencyKey: $"notification:announcement:{announcement.Id}:{p.SubjectId}",
+                        body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
+                        targetId: targetId,
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
         return announcement;
     }
@@ -400,6 +464,58 @@ public sealed class AnnouncementService : IAnnouncementService
         }
 
         session.Store(announcement);
+
+        // ADR 0084 — the announcement emitter (opt-IN kind). Only fires when
+        // this publish **was** the draft→published transition (a second
+        // publish on an already-live announcement is a no-op — the IsDraft
+        // gate above is the pin). Recipient universe + the targetId sentinel
+        // are the same as CreateAsync (the target community's members when
+        // CommunityId is set, else every verified resident). One SaveChangesAsync
+        // commits the flip + the inbox rows atomically (C3).
+        if (_notifications is not null)
+        {
+            if (announcement.CommunityId is { } communityId)
+            {
+                var members = await session.Query<UserInfo.ComponentMembership>()
+                    .Where(m => m.ComponentId == communityId)
+                    .Select(m => m.UserId)
+                    .ToListAsync().ConfigureAwait(false);
+                foreach (var member in members)
+                {
+                    if (string.Equals(member, actorId, StringComparison.Ordinal))
+                        continue;
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: member,
+                        kind: NotificationKinds.Announcement,
+                        idempotencyKey: $"notification:announcement:{announcement.Id}:{member}",
+                        body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
+                        targetId: communityId,
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                var all = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
+                const string targetId = "announcements";
+                foreach (var p in all)
+                {
+                    if (string.Equals(p.SubjectId, actorId, StringComparison.Ordinal))
+                        continue;
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: p.SubjectId,
+                        kind: NotificationKinds.Announcement,
+                        idempotencyKey: $"notification:announcement:{announcement.Id}:{p.SubjectId}",
+                        body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
+                        targetId: targetId,
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
         return announcement;
     }
