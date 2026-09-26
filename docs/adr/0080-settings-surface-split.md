@@ -1,7 +1,49 @@
-# ADR 0080 — The /settings surface split: four linkable section pages
+# ADR 0080 — The /settings surface split: linkable section pages
 
 Status: Accepted
 Date: 2026-09-25
+Amended: 2026-09-30 (email section folded into the Language tab; the
+Children page adopted as a settings tab — see **Amendment (2026-09-30)** below)
+
+## Amendment (2026-09-30)
+
+Two surface refinements supersede parts of the original four-section decision
+below; everything not restated here still stands.
+
+- **The Email &amp; notification language section (ADR 0061) is folded into
+  the Language tab.** Rationale: it is another "which language" choice and
+  lived awkwardly as a lone picker on its own page. Concretely:
+  - `Views/Locale/EmailLanguage.cshtml` is **deleted**; its email picker +
+    reset block and the **help/account mount-slot link** (ADR 0039 §3.8) are
+    merged into `Views/Locale/Index.cshtml` (the Language tab), which now
+    `@inject`s `IPageService`.
+  - `LocaleController.SettingsEmailLanguage()` (the
+    `GET /settings/email-language` route) is **retired as a page** and now
+    `RedirectToAction(nameof(Index))` — the route is kept so saved links and
+    deep references still land on the page that owns the section.
+  - `SaveEmailLanguage` (the `POST /settings/email-language` lane, signature
+    and fail-closed handling unchanged) now redirects to **`Index`** (the
+    Language tab) instead of `SettingsEmailLanguage`.
+  - The tab strip is now **three settings tabs + Children** (see the next
+    bullet); the `Email & notification language` tab row and its active-case
+    are removed from `_SettingsTabs.cshtml`.
+  - `SettingsSectionSplitTests` is updated: the email GET pin now asserts the
+    redirect to `Index`, and the `SaveEmailLanguage` subject-null pin asserts
+    a redirect to `Index`.
+  - This supersedes the table row
+    `/settings/email-language` | `EmailLanguage` and the "help/account
+    … renders at the bottom of `EmailLanguage.cshtml`" bullet.
+
+- **The Children page (ADR 0028) becomes a settings tab.** The "Children"
+  entry is removed from the account dropdown (`_AccountNav.cshtml`) and the
+  `Guardian/Index.cshtml` view now renders the shared `_SettingsTabs.cshtml`
+  sub-nav (active tab = Children). Because the Guardian page's action is also
+  named `Index` (as is the Language tab), `_SettingsTabs.cshtml`'s active-tab
+  detection is now **controller-aware** (`controller == "Guardian"` →
+  Children; otherwise the `LocaleController` action switch). The tab label
+  reuses the already-registered `nav.children` key, so no new translation key
+  is introduced. This supersedes the "active tab is derived from the current
+  action name" and "four tabs" wording in the Decision.
 
 ## Context
 

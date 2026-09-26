@@ -84,6 +84,12 @@ actor here").
     platform default), and the instance-default row is marked so the resident
     can see which choice is "the neighborhood default."
 
+    *(Surface placement: ADR 0080 originally split this section out onto its
+    own `/settings/email-language` page, then the 2026-09-30 amendment
+    re-homed it back onto the **Language** tab — that is the current shape.
+    The `GET /settings/email-language` route is now a redirect to the
+    Language tab; the save lane's route is unchanged.)*
+
 - **The two email lanes resolve through `ITranslationProvider`, with an English
   fallback when no provider is wired in:**
   - **Verification** (`IdentityService`): the subject (`email.verify_subject`)

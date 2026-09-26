@@ -6,6 +6,11 @@
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
         <h1><kw-l key="guardian.title">Your children</kw-l></h1>
+        @* The settings sub-nav (ADR 0028, moved here from the account dropdown
+           2026-09-30). Shown to every signed-in resident — a non-guardian sees
+           the same page with an empty list — so the tab is unconditional, exactly
+           as the old dropdown entry was. *@
+        @await Html.PartialAsync("~/Views/Locale/_SettingsTabs.cshtml")
         <p class="text-muted"><kw-l key="guardian.lead">The accounts you set up for a child, and the controls you hold over each one.</kw-l></p>
 
         @*

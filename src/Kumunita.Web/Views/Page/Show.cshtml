@@ -1,6 +1,5 @@
 @model Kumunita.Web.Models.PageShowViewModel
 @using Kumunita.Web.Security
-@using Kumunita.Core.Pages
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Page" : Model.Title;
 
@@ -312,7 +311,6 @@
                         </div>
                     }
                 }
-            }
         </div>
 
         <div class="card">

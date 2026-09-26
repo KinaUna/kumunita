@@ -9,10 +9,11 @@ using NSubstitute;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
-/// ADR 0080 — the /settings surface split (the ADR 0062 pattern): four
+/// ADR 0080 — the /settings surface split (the ADR 0062 pattern): three
 /// linkable section pages on <see cref="LocaleController"/> (Language at
-/// <c>Index</c>, Time zone, Date &amp; time format, Email &amp; notification
-/// language) sharing one <see cref="LocaleController.LocaleSettingsViewModel"/>.
+/// <c>Index</c> — which also carries the Email &amp; notification language
+/// section, ADR 0061, folded in 2026-09-30 — plus Time zone and Date &amp; time
+/// format) sharing one <see cref="LocaleController.LocaleSettingsViewModel"/>.
 /// Pins the split's two observable halves: each section GET renders its own
 /// view name with the shared model, and each save lane redirects back to the
 /// section that owns it (the subject-null branches, which return before any
@@ -110,18 +111,18 @@ public class SettingsSectionSplitTests
     }
 
     [Fact]
-    public async Task SettingsEmailLanguage_Renders_EmailLanguage_View_With_The_Shared_Model()
+    public void SettingsEmailLanguage_RetiredRoute_Redirects_To_Language_Tab()
     {
+        // The email & notification language section (ADR 0061) was folded into
+        // the Language tab (ADR 0080, 2026-09-30); the retired GET route now
+        // just points back at the page that owns the section.
         var controller = BuildController(signedIn: true,
             profile: new Profile { SubjectId = Subject, EmailLanguage = "de" });
 
-        var result = await controller.SettingsEmailLanguage();
+        var result = controller.SettingsEmailLanguage();
 
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("EmailLanguage", view.ViewName);
-        var model = Assert.IsType<LocaleController.LocaleSettingsViewModel>(view.ViewData.Model);
-        Assert.NotNull(model.EmailLanguage);
-        Assert.Equal("de", model.EmailLanguage.SelectedCode);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(LocaleController.Index), redirect.ActionName);
     }
 
     // ── Save lanes redirect back to the section that owns them ────────────
@@ -152,14 +153,14 @@ public class SettingsSectionSplitTests
     }
 
     [Fact]
-    public async Task SaveEmailLanguage_SignedOut_Redirects_To_SettingsEmailLanguage()
+    public async Task SaveEmailLanguage_SignedOut_Redirects_To_Language_Tab()
     {
         var controller = BuildController(signedIn: false);
 
         var result = await controller.SaveEmailLanguage(code: "de", clear: null);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(LocaleController.SettingsEmailLanguage), redirect.ActionName);
+        Assert.Equal(nameof(LocaleController.Index), redirect.ActionName);
     }
 
     [Fact]
