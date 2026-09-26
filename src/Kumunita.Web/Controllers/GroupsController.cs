@@ -1052,7 +1052,12 @@ public sealed class GroupsController(
             userId: subjectId!,
             invitedBy: resolved.Actor);
 
-        TempData["info"] = $"Invited {subjectId} to “{resolved.Group.Name}”.";
+        // The toast must show the resident's name, not their opaque subject id —
+        // resolve the profile's display name (fall back to the subject id only
+        // if no profile row exists, consistent with the invitations card's
+        // <c>by?.DisplayName ?? inv.InvitedBy</c> shape).
+        var invitee = await userInfo.GetProfileAsync(subjectId!);
+        TempData["info"] = $"Invited {invitee?.DisplayName ?? subjectId} to “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
