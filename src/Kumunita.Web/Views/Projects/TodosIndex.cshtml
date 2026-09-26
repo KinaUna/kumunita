@@ -446,6 +446,14 @@
                     </div>
                 </div>
             }
+
+            @* M7 (ADR 0090 D5) — the to-do feed's shared pager (F2 one-page
+               no-render pin): the <c>_Pager</c> partial renders nothing when the
+               VM field is null (a one-page feed). *@
+            @if (Model.Pager is not null)
+            {
+                <partial name="_Pager" model="Model.Pager" />
+            }
         </div>
     </div>
 </div>

@@ -281,6 +281,22 @@ public sealed record GroupDetailViewModel(
     /// button's visibility pin — the <see cref="CanPost"/> analog for the M4
     /// event surface; the POST create gate is the authoritative deny, GE·3).</summary>
     public bool CanCreateEvent { get; init; }
+
+    // ── M7 (ADR 0090 D5) — the two paged sections' pagers ──────────────────────
+    // The detail page renders **two** paged sections (the group posts + the
+    // group events) — each carries its own <see cref="PagedViewModel"/> (the
+    // section-scoped names make each <c>_Pager</c>'s <c>BaseUrl</c> +
+    // <c>FilterParams</c> unambiguous). The F2 one-page no-render pin: null on
+    // a single page — the <c>_Pager</c> partial renders nothing. Object-initializer
+    // properties (not positional params) so the existing shape-pinning Web test
+    // keeps compiling unchanged.
+    /// <summary>The group-posts section's pager (M7, ADR 0090 D5) — null on a
+    /// single page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
+    public PagedViewModel? PagerPosts { get; init; }
+
+    /// <summary>The group-events section's pager (M7, ADR 0090 D5) — null on a
+    /// single page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
+    public PagedViewModel? PagerEvents { get; init; }
 }
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route

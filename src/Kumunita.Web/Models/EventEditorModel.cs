@@ -374,7 +374,12 @@ public sealed record EventIndexViewModel(
     // a collection expression `[]` is not a constant and is illegal here):
     // callers that omit the argument treat it as the empty "no section"
     // case — the view's `Count > 0` guard is null-safe against it.
-    IReadOnlyList<EventRow> MyEvents = null!);
+    IReadOnlyList<EventRow> MyEvents = null!,
+    // M7 (ADR 0090 D5) — the pager (the F2 one-page no-render pin: null on a
+    // single page). The <c>_Pager</c> partial renders nothing when null.
+    // Carries the <c>componentId</c> filter (D7 — the pager preserves the
+    // filter) as <see cref="PagedViewModel.FilterParams"/>.
+    PagedViewModel? Pager = null);
 
 /// <summary>
 /// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read

@@ -103,6 +103,19 @@ public sealed class FeedViewModel
     /// reachable directory.
     /// </summary>
     public IReadOnlyList<CommunityLink> Communities { get; set; } = [];
+
+    /// <summary>
+    /// M7 (ADR 0090 D5) — the one-page no-render pin (F2): <c>null</c> when the
+    /// section is a single page (<c>page == 1</c> and the seam's
+    /// <see cref="Kumunita.Core.Posts.FeedResult.HasMore"/> is <c>false</c>);
+    /// the <c>_Pager</c> partial renders nothing when this is <c>null</c>.
+    /// Serves both the single-community feed (<c>/community/{id}</c>) and the
+    /// all-sections feed (<c>/community</c>) — each route sets its own
+    /// <c>BaseUrl</c>. The <see cref="Kumunita.Web.Models.PagedViewModel"/>
+    /// carries the <c>HasMore</c> signal (D1 — the sole paging signal); there is
+    /// no viewer-facing total (C-M7·7 — banned).
+    /// </summary>
+    public PagedViewModel? Pager { get; set; }
 }
 
 /// <summary>

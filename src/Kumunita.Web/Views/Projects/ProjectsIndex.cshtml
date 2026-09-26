@@ -83,6 +83,14 @@
                         </div>
                     </div>
                 }
+
+                @* M7 (ADR 0090 D5) — the goals section pager (F2 one-page
+                   no-render pin): the <c>_Pager</c> partial renders nothing when
+                   the VM field is null. *@
+                @if (Model.PagerGoals is not null)
+                {
+                    <partial name="_Pager" model="Model.PagerGoals" />
+                }
             </div>
         </section>
 
@@ -131,6 +139,14 @@
                             }
                         </div>
                     </div>
+                }
+
+                @* M7 (ADR 0090 D5) — the standalone-projects section pager
+                   (F2 one-page no-render pin): the <c>_Pager</c> partial renders
+                   nothing when the VM field is null. *@
+                @if (Model.PagerProjects is not null)
+                {
+                    <partial name="_Pager" model="Model.PagerProjects" />
                 }
             </div>
         </section>

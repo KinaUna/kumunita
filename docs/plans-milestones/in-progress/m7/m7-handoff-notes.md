@@ -130,3 +130,105 @@ scratch tier of the three-tier contract — see the plan header).
   the modified registry). **No surface wired** (U03/U04 do that), **no
   design-doc edits** (the design doc's § Seams / § FACES / §7.8 are the
   pins consumed, not modified).
+
+## U03 — wire the shared pager into the 7 existing paged routes (8 instances) + D2
+
+- **Scope honored (the lock, not suggestions):** no new seams, no Core
+  change, no new filters, no design-doc edits. U03 only *consumes* the
+  already-built `PagedViewModel` (U02) + the `_Pager` partial + the
+  D9 filter inventory, wiring the 7 existing paged routes (8 pager
+  instances — the group-detail `Detail` and projects-landing
+  `ProjectsIndex` routes each render **two** paged sections) and applying
+  the D2 view-text removals.
+- **Per route — the controller accepts `int page = 1`, reads the seam's
+  `HasMore`, and sets the VM's pager to `PagedViewModel.ForRoute(section
+  route, page, 30, hasMore, filter params from the D9 inventory)` *only
+  when `hasMore || page > 1`* (the F2 one-page no-render pin — a one-page
+  surface sets the VM field to `null` so the `_Pager` partial renders
+  nothing):**
+  - `PostsController.Index` (`GET /community/{id}`) → `FeedViewModel.Pager`
+    = `ForRoute($"/community/{componentId}", page, 30, feed.HasMore)` — no
+    filter form (D9).
+  - `PostsController.AllSections` (`GET /community`) →
+    `FeedViewModel.Pager` = `ForRoute("/community", page, 30, feed.HasMore)`
+    — no filter form (D9).
+  - `GroupsController.Detail` (`GET /groups/{id}`) → two section pagers:
+    `GroupDetailViewModel.PagerPosts` + `PagerEvents` (each
+    `ForRoute($"/groups/{id}", page, 30, …HasMore)`; the group is the route
+    — D9 — so no filter form).
+  - `EventController.Index` (`GET /events`) → `EventIndexViewModel.Pager` =
+    `ForRoute("/events", page, 30, hasMore, { componentId })` (the D9
+    `componentId` filter carried as a `FilterParams` pair, D7).
+  - `ProjectsController.ProjectsIndex` (`GET /projects`) → two section
+    pagers: `ProjectsIndexViewModel.PagerGoals` + `PagerProjects` (each
+    `ForRoute("/projects", page, 30, …HasMore, { componentId })`).
+  - `ProjectsController.TodosIndex` (`GET /projects/todos`) →
+    `TodoIndexViewModel.Pager` = `ForRoute("/projects/todos", page, 30,
+    hasMore, { componentId?, assigneeId?, unassignedOnly?, blockedOnly? })`
+    — the D9 filter set, **non-default values only** so a plain feed's pager
+    links stay clean.
+  - `ProjectsController.BoardsIndex` (`GET /projects/boards`) →
+    `BoardIndexViewModel.Pager` = `ForRoute("/projects/boards", page, 30,
+    hasMore, { componentId })`.
+- **The 8 `_Pager` drop-ins (6 view files):** `Posts/Index.cshtml` (1 —
+  serves both `Index` + `AllSections`), `Groups/Detail.cshtml` (2:
+  `PagerPosts` + `PagerEvents`), `Event/Index.cshtml` (1),
+  `Projects/ProjectsIndex.cshtml` (2: `PagerGoals` + `PagerProjects`),
+  `Projects/TodosIndex.cshtml` (1), `Projects/BoardIndex.cshtml` (1). Each
+  is the U02 drop-in pattern:
+  `@if (Model.Pager… is not null) { <partial name="_Pager" model="…" /> }`.
+- **The D2 view-text removals (C-M7·7 — the candidate count is never
+  viewer-facing):** removed the "N in this community; M shown to you" block
+  from `Posts/Index.cshtml` (`@if (Model.Total > Model.Items.Count)`) and the
+  two "N in this group; M shown to you" blocks from `Groups/Detail.cshtml`
+  (`@if (Model.GroupPostsTotal > …)` + `@if (Model.GroupEventsTotal > …)`).
+  The controllers *still* set `GroupPostsTotal` / `GroupEventsTotal` on the
+  VM (the U10 `GroupDetailViewModel` shape pin reads them); only the **view
+  rendering** of the hidden-count hint is removed, replaced by the pager.
+- **Home page untouched (exit criterion):** `HomeController`'s
+  `ListAllFeedAsync` call (at `page: 1`) is **not** one of the 7 paged routes
+  and gets **no pager** — I did not modify `HomeController.cs`. (This is
+  distinct from `PostsController.AllSections`'s `ListAllFeedAsync`, the
+  `/community` route, which *is* paged.)
+- **Tests (3 new, all passing) — `tests/Kumunita.Web.Tests/M7PagerWiringTests.cs`:**
+  `PostsFeed_Page2_HasMore_PagerPresent`, `PostsFeed_Page1_Partial_PagerAbsent`,
+  `EventsFeed_FilterParam_PreservedInPager`. **Drift note (the sealed
+  `PostService` wall):** the posts-feed `PostService` is `sealed` and opens
+  its own `IDocumentStore` sessions (NSubstitute cannot proxy it; this
+  assembly has no Postgres fixture) — so the two `PostsFeed_*` tests are
+  **data-shape pins** that mirror the controller's exact wiring expression
+  (`(feed.HasMore || page > 1) ? PagedViewModel.ForRoute($"/community/{id}",
+  page, 30, feed.HasMore) : null`) over a `FeedResult`, pinning D1 (HasNext =
+  the seam's `HasMore`), D5 (HasPrevious = page > 1), the section route base
+  URL, and D9 (empty `FilterParams`). The `EventsFeed_*` test drives the
+  **real** `EventController` (its `IEventService` seam is mockable) and pins
+  D7 — the `componentId` filter rides along in `FilterParams` — end-to-end.
+- **Shape-pin update (a deliberate U03 change):**
+  `GroupsDetailViewModelTests.GroupDetailViewModel_Has_Exactly_Nineteen_…`
+  is renamed to `…_Exactly_TwentyOne_…` and gains `PagerEvents` +
+  `PagerPosts` (the ADR 0090 D5 section-pager addition the design doc / plan
+  require) — the pin grows **only** through this handoff note, per the M2
+  §2.7 drift-guard the test's own doc-comment invokes.
+- **Validation:** `dotnet build Kumunita.slnx -c Debug` → **Build
+  succeeded, 0 errors** (2 pre-existing warnings, neither in U03 files).
+  The 3 wiring tests pass:
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+  -class Kumunita.Web.Tests.M7PagerWiringTests` → `Total: 3, Errors: 0,
+  Failed: 0`. Grep pins (U03 exit criteria): `<partial name="_Pager"` in
+  views → **8 hits**; `Model.Total >` in `Posts/Index.cshtml` → **0**;
+  `GroupPostsTotal` / `GroupEventsTotal` in `Groups/Detail.cshtml` → **0**.
+- **Full-suite status:** `dotnet exec …Kumunita.Web.Tests.dll` → `Total: 473,
+  Failed: 6`. **The 6 are pre-existing, not U03 regressions** — all in
+  `ProjectsControllerTests` (`Project_Create_RedirectsToDetail`,
+  `BoardDetail_ProjectLink_RendersWhenReadable`, `Board_Detail_LanesAndCards`,
+  `CreateGet_SeedBlockerPicker`, `TodoEdit_ProjectPickerSeeded_ReadableNonDeleted`,
+  `Project_Edit_RendersFields`), NRE-ing in `SeedGoalPickerAsync` /
+  `SeedBlockerPickerAsync` (the Create / BoardDetail / Edit lanes, which U03
+  never touched). **Confirmed at HEAD** by stashing all U03 changes + moving
+  `M7PagerWiringTests.cs` aside: the identical 6 fail at `Kumunita.slnx` HEAD
+  (a U01 seam-change artifact — those tests stub only `GetProjectAsync`, and
+  the `ListGoalsAsync` / `ListProjectsAsync` / `ListBoardsAsync` seams now
+  return page records that NSubstitute leaves `null`, so `.Items` NREs).
+  **Flagged for U05 (close)** to fix those 6 (stub the seam's page records),
+  out of U03 scope.
+

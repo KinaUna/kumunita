@@ -99,7 +99,13 @@ public sealed record ProjectsIndexViewModel(
     IReadOnlyList<ProjectCard> StandaloneProjects,
     IReadOnlyList<(string Id, string Name)> ComponentPickerOptions,
     string? CurrentComponentId,
-    int CurrentPage);
+    int CurrentPage,
+    // M7 (ADR 0090 D5) — the two paged sections' pagers (the landing renders
+    // goals + standalone projects). The F2 one-page no-render pin: null on a
+    // single page — the <c>_Pager</c> partial renders nothing. Each carries the
+    // <c>componentId</c> filter (D7) as <see cref="PagedViewModel.FilterParams"/>.
+    PagedViewModel? PagerGoals = null,
+    PagedViewModel? PagerProjects = null);
 
 /// <summary>
 /// One <see cref="Kumunita.Core.Projects.Project"/> in the **goal detail's

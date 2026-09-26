@@ -97,7 +97,12 @@ public sealed record TodoIndexViewModel(
     int CurrentPage,
     // ADR 0087 D6 — the "blocked only" feed filter (a filter, never a gate —
     // C-TBD·2); the toggle link toggles this.
-    bool BlockedOnly = false);
+    bool BlockedOnly = false,
+    // M7 (ADR 0090 D5) — the pager (the F2 one-page no-render pin: null on a
+    // single page). Carries the <c>componentId</c> / <c>assigneeId</c> /
+    // <c>unassignedOnly</c> / <c>blockedOnly</c> filters (D7) as
+    // <see cref="PagedViewModel.FilterParams"/>.
+    PagedViewModel? Pager = null);
 
 /// <summary>
 /// One <see cref="BoardItemPlacement"/> of the to-do, enriched with the

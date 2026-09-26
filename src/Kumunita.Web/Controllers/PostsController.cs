@@ -114,7 +114,7 @@ public sealed class PostsController(
     /// §2.3 row 1 (unauth) is the <see cref="AuthorizeAttribute"/>.
     /// </summary>
     [HttpGet("/community/{componentId}")]
-    public async Task<IActionResult> Index([FromRoute] string componentId)
+    public async Task<IActionResult> Index([FromRoute] string componentId, int page = 1)
     {
         if (string.IsNullOrEmpty(componentId))
             return NotFound();
@@ -140,7 +140,7 @@ public sealed class PostsController(
             // own access decision.
             return NotFound();
 
-        var feed = await posts.ListFeedAsync(componentId, actor, page: 1);
+        var feed = await posts.ListFeedAsync(componentId, actor, page: page);
 
         // Whether the current viewer holds a posting right on *this* community —
         // the exact rule the composer's POST gate enforces (AccessibleComponentsAsync
@@ -237,6 +237,12 @@ public sealed class PostsController(
             // viewer with no reachable communities renders no pill directory;
             // a GlobalAdmin still sees every enabled community.
             Communities = accessibleLinks,
+            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on
+            // a single page so the _Pager partial renders nothing. No filter
+            // form on this surface (D9) — the links carry ?page=N only.
+            Pager = (feed.HasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/community/{componentId}", page, 30, feed.HasMore)
+                : null,
         });
     }
 
@@ -263,7 +269,7 @@ public sealed class PostsController(
     /// </para>
     /// </summary>
     [HttpGet("/community")]
-    public async Task<IActionResult> AllSections()
+    public async Task<IActionResult> AllSections(int page = 1)
     {
         var actor = SubjectId(User) ?? string.Empty;
 
@@ -290,7 +296,7 @@ public sealed class PostsController(
         var componentIds = components.Select(c => c.Id).ToList();
         var nameByComponentId = components.ToDictionary(c => c.Id, c => c.Name);
 
-        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: 1);
+        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page);
 
         // ADR 0051 — the all-sections feed shows each post + its section name in
         // the viewer's current language when a translation exists, else the
@@ -345,6 +351,12 @@ public sealed class PostsController(
             // a GlobalAdmin sees every enabled one), so a viewer with no
             // reachable communities renders no pill directory.
             Communities = accessibleLinks,
+            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on
+            // a single page so the _Pager partial renders nothing. No filter
+            // form on this surface (D9) — the links carry ?page=N only.
+            Pager = (feed.HasMore || page > 1)
+                ? PagedViewModel.ForRoute("/community", page, 30, feed.HasMore)
+                : null,
         });
     }
 

@@ -487,9 +487,11 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
 
         IReadOnlyList<TodoItem> todos;
+        TodoPage todosPage;
         try
         {
-            todos = (await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
+            todosPage = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            todos = todosPage.Items;
         }
         catch (UnauthorizedAccessException)
         {
@@ -548,6 +550,15 @@ public sealed class ProjectsController : Controller
                 .ToList();
         }
 
+        // M7 (ADR 0090 D7/D9) — the to-do feed's active filters carried across
+        // prev/next as FilterParams (non-default values only, so a plain feed's
+        // pager links stay clean).
+        var todoFilterParams = new Dictionary<string, string>();
+        if (componentId is not null) todoFilterParams["componentId"] = componentId;
+        if (assigneeId is not null) todoFilterParams["assigneeId"] = assigneeId;
+        if (unassignedOnly) todoFilterParams["unassignedOnly"] = "true";
+        if (blockedOnly) todoFilterParams["blockedOnly"] = "true";
+
         var vm = new TodoIndexViewModel(
             Todos: rows,
             Components: await SeedComponentPickerAsync(),
@@ -555,7 +566,14 @@ public sealed class ProjectsController : Controller
             CurrentAssigneeId: assigneeId,
             UnassignedOnly: unassignedOnly,
             CurrentPage: page,
-            BlockedOnly: blockedOnly);
+            BlockedOnly: blockedOnly,
+            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
+            // single page so the _Pager partial renders nothing. The filters are
+            // carried across prev/next (D7) via FilterParams.
+            Pager: (todosPage.HasMore || page > 1)
+                ? PagedViewModel.ForRoute("/projects/todos", page, 30, todosPage.HasMore,
+                    todoFilterParams.Count > 0 ? todoFilterParams : null)
+                : null);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1383,9 +1401,11 @@ public sealed class ProjectsController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
 
         IReadOnlyList<KanbanBoard> boards;
+        BoardPage boardsPage;
         try
         {
-            boards = (await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
+            boardsPage = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            boards = boardsPage.Items;
         }
         catch (UnauthorizedAccessException)
         {
@@ -1424,7 +1444,14 @@ public sealed class ProjectsController : Controller
             // ADR 0086 D9 — the row dropdown's "Add to Project…" modal
             // picker (a display surface, never a gate — C-PL·3; empty ⇒
             // the item + modal hide, the BoardEdit F10 rule).
-            Projects: await SeedProjectPickerAsync());
+            Projects: await SeedProjectPickerAsync(),
+            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
+            // single page so the _Pager partial renders nothing. The community
+            // filter is carried across prev/next (D7) as a FilterParams pair.
+            Pager: (boardsPage.HasMore || page > 1)
+                ? PagedViewModel.ForRoute("/projects/boards", page, 30, boardsPage.HasMore,
+                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
+                : null);
 
         return View("BoardIndex", vm);
     }
@@ -2464,14 +2491,18 @@ public sealed class ProjectsController : Controller
 
         IReadOnlyList<ProjectGoal> goals;
         IReadOnlyList<Project> standaloneProjects;
+        GoalPage goalsPage;
+        ProjectPage projectsPage;
         try
         {
-            goals = (await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
+            goalsPage = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            goals = goalsPage.Items;
             // The landing's projects section is the **standalone** feed
             // (the `goalId == null` filter — the D8 / design doc §5 pin;
             // a goal's projects are the goal detail's (U06) surface, not
             // this page's).
-            standaloneProjects = (await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
+            projectsPage = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            standaloneProjects = projectsPage.Items;
         }
         catch (UnauthorizedAccessException)
         {
@@ -2543,7 +2574,19 @@ public sealed class ProjectsController : Controller
             StandaloneProjects: projectCards,
             ComponentPickerOptions: await SeedComponentPickerAsync(),
             CurrentComponentId: componentId,
-            CurrentPage: page);
+            CurrentPage: page,
+            // M7 (ADR 0090 D5) — the two paged sections' pagers (F2 one-page
+            // no-render pin): each null on a single page so the _Pager partial
+            // renders nothing. The community filter is carried across prev/next
+            // (D7) as a FilterParams pair on each.
+            PagerGoals: (goalsPage.HasMore || page > 1)
+                ? PagedViewModel.ForRoute("/projects", page, 30, goalsPage.HasMore,
+                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
+                : null,
+            PagerProjects: (projectsPage.HasMore || page > 1)
+                ? PagedViewModel.ForRoute("/projects", page, 30, projectsPage.HasMore,
+                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
+                : null);
 
         return View("ProjectsIndex", vm);
     }
