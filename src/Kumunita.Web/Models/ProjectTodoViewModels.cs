@@ -164,7 +164,41 @@ public sealed record TodoDetailViewModel(
     // <see cref="Kumunita.Core.Projects.TodoDetailResult.Blocker"/> —
     // access-scoped: an unreadable / absent / soft-deleted blocker degrades to
     // the generic label). `null` = the to-do is not blocked (no chip).
-    Kumunita.Core.Projects.BlockerChip? Blocker = null);
+    Kumunita.Core.Projects.BlockerChip? Blocker = null,
+    // ADR 0100 — the to-do's comments + replies (the service's
+    // <see cref="Kumunita.Core.Projects.TodoDetailResult.Comments"/>; C-M3·1:
+    // the to-do's single Read decision already ran, a comment inherits it — no
+    // per-comment decision). Ordered by Created ascending. `null`/empty = no
+    // comments yet (the view renders the empty-state label + composer).
+    IReadOnlyList<CommentRow>? Comments = null);
+
+/// <summary>
+/// One <see cref="Kumunita.Core.Projects.TodoComment"/> as a **detail row**
+/// (the <c>GET /projects/todos/{id}</c> comments surface — ADR 0100). The
+/// comment inherits the to-do's single <c>Read</c> decision (C-M3·1); its
+/// <see cref="AuthorDisplayName"/> is a **read** lookup (a display
+/// convenience, never an access decision — the M4/M5 idiom).
+/// <para>
+/// **<see cref="ParentId"/>** marks a reply under its parent comment (the
+/// sole hierarchy mechanism — C-M5·7); a top-level comment has it null.
+/// **<see cref="IsAuthor"/>** is the row-level **delete affordance** —
+/// whether this actor may delete this comment now (author-only, ADR 0016 — a
+/// convenience mirror for rendering the button; the authoritative decision is
+/// the service's <c>DeleteTodoCommentAsync</c> lane). **<see
+/// cref="DeletedAt"/>** is the ADR 0024 soft-delete stamp (a non-null value
+/// renders the deleted placeholder in place of the body).
+/// </para>
+/// </summary>
+public sealed record CommentRow(
+    string Id,
+    string? ParentId,
+    string AuthorId,
+    string AuthorDisplayName,
+    string Body,
+    string LanguageCode,
+    DateTimeOffset Created,
+    DateTimeOffset? DeletedAt,
+    bool IsAuthor);
 
 /// <summary>
 /// The **compose / edit** form model (the <c>GET /projects/todos/new</c>

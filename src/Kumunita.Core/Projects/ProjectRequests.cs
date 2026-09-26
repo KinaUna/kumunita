@@ -145,6 +145,12 @@ public sealed record TodoDetailResult
     public required TodoItem Todo { get; init; }
     public IReadOnlyList<TodoItem> Subtasks { get; init; } = [];
     public BlockerChip? Blocker { get; init; }            // ADR 0087 D4 — the "waiting on" chip, access-scoped (C-TBD·4); null when not blocked
+
+    // ADR 0100 — the to-do's comments + replies (C-M3·1: the parent to-do's
+    // single Read decision already ran in GetTodoAsync; a comment carries no
+    // own audience, so it is returned as-is, no per-comment decision). Ordered
+    // by Created ascending (the GetTodoAsync list-order pin).
+    public IReadOnlyList<TodoComment> Comments { get; init; } = [];
 }
 
 /// <summary>

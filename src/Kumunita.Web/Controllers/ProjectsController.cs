@@ -725,6 +725,29 @@ public sealed class ProjectsController : Controller
         var canTranslateTodo = !string.IsNullOrEmpty(actorId)
             && ProjectService.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
 
+        // ADR 0100 — the to-do's comments + replies (C-M3·1: the to-do's single
+        // Read decision already ran in GetTodoAsync; a comment inherits it —
+        // no per-comment decision). The comment authors' display names are a
+        // **read** lookup (a display convenience, never an access decision —
+        // the M4/M5 idiom). IsAuthor is the row-level delete affordance
+        // (author-only, ADR 0016 — the authoritative gate is the service's
+        // DeleteTodoCommentAsync lane).
+        var commentRows = new List<CommentRow>(result.Comments.Count);
+        foreach (var c in result.Comments)
+        {
+            var authorProfile = await userInfo.GetProfileAsync(c.AuthorId);
+            commentRows.Add(new CommentRow(
+                Id: c.Id,
+                ParentId: c.ParentId,
+                AuthorId: c.AuthorId,
+                AuthorDisplayName: authorProfile?.DisplayName ?? c.AuthorId,
+                Body: c.Body,
+                LanguageCode: c.LanguageCode,
+                Created: c.Created,
+                DeletedAt: c.DeletedAt,
+                IsAuthor: string.Equals(c.AuthorId, actorId, StringComparison.Ordinal)));
+        }
+
         var vm = new TodoDetailViewModel(
             Todo: row,
             Subtasks: subtasks,
@@ -735,11 +758,16 @@ public sealed class ProjectsController : Controller
             Languages: todoLanguages,
             CanTranslate: canTranslateTodo,
             OriginalLanguageCode: result.Todo.LanguageCode,
-            Blocker: result.Blocker);
+            Blocker: result.Blocker,
+            Comments: commentRows);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
         await SeedGrantPickerOptionsAsync();
+
+        // ADR 0100 — the comment composer's authored-in language picker (the
+        // M3 reply-form idiom; the <see cref="SeedLanguagePickerAsync"/> seed).
+        ViewData["TodoComment_Languages"] = await SeedLanguagePickerAsync();
 
         return View(vm);
     }
@@ -1351,6 +1379,86 @@ public sealed class ProjectsController : Controller
 
         TempData["info"] = "To-do deleted.";
         return Redirect("/projects/todos");
+    }
+
+    // ── Comment write lanes (ADR 0100) ──────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/comments</c> — the add-comment write lane
+    /// (ADR 0100). The form posts a <c>body</c> (required), an optional
+    /// <c>languageCode</c> (ADR 0018 — the authored-in tag), and an optional
+    /// <c>parentId</c> (non-null = a reply to that comment, the C-M5·7 sole
+    /// hierarchy mechanism). **Standing:** any actor who passes the to-do's
+    /// <c>CanAsync(Read)</c> decision (C-M3·1 — a comment inherits the to-do's
+    /// single audience decision). A missing / soft-deleted to-do is 404, a
+    /// denied actor 403, a <c>parentId</c> that is missing / soft-deleted / on
+    /// a different to-do is 404 (the C3 split — the service's decision is the
+    /// gate; the controller is the thin shape, ADR 0006-D).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/comments")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddCommentPost(
+        string id, [FromForm] string? body, [FromForm] string? languageCode, [FromForm] string? parentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            ModelState.AddModelError(string.Empty, "A comment needs some text.");
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.CreateTodoCommentAsync(
+                id, actorId, RoleSet(User), body,
+                string.IsNullOrWhiteSpace(languageCode) ? null : languageCode,
+                string.IsNullOrWhiteSpace(parentId) ? null : parentId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Comment added.";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/comments/{commentId}/delete</c> — the
+    /// soft-delete-a-comment write lane (ADR 0100, the ADR 0024 shape).
+    /// **Author-only** (ADR 0016 precedent): a non-author is refused (403), a
+    /// missing comment / to-do is 404 (the C3 split). The record is kept
+    /// (<see cref="Kumunita.Core.Projects.TodoComment.DeletedAt"/> stamped) —
+    /// the detail view renders a placeholder in its place.
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/comments/{commentId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteCommentPost(string id, string commentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        try
+        {
+            await projects.DeleteTodoCommentAsync(
+                id, commentId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Comment deleted.";
+        return Redirect($"/projects/todos/{id}");
     }
 
     // ── Board read lanes (U08) ──────────────────────────────────────────────

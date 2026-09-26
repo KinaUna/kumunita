@@ -128,6 +128,16 @@ public static class KnownTranslationKeys
             ["projects.todo.no_body"]        = "No body — this to-do is title-only.",
             ["projects.todo.subtasks"]       = "Subtasks",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — the comments + replies section (C-M3·1 — comments
+            // inherit the to-do's single Read decision, so the section is
+            // visible to exactly the audience the to-do itself is).
+            ["projects.todo.comments"]       = "Comments",
+            ["projects.todo.comment_empty"]  = "No comments yet. If you can see this to-do, you can comment on it.",
+            ["projects.todo.comment_reply"]  = "Comment",
+            ["projects.todo.comment_submit"] = "Comment",
+            ["projects.todo.comment_deleted"] = "This comment has been deleted by its author.",
+            ["projects.todo.comment_delete"] = "Delete",
+            ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision (the C-M3·1 \"comment-inherits\" rule). You are commenting only where the to-do itself is visible.",
             ["projects.todo.back"]           = "← Back to to-dos",
             ["projects.todo.untitled"]       = "Untitled to-do",
             ["projects.todo.edit"]           = "Edit",
@@ -1605,6 +1615,15 @@ public static class KnownTranslationKeys
             ["projects.todo.no_body"]        = "Kein Text — diese Aufgabe hat nur einen Titel.",
             ["projects.todo.subtasks"]       = "Unteraufgaben",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — Kommentare + Antworten (C-M3·1 — Kommentare erben die
+            // einzelne Read-Entscheidung der Aufgabe).
+            ["projects.todo.comments"]       = "Kommentare",
+            ["projects.todo.comment_empty"]  = "Noch keine Kommentare. Wenn du diese Aufgabe sehen kannst, kannst du sie kommentieren.",
+            ["projects.todo.comment_reply"]  = "Kommentar",
+            ["projects.todo.comment_submit"] = "Kommentieren",
+            ["projects.todo.comment_deleted"] = "Dieser Kommentar wurde von seinem Autor gelöscht.",
+            ["projects.todo.comment_delete"] = "Löschen",
+            ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar (die C-M3·1-\"Kommentar-erbt\"-Regel). Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
             ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
             ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
             ["projects.todo.edit"]           = "Bearbeiten",
@@ -3049,6 +3068,15 @@ public static class KnownTranslationKeys
             ["projects.todo.no_body"]        = "Pas de texte — cette tâche n'a qu'un titre.",
             ["projects.todo.subtasks"]       = "Sous-tâches",
             ["projects.todo.boards"]         = "Tableaux",
+            // ADR 0100 — Commentaires + réponses (C-M3·1 — les commentaires
+            // héritent de la décision de lecture unique de la tâche).
+            ["projects.todo.comments"]       = "Commentaires",
+            ["projects.todo.comment_empty"]  = "Pas encore de commentaires. Si vous pouvez voir cette tâche, vous pouvez la commenter.",
+            ["projects.todo.comment_reply"]  = "Commentaire",
+            ["projects.todo.comment_submit"] = "Commenter",
+            ["projects.todo.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
+            ["projects.todo.comment_delete"] = "Supprimer",
+            ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche (la règle \"commentaire-hérite\" C-M3·1). Vous ne commentez que là où la tâche elle-même est visible.",
             ["projects.todo.back"]           = "← Retour aux tâches",
             ["projects.todo.untitled"]       = "Tâche sans titre",
             ["projects.todo.edit"]           = "Modifier",
@@ -4450,6 +4478,15 @@ public static class KnownTranslationKeys
             ["projects.todo.no_body"]        = "Ingen tekst — denne opgave har kun et navn.",
             ["projects.todo.subtasks"]       = "Delopgaver",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — Kommentarer + svar (C-M3·1 — kommentarer arver
+            // opgavens enkelte Read-afgørelse).
+            ["projects.todo.comments"]       = "Kommentarer",
+            ["projects.todo.comment_empty"]  = "Ingen kommentarer endnu. Hvis du kan se denne opgave, kan du kommentere den.",
+            ["projects.todo.comment_reply"]  = "Kommentar",
+            ["projects.todo.comment_submit"] = "Kommentér",
+            ["projects.todo.comment_deleted"] = "Denne kommentar er slettet af dens forfatter.",
+            ["projects.todo.comment_delete"] = "Slet",
+            ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse (C-M3·1-\"kommentar-arver\"-reglen). Du kommenterer kun hvor opgaven selv er synlig.",
             ["projects.todo.back"]           = "← Tilbage til opgaverne",
             ["projects.todo.untitled"]       = "Opgave uden navn",
             ["projects.todo.edit"]           = "Rediger",

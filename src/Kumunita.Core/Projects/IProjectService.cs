@@ -78,6 +78,59 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// </summary>
     Task<TodoDetailResult> GetTodoAsync(string todoItemId, string actorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// **Add a comment** (or a reply to another comment) on a to-do (ADR 0100).
+    /// A new <see cref="TodoComment"/> row with the to-do's id as
+    /// <see cref="TodoComment.TodoId"/> and, when <paramref name="parentId"/>
+    /// is non-null, that comment's id as
+    /// <see cref="TodoComment.ParentId"/> (the sole hierarchy mechanism —
+    /// C-M5·7: a <c>null</c> parent is a top-level comment, a non-null parent
+    /// is a reply). **Standing:** any actor who passes the to-do's
+    /// <c>CanAsync(Read)</c> decision (the to-do's audience is the sole access
+    /// boundary — a comment inherits it, C-M3·1; there is no separate
+    /// comment-level standing matrix). A <paramref name="parentId"/> that is
+    /// missing, already soft-deleted, or on a *different* to-do is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>LanguageCode</c> is
+    /// materialized from the instance default when <paramref
+    /// name="languageCode"/> is null/empty (ADR 0018). One
+    /// <see cref="AccessAudit"/> row (<c>todo.comment.create</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do id is not found, the
+    /// to-do is soft-deleted, or a non-null <paramref name="parentId"/> does
+    /// not resolve to a live comment on the same to-do.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor may not read
+    /// the to-do.</exception>
+    Task<TodoComment> CreateTodoCommentAsync(
+        string todoId, string actorId, IReadOnlySet<string> actorRoles,
+        string body, string? languageCode, string? parentId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// **Soft-delete a comment** the actor authored on a to-do (ADR 0100, the
+    /// ADR 0024 author-soft-delete shape carried from
+    /// <see cref="Kumunita.Core.Posts.PostReply.DeletedAt"/>): stamps
+    /// <see cref="TodoComment.DeletedAt"/> forward (the record is kept, never
+    /// hard-deleted), and the detail view renders a placeholder in place of
+    /// the body. **Standing:** author-only (the comment's
+    /// <see cref="TodoComment.AuthorId"/> == the actor — the ADR 0016
+    /// reply-delete precedent: a non-author is refused, there is no
+    /// moderator / GlobalAdmin override branch on a comment's own delete).
+    /// The comment must exist and be under the given to-do (a comment on a
+    /// different to-do is a <see cref="KeyNotFoundException"/> — 404,
+    /// non-leaky). One <see cref="AccessAudit"/> row
+    /// (<c>todo.comment.delete</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do id is not found, the
+    /// to-do is soft-deleted, or the <paramref name="commentId"/> does not
+    /// resolve to a comment under that to-do.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the
+    /// comment's author.</exception>
+    Task<TodoComment> DeleteTodoCommentAsync(
+        string todoId, string commentId, string actorId, IReadOnlySet<string> actorRoles,
+        CancellationToken ct = default);
+
         /// <summary>
         /// The **blocker picker** read lane (ADR 0087 D7) — the actor's readable,
         /// non-deleted to-dos (the candidates are <c>!IsDeleted</c>; the

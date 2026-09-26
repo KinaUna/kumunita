@@ -3854,6 +3854,328 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(chip.LinkPath);
     }
 
+    // ── Comments + replies (ADR 0100) ───────────────────────────────────────
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C-M3·1): <see cref="ProjectService.CreateTodoCommentAsync"/>
+    /// writes a **top-level** comment (a <c>null</c> <see cref="TodoComment.ParentId"/>
+    /// is a top-level comment on the to-do), stores the author's
+    /// <see cref="TodoComment.Body"/> verbatim, and commits one
+    /// <c>todo.comment.create</c> audit row (<c>TargetKind = "todo"</c>,
+    /// <c>Via = Owner</c>) atomically with the write (C3).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_TopLevel_StoresRowAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-1-author";
+        const string commenter = "u-cmt-1-commenter";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-1-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null, // public — a member commenter passes the Read pass
+        });
+
+        var created = await svc.CreateTodoCommentAsync(
+            "cmt-1-todo", commenter, MemberRoles, "First thought", "en");
+
+        Assert.NotEmpty(created.Id);
+        Assert.Equal("cmt-1-todo", created.TodoId);
+        Assert.Null(created.ParentId);
+        Assert.Equal(commenter, created.AuthorId);
+        Assert.Equal("First thought", created.Body);
+        Assert.Equal("en", created.LanguageCode);
+        Assert.Null(created.DeletedAt);
+
+        // The C3 audit row committed with the write.
+        var audit = Assert.Single(await TodoAuditRows(store, "cmt-1-todo"),
+            a => a.Action == "todo.comment.create");
+        Assert.Equal(AccessVia.Owner, audit.Via);
+
+        // The read lane returns the comment (the to-do's Read decision already ran).
+        var detail = await svc.GetTodoAsync("cmt-1-todo", author);
+        Assert.Single(detail.Comments);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C-M5·7): a **reply** — a non-null
+    /// <paramref name="parentId"/> resolves to a live top-level comment on the
+    /// same to-do, so <see cref="TodoComment.ParentId"/> is set to that comment's
+    /// id (the sole hierarchy mechanism; a reply's parent is a top-level comment).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_Reply_SetsParentId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-2-author";
+        const string commenter = "u-cmt-2-commenter";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-2-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var topLevel = await svc.CreateTodoCommentAsync(
+            "cmt-2-todo", commenter, MemberRoles, "Question?", "en");
+
+        var reply = await svc.CreateTodoCommentAsync(
+            "cmt-2-todo", author, MemberRoles, "Answer.", "en",
+            parentId: topLevel.Id);
+
+        Assert.Equal(topLevel.Id, reply.ParentId);
+        Assert.Equal("cmt-2-todo", reply.TodoId);
+
+        var detail = await svc.GetTodoAsync("cmt-2-todo", author);
+        Assert.Equal(2, detail.Comments.Count);
+        Assert.Contains(detail.Comments, c => c.ParentId == topLevel.Id);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C3 404-vs-403 split): a <paramref name="parentId"/> that
+    /// does **not** resolve to a live comment on the given to-do is a
+    /// <see cref="KeyNotFoundException"/> (404) — the parent is on a
+    /// **different** to-do (non-leaky: the id does not even matter), is
+    /// **missing** entirely, or is **soft-deleted**. No row is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_InvalidParentRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-3-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-3-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-3-other", AuthorId = author, Title = "Another to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 30, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A live top-level comment on the *other* to-do.
+        var otherComment = await svc.CreateTodoCommentAsync(
+            "cmt-3-other", author, MemberRoles, "On the other to-do", "en");
+        // A soft-deleted top-level comment on *this* to-do.
+        var deletedComment = await svc.CreateTodoCommentAsync(
+            "cmt-3-todo", author, MemberRoles, "To be deleted", "en");
+        await svc.DeleteTodoCommentAsync("cmt-3-todo", deletedComment.Id, author, MemberRoles);
+
+        // Parent on a different to-do → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: otherComment.Id));
+
+        // Missing parent → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: "cmt-3-missing"));
+
+        // Soft-deleted parent → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: deletedComment.Id));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C3 404-vs-403 split): a comment on a to-do that is
+    /// **absent** is a <see cref="KeyNotFoundException"/> (404), and a comment
+    /// on a **soft-deleted** to-do is also a <see cref="KeyNotFoundException"/>
+    /// (404 — the to-do is gone for everyone, so it is not a 403).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_MissingOrDeletedTodoRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-4-author";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-4-missing", author, MemberRoles,
+                "Ghost to-do", "en"));
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-4-deleted", AuthorId = author, Title = "Deleted to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-4-deleted", author, MemberRoles,
+                "On a deleted to-do", "en"));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (standing = the to-do's <c>Read</c> decision, C-M3·1):
+    /// an actor who **cannot read** the to-do is refused the comment write with
+    /// <see cref="UnauthorizedAccessException"/> (403) — the to-do is
+    /// audience-restricted to a third party, so a stranger's <c>Read</c> pass is
+    /// denied. Nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_UnreadableTodoRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-5-author";
+        const string stranger = "u-cmt-5-stranger";
+        const string grantee = "u-cmt-5-grantee";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-5-todo", AuthorId = author, Title = "Restricted to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee), // the stranger is not granted
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateTodoCommentAsync("cmt-5-todo", stranger, MemberRoles,
+                "Intrusion", "en"));
+
+        // The to-do's comment set is still empty.
+        await using var q = store.QuerySession();
+        var ct = TestContext.Current.CancellationToken;
+        Assert.Equal(0, await q.Query<TodoComment>()
+            .Where(c => c.TodoId == "cmt-5-todo").CountAsync(ct));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (the ADR 0024 author-soft-delete shape): only the
+    /// comment's **author** may soft-delete it — a non-author is refused with
+    /// <see cref="UnauthorizedAccessException"/> (403, there is no moderator /
+    /// GlobalAdmin override branch on a comment's own delete, the ADR 0016
+    /// reply-delete precedent). The record is untouched by the refused write.
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodoComment_NonAuthorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-6-author";
+        const string commenter = "u-cmt-6-commenter";
+        const string stranger = "u-cmt-6-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-6-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        var comment = await svc.CreateTodoCommentAsync(
+            "cmt-6-todo", commenter, MemberRoles, "Mine", "en");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteTodoCommentAsync("cmt-6-todo", comment.Id, stranger, MemberRoles));
+
+        await using var q = store.QuerySession();
+        var reloaded = (await q.LoadAsync<TodoComment>(comment.Id))!;
+        Assert.Null(reloaded.DeletedAt); // untouched by the refused write
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (ADR 0024): the **author** soft-deletes their own
+    /// comment — <see cref="TodoComment.DeletedAt"/> is stamped forward (the
+    /// record is **kept**, never hard-deleted), a <c>todo.comment.delete</c>
+    /// audit row commits atomically (C3), and the read lane still returns the
+    /// row (so the detail view can render the placeholder in place of the body).
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodoComment_Author_SoftDeletesAndKeepsRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-7-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-7-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        var comment = await svc.CreateTodoCommentAsync(
+            "cmt-7-todo", author, MemberRoles, "To be deleted", "en");
+        Assert.Null(comment.DeletedAt);
+
+        var deleted = await svc.DeleteTodoCommentAsync("cmt-7-todo", comment.Id, author, MemberRoles);
+        Assert.NotNull(deleted.DeletedAt);
+
+        // C3 audit row for the delete.
+        Assert.Contains(await TodoAuditRows(store, "cmt-7-todo"),
+            a => a.Action == "todo.comment.delete");
+
+        // The record is kept — the read lane still returns it (now deleted).
+        var detail = await svc.GetTodoAsync("cmt-7-todo", author);
+        var row = Assert.Single(detail.Comments);
+        Assert.NotNull(row.DeletedAt);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b>: the read lane returns the to-do's comments ordered by
+    /// <see cref="TodoComment.Created"/> ascending (the detail view lists them in
+    /// chronological order, replies under their parent).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_ReturnsCommentsInCreatedOrder()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-8-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-8-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Older", "en");
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Newer", "en");
+
+        var detail = await svc.GetTodoAsync("cmt-8-todo", author);
+        var bodies = detail.Comments.Select(c => c.Body).ToList();
+        // Created ascending — the older comment precedes the newer one.
+        Assert.Equal(["Older", "Newer"], bodies);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b>: a comment with a **blank** <c>body</c> is refused with
+    /// <see cref="ArgumentException"/> (the service-side guard — the web layer
+    /// also validates, but the service is the gate). Nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_BlankBodyRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-9-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-9-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateTodoCommentAsync("cmt-9-todo", author, MemberRoles, "   ", "en"));
+
+        await using var q = store.QuerySession();
+        var ct = TestContext.Current.CancellationToken;
+        Assert.Equal(0, await q.Query<TodoComment>()
+            .Where(c => c.TodoId == "cmt-9-todo").CountAsync(ct));
+    }
+
     private static async Task<IReadOnlyList<AccessAudit>> GoalAuditRows(IDocumentStore store, string goalId)
     {
         var ct = TestContext.Current.CancellationToken;
