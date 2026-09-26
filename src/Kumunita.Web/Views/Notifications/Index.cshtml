@@ -76,7 +76,36 @@
                             <span class="badge text-bg-light text-dark">
                                 <kw-l key="notifications.kind.@n.Kind">@n.Kind</kw-l>
                             </span>
-                            <span class="ms-auto small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
+                            @* ADR 0096 — the per-row read toggle: one inline
+                               form per row (the same
+                               [ValidateAntiForgeryToken] shape as the header's
+                               mark-all-read). An unread row offers "Mark as
+                               read" (POST /notifications/{id}/mark-read); a
+                               read row offers "Mark as unread" (POST
+                               /notifications/{id}/mark-unread). Both gate on
+                               the same [Authorize] self-lane — the recipient
+                               owns the row (the service's personal gate). *@
+                            <span class="ms-auto d-flex align-items-center gap-2">
+                                <span class="small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
+                                @if (n.ReadAt is null)
+                                {
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-read")" class="m-0 d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <kw-l key="notifications.mark_read">Mark as read</kw-l>
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-unread")" class="m-0 d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <kw-l key="notifications.mark_unread">Mark as unread</kw-l>
+                                        </button>
+                                    </form>
+                                }
+                            </span>
                         </div>
 
                         @* todo.assign rows (SourceId = the TodoItem.Id) carry a

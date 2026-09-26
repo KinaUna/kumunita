@@ -141,6 +141,84 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         Assert.Equal(5, await CountAll(store, Actor));
     }
 
+    // ── 3a — ADR 0096 — POST /notifications/{id}/mark-read → 302 + that one row read ─
+
+    /// <summary>
+    /// <c>POST /notifications/{id}/mark-read</c> (ADR 0096, the single-row
+    /// read lane): sets <c>ReadAt = now</c> on the **one** named notification
+    /// the actor owns (the frozen
+    /// <see cref="NotificationService.MarkReadAsync"/>), and **leaves the
+    /// actor's other unread rows unread** (unlike mark-all-read) — the
+    /// redirect is back to the inbox (<c>302</c> /
+    /// <see cref="RedirectToActionResult"/>). A state lane — no audit row.
+    /// Asserted against the live store: the named row is now read, the two
+    /// sibling unread rows are still unread.
+    /// </summary>
+    [Fact]
+    public async Task POST_Notifications_MarkRead_Sets_Only_That_Row_Read()
+    {
+        var store = await BootStoreAsync();
+        // One target row (unread) + two sibling unread rows.
+        var targetKey = "notification:post.reply:mr1-target";
+        await PlantNotification(store, Actor, NotificationKinds.PostReply,
+            key: targetKey, readAt: null);
+        for (var i = 0; i < 2; i++)
+            await PlantNotification(store, Actor, NotificationKinds.PostReply,
+                key: $"notification:post.reply:mr1-sib-{i}", readAt: null);
+        var targetId = (await FindRowId(store, targetKey))!;
+
+        var controller = Build(store);
+        var result = await controller.MarkRead(targetId);
+
+        // 302 — the redirect back to the inbox (Index).
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(NotificationsController.Index), redirect.ActionName);
+        // The named row is now read; the two siblings are **still** unread
+        // (the single-row lane touches exactly one row).
+        Assert.Equal(2, await CountUnread(store, Actor));
+        var row = await LoadRow(store, targetId);
+        Assert.NotNull(row?.ReadAt);
+    }
+
+    // ── 3b — ADR 0096 — POST /notifications/{id}/mark-unread → 302 + that one row unread ─
+
+    /// <summary>
+    /// <c>POST /notifications/{id}/mark-unread</c> (ADR 0096, the
+    /// single-row unread lane): clears <c>ReadAt</c> on the **one** named
+    /// notification the actor owns (the frozen
+    /// <see cref="NotificationService.MarkUnreadAsync"/>), and **leaves the
+    /// actor's other read rows read** — the redirect is back to the inbox
+    /// (<c>302</c> / <see cref="RedirectToActionResult"/>). A state lane —
+    /// no audit row. Asserted against the live store: the named row is now
+    /// unread, the sibling read row is still read.
+    /// </summary>
+    [Fact]
+    public async Task POST_Notifications_MarkUnread_Sets_Only_That_Row_Unread()
+    {
+        var store = await BootStoreAsync();
+        // One target row (read) + one sibling read row + one sibling unread row.
+        var targetKey = "notification:group.post:mu1-target";
+        await PlantNotification(store, Actor, NotificationKinds.GroupPost,
+            key: targetKey, readAt: DateTimeOffset.UtcNow);
+        await PlantNotification(store, Actor, NotificationKinds.GroupPost,
+            key: "notification:group.post:mu1-sib-read", readAt: DateTimeOffset.UtcNow);
+        await PlantNotification(store, Actor, NotificationKinds.GroupPost,
+            key: "notification:group.post:mu1-sib-unread", readAt: null);
+        var targetId = (await FindRowId(store, targetKey))!;
+
+        var controller = Build(store);
+        var result = await controller.MarkUnread(targetId);
+
+        // 302 — the redirect back to the inbox (Index).
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(NotificationsController.Index), redirect.ActionName);
+        // The named row is now unread; the sibling unread row is untouched,
+        // so the unread count goes 1 → 2, and the sibling read row is still read.
+        Assert.Equal(2, await CountUnread(store, Actor));
+        var row = await LoadRow(store, targetId);
+        Assert.Null(row?.ReadAt);
+    }
+
     // ── 4 — GET /notifications/preferences → 200 + the thirteen Known toggles ─
 
     /// <summary>
@@ -457,6 +535,22 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         return await q.Query<Notification>()
             .Where(n => n.RecipientId == recipientId)
             .CountAsync(ct);
+    }
+
+    private static async Task<string?> FindRowId(IDocumentStore store, string idempotencyKey)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return (await q.Query<Notification>()
+            .Where(n => n.IdempotencyKey == idempotencyKey)
+            .FirstOrDefaultAsync(ct))?.Id;
+    }
+
+    private static async Task<Notification?> LoadRow(IDocumentStore store, string notificationId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Notification>(notificationId, ct);
     }
 
     private sealed class NoOpTempDataProvider : ITempDataProvider

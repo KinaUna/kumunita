@@ -151,6 +151,46 @@ public sealed class NotificationsController(
     }
 
     /// <summary>
+    /// <c>POST /notifications/{id}/mark-read</c> (ADR 0096 — the
+    /// single-row read lane): sets <c>ReadAt = now</c> on the **one**
+    /// notification the caller owns (the frozen
+    /// <see cref="NotificationService.MarkReadAsync"/> owns the write —
+    /// the recipient-gated single row, C-M6·3; no audit row), then back to
+    /// the inbox. A state lane, not a read — no audit row (C-M6·3, F11).
+    /// </summary>
+    [HttpPost("/notifications/{id}/mark-read")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkRead(string id)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        await notifications.MarkReadAsync(actorId, id);
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// <c>POST /notifications/{id}/mark-unread</c> (ADR 0096 — the
+    /// single-row unread lane): clears <c>ReadAt</c> on the **one**
+    /// notification the caller owns (the frozen
+    /// <see cref="NotificationService.MarkUnreadAsync"/> owns the write —
+    /// the recipient-gated single row, C-M6·3; no audit row), then back to
+    /// the inbox. A state lane, not a read — no audit row (C-M6·3, F11).
+    /// </summary>
+    [HttpPost("/notifications/{id}/mark-unread")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkUnread(string id)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        await notifications.MarkUnreadAsync(actorId, id);
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
     /// <c>GET /notifications/preferences</c> — the preference read
     /// (design doc §6.4 route 4, C-M6·9): the eleven
     /// <see cref="NotificationKinds.Known"/> toggles (ADR 0077 adds the

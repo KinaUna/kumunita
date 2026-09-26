@@ -1039,6 +1039,88 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.DoesNotContain("notifications.decline", email.Body);
     }
 
+    // ── ADR 0096 — the single-row read / unread state lanes ──────────────────
+    //
+    // C-M6·3 (D3 / F11): the single-row read/unread lanes are **personal** —
+    // a <c>Notification</c> row is loaded and gated on its
+    // <see cref="Notification.RecipientId"/>; a row the actor does **not**
+    // own is a <see cref="KeyNotFoundException"/>, never a cross-recipient
+    // write (no <c>IAuthorizationService</c> call, no audit row — the
+    // <c>RecipientId</c> *is* the whole access story). The toggle touches
+    // exactly **one** row (unlike <c>MarkAllReadAsync</c>, which sets every
+    // unread row).
+
+    [Fact]
+    public async Task MarkRead_Sets_ReadAt_On_Owned_Row_Only()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-mr1";
+        await PlantProfile(store, recipient, "mr1@kumunita");
+
+        // One unread target + one unread sibling — MarkRead must touch only
+        // the target (the single-row lane, not the all-read lane).
+        var target = await PlantRow(store, recipient, NotificationKinds.PostReply,
+            "notification:post.reply:mr1-target");
+        var sibling = await PlantRow(store, recipient, NotificationKinds.PostReply,
+            "notification:post.reply:mr1-sib");
+
+        await svc.MarkReadAsync(recipient, target.Id, TestContext.Current.CancellationToken);
+
+        var targetAfter = await LoadRow(store, target.Id);
+        var siblingAfter = await LoadRow(store, sibling.Id);
+        Assert.NotNull(targetAfter?.ReadAt);                 // the named row is now read
+        Assert.Null(siblingAfter?.ReadAt);                   // the sibling is untouched
+    }
+
+    [Fact]
+    public async Task MarkUnread_Clears_ReadAt_On_Owned_Row_Only()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-mu1";
+        await PlantProfile(store, recipient, "mu1@kumunita");
+
+        var target = await PlantRow(store, recipient, NotificationKinds.GroupPost,
+            "notification:group.post:mu1-target", readAt: DateTimeOffset.UtcNow);
+        var sibling = await PlantRow(store, recipient, NotificationKinds.GroupPost,
+            "notification:group.post:mu1-sib", readAt: DateTimeOffset.UtcNow);
+
+        await svc.MarkUnreadAsync(recipient, target.Id, TestContext.Current.CancellationToken);
+
+        var targetAfter = await LoadRow(store, target.Id);
+        var siblingAfter = await LoadRow(store, sibling.Id);
+        Assert.Null(targetAfter?.ReadAt);                    // the named row is now unread
+        Assert.NotNull(siblingAfter?.ReadAt);                // the sibling is untouched
+    }
+
+    /// <summary>
+    /// The **personal gate** (C-M6·3): an actor may not flip the read state
+    /// of a row they do not own — a cross-recipient id (here, an unknown id,
+    /// which is the cross-recipient case for a foreign recipient) throws
+    /// <see cref="KeyNotFoundException"/> and leaves no row modified. This is
+    /// the Core wall the thin controller route relies on: the
+    /// <c>RecipientId</c> is the whole access story, no
+    /// <c>IAuthorizationService</c>, no audit row.
+    /// </summary>
+    [Fact]
+    public async Task MarkRead_Foreign_Recipient_Throws_KeyNotFound()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string owner = "u-0096-owner";
+        const string intruder = "u-0096-intruder";
+        await PlantProfile(store, owner, "0096-owner@kumunita");
+        await PlantProfile(store, intruder, "0096-intruder@kumunita");
+
+        var row = await PlantRow(store, owner, NotificationKinds.PostReply,
+            "notification:post.reply:0096-row");
+
+        // The intruder names the owner's row — the personal gate rejects it.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.MarkReadAsync(intruder, row.Id, TestContext.Current.CancellationToken));
+
+        // And the owner's row is untouched (still unread).
+        Assert.Null((await LoadRow(store, row.Id))?.ReadAt);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1164,6 +1246,39 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// <summary>Emits a notification **and commits** the session — the
     /// caller's responsibility per the design-doc contract ("the caller
     /// commits the session — the service does not").</summary>
+    /// <summary>Plants a <see cref="Notification"/> row directly (bypassing
+    /// <c>EmitAsync</c> / the mailer) for the single-row state-lane tests —
+    /// the Web test's <c>PlantNotification</c> shape.</summary>
+    private static async Task<Notification> PlantRow(
+        IDocumentStore store, string recipientId, string kind, string key,
+        DateTimeOffset? readAt = null)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var row = new Notification
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            RecipientId = recipientId,
+            Kind = kind,
+            IdempotencyKey = key,
+            SourceId = key.Split(':')[^1],
+            Subject = "S",
+            Body = "B",
+            Created = DateTimeOffset.UtcNow,
+            ReadAt = readAt,
+        };
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(row);
+        await w.SaveChangesAsync(ct);
+        return row;
+    }
+
+    private static async Task<Notification?> LoadRow(IDocumentStore store, string notificationId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Notification>(notificationId, ct);
+    }
+
     private static async Task<Notification> Emit(
         NotificationService svc, IDocumentSession session,
         string recipientId, string kind, string key, string? body)

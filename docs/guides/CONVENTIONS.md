@@ -58,7 +58,7 @@ seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
 | `being-a-child` | the child's own view of a child account: what stays theirs (posts/replies/profile the guardian can't read), what the guardian handles (memberships, suspend), group invitations (decline always open, accept needs guardian approval), and hand-over restoring the child's own controls | ADR 0028 / 0038 |
 | `admins` | what a global admin does (accounts, communities, the platform pages incl. reset-to-seeded, the sign-up gate, the platform defaults) and what keeps the role in check (audit trail; no reading of residents' content) | ADR 0062 / 0050 / 0019 / 0020 / 0040 / 0058 |
 | `moderators` | what a standing moderator may do (see their scoped report queue) and may not (act on a report — assign/unlock/resolve stay with an admin; see outside their part; read anyone's content) | ADR 0003 / 0030 |
-| `notifications` | where the bell and inbox live, the mark-all-read action, what an email is (inbox always records), the per-kind email on/off dial (preferences), and the per-place opt-in (subscriptions) | ADR 0076 / 0077 / 0083 / 0084 |
+| `notifications` | where the bell and inbox live, the mark-all-read action (and the per-row mark read/unread toggle), what an email is (inbox always records), the per-kind email on/off dial (preferences), and the per-place opt-in (subscriptions) | ADR 0076 / 0077 / 0083 / 0084 / 0096 |
 
 A guide that documents a feature **not yet shipped** (M5 Projects, M6
 Portability / iCal / search, the deferred items in SECURITY.md

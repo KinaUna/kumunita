@@ -71,6 +71,11 @@
             default: return "projects.board.status.none";
         }
     }
+    // ADR 0082 — the LangName helper: resolve a language code to its native
+    // name from Model.Languages (the ADR 0082 idiom; the fallback is the raw
+    // code). Used by the ⋮ dropdown's translation add / edit / remove items.
+    var langNames = (Model.Languages ?? []).ToDictionary(l => l.Code, l => l.NativeName);
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
 <div class="row justify-content-center">
@@ -225,6 +230,57 @@
                                     </button>
                                 </li>
                             }
+                            @* ADR 0082 — the translation add / edit / remove
+                               as dropdown items opening the modals below
+                               (replacing the prior inline <details> block):
+                               one "Edit" per existing translation + one
+                               "Add" per enabled-but-missing language (both
+                               open modals), then a "Remove" per existing.
+                               Server-side gate on CanTranslate (the ADR 0088
+                               translator lane); the items are localized (the
+                               ADR 0015 kw-l tags — the same posts.translation_*
+                               keys the Community-post / Project / To-do
+                               surfaces use). *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#board-trans-edit-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#board-trans-add-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @if (Model.Translations is { Count: > 0 })
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/remove")"
+                                                  data-confirm="Remove this translation?" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            }
                             <li>
                                 <form method="post" action="@($"/projects/boards/{Model.Board.Id}/delete")"
                                       data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
@@ -238,102 +294,120 @@
             </div>
         </header>
 
-        @* ADR 0088 — the board's translation management (add / edit / remove),
-           gated on the standing (Model.CanTranslate — the service's display
-           pin; the standing is re-pinned server-side on write). The add form
-           offers one language per enabled code that has no translation yet;
-           the existing rows offer edit + remove. Same shape as the Event /
-           Announcement detail translation sections. *@
+        @* ADR 0082 — the board's translation management (add / edit / remove)
+           now lives in the ⋮ action dropdown above (dropdown items opening
+           these modals) rather than as an inline <details> card. One edit
+           modal per existing translation (title + body, plain textarea) and
+           one add modal per enabled-but-missing language (title prefilled
+           from the original + an rc-editor body, the ADR 0025 rich-body lane;
+           data-rich-editor-no-image keeps the board translation body
+           text-only, mirroring the Project / To-do translation lanes).
+           Gated on CanTranslate (ADR 0088). The routes / form actions / field
+           names are the ADR 0088 lanes — only the presentation moved from
+           <details> to a modal. *@
         @if (Model.CanTranslate)
         {
-            <div class="card mb-3">
-                <div class="card-body p-2">
-                    <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
-
-                    @foreach (var opt in (Model.Languages ?? []))
-                    {
-                        bool hasTranslation = Model.Translations is not null
-                            && Model.Translations.Any(t => t.LanguageCode == opt.Code);
-                        if (hasTranslation) continue;
-
-                        <details class="mb-1 mt-2">
-                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                <kw-l key="posts.translation_add">Add</kw-l> <b>@opt.NativeName</b>
-                            </summary>
-                            <form class="ms-2" method="post"
-                                  action="@($"/projects/boards/{Model.Board.Id}/translations")">
+            @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+            {
+                <div class="modal fade" id="@($"board-trans-edit-{existing.LanguageCode}")" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/update")"
+                                  id="@($"board-trans-edit-form-{existing.LanguageCode}")">
                                 @Html.AntiForgeryToken()
-                                <input type="hidden" name="languageCode" value="@opt.Code" />
-                                <label class="form-label small" for="board-t-title-@opt.Code">
-                                    @opt.NativeName <kw-l key="posts.translation_title_label">title</kw-l>
-                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                </label>
-                                <input class="form-control form-control-sm mb-2" id="board-t-title-@opt.Code"
-                                       name="title" value="@Model.Board.Title" />
-                                <label class="form-label small" for="board-t-body-@opt.Code">
-                                    <kw-l key="posts.translation_body_label">Body</kw-l>
-                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                </label>
-                                <div class="rc-editor">
-                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                        <partial name="_RichEditorToggle" />
-                                    </div>
-                                    <textarea class="form-control form-control-sm mb-2" id="board-t-body-@opt.Code"
-                                              name="body" rows="3" placeholder="…" data-rich-editor></textarea>
-                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"board-trans-edit-label-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
                                 </div>
-                                <button type="submit" class="btn btn-sm btn-primary">
-                                    <kw-l key="posts.translation_save">Save translation</kw-l>
-                                </button>
-                            </form>
-                        </details>
-                    }
-
-                    @if (Model.Translations is { Count: > 0 })
-                    {
-                        <hr class="my-2" />
-                        @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
-                        {
-                            <details class="mb-1 mt-1">
-                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                    <kw-l key="posts.translation_edit">Edit</kw-l> <b>@tr.LanguageCode</b>
-                                </summary>
-                                <div class="ms-2">
-                                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/update")">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
-                                        <label class="form-label small">
-                                            <kw-l key="posts.translation_title_label">Title</kw-l>
-                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="@($"board-trans-edit-title-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                                         </label>
-                                        <input class="form-control form-control-sm mb-2" name="title" value="@tr.Title" />
-                                        <label class="form-label small">
+                                        <input class="form-control" type="text" name="title"
+                                               id="@($"board-trans-edit-title-{existing.LanguageCode}")"
+                                               maxlength="120" value="@existing.Title" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="@($"board-trans-edit-body-{existing.LanguageCode}")">
                                             <kw-l key="posts.translation_body_label">Body</kw-l>
                                         </label>
-                                        <textarea class="form-control form-control-sm mb-2" name="body" rows="3">@tr.Body</textarea>
-                                        <button type="submit" class="btn btn-sm btn-primary">
-                                            <kw-l key="posts.translation_save">Save translation</kw-l>
-                                        </button>
-                                    </form>
-                                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/remove")"
-                                          class="mt-2" onsubmit="return confirm('Remove this translation?');">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                            <kw-l key="posts.translation_remove">Remove</kw-l> <b>@tr.LanguageCode</b>
-                                        </button>
-                                    </form>
+                                        <textarea class="form-control" name="body" rows="4"
+                                                  id="@($"board-trans-edit-body-{existing.LanguageCode}")"
+                                                  placeholder="…">@existing.Body</textarea>
+                                    </div>
                                 </div>
-                            </details>
-                        }
-                    }
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"board-trans-edit-form-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            }
+            @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+            {
+                <div class="modal fade" id="@($"board-trans-add-{lang.Code}")" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations")"
+                                  id="@($"board-trans-add-form-{lang.Code}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"board-trans-add-label-{lang.Code}")">
+                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="@($"board-trans-add-title-{lang.Code}")">
+                                            <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control" type="text" name="title"
+                                               id="@($"board-trans-add-title-{lang.Code}")"
+                                               maxlength="120" value="@Model.Board.Title" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="@($"board-trans-add-body-{lang.Code}")">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <div class="rc-editor">
+                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                <partial name="_RichEditorToggle" />
+                                            </div>
+                                            <textarea class="form-control" name="body" id="@($"board-trans-add-body-{lang.Code}")" data-rich-editor></textarea>
+                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"board-trans-add-form-{lang.Code}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
         }
 
         @* ADR 0088 — the description now renders inside the board's
@@ -1154,6 +1228,13 @@
 </div>
 
 @section Scripts {
+    <!-- ADR 0082 — the rich editor for the board's translation "Add" modal
+         body (the ADR 0025 rc-editor lane; self-wires onto the modal's
+         textarea[data-rich-editor] at load, the same per-view <script>
+         idiom TodoDetail / ProjectDetail / the post + announcement
+         translation lanes use). data-rich-editor-no-image keeps the board
+         translation body text-only. -->
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
     <!-- Projects board (M5 — ADR 0067) — client/lib/projects-board.ts,
          tsc-built; keyboard reorder / move on a focused card (Arrow keys →
          the card's own move-… POST form, CSRF-aware, server-authoritative —

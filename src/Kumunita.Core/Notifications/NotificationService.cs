@@ -391,6 +391,57 @@ public sealed class NotificationService
     }
 
     /// <summary>
+    /// The single-row "mark read" state lane (ADR 0096): sets
+    /// <c>ReadAt = now</c> on the **one** notification the recipient owns.
+    /// A **personal** lane — the row is loaded and gated on
+    /// <see cref="Notification.RecipientId"/> (D3 — the recipient id *is*
+    /// the whole access story; a row the recipient does not own is a
+    /// <see cref="KeyNotFoundException"/>, never a cross-recipient write).
+    /// A state lane, not a read — no audit row (D3, F11).
+    /// </summary>
+    public async Task MarkReadAsync(
+        string recipientId,
+        string notificationId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        if (string.IsNullOrWhiteSpace(notificationId)) throw new ArgumentException("A notification id is required.", nameof(notificationId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await session.LoadAsync<Notification>(notificationId, ct).ConfigureAwait(false);
+        if (row is null || row.RecipientId != recipientId)
+            throw new KeyNotFoundException("The notification is not owned by this recipient.");
+        row.ReadAt = DateTimeOffset.UtcNow;
+        session.Store(row);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The single-row "mark unread" state lane (ADR 0096): clears
+    /// <c>ReadAt</c> (back to <c>null</c> = unread) on the **one**
+    /// notification the recipient owns. Same **personal** gate as
+    /// <see cref="MarkReadAsync"/> — a row the recipient does not own is a
+    /// <see cref="KeyNotFoundException"/>, never a cross-recipient write.
+    /// A state lane, not a read — no audit row (D3, F11).
+    /// </summary>
+    public async Task MarkUnreadAsync(
+        string recipientId,
+        string notificationId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        if (string.IsNullOrWhiteSpace(notificationId)) throw new ArgumentException("A notification id is required.", nameof(notificationId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await session.LoadAsync<Notification>(notificationId, ct).ConfigureAwait(false);
+        if (row is null || row.RecipientId != recipientId)
+            throw new KeyNotFoundException("The notification is not owned by this recipient.");
+        row.ReadAt = null;
+        session.Store(row);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// The preference read (D9): the recipient's
     /// <see cref="NotificationPreference"/>; returns a **default** instance
     /// (<c>KindsEnabled = null</c> = all enabled) when none exists — the
