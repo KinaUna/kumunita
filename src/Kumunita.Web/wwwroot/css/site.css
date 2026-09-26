@@ -1977,9 +1977,14 @@ body.kmb-page-fullbleed .navbar {
 /* The compact list-item density — the dropdown's items are
    .dropdown-item elements (the module builds them), tighter than
    the default dropdown padding so a five-item list reads at a
-   glance. */
+   glance. `white-space: normal` + `overflow-wrap: anywhere` keep
+   wide unbroken text (URLs, long words) inside the fixed 320px
+   width — wrapping onto multiple lines instead of growing a
+   horizontal scrollbar under the menu. */
 .notifications-dropdown .dropdown-item {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
