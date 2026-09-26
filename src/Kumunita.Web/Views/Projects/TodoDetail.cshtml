@@ -365,6 +365,14 @@
                                         @tr.Title
                                     }
                                 </h1>
+                                @* ADR 0025 shape (the BoardDetail/ProjectDetail
+                                   detail idiom) — a read surface renders the
+                                   translation's body as plain rendered
+                                   Markdown. *@
+                                @if (!string.IsNullOrWhiteSpace(tr.Body))
+                                {
+                                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(tr.Body))</div>
+                                }
                             </div>
                         }
 
@@ -502,25 +510,13 @@
                     </div>
                 }
 
-                @* The body (the U09 spec's rich-editor shape — the
-                   rc-editor-toolbar / data-rich-editor /
-                   data-rich-editor-preview pattern, the ADR 0031 pin, the
-                   M3/M4 precedent): shown + editable in place. *@
+                @* The body (the ADR 0025 shape — the BoardDetail / ProjectDetail
+                   detail idiom): a read surface renders the Markdown as plain
+                   text through the one MarkdownRenderer; editing lives in its
+                   own view (GET /projects/todos/{id}/edit). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.Body))
                 {
-                    <div class="rc-editor">
-                        <div class="rc-editor-toolbar" data-rich-editor>
-                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                            <partial name="_RichEditorToggle" />
-                        </div>
-                        <textarea class="form-control" id="body" name="Body" rows="6" data-rich-editor>@Model.Todo.Body</textarea>
-                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                    </div>
+                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Todo.Body))</div>
                 }
                 else
                 {
@@ -590,7 +586,3 @@
         }
     </div>
 </div>
-
-@section Scripts {
-    <script type="module" src="~/js/lib/rich-editor.js"></script>
-}
