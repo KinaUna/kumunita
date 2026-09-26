@@ -1505,6 +1505,19 @@ public static class KnownTranslationKeys
             // tail (the older rows) — the locked en strings (design §7.8).
             ["pagination.prev"] = "Newer",
             ["pagination.next"] = "Older",
+
+            // M8 (ADR 0091 D1/D4) — the one /search page + nav entry.
+            ["search.nav"] = "Search",
+            ["search.title"] = "Search",
+            ["search.placeholder"] = "Search posts, events, pages and announcements…",
+            ["search.no-results"] = "No results for",
+            ["search.section.posts"] = "Posts",
+            ["search.section.events"] = "Events",
+            ["search.section.pages"] = "Pages",
+            ["search.section.announcements"] = "Announcements",
+            ["search.scope.community"] = "Community",
+            ["search.scope.groups"] = "Groups",
+            ["search.empty.hint"] = "Find posts, events, pages and announcements by text — the results only show content you can already read.",
         };
 
     /// <summary>
@@ -2871,6 +2884,19 @@ public static class KnownTranslationKeys
             // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
             ["pagination.prev"] = "Neuere",
             ["pagination.next"] = "Ältere",
+
+            // M8 (ADR 0091 D1/D4) — die eine /search-Seite + Nav-Eintrag.
+            ["search.nav"] = "Suche",
+            ["search.title"] = "Suche",
+            ["search.placeholder"] = "Beiträge, Events, Seiten und Ankündigungen durchsuchen…",
+            ["search.no-results"] = "Keine Ergebnisse für",
+            ["search.section.posts"] = "Beiträge",
+            ["search.section.events"] = "Events",
+            ["search.section.pages"] = "Seiten",
+            ["search.section.announcements"] = "Ankündigungen",
+            ["search.scope.community"] = "Gemeinschaft",
+            ["search.scope.groups"] = "Gruppen",
+            ["search.empty.hint"] = "Finde Beiträge, Events, Seiten und Ankündigungen nach Text — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
         };
 
     /// <summary>
@@ -4239,6 +4265,19 @@ public static class KnownTranslationKeys
             // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
             ["pagination.prev"] = "Plus récents",
             ["pagination.next"] = "Plus anciens",
+
+            // M8 (ADR 0091 D1/D4) — la page /search unique + l'entrée de navigation.
+            ["search.nav"] = "Recherche",
+            ["search.title"] = "Recherche",
+            ["search.placeholder"] = "Rechercher dans les publications, événements, pages et annonces…",
+            ["search.no-results"] = "Aucun résultat pour",
+            ["search.section.posts"] = "Publications",
+            ["search.section.events"] = "Événements",
+            ["search.section.pages"] = "Pages",
+            ["search.section.announcements"] = "Annonces",
+            ["search.scope.community"] = "Communauté",
+            ["search.scope.groups"] = "Groupes",
+            ["search.empty.hint"] = "Retrouvez des publications, événements, pages et annonces par texte — seules les contenus que vous pouvez déjà lire s'affichent.",
         };
 
     /// <summary>
@@ -5602,6 +5641,19 @@ public static class KnownTranslationKeys
             // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
             ["pagination.prev"] = "Nyere",
             ["pagination.next"] = "Ældre",
+
+            // M8 (ADR 0091 D1/D4) — den ene /search-side + nav-indgang.
+            ["search.nav"] = "Søg",
+            ["search.title"] = "Søg",
+            ["search.placeholder"] = "Søg i indlæg, arrangementer, sider og meddelelser…",
+            ["search.no-results"] = "Ingen resultater for",
+            ["search.section.posts"] = "Indlæg",
+            ["search.section.events"] = "Arrangementer",
+            ["search.section.pages"] = "Sider",
+            ["search.section.announcements"] = "Meddelelser",
+            ["search.scope.community"] = "Fællesskab",
+            ["search.scope.groups"] = "Grupper",
+            ["search.empty.hint"] = "Find indlæg, arrangementer, sider og meddelelser efter tekst — kun indhold, du allerede kan læse, vises.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

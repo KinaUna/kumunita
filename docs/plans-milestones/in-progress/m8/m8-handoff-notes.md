@@ -112,3 +112,116 @@ next unit's entry reads.
   `IAuthorizationService` or the audit identity. **Do not start U02 from
   this unit** — U01 stops here.
 
+## U02 — Web surface (`SearchController` + view + nav box + 11 keys)
+
+- **Files written (the 4 U02 deliverables):**
+  - `src/Kumunita.Web/Controllers/SearchController.cs` — one action
+    `Index(string? q, string? surface, string? scope, int? page)` on
+    `[HttpGet("/search")]`; no `[Authorize]` (F1 — anonymous can search the
+    community scope). Consumes the frozen `ISearchService` seam only
+    (`SearchAsync` on `surface=all`, `SearchSurfaceAsync` on a single
+    surface). `surface` normalizes: unknown → `all`. `scope` + signed-in
+    gate: `wantsGroups && User.Identity.IsAuthenticated ? Groups : Community`
+    (F6 — anonymous silently degrades to the community scope, no 403).
+    `page` floors to 1 (`page is > 0 ? page : 1`). Blank `q` short-circuits
+    to an empty `SearchResults`/`SearchSurfacePage` **without** a service
+    call (test 1's contract: the empty state is a render decision, not a
+    query). The pager is built only when `sp.HasMore || pageNum > 1`, via
+    `PagedViewModel.ForRoute("/search", sp.Page, SearchService.PageSize,
+    sp.HasMore, {q, surface, scope})` — the ADR 0090 D7 filter-preservation
+    shape (the pager links carry `q` + `surface` + `scope`).
+  - `src/Kumunita.Web/Models/SearchIndexViewModel.cs` — the render model
+    (record: `Q`, `Scope`, `Surface`, `Page`, `Sections`, `PageHrefs`,
+    `Pager`). `IsAll` = `surface=all`. `HrefFor(SearchHit)` resolves the
+    detail href: `pages` → `PageHrefs` map (path-derived); group-scope hit
+    → `/groups/{GroupId}/{surface}/{Id}`; else `/{surface}/{Id}`.
+  - `src/Kumunita.Web/Views/Search/Index.cshtml` — the one search page.
+    Fixed surface order posts→events→pages→announcements; a surface absent
+    from `Sections` (zero visible hits) renders nothing (C-M8·2/4). Each
+    section headed by `search.section.<surface>`; on `all`, the heading is a
+    "see all" link to `/search?q=…&surface=<s>&scope=…`. Hits render title
+    (linked) + the raw `BodyExcerpt` (Razor auto-escapes — risk #4). The
+    scope `<select>` is resident-only (anonymous = community, no mislead).
+    Blank `q` → `search.empty.hint`; non-blank + no hits → `search.no-results`
+    + the echoed `q` (C-M8·4 — no count, only the query string).
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the nav search box
+    (D1 — one entry point): a GET `<form action="/search">` with a
+    `<input name="q">`, placed between the nav `<ul>` and
+    `<partial name="_AccountNav" />` (the nav block; the existing links do
+    not reflow — the box is a sibling `<form>`, not a nav item). The
+    placeholder is resolved server-side via
+    `EffectiveLanguageCode.ResolveAsync` +
+    `ITranslationProvider.GetAsync("search.placeholder", _kwL)` (the
+    ADR 0072 pattern — `<kw-l>` can't sit inside an attribute).
+- **The 11 `kw-l` keys × 4 languages (design §2.5):** added to
+  `KnownTranslationKeys` `EnValues`/`DeValues`/`FrValues`/`DaValues`
+  (`search.nav`, `search.title`, `search.placeholder`, `search.no-results`,
+  `search.section.posts/events/pages/announcements`,
+  `search.scope.community/groups`, `search.empty.hint`). The
+  `KnownTranslationKeys_ParityTests` enforces the exact en==de==fr==da key
+  set with no empty values — all 11 land non-empty in all four dicts.
+- **Drift (2 notes — NOT design-doc rewrites):**
+  1. **Page-hit hrefs are path-derived, not id-derived** (the design's
+     §9 handoff named the route as `/pages/{**path}`). The controller
+     injects `IPageService` and calls `GetTreeAsync()` **once** (no args)
+     per `surface=all` request that has page hits, building an `id →
+     PagePaths.Href(byId, page)` map; the view model carries it as
+     `PageHrefs` and `HrefFor` resolves it. This is a *display projection*
+     (the visibility decision already ran in the service) — the `SearchHit`
+     record shape from Part 2 §2.1 is unchanged (U01's frozen seam is
+     untouched). The first draft wrongly rewrote the `SearchHit` records
+     client-side; removed in favor of the side-map.
+  2. **Placeholder localization** uses the ADR 0072 server-side `GetAsync`
+     pattern in **both** the layout nav box and the view's in-page search
+     form (`kw-l` can't emit into an attribute). The layout gained
+     `@inject ITranslationProvider` + `@inject ILocalizationService` +
+     `@using Kumunita.Web.Security` (for `EffectiveLanguageCode`) — none of
+     these were previously present in `_Layout.cshtml`.
+- **Build + tests (all green):**
+  - `dotnet build Kumunita.slnx -c Debug` → **0 errors** (2 pre-existing
+    warnings in `ProjectsController`/`BoardDetail`, unrelated to U02).
+  - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    → **Total: 476, Errors: 0, Failed: 0** — includes
+    `KwLRegistryConsistencyTests` (every literal `key="…"` in a `.cshtml`
+    under `Views/` resolves in `EnValues` — the check that pins the 11 new
+    `search.*` keys as registered, since the new view + layout now reference
+    them) and `MilestonesTests`. **No `SearchControllerTests` exist yet** —
+    the mocked search Web suite is U03's deliverable; U02 is the surface
+    under it.
+  - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+    -class "Kumunita.Core.Tests.KnownTranslationKeys_ParityTests"` →
+    **Total: 7, Errors: 0, Failed: 0** — the four-dict parity the U02 key
+    insertion must satisfy.
+- **App smoke (live, on the dev Postgres 5433 container):**
+  - `/search?q=community` (anonymous) → `Pages` section renders; each hit
+    links to its **path-derived** route (`/pages/system/help/notifications`,
+    `/pages/system/help/moderators`, …) — the `PageHrefs` projection works
+    end-to-end. The section heading "see all" link carries `q=community` +
+    `surface=pages` + `scope=community` (ADR 0090 D7). Nav box visible.
+  - `/search?q=zzzqqqxyyxwvut` (anonymous) → the empty-results state:
+    `No results for zzzqqqxyyxwvut` (the localized `search.no-results` +
+    the echoed `q` — no count shown, C-M8·4).
+  - `/search?q=the&surface=events&scope=community` (anonymous) → the
+    single-surface shape; the seeded community event set is ≤ 4 (no `>20`
+    visible-surface in the seed data), so the `_Pager` partial is **not**
+    exercised against the live app — the ADR 0090 D7 filter-preservation on
+    the pager links is instead pinned by the mocked Web test in U03
+    (`Search_Index_SingleSurface_RendersPager_WithPageAndQInLinks`). This
+    is the correct place for that assertion (a live-app exercise would
+    require a data mutation the plan does not ask for).
+- **Scope / F6 / F1 confirmed on the live page:** the nav box and the
+  in-page form are visible to anonymous (F1); the in-page scope `<select>`
+  is **not** rendered to anonymous (F6 — only the signed-in branch renders
+  the community/groups picker; anonymous is community-scope on the server
+  side via the controller's `effectiveScope` gate).
+- **U03 entry reads:** the mocked Web test suite (design §2.4, tests 1–10 —
+  `SearchControllerTests` over an NSubstitute `ISearchService` +
+  `IPageService`, the `AnnouncementControllerTests` precedent) is the next
+  unit. U02's live-app smoke covered the anonymous community-scope render
+  (hits, no-results, nav box, section "see all" link filters); U03 covers
+  the **signed-in** group-scope render, the **pager link filter-preservation**
+  (the one U02 couldn't exercise live), the **page-floor** (`page=0`/
+  `page=-1` → 1), and the **escaped-rendering** pin (a hit with `<script>`
+  in its excerpt must render escaped, not execute). **Do not start U03
+  from this unit** — U02 stops here.
+
