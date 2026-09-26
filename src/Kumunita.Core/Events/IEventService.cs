@@ -31,8 +31,14 @@ public interface IEventService
     /// gate* (C-M3·2); the survivors are <c>CanSeeAsync(Read)</c>-filtered (C6 / C3),
     /// ordered by <c>Start</c> ascending, paged. Drafts and deleted events are
     /// excluded for non-authors.
+    /// <para>
+    /// <see cref="EventPage.HasMore"/> (ADR 0090 D1 / D3) is the sole paging
+    /// signal: <c>true</c> iff the page's candidate set filled the page
+    /// (<c>candidates.Count == PageSize</c>); <c>false</c> on an empty page
+    /// (C-M7·5).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<Event>> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+    Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
 
     /// <summary>
     /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set

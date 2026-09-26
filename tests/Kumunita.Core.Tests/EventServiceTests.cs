@@ -97,12 +97,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The grantee sees the event in the feed (branch 6 MatchGroups).
-        var granteeFeed = await svc.ListUpcomingAsync(null, grantee, 1);
+        var granteeFeed = (await svc.ListUpcomingAsync(null, grantee, 1)).Items;
         Assert.Contains("f1-ev", granteeFeed.Select(e => e.Id));
 
         // A stranger is denied the event (branch 7 Deny — the audience does
         // not match the stranger, and the stranger is not the owner).
-        var strangerFeed = await svc.ListUpcomingAsync(null, stranger, 1);
+        var strangerFeed = (await svc.ListUpcomingAsync(null, stranger, 1)).Items;
         Assert.DoesNotContain("f1-ev", strangerFeed.Select(e => e.Id));
     }
 
@@ -131,7 +131,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = null, // public — branch 5
         });
 
-        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
         Assert.Contains("f2-ev", feed.Select(e => e.Id));
 
         // Detail: the resident reads the public event via a single CanAsync
@@ -173,12 +173,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // The community member sees the event (branch 4 — the live
         // communityIds contain the event's ComponentId).
-        var memberFeed = await svc.ListUpcomingAsync(comp, member, 1);
+        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1)).Items;
         Assert.Contains("f3-ev", memberFeed.Select(e => e.Id));
 
         // A non-member resident is denied (branch 7 — the Community flag is
         // set but the actor's communityIds do not contain the component).
-        var nonMemberFeed = await svc.ListUpcomingAsync(comp, nonMember, 1);
+        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1)).Items;
         Assert.DoesNotContain("f3-ev", nonMemberFeed.Select(e => e.Id));
 
         // Detail 404-vs-403 split: the member reads it (Allow); the
@@ -224,10 +224,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = Audience(GrantKind.Group, group),
         });
 
-        var memberFeed = await svc.ListUpcomingAsync(null, member, 1);
+        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
         Assert.Contains("f4-ev", memberFeed.Select(e => e.Id));
 
-        var outsiderFeed = await svc.ListUpcomingAsync(null, outsider, 1);
+        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1)).Items;
         Assert.DoesNotContain("f4-ev", outsiderFeed.Select(e => e.Id));
     }
 
@@ -270,8 +270,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         // The draft is excluded from the feed unconditionally (the candidate
         // set filters !IsDraft) — neither the author nor the stranger sees it
         // in the feed.
-        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
-        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, stranger, 1)).Select(e => e.Id));
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, stranger, 1)).Items.Select(e => e.Id));
     }
 
     // ── 6 — M4_FeedOrderedStartAscending (feed ordering) ─────────────────────
@@ -296,7 +296,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event { Id = "late", AuthorId = author, Title = "late", Body = "l", Start = t.AddDays(1), End = t.AddDays(1), IsDraft = false, Audience = null });
         await Plant(store, new Event { Id = "early", AuthorId = author, Title = "early", Body = "e", Start = t.AddDays(-1), End = t.AddDays(-1), IsDraft = false, Audience = null });
 
-        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
         // All three are public + published + non-deleted ⇒ all visible.
         Assert.Equal(3, feed.Count);
         // Start ascending: early → mid → late.
@@ -333,7 +333,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
-        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
         Assert.Contains("f7-live", feed.Select(e => e.Id));
         Assert.DoesNotContain("f7-deleted", feed.Select(e => e.Id));
 
@@ -856,14 +856,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // A draft is excluded from the feed and invisible to a non-author.
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
 
         var published = await svc.PublishAsync(ev.Id, author);
         Assert.False(published.IsDraft);
 
         // Now the feed shows it and a public reader can open it.
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await svc.GetAsync(ev.Id, resident);
 
         var rows = await EventAuditRows(store);
@@ -940,13 +940,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Title = "live", Body = "b", Start = created, End = created,
             IsDraft = false, Audience = null,
         });
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await svc.GetAsync(ev.Id, resident);
 
         await svc.DeleteAsync(ev.Id, author, EmptyRoles);
 
         // Gone from the feed; the detail is a 404 (non-leaky pin).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
 
         var rows = await EventAuditRows(store);
@@ -974,7 +974,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => svc.DeleteAsync(ev.Id, stranger, EmptyRoles));
         // The event is still live (not deleted).
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
     }
 
     // ── U04·14 — M4_RsvpLastWriteWins (ADR 0054 §3.2) ───────────────────────
@@ -1124,7 +1124,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.True(decision.Allowed);
 
         // A signed-in resident (the "member" in the §3.7 name) also sees it.
-        var residentFeed = await svc.ListUpcomingAsync(null, resident, 1);
+        var residentFeed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
         Assert.Contains("t02-ev", residentFeed.Select(e => e.Id));
         var ev2 = await svc.GetAsync("t02-ev", resident);
         Assert.Equal("Open to all", ev2.Title);
@@ -1329,13 +1329,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = null,
             IsDraft = false,
         });
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
 
         // The non-author GlobalAdmin soft-deletes it (the ADR 0017 override).
         await svc.DeleteAsync(ev.Id, admin, GlobalAdminRoles);
 
         // Gone from the feed; the detail is a 404 (the non-leaky pin).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
 
         // The audit row is stored and tagged Admin (the override branch,
@@ -1540,11 +1540,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The member (grantee) sees the event in the feed.
-        var feed = await svc.ListUpcomingAsync(null, member, 1);
+        var feed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
         Assert.Contains("t01-ev", feed.Select(e => e.Id));
 
         // A stranger (not in the audience) does not see it.
-        var strangerFeed = await svc.ListUpcomingAsync(null, "u-u09-t01-stranger", 1);
+        var strangerFeed = (await svc.ListUpcomingAsync(null, "u-u09-t01-stranger", 1)).Items;
         Assert.DoesNotContain("t01-ev", strangerFeed.Select(e => e.Id));
     }
 
@@ -1576,11 +1576,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The community member sees the event (branch 4).
-        var memberFeed = await svc.ListUpcomingAsync(comp, member, 1);
+        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1)).Items;
         Assert.Contains("t03-ev", memberFeed.Select(e => e.Id));
 
         // A non-member does not (branch 7 Deny).
-        var nonMemberFeed = await svc.ListUpcomingAsync(comp, nonMember, 1);
+        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1)).Items;
         Assert.DoesNotContain("t03-ev", nonMemberFeed.Select(e => e.Id));
     }
 
@@ -1616,11 +1616,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The group member sees the event (branch 6 MatchGroups).
-        var memberFeed = await svc.ListUpcomingAsync(null, member, 1);
+        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
         Assert.Contains("t04-ev", memberFeed.Select(e => e.Id));
 
         // An un-granted resident does not (branch 7 Deny).
-        var outsiderFeed = await svc.ListUpcomingAsync(null, outsider, 1);
+        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1)).Items;
         Assert.DoesNotContain("t04-ev", outsiderFeed.Select(e => e.Id));
     }
 
@@ -1646,7 +1646,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // Before delete: the event is in the feed and readable.
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await svc.GetAsync(ev.Id, resident);
 
         // The author soft-deletes (ADR 0024 — IsDeleted = true).
@@ -1654,7 +1654,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // After delete: the event is filtered from the feed and the detail
         // is a 404 (the non-leaky pin — same as a missing id).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
 
         // The delete lane's audit row is stored (C3, TargetKind "event").
@@ -1688,7 +1688,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await svc.DeleteAsync(ev.Id, author, EmptyRoles);
 
         // The event is now filtered from the feed (the read lanes filter it).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
 
         // The detail is a 404 (the non-leaky pin).
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, author));
@@ -1705,7 +1705,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => svc.DeleteAsync(ev2.Id, stranger, EmptyRoles));
         // The second event is still live (the denied write did not apply).
-        Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+        Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
     }
 
     // ════════════════════════════════════════════════════════════════════════

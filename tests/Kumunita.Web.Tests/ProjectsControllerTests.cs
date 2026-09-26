@@ -67,7 +67,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns([todo]);
+            .Returns(new TodoPage([todo], false));
 
         // The feed's copy-to / move-to pickers read each to-do's placement
         // board ids (the board card menu's convention: a board never offers
@@ -94,7 +94,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<IReadOnlyList<TodoItem>>(
+            .Returns(Task.FromException<TodoPage>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(
@@ -1080,9 +1080,9 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
         projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
         projects.ListTodosAsync(null, null, actor, 1, unassignedOnly: false, projectId: projectId, ct: Arg.Any<CancellationToken>())
-            .Returns(new List<TodoItem> { todo });
+            .Returns(new TodoPage(new List<TodoItem> { todo }, false));
         projects.ListBoardsAsync(null, actor, 1, projectId: projectId, ct: Arg.Any<CancellationToken>())
-            .Returns(new List<KanbanBoard> { board });
+            .Returns(new BoardPage(new List<KanbanBoard> { board }, false));
 
         var controller = Build(projects, subjectId: actor);
         var result = await controller.ProjectDetail(projectId);
@@ -1328,11 +1328,11 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Project>
+            .Returns(new ProjectPage(new List<Project>
             {
                 new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
                 new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
-            });
+            }, false));
 
         var controller = Build(projects, subjectId: actor);
         var result = await controller.TodoEditGet(todoId);
@@ -1450,11 +1450,11 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListProjectsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Project>
+            .Returns(new ProjectPage(new List<Project>
             {
                 new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
                 new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
-            });
+            }, false));
 
         var controller = Build(projects, subjectId: actor);
         var result = await controller.BoardEditGet(boardId);
@@ -1663,7 +1663,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns([]);
+            .Returns(new TodoPage([], false));
         var store = await BuildRealStoreAsync();
         var controller = Build(projects, store: store, subjectId: actor);
 
@@ -1782,14 +1782,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
                 Arg.Any<bool>(), Arg.Any<CancellationToken>())
-            .Returns([]);
+            .Returns(new TodoPage([], false));
         projects.ListPickerTodosAsync(
                 Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<TodoItem>
+            .Returns(new TodoPage(new List<TodoItem>
             {
                 new() { Id = "tbd-opt-b", Title = "Beta blocker", AuthorId = actor, Created = default },
                 new() { Id = "tbd-opt-a", Title = "Alpha blocker", AuthorId = actor, Created = default },
-            });
+            }, false));
 
         var controller = Build(projects, subjectId: actor); // no real store needed (all reads are substituted)
         var vm = Assert.IsType<TodoEditorModel>(
@@ -2007,10 +2007,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         var projects = Substitute.For<IProjectService>();
         projects.ListGoalsAsync(
                 Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<ProjectGoal> { goal });
+            .Returns(new GoalPage(new List<ProjectGoal> { goal }, false));
         projects.ListProjectsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Project> { project });
+            .Returns(new ProjectPage(new List<Project> { project }, false));
 
         var controller = Build(projects, subjectId: actor);
         var result = await controller.ProjectsIndex(componentId: null, page: 1);
@@ -2033,7 +2033,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         var deniedProjects = Substitute.For<IProjectService>();
         deniedProjects.ListGoalsAsync(
                 Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromException<IReadOnlyList<ProjectGoal>>(new UnauthorizedAccessException("denied")));
+            .Returns(Task.FromException<GoalPage>(new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.ProjectsIndex(null, page: 1));
     }
@@ -2056,10 +2056,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         var projects = Substitute.For<IProjectService>();
         projects.ListGoalsAsync(
                 Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<ProjectGoal>());
+            .Returns(new GoalPage(new List<ProjectGoal>(), false));
         projects.ListProjectsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new List<Project>());
+            .Returns(new ProjectPage(new List<Project>(), false));
 
         var controller = Build(projects, subjectId: actor);
         var result = await controller.ProjectsIndex(componentId: null, page: 1);

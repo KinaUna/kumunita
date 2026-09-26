@@ -42,6 +42,10 @@ namespace Kumunita.Core.Announcements;
 /// </summary>
 public sealed class AnnouncementService : IAnnouncementService
 {
+    // ADR 0090 D4 — the M7 paged feed's page size (the PostService / EventService
+    // / ProjectService `PageSize = 30` precedent).
+    private const int PageSize = 30;
+
     private readonly IDocumentStore _store;
     private readonly IUserInfoService _userInfo;
     // ADR 0084 — the M6 notification emitter seam (optional nullable default
@@ -89,6 +93,52 @@ public sealed class AnnouncementService : IAnnouncementService
             .OrderByDescending(a => a.Created)
             .ToListAsync()
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The <see cref="ListVisibleAsync"/> feed, **paged** (ADR 0090 D6, M7
+    /// U01 — the design doc §7.6 lock): the **same** visibility filter (the
+    /// <see cref="ResolveReadVisibilityAsync"/> resolution + the
+    /// <c>!IsDraft</c> / scope-vs-role predicate), the same <c>Created</c>
+    /// descending order, then a <c>Skip((page - 1) * PageSize).Take(PageSize)</c>
+    /// window over the ordered candidate list (<see cref="PageSize"/> = 30 —
+    /// the D4 shape). <see cref="AnnouncementPage.HasMore"/> is the sole
+    /// paging signal (D1 — <c>pageCount == PageSize</c>); an out-of-range page
+    /// returns an empty page with <c>HasMore: false</c> (the D8 shape — and
+    /// there is no <c>CanSeeAsync</c> to skip, so C-M7·5 holds vacuously).
+    /// **No** <see cref="Authorization.AccessAudit"/> row (announcements have
+    /// no audit lane — the <see cref="ListVisibleAsync"/> pin; C-M7·1
+    /// vacuously satisfied). The non-paged <see cref="ListVisibleAsync"/> is
+    /// unmodified (the banner + admin surfaces keep the whole-list read).
+    /// </summary>
+    public async Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        if (page < 1) page = 1;
+
+        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
+
+        await using var session = _store.QuerySession();
+        var candidates = await session
+            .Query<Announcement>()
+            .Where(a => !a.IsDraft &&
+                        ((a.CommunityId == null &&
+                          (a.Scope == AnnouncementScope.Public ||
+                           (authed && a.Scope == AnnouncementScope.Community)))
+                         || (a.CommunityId != null &&
+                             (admin || communities.Contains(a.CommunityId!)))))
+            .OrderByDescending(a => a.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var items = candidates
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+        // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
+        // set filled the page (design doc §7.6).
+        return new AnnouncementPage(Items: items, HasMore: items.Count == PageSize);
     }
 
     /// <summary>

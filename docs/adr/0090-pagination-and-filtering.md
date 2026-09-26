@@ -64,14 +64,22 @@ why nothing else*.
   *count* of hidden posts is the leak. A second field next to a wrong
   field is a trap; one correct field + the view fix is not.
 
-- **The bare-list seams get `out bool hasMore`, not a new record type per
-  surface (D3).** `ListUpcomingAsync`, `ListTodosAsync`,
+- **The bare-list seams get an extra `HasMore` signal, not a generic
+  `PagedResult<T>` wrapper (D3).** `ListUpcomingAsync`, `ListTodosAsync`,
   `ListPickerTodosAsync`, `ListBoardsAsync`, `ListGoalsAsync`,
-  `ListProjectsAsync` gain `out bool hasMore` as the last parameter
-  (before `CancellationToken`) — the .NET idiom for "one extra signal";
-  the record-shaped seams (`FeedResult`, `GroupEventFeedResult`) gain a
-  `HasMore` field. Seven new `PagedResult<T>` records for one `bool` is
-  the rejected alternative.
+  `ListProjectsAsync` each report the `HasMore` signal; the record-shaped
+  seams (`FeedResult`, `GroupEventFeedResult`) carry it as a `HasMore`
+  field. Seven new `PagedResult<T>` records for one `bool` (a generic
+  wrapper type) is the rejected alternative. **Vehicle (U01 drift,
+  2026-09-26):** the seam is `async`, and C# forbids `ref` / `in` / `out`
+  parameters on `async` methods (**CS1988**), so the `out bool hasMore`
+  parameter form is not compilable — the signal is carried by a **page
+  record return** `(Items, HasMore)` per seam: `EventPage` / `TodoPage` /
+  `BoardPage` / `GoalPage` / `ProjectPage`. This is the same record-return
+  idiom the record-shaped seams already use, not the rejected generic
+  `PagedResult<T>` wrapper — the decision's substance (D3: one extra
+  signal, not a generic wrapper; D1: `HasMore` is the sole paging signal)
+  is unchanged.
 
 - **Page size stays 30, stays per-service (D4, C-M7·3).** The existing
   `PageSize = 30` constants in the three paged services are the contract
@@ -133,8 +141,8 @@ why nothing else*.
   adapter, no new bounded context, no new document, no new index — this
   is a read-lane and a UI lane on the frozen seams (the ADR 0006 /
   ADR 0004 §B discipline). The frozen-surface rule is honoured: the
-  `out bool` / `HasMore` field / two new paged read overloads are
-  compatible ADDs; the existing `ListVisibleAsync` /
+  `HasMore` signal (record return / `HasMore` field) / two new paged read
+  overloads are compatible ADDs; the existing `ListVisibleAsync` /
   `ListPostsByTagAsync` / `ListPagesByTagAsync` stay byte-identical for
   the banner / admin / non-paged call sites.
 

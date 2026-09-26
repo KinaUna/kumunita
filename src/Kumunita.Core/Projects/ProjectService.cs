@@ -107,7 +107,7 @@ public sealed class ProjectService : IProjectService
     /// **not** change the audience decision (C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default)
+    public async Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -133,8 +133,14 @@ public sealed class ProjectService : IProjectService
             q = q.Where(t => t.BlockedByTodoId != null);
         var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
         if (candidates.Count == 0)
-            return Array.Empty<TodoItem>();
+            return new TodoPage(Array.Empty<TodoItem>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "todo"), from that single call (the EventService shape).
@@ -145,7 +151,7 @@ public sealed class ProjectService : IProjectService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(t => visibleIds.Contains(t.Id)).ToList();
+        return new TodoPage(candidates.Where(t => visibleIds.Contains(t.Id)).ToList(), hasMore);
     }
 
     /// <summary>
@@ -245,7 +251,7 @@ public sealed class ProjectService : IProjectService
     /// A **display** surface, never a gate (C-TBD·4) — it does not pre-check
     /// cycles (the write lane does — C-TBD·3).
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default)
+    public async Task<TodoPage> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -258,8 +264,14 @@ public sealed class ProjectService : IProjectService
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
         if (candidates.Count == 0)
-            return Array.Empty<TodoItem>();
+            return new TodoPage(Array.Empty<TodoItem>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "todo"), from that single call (the ListTodosAsync shape).
@@ -268,7 +280,7 @@ public sealed class ProjectService : IProjectService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(t => visibleIds.Contains(t.Id)).ToList();
+        return new TodoPage(candidates.Where(t => visibleIds.Contains(t.Id)).ToList(), hasMore);
     }
 
     /// <summary>
@@ -291,7 +303,7 @@ public sealed class ProjectService : IProjectService
     /// **not** change the audience decision (C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default)
+    public async Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -307,8 +319,14 @@ public sealed class ProjectService : IProjectService
             q = q.Where(b => b.ProjectId == projectId);
         var candidates = await q.OrderByDescending(b => b.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
         if (candidates.Count == 0)
-            return Array.Empty<KanbanBoard>();
+            return new BoardPage(Array.Empty<KanbanBoard>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "board"), from that single call (the ListTodosAsync shape).
@@ -317,7 +335,7 @@ public sealed class ProjectService : IProjectService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(b => visibleIds.Contains(b.Id)).ToList();
+        return new BoardPage(candidates.Where(b => visibleIds.Contains(b.Id)).ToList(), hasMore);
     }
 
     /// <summary>
@@ -1588,7 +1606,7 @@ public sealed class ProjectService : IProjectService
     /// with <c>TargetKind = "goal"</c> via the
     /// <see cref="ProjectGoalToAuditableResource"/>, U01).
     /// </summary>
-    public async Task<IReadOnlyList<ProjectGoal>> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<GoalPage> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -1599,8 +1617,14 @@ public sealed class ProjectService : IProjectService
             q = q.Where(g => g.ComponentId == componentId);
         var candidates = await q.OrderByDescending(g => g.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
         if (candidates.Count == 0)
-            return Array.Empty<ProjectGoal>();
+            return new GoalPage(Array.Empty<ProjectGoal>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "goal"), from that single call (the ListBoardsAsync shape).
@@ -1609,7 +1633,7 @@ public sealed class ProjectService : IProjectService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(g => visibleIds.Contains(g.Id)).ToList();
+        return new GoalPage(candidates.Where(g => visibleIds.Contains(g.Id)).ToList(), hasMore);
     }
 
     /// <summary>
@@ -1784,7 +1808,7 @@ public sealed class ProjectService : IProjectService
     /// <c>TargetKind = "project"</c> via the
     /// <see cref="ProjectToAuditableResource"/>, U01).
     /// </summary>
-    public async Task<IReadOnlyList<Project>> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default)
+    public async Task<ProjectPage> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -1793,17 +1817,23 @@ public sealed class ProjectService : IProjectService
             .Where(p => !p.IsDeleted);
         if (componentId is not null)
             q = q.Where(p => p.ComponentId == componentId);
-        // The goalId association filter (the design doc D8 / U03 pin):
-        // null → the standalone-projects feed (GoalId == null); a value →
-        // that goal's projects (GoalId == goalId). A feed filter, never a
-        // gate (C-PL·3) — the audience decision is the access boundary.
+        // The goal association filter (design doc §9.3): a feed filter,
+        // never a gate (C-PL·3) — the project's own Audience decision stays
+        // the access boundary. null → the standalone feed (GoalId == null);
+        // a value → that goal's projects (GoalId == goalId).
         q = goalId is null
             ? q.Where(p => p.GoalId == null)
             : q.Where(p => p.GoalId == goalId);
         var candidates = await q.OrderByDescending(p => p.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
         if (candidates.Count == 0)
-            return Array.Empty<Project>();
+            return new ProjectPage(Array.Empty<Project>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "project"), from that single call (the ListGoalsAsync shape).
@@ -1812,7 +1842,7 @@ public sealed class ProjectService : IProjectService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
+        return new ProjectPage(candidates.Where(p => visibleIds.Contains(p.Id)).ToList(), hasMore);
     }
 
     /// <summary>

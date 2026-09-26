@@ -421,7 +421,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // The community feed never contains the group event (the author is the
         // strongest possible claimant, so if even they can't see it the lane
         // is exclusive by construction).
-        var upcoming = await svc.ListUpcomingAsync(null, owner, page: 1);
+        var upcoming = (await svc.ListUpcomingAsync(null, owner, page: 1)).Items;
         Assert.DoesNotContain(upcoming, e => e.Id == "ge12-group");
     }
 

@@ -65,7 +65,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var granteeFeed = await svc.ListTodosAsync(null, null, grantee, 1);
+        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1)).Items;
         Assert.Contains("f1-todo", granteeFeed.Select(t => t.Id));
     }
 
@@ -93,7 +93,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var strangerFeed = await svc.ListTodosAsync(null, null, stranger, 1);
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
         Assert.DoesNotContain("f1-todo", strangerFeed.Select(t => t.Id));
     }
 
@@ -1658,10 +1658,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var granteeFeed = await svc.ListGoalsAsync(null, grantee, 1);
+        var granteeFeed = (await svc.ListGoalsAsync(null, grantee, 1)).Items;
         Assert.Contains("f1-goal", granteeFeed.Select(g => g.Id));
 
-        var strangerFeed = await svc.ListGoalsAsync(null, stranger, 1);
+        var strangerFeed = (await svc.ListGoalsAsync(null, stranger, 1)).Items;
         Assert.DoesNotContain("f1-goal", strangerFeed.Select(g => g.Id));
     }
 
@@ -1841,12 +1841,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         // The standalone feed (goalId == null — the /projects landing's projects section).
-        var standaloneFeed = await svc.ListProjectsAsync(null, null, author, 1);
+        var standaloneFeed = (await svc.ListProjectsAsync(null, null, author, 1)).Items;
         Assert.Contains("f5-standalone", standaloneFeed.Select(p => p.Id));
         Assert.DoesNotContain("f5-under-goal", standaloneFeed.Select(p => p.Id));
 
         // The under-goal feed (goalId filter narrows to that goal's projects).
-        var underGoalFeed = await svc.ListProjectsAsync(null, "f5-goal", author, 1);
+        var underGoalFeed = (await svc.ListProjectsAsync(null, "f5-goal", author, 1)).Items;
         Assert.Contains("f5-under-goal", underGoalFeed.Select(p => p.Id));
         Assert.DoesNotContain("f5-standalone", underGoalFeed.Select(p => p.Id));
     }
@@ -2517,7 +2517,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // out-of-project to-do is excluded for everyone (the filter), and the
         // in-project + restricted to-dos are candidates — the audience
         // decision then admits each actor its own slice.
-        var authorFiltered = await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project");
+        var authorFiltered = (await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project")).Items;
         Assert.Contains("f7e-in-project", authorFiltered.Select(t => t.Id));
         Assert.DoesNotContain("f7e-out-of-project", authorFiltered.Select(t => t.Id));
         Assert.Contains("f7e-restricted", authorFiltered.Select(t => t.Id)); // the author may read it.
@@ -2526,7 +2526,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // C-PL·3): the filter does **not** open the gate for the stranger —
         // the restricted to-do (which matches the filter) is still hidden,
         // while the public in-project to-do is visible to everyone.
-        var strangerFiltered = await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project");
+        var strangerFiltered = (await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project")).Items;
         Assert.Contains("f7e-in-project", strangerFiltered.Select(t => t.Id));   // public — visible.
         Assert.DoesNotContain("f7e-out-of-project", strangerFiltered.Select(t => t.Id)); // the filter.
         Assert.DoesNotContain("f7e-restricted", strangerFiltered.Select(t => t.Id)); // the gate.
@@ -2565,7 +2565,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var filtered = await svc.ListBoardsAsync(null, author, 1, "f7f-project");
+        var filtered = (await svc.ListBoardsAsync(null, author, 1, "f7f-project")).Items;
         Assert.Contains("f7f-in-project", filtered.Select(b => b.Id));
         Assert.DoesNotContain("f7f-out-of-project", filtered.Select(b => b.Id));
     }
@@ -2605,7 +2605,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // The existing 5-arg call shape (default projectId = null): both
         // to-dos are in the author's feed — the M5 behavior is intact.
-        var feed = await svc.ListTodosAsync(null, null, author, 1);
+        var feed = (await svc.ListTodosAsync(null, null, author, 1)).Items;
         Assert.Contains("f7g-in-project", feed.Select(t => t.Id));
         Assert.Contains("f7g-standalone", feed.Select(t => t.Id));
     }
@@ -2828,11 +2828,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var unassigned = await svc.ListTodosAsync(null, null, reader, 1, unassignedOnly: true);
+        var unassigned = (await svc.ListTodosAsync(null, null, reader, 1, unassignedOnly: true)).Items;
         Assert.Contains("c5-unassigned", unassigned.Select(t => t.Id));
         Assert.DoesNotContain("c5-assigned", unassigned.Select(t => t.Id));
 
-        var all = await svc.ListTodosAsync(null, null, reader, 1);
+        var all = (await svc.ListTodosAsync(null, null, reader, 1)).Items;
         Assert.Contains("c5-unassigned", all.Select(t => t.Id));
         Assert.Contains("c5-assigned", all.Select(t => t.Id));
     }
@@ -2987,7 +2987,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var blockedFeed = await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true);
+        var blockedFeed = (await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true)).Items;
         Assert.Contains("tbd-f4-b", blockedFeed.Select(t => t.Id));
         Assert.DoesNotContain("tbd-f4-a", blockedFeed.Select(t => t.Id));
     }

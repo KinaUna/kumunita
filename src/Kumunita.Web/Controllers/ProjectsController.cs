@@ -489,7 +489,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<TodoItem> todos;
         try
         {
-            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted);
+            todos = (await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
         }
         catch (UnauthorizedAccessException)
         {
@@ -822,7 +822,7 @@ public sealed class ProjectsController : Controller
         {
             try
             {
-                parentCandidates = (await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted))
+                parentCandidates = (await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted)).Items // ADR 0090 D1/D3
                     .Where(t => t.ParentId is null)
                     .ToList();
             }
@@ -996,7 +996,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<TodoItem> candidates;
         try
         {
-            candidates = await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted);
+            candidates = (await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (UnauthorizedAccessException)
         {
@@ -1385,7 +1385,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<KanbanBoard> boards;
         try
         {
-            boards = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted);
+            boards = (await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
         }
         catch (UnauthorizedAccessException)
         {
@@ -2466,12 +2466,12 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<Project> standaloneProjects;
         try
         {
-            goals = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted);
+            goals = (await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
             // The landing's projects section is the **standalone** feed
             // (the `goalId == null` filter — the D8 / design doc §5 pin;
             // a goal's projects are the goal detail's (U06) surface, not
             // this page's).
-            standaloneProjects = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted);
+            standaloneProjects = (await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
         }
         catch (UnauthorizedAccessException)
         {
@@ -2940,7 +2940,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<TodoItem> todos;
         try
         {
-            todos = await projects.ListTodosAsync(null, null, actorId, 1, unassignedOnly: false, projectId: id, ct: HttpContext.RequestAborted);
+            todos = (await projects.ListTodosAsync(null, null, actorId, 1, unassignedOnly: false, projectId: id, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (KeyNotFoundException)
         {
@@ -2954,7 +2954,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<KanbanBoard> boards;
         try
         {
-            boards = await projects.ListBoardsAsync(null, actorId, 1, projectId: id, ct: HttpContext.RequestAborted);
+            boards = (await projects.ListBoardsAsync(null, actorId, 1, projectId: id, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (KeyNotFoundException)
         {
@@ -3357,7 +3357,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<ProjectGoal> goals;
         try
         {
-            goals = await projects.ListGoalsAsync(null, actorId, 1, ct: HttpContext.RequestAborted);
+            goals = (await projects.ListGoalsAsync(null, actorId, 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (KeyNotFoundException)
         {
@@ -3392,7 +3392,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<Project> list;
         try
         {
-            list = await projects.ListProjectsAsync(null, null, actorId, 1, ct: HttpContext.RequestAborted);
+            list = (await projects.ListProjectsAsync(null, null, actorId, 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (KeyNotFoundException)
         {
@@ -3425,7 +3425,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<Kumunita.Core.Projects.TodoItem> list;
         try
         {
-            list = await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted);
+            list = (await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3
         }
         catch (KeyNotFoundException)
         {

@@ -23,8 +23,67 @@ scratch tier of the three-tier contract — see the plan header).
   self-corrected in the plan; the doc pins the two-record shape);
   (4) the locked `en` strings: `pagination.prev` = "Newer",
   `pagination.next` = "Older" (feeds are newest-first /
-  earliest-start-first — *Prev* steps toward the head).
+  earliest-start-first — *Prev* steps toward the head);
+  (5) the **U01 call-site compile pass** (new §7.2a) — the D3 `out bool`
+  change is a source-level break at the ~5 Web-controller call sites +
+  ~20 existing-test call sites, so U01's whole-solution-build exit + the
+  "no other Web/test change" clause only both hold with the one-token
+  `out` fix at each; the compiler is the authoritative break set.
 - **No code touched:** nothing under `src/` or `tests/` was modified;
   no build was run. U01 entry reads: the design doc § Seams (the exact
-  C#) + § Pinned seam tests (the 12 names) + § Invariants (C-M7·1/4/5/7)
-  + this section.
+  C#) + **§7.2a (the call-site compile pass — the only Web/test touch
+  in U01)** + § Pinned seam tests (the 12 names) + § Invariants
+  (C-M7·1/4/5/7) + this section.
+
+## U01 — paged-seam `HasMore` + `Total` correction + D6 surfaces + 12 pinned tests
+
+- **The six seams report `HasMore`.** `FeedResult` / `GroupEventFeedResult`
+  carry `HasMore` as a field (already the convention); the four remaining
+  bare-list seams pivot to a **page-record return** `(Items, HasMore)`:
+  `EventService.ListUpcomingAsync` → `EventPage`; `ProjectService.
+  ListTodosAsync` / `ListPickerTodosAsync` / `ListBoardsAsync` /
+  `ListGoalsAsync` / `ListProjectsAsync` → `TodoPage` / `TodoPage` /
+  `BoardPage` / `GoalPage` / `ProjectPage`. **Drift (design log §U01):**
+  the design doc §7.5 / ADR 0090 D3 pin of `out bool hasMore` is
+  **CS1988-illegal** — C# forbids `ref` / `in` / `out` on `async` methods —
+  so the record return is the only C#-legal + idiomatic vehicle. Semantics
+  unchanged: D1 (`HasMore` sole signal), D2 (`Total` candidate count),
+  D8 (0-candidate early return = no-decision), C3 (one aggregate audit row).
+- **`FeedResult.Total` corrected to the candidate count** (D2 / C-M7·7):
+  pre-decision, pre-paging `CountAsync` over the filtered query — `31`,
+  never the page's `30`.
+- **The three D6 surfaces gained paged seams:**
+  `AnnouncementService.ListVisiblePagedAsync` → `AnnouncementPage`;
+  `TagService.ListPostsByTagPagedAsync` → `TagPostPage`;
+  `TagService.ListPagesByTagPagedAsync` → `TagPagePage`.
+- **Call-site compile pass (design doc §7.2a):** one `.Items` extraction at
+  the ~5 `EventController` + ~11 `ProjectsController` call sites; ~43 Core
+  test sites (`, out _` → `.Items`); 19 Web NSubstitute sites (`.Returns(
+  new <PageRecord>(…))` + `Task.FromException<<PageRecord>>`).
+- **12 pinned seam tests (all passing):** `F1_FullPage_HasMoreTrue`,
+  `F2_PartialPage_HasMoreFalse`, `F5_OversizedPage_EmptyAndNoAuditRow`,
+  `F8_TotalIsCandidateCount_NotPageCount`, `C_M7_1_OneAggregateRowPerPageVisit`,
+  `C_M7_5_ListUpcomingAsync_OversizedPage_NoAuditRow`,
+  `ListUpcomingAsync_FullPage_HasMoreTrue`,
+  `ListUpcomingAsync_PartialPage_HasMoreFalse`,
+  `ListTodosAsync_FullPage_HasMoreTrue`,
+  `ListTodosAsync_OversizedPage_HasMoreFalseAndEmpty`,
+  `ListVisiblePagedAsync_Announcements_Page1_Full_HasMoreTrue`,
+  `ListPostsByTagPagedAsync_FullPage_HasMoreTrue`.
+- **Validation:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded,
+  0 errors / 0 warnings**. The 12 tests pass:
+  `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+  -class Kumunita.Core.Tests.M7PaginationSeamTests` → `Total: 12, Errors: 0,
+  Failed: 0` (Testcontainers `postgres:18`; ~15 s). **Note:** the xunit.v3
+  runner's class filter is `-class "<fqname>"` (positional), *not*
+  `--filter-class` (that is the v1/v2 / VSTest flag the summary had pinned).
+- **Files touched:** 6 seam files under `src/Kumunita.Core/` (`Events/
+  IEventService.cs` + `EventService.cs`; `Projects/IProjectService.cs` +
+  `ProjectService.cs`; `Posts/PostService.cs`; `Announcements/
+  AnnouncementService.cs`; `Tags/TagService.cs`), 2 controller files under
+  `src/Kumunita.Web/Controllers/` (`EventController.cs`,
+  `ProjectsController.cs`), 5 test files under `tests/` (`M7PaginationSeamTests.cs`
+  new; `PostServiceTests.cs`, `EventServiceTests.cs`,
+  `GroupEventServiceTests.cs`, `ProjectServiceTests.cs`,
+  `EventControllerTests.cs`, `ProjectsControllerTests.cs`), and the 2 ADR /
+  design docs above. **No schema, auth-surface, or document changes.**

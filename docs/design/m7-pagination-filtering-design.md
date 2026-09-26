@@ -370,6 +370,13 @@ tests).
   `IAnnouncementService` (new seam); `TagService.ListPostsByTagPagedAsync`
   + `ListPagesByTagPagedAsync` + `TagPostPage` / `TagPagePage` (new);
   `ITagService` (new seams). **No document changes, no schema changes.**
+- **The U01 call-site compile pass** (§7.2a, locked): the one-token `out`
+  fix at the ~5 Web-controller call sites (`EventController.Index`,
+  `ProjectsController` ×5 reads) + the ~20 existing-test call sites
+  (`EventServiceTests` / `ProjectServiceTests` real-service calls;
+  `EventControllerTests` / `ProjectsControllerTests` NSubstitute setups +
+  `Received` assertions). Mechanical, no behavior change; the **only**
+  Web/test touch in U01 (the pager wiring + D2 view-text stay in U03/U04).
 - **`Kumunita.Web`** (U02–U04): `Models/PagedViewModel.cs` (new);
   `Views/Shared/_Pager.cshtml` (new); `KnownTranslationKeys.cs` (the two
   `pagination.*` keys × 4 languages); the 7 existing routes' VMs /
@@ -421,6 +428,45 @@ return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, 
 The normal return becomes `Total: candidateCount, HasMore: candidates.Count == PageSize`.
 **No other change** to any of the three methods — the `CanSeeAsync` call,
 the visible-set filter, and the audit row are untouched (C-M7·1).
+
+### 7.2a Call-site compile pass (U01, locked)
+
+The `out`-parameter change (D3) is a **source-level break** for every
+existing call site of the seven `out`-gained methods, and the U01 exit is
+`dotnet build Kumunita.slnx -c Debug` green (the **whole** solution — the
+plan's per-unit exit). The two clauses only both hold if U01 also adds the
+one-token `out _` (or `out var hasMore`) fix at each existing call site.
+**Locked:** U01's deliverables include this compile pass — the **only**
+permitted Web/test touch in U01, and it is mechanical (one token per
+line, no behavior change, no other file):
+
+- **Web controllers (5 call sites, 2 files):** `EventController.Index`
+  (`ListUpcomingAsync`); `ProjectsController` — `TodosIndex`
+  (`ListTodosAsync` ×3: the feed, the `page: 1` parent-candidate and
+  picker reads), `BoardsIndex` (`ListBoardsAsync`), `ProjectsIndex`
+  (`ListGoalsAsync` + `ListProjectsAsync`), the `ListPickerTodosAsync`
+  picker read.
+- **Existing Core tests (the real-service call sites, ~10 lines):**
+  `tests/Kumunita.Core.Tests/EventServiceTests.cs` (`ListUpcomingAsync`
+  call sites), `tests/Kumunita.Core.Tests/ProjectServiceTests.cs`
+  (`ListTodosAsync` / `ListGoalsAsync` / `ListProjectsAsync` call sites).
+- **Existing Web tests (the NSubstitute setups + `Received`
+  assertions, ~10 lines):** `tests/Kumunita.Web.Tests/
+  EventControllerTests.cs` (`ListUpcomingAsync` setups),
+  `tests/Kumunita.Web.Tests/ProjectsControllerTests.cs`
+  (`ListTodosAsync` / `ListBoardsAsync` / `ListProjectsAsync` /
+  `ListPickerTodosAsync` setups + `Received` assertions).
+
+The authoritative break set is whatever `dotnet build Kumunita.slnx`
+reports (the compiler is the pin — the list above is the U00-verified
+shape). **No** other Web or test change in U01: the pager wiring (U03),
+the newly-paged wiring (U04), and the D2 view-text removals stay in
+their units. **Not broken** (verified): no test constructs `FeedResult`
+/ `GroupEventFeedResult` (`new` / deconstruction — only property reads),
+`PostService.ListFeed*` is called only through `FeedResult`-shaped
+results (its signature is unchanged — only the record gained a field),
+and the new overloads (`ListVisiblePagedAsync` / the tag paged seams)
+have no existing callers.
 
 ### 7.3 `IEventService.ListUpcomingAsync` (D3, U01)
 
@@ -713,5 +759,34 @@ line here and stops (unit-series rule 6).
   before the `CountAsync` — the C-M7·5 pin). Also locked: the two tag
   page records (`TagPostPage` / `TagPagePage`) over the single `TagPage`
   the plan's § Seams first named (the two element types make the single
-  record wrong). The lane plan text is the pre-lock shape; this doc +
-  ADR 0090 are the lock.
+  record wrong). **(5)** Locked: the U01 deliverables include the
+  **call-site compile pass** (new §7.2a) — the D3 `out bool` change is a
+  source-level break at the ~5 Web-controller call sites + ~20
+  existing-test call sites, so U01's "whole-solution build green" exit and
+  "no other Web/test change in U01" only both hold with the one-token
+  `out` fix at each. The compiler (`dotnet build Kumunita.slnx`) is the
+  authoritative break set; the §7.2a list is the U00-verified shape. The
+  lane plan text is the pre-lock shape; this doc + ADR 0090 are the lock.
+- **U01 — 2026-09-26. (CS1988 — the §7.5 pin is C#-illegal on `async`
+  seams; resolved by the page-record pivot.)** The §7.5 / D3 pin of
+  **`out bool hasMore`** on the six async list seams is **CS1988-illegal**:
+  C# forbids `ref` / `in` / `out` parameters on `async` methods, so a seam
+  `Task<IReadOnlyList<T>> ListXAsync(..., out bool hasMore)` cannot compile
+  as-is. This is a hard language rule, not a project choice — the only
+  C#-legal + idiomatic way to carry a second return value off an `async`
+  seam is a **record return**. U01 therefore pivots every paged seam to a
+  **page-record return** `(Items, HasMore)`, consistent with the pre-existing
+  `FeedResult` / `GroupEventFeedResult` / `AnnouncementPage` / `TagPostPage`
+  / `TagPagePage` conventions (the `FeedResult.HasMore` "sole paging signal"
+  shape D1 already pins). New records introduced by U01: `EventPage`
+  (`Events`), and `TodoPage` / `BoardPage` / `GoalPage` / `ProjectPage`
+  (`Projects`). The D1 / D2 / D3 / D8 semantics are **unchanged** — only the
+  *vehicle* for the signal moved from an `out` parameter to a record field
+  (`HasMore`). `out bool` is also NSubstitute-hostile (by-ref is unsupported
+  upstream, issue #992); the record return is mockable cleanly (a plain value
+  type) — so the Web NSubstitute test suite needed only a one-line
+  `.Returns(new TodoPage(...))` wrap per seam, not a new mocking path. This
+  is the *sole* U01 deviation from the §7.5 literal seam signatures; it is a
+  compiler-forced shape change, not a semantic one — `Total`, `HasMore`, the
+  D8 early-return no-decision, and the C3 audit-row pins all hold verbatim
+  (the 12 pinned seam tests pass).

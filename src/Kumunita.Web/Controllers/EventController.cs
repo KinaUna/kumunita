@@ -238,7 +238,7 @@ public sealed class EventController : Controller
         IReadOnlyList<Event> events;
         try
         {
-            events = await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted);
+            events = (await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted)).Items; // ADR 0090 D1/D3 — the paging signal is the page's .HasMore (pager wiring: U03/U04).
         }
         catch (UnauthorizedAccessException)
         {
