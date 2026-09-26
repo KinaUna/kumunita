@@ -1,0 +1,28 @@
+@model Kumunita.Web.Controllers.AdminAnnouncementCommentsController.AnnouncementCommentsAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Announcement comments";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.anncomments_title">Announcement comments</kw-l></h1>
+
+<p class="text-muted">
+    <kw-l key="admin.anncomments_lede">Whether signed-in residents may comment on announcements. Closing the gate hides the comment list and composer on every announcement — no one can add a comment. Visitors can never comment, and existing comments are not removed — the gate only controls new comments.</kw-l>
+</p>
+
+<form method="post" action="/admin/announcements/comments">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="enabled" class="form-label"><kw-l key="admin.anncomments_title">Announcement comments</kw-l></label>
+            <select class="form-select" name="enabled" id="enabled">
+                <option value="True" selected="@(Model.Enabled ? "selected" : null)"><kw-l key="admin.anncomments_on">Open — signed-in residents can comment</kw-l></option>
+                <option value="False" selected="@(!Model.Enabled ? "selected" : null)"><kw-l key="admin.anncomments_off">Closed — no signed-in resident can add a comment</kw-l></option>
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.anncomments_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

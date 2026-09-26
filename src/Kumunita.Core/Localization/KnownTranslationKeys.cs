@@ -443,6 +443,19 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "On — admins are notified of new sign-ups and verifications",
             ["admin.signup_notify_off"]     = "Off — no admin notifications on sign-up / verification",
 
+            // ── admin — the announcement-comments gate (the
+            // /admin/announcements/comments surface; ADR 0101) ───────────────
+            ["admin.anncomments_title"]     = "Announcement comments",
+            ["admin.anncomments_lede"]      =
+                "Whether signed-in residents may comment on announcements. " +
+                "Closing the gate hides the comment list and composer on every " +
+                "announcement — no one can add a comment. Visitors can never " +
+                "comment, and existing comments are not removed — the gate " +
+                "only controls new comments.",
+            ["admin.anncomments_on"]        = "Open — signed-in residents can comment",
+            ["admin.anncomments_off"]       = "Closed — no signed-in resident can add a comment",
+            ["admin.anncomments_save"]      = "Save",
+
             // ── account — sign-up-closed notice (the /account/signup and
             // /account/login surfaces when the admin gate is closed; ADR 0050) ─
             ["account.signup_closed_title"] = "Sign-up is closed",
@@ -1116,6 +1129,20 @@ public static class KnownTranslationKeys
             ["announcements.edited"] = "edited",
             ["announcements.banner_read_more"] = "Read more",
             ["announcements.banner_all"] = "All announcements",
+
+            // ── announcement comments (the Detail.cshtml comment lane;
+            //    signed-in-only, admin-toggleable; ADR 0101) ──────────────────
+            ["announcements.comments"] = "Comments",
+            ["announcements.comment_empty"] = "No comments yet. Be the first to say something.",
+            ["announcements.comment_deleted"] = "This comment has been deleted by its author.",
+            ["announcements.comment_delete"] = "Delete",
+            ["announcements.comment_reply"] = "Write a comment",
+            ["announcements.comment_submit"] = "Comment",
+            ["announcements.comment_audience_note"] =
+                "Comments are visible to signed-in residents only, even on a " +
+                "public announcement, and follow this announcement's own " +
+                "audience (a community-targeted one is visible to that " +
+                "community's residents).",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Last updated:",
@@ -1925,6 +1952,19 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "An — Admins werden bei neuen Registrierungen und Verifizierungen benachrichtigt",
             ["admin.signup_notify_off"]     = "Aus — keine Admin-Benachrichtigungen bei Registrierung / Verifizierung",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Ankündigungen kommentieren",
+            ["admin.anncomments_lede"]      =
+                "Ob angemeldete Anwohner:innen Ankündigungen kommentieren dürfen. " +
+                "Geschlossen werden die Kommentarliste und das Eingabefeld auf " +
+                "jeder Ankündigung ausgeblendet — niemand kann mehr einen " +
+                "Kommentar hinzufügen. Besucher:innen konnten nie kommentieren, " +
+                "und bereits vorhandene Kommentare bleiben erhalten — das " +
+                "Schalterfeld steuert nur neue Kommentare.",
+            ["admin.anncomments_on"]        = "Offen — angemeldete Anwohner:innen können kommentieren",
+            ["admin.anncomments_off"]       = "Geschlossen — keine:r kann einen Kommentar hinzufügen",
+            ["admin.anncomments_save"]      = "Speichern",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Die Registrierung ist geschlossen",
             ["account.signup_closed_body"]  =
@@ -2568,6 +2608,19 @@ public static class KnownTranslationKeys
             ["announcements.edited"] = "bearbeitet",
             ["announcements.banner_read_more"] = "Mehr lesen",
             ["announcements.banner_all"] = "Alle Ankündigungen",
+
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Kommentare",
+            ["announcements.comment_empty"] = "Noch keine Kommentare. Schreib als Erster etwas.",
+            ["announcements.comment_deleted"] = "Dieser Kommentar wurde von seiner Autorin bzw. seinem Autor gelöscht.",
+            ["announcements.comment_delete"] = "Löschen",
+            ["announcements.comment_reply"] = "Kommentar schreiben",
+            ["announcements.comment_submit"] = "Kommentieren",
+            ["announcements.comment_audience_note"] =
+                "Kommentare sind nur für angemeldete Anwohner:innen sichtbar — " +
+                "auch bei einer öffentlichen Ankündigung — und folgen dem " +
+                "eigenen Publikum dieser Ankündigung (eine an eine " +
+                "Community gerichtete ist deren Anwohner:innen sichtbar).",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Zuletzt aktualisiert:",
@@ -3332,6 +3385,19 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "Activé — les admins sont notifiés des nouvelles inscriptions et vérifications",
             ["admin.signup_notify_off"]     = "Désactivé — aucune notification admin sur inscription / vérification",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Commentaires sur les annonces",
+            ["admin.anncomments_lede"]      =
+                "Si les habitants connectés peuvent commenter les annonces. " +
+                "Désactivé, la liste des commentaires et le champ de saisie " +
+                "sont masqués sur chaque annonce — personne ne peut plus en " +
+                "ajouter. Les visiteurs ne pouvaient de toute façon pas " +
+                "commenter, et les commentaires existants sont conservés — " +
+                "le bouton ne contrôle que les nouveaux commentaires.",
+            ["admin.anncomments_on"]        = "Ouvert — les habitants connectés peuvent commenter",
+            ["admin.anncomments_off"]       = "Fermé — aucun habitant ne peut ajouter de commentaire",
+            ["admin.anncomments_save"]      = "Enregistrer",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "L'inscription est fermée",
             ["account.signup_closed_body"]  =
@@ -3977,6 +4043,19 @@ public static class KnownTranslationKeys
             ["announcements.edited"] = "modifiée",
             ["announcements.banner_read_more"] = "Lire la suite",
             ["announcements.banner_all"] = "Toutes les annonces",
+
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Commentaires",
+            ["announcements.comment_empty"] = "Pas encore de commentaires. Sois le premier à dire quelque chose.",
+            ["announcements.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
+            ["announcements.comment_delete"] = "Supprimer",
+            ["announcements.comment_reply"] = "Écrire un commentaire",
+            ["announcements.comment_submit"] = "Commenter",
+            ["announcements.comment_audience_note"] =
+                "Les commentaires ne sont visibles que par les habitants " +
+                "connectés — même sur une annonce publique — et suivent le " +
+                "public de cette annonce (une annonce destinée à une " +
+                "communauté est visible par les habitants de celle-ci).",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Dernière mise à jour :",
@@ -4741,6 +4820,18 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "Til — adminer får besked ved nye tilmeldinger og bekræftelser",
             ["admin.signup_notify_off"]     = "Fra — ingen besked til adminer ved tilmelding / bekræftelse",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Kommentarer på meddelelser",
+            ["admin.anncomments_lede"]      =
+                "Om loggede indboere må kommentere meddelelser. Slukker du " +
+                "den, skjules kommentarlisten og skrivefeltet på alle " +
+                "meddelelser — ingen kan længere tilføje en kommentar. " +
+                "Besøgende kunne aldrig kommentere, og eksisterende " +
+                "kommentarer beholdes — knappen styrer kun nye kommentarer.",
+            ["admin.anncomments_on"]        = "Åben — loggede indboere kan kommentere",
+            ["admin.anncomments_off"]       = "Lukket — ingen kan tilføje en kommentar",
+            ["admin.anncomments_save"]      = "Gem",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Tilmeldingen er lukket",
             ["account.signup_closed_body"]  =
@@ -5380,6 +5471,19 @@ public static class KnownTranslationKeys
             ["announcements.edited"] = "redigeret",
             ["announcements.banner_read_more"] = "Læs mere",
             ["announcements.banner_all"] = "Alle meddelelser",
+
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Kommentarer",
+            ["announcements.comment_empty"] = "Ingen kommentarer endnu. Vær den første til at sige noget.",
+            ["announcements.comment_deleted"] = "Denne kommentar er blevet slettet af dens forfatter.",
+            ["announcements.comment_delete"] = "Slet",
+            ["announcements.comment_reply"] = "Skriv en kommentar",
+            ["announcements.comment_submit"] = "Kommentar",
+            ["announcements.comment_audience_note"] =
+                "Kommentarer er kun synlige for loggede indboere — også på en " +
+                "officiel meddelelse — og følger denne meddelelses eget " +
+                "publikum (en meddelelse rettet til et fællesskab er synligt " +
+                "for dets indboere).",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Sidst opdateret:",

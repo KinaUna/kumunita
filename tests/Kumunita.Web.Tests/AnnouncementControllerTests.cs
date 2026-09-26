@@ -1765,6 +1765,164 @@ public class AnnouncementControllerTests
         Assert.Equal(existingDraftId, model.DraftId);
     }
 
+    // ── ADR 0101 — resident-comment lanes (top-level only) ────────────────
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments</c> by a **visitor**
+    /// (no subject claim) is a 403 (ForbidResult) before the service is
+    /// touched — a visitor never comments.
+    /// </summary>
+    [Fact]
+    public async Task AddComment_Anonymous_Returns_Forbid()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.AddComment("ann-1", "hi", null);
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().CreateAnnouncementCommentAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments</c>: the service
+    /// refuses (the admin toggle is **off** — a
+    /// <see cref="UnauthorizedAccessException"/>) → the controller maps that
+    /// to a clean 403 (Forbid), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task AddComment_When_ToggleOff_Returns_Forbid()
+    {
+        const string id = "ann-comment-toggle-off";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-resident-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(Task.FromResult<Announcement?>(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "t", Body = "b", AuthorId = "subj-author",
+                Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+            }));
+        announcements.CreateAnnouncementCommentAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<AnnouncementComment>(
+                new UnauthorizedAccessException("Commenting on announcements is currently disabled.")));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+        var result = await controller.AddComment(id, "hi there", null);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments</c>: a signed-in
+    /// resident on a visible announcement with the toggle **on** comments
+    /// successfully — the service's create is called and the response is a
+    /// redirect to the detail page (the comment list reloads with the new row).
+    /// </summary>
+    [Fact]
+    public async Task AddComment_When_Authorized_StoresAndRedirects()
+    {
+        const string id = "ann-comment-ok";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-resident-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(Task.FromResult<Announcement?>(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "t", Body = "b", AuthorId = "subj-author",
+                Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+            }));
+        announcements.CreateAnnouncementCommentAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromResult(new AnnouncementComment
+            {
+                Id = "c-1", AnnouncementId = id, AuthorId = "subj-resident-001",
+                Body = "great thanks", Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+            }));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+        var result = await controller.AddComment(id, "great thanks", null);
+
+        await announcements.Received(1).CreateAnnouncementCommentAsync(
+            id, "subj-resident-001", Arg.Any<IReadOnlySet<string>>(),
+            "great thanks", Arg.Any<string?>(), Arg.Any<IDocumentSession>());
+        Assert.IsType<RedirectToActionResult>(result);
+    }
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments/{commentId}/delete</c>
+    /// by a **visitor** (no subject claim) is a 403 (ForbidResult) before the
+    /// service is touched — a visitor never deletes.
+    /// </summary>
+    [Fact]
+    public async Task DeleteComment_Anonymous_Returns_Forbid()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.DeleteComment("ann-1", "c-1");
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().DeleteAnnouncementCommentAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments/{commentId}/delete</c>:
+    /// the service refuses (a **non-author** — a
+    /// <see cref="UnauthorizedAccessException"/>, the author-only rule) → the
+    /// controller maps that to a clean 403 (Forbid), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task DeleteComment_When_NonAuthor_Returns_Forbid()
+    {
+        const string id = "ann-comment-del";
+        const string commentId = "c-author";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.DeleteAnnouncementCommentAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<AnnouncementComment>(
+                new UnauthorizedAccessException(
+                    $"Actor is not the author of comment '{commentId}'.")));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: "subj-stranger");
+
+        var result = await controller.DeleteComment(id, commentId);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// ADR 0101 — <c>POST /announcements/{id}/comments/{commentId}/delete</c>:
+    /// the service refuses (a **missing** comment — a
+    /// <see cref="KeyNotFoundException"/>) → the controller maps that to a
+    /// clean 404 (NotFound), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task DeleteComment_When_Missing_Returns_404()
+    {
+        const string id = "ann-comment-del-missing";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.DeleteAnnouncementCommentAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<AnnouncementComment>(
+                new KeyNotFoundException("Comment 'c-x' was not found in the session; nothing to delete.")));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+        var result = await controller.DeleteComment(id, "c-x");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     /// <summary>
     /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
     /// the compose form's language picker: an empty enabled catalog + the

@@ -127,10 +127,9 @@ public sealed record AnnouncementDetailViewModel(
     /// only the author ever sees a draft (<see
     /// cref="Kumunita.Core.Announcements.AnnouncementService.GetAsync"/>
     /// returns a draft to the author only), and only the author may publish it
-    /// (the ADR 0037 author-only pin). Defaulted so existing positional call
-    /// sites keep compiling.
+    /// (the ADR 0037 author-only pin).
     /// </summary>
-    bool IsAuthor = false,
+    bool IsAuthor,
 
     /// <summary>
     /// Whether the announcement is a <b>draft</b> (ADR 0037) —
@@ -139,7 +138,70 @@ public sealed record AnnouncementDetailViewModel(
     /// the detail page renders the draft badge + Publish button for exactly
     /// the one viewer who may act on it.
     /// </summary>
-    bool IsDraft = false);
+    bool IsDraft,
+
+    // ── ADR 0101 — resident comments on the announcement (top-level only) ──
+
+    /// <summary>Whether the comment surface may render at all for this viewer
+    /// (ADR 0101): the viewer is **signed in** *and* the admin
+    /// announcement-comments toggle is **on** (a
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings
+    /// .AnnouncementCommentsEnabled"/> read). When false, the detail page
+    /// renders neither the comment list nor the composer (a visitor, or a
+    /// signed-in user with the toggle off, sees only the announcement body).
+    /// A shape convenience — the service's read/write lanes are the real gate;
+    /// this flag only keeps the affordance in step with both.</summary>
+    bool CanComment,
+
+    /// <summary>The announcement's resident comments (ADR 0101), ordered by
+    /// <c>Created</c> ascending, each with a resolved author display name
+    /// (null-safe: falls back to the raw subject id if the author's profile
+    /// row is missing — a display-name lookup, never an access decision) and
+    /// the author-only delete affordance (<see
+    /// cref="AnnouncementCommentRow.IsAuthor"/>). Populated only when
+    /// <see cref="CanComment"/> is true (otherwise the detail page renders
+    /// nothing here, and the controller passes an empty list).</summary>
+    IReadOnlyList<AnnouncementCommentRow> Comments,
+
+    /// <summary>The enabled <see cref="Kumunita.Core.Localization
+    /// .LanguageCatalog"/> languages for the comment composer's
+    /// <see cref="Kumunita.Core.Localization.LanguageOption"/> picker (ADR 0018
+    /// — the authored-in tag the author is writing the comment in). The shared
+    /// <see cref="LanguageOption"/> record (the ADR 0022 / post-reply shape);
+    /// the <c>HasTranslation</c> flag is unused for a comment (a tag, not a
+    /// translation) but is set to <c>false</c> for the shared record's shape.
+    /// Populated only when <see cref="CanComment"/> is true (the controller
+    /// passes an empty list otherwise).</summary>
+    IReadOnlyList<LanguageOption> CommentLanguages);
+
+/// <summary>
+/// One <see cref="Kumunita.Core.Announcements.AnnouncementComment"/> as a
+/// **detail row** (the <c>GET /announcements/{id}</c> comments surface —
+/// ADR 0101). The comment inherits the announcement's flat
+/// <see cref="Kumunita.Core.Announcements.AnnouncementScope"/> read decision
+/// (the ADR 0100 C-M3·1 "comment-inherits the parent's single decision" rule,
+/// with the flat scope split standing in for the to-do's <c>Read</c>); its
+/// <see cref="AuthorDisplayName"/> is a **read** lookup (a display
+/// convenience, never an access decision — the M4/M5 idiom).
+/// <para>
+/// **<see cref="IsAuthor"/>** is the row-level **delete affordance** —
+/// whether this actor may delete this comment now (author-only, ADR 0024 — a
+/// convenience mirror for rendering the button; the authoritative decision is
+/// the service's <see cref="Kumunita.Core.Announcements.AnnouncementService
+/// .DeleteAnnouncementCommentAsync"/> lane). **<see cref="DeletedAt"/>** is
+/// the ADR 0024 soft-delete stamp (a non-null value renders the deleted
+/// placeholder in place of the body).
+/// </para>
+/// </summary>
+public sealed record AnnouncementCommentRow(
+    string Id,
+    string AuthorId,
+    string AuthorDisplayName,
+    string Body,
+    string LanguageCode,
+    DateTimeOffset Created,
+    DateTimeOffset? DeletedAt,
+    bool IsAuthor);
 
 /// <summary>The /announcements/new create form (the write lane) — also reused for the
 /// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share

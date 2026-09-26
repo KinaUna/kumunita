@@ -89,4 +89,22 @@ public sealed class LocaleSettings
     /// if the signal becomes noise.
     /// </summary>
     public bool NotifyAdminsOnSignup { get; set; } = true;
+
+    /// <summary>
+    /// Whether signed-in residents may **comment on platform announcements**
+    /// (ADR 0101). The <see cref="Kumunita.Core.Announcements"/> comment lane
+    /// is the one that reads this: when <c>true</c> a signed-in user who can
+    /// see an announcement may comment on it (and the comment list is shown
+    /// on the detail page); when <c>false</c> the composer is hidden and no
+    /// signed-in user may add a comment. A visitor (not signed in) can never
+    /// comment regardless of this flag, and comments are always visible to
+    /// signed-in users only — even on a public-scope announcement — under the
+    /// announcement's own flat scope split (ADR 0101). An *additive* field on
+    /// the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="NotifyAdminsOnSignup"/>.
+    /// Defaults to <c>true</c> so a fresh instance ships with the discussion
+    /// lane open out of the box (the M6 lean-default <c>true</c> floor); an
+    /// admin tightens it to <c>false</c> to silence the surface.
+    /// </summary>
+    public bool AnnouncementCommentsEnabled { get; set; } = true;
 }

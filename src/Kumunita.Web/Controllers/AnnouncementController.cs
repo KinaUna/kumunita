@@ -301,6 +301,42 @@ public sealed class AnnouncementController(
         var canTranslate = AnnouncementService.CanTranslateAnnouncement(
             a.Scope, a.CommunityId, actor, RoleSet(User));
 
+        // ADR 0101 — the resident-comment surface on the detail page. It
+        // renders only for a **signed-in** viewer (a visitor sees only the
+        // announcement body) **and** only while the admin announcement-comments
+        // toggle is **on** (the AreAnnouncementCommentsEnabledAsync read, the
+        // true floor). When both hold, the announcement's comments are loaded
+        // (the flat scope gate already ran in GetAsync above — a comment is
+        // never visible where the announcement is not, and never to a visitor,
+        // even on a public announcement) and the composer's language picker is
+        // seeded from the enabled catalog (ADR 0018 — the authored-in tag).
+        bool commentsEnabled = await announcements.AreAnnouncementCommentsEnabledAsync();
+        bool canComment = actor.Length > 0 && commentsEnabled;
+
+        IReadOnlyList<AnnouncementCommentRow> comments = [];
+        if (canComment)
+        {
+            var raw = await announcements.GetAnnouncementCommentsAsync(a.Id, actor, RoleSet(User));
+            var commentAuthorIds = raw.Select(c => c.AuthorId).Distinct().ToList();
+            var commentAuthorNames = new Dictionary<string, string>(commentAuthorIds.Count);
+            foreach (var cid in commentAuthorIds)
+            {
+                var cprof = await userInfo.GetProfileAsync(cid);
+                commentAuthorNames[cid] = cprof?.DisplayName is not null && cprof.DisplayName.Length > 0
+                    ? cprof.DisplayName
+                    : cid;
+            }
+            comments = raw
+                .Select(c => new AnnouncementCommentRow(
+                    c.Id, c.AuthorId, commentAuthorNames[c.AuthorId], c.Body,
+                    c.LanguageCode, c.Created, c.DeletedAt, c.AuthorId == actor))
+                .ToList();
+        }
+
+        var commentLanguages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, false))
+            .ToList();
+
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
             authorName, a.AuthorId, a.Pinned, communityName, canEdit,
@@ -309,7 +345,11 @@ public sealed class AnnouncementController(
             // draft to the author only, so IsAuthor ⇔ IsDraft here; both feed
             // the detail page's draft badge + Publish button (author-only).
             IsAuthor: actor == a.AuthorId,
-            IsDraft:  a.IsDraft));
+            IsDraft:  a.IsDraft,
+            // ADR 0101 — the resident-comment surface (signed-in + toggle-on).
+            CanComment:       canComment,
+            Comments:         comments,
+            CommentLanguages: commentLanguages));
     }
 
     // ── Add a translation (POST /announcements/{id}/translations) ───────────
@@ -910,5 +950,112 @@ public sealed class AnnouncementController(
 
         TempData["info"] = "Announcement published.";
         return RedirectToAction("Detail", new { id });
+    }
+
+    // ── ADR 0101 — resident-comment lanes (top-level only) ────────────────
+    // The ADR 0100 to-do comment shape carried to the Announcements lane:
+    // a thin Web wrapper over the service's CreateAnnouncementCommentAsync /
+    // DeleteAnnouncementCommentAsync. Signed-in + toggle-on (create),
+    // author-only (delete). A visitor / toggle-off is a 403 (ForbidResult);
+    // a missing / not-visible announcement or comment is a 404 (non-leaky,
+    // the announcement lane's posture).
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/comments</c> — the add-comment write lane
+    /// (ADR 0101). The form posts a <c>body</c> (required) and an optional
+    /// <c>languageCode</c> (ADR 0018 — the authored-in tag). **Standing:** the
+    /// actor is **signed in**, the announcement exists and is visible to them
+    /// under its flat <see cref="AnnouncementScope"/> split, and the admin
+    /// announcement-comments toggle is **on** (a visitor, a non-visible
+    /// announcement, or a toggle-off is a 403 / 404, non-leaky — the service's
+    /// decision is the gate; the controller is the thin shape, ADR 0006-D).
+    /// No <c>[Authorize]</c>: a plain signed-in resident may comment (the
+    /// service's signed-in + toggle + visibility checks are the real gate, not
+    /// a role — the same "any signed-in resident" posture as the to-do comment
+    /// lane).
+    /// </summary>
+    [HttpPost("/announcements/{id}/comments")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddComment(
+        string id, [FromForm] string? body, [FromForm] string? languageCode)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult(); // ADR 0101 — a visitor never comments.
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A comment needs some text.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+
+        // The viewer must be able to see the announcement (the flat scope
+        // gate — a null row is a 404, the announcement lane's non-leaky
+        // posture).
+        var a = await announcements.GetAsync(id, actorId, RoleSet(User));
+        if (a is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.CreateAnnouncementCommentAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                body,
+                string.IsNullOrWhiteSpace(languageCode) ? null : languageCode,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Toggle-off (or a visibility re-check) — the 403 shape.
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Comment added.";
+        return RedirectToAction("Detail", "Announcement", new { id });
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/comments/{commentId}/delete</c> — the
+    /// soft-delete-a-comment write lane (ADR 0101, the ADR 0024 shape).
+    /// **Author-only** (ADR 0016 precedent): a non-author is refused (403),
+    /// a missing comment / announcement is 404 (non-leaky). The record is
+    /// kept (<see cref="Kumunita.Core.Announcements.AnnouncementComment
+    /// .DeletedAt"/> stamped) — the detail view renders a placeholder in its
+    /// place. No <c>[Authorize]</c>: a plain signed-in resident (the
+    /// author) is the only one who needs this route; the service's
+    /// author-only check is the real gate.
+    /// </summary>
+    [HttpPost("/announcements/{id}/comments/{commentId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteComment(string id, string commentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult(); // ADR 0101 — a visitor never deletes.
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.DeleteAnnouncementCommentAsync(
+                id, commentId, actorId, RoleSet(User), session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Comment deleted.";
+        return RedirectToAction("Detail", "Announcement", new { id });
     }
 }

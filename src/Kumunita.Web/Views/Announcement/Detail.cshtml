@@ -386,6 +386,119 @@
                 </span>
             </div>
         </div>
+
+        @* ADR 0101 — the resident-comment surface. Rendered only when
+           <c>Model.CanComment</c> is true: the viewer is **signed in** *and*
+           the admin announcement-comments toggle is **on** (the
+           <see cref="AnnouncementDetailViewModel.CanComment"/> read). A
+           visitor, or a signed-in user with the toggle off, sees only the
+           announcement body above — no comment list, no composer. A comment
+           inherits the announcement's flat scope split (the C-M3·1
+           "comment-inherits the parent's single decision" rule, with the flat
+           split standing in for the to-do's <c>Read</c> decision) — so it is
+           never visible where the announcement is not, and never to a
+           visitor, even on a public-scope announcement. *@
+        @if (Model.CanComment)
+        {
+            <section class="mt-4" id="announcement-comments">
+                <h2 class="h5 mb-3"><kw-l key="announcements.comments">Comments</kw-l></h2>
+
+                @{
+                    string CommentBodyHtml(string body) => Kumunita.Web.Security.MarkdownRenderer.RenderHtml(body);
+                }
+
+                @if (Model.Comments.Count == 0)
+                {
+                    <p class="text-body-tertiary mb-3">
+                        <kw-l key="announcements.comment_empty">No comments yet. Be the first to say something.</kw-l>
+                    </p>
+                }
+                else
+                {
+                    <div class="list-group mb-3">
+                        @foreach (var c in Model.Comments)
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="d-inline-flex align-items-center me-2">
+                                        <img class="avatar avatar-sm" src="/profile/avatar/@c.AuthorId" alt="" data-avatar-fallback>
+                                    </div>
+                                    <div>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <span class="fw-semibold">@c.AuthorDisplayName</span>
+                                            <span class="text-muted small"><kw-dt dt="@c.Created" format="g"></kw-dt></span>
+                                            @if (c.DeletedAt is not null)
+                                            {
+                                                <span class="badge text-bg-light border"><kw-l key="announcements.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                            }
+                                            @if (c.IsAuthor && c.DeletedAt is null)
+                                            {
+                                                <form class="d-inline ms-2" method="post"
+                                                      action="@($"/announcements/{Model.Id}/comments/{c.Id}/delete")"
+                                                      style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-link text-danger p-0"><kw-l key="announcements.comment_delete">Delete</kw-l></button>
+                                                </form>
+                                            }
+                                        </div>
+                                        @if (c.DeletedAt is null)
+                                        {
+                                            <div class="rc-body mt-1">@Html.Raw(CommentBodyHtml(c.Body))</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* The composer (the M3 / to-do reply-form shape: rc-editor +
+                   language picker — ADR 0018 the authored-in tag). *@
+                <div class="card">
+                    <div class="card-body">
+                        <form class="mb-0" method="post" action="@($"/announcements/{Model.Id}/comments")">
+                            @Html.AntiForgeryToken()
+                            <label class="form-label" for="ann-comment-body" style="font-weight:600;">
+                                <kw-l key="announcements.comment_reply">Comment</kw-l>
+                            </label>
+                            <div class="rc-editor">
+                                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                    <partial name="_RichEditorToggle" />
+                                </div>
+                                <textarea class="form-control mb-3" id="ann-comment-body" name="body" rows="3"
+                                          required placeholder="…" data-rich-editor></textarea>
+                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="ann-comment-language" style="font-weight:600;">
+                                    <kw-l key="posts.reply_language_label">Language</kw-l>
+                                </label>
+                                <select class="form-control" id="ann-comment-language" name="languageCode">
+                                    @foreach (var l in Model.CommentLanguages)
+                                    {
+                                        <option value="@l.Code">@l.NativeName</option>
+                                    }
+                                </select>
+                                <div class="text-muted small mt-1">
+                                    <kw-l key="posts.reply_language_note">The language you're commenting in — a tag, not a translation.</kw-l>
+                                </div>
+                            </div>
+                            <div class="text-muted small mb-3">
+                                <kw-l key="announcements.comment_audience_note">Comments are visible to signed-in residents only, even on a public announcement, and under this announcement's own audience (a community-targeted one is visible to that community's residents).</kw-l>
+                            </div>
+                            <button type="submit" class="btn btn-primary"><kw-l key="announcements.comment_submit">Comment</kw-l></button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        }
     </div>
 </div>
 
