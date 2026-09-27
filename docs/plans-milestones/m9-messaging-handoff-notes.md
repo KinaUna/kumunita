@@ -121,3 +121,102 @@ not re-derive the register.
   the 14 + 10 pinned test names are locked in the design doc §2.5
   (U02/U03/U06 copy them by name).
 - **Next:** U01 (see `in-progress/messaging-u01.md`).
+
+## U01 — documents + M9DocTypes + boot wiring
+
+- **Entry state:** design doc §2.1/§2.2 LOCKED (U00 locked D1–D8, no veto);
+  no `Messaging/` context, no `M9DocTypes`, and no `Conversation` / `Message`
+  anywhere yet (grep-confirmed greenfield). `M3DocTypes.cs` read in full as
+  the registration shape to mirror; `Program.cs` `AddMarten` lambda read as
+  the boot-wiring site; `SchemaBootstrap.cs` read in full.
+- **Files written (all three new):**
+  - `src/Kumunita.Core/Messaging/Conversation.cs` — the POCO, **verbatim**
+    from design doc §2.1: `Id` / `ParticipantA` / `ParticipantB` /
+    `Created` / `LastMessageAt?`. `sealed`, `string Id = string.Empty`
+    surrogate, `DateTimeOffset Created`, `DateTimeOffset? LastMessageAt`.
+  - `src/Kumunita.Core/Messaging/Message.cs` — the POCO, **verbatim** from
+    design doc §2.1: `Id` / `ConversationId` / `SenderId` / `Body` /
+    `Created` / `ReadBy?` / `LanguageCode` (default `"en"` — the ADR 0018
+    authored-in tag, the U00 drift-guard pin 6). `sealed`, `Body =
+    string.Empty` (the 2000-char cap is U03's service rule, not the doc).
+  - `src/Kumunita.Core/M9DocTypes.cs` — the registration surface (the
+    `M6DocTypes` shape — a `public static class` with one
+    `Configure(StoreOptions opts)` method; no hand-rolled
+    `FeatureSchemaBase`, ADR 0004 §B.1).
+- **Modified (one line + comment block):** `src/Kumunita.Web/Program.cs`
+  — `M9DocTypes.Configure(opts);` added **after** the
+  `M6DocTypes.Configure(opts);` call (line 135 pre-edit) inside the
+  `AddMarten(opts => { … })` lambda. Neighbor line it sat next to: the
+  `M6DocTypes.Configure(opts);` call (the M6 U02 precedent location, the
+  last doc-surface registration before the lambda closes).
+- **(a) `M9DocTypes` `.Schema.For` lines + the two index definitions, exactly
+  as written:**
+  ```csharp
+  opts.Schema.For<Conversation>()
+         .UniqueIndex("convo_uidx_pair",
+                     c => c.ParticipantA, c => c.ParticipantB);
+
+  opts.Schema.For<Message>()
+         .Index(m => new { m.ConversationId, m.Created });
+  ```
+  The `Conversation` index is the **unique** business-key index — the F1
+  idempotency witness (a second open of the same unordered pair returns the
+  existing conversation). The `Message` index is a **regular** composite
+  thread-ordering index (the M6 `Notification` `(RecipientId, Created)`
+  feed-ordering shape, not an integrity constraint). Both use conventional
+  `string` ids (Marten's default) — **no** `.Identity(...)` pin needed
+  (the `M6DocTypes` `NotificationPreference` `Identity` pin is specific to
+  that doc's no-separate-`Id` shape and does not apply here).
+- **(b) Boot-path insertion point (single registration — the M3/M4/M6
+  precedent):** one line in one file, `src/Kumunita.Web/Program.cs`
+  (the `AddMarten` lambda, after `M6DocTypes.Configure(opts)`). **The plan
+  register's "two boot paths" instruction — add a line to
+  `SchemaBootstrap.cs` too — is a misdescription, verified against the
+  actual code and every prior milestone's handoff note:**
+  `SchemaBootstrap.ApplyAsync` calls
+  `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`, which
+  *consumes* every `Schema.For<T>` / `Storage.Add<T>` registration that the
+  host (i.e. `Program.cs`) registered on the `IDocumentStore`'s
+  `StoreOptions` — it carries **no** doc-type registration cluster of its
+  own (grep-confirmed: zero `…DocTypes.Configure` calls in
+  `src/Kumunita.Core/Bootstrap/`). The M3 U3 handoff note records the exact
+  same precedent and explicitly records this as the M3/U3 deviation; the
+  M4 U01 and M6 U02 handoff notes both record the same "1 line in 1 file,
+  `SchemaBootstrap.cs` was **not** touched" shape. **Not a drift-pause** —
+  the frozen §2.1 pin is the `M9DocTypes` type + the `Configure(StoreOptions)`
+  signature, both preserved verbatim; the *file* the registration call
+  belongs in is determined by the actual codebase shape, which the entry
+  reads are the authority for (the design doc §2.1 text says "the U01 entry
+  reads are the authority for the exact current lines").
+- **(c) `ParticipantA < ParticipantB` normalization rule, as written:** the
+  design doc §2.1 comment on `Conversation.ParticipantA` /
+  `ParticipantB` says **`min(actorId, otherId)` / `max(actorId, otherId)`**
+  (string compare) — U03's `OpenConversationAsync` **must** sort the pair
+  before storing so the unordered pair has exactly one canonical form, or
+  the `convo_uidx_pair` unique index will reject a second open of the same
+  pair in the other order (F1). The index enforces it at the DB layer;
+  the sort is U03's service-side obligation, not the doc's.
+- **(d) Drift vs. the design doc:** none against the §2.1 field sets or the
+  §2.1 index list (both indexes are exactly the two §2.1 names — the unique
+  `(ParticipantA, ParticipantB)` on `Conversation` and the
+  `(ConversationId, Created)` on `Message`). One **naming** choice the
+  design doc left open: the design doc names the unique index by its
+  columns only ("a unique index on `Conversation` `(ParticipantA,
+  ParticipantB)`") without a literal index name. This implementation gives
+  it an explicit short name, `convo_uidx_pair`, mirroring the
+  `M3DocTypes` `ann_tr_uidx_ann_lang` explicit-name precedent (the
+  auto-derived `mt_doc_conversation_uidx_participant_aparticipant_b`
+  is 46 chars — within Postgres's 64-char NAMEDATALEN limit, so it is not
+  *required* here, but it is the codebase's consistent shape for a
+  business-key unique index on a new surface, and it keeps the name short
+  and greppable). The `Message` index keeps the auto-derived name (the
+  M6 `Notification` `(RecipientId, Created)` feed index does too).
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green (5 projects,
+  zero errors, zero warnings on the new files). No test in this unit —
+  U03 owns the first M9 test. `M9DocTypes` compiles; both the dev-loop
+  (`Program.cs` `AddMarten` lambda) and the all-env apply path
+  (`SchemaBootstrap.ApplyAsync` → `ApplyAllConfiguredChangesToDatabaseAsync`)
+  pick the surface up automatically (the M3/M4/M5/M6 precedent).
+- **Next:** U02 (see `in-progress/messaging-u02.md`) — the `LocaleSettings`
+  `MessagingEnabled` additive bool + the two toggle seams + the one
+  `messaging.toggle` audit row.
