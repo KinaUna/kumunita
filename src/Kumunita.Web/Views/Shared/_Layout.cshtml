@@ -236,6 +236,12 @@
          data-bs-autohide / data-bs-delay attributes drive the 5 s
          auto-dismiss + fade-out. -->
     <script type="module" src="~/js/lib/flash-toast.js"></script>
+    <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
+         Kanban board + the events calendar): wires the .page-expand-toggle /
+         .page-expand-close buttons to the body.kmb-page-expanded class
+         (site.css does the filling/hiding). Self-guards on pages without
+         either button, so loading it globally is safe. -->
+    <script type="module" src="~/js/lib/expand-page.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

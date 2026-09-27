@@ -84,6 +84,15 @@
             <a href="/projects/boards" class="btn btn-link p-0 kanban-back"><kw-l key="projects.board.back">← Back to boards</kw-l></a>
         </p>
 
+        @* The full-page expand mode's close button (client/lib/expand-page.js
+           toggles body.kmb-page-expanded — the site.css rules show this ✕
+           only while expanded, pinned top-right). A plain button, not a
+           link: collapsing is client-side (no navigation). *@
+        <button type="button" class="btn btn-sm btn-outline-secondary page-expand-close" aria-pressed="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <span><kw-l key="common.exit_full_page">Exit full page</kw-l></span>
+        </button>
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -187,6 +196,17 @@
                    is the service's (F2 / F8); the view renders what the
                    service returns (C3). *@
                 <div class="d-flex align-items-center gap-2">
+                    @* The full-page expand toggle (expand-page.js's second
+                       display mode, the full-screen sibling): keeps the page
+                       in the normal viewport but hides the navbar / footer
+                       and stretches the board to fill 100% of the page body
+                       (the body.kmb-page-expanded rules in site.css). The ✕
+                       close sits above the content; Escape also collapses. *@
+                    <button type="button" class="btn btn-sm btn-outline-secondary page-expand-toggle"
+                            aria-pressed="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="common.full_page">Full page</kw-l></span>
+                    </button>
                     @* The full-screen toggle (the board is the Fullscreen API
                        element — the browser hides the rest of the page and
                        client/lib/projects-board.ts syncs the .kanban-full
