@@ -699,3 +699,129 @@ not re-derive the register.
 - **Next:** U06 (Web tests — `MessagesControllerTests` + the admin
   Get/Post pair; re-pin any `Known`-count pin to 17 per U03's drift note
   2). The plan is at `in-progress/messaging-u06.md`.
+
+## U06 — Web tests
+
+- **Files written (the 1 deliverable, exactly):**
+  1. `tests/Kumunita.Web.Tests/MessagesControllerTests.cs` (new).
+- **Harness pattern (the `AnnouncementControllerTests` setup as applied):**
+  NSubstitute stand-ins for `IMessagingService` + `IUserInfoService`;
+  `controller.ControllerContext = new ControllerContext { HttpContext }`
+  with a signed-in `ClaimsPrincipal` carrying the
+  `Kumunita.Core.Identity.ClaimTypes.Subject` claim (the
+  `KumunitaPrincipal.SubjectId` read — note `ClaimTypes` is ambiguous
+  against `System.Security.Claims.ClaimTypes`, so the tests fully-qualify
+  it); `controller.TempData = new TempDataDictionary(http,
+  new NoOpTempDataProvider())` (the
+  `AccountControllerSignupGateTests` pattern — `Send` / `Save` set
+  `TempData["info"]` on success and would NRE without it). No Postgres, no
+  Marten store, no `IDocumentStore` (neither controller consumes one).
+  `BuildMessaging(enabled)` / `BuildAdmin(enabled)` helpers set the
+  `IsMessagingEnabledAsync` stub up front. One NSubstitute gotcha hit: this
+  version has no `ThrowsAsync` on `Task<T>` — the non-participant pin
+  stubs with `.Returns(Task.FromException<ConversationDetail>(new
+  KeyNotFoundException(...)))`.
+- **The 10 test names (as written — zero renames from the plan):**
+  `Messages_Index_ToggleOff_RendersDisabled_NoListCall` ·
+  `Messages_Index_ToggleOn_RendersConversationList` ·
+  `Messages_Thread_NonParticipant_404_NoView` ·
+  `Messages_Thread_RendersMessages_WithUnreadMarkers` ·
+  `Messages_Send_PostsBody_ToService` ·
+  `Messages_Send_BlankBody_RendersError_NoServiceCall` ·
+  `Messages_Nav_ToggleOff_EntryHidden` · `Messages_Nav_ToggleOn_EntryPresent` ·
+  `AdminMessaging_Get_RendersCurrentState` ·
+  `AdminMessaging_Post_FlipsToggle_AuditedByService`.
+- **Key shapes as pinned against the shipped controllers (U04/U05
+  consumed as-is, no controller edits):**
+  - F5: `Index` toggle-off → `ViewResult` with
+    `MessagesIndexViewModel.Disabled == true`, empty `Conversations` +
+    `Candidates`, **`ListConversationsAsync` + `GetProfilesAsync` both
+    `DidNotReceive`** (the no-list-call pin — the picker read is also
+    gated by the toggle, stronger than the plan's minimum).
+  - F5 (on): `Index` toggle-on → `ListConversationsAsync(Actor, 1)`
+    received once; candidates exclude the actor (`OtherId` only) and
+    blocked profiles (the `GetProfilesAsync(verifiedOnly: false)` seam,
+    the controller's `!p.Blocked && p.SubjectId != actorId` filter);
+    `Pager == null` when `HasMore == false` (the ADR 0090 null-pager
+    one-page shape).
+  - C-M9·1: `Thread` with `GetConversationAsync` throwing
+    `KeyNotFoundException` → `NotFoundResult` (not a `ViewResult`, not a
+    403) and **`MarkReadAsync` `DidNotReceive`** (no read-state write for
+    a non-participant).
+  - D8/F3: `Thread` happy path → model carries the `ConversationRef`,
+    both `Message`s, `ActorId`, `ActorDisplayName` (the
+    `GetProfileAsync` best-effort read), `Pager == null`;
+    `MarkReadAsync(ConvoId, Actor)` received exactly once; the
+    unread-marker shape (`!mine && m.ReadBy is null` + the
+    `message.unread` badge) pinned against `Views/Messages/Thread.cshtml`
+    source (the `SearchControllerTests.ReadViewSource` pattern).
+  - Send: happy path → `RedirectResult` to `/messages/{id}` +
+    `SendAsync(ConvoId, Actor, body)` received once; blank body →
+    `Thread` view with `Error == true` and **`SendAsync` `DidNotReceive`**
+    (the check is in the controller, before the service).
+  - Nav: the two `Messages_Nav_*` pins follow the
+    `Search_NavBox_Rendered_*` precedent — the
+    `_AccountNav.cshtml` partial cannot be driven through a controller
+    substitute (it renders in the layout), so both pin the view source:
+    the `Messaging.IsMessagingEnabledAsync()` `@if` gate wraps the
+    `href="/messages"` link + the `message.nav` key, and `message.nav`
+    is registered non-empty in `KnownTranslationKeys.EnValues` (the F7
+    shape; `KnownTranslationKeys_ParityTests` enforces the four-language
+    closure). No rename of the pinned behavior — the plan's
+    "hidden/present" is pinned as "gate wraps the entry" vs "entry +
+    key present under the gate".
+  - F6: `AdminMessaging_Get_RendersCurrentState` → `ViewResult` with
+    `MessagingAdminViewModel.Enabled == true` + `IsMessagingEnabledAsync`
+    received once; `AdminMessaging_Post_FlipsToggle_AuditedByService` →
+    `RedirectToAction` to `Index` + `SetMessagingEnabledAsync(false,
+    Actor)` received exactly once (the form's value + the actor's
+    subject id — the audit row is the service's, pinned in U02's Core
+    tests, not re-pinned here).
+- **Drift (three, all record-don't-pause):**
+  1. **The sanctioned `AllKinds.Count` re-pin was NOT applied — U03's
+     drift note 2 premise is factually wrong.** U03's handoff (and the
+     U03 commit message, `ec1f795`) claim "Known grows 16 → 17". Verified
+     against the shipped code: `NotificationKinds.Known` still ends at
+     `Announcement, CommunityPost, PageChild` (16 entries) — the `ec1f795`
+     diff for `NotificationKinds.cs` adds only the `MessageNew` constant
+     (+ its doc comment), and does **not** append it to the `Known` list.
+     The `NotificationsControllerTests` `AllKinds.Count == 16` pin is
+     therefore **currently passing** (it is inside the 521/521 green run
+     below), and re-pinning it to 17 would turn a green pin red and
+     contradict the shipped registry. The design doc (§D6) mandates only
+     "one new constant on the closed set, not in `OptInKinds`" —
+     `Known`-list membership was U03's own drift decision, and it was
+     recorded but never shipped. No `message.new` toggle exists on the
+     settings page today, consistent with the 16-entry pin. **Left
+     untouched; recorded here so U07 does not re-attempt the re-pin.**
+     (If a future lane does add `message.new` to `Known`, the pin
+     follows in that lane's own unit.)
+  2. **NSubstitute `ThrowsAsync` is unavailable** in this NSubstitute
+     version for `Task<T>` return stubs — stubbed with
+     `Task.FromException` + `.Returns(...)` instead (see harness
+     pattern). Pure test-side idiom; no production impact.
+  3. **`Messages_Index_ToggleOff_RendersDisabled_NoListCall` pins more
+     than the plan's text** — the shipped controller also skips the
+     picker's `GetProfilesAsync` read on the disabled path (it returns
+     the disabled view immediately after the toggle read), so the pin
+     asserts `DidNotReceive` on both the list and the picker. This is
+     the shipped behavior pinned, not a rescope: the plan's pin is
+     "no list call", and the extra assertion only makes the F5 gate
+     stronger.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green (0 errors, 0
+  warnings). `Kumunita.Web.Tests.MessagesControllerTests` **10/10** via
+  `dotnet exec … -class "Kumunita.Web.Tests.MessagesControllerTests"`
+  (0.6s, no Docker). **Full `Kumunita.Web.Tests` assembly 521/521**
+  (13.99s, Docker up/down clean) — proves the
+  `NotificationsControllerTests` `AllKinds.Count == 16` pin stays green
+  per drift note 1 above.
+- **Not touched:** no production files (U04's `MessagesController` +
+  U05's `AdminMessagingController` consumed as-is — every pinned test
+  passed against the shipped code on the first green build, so no
+  `## U06 — Drift pause` was needed); no `NotificationKinds.cs` (drift
+  note 1 — the 16 pin is correct as shipped); no service-layer files; no
+  `IAuthorizationService`; no files outside the one deliverable.
+- **Next:** U07 (close the milestone — the roadmap flip + doc parity).
+  The plan is at `in-progress/messaging-u07.md`. **Carry the drift note 1
+  correction into the U07 close-out: do not re-pin `AllKinds.Count` to
+  17 — it is 16 in the shipped code and its pin is green.**
