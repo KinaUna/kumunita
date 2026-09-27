@@ -1,5 +1,7 @@
+using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
 
 namespace Kumunita.Core.Portability;
 
@@ -80,13 +82,43 @@ public interface IPortabilityService
 /// </summary>
 public sealed class PortabilityService(
     Marten.IDocumentStore documentStore,
+    Identity.AppDbContext appDbContext,
     UserManager<Identity.User> userManager,
+    IOptions<CommunityOptions> communityOptions,
     IMediaStore mediaStore,
     IMediaFileStore mediaFileStore) : IPortabilityService
 {
     /// <inheritdoc />
-    public Task<Stream> ExportAsync(string actorId, CancellationToken ct = default) =>
-        throw new NotImplementedException("M11 U01 shell — the export body lands in U02–U03 (the doc/principal/config loop + the media + the manifest finalize).");
+    public async Task<Stream> ExportAsync(string actorId, CancellationToken ct = default)
+    {
+        // U02 (this unit) — the docs + the no-secret principals + the config
+        // (the media bytes + the manifest finalize are U03's — the reserved
+        // seam below).
+        var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(documentStore, ct);
+        var principals = await PrincipalsExport.ExportAsync(appDbContext, userManager, documentStore, ct);
+        var config = await ConfigExport.ExportAsync(documentStore, communityOptions, ct);
+
+        // U03 — the media bytes (the `media/` section) + the manifest finalize
+        // (the `format` / `generated_at` / `community_name` / `doc_counts` /
+        // `media_manifest` head). Until U03 lands, this is a minimal
+        // placeholder (the media section empty, the manifest's doc counts
+        // populated, the media manifest empty) so the archive is
+        // structurally complete over the three U02 sections.
+        var media = new Dictionary<string, byte[]>();
+        var manifest = new PortabilityManifest
+        {
+            Format = PortabilityManifest.FormatVersion,
+            GeneratedAt = DateTimeOffset.UtcNow,
+            CommunityName = communityOptions.Value.Name,
+            DocCounts = docCounts,
+            MediaManifest = [],
+        };
+
+        var stream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
+        stream.Position = 0;
+        return stream;
+    }
 
     /// <inheritdoc />
     public Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default) =>

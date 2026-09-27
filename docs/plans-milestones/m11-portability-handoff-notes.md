@@ -403,3 +403,157 @@ Per the register's U02 entry reads (plus U01's actual seams):
   snapshot reads — the §config field set sources).
 - `src/Kumunita.Core/Media/MediaObject.cs` (the catalog shape the
   `docCounts["MediaObject"]` entry + the U03 media loop read).
+
+---
+
+## U02 — Export: documents + the no-secret principals + the config
+
+### Exit status
+
+`dotnet build Kumunita.slnx -c Debug` → **green** (Core + Web; the two
+`CS9113: Parameter … is unread` warnings on `PortabilityService`'s
+`mediaStore` / `mediaFileStore` are expected — U03 consumes them).
+`Kumunita.Web.Tests` → **528 total, 0 failed**.
+`Kumunita.Core.Tests` → **956 total, 0 failed**.
+
+### Files written
+
+- **Created** `src/Kumunita.Core/Portability/PortabilityExportDocuments.cs`
+  — the registry loop (D7 / C-M11·4/5): iterates
+  `PortabilityDocTypes.InOrder()` (44 entries), dispatches
+  `IQuerySession.Query<T>()` + `Marten.QueryableExtensions.ToListAsync<T>()`
+  via reflection (`QueryMethod.MakeGenericType(docType)` +
+  `ToListAsyncMethod.MakeGenericMethod(docType)`), serializes each
+  `List<T>` to a JSON array via
+  `JsonSerializer.SerializeToUtf8Bytes(list, typeof(List<>).MakeGenericType(docType), JsonOpts)`,
+  and returns `(Dictionary<string, byte[]> Docs, Dictionary<string, int> DocCounts)`.
+- **Created** `src/Kumunita.Core/Portability/PrincipalsExport.cs` —
+  the no-secret principals extractor (D3 / C-M11·2): reads
+  `AppDbContext.Users` (EF Core, the principal source), `Profile` docs
+  (Marten, for `DisplayName` / `Verified` / `Blocked`),
+  `UserManager.GetRolesAsync(user)` (the standing), and projects only the
+  eight allowed §principals fields into `PortabilityPrincipal`.
+- **Created** `src/Kumunita.Core/Portability/ConfigExport.cs` — the
+  config snapshot (D2 / §config): reads `CommunityOptions` (via
+  `IOptions<CommunityOptions>`), `LocaleSettings` singleton (Marten),
+  `LanguageCatalog` rows (Marten), and projects into the `PortabilityConfig`
+  POCO set.
+- **Modified** `src/Kumunita.Core/Portability/PortabilityService.cs` —
+  filled the `ExportAsync` body (composes the three above +
+  `KumunitaArchive.WriteAsync`); added `AppDbContext` +
+  `IOptions<CommunityOptions>` to the ctor (6 parameters total).
+  `ImportAsync` still throws `NotImplementedException` (U05–U06).
+- **Modified** `src/Kumunita.Core/DependencyInjection.cs` — the
+  `IPortabilityService` factory now resolves `AppDbContext` +
+  `IOptions<CommunityOptions>` and passes them to the ctor.
+
+### Registry entry count (the loop size)
+
+**44 entries.** The loop iterates `PortabilityDocTypes.InOrder()` —
+orders 1→44 in the 9 locked order-groups. One `docs/{Type}.json` (a JSON
+array of the POCO rows) is emitted per entry + one `docCounts` row
+(type name → row count).
+
+### Principals field set (the C-M11·2 locked eight)
+
+The `PortabilityPrincipal` POCO carries exactly these fields — **no
+other**:
+
+| Field | Source |
+|-------|--------|
+| `SubjectId` | `User.Id` (EF Core `AppDbContext.Users`) |
+| `Username` | `User.UserName` |
+| `Email` | `User.Email` |
+| `NormalizedEmail` | `User.NormalizedEmail` |
+| `DisplayName` | `Profile.DisplayName` (Marten, nullable) |
+| `Verified` | `Profile.Verified ?? false` |
+| `Blocked` | `Profile.Blocked ?? false` |
+| `Roles` | `UserManager.GetRolesAsync(user)` (the standing) |
+
+**Credential columns confirmed dropped (C-M11·2 source boundary):**
+`PasswordHash`, `SecurityStamp`, `AccessToken`, `RefreshToken`,
+`RecoveryCode`, Identity sign-in record — the projection **never reads**
+these; the `PortabilityPrincipal` POCO has no such field.
+
+### Config field set (the §config locked shape)
+
+| POCO | Fields |
+|------|--------|
+| `PortabilityConfigCommunity` | `Name` (`CommunityOptions.Name`), `SupportEmail` (`CommunityOptions.SupportEmail`) |
+| `PortabilityConfigLocale` | `DefaultLanguageCode`, `DefaultTimezone`, `DefaultDateFormat`, `IsSignupOpen`, `NotifyAdminsOnSignup`, `AnnouncementCommentsEnabled`, `MessagingEnabled` (all from the `LocaleSettings` singleton) |
+| `PortabilityConfigLanguage` | `Id`, `NativeName`, `Enabled`, `SortOrder` (every `LanguageCatalog` row, ordered by `SortOrder`) |
+
+### `PortabilityService` ctor + `ExportAsync` (as written)
+
+```csharp
+public sealed class PortabilityService(
+    Marten.IDocumentStore documentStore,
+    Identity.AppDbContext appDbContext,
+    UserManager<Identity.User> userManager,
+    IOptions<CommunityOptions> communityOptions,
+    IMediaStore mediaStore,
+    IMediaFileStore mediaFileStore) : IPortabilityService
+```
+
+`ExportAsync` body:
+
+```csharp
+var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(documentStore, ct);
+var principals = await PrincipalsExport.ExportAsync(appDbContext, userManager, documentStore, ct);
+var config = await ConfigExport.ExportAsync(documentStore, communityOptions, ct);
+
+// U03 placeholder — media bytes + manifest finalize land there.
+var media = new Dictionary<string, byte[]>();
+var manifest = new PortabilityManifest
+{
+    Format = PortabilityManifest.FormatVersion,
+    GeneratedAt = DateTimeOffset.UtcNow,
+    CommunityName = communityOptions.Value.Name,
+    DocCounts = docCounts,
+    MediaManifest = [],
+};
+
+var stream = new MemoryStream();
+await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
+stream.Position = 0;
+return stream;
+```
+
+### Drift from the plan's text
+
+1. **`UserManager.GetAllAsync()` does not exist** in .NET 10's
+   `UserManager<TUser>` — the principal source is `AppDbContext.Users`
+   (the EF Core `IQueryable<User>` on the `identity` schema). The ctor
+   gains `AppDbContext` (not in U01's four-parameter shell); DI updated
+   accordingly.
+2. **`ToListAsync` ambiguity** — `Marten.QueryableExtensions.ToListAsync<T>`
+   and `Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.
+   ToListAsync<TSource>` collide when both `using`s are in scope
+   (CS0121). Resolution: `PrincipalsExport.cs` drops
+   `using Microsoft.EntityFrameworkCore;` and fully-qualifies the EF Core
+   call; `PortabilityExportDocuments.cs` dispatches Marten's
+   `ToListAsync<T>` via reflection (no `using` collision at all).
+
+### Compile warnings
+
+- 2× `CS9113: Parameter '…' is unread` on `PortabilityService`'s
+  `mediaStore` / `mediaFileStore` — **expected** (U03 consumes them; the
+  warning disappears when the media loop lands).
+- The 2 U01 `CS9113` warnings on `documentStore` / `userManager` are now
+  **resolved** (the `ExportAsync` body reads both).
+- No other new warnings in `Kumunita.Core` / `Kumunita.Web`.
+- **No new packages.** `Kumunita.Core.csproj` is untouched.
+
+### Next unit's entry reads (U03 — media bytes + manifest finalize)
+
+Per the register's U03 entry reads:
+- `src/Kumunita.Core/Media/IMediaStore.cs` + `IMediaFileStore.cs` +
+  `MediaObject.cs` (the `contentId` → `GetBytesAsync` / `ReadAsync` seam
+  + the `{Id[0..2]}/{Id}` layout).
+- `src/Kumunita.Core/Portability/KumunitaArchive.cs` — `WriteAsync`
+  signature (the `media` dict + the `MediaManifest` list U03 populates).
+- `src/Kumunita.Core/Portability/PortabilityService.cs` — the U02
+  placeholder (`var media = new Dictionary<string, byte[]>();` +
+  `MediaManifest = []`) U03 replaces.
+- `docs/design/m11-portability-design.md` — §layout (`media/` section
+  pin), §manifest (`media_manifest` entry shape).

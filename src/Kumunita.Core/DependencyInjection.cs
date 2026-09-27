@@ -308,7 +308,9 @@ public static class ServiceCollectionExtensions
         // IPortabilityService verbatim.
         services.AddTransient<IPortabilityService>(sp => new PortabilityService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Identity.AppDbContext>(),
             sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>(),
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CommunityOptions>>(),
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<IMediaFileStore>()));
 
