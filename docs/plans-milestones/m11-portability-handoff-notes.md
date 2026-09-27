@@ -211,3 +211,195 @@ Per the register's U01 entry reads:
 - `src/Kumunita.Core/Kumunita.Core.csproj` — confirm **no new package** is
   needed (the BCL `System.IO.Compression` is in the framework; D2's "no new
   package" pin).
+
+---
+
+## U01 — Framework: the `Portability` context, manifest model, inventory registry, archive (de)serializer
+
+### Files written
+
+- `src/Kumunita.Core/Portability/PortabilityManifest.cs` (new) — the
+  `manifest.json` POCO set (`PortabilityManifest` +
+  `PortabilityMediaEntry`) + the `FormatVersion` constant
+  `kumunita/portability/1`.
+- `src/Kumunita.Core/Portability/PortabilityDocTypes.cs` (new) — the D7
+  closed inventory registry: `PortabilityReferenceField` record
+  (with the `PrincipalTarget` / `LanguageCatalogTarget` /
+  `MultiKindTarget` constants), `PortabilityDocEntry` record, and the
+  static `PortabilityDocTypes` class (the `Entries` list, `Count`,
+  `ByType`, `InOrder()`, `TryGet()`).
+- `src/Kumunita.Core/Portability/KumunitaArchive.cs` (new) — the archive
+  (de)serializer: the `KumunitaArchive` static class (the
+  `WriteAsync` / `ReadAsync` / `ToJson<T>` / `FromJson<T>` /
+  `MediaEntryName` / `MediaIdFromEntryName` surface) + the §principals
+  POCO (`PortabilityPrincipal` — the C-M11·2 field-shape pin: no
+  hash/stamp/token field) + the §config POCO set (`PortabilityConfig` /
+  `PortabilityConfigCommunity` / `PortabilityConfigLocale` /
+  `PortabilityConfigLanguage`) + the `KumunitaArchiveData` deserialized
+  record.
+- `src/Kumunita.Core/Portability/PortabilityService.cs` (new) — the
+  `IPortabilityService` interface (the `ExportAsync` / `ImportAsync`
+  locked signatures), the `PortabilityImportResult` record (the §validate
+  closed-failure-set contract + the `Success` static), and the
+  `PortabilityService` shell (ctor + `NotImplementedException` bodies —
+  U02–U06 fill them).
+- `src/Kumunita.Core/DependencyInjection.cs` — the `Portability` using +
+  the `IPortabilityService` → `PortabilityService` registration (next to
+  the Search registration, before `return services`). The registry +
+  serializer are **static** (pure data / pure functions) — no DI entry is
+  needed or wanted for them; the only registration is the service shell.
+
+### Registry entry count (the D7 list length, so U02/U05 know the loop size)
+
+**44 entries.** Orders 1–44, in the 9 locked order-groups from §inventory
+(copied verbatim into `PortabilityDocTypes.Entries`):
+
+- **Order 1** (base units): `Group` (1), `Component` (2), `MediaObject`
+  (3), `Tag` (4)
+- **Order 2** (the identity graph): `Profile` (5), `DelegationGrant`
+  (6), `GuardianLink` (7), `GroupMembership` (8), `GroupInvitation`
+  (9), `GroupJoinRequest` (10), `ModeratorAssignment` (11),
+  `ComponentMembership` (12)
+- **Order 3** (the M1 translations): `TranslationResource` (13),
+  `GroupTranslation` (14), `CommunityTranslation` (15), `TagTranslation`
+  (16)
+- **Order 4** (the M3 content): `Post` (17), `PostReply` (18),
+  `PostTranslation` (19), `ReplyTranslation` (20), `Report` (21),
+  `Announcement` (22), `AnnouncementTranslation` (23),
+  `AnnouncementComment` (24)
+- **Order 5** (the M4 content): `Event` (25), `EventRsvp` (26),
+  `EventTranslation` (27)
+- **Order 6** (the M5/PL content): `ProjectGoal` (28), `Project` (29),
+  `TodoItem` (30), `KanbanBoard` (31), `KanbanLane` (32),
+  `BoardItemPlacement` (33), `TodoTranslation` (34), `BoardTranslation`
+  (35), `ProjectTranslation` (36), `TodoComment` (37)
+- **Order 7** (the M6 content): `Notification` (38),
+  `NotificationPreference` (39), `NotificationSubscription` (40)
+- **Order 8** (the M9 content): `Conversation` (41), `Message` (42)
+- **Order 9** (the PG content): `Page` (43), `PageTranslation` (44)
+
+The five excluded docs (`IdentityToken`, `OutboxEmail`,
+`EmailDeadLetter`, `AccessAudit`, `AuditPurgeSummary`) and the
+`config.json`-carried state (`LocaleSettings` / `LanguageCatalog`) are
+**not** entries (§inventory "Excluded" + drift guard entries 1–4). The
+`ReferenceFields` per entry are the §inventory table's "Reference fields"
+column verbatim: `→ principal` fields are `Target = "principal"`;
+`→ LanguageCatalog` fields are `Target = "LanguageCatalog"`; the
+kind-dependent `TargetId` (Notification / NotificationSubscription) is
+`Target = "Component|Group|Page|Announcement"` (`MultiKindTarget`); the
+list-valued fields (`ImageIds` / `TagIds`) have `IsArray = true`; the
+doc-type targets carry the type name (e.g. `"MediaObject"`, `"Post"`).
+**Note for U05:** the `Nullable` annotation in §inventory ("(nullable)")
+is *not* encoded in the registry data — the integrity loop must treat an
+absent/null field value as a satisfied reference (skip), not a dangling
+one. The `Target` / `IsArray` / `Field` triple is the full reference map
+U05's data-driven loop consumes.
+
+### `PortabilityService` ctor + method signatures (as written — U02–U06 copy verbatim)
+
+```csharp
+public interface IPortabilityService
+{
+    Task<Stream> ExportAsync(string actorId, CancellationToken ct = default);
+    Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default);
+}
+
+public sealed class PortabilityService(
+    Marten.IDocumentStore documentStore,
+    UserManager<Identity.User> userManager,
+    IMediaStore mediaStore,
+    IMediaFileStore mediaFileStore) : IPortabilityService
+```
+
+(plus the `PortabilityImportResult(bool Ok, IReadOnlyList<string> Failures)`
+record with a `Success` static — the §validate closed-failure-set shape).
+Both methods currently throw `NotImplementedException` (U02–U04 fill
+`ExportAsync`; U05–U06 fill `ImportAsync`). `actorId` is the GlobalAdmin
+actor's `subjectId` for the one-audit-row the service emits (U04/U06).
+
+### `KumunitaArchive` public surface (the write/read entry points)
+
+```csharp
+public static class KumunitaArchive
+{
+    public const string ManifestPath   = "manifest.json";
+    public const string PrincipalsPath = "identity/principals.json";
+    public const string ConfigPath     = "config.json";
+    public const string DocsPrefix     = "docs/";
+    public const string MediaPrefix    = "media/";
+
+    public static string MediaEntryName(string contentId);              // "media/{Id[0..2]}/{Id}"
+    public static string MediaIdFromEntryName(string entryName);        // the inverse
+    public static byte[] ToJson<T>(T value);
+    public static T? FromJson<T>(byte[] json);
+    public static Task WriteAsync(Stream stream, PortabilityManifest manifest,
+        IReadOnlyDictionary<string, byte[]> docs,
+        IReadOnlyDictionary<string, byte[]> media,
+        byte[] principals, byte[] config, CancellationToken ct = default);
+    public static Task<KumunitaArchiveData> ReadAsync(Stream stream, CancellationToken ct = default);
+}
+```
+
+`KumunitaArchiveData` (the `ReadAsync` output): `Manifest` (nullable
+until the entry is seen — `ReadAsync` throws `InvalidDataException` if
+`manifest.json` is absent), `Docs` (type name → array bytes, ordinal),
+`Media` (content id → payload bytes, ordinal), `Principals` + `Config`
+(the raw section bytes — the U02/U05/U06 loops deserialize them via
+`FromJson<T>`).
+
+### `format` version string
+
+**`kumunita/portability/1`** — `PortabilityManifest.FormatVersion`.
+
+### Compile warnings
+
+- 4× `CS9113: Parameter '…' is unread` on `PortabilityService`'s ctor
+  parameters (`documentStore`, `userManager`, `mediaStore`,
+  `mediaFileStore`) — **expected**: the shell's bodies are
+  `NotImplementedException`; U02–U06 consume them. No suppression added
+  (the warning disappears as the bodies land).
+- No other new warnings in `Kumunita.Core` / `Kumunita.Web`.
+- **No new packages** (the BCL `System.IO.Compression.ZipArchive` +
+  `System.Text.Json` are in the .NET 10 framework; D2's "no new package"
+  pin holds — `Kumunita.Core.csproj` is untouched).
+- `dotnet build Kumunita.slnx -c Debug` **green** (Core + Web).
+- `Kumunita.Web.Tests` suite: **528 total, 0 failed** (the NSubstitute
+  no-Postgres pins are unaffected by the new context).
+
+### Smoke (not a pinned test — the real tests are U07's)
+
+A scratch `.tmp/smoke/` project (deleted after the green run) exercised
+the machinery end-to-end in-process:
+
+- `WriteAsync` → `ReadAsync` round-trip over a manifest + one
+  `docs/Post.json` + one media entry + principals + config — **28/28
+  checks green** (manifest fields incl. `doc_counts` + `media_manifest`;
+  the `docs/` + `media/` + `identity/` + `config` sections; the
+  `PortabilityPrincipal` + `PortabilityConfig` JSON round-trips).
+- `PortabilityDocTypes.Count == 44`; `ByType["Post"].Order == 17`;
+  `InOrder()` spans 1→44; `TryGet` present/absent.
+- `MediaEntryName("abc123def456") == "media/ab/abc123def456"` + the
+  inverse (the C-M11·3 layout pin mirrors `LocalVolumeFileStore`'s
+  `{root}/{Id[0..2]}/{Id}`).
+
+### Next unit's entry reads (U02 — Export: documents + the no-secret principals + the config)
+
+Per the register's U02 entry reads (plus U01's actual seams):
+- `docs/design/m11-portability-design.md` — §principals (the locked
+  no-secret field set + the **excluded** credential fields), §config
+  (the locked config field set), §manifest (the doc-count source).
+- `src/Kumunita.Core/Portability/PortabilityService.cs` +
+  `PortabilityDocTypes.cs` + `KumunitaArchive.cs` (U01's shell +
+  registry + serializer — the seam U02 fills; the §config POCOs live in
+  `KumunitaArchive.cs`, the §principals POCO likewise).
+- `src/Kumunita.Core/Identity/IdentityService.cs` + `User.cs` (the
+  `UserManager<User>` / `User` shape U02 extracts from, and the
+  **excluded** credential fields — `PasswordHash` / `SecurityStamp` —
+  to confirm are dropped; `UserManager.GetAllAsync()` is the principal
+  source, `GetRolesAsync` the standing).
+- `src/Kumunita.Core/Localization/LanguageCatalog.cs` +
+  `src/Kumunita.Core/CommunityOptions.cs` (the `LocaleSettings` +
+  `LanguageCatalog` + `CommunityOptions` state the `config.json`
+  snapshot reads — the §config field set sources).
+- `src/Kumunita.Core/Media/MediaObject.cs` (the catalog shape the
+  `docCounts["MediaObject"]` entry + the U03 media loop read).

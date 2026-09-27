@@ -133,28 +133,34 @@ function isAllowlistedShellRequest(event) {
  *    that 404s/403s is never cached).
  */
 function staleWhileRevalidate(request) {
+  // `cache` must live in the OUTER callback's scope: it is opened once, then
+  // referenced by both the nested hit and miss handlers below. A chain like
+  // `.then((cache) => cache.match(request)).then((cached) => …)` would drop
+  // `cache` out of scope before the `.put` calls -> ReferenceError -> the
+  // `respondWith` promise rejects -> net::ERR_FAILED on every shell asset.
   return caches
     .open(CACHE_NAME)
-    .then((cache) => cache.match(request))
-    .then((cached) => {
-      if (cached) {
-        return fetch(request)
-          .then((fresh) => {
-            if (fresh && fresh.ok && isSameOriginResponse(fresh)) {
-              cache.put(request, fresh).catch(() => {});
-            }
-            return cached;
-          })
-          .catch(() => cached);
-      }
-
-      return fetch(request).then((fresh) => {
-        if (fresh && fresh.ok && isSameOriginResponse(fresh)) {
-          cache.put(request, fresh.clone()).catch(() => {});
+    .then((cache) =>
+      cache.match(request).then((cached) => {
+        if (cached) {
+          return fetch(request)
+            .then((fresh) => {
+              if (fresh && fresh.ok && isSameOriginResponse(fresh)) {
+                cache.put(request, fresh).catch(() => {});
+              }
+              return cached;
+            })
+            .catch(() => cached);
         }
-        return fresh;
-      });
-    });
+
+        return fetch(request).then((fresh) => {
+          if (fresh && fresh.ok && isSameOriginResponse(fresh)) {
+            cache.put(request, fresh.clone()).catch(() => {});
+          }
+          return fresh;
+        });
+      })
+    );
 }
 
 function isSameOriginResponse(response) {

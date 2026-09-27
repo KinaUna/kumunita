@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Portability;
 using Kumunita.Core.UserInfo;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -295,6 +296,21 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<IUserInfoService>()));
+
+        // M11 (ADR 0108, plan U01): the Portability context's service shell
+        // (bounded context Kumunita.Core.Portability — the operator plane,
+        // not a content-decision lane — C-M11·7: zero new AccessAction /
+        // AccessVia / IAuthorizationService branch / Audience). The service
+        // composes only the frozen seams: IDocumentStore (Marten, the domain
+        // docs), UserManager (Identity, the principals), IMediaStore /
+        // IMediaFileStore (the content-addressed bytes). U01 ships signatures
+        // only (the bodies are U02–U06); the Web surface + U07 tests target
+        // IPortabilityService verbatim.
+        services.AddTransient<IPortabilityService>(sp => new PortabilityService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>(),
+            sp.GetRequiredService<IMediaStore>(),
+            sp.GetRequiredService<IMediaFileStore>()));
 
         return services;
     }
