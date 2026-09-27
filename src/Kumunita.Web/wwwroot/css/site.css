@@ -455,6 +455,32 @@ body.kmb-page-fullbleed .navbar {
   font-weight: 600;
 }
 
+/* Responsive (mobile-first): on a narrow phone the single flex row squishes
+   the text between the badge and the fixed-width links. Stack it instead —
+   the badge and title/body preview flow at the top, and the "Read more" /
+   "All announcements" actions sit on their own row (the close button stays
+   at the far right of that row). Only the preview span (`.me-auto`) takes
+   the full row — the badge stays its natural width. */
+@media (max-width: 767.98px) {
+  .kumunita-pinned-announcement .d-flex {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+  }
+  .kumunita-pinned-announcement .d-flex .me-auto {
+    flex: 1 1 100%;
+    order: 1;
+  }
+  .kumunita-pinned-announcement .d-flex .badge {
+    order: 0;
+  }
+  .kumunita-pinned-announcement .d-flex .btn {
+    order: 2;
+  }
+  .kumunita-pinned-announcement .d-flex .btn-close {
+    order: 3;
+  }
+}
+
 /* --- Badges ------------------------------------------------------------------ */
 .badge {
   font-family: var(--bs-heading-font-family);
