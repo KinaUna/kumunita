@@ -810,6 +810,22 @@ carries the per-unit entries):
   number confirmed free: **0107** (the index ran 0001–0106; `0106` is
   the to-do self-assign lane, the current highest — verified against
   `docs/adr/README.md`).
+- **U06 (2026-09-27) — the Playwright spec is authored + the
+  author-not-run precedent recorded, not run.** The 9 Playwright
+  pins in `e2e-pwa-responsive.spec.ts` are authored with the
+  selectors + route pins grounded against the shipped `.cshtml`, but
+  the `kumunita` fixture remains a documented throw (the M2 D2
+  precedent, re-confirmed — no M10 unit U0–U05 implements the
+  runtime). The register § U06 Exit permits this path (the spec is
+  *authored + the precedent recorded*, not retried). The *structural*
+  half of every pin is exercised by the 7 xUnit pins in
+  `PwaManifestTests` (U06 adds the 2 remaining:
+  `Pwa_Install_Kw_L_Key_Registered_In_All_Four_Languages` (D10) +
+  `Site_Css_Media_Block_Boundary_Pinned` (D6, the four + one
+  `@media` baseline, locked)); the *behavioral* half (this spec) is
+  the witness the Playwright runtime unit records when the `kumunita`
+  fixture's `signup` / `login` are implemented. See
+  `m10-pwa-handoff-notes.md` § U06.
 
 ## §the three acceptance tests (template)
 

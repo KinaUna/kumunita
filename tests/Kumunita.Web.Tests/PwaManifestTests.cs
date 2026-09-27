@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Kumunita.Core.Localization;
 using Xunit;
 
 namespace Kumunita.Web.Tests;
@@ -257,6 +258,79 @@ public class PwaManifestTests
             .Where(l => l.StartsWith("/"))
             .ToList();
         return paths;
+    }
+
+    // ── U06 pins (D10 + D6) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// U06 / D10 — the <c>pwa.install</c> key is registered in all four
+    /// languages with the design doc §install's locked strings (en / de /
+    /// fr / da). The U03 install module (<c>wwwroot/js/pwa-install.ts</c>)
+    /// reads exactly this key to label the "Install app" button (the D10
+    /// single-closed-key contract); a missing or renamed key would leave
+    /// the button blank or in the wrong language. This is the xUnit
+    /// witness for the key's registration; the Playwright spec's
+    /// behavioral witness (the rendered button text in Chromium) is the
+    /// author-not-run one (the M3 U13 / M4 U11 / TG U9 precedent, the
+    /// <c>kumunita</c> fixture's documented throw).
+    /// </summary>
+    [Fact(DisplayName = "M10 U06: pwa.install key registered in all four languages (D10)")]
+    public void Pwa_Install_Kw_L_Key_Registered_In_All_Four_Languages()
+    {
+        const string key = "pwa.install";
+
+        // The design doc §install's locked strings (D10).
+        Assert.True(KnownTranslationKeys.EnValues.ContainsKey(key),
+            $"en: key '{key}' is not in KnownTranslationKeys.EnValues — the D10 single-closed-key contract requires it.");
+        Assert.Equal("Install app", KnownTranslationKeys.EnValues[key]);
+
+        Assert.True(KnownTranslationKeys.DeValues.ContainsKey(key),
+            $"de: key '{key}' is not in KnownTranslationKeys.DeValues — the D10 single-closed-key contract requires it.");
+        Assert.Equal("App installieren", KnownTranslationKeys.DeValues[key]);
+
+        Assert.True(KnownTranslationKeys.FrValues.ContainsKey(key),
+            $"fr: key '{key}' is not in KnownTranslationKeys.FrValues — the D10 single-closed-key contract requires it.");
+        Assert.Equal("Installer l'application", KnownTranslationKeys.FrValues[key]);
+
+        Assert.True(KnownTranslationKeys.DaValues.ContainsKey(key),
+            $"da: key '{key}' is not in KnownTranslationKeys.DaValues — the D10 single-closed-key contract requires it.");
+        Assert.Equal("Installér app", KnownTranslationKeys.DaValues[key]);
+    }
+
+    /// <summary>
+    /// U06 / D6 — the <c>site.css</c> media-block boundary is pinned to
+    /// the U00–U05 baseline: exactly <b>four</b> <c>@media (max-width:
+    /// 767.98px)</c> blocks + <b>one</b> <c>@media (prefers-reduced-motion:
+    /// reduce)</c> block, for a total of <b>five</b> <c>@media</c>
+    /// occurrences. No M10 unit (U01–U05) introduced a new media boundary;
+    /// this pin holds that. A count change without a recorded drift-guard
+    /// entry is a breach (the design doc §drift-guard frozen pin #7).
+    /// </summary>
+    [Fact(DisplayName = "M10 U06: site.css media-block boundary pinned (D6)")]
+    public void Site_Css_Media_Block_Boundary_Pinned()
+    {
+        var cssPath = Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "css", "site.css");
+        Assert.True(File.Exists(cssPath), $"site.css not found at {cssPath}.");
+        var css = File.ReadAllText(cssPath);
+
+        // The four width blocks (the U00–U05 baseline — the U00 drift
+        // note (a) corrected the register's "six" to four; this pin
+        // holds four).
+        var widthBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*767\.98px\)");
+        Assert.True(widthBlocks.Count == 4,
+            $"Expected exactly 4 '@media (max-width: 767.98px)' blocks (the U00–U05 baseline); found {widthBlocks.Count}.");
+
+        // The one reduced-motion block.
+        var motionBlocks = Regex.Matches(css, @"@media\s*\(prefers-reduced-motion:\s*reduce\)");
+        Assert.True(motionBlocks.Count == 1,
+            $"Expected exactly 1 '@media (prefers-reduced-motion: reduce)' block; found {motionBlocks.Count}.");
+
+        // The total @media count is five (four + one) — the "no new
+        // boundary" witness (the design doc §drift-guard frozen pin #7:
+        // "a count change without a recorded entry is a breach").
+        var allMedia = Regex.Matches(css, @"@media");
+        Assert.True(allMedia.Count == 5,
+            $"Expected exactly 5 '@media' occurrences total (4 width + 1 reduced-motion); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

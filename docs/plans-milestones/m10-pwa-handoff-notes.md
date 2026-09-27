@@ -1099,3 +1099,152 @@ reads — it does not re-derive the register.
   "split-view" is a 1-column-only layout (no 2-column desktop state
   exists) — the spec's assertion is `grid-template-columns: 1fr` (the
   pin), not a 2→1 collapse.
+
+## U06 — tests: the 9 Playwright pins + the 2 xUnit pins (author + record)
+
+- **Files written / changed:**
+  - `tests/Kumunita.Web.Tests/e2e-pwa-responsive.spec.ts` (**new**) —
+    the 9 pinned Playwright tests across 5 `test.describe` blocks
+    (§1 manifest + icons, §2 SW registered, §3 offline shell, §4
+    signed-in negative pin, §5 the 360-px viewport pass + the two
+    a11y floors). The header (the first ~90 lines) carries the
+    author-not-run disclosure verbatim + the route/selector pins
+    grounded against the actual `.cshtml`. The `kumunita` fixture is
+    a **documented throw** (the M2 D2 precedent, re-confirmed) — the
+    same shape as `e2e-m2.spec.ts` / `e2e-m3.spec.ts` /
+    `e2e-m4.spec.ts` / `e2e-tags.spec.ts`. The 4 signed-in tests
+    (§3's offline test does *not* need the fixture; §4 + the 3 §5
+    tests do) wrap `kumunita.login(...)` in a try/catch that
+    re-throws a **descriptive author-not-run error** so the spec's
+    output is self-documenting (the M3 U13 / M4 U11 / TG U9
+    precedent).
+  - `tests/Kumunita.Web.Tests/PwaManifestTests.cs` (**extended, not
+    rewritten**) — 2 new `[Fact]` pins added after U02's two (the
+    U01 3 + U02 2 = 5 existing pins are **untouched**):
+    `Pwa_Install_Kw_L_Key_Registered_In_All_Four_Languages` (D10) +
+    `Site_Css_Media_Block_Boundary_Pinned` (D6). One `using
+    Kumunita.Core.Localization;` added (for
+    `KnownTranslationKeys`).
+
+- **The 9 pinned test names (F1–F7 witness, verbatim):**
+  1. `Manifest_Fetch_And_Shape` (F1 / C-M10·1) — §1.
+  2. `Icons_200_And_Correct_Dimensions` (F1 / C-M10·1) — §1.
+  3. `ServiceWorker_Registered_In_Chromium` (F1 / C-M10·3) — §2.
+  4. `Offline_Shell_Revisit_Of_Root_Renders` (F2 / C-M10·1/2) — §3.
+  5. `SignedIn_Route_Not_In_ServiceWorker_Cache` (C-M10·2) — §4.
+  6. `Viewport_360px_Navbar_AccountNav_FlashToast_PinnedAnnouncement_Footer_No_Overflow`
+     (F3 / C-M10·4) — §5, the U04 half.
+  7. `Viewport_360px_PostReplyCard_GroupCard_Calendar_Kanban_WYSIWYG_No_Overflow`
+     (F3 / C-M10·4) — §5, the U05 half.
+  8. `TouchTargets_44px_Floor_Holds_At_360px` (F4 / C-M10·5a, D8a)
+     — §5, the Floor A closed list.
+  9. `FocusVisible_Holds_On_Kmb_Custom_Pieces` (F4 / C-M10·5b, D8b)
+     — §5, the Floor B closed list.
+
+- **The 2 new xUnit pins (verbatim intent):**
+  - `Pwa_Install_Kw_L_Key_Registered_In_All_Four_Languages` (D10) —
+    asserts `pwa.install` is present in all four
+    `KnownTranslationKeys` maps with the design doc §install's
+    locked strings: en `"Install app"`, de `"App installieren"`,
+    fr `"Installer l'application"`, da `"Installér app"`. Uses
+    `Assert.True(dict.ContainsKey(key), msg)` + the 2-arg
+    `Assert.Equal` (the xUnit v3 house idiom — the 3-arg
+    `Assert.Equal(..., message)` overload is removed).
+  - `Site_Css_Media_Block_Boundary_Pinned` (D6) — reads `site.css`,
+    asserts **exactly 4** `@media (max-width: 767.98px)` blocks +
+    **exactly 1** `@media (prefers-reduced-motion: reduce)` block +
+    **exactly 5** total `@media` occurrences (the U00–U05 baseline,
+    "no new boundary" witness — the design doc §drift-guard frozen
+    pin #7). Uses `Regex.Matches(...).Count` + `Assert.True(count ==
+    N, msg)`.
+
+- **`@media` count as left (four + one — the D6 baseline,
+  unchanged):** `site.css` carries exactly four width blocks
+  (lines 578, 1492, 1833, 2263) + one reduced-motion block (line
+  1143), five total. U06 **introduced no new media boundary** — the
+  pin holds the U00–U05 baseline. (The U00 drift note (a) already
+  corrected the register's "six" to four; this pin locks four.)
+
+- **Author-not-run precedent (invoked verbatim, the spec header's
+  first ~5 lines):**
+  > STATUS (honest — per U06's own entry read, mirroring the M3 U13 /
+  > M4 U11 / TG U9 author-not-run precedent):
+  >   Authored against the *shipped* M1–M10 UI (selectors + route
+  >   pins are grounded against the actual .cshtml — the header block
+  >   below lists them). NOT yet runnable: the *M2 D2* documented-
+  >   throw is re-confirmed here (the `kumunita` fixture is a
+  >   documented throw in e2e-m2.spec.ts, e2e-m3.spec.ts,
+  >   e2e-m4.spec.ts, AND this file, and no M10 unit — U0 through
+  >   U05 — implements the runtime).
+
+- **Spec run-status:** **authored + the precedent recorded** —
+  **not** run. The register § U06 Exit explicitly permits this path
+  ("if the auth runtime is still absent, the spec is *authored + the
+  precedent recorded* … not retried"). The *structural* half of
+  every pin is already exercised by the 7 xUnit pins in
+  `PwaManifestTests` (the manifest's JSON shape, the icon dimensions,
+  the SW file's same-origin + allowlist, and the two new U06 pins);
+  the *behavioral* half (this spec) is the witness the Playwright
+  runtime unit records when the `kumunita` fixture's `signup` /
+  `login` are implemented.
+
+- **Drift pauses carried forward (from U04/U05, now wired into the
+  spec's assertions — not re-fixed, just witnessed):**
+  - **`elementFromPoint` is the authoritative hit-area witness, not
+    `page.mouse.click`** — the U04 Floor A mechanism (the
+    `.btn-close::after` 44×44 expansion) extends the *hit area*
+    beyond the *visible box*; `page.mouse.click` does not route
+    through `::after` the way a real tap does. The spec asserts on
+    the **visible box** (`floorPx`) + the **`::after` computed
+    style** (44×44 absolute) — the two-part witness, matching the
+    U04 smoke.
+  - **The ~700 ms `box-shadow` settle before a `:focus-visible`
+    ring assertion** — the U05 drift note (the `box-shadow 0.15s`
+    transition on every `.btn`). The spec's Floor B tests use
+    `page.waitForFunction(...)` on the `box-shadow` value with a
+    2000 ms timeout before asserting `visibleRing(...)`.
+  - **`Admin/Platform.cshtml:56` `.table-responsive` gap** — the
+    U05 drift pause (1 of 6 shipped tables unwrapped). The spec does
+    **not** assert this (it is a drift-pause witness, not a pass
+    assertion — recorded here, carried to U07's close for the design
+    doc §drift log).
+  - **The WYSIWYG 1-column-only pin** — `.rc-editor` is always
+    `grid-template-columns: 1fr` at the class home; the spec asserts
+    `1fr` (the pin), **not** a 2→1 collapse (the U05 mechanism
+    clarification).
+
+- **Build (the mandatory order, both green):**
+  1. `dotnet build Kumunita.slnx -c Debug` — **green** (1 pre-existing
+     warning in `Kumunita.Core.Tests` — `xUnit2013` in
+     `MessagingServiceTests.cs:204`, not this unit's).
+  2. No `npm` build needed (U06 authors a `.spec.ts` that is
+     **intentionally not** in `tsconfig.json`'s `include`
+     (`client/**/*.ts`) — consistent with the M4 U11 precedent where
+     `e2e-m4.spec.ts` is also not tsc-compiled; the Playwright
+     runner transpiles it at run time).
+
+- **Test gate (both assemblies, in-process xunit.v3, both green):**
+  - `dotnet exec
+    tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    — **Total: 528, Errors: 0, Failed: 0** (526 baseline + the 2 new
+    U06 xUnit pins; all 7 `PwaManifestTests` pins green).
+  - `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    — **Total: 956, Errors: 0, Failed: 0** (unchanged — M10 adds no
+    Core tests; the run is part of the green gate).
+
+- **`site.css`:** **not** touched (the unit-series rule — the
+  responsive pass is U04/U05's; U06 only *pins* the baseline it
+  left).
+- **`playwright.config.ts` / `tsconfig.json` / the csproj:**
+  **not** touched (the unit-series rule).
+- **No view / Core changes** (the unit-series rule — U06 is tests
+  only).
+
+- **Next:** **U07 close** (see `in-progress/pwa-responsive-u07.md`)
+  — the milestone close-out: fold the U03 + U05 + U06 drift pauses
+  (the `Admin/Platform.cshtml:56` `.table-responsive` gap; the
+  WYSIWYG 1-column mechanism clarification; the U06 author-not-run
+  spec status) into the design doc §drift log, and close the
+  milestone (the `Milestones.cs` + README roadmap row + the
+  `MilestonesTests.cs` pin, if the milestone flips to done).
