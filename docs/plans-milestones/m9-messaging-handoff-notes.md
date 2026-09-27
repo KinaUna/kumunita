@@ -220,3 +220,75 @@ not re-derive the register.
 - **Next:** U02 (see `in-progress/messaging-u02.md`) — the `LocaleSettings`
   `MessagingEnabled` additive bool + the two toggle seams + the one
   `messaging.toggle` audit row.
+
+## U02 — toggle seams
+
+- **Entry state:** design doc §D2/§2.2/§2.3 LOCKED (U00); `Conversation` /
+  `Message` + `M9DocTypes` landed (U01); no `IMessagingService` /
+  `MessagingService` anywhere yet (grep-confirmed). `AnnouncementService.cs`
+  `AreAnnouncementCommentsEnabledAsync` / `SetAnnouncementCommentsEnabledAsync`
+  read in full as the floor + write-row shape; `LanguageCatalog.cs`
+  `LocaleSettings` read in full; `AccessAudit.cs` + `Decision.cs` read in
+  full (enum members verified); `AnnouncementServiceTests.cs` toggle pins +
+  harness helpers read; ADR 0101 §toggle read. **No drift** — the seam
+  placement (on the messaging service, not `IIdentityService`) matches the
+  design doc's locked §2.2 interface block, so no drift pause.
+- **Files written (all deliverables, 4 + the test file):**
+  - `src/Kumunita.Core/Localization/LanguageCatalog.cs` — one additive
+    `public bool MessagingEnabled { get; set; } = false;` on
+    `LocaleSettings`, **after** `AnnouncementCommentsEnabled` (the
+    `false`-floor text as written: "Defaults to `false` — the deliberate
+    **inverse** of the codebase `true`-floor convention … a missing
+    settings row reads as **off** (the `false` floor, design doc §D2)").
+  - `src/Kumunita.Core/Messaging/IMessagingService.cs` — the interface with
+    the **two toggle seams only** (U03 appends the rest), verbatim from the
+    design doc §2.2 locked block:
+    `Task<bool> IsMessagingEnabledAsync();` ·
+    `Task SetMessagingEnabledAsync(bool enabled, string actorId);`
+  - `src/Kumunita.Core/Messaging/MessagingService.cs` — ctor over
+    `IDocumentStore` only (U03 will gain the optional `NotificationService?`
+    seam). `IsMessagingEnabledAsync`: `QuerySession` +
+    `LoadAsync<LocaleSettings>(SingletonId)` → `settings?.MessagingEnabled
+    == true` (the `false` floor). `SetMessagingEnabledAsync`: empty
+    `actorId` → `UnauthorizedAccessException` (the ADR 0101 shape verbatim);
+    load-or-mint the singleton, set the flag, store settings + audit row,
+    one `SaveChangesAsync`.
+  - `src/Kumunita.Core/DependencyInjection.cs` —
+    `AddTransient<Messaging.IMessagingService>(sp => new
+    Messaging.MessagingService(sp.GetRequiredService<Marten.IDocumentStore
+    >()))`, added directly after the `IAnnouncementService` registration
+    (the same factory shape).
+- **Audit-row field values (as implemented, verified against the design
+  doc §2.3 frozen text):** `Action = "messaging.toggle"`,
+  `TargetKind = "messaging.toggle"`, `TargetId = "messaging.toggle"` (the
+  flat sentinel), `Via = Authorization.AccessVia.Admin`, `Outcome =
+  Authorization.AccessOutcome.Allow` (both enum members exist in
+  `Decision.cs` — no append needed), `ActorId = EffectivePrincipalId =
+  actorId`, `VisibleCount = HiddenCount = null` (the single-target shape).
+- **Pinned tests (2):**
+  - `IsMessagingEnabled_FreshInstance_FloorsToFalse` — fresh store, no
+    `LocaleSettings` row → `false`; `Assert.Empty` on the `AccessAudit`
+    lane (the `IsSignupOpen_FreshInstance_FloorsToTrue_NoAuditRow` shape,
+    the `false` floor).
+  - `SetMessagingEnabled_Toggle_StoresFlagAndAuditRow` — `Set(true,
+    "u-admin")` → flag reads `true`; exactly one `messaging.toggle` row,
+    `Via = Admin`, `Outcome = Allow`, `TargetKind = TargetId =
+    "messaging.toggle"`, `ActorId = "u-admin"`, `VisibleCount` /
+    `HiddenCount` null (the ADR 0101
+    `SetAnnouncementCommentsEnabled_Closed_StoresFlagAndAuditRow` shape).
+  - Harness notes: `BootStoreAsync` mirrors `AnnouncementServiceTests`
+    (fresh scratch Postgres per test) but registers `M9DocTypes` instead of
+    `M3DocTypes` (the `LocaleSettings` + `AccessAudit` rows come from
+    `M1DocTypes` in both); the `AuditRows` helper is copied verbatim.
+- **Drift:** none. The design doc's locked seam block, the audit-row
+  table, the `false`-floor text, and the ADR 0101 precedent all fit the
+  actual code exactly; the one plan-text nuance ("`IIdentityService`
+  hosting variant" as a possible drift) was checked and rejected — the
+  design doc is authoritative and names the messaging service.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green (5 projects, zero
+  errors). `Kumunita.Core.Tests.MessagingServiceTests` 2/2 via
+  `dotnet exec … -class "Kumunita.Core.Tests.MessagingServiceTests"`
+  (8.1s, Docker Postgres up/down clean).
+- **Next:** U03 (see `in-progress/messaging-u03.md`) — the open / send /
+  list / thread / read seams + the 12 behavior pins, extending this
+  `MessagingServiceTests.cs` class.

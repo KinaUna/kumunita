@@ -107,4 +107,22 @@ public sealed class LocaleSettings
     /// admin tightens it to <c>false</c> to silence the surface.
     /// </summary>
     public bool AnnouncementCommentsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Whether direct 1:1 resident <b>messaging</b> is live on this instance
+    /// (ADR 0105, M9). The <see cref="Kumunita.Core.Messaging"/> context is
+    /// the one that reads this: when <c>true</c> signed-in residents may open
+    /// conversations and exchange messages; when <c>false</c> the surface is
+    /// hidden and every messaging seam refuses (the toggle is enforced in
+    /// the service, never only the view — C-M9·2). An *additive* field on
+    /// the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="AnnouncementCommentsEnabled"/>.
+    /// Defaults to <c>false</c> — the deliberate <b>inverse</b> of the
+    /// codebase <c>true</c>-floor convention, because messaging is a
+    /// privacy-sensitive <b>opt-in</b>, not a public-surface default: a
+    /// missing settings row reads as <b>off</b> (the <c>false</c> floor,
+    /// design doc §D2). A GlobalAdmin opts the instance in at
+    /// <c>/admin/messaging</c>.
+    /// </summary>
+    public bool MessagingEnabled { get; set; } = false;
 }
