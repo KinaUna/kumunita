@@ -1210,7 +1210,36 @@ public sealed class ProjectService : IProjectService
         // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6) —
         // evaluated against the **pre-assignment** row (the current assignee
         // keeps standing until the write rewrites the field).
-        CheckTodoStanding(actorId, actorRoles, todo);
+        //
+        // ADR 0106 — **self-assign pick-up** (the claim generalized): a
+        // resident who can **see** the to-do (Read-allowed) may assign it
+        // onto **themself** while it is **unassigned** — a pick-up, not a
+        // take-over. This bypasses `CheckTodoStanding` (which requires
+        // creator ∪ assignee ∪ GlobalAdmin) for that one case. An already-
+        // assigned to-do still requires standing (no take-over), and
+        // assigning to **someone else** still requires standing.
+        var isSelfAssign = string.Equals(assigneeId, actorId, StringComparison.Ordinal);
+        if (isSelfAssign && string.IsNullOrEmpty(todo.AssigneeId))
+        {
+            // The to-do must be visible to the actor (the audience decision is
+            // the sole access boundary). A resident in the community (or any
+            // audience grant holder) passes; a stranger denied Read is
+            // refused. This is the same gate ClaimTodoAsync applies (the
+            // claim lane's "community membership or group membership" is a
+            // subset of Read-allowed; here we simply use the Read decision
+            // directly — broader but equally safe: if you can see it, you
+            // may take it onto yourself while it is unassigned).
+            var decision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(todo))
+                .ConfigureAwait(false);
+            if (!decision.Allowed)
+                throw new UnauthorizedAccessException(
+                    $"Actor may not assign to-do '{todoItemId}' onto themselves (Read denied).");
+        }
+        else
+        {
+            CheckTodoStanding(actorId, actorRoles, todo);
+        }
 
         todo.AssigneeId = assigneeId;                      // `null` = unassign.
         todo.Modified = DateTimeOffset.UtcNow;

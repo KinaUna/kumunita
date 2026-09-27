@@ -138,7 +138,18 @@ public sealed record TodoCardRow(
     // degrades to `Generic`, no title / link — C-TBD·4). `null` = the card
     // has no blocker, so the chip is omitted entirely (the TodoDetail chip
     // idiom). A **hint** — it never gates the card (D2).
-    Kumunita.Core.Projects.BlockerChip? Blocker = null);
+    Kumunita.Core.Projects.BlockerChip? Blocker = null,
+    // ADR 0106 — the card's "Details" expander surface (reveals the body,
+    // the Start / Due dates if set, the waiting-on if set, and the
+    // community): the to-do's **body** (rendered as markdown in the view —
+    // a title-only to-do leaves it empty → the "no body" hint), and its
+    // **community display name** (the enabled-component name the controller
+    // resolved from `ComponentId`; `null` when unscoped / unresolvable, in
+    // which case the expander omits the community line). Display metadata
+    // only — never a gate (the card's visibility already ran the two-level
+    // read decision, C-M5·3).
+    string? Body = null,
+    string? CommunityDisplayName = null);
 
 /// <summary>
 /// The <b>board detail</b> view model (the <c>GET /projects/boards/{id}</c>

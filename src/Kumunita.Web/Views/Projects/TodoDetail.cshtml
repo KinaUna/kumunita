@@ -71,6 +71,22 @@
                             </form>
                         </li>
                     }
+                    @* ADR 0106 — "Assign to me" (the self-assign pick-up
+                       lane, the claim generalized): visible only when the
+                       to-do is **unassigned** and the actor is authenticated.
+                       Posts the assign route with the actor's own subject id.
+                       The service's self-assign allowance (Read-allowed +
+                       unassigned) is the server-side gate. *@
+                    @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                    {
+                        <li>
+                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
+                            </form>
+                        </li>
+                    }
                     <li>
                         <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
                     </li>

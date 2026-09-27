@@ -139,6 +139,27 @@ public sealed class ProjectsController : Controller
 
         ViewData["Audience_Users"] = userOptions;
         ViewData["Audience_Groups"] = groupOptions;
+
+        // ADR 0106 — the **assign** people list includes the actor themself:
+        // "Assign to…" should let a resident take a to-do onto themselves
+        // (the self-assign lane, the claim generalized), so the current user
+        // must appear as an option. This is a *separate* list from the
+        // grant-picker `Audience_Users` (which deliberately excludes self —
+        // a grant of "addressed to me" is meaningless; the single-source
+        // audience editor and the subtask assignee picker keep reading
+        // `Audience_Users`). Same verified/non-blocked set, same order,
+        // self included.
+        var assignUserOptions = profiles
+            .Where(p => !p.Blocked)
+            .Select(p => new GrantOption
+            {
+                Id    = p.SubjectId,
+                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+                Kind  = "User",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        ViewData["Assign_Users"] = assignUserOptions;
     }
 
     /// <summary>
@@ -1673,7 +1694,16 @@ public sealed class ProjectsController : Controller
                     // (`null` = no date; the card gates the line on non-null).
                     StartAt: card.StartAt,
                     DueAt: card.DueAt,
-                    Blocker: blocker);
+                    Blocker: blocker,
+                    // ADR 0106 — the "Details" expander surface: the body
+                    // verbatim (the view renders it as markdown; a title-only
+                    // to-do leaves it empty → the "no body" hint), and the
+                    // community display name resolved from `ComponentId` via
+                    // the enabled-component `componentNames` map (`null` when
+                    // unscoped / unresolvable → the view omits that line).
+                    Body: card.Body,
+                    CommunityDisplayName: card.ComponentId is not null
+                        && componentNames.TryGetValue(card.ComponentId, out var cn) ? cn : null);
             }).ToList();
 
             laneRows.Add(new LaneDetailRow(
@@ -1980,10 +2010,27 @@ public sealed class ProjectsController : Controller
     {
         var model = new BoardEditorModel
         {
+            // ADR 0106 — the new-board default audience is "Everyone in this
+            // community" (the ADR 0036 community-visible flag, the Posts
+            // precedent): checked by default so a board is visible to every
+            // signed-in resident out of the box. A `null`/empty
+            // `ComponentId` makes the ADR 0036 branch the whole decision
+            // (any signed-in actor sees it — the resident-only standing), and
+            // the "granular" audience panel (the _GrantPickers block) hides
+            // while the flag is on, exactly as the view's copy promises ("By
+            // default the board is visible to everyone; turn that off … only
+            // if you want to narrow who can see it."). Without this seed the
+            // flag is `false` + empty grants, which under `EvaluateAudience`
+            // (an empty audience always denies) left a fresh board
+            // author-only — contradicting the view's own "default is
+            // everyone" text. The view's checkbox already renders from
+            // `Model.Audience?.CommunityVisible ?? true`; seeding `true`
+            // makes the rendered state and the submitted state agree.
             Audience = new AudienceEditorModel
             {
                 Mode = "Any",
                 Grants = "[]",
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
             // ADR 0018 / ADR 0049 — pre-select the actor's current effective

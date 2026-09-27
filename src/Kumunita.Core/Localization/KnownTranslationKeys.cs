@@ -126,6 +126,10 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Created",
             ["projects.todo.modified"]       = "Modified",
             ["projects.todo.no_body"]        = "No body — this to-do is title-only.",
+            // ADR 0106 — self-assign lane + card details expander.
+            ["projects.todo.assign_to_me"]   = "Assign to me",
+            ["projects.todo.details"]        = "Details",
+            ["projects.todo.community"]      = "Community",
             ["projects.todo.subtasks"]       = "Subtasks",
             ["projects.todo.boards"]         = "Boards",
             // ADR 0100 — the comments + replies section (C-M3·1 — comments
@@ -1680,6 +1684,10 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Erstellt",
             ["projects.todo.modified"]       = "Geändert",
             ["projects.todo.no_body"]        = "Kein Text — diese Aufgabe hat nur einen Titel.",
+            // ADR 0106 — Selbstzuweisungs-Spur + Kartendetailaufklapper.
+            ["projects.todo.assign_to_me"]   = "Mir zuweisen",
+            ["projects.todo.details"]        = "Details",
+            ["projects.todo.community"]      = "Community",
             ["projects.todo.subtasks"]       = "Unteraufgaben",
             ["projects.todo.boards"]         = "Boards",
             // ADR 0100 — Kommentare + Antworten (C-M3·1 — Kommentare erben die
@@ -3201,6 +3209,10 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Créé le",
             ["projects.todo.modified"]       = "Modifié le",
             ["projects.todo.no_body"]        = "Pas de texte — cette tâche n'a qu'un titre.",
+            // ADR 0106 — voie d'auto-attribution + panneau de détails de carte.
+            ["projects.todo.assign_to_me"]   = "M'attribuer",
+            ["projects.todo.details"]        = "Détails",
+            ["projects.todo.community"]      = "Communauté",
             ["projects.todo.subtasks"]       = "Sous-tâches",
             ["projects.todo.boards"]         = "Tableaux",
             // ADR 0100 — Commentaires + réponses (C-M3·1 — les commentaires
@@ -4675,6 +4687,10 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Oprettet",
             ["projects.todo.modified"]       = "Ændret",
             ["projects.todo.no_body"]        = "Ingen tekst — denne opgave har kun et navn.",
+            // ADR 0106 — selvtildelings-sporet + kortdetaljs udvidelsesfelt.
+            ["projects.todo.assign_to_me"]   = "Tildel mig",
+            ["projects.todo.details"]        = "Detaljer",
+            ["projects.todo.community"]      = "Fællesskab",
             ["projects.todo.subtasks"]       = "Delopgaver",
             ["projects.todo.boards"]         = "Boards",
             // ADR 0100 — Kommentarer + svar (C-M3·1 — kommentarer arver

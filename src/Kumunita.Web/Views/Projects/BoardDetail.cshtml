@@ -800,6 +800,78 @@
                                             {
                                                 <span class="ms-1"><kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
                                             }
+                                            @* ADR 0106 — the card's "Details" expander
+                                               (a Bootstrap collapse): reveals the body
+                                               (rendered as markdown), the Start / Due
+                                               dates if set, the waiting-on if set, and
+                                               the community name if set. Always available
+                                               on a card — the "at a glance" summary is the
+                                               metadata line above; the expander gives the
+                                               full picture without navigating to the detail. *@
+                                            <button type="button" class="btn btn-sm btn-link text-dark text-decoration-none p-0 ms-1"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="@($"#details-{card.TodoId}")"
+                                                    aria-expanded="false"
+                                                    aria-controls="@($"details-{card.TodoId}")">
+                                                <kw-l key="projects.todo.details">Details</kw-l>
+                                            </button>
+                                        </div>
+                                        @* ADR 0106 — the card details collapse content.
+                                           Rendered markdown body (the same
+                                           MarkdownRenderer the TodoDetail view uses),
+                                           the dates, the blocker chip (reusing the
+                                           same markup as the at-a-glance line), and
+                                           the community name. Each section is gated
+                                           on the field being set. *@
+                                        <div class="collapse mt-2" id="@($"details-{card.TodoId}")">
+                                            @if (!string.IsNullOrWhiteSpace(card.Body))
+                                            {
+                                                <div class="rc-body text-body-secondary small">
+                                                    @Html.Raw(MarkdownRenderer.RenderHtml(card.Body))
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-body-secondary small mb-2">
+                                                    <kw-l key="projects.todo.no_body">No body — this to-do is title-only.</kw-l>
+                                                </p>
+                                            }
+                                            @if (card.StartAt is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.start">Start</kw-l>: <kw-dt dt="@card.StartAt" format="g"></kw-dt>
+                                                </div>
+                                            }
+                                            @if (card.DueAt is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.due">Due</kw-l>: <kw-dt dt="@card.DueAt" format="g"></kw-dt>
+                                                </div>
+                                            }
+                                            @if (card.Blocker is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    @if (card.Blocker.Generic)
+                                                    {
+                                                        <span><kw-l key="todo.blocked_by">Waiting on</kw-l>: <kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span><kw-l key="todo.blocked_by">Waiting on</kw-l>: @card.Blocker.Title
+                                                            @if (!string.IsNullOrWhiteSpace(card.Blocker.Status))
+                                                            {
+                                                                <span class="text-muted"> · @card.Blocker.Status</span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(card.CommunityDisplayName))
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.community">Community</kw-l>: @card.CommunityDisplayName
+                                                </div>
+                                            }
                                         </div>
                                     </div>
                                     @* The card action dropdown (the
@@ -844,6 +916,25 @@
                                                     <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
                                                 </button>
                                             </li>
+                                            @* ADR 0106 — "Assign to me" (the self-assign
+                                               pick-up lane, the claim generalized): visible
+                                               only when the to-do is **unassigned** and the
+                                               actor is authenticated. Posts the assign route
+                                               with the actor's own subject id + the same-site
+                                               returnUrl back to this board. The service's
+                                               self-assign allowance (Read-allowed +
+                                               unassigned) is the server-side gate. *@
+                                            @if (string.IsNullOrWhiteSpace(card.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                                        <input type="hidden" name="returnUrl" value="@($"/projects/boards/{Model.Board.Id}")" />
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
                                             <li>
                                                 <a class="dropdown-item text-dark" href="@($"/projects/todos/{card.TodoId}")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
                                             </li>
@@ -1091,7 +1182,11 @@
                                                             </p>
                                                         }
                                                         @{
-                                                            var assignPeople = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            // ADR 0106 — the assign people list is the **self-including**
+                                                            // `Assign_Users` (the current user can assign a to-do onto
+                                                            // themselves, the self-assign lane), not the grant-picker
+                                                            // `Audience_Users` (which excludes self).
+                                                            var assignPeople = (ViewData["Assign_Users"] as List<GrantOption>) ?? new List<GrantOption>();
                                                             var assignGroups = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>();
                                                             var assignCommunities = (ViewData["Assign_Communities"] as List<GrantOption>) ?? new List<GrantOption>();
                                                             // ADR 0074 — the optgroup labels (the <kw-l> TagHelper
