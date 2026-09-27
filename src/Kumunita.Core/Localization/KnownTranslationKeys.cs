@@ -832,6 +832,13 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Delete",
             ["pages.resetSeeded"] = "Reset to seeded text",
             ["pages.untitled"]    = "Untitled page",
+            // The /pages browse's two sections (ADR 0040's kind split,
+            // surfaced in the UI — resident pages apart from platform pages).
+            ["pages.section_community"] = "Community pages",
+            ["pages.section_platform"]  = "Platform pages",
+            ["pages.section_platform_lede"] =
+                "Published by the platform — terms, help, privacy, and the " +
+                "code of conduct.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             // The /blog/{userId} feed — a resident's own User-kind pages,
@@ -2316,6 +2323,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Löschen",
             ["pages.resetSeeded"] = "Auf Seed-Text zurücksetzen",
             ["pages.untitled"]    = "Unbenannte Seite",
+            ["pages.section_community"] = "Seiten der Gemeinschaft",
+            ["pages.section_platform"]  = "Plattformseiten",
+            ["pages.section_platform_lede"] =
+                "Von der Plattform veröffentlicht — Nutzungsbedingungen, Hilfe, " +
+                "Datenschutz und Verhaltenskodex.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Neue Blogseite",
@@ -3750,6 +3762,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Supprimer",
             ["pages.resetSeeded"] = "R\u00e9initialiser au texte seed\u00e9",
             ["pages.untitled"]    = "Page sans titre",
+            ["pages.section_community"] = "Pages de la communaut\u00e9",
+            ["pages.section_platform"]  = "Pages de la plateforme",
+            ["pages.section_platform_lede"] =
+                "Publi\u00e9es par la plateforme — conditions, aide, confidentialit\u00e9 " +
+                "et r\u00e8gles de conduite.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Nouvelle page de blog",
@@ -5183,6 +5200,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Slet",
             ["pages.resetSeeded"] = "Nulstil til seedet tekst",
             ["pages.untitled"]    = "Side uden titel",
+            ["pages.section_community"] = "Sider f\u00f8llesskabet",
+            ["pages.section_platform"]  = "Platformsider",
+            ["pages.section_platform_lede"] =
+                "Udgivet af platformen — vilk\u00e5r, hj\u00e6lp, privatliv og " +
+                "adf\u00e6rskode.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Ny blogside",

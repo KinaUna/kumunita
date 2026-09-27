@@ -18,7 +18,20 @@
             </div>
         </header>
 
-        @if (Model.Roots.Count == 0)
+        @* The browse is split into two sections (the ADR 0040 kind split,
+           surfaced in the UI): the residents' own pages first (the "community"
+           content the <c>/pages</c> surface primarily serves — any signed-in
+           resident can add one via the New-page button above), then the
+           platform's own pages (the seeded Terms / Help / Privacy / Code of
+           conduct — GlobalAdmin-managed, also reachable from the footer's
+           Platform column). Two separate ledgers keep the two audiences of
+           content visually apart on the page, instead of one mixed tree where
+           a seeded platform page and a resident's blog page sit side by side.
+           Both sections reuse the same collapsible <details>/<summary>
+           affordance from _PageTreeItem; storage is untouched (each node's
+           href still derives from its real ancestor chain, so /pages/system/…
+           and /pages/{resident}/… both resolve exactly as before). *@
+        @if (Model.Roots.Count == 0 && Model.SystemRoots.Count == 0)
         {
             <div class="alert alert-info">
                 @* Plain text — the kw-l TagHelper auto-escapes (SetContent),
@@ -34,14 +47,41 @@
                <details>/<summary> group (see _PageTreeItem) — children
                are collapsed by default, so a long list of branches stays
                short until the resident expands a branch. *@
-            <nav aria-label="Page tree">
-                <ul class="airy-page-list">
-                @foreach (var node in Model.Roots)
-                {
-                    <partial name="_PageTreeItem" model="node" />
-                }
-                </ul>
-            </nav>
+            @if (Model.Roots.Count > 0)
+            {
+                <section aria-label="Community pages">
+                    <h2 class="h5 mb-2 mt-1">
+                        <kw-l key="pages.section_community">Community pages</kw-l>
+                    </h2>
+                    <nav aria-label="Community page tree">
+                        <ul class="airy-page-list">
+                        @foreach (var node in Model.Roots)
+                        {
+                            <partial name="_PageTreeItem" model="node" />
+                        }
+                        </ul>
+                    </nav>
+                </section>
+            }
+            @if (Model.SystemRoots.Count > 0)
+            {
+                <section aria-label="Platform pages" class="mt-5">
+                    <h2 class="h5 mb-2 mt-1">
+                        <kw-l key="pages.section_platform">Platform pages</kw-l>
+                    </h2>
+                    <p class="text-secondary small mb-3">
+                        <kw-l key="pages.section_platform_lede">Published by the platform — terms, help, privacy, and the code of conduct.</kw-l>
+                    </p>
+                    <nav aria-label="Platform page tree">
+                        <ul class="airy-page-list">
+                        @foreach (var node in Model.SystemRoots)
+                        {
+                            <partial name="_PageTreeItem" model="node" />
+                        }
+                        </ul>
+                    </nav>
+                </section>
+            }
         }
     </div>
 </div>
