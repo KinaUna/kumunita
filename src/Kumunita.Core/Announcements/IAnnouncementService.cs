@@ -252,4 +252,97 @@ public interface IAnnouncementService
         string languageCode,
         string actorId,
         IReadOnlySet<string> actorRoles,
+        IDocumentSession session);
+
+    // ── ADR 0101 — resident comments on an announcement (top-level only) ──
+
+    /// <summary>
+    /// Whether the signed-in residents may comment on platform announcements
+    /// (ADR 0101) — the <c>true</c> floor on
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings
+    /// .AnnouncementCommentsEnabled"/> (a missing singleton row reads as
+    /// <c>true</c>). A read seam only; the write lane is
+    /// <see cref="SetAnnouncementCommentsEnabledAsync"/>.
+    /// </summary>
+    Task<bool> AreAnnouncementCommentsEnabledAsync();
+
+    /// <summary>
+    /// Sets the ADR 0101 announcement-comments gate (the
+    /// <see cref="Kumunita.Core.Identity.IIdentityService.SetSignupOpenAsync"/>
+    /// singleton-toggle shape): reads-or-mints the
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings"/> singleton, sets
+    /// <see cref="Kumunita.Core.Localization.LocaleSettings
+    /// .AnnouncementCommentsEnabled"/>, and commits exactly one
+    /// <see cref="Authorization.AccessAudit"/> row
+    /// (<c>announcementcomments.set-enabled</c>, <c>Via = Admin</c>,
+    /// <c>TargetKind = "announcementcomments"</c>) in the same session
+    /// (C3). A GlobalAdmin-only write surface (the ASP.NET gate narrows the
+    /// actor; the service is the single audited write lane).
+    /// </summary>
+    Task SetAnnouncementCommentsEnabledAsync(bool enabled, string actorId);
+
+    /// <summary>
+    /// The announcement's resident comments (ADR 0101): the
+    /// <see cref="AnnouncementComment"/> rows under
+    /// <paramref name="announcementId"/>, ordered by <c>Created</c> ascending,
+    /// including soft-deleted rows so the view can render a placeholder in
+    /// place of the body. **Read gate (ADR 0101):** the caller must be
+    /// **signed in** (an anonymous visitor is refused — <see
+    /// cref="UnauthorizedAccessException"/> / 403) and must be able to see the
+    /// announcement under its own flat <see cref="AnnouncementScope"/> split
+    /// (the same <see cref="ResolveReadVisibilityAsync"/>-derived predicate
+    /// <see cref="GetAsync"/> applies) — so a comment is never visible where
+    /// the announcement is not, and never to a visitor, even on a
+    /// public-scope announcement. A missing id is a
+    /// <see cref="KeyNotFoundException"/> (404, non-leaky). **No** read-time
+    /// <c>AccessAudit</c> row (the announcement's flat scope gate already ran
+    /// — the C-M3·1 "comment-inherits the parent's single decision" rule).
+    /// </summary>
+    Task<IReadOnlyList<AnnouncementComment>> GetAnnouncementCommentsAsync(
+        string announcementId, string? actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// **Adds a comment** on an announcement in the <b>caller's</b> in-flight
+    /// session (ADR 0101, invariant C3). **Standing:** the actor must be
+    /// **signed in** (an anonymous actor is a hard
+    /// <see cref="UnauthorizedAccessException"/> / 403), the announcement
+    /// must exist and be visible to the actor under its flat
+    /// <see cref="AnnouncementScope"/> split (a missing / not-visible id is a
+    /// <see cref="KeyNotFoundException"/> / 404, non-leaky), and the ADR 0101
+    /// gate must be <c>true</c> (<see cref="AreAnnouncementCommentsEnabledAsync"/>
+    /// — a hard <see cref="UnauthorizedAccessException"/> / 403 when off). The
+    /// <c>LanguageCode</c> is materialized from the instance default when
+    /// unchosen (ADR 0018). One
+    /// <see cref="Authorization.AccessAudit"/> row
+    /// (<c>announcementcomment.create</c>, <c>TargetKind = "announcement"</c>,
+    /// <c>Via = Owner</c>) commits atomically with the write (C3).
+    /// </summary>
+    Task<AnnouncementComment> CreateAnnouncementCommentAsync(
+        string announcementId,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        string body,
+        string? languageCode,
+        IDocumentSession session);
+
+    /// <summary>
+    /// **Soft-deletes a comment** the actor authored on an announcement
+    /// (ADR 0101, the ADR 0024 shape carried from
+    /// <see cref="Kumunita.Core.Posts.PostReply.DeletedAt"/>): stamps
+    /// <see cref="AnnouncementComment.DeletedAt"/> forward (the record is
+    /// kept, never hard-deleted). **Standing:** author-only (the comment's
+    /// <see cref="AnnouncementComment.AuthorId"/> == the actor — the ADR 0016
+    /// reply-delete precedent; a non-author is refused, there is no moderator /
+    /// GlobalAdmin override branch on a comment's own delete). The comment
+    /// must exist and be under the given announcement (a comment on a
+    /// different announcement is a <see cref="KeyNotFoundException"/> — 404,
+    /// non-leaky). One <see cref="Authorization.AccessAudit"/> row
+    /// (<c>announcementcomment.delete</c>, <c>TargetKind = "announcement"</c>,
+    /// <c>Via = Owner</c>) commits atomically with the write (C3).
+    /// </summary>
+    Task<AnnouncementComment> DeleteAnnouncementCommentAsync(
+        string announcementId,
+        string commentId,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
         IDocumentSession session);}

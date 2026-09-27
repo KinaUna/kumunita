@@ -1,0 +1,103 @@
+@model Kumunita.Web.Controllers.MessagesController.MessagesIndexViewModel
+@using Kumunita.Core.Localization
+@using Kumunita.Core.Messaging
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@{
+    ViewData["Title"] = "Messages";
+    // A label needed inside an attribute (the unread badge's title) + the
+    // unnamed-participant fallback — the <kw-l> TagHelper can't sit inside an
+    // attribute, so resolve them server-side, once, up front (the ADR 0072 /
+    // Search/Index placeholder pattern).
+    var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var unreadWord = await Translation.GetAsync("message.unread", lang);
+    var otherWord = await Translation.GetAsync("message.other", lang);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <h1><kw-l key="message.title">Messages</kw-l></h1>
+        </header>
+
+        @if (Model.Disabled || Model.Error)
+        {
+            @* F5 — the instance toggle is off (or an open attempt failed): the
+               disabled state, no list, no picker. The resident is told
+               nothing beyond the notice. *@
+            <div class="alert alert-secondary" role="status">
+                <kw-l key="message.disabled">Direct messaging is turned off on this instance.</kw-l>
+            </div>
+            return;
+        }
+
+        <div class="row g-4">
+            @* ── The conversation list ──────────────────────────────────── *@
+            <div class="col-lg-8">
+                @if (Model.Conversations.Count == 0)
+                {
+                    <div class="alert alert-secondary" role="status">
+                        <kw-l key="message.thread.empty">No messages yet — say hello.</kw-l>
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group">
+                        @foreach (var c in Model.Conversations)
+                        {
+                            <li class="list-group-item d-flex align-items-start">
+                                <a class="text-dark text-decoration-none flex-grow-1" href="/messages/@c.Id">
+                                    <div class="fw-semibold">
+                                        @(string.IsNullOrEmpty(c.OtherDisplayName) ? otherWord : c.OtherDisplayName)
+                                        @if (c.UnreadCount > 0)
+                                        {
+                                            <span class="badge text-bg-primary ms-2" title="@unreadWord">@c.UnreadCount</span>
+                                        }
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(c.LastMessageBody))
+                                    {
+                                        <div class="small text-truncate text-secondary">@c.LastMessageBody</div>
+                                    }
+                                    @if (c.LastMessageAt is { } lastAt)
+                                    {
+                                        <div class="small text-secondary"><kw-dt dt="@lastAt" format="g"></kw-dt></div>
+                                    }
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                    @if (Model.Pager is not null)
+                    {
+                        <partial name="_Pager" model="Model.Pager" />
+                    }
+                }
+            </div>
+
+            @* ── New conversation picker ────────────────────────────────── *@
+            <div class="col-lg-4">
+                <section>
+                    <h2 class="h5 mb-3"><kw-l key="message.new">New conversation</kw-l></h2>
+                    @if (Model.Candidates.Count == 0)
+                    {
+                        <p class="text-secondary small">—</p>
+                    }
+                    else
+                    {
+                        <form method="post" action="/messages/open" class="mb-0">
+                            @Html.AntiForgeryToken()
+                            <select class="form-select mb-2" name="otherId" required aria-label="Resident">
+                                <option value="" disabled selected>…</option>
+                                @foreach (var candidate in Model.Candidates)
+                                {
+                                    <option value="@candidate.SubjectId">@candidate.DisplayName</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-primary"><kw-l key="message.new">New conversation</kw-l></button>
+                        </form>
+                    }
+                </section>
+            </div>
+        </div>
+    </div>
+</div>

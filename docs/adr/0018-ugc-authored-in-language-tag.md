@@ -76,10 +76,16 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
   and the two reply forms (`Posts/Detail`, `Groups/PostDetail`) each get a
   `Language` `<select>` posting the author's choice. The options are the
   instance's **enabled** `LanguageCatalog` (ADR 0005 B), ordered by
-  `SortOrder`. The picker is pre-selected to the instance default (create
-  lane) or the stored row's tag (announcement + post edit lanes) so the
-  highlighted option is the one that will be submitted. This is a **tag
-  picker, not a translation** — the form help text says so explicitly.
+  `SortOrder`. The picker is pre-selected to the stored row's tag on the
+  edit lanes; on the create lanes and the reply/comment forms the
+  pre-selection is the actor's **current effective language** (ADR 0049 —
+  the `kumunita.locale` cookie → first enabled `Accept-Language` match →
+  instance default → `en` floor, the same chain the `<kw-l>` TagHelper
+  resolves UI strings through) — "write in the language you're reading in"
+  — amended 2026-09-26, generalizing the earlier instance-default
+  pre-selection. The highlighted option is the one that will be submitted.
+  This is a **tag picker, not a translation** — the form help text says so
+  explicitly.
 - **New read seam:** `ILocalizationService.GetDefaultLanguageCodeAsync()`
   (a read, no audit row — same shape as `ListLanguagesAsync`) returns the
   instance default with the `en` floor, so the Web compose handlers can

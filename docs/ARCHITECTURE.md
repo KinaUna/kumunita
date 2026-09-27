@@ -29,11 +29,12 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M6** notifications | **shared awareness** — the platform reaches out to the resident where they are |
   | **M7** pagination and filtering | **navigation** — a growing archive stays browsable |
   | **M8** search | **understanding** — finding what already exists in the neighborhood's memory |
-  | **M9** PWA and responsive design | **portability of the surface** — the same platform in the resident's pocket |
-  | **M10** portability (import/export) | **outcome + world seams** — the loop closes *into* the residents' lives |
-  | **M11** iCal | **outcome + world seams** — events land in the calendars residents already check |
-  | **M12** logging and analytics | **feedback** — the operator sees how the platform is used |
-  | **M13** integration of Events and Projects | **coordination** — the two coordination surfaces interlock |
+  | **M9** messaging | **shared awareness ↔ understanding** — a direct 1:1 channel between residents; a signal finds its recipient without the public surface |
+  | **M10** PWA and responsive design | **portability of the surface** — the same platform in the resident's pocket |
+  | **M11** portability (import/export) | **outcome + world seams** — the loop closes *into* the residents' lives |
+  | **M12** iCal | **outcome + world seams** — events land in the calendars residents already check |
+  | **M13** logging and analytics | **feedback** — the operator sees how the platform is used |
+  | **M14** integration of Events and Projects | **coordination** — the two coordination surfaces interlock |
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
@@ -102,7 +103,8 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Events/             # M4 ✓ (ADR 0054) — Event + EventRsvp docs + EventService (feed/detail/compose + last-write-wins RSVP) + EventToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService) + the EventReminders §6.4 job (EventReminderService/Handler/Tick over the M1 durable-email trio) + the author ∪ GlobalAdmin standing matrix enforced **server-side** in the EventService (the edit/delete write lanes carry the principal's actorRoles, the AnnouncementService/PageService precedent — the GlobalAdmin override is exercised in the service, not deferred to the Web boundary; the audit row tags the branch: Owner/Admin); gate 2026-09-21: Core 668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests green together; re-verified after U13's GlobalAdmin-override seam fix: Core 670/670 + Web 351/351, the 25 M4 seam tests (T01–T25) green together; see design/m4-events-design.md § Run result (M4 acceptance gate — 2026-09-21)
     │   │   ├── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md; PL ✓ (ADR 0086) — ProjectGoal + Project docs (additive on M5DocTypes, zero migration) + ProjectGoalToAuditableResource (TargetKind "goal") + ProjectToAuditableResource (TargetKind "project") + the IProjectService goal / project / association / delete lanes (standing creator ∪ GlobalAdmin, the ADR 0070 matrix) + the additive ProjectId? feed-filter field on TodoItem + KanbanBoard (never a gate); see design/pl-goals-projects-design.md
     │   │   ├── Notifications/      # M6 ✓ (ADR 0076) — Notification + NotificationPreference docs (the M6DocTypes surface) + NotificationService (the EmitAsync writer + the inbox / preference lanes, reusing the M1 durable-email trio, no IAuthorizationService — a personal read, not an AccessAction decision); see design/m6-notifications-design.md
-    │   │   └── Search/             # M8 ✓ (ADR 0091) — no docs, no DocTypes surface (zero schema change, ADR 0004 §B untouched) + ISearchService (SearchAsync `all` read + SearchSurfaceAsync paged single-surface read, the ADR 0090 D1/D3 HasMore shape) + SearchService (store-composing; composes only the frozen IDocumentStore / IAuthorizationService / IUserInfoService; per-surface candidate predicates copied from the canonical reads, the case-insensitive substring match over Title + Body, the truncated context window); one aggregate audit row per (query, surface, scope) decision — TargetKind "search:<surface>" (search:posts / search:events / search:pages / search:announcements), TargetId null, zero-candidate visits emit no row; see design/m8-search-design.md
+    │   │   ├── Search/             # M8 ✓ (ADR 0091) — no docs, no DocTypes surface (zero schema change, ADR 0004 §B untouched) + ISearchService (SearchAsync `all` read + SearchSurfaceAsync paged single-surface read, the ADR 0090 D1/D3 HasMore shape) + SearchService (store-composing; composes only the frozen IDocumentStore / IAuthorizationService / IUserInfoService; per-surface candidate predicates copied from the canonical reads, the case-insensitive substring match over Title + Body, the truncated context window); one aggregate audit row per (query, surface, scope) decision — TargetKind "search:<surface>" (search:posts / search:events / search:pages / search:announcements), TargetId null, zero-candidate visits emit no row; see design/m8-search-design.md
+    │   │   └── Messaging/          # M9 ✓ (ADR 0105) — Conversation + Message docs (the M9DocTypes surface; a unique (ParticipantA, ParticipantB) pair index + a (ConversationId, Created) thread index) + IMessagingService / MessagingService (the toggle seams IsMessagingEnabledAsync / SetMessagingEnabledAsync over the LocaleSettings.MessagingEnabled false-floor + open / send / list / thread / mark-read); participant-by-id access — no Audience, no IAuthorizationService call, zero new AccessAction / AccessVia / IAuditableResource adapter (a non-participant, GlobalAdmin included, gets a non-leaky 404); one in-transaction AccessAudit row per write (Action/TargetKind "message" on open + send, Via Owner; "messaging.toggle" on the admin flip, Via Admin), reads + mark-read emit no row; the D6 nudge reuses the M6 lane (EmitAsync, kind message.new, idempotency key notification:message.new:{messageId}); plain-text ≤ 2000 chars, immutable in M9 (rich content / edit / delete are the follow-on lanes' entry); see design/m9-messaging-design.md
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── Milestones.cs       # home-page roadmap (kept in sync with README's "Roadmap" — AGENTS.md)
@@ -139,7 +141,19 @@ ADR 0091 ships the `ISearchService` seam (`SearchAsync` + `SearchSurfaceAsync`)
 zero schema change; one aggregate audit row per (query, surface, scope)
 decision, `TargetKind = "search:<surface>"`, zero-candidate visits emit no
 row; deferred lanes: language-scoped search — ADR 0018's consequence — and
-`tsvector` full-text). M7 (ADR 0090) shipped the shared pagination idiom
+`tsvector` full-text). `Messaging/` (M9) is now live —
+ADR 0105 ships the `Conversation` + `Message` docs (the `M9DocTypes` surface)
++ the `IMessagingService` seam (`IsMessagingEnabledAsync` /
+`SetMessagingEnabledAsync` + `OpenConversationAsync` / `SendAsync` /
+`ListConversationsAsync` / `GetConversationAsync` / `MarkReadAsync`) on the
+**participant-by-id** access story — zero new authorization surface (no
+`Audience`, no `IAuthorizationService` call, no new `AccessAction` /
+`AccessVia` / `IAuditableResource` adapter; a non-participant — GlobalAdmin
+included — gets a non-leaky 404) — and the write audit rows
+`TargetKind = "message"` (open / send, `Via = Owner`) and
+`TargetKind = "messaging.toggle"` (the admin flip, `Via = Admin`); reads and
+mark-read emit no row; the new-message nudge rides the M6 `Notification` lane
+(kind `message.new`). M7 (ADR 0090) shipped the shared pagination idiom
 — the `PagedViewModel` record + the `_Pager` partial (`Views/Shared/_Pager.cshtml`) +
 the `HasMore` signal on every paged Core seam. A new list surface that needs paging adds
 the `HasMore` signal to its seam (the D1/D3 shape) and drops in the `_Pager` partial (the
@@ -156,7 +170,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, and translated UI
   strings (ADR 0005); consumed by the presentation layer, never by feature
   authorization. (Static pages live in the `Pages` context now, ADR 0039.)
-- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091).
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091), Messaging (M9 ✓ — ADR 0105).
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:

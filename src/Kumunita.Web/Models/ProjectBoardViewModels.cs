@@ -138,7 +138,18 @@ public sealed record TodoCardRow(
     // degrades to `Generic`, no title / link — C-TBD·4). `null` = the card
     // has no blocker, so the chip is omitted entirely (the TodoDetail chip
     // idiom). A **hint** — it never gates the card (D2).
-    Kumunita.Core.Projects.BlockerChip? Blocker = null);
+    Kumunita.Core.Projects.BlockerChip? Blocker = null,
+    // ADR 0106 — the card's "Details" expander surface (reveals the body,
+    // the Start / Due dates if set, the waiting-on if set, and the
+    // community): the to-do's **body** (rendered as markdown in the view —
+    // a title-only to-do leaves it empty → the "no body" hint), and its
+    // **community display name** (the enabled-component name the controller
+    // resolved from `ComponentId`; `null` when unscoped / unresolvable, in
+    // which case the expander omits the community line). Display metadata
+    // only — never a gate (the card's visibility already ran the two-level
+    // read decision, C-M5·3).
+    string? Body = null,
+    string? CommunityDisplayName = null);
 
 /// <summary>
 /// The <b>board detail</b> view model (the <c>GET /projects/boards/{id}</c>
@@ -297,12 +308,14 @@ public sealed class BoardEditorModel
 
 /// <summary>
 /// The **board edit** form model (the <c>GET /projects/boards/{id}/edit</c>
-/// + <c>POST /projects/boards/{id}</c> lanes — ADR 0070). A **full update**
-/// of the board's <see cref="Title"/> (required) + optional <see
-/// cref="Description"/> Markdown (a blank description clears it to
-/// <c>null</c> — the <see cref="Kumunita.Core.Projects.UpdateBoardRequest"/>
-/// shape). The board's standing, audience, component, and language are
-/// creation-time choices — **not** editable here (ADR 0070).
+/// + <c>POST /projects/boards/{id}</c> lanes — ADR 0070, amended by ADR
+/// 0098). A **full update** of the board's <see cref="Title"/> (required) +
+/// optional <see cref="Description"/> Markdown (a blank description clears
+/// it to <c>null</c>) + the board's <see cref="Audience"/> editor (ADR
+/// 0098 — the stored audience prefills it; the posted editor is the
+/// actor's complete choice, written verbatim). The board's standing,
+/// component, and language remain creation-time choices — **not** editable
+/// here (ADR 0070).
 /// </summary>
 public sealed class BoardUpdateModel
 {
@@ -315,6 +328,13 @@ public sealed class BoardUpdateModel
     /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/>, edited by the
     /// one <c>bindRichEditor</c>; a blank value clears it).</summary>
     public string? Description { get; set; }
+
+    /// <summary>The board's **audience** editor (ADR 0098) — the M2
+    /// reusable <see cref="AudienceEditorModel"/> (the single-source pin).
+    /// Prefilled from the stored <see cref="KanbanBoard.Audience"/>; the
+    /// posted editor is the actor's complete choice (a non-null value
+    /// written verbatim, ADR 0001-B).</summary>
+    public AudienceEditorModel Audience { get; set; } = new();
 
     /// <summary>The board's **project association** (ADR 0086 D4 / D9) —
     /// the <see cref="KanbanBoard.ProjectId"/>: a feed filter, never a gate
@@ -332,8 +352,20 @@ public sealed class BoardUpdateModel
 
     /// <summary>true when the model is well-formed for a round-trip.
     /// <see cref="Title"/> is required (a board with no title is a
-    /// malformed shape, not a silent blank row).</summary>
-    public bool IsValid => !string.IsNullOrWhiteSpace(Title);
+    /// malformed shape, not a silent blank row); <see cref="Audience"/> is
+    /// well-formed (the editor's <see cref="AudienceEditorModel.IsValid"/>
+    /// — a missing mode is a malformed post, not a silent default — C1).</summary>
+    public bool IsValid
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Title))
+                return false;
+            if (Audience is null || !Audience.IsValid)
+                return false;
+            return true;
+        }
+    }
 }
 
 /// <summary>

@@ -514,6 +514,74 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         return;
     }
 
+    /// <inheritdoc />
+    public async Task DeleteGroupAsync(string groupId, string deletedBy)
+    {
+        // ADR 0093: the owner ∪ GlobalAdmin delete lane. Hard delete — the
+        // Group document, its GroupMembership rows, and its GroupInvitation
+        // rows go in one session + one SaveChangesAsync (invariant C3); one
+        // AccessAudit row (Action "group.delete", TargetKind "group",
+        // TargetId = groupId) rides the same transaction with the Owner/Admin
+        // Via derivation every other group write lane uses. No cascade into
+        // group-scoped Post / Event / GroupTranslation rows (ADR 0093): the
+        // group lane's authorization is membership-only (ADR 0013) and the
+        // membership rows are gone, so those rows become unreachable and are
+        // left in place rather than deleted.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // The group document + its membership + its invitation rows.
+        session.Delete<Group>(groupId);
+
+        var memberships = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var m in memberships)
+            session.Delete<GroupMembership>(m.Id);
+
+        var invitations = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var i in invitations)
+            session.Delete<GroupInvitation>(i.Id);
+
+        // ADR 0094: the group's join-request rows go with it (the same
+        // one-row-per-(group, user) cascade as the invitation rows above).
+        var joinRequests = await session.Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var j in joinRequests)
+            session.Delete<GroupJoinRequest>(j.Id);
+
+        var via = deletedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : deletedBy;
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = deletedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.delete",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
     // ── ADR 0026 — group name/description translations ─────────────────────
     // Mirrors the ADR 0022 post-translation lane (PostService), in this context:
     // a GroupTranslation row (at most one per language, the M1DocTypes unique
@@ -841,13 +909,26 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         var ns = services?.GetService<Notifications.NotificationService>();
         if (ns is not null)
         {
+            // ADR 0095 — the group-invite notification now carries the accept /
+            // decline actions: the invitee can act on the email's links (or the
+            // inbox's buttons) without navigating to the group first. The two
+            // same-origin relative paths point at the Web's self-lane GET
+            // actions (GroupsController.AcceptInvitationLink / DeclineInvitationLink,
+            // the same [Authorize] gate as the POST self-lane); the
+            // NotificationService stores them relative and appends them to the
+            // email as BaseUrl-prefixed absolute links (the VerificationOptions.BaseUrl
+            // precedent). The idempotency key / body / kind are unchanged (ADR
+            // 0083's emission shape — this is an additive ADR 0095 lane, not a
+            // re-emission; a re-invite still dedups on the same key).
             await ns.EmitAsync(
                 session,
                 userId,
                 Notifications.NotificationKinds.GroupInvite,
                 $"notification:{Notifications.NotificationKinds.GroupInvite}:{groupId}:{userId}",
                 group.Name,
-                CancellationToken.None).ConfigureAwait(false);
+                acceptPath: $"/groups/{groupId}/invitations/accept",
+                declinePath: $"/groups/{groupId}/invitations/decline",
+                ct: CancellationToken.None).ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -1167,6 +1248,312 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             .Query<GroupInvitation>()
             .Where(i => i.GroupId == groupId && i.Status == InvitationStatus.Pending)
             .OrderBy(i => i.InvitedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    // ── ADR 0094 — resident self-initiated join requests for public groups ──
+    // The reverse direction of the m2b owner-invited lane: the *resident*
+    // starts it (request + withdraw self-lane) and the group's owner ∪
+    // GlobalAdmin resolves it (approve → membership lands / decline). Same
+    // document conventions (business-key upsert, C3 audit in-session, C4
+    // strong consistency on approve), the same GU supervised-child wall on the
+    // membership-landing lane (approve), and the same "a resolved row is an
+    // invalid transition" state machine.
+
+    /// <inheritdoc />
+    public async Task<GroupJoinRequest> RequestToJoinGroupAsync(string groupId, string actorId)
+    {
+        // Self-lane (the requester starts it). Upsert the (group, user) row on
+        // the business key; a resolved (Approved / Declined) row resets to the
+        // fresh Pending shape — the two resolve stamps are cleared with it.
+        // Appends AccessAudit (action "group.join.request", the requester's own
+        // standing) in the same session; one SaveChangesAsync (invariant C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        var row = await session.Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId && j.UserId == actorId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+        {
+            row = new GroupJoinRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = actorId,
+                Status = JoinRequestStatus.Pending,
+                RequestedAt = now
+            };
+        }
+        else
+        {
+            row.Status = JoinRequestStatus.Pending;
+            row.RequestedAt = now;
+            row.ResolvedAt = null;
+            row.ResolvedBy = null;
+        }
+
+        session.Store(row);
+
+        // Self-lane audit: the requester's own standing — Via Owner with the
+        // requester as all three identities (the accept self-lane's shape).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "group.join.request",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc />
+    public async Task ApproveJoinRequestAsync(string groupId, string userId, string resolvedBy)
+    {
+        // Owner ∪ GlobalAdmin lane (JR·1): resolve the requester's Pending row
+        // and land the membership. In the same session (C3): the row moves
+        // Pending → Approved, the GroupMembership row is upserted (C4), and the
+        // audit row (action "group.join.approve", owner ⇒ Owner else Admin)
+        // rides the transaction. One SaveChangesAsync.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // GU gate (ADR 0028 §C / G·2): a supervised child — one with an active
+        // GuardianLink — does not have a self-standing to approve their own
+        // request (their membership-landing lane is guardian-mediated, exactly
+        // as AcceptGroupInvitationAsync's). Read-only; refuse here.
+        var supervised = await session.Query<GuardianLink>()
+            .Where(l => l.ChildId == userId && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (supervised is not null)
+            throw new InvalidOperationException(
+                $"Account {userId} is supervised; a group join must be approved by their guardian.");
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        var row = await session.Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId && j.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No join request for {userId} in group {groupId}");
+
+        if (row.Status != JoinRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Join request {row.Id} is already {row.Status}; only a Pending request can be approved.");
+
+        row.Status = JoinRequestStatus.Approved;
+        row.ResolvedAt = now;
+        row.ResolvedBy = resolvedBy;
+        session.Store(row);
+
+        // The membership lands here — the exact AddGroupMemberAsync upsert shape
+        // (strong consistency, invariant C4).
+        var membership = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            membership = new GroupMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = userId,
+                AddedBy = resolvedBy,
+                At = now
+            };
+        }
+        else
+        {
+            membership.AddedBy = resolvedBy;
+            membership.At = now;
+        }
+
+        session.Store(membership);
+
+        var via = resolvedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : resolvedBy;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = resolvedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.join.approve",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task DeclineJoinRequestAsync(string groupId, string userId, string resolvedBy)
+    {
+        // Owner ∪ GlobalAdmin lane (JR·1): the same gate + state check as
+        // ApproveJoinRequestAsync, but no GroupMembership row is touched — the
+        // requester simply never becomes a member. One SaveChangesAsync (C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        var row = await session.Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId && j.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No join request for {userId} in group {groupId}");
+
+        if (row.Status != JoinRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Join request {row.Id} is already {row.Status}; only a Pending request can be declined.");
+
+        row.Status = JoinRequestStatus.Declined;
+        row.ResolvedAt = now;
+        row.ResolvedBy = resolvedBy;
+        session.Store(row);
+
+        var via = resolvedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : resolvedBy;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = resolvedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.join.decline",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task WithdrawJoinRequestAsync(string groupId, string actorId)
+    {
+        // Self-lane (the requester pulls their own Pending row back). The row
+        // must be the actor's own and Pending; it moves to the terminal
+        // Withdrawn state (stamped with the requester) — the direct analogue of
+        // the m2b owner's CancelGroupInvitationAsync: the row drops off both
+        // the requester's "Your join requests" card and the owner's review
+        // list, and stays re-requestable (a re-request resets it to Pending).
+        // No GroupMembership row is touched. One SaveChangesAsync (C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var row = await session.Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId && j.UserId == actorId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        // Self-lane (JR·4): a row that isn't the actor's own is an invalid
+        // self-lane call (the Web's 404 gate is the first wall; this is the
+        // Core's).
+        if (row is null || row.UserId != actorId)
+            throw new InvalidOperationException(
+                $"No join request for {actorId} in group {groupId} to withdraw.");
+
+        if (row.Status != JoinRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Join request {row.Id} is already {row.Status}; only a Pending request can be withdrawn.");
+
+        row.Status = JoinRequestStatus.Withdrawn;
+        row.ResolvedAt = now;
+        row.ResolvedBy = actorId;
+        session.Store(row);
+
+        // Self-lane audit: the requester's own standing (Via Owner, all three
+        // identities the requester).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "group.join.withdraw",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    // ── ADR 0094 read lanes (candidate reads — no AccessAudit row, C-M2·2
+    // carried; live rows, invariant C4) ─────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForUserAsync(string userId)
+    {
+        // The requester's own pending set (the /groups list's "Your join
+        // requests" card + the withdraw self-lane's Web gate). Pending rows
+        // only, newest first.
+        if (string.IsNullOrEmpty(userId))
+            return Array.Empty<GroupJoinRequest>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupJoinRequest>()
+            .Where(j => j.UserId == userId && j.Status == JoinRequestStatus.Pending)
+            .OrderByDescending(j => j.RequestedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string groupId)
+    {
+        // The group's pending set (the /groups/{id} review surface). Pending
+        // rows only, oldest first ("who is still holding" order).
+        if (string.IsNullOrEmpty(groupId))
+            return Array.Empty<GroupJoinRequest>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupJoinRequest>()
+            .Where(j => j.GroupId == groupId && j.Status == JoinRequestStatus.Pending)
+            .OrderBy(j => j.RequestedAt)
             .ToListAsync()
             .ConfigureAwait(false);
     }

@@ -57,6 +57,15 @@ public sealed record PageNode(
     /// draft node (the author-only draft gate ran before this node was
     /// offered).</summary>
     bool IsDraft,
+    /// <summary>
+    /// Whether the node is a <c>PageKind.System</c> page (the platform's
+    /// own content — the ADR 0040 kind) vs. a <c>PageKind.User</c> page
+    /// (a resident's blog). Drives the tree browse's two-section layout
+    /// (system pages grouped apart from resident pages) and is display-
+    /// only — the standing gates are the <c>PG</c> service's, not the
+    /// view's.
+    /// </summary>
+    bool IsSystem,
     IReadOnlyList<PageNode> Children);
 
 /// <summary>
@@ -68,7 +77,20 @@ public sealed record PageNode(
 /// An empty forest (no pages, or all denied) is a valid shape — the view
 /// renders a "no pages yet" note, not a 404.
 /// </summary>
-public sealed record PageTreeViewModel(IReadOnlyList<PageNode> Roots);
+/// <param name="Roots">
+/// The resident-authored (<c>PageKind.User</c>) roots — the "community"
+/// section of the browse (a resident's blog pages).
+/// </param>
+/// <param name="SystemRoots">
+/// The platform's own (<c>PageKind.System</c>) roots — the "platform"
+/// section (the seeded terms / help / privacy / conduct tree, hoisted out
+/// of the <c>system</c> container by the controller's ADR 0043/0057
+/// container rule). Display partitioning only: storage is untouched, and
+/// every href still derives from the real ancestor chain.
+/// </param>
+public sealed record PageTreeViewModel(
+    IReadOnlyList<PageNode> Roots,
+    IReadOnlyList<PageNode> SystemRoots);
 
 /// <summary>
 /// The <c>GET /blog/{userId}</c> per-user blog feed (ADR 0040) — the

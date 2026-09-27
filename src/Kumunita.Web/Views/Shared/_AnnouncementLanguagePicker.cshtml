@@ -4,8 +4,8 @@
     picker (shared by the New + Edit compose views). The <b>Language</b> card:
     a <c>select</c> posting <c>LanguageCode</c>, pre-selected from
     <c>Model.LanguageCode</c> (the GET compose handlers pre-select the
-    instance default on the create lane, the stored row's tag on the edit
-    lane). A tag, never a translation (ADR 0005 C unchanged) — it keeps the
+    actor's current effective language — ADR 0049 — on the create lane, the
+    stored row's tag on the edit lane). A tag, never a translation (ADR 0005 C unchanged) — it keeps the
     text findable later and lets a reader add their own language version.
 *@
 <div class="card mb-4">

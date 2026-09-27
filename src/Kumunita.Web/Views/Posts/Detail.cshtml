@@ -86,7 +86,7 @@
                    unconditionally so a non-author can still file a report. *@
                 <div class="d-flex justify-content-end mb-2">
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
                                     aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end">
@@ -564,7 +564,7 @@
                                        gated on IsAuthor. The service's write-lane re-check at
                                        POST is the real gate. *@
                                     <div class="dropdown d-inline-block">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                                 data-bs-toggle="dropdown" aria-expanded="false"
                                                 aria-label="@($"Actions for reply by {r.AuthorDisplayName}")">⋮</button>
                                         <ul class="dropdown-menu dropdown-menu-end">
@@ -899,7 +899,8 @@
                         <select class="form-control" id="reply-language" name="languageCode">
                             @foreach (var (languageCode, nativeName) in replyLanguages)
                             {
-                                <option value="@languageCode">@nativeName</option>
+                                @* ADR 0049 — default to the language the resident is reading in *@
+                                <option value="@languageCode" selected="@(String.Equals(languageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
                             }
                         </select>
                         <div class="text-muted small mt-1">
@@ -929,20 +930,8 @@
        content/reply notification link carries). On load, if the URL hash is a
        reply anchor (#reply-{id}), scroll that reply into view and flash the
        .reply-highlight CSS (a tinted background + a soft outline that fades).
-       No module import needed — a plain inline script reading location.hash
-       and the DOM. *@
-    <script type="module">
-        (function highlightReplyFromHash() {
-            var hash = window.location.hash || "";
-            if (!hash.startsWith("#reply-")) return;
-            var el = document.getElementById(hash.slice(1));
-            if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("reply-highlight");
-            // Auto-clear after the flash (the CSS animation owns the fade;
-            // the class removal is the belt-and-suspenders reset so a
-            // re-click can re-trigger it).
-            window.setTimeout(function () { el.classList.remove("reply-highlight"); }, 4000);
-        })();
-    </script>
+       Lives in client/lib/reply-highlight.ts (tsc-built, the OPS §10
+       no-inline-script rule — the app CSP is script-src 'self' with no
+       'unsafe-inline', so an inline <script> here would be blocked). *@
+    <script type="module" src="~/js/lib/reply-highlight.js"></script>
 }

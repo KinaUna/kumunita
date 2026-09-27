@@ -134,5 +134,20 @@ public static class M5DocTypes
 
         opts.Schema.For<ProjectTranslation>()
                .UniqueIndex(p => p.ProjectId, p => p.LanguageCode);
+
+        // ── TodoComment (ADR 0100) — the comment / reply lane on a to-do.
+        // A conventional string Id (Marten's default). The (TodoId, Created)
+        // index is the **detail-list ordering** lookup (GetTodoAsync lists a
+        // to-do's comments by Created ascending — the same shape as the
+        // TodoItem (ComponentId, Created) feed-ordering index). The ParentId
+        // index is the reply lookup (the GetTodoAsync reply-under-comment
+        // read). No unique indexes — many comments per to-do, one reply per
+        // (parent) is a business invariant enforced server-side, not by
+        // schema (the TodoItem.ParentId precedent — the hierarchy is the
+        // C-M5·7 sole mechanism, not a schema key). Unnamed: the auto-derived
+        // names stay under Postgres' 64-char NAMEDATALEN cap (the note above).
+        opts.Schema.For<TodoComment>()
+               .Index(c => new { c.TodoId, c.Created })
+               .Index(c => c.ParentId);
     }
 }

@@ -13,41 +13,16 @@ not a code concern.
 
 ## Status
 
-**M3 complete** (`docs/design/m3-posts-design.md`,
-`docs/design/m3b-moderation.md`). The live loop now includes M1 identity /
-groups / delegation / authorization, M2 directory + profile editor + groups,
-M3 posts + audience-scoped feeds + the M3b moderation lane
-(file/assign/resolve + `PostStatus`) — all server-rendered MVC + Razor, with
-a durable Wolverine outbox, retry + dead-letter, and the `/health` degraded
-gate. The deployable surface has grown but the topology hasn't changed:
-`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`, `Kumunita.Web.Tests`),
-multi-stage Docker image, the versioned schema boot (Marten feature + EF
-Identity migration + first-boot seeder), a `/health` liveness probe, and a
-`Coolify`-based deploy (Coolify `app` + dedicated Postgres 18, image parity
-with `dev-db-init` + `docker-compose.yml`: **18**).
-Profile **avatars** have also landed — the reference lane of the content-addressed
-local-volume media store (ADR 0011, its own design doc); it adds a second restore
-surface next to the Postgres dump (OPS.md §4/§5).
-**Multilingual** has landed as **two lanes**. `ML` (ADR 0005) shipped the
-**seam**: the admin-managed language catalog + instance default, the per-request
-translation provider (preference cookie → default → `en`, per-string/per-page
-fallback), the `/admin/languages` surface, and the `/terms` + `/help`
-static-page routes. `ML-UI` (ADR 0015) then wired the **live UI**: every in-scope
-view resolves per request, a seeded `en` floor is always present, the admin
-edits the **closed** key list at `/admin/languages`, a signed-out visitor can
-pick a language at `/language`, and `/about` is a static page.
-**Rich content** (`RC`, ADR 0025) has landed — Markdown bodies + in-content
-images on posts, replies, announcements & static pages: one escape-first
-renderer extension (`![alt](src)` under a stricter `src` allowlist), the
-`GET /content-image/{id}` serving route (decision-deferred to the owning
-resource, Deny → 404 not 403, one `Read` audit row), the `POST /content-image`
-upload lane (ADR 0011's boundary verbatim), and the composer control on all
-four surfaces.
-**GU is done** — guardian controls, the account-scope supervision of a child's
-account (ADR 0028); **PG is done** — the hierarchical, audience-restricted,
-translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
-(ADR 0054); **EV-DWM is done** — events calendar day/week/month views
-(ADR 0064); **M5 is done** — projects (ADR 0067); **M6 is done** — notifications (ADR 0076); **M7 is done** — pagination & filtering (the `HasMore` signal on every paged seam, the `FeedResult.Total` correction, the `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, the D7 filter-reset pin; ADR 0090); **M8 is done** — search (one `/search` surface over the four resident content surfaces on the frozen authorization seams, zero schema change; ADR 0091); **next is M9** — PWA and responsive design. Then M10–M13 (portability, iCal, logging & analytics, Events+Projects integration — see the "Roadmap" below).
+**M10 in progress** (PWA and responsive design);
+M1–M9 and all named lanes
+are done — identity, groups & delegation, directory & profiles, posts +
+moderation, multilingual (`ML`/`ML-UI`), rich content (`RC`), guardian
+controls (`GU`), pages (`PG`), events + calendar (`M4`/`GE`/`EV-DWM`),
+projects (`M5`), notifications (`M6`), pagination (`M7`), search (`M8`) and
+messaging (`M9`), on one server-rendered stack over a single Postgres.
+
+The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
+milestone-by-milestone breakdown is in the Roadmap below.
 
 ## Principles
 
@@ -260,11 +235,12 @@ stays trivial and the authorization rules can grow freely.
 - **Todo dependency** (`TBD`, ADR 0087) — the "waiting on" lane on top of M5: one optional `BlockedByTodoId?` on `TodoItem` (additive on `M5DocTypes`, zero migration) — a **hint, never a gate** (it never changes the to-do's own `Audience` decision, a write, or a hard-delete cascade); a "Blocked by" chip on the to-do detail (access-scoped — an unreadable / absent / soft-deleted blocker degrades to a generic label, no title / link), the blocker picker on the to-do create / edit forms (select a to-do or "None" to clear — the `ClearBlockedBy` flag), and a `?blockedOnly=true` feed filter (a filter, never a gate, the `unassignedOnly` / `projectId` discipline); the **creator ∪ assignee ∪ GlobalAdmin** standing (C-M5·6) is re-checked server-side in the write lane, and the only refusal this lane adds is one cycle guard (self + transitive); additive and reusing — no new `AccessAction` / `AccessVia` / authorization branch, no hard delete, `todo.*` `kw-l` keys × 4 languages, `M7` stays the single in-progress milestone (a named lane, not a milestone). **Done.**
 - **M7** — Pagination and filtering: the one canonical paging contract — a `HasMore` signal on every paged seam, the `FeedResult.Total` correction (candidate count, not page count), the shared `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, and the D7 filter-reset pin (the filter set is frozen — text search is M8). **Done** (ADR 0090).
 - **M8** — Search: one `/search` surface (a nav search box, anonymous + signed-in) over the four resident content surfaces (community + group posts, community + group events, pages, announcements): `all` renders the top 5 hits per surface (a search-box answer, no pager); a single surface renders a paged list on the M7 `HasMore` signal + the shared `_Pager` partial (the ADR 0090 hand-off — no new pager idiom); the `groups` scope is signed-in-only and rides the **frozen** ADR 0013 group seams (`CanSeeGroupAsync` / `CanSeeGroupFeedAsync` — a group the viewer can't see contributes no hit and no count; anonymous degrades silently to community, no 403); case-insensitive substring match over authored-in `Title` + `Body` with a truncated, HTML-escaped context window — **zero schema change** (no index, no migration, ADR 0004 §B untouched); zero new authorization surface (no new `AccessAction` / `AccessVia` / adapter); one aggregate audit row per (query, surface, scope) decision (`TargetKind = "search:<surface>"`, zero-candidate visits emit no row); the render surface is hits + `HasMore` only — never a `Total`/`HiddenCount`. **Done** (ADR 0091). *Deliberately not in M8 (follow-on lanes, own ADRs): search over UGC translations (ADR 0018's "language-scoped search" consequence), `tsvector` full-text search (a versioned migration by construction), the project-family surfaces (M5's scope — a one-line predicate when wanted).*
-- **M9** — PWA and responsive design. **In progress.**
-- **M10** — Portability (import/export).
-- **M11** — iCal.
-- **M12** — Logging and analytics.
-- **M13** — Integration of Events and Projects.
+- **M9** — Messaging: 1:1 resident messaging — a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; a new `Conversation` + `Message` doc in a new `Kumunita.Core.Messaging` context, participant-only access (no `Audience`, no `GlobalAdmin` break-glass — the `RecipientId`-style personal read, ADR 0076 D3 shape), a per-recipient read state, a "new message" nudge through the M6 `Notification` lane, one `LocaleSettings` admin toggle (a GlobalAdmin can enable or disable the surface instance-wide, the ADR 0101 shape), `message.*` `kw-l` keys × 4 languages, zero new `AccessAction` / `AccessVia` / adapter. **Done.** (ADR 0105)
+- **M10** — PWA and responsive design. **In progress.**
+- **M11** — Portability (import/export).
+- **M12** — iCal.
+- **M13** — Logging and analytics.
+- **M14** — Integration of Events and Projects.
 
 ## Deferred (future, by design)
 

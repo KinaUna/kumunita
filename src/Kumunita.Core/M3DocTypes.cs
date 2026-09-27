@@ -65,5 +65,14 @@ public static class M3DocTypes
         opts.Schema.For<AnnouncementTranslation>()
                .UniqueIndex("ann_tr_uidx_ann_lang",
                             t => t.AnnouncementId, t => t.LanguageCode);
+
+        // Announcement comments (ADR 0101 — the "let residents comment on
+        // announcements" lane, the ADR 0100 TodoComment shape carried to the
+        // Announcements bounded context, minus the C-M5·7 reply hierarchy:
+        // top-level only). Read by (AnnouncementId) ordered by Created — the
+        // (AnnouncementId, Created) index matches the read's order (the
+        // TodoComment (TodoId, Created) index shape).
+        opts.Schema.For<AnnouncementComment>()
+               .Index(c => new { c.AnnouncementId, c.Created });
     }
 }

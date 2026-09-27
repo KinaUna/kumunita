@@ -128,6 +128,28 @@
                          module) re-points them when a resident clicks an
                          empty calendar slot instead. -->
                     <button type="button" class="btn btn-primary btn-sm events-new-event-btn" data-bs-toggle="modal" data-bs-target="#new-event-modal"><kw-l key="events.new_event">New event</kw-l></button>
+                    <!-- The full-page expand toggle (client/lib/expand-page.js,
+                         shared with the Kanban board's): keeps the page in
+                         the normal viewport but hides the navbar / footer
+                         and stretches the calendar to fill 100% of the page
+                         body (the body.kmb-page-expanded rules in site.css).
+                         The ✕ close sits just above the grid; Escape also
+                         collapses. -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary page-expand-toggle" aria-pressed="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="common.full_page">Full page</kw-l></span>
+                    </button>
+                    <!-- The browser full-screen toggle (client/lib/
+                         calendar-fullscreen.ts, the board's ⛶ sibling):
+                         #events-calendar becomes the Fullscreen API element
+                         — the browser hides the rest of the page, the
+                         :fullscreen rules in site.css give it the full-bleed
+                         look, and the ✕ close inside the grid exits (native
+                         Esc always works). -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary calendar-fullscreen-toggle" aria-pressed="false">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="common.fullscreen">Full screen</kw-l></span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -163,6 +185,16 @@
             }
         </div>
 
+        @* The full-page expand mode's close button (expand-page.js toggles
+           body.kmb-page-expanded; the site.css rules show this ✕ only while
+           expanded, pinned top-right). A plain button, not a link:
+           collapsing is client-side (no navigation). Placed once here —
+           above both the Day/Week and Month branches. *@
+        <button type="button" class="btn btn-sm btn-outline-secondary page-expand-close" aria-pressed="false" style="margin-bottom: 0.75rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            <span><kw-l key="common.exit_full_page">Exit full page</kw-l></span>
+        </button>
+
         @* The grid renders even when the window is empty (C-DWM: the day/week
              time-ruler and the month chip grid are the empty state — the
              structure shows even with no events, so a resident sees the
@@ -187,6 +219,14 @@
                  data-from="@Model.FromAnchor"
                  data-view="@Model.View"
                  data-overlap-hint="@overlapHint">
+                <!-- The browser full-screen close button (calendar-fullscreen.ts
+                     + site.css show it only while #events-calendar is the
+                     :fullscreen element — the only calendar control the
+                     browser keeps visible then). -->
+                <button type="button" class="btn btn-sm btn-outline-secondary calendar-fullscreen-close" aria-pressed="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    <span><kw-l key="common.exit_fullscreen">Exit full screen</kw-l></span>
+                </button>
                 <div class="events-time-grid @((Model.View == "day") ? "events-time-grid--day" : "events-time-grid--week")">
                     <div class="events-time-ruler" aria-hidden="true">
                         @* The 2rem head band mirrors each day-column's day-label
@@ -235,6 +275,12 @@
                  data-from="@Model.FromAnchor"
                  data-view="@Model.View"
                  data-overlap-hint="@overlapHint">
+                <!-- The browser full-screen close button (same contract as the
+                     Day/Week branch above). -->
+                <button type="button" class="btn btn-sm btn-outline-secondary calendar-fullscreen-close" aria-pressed="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    <span><kw-l key="common.exit_fullscreen">Exit full screen</kw-l></span>
+                </button>
                 <!-- The day-columns (Model.WindowDays — U02's per-view
                      window; month = the true calendar month, 5–6 full
                      weeks, D4): each shows its date label + an empty chip
@@ -359,4 +405,11 @@
          clicked, re-points the modal's Start/End inputs to that date + hour
          (30-minute snap) and opens the Bootstrap modal. -->
     <script type="module" src="~/js/lib/events-calendar-new.js"></script>
+    <!-- The calendar's browser full-screen channel (client/lib/
+         calendar-fullscreen.ts, the board's ⛶ sibling): #events-calendar
+         becomes the Fullscreen API element; the :fullscreen rules in
+         site.css give it the full-bleed look, and the ✕ close inside the
+         grid exits (native Esc always works). expand-page.js (global)
+         supplies the full-page expand channel. -->
+    <script type="module" src="~/js/lib/calendar-fullscreen.js"></script>
 }

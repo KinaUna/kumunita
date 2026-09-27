@@ -82,7 +82,7 @@
             @if (Model.CanTranslate)
             {
                 <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                    <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                             data-bs-toggle="dropdown" aria-expanded="false"
                             aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Name) ? "group" : Model.Name)}")">⋮</button>
                     <ul class="dropdown-menu dropdown-menu-end">
@@ -506,6 +506,42 @@
                     </ul>
                 }
 
+                @*
+                    ADR 0094 — the owner ∪ GlobalAdmin's join-request review
+                    surface (Model.PendingJoinRequests). A resident's
+                    self-initiated request to join this (public) group: approve
+                    lands the membership (C4) / decline leaves the requester
+                    out. Offered to canManage (the route's TryResolveOwnerSurface
+                    gate is the real SoD wall — a plain member's POST 404s).
+                *@
+                @if (canManage && Model.PendingJoinRequests.Count > 0)
+                {
+                    <h2 class="mt-4">
+                        <kw-l key="groups.join_requests_pending_heading">Pending join requests</kw-l>
+                        <span class="badge bg-secondary">@Model.PendingJoinRequests.Count</span>
+                    </h2>
+                    <ul class="list-group mb-3">
+                        @foreach (var p in Model.PendingJoinRequests)
+                        {
+                            <li class="list-group-item d-flex align-items-center justify-content-between">
+                                <span>@p.DisplayName</span>
+                                <span class="d-inline-flex gap-2">
+                                    <form method="post"
+                                          action="@Url.Action("ApproveJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.join_approve">Approve</kw-l></button>
+                                    </form>
+                                    <form method="post"
+                                          action="@Url.Action("DeclineJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.join_decline">Decline</kw-l></button>
+                                    </form>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+
                 @if (Model.IsOwner)
                 {
                     <h2 class="mt-4"><kw-l key="groups.invite_heading">Invite a resident</kw-l></h2>
@@ -665,6 +701,34 @@
                             }
                         </div>
                     }
+
+                    @*
+                        ADR 0093 — the group's delete (owner ∪ GlobalAdmin, the
+                        TryResolveOwnerSurface gate is the real SoD wall; a plain
+                        member never sees this form). Hard delete — the group, its
+                        membership, and its invitations are removed; group-scoped
+                        posts / events / translations are left in place and become
+                        unreachable (the group lane is membership-only, ADR 0013).
+                        The confirm is the declarative data-confirm contract
+                        (client/lib/confirm.ts, SECURITY.md §6). The route redirects
+                        to the /groups list (the actor is out of the owner ∪ member
+                        projection on the next read — the ADR 0008 LeaveGroup
+                        redirect shape).
+                    *@
+                    <div class="mt-4 border-top pt-3">
+                        <h2 class="h4"><kw-l key="groups.danger_heading">Danger zone</kw-l></h2>
+                        <p class="text-muted">
+                            <kw-l key="groups.danger_delete_hint">Deleting the group removes it, its members, and any pending invitations. This cannot be undone.</kw-l>
+                        </p>
+                        <form method="post" action="@Url.Action("DeleteGroup", "Groups", new { id = Model.GroupId })"
+                              data-confirm="Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone."
+                              style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-danger">
+                                <kw-l key="groups.danger_delete_button">Delete this group</kw-l>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             }
 

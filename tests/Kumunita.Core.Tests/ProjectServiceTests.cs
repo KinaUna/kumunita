@@ -1061,6 +1061,90 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     }
 
     /// <summary>
+    /// <b>F12</b> (audience inheritance, C-M5·3): a to-do added directly onto
+    /// a board lane <b>inherits the board's audience</b> — the new card's
+    /// <see cref="TodoItem.Audience"/> is the board's <see
+    /// cref="KanbanBoard.Audience"/>, carried verbatim. The behavioral pin is
+    /// the standalone feed (which gates on the to-do's own <c>Audience</c>,
+    /// not the board's): the audience grantee sees the card, a stranger does
+    /// not. This is what keeps a card created on a restricted board from
+    /// leaking into the public to-do feed (the pre-change behavior was
+    /// <c>Audience = null</c> — world-visible).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_InheritsBoardAudience()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12d-author";
+        const string grantee = "u-u12-f12d-grantee";
+        const string stranger = "u-u12-f12d-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12d-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12d-lane", BoardId = "f12d-board", Title = "Doing", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var todo = await svc.AddTodoToLaneAsync("f12d-board", "f12d-lane", "Inherited card", author, MemberRoles);
+
+        // The card carries the board's audience verbatim (C-M5·3) — not null.
+        Assert.NotNull(todo.Audience);
+        Assert.Equal(AudienceMode.Any, todo.Audience.Mode);
+        var grant = Assert.Single(todo.Audience.Grants);
+        Assert.Equal(GrantKind.User, grant.Kind);
+        Assert.Equal(grantee, grant.Id);
+
+        // Behavioral: the standalone feed gates on the to-do's own audience.
+        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1)).Items;
+        Assert.Contains(todo.Id, granteeFeed.Select(t => t.Id));
+
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        Assert.DoesNotContain(todo.Id, strangerFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
+    /// <b>F12</b> (public board, C-M5·3): a board whose <see
+    /// cref="KanbanBoard.Audience"/> is <c>null</c> (public) still yields a
+    /// <c>null</c> (public) card — inheritance is a copy of the stored value,
+    /// not a forcing to a non-null shape. The card is visible to the grantee,
+    /// the author, and a stranger alike (world-visible).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_PublicBoardYieldsPublicCard()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12e-author";
+        const string stranger = "u-u12-f12e-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12e-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null, // public
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12e-lane", BoardId = "f12e-board", Title = "Doing", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var todo = await svc.AddTodoToLaneAsync("f12e-board", "f12e-lane", "Public card", author, MemberRoles);
+
+        Assert.Null(todo.Audience); // inherited null — public, unchanged
+
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        Assert.Contains(todo.Id, strangerFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
     /// <b>F12</b> (refuse, C-M5·5): a lane already at its <c>MaxItems</c>
     /// limit **refuses** the add with <see cref="InvalidOperationException"/>
     /// (the lane's <c>Title</c> in the message) and **nothing is written**
@@ -1372,6 +1456,183 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         }
     }
 
+    // ── F17 — delete a lane (ADR 0097) ─────────────────────────────────────
+
+    /// <summary>
+    /// <b>F17</b> (delete): <see cref="ProjectService.DeleteLaneAsync"/>
+    /// **deletes** the <see cref="KanbanLane"/> row and its
+    /// <see cref="BoardItemPlacement"/> rows (lanes are the board's own rows —
+    /// no <c>IsDeleted</c> flag), the **to-do is untouched** (C-M5·2 — it
+    /// keeps its standalone form), the board's **remaining** lanes re-settle
+    /// to a clean <c>0..n-1</c> <c>Order</c>, and one
+    /// <see cref="AccessAudit"/> row (<c>board.delete_lane</c>, the **board's**
+    /// id as the target — the lane is not an auditable resource of its own)
+    /// commits atomically (C3).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_DeletesLaneAndPlacements_TodosKept_Renumerated_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A (0), B (1), C (2) — cards on B (the lane to delete) and on A (a
+        // surviving lane) to prove the survivors' placements are untouched.
+        await Plant(store, new KanbanLane { Id = "f17-A", BoardId = "f17-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f17-B", BoardId = "f17-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f17-C", BoardId = "f17-board", Title = "C", Order = 2, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17-todoB", AuthorId = author, Title = "On B", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new TodoItem { Id = "f17-todoA", AuthorId = author, Title = "On A", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17-pB", TodoItemId = "f17-todoB", BoardId = "f17-board", LaneId = "f17-B", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+        await Plant(store, new BoardItemPlacement { Id = "f17-pA", TodoItemId = "f17-todoA", BoardId = "f17-board", LaneId = "f17-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await svc.DeleteLaneAsync("f17-B", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            // The lane and its placements are gone.
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17-B"));
+            Assert.Null(await q.LoadAsync<BoardItemPlacement>("f17-pB"));
+
+            // The to-do itself is kept (C-M5·2) — standalone, not soft-deleted.
+            var todo = (await q.LoadAsync<TodoItem>("f17-todoB"))!;
+            Assert.Equal("On B", todo.Title);
+            Assert.False(todo.IsDeleted);
+
+            // The remaining lanes re-settle to a clean 0..n-1 sequence:
+            // A (0), C (1) — the survivor on A keeps its placement + slot.
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f17-A"))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f17-C"))!.Order);
+            var pA = (await q.LoadAsync<BoardItemPlacement>("f17-pA"))!;
+            Assert.Equal("f17-A", pA.LaneId);
+            Assert.Equal(0, pA.Order);
+        }
+
+        // The board.delete_lane audit row (C3) — the board is the target
+        // (the lane is not an auditable resource of its own), Via Owner
+        // (the creator branch).
+        var audits = await BoardAuditRows(store, "f17-board");
+        var row = Assert.Single(audits, a => a.Action == "board.delete_lane");
+        Assert.Equal("board", row.TargetKind);
+        Assert.Equal("f17-board", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F17</b> (last lane): deleting the board's **only** lane is a
+    /// renumber no-op — the lane is still deleted, the board is left with
+    /// **zero** lanes (the detail view's <c>projects.board.no_lanes</c> empty
+    /// state), and the lane's to-do is kept (C-M5·2).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_LastLane_BoardLeftWithZeroLanes_TodoKept()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17b-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17b-sole", BoardId = "f17b-board", Title = "Only", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17b-todo", AuthorId = author, Title = "On the only lane", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17b-p", TodoItemId = "f17b-todo", BoardId = "f17b-board", LaneId = "f17b-sole", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await svc.DeleteLaneAsync("f17b-sole", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17b-sole"));
+            Assert.Equal(0, await q.Query<KanbanLane>().Where(l => l.BoardId == "f17b-board").CountAsync());
+            // The to-do survives its lane's deletion (C-M5·2).
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17b-todo"));
+            // The board itself is untouched (no soft-delete flag on a lane
+            // delete — only the board-delete seam flips board.IsDeleted).
+            var board = (await q.LoadAsync<KanbanBoard>("f17b-board"))!;
+            Assert.False(board.IsDeleted);
+        }
+    }
+
+    /// <summary>
+    /// <b>F17</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the delete with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written
+    /// (the lane, its placements, and the to-do are all untouched).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_NonCreatorRefused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17c-author";
+        const string stranger = "u-u12-f17c-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17c-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17c-A", BoardId = "f17c-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17c-todo", AuthorId = author, Title = "On A", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17c-p", TodoItemId = "f17c-todo", BoardId = "f17c-board", LaneId = "f17c-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteLaneAsync("f17c-A", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.NotNull(await q.LoadAsync<KanbanLane>("f17c-A"));        // untouched
+            Assert.NotNull(await q.LoadAsync<BoardItemPlacement>("f17c-p"));
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17c-todo"));
+        }
+
+        // No audit row for the refused delete.
+        Assert.Empty(await BoardAuditRows(store, "f17c-board"));
+    }
+
+    /// <summary>
+    /// <b>F17</b> (C3 404-vs-403 split): a **missing** lane id is <see
+    /// cref="KeyNotFoundException"/> (404); a lane whose board is
+    /// **soft-deleted** is <see cref="KeyNotFoundException"/> (404) too — the
+    /// board-delete seam already owns the board, so the lane-delete seam does
+    /// not re-enter a deleted board's tree.
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_MissingLane_404_OnSoftDeletedBoard_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17d-author";
+
+        // A missing lane id — the 404 side.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.DeleteLaneAsync("no-such-lane", author, MemberRoles));
+
+        // A lane on a soft-deleted board — the 404 side (checked before the
+        // standing, so even the creator is refused).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17d-board", AuthorId = author, Title = "Deleted board",
+            IsDeleted = true,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17d-A", BoardId = "f17d-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.DeleteLaneAsync("f17d-A", author, MemberRoles));
+    }
+
     // ── F15 — move a card to a lane + position (ADR 0069) ───────────────────
 
     /// <summary>
@@ -1626,6 +1887,93 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
 
         // A no-op re-save leaves the stamp untouched.
+        Assert.Null(updated.Modified);
+    }
+
+    /// <summary>
+    /// <b>F16</b> (ADR 0098 — audience edit): a non-null
+    /// <see cref="UpdateBoardRequest.Audience"/> is applied verbatim (ADR
+    /// 0001-B) and <see cref="KanbanBoard.Modified"/> is stamped (a real
+    /// change — the audience went from <c>null</c>/public to restricted).
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_AudienceApplied_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16f-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var audience = new Audience(AudienceMode.Any,
+            new[] { new AudienceGrant(GrantKind.User, "u-f16f-grantee") })
+        {
+            Community = true,
+        };
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "Board", Audience = audience });
+
+        Assert.NotNull(updated.Modified);
+        Assert.NotNull(updated.Audience);
+        Assert.Equal(AudienceMode.Any, updated.Audience!.Mode);
+        Assert.True(updated.Audience.Community);
+        Assert.Single(updated.Audience.Grants);
+        Assert.Equal(GrantKind.User, updated.Audience.Grants[0].Kind);
+        Assert.Equal("u-f16f-grantee", updated.Audience.Grants[0].Id);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            Assert.NotNull(reloaded.Audience);
+            Assert.Equal(AudienceMode.Any, reloaded.Audience!.Mode);
+            Assert.Single(reloaded.Audience.Grants);
+            Assert.Equal("u-f16f-grantee", reloaded.Audience.Grants[0].Id);
+        }
+    }
+
+    /// <summary>
+    /// <b>F16</b> (ADR 0098 — null audience leaves it unchanged): a
+    /// <see cref="UpdateBoardRequest.Audience"/> of <c>null</c> (the
+    /// title/description-only shape) leaves the stored audience **untouched**
+    /// and, when the title/description are also unchanged, the no-op
+    /// <c>Modified</c> stamp stays <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_NullAudience_LeavesStoredAudienceUntouched()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16g-author";
+
+        var storedAudience = new Audience(AudienceMode.All,
+            new[] { new AudienceGrant(GrantKind.Group, "g-f16g") });
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Same title",
+            Description = "Same description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = storedAudience,
+        });
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
+
+        // A null audience on the request does not clear the stored one.
+        Assert.NotNull(updated.Audience);
+        Assert.Equal(AudienceMode.All, updated.Audience!.Mode);
+        Assert.Single(updated.Audience.Grants);
+        Assert.Equal(GrantKind.Group, updated.Audience.Grants[0].Kind);
+
+        // No field changed — the Modified stamp stays untouched.
         Assert.Null(updated.Modified);
     }
 
@@ -3504,6 +3852,328 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(chip.Title);
         Assert.Null(chip.Status);
         Assert.Null(chip.LinkPath);
+    }
+
+    // ── Comments + replies (ADR 0100) ───────────────────────────────────────
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C-M3·1): <see cref="ProjectService.CreateTodoCommentAsync"/>
+    /// writes a **top-level** comment (a <c>null</c> <see cref="TodoComment.ParentId"/>
+    /// is a top-level comment on the to-do), stores the author's
+    /// <see cref="TodoComment.Body"/> verbatim, and commits one
+    /// <c>todo.comment.create</c> audit row (<c>TargetKind = "todo"</c>,
+    /// <c>Via = Owner</c>) atomically with the write (C3).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_TopLevel_StoresRowAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-1-author";
+        const string commenter = "u-cmt-1-commenter";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-1-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null, // public — a member commenter passes the Read pass
+        });
+
+        var created = await svc.CreateTodoCommentAsync(
+            "cmt-1-todo", commenter, MemberRoles, "First thought", "en");
+
+        Assert.NotEmpty(created.Id);
+        Assert.Equal("cmt-1-todo", created.TodoId);
+        Assert.Null(created.ParentId);
+        Assert.Equal(commenter, created.AuthorId);
+        Assert.Equal("First thought", created.Body);
+        Assert.Equal("en", created.LanguageCode);
+        Assert.Null(created.DeletedAt);
+
+        // The C3 audit row committed with the write.
+        var audit = Assert.Single(await TodoAuditRows(store, "cmt-1-todo"),
+            a => a.Action == "todo.comment.create");
+        Assert.Equal(AccessVia.Owner, audit.Via);
+
+        // The read lane returns the comment (the to-do's Read decision already ran).
+        var detail = await svc.GetTodoAsync("cmt-1-todo", author);
+        Assert.Single(detail.Comments);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C-M5·7): a **reply** — a non-null
+    /// <paramref name="parentId"/> resolves to a live top-level comment on the
+    /// same to-do, so <see cref="TodoComment.ParentId"/> is set to that comment's
+    /// id (the sole hierarchy mechanism; a reply's parent is a top-level comment).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_Reply_SetsParentId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-2-author";
+        const string commenter = "u-cmt-2-commenter";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-2-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var topLevel = await svc.CreateTodoCommentAsync(
+            "cmt-2-todo", commenter, MemberRoles, "Question?", "en");
+
+        var reply = await svc.CreateTodoCommentAsync(
+            "cmt-2-todo", author, MemberRoles, "Answer.", "en",
+            parentId: topLevel.Id);
+
+        Assert.Equal(topLevel.Id, reply.ParentId);
+        Assert.Equal("cmt-2-todo", reply.TodoId);
+
+        var detail = await svc.GetTodoAsync("cmt-2-todo", author);
+        Assert.Equal(2, detail.Comments.Count);
+        Assert.Contains(detail.Comments, c => c.ParentId == topLevel.Id);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C3 404-vs-403 split): a <paramref name="parentId"/> that
+    /// does **not** resolve to a live comment on the given to-do is a
+    /// <see cref="KeyNotFoundException"/> (404) — the parent is on a
+    /// **different** to-do (non-leaky: the id does not even matter), is
+    /// **missing** entirely, or is **soft-deleted**. No row is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_InvalidParentRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-3-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-3-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-3-other", AuthorId = author, Title = "Another to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 30, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A live top-level comment on the *other* to-do.
+        var otherComment = await svc.CreateTodoCommentAsync(
+            "cmt-3-other", author, MemberRoles, "On the other to-do", "en");
+        // A soft-deleted top-level comment on *this* to-do.
+        var deletedComment = await svc.CreateTodoCommentAsync(
+            "cmt-3-todo", author, MemberRoles, "To be deleted", "en");
+        await svc.DeleteTodoCommentAsync("cmt-3-todo", deletedComment.Id, author, MemberRoles);
+
+        // Parent on a different to-do → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: otherComment.Id));
+
+        // Missing parent → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: "cmt-3-missing"));
+
+        // Soft-deleted parent → 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
+                "Reply?", "en", parentId: deletedComment.Id));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (C3 404-vs-403 split): a comment on a to-do that is
+    /// **absent** is a <see cref="KeyNotFoundException"/> (404), and a comment
+    /// on a **soft-deleted** to-do is also a <see cref="KeyNotFoundException"/>
+    /// (404 — the to-do is gone for everyone, so it is not a 403).
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_MissingOrDeletedTodoRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-4-author";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-4-missing", author, MemberRoles,
+                "Ghost to-do", "en"));
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-4-deleted", AuthorId = author, Title = "Deleted to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateTodoCommentAsync("cmt-4-deleted", author, MemberRoles,
+                "On a deleted to-do", "en"));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (standing = the to-do's <c>Read</c> decision, C-M3·1):
+    /// an actor who **cannot read** the to-do is refused the comment write with
+    /// <see cref="UnauthorizedAccessException"/> (403) — the to-do is
+    /// audience-restricted to a third party, so a stranger's <c>Read</c> pass is
+    /// denied. Nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_UnreadableTodoRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-5-author";
+        const string stranger = "u-cmt-5-stranger";
+        const string grantee = "u-cmt-5-grantee";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-5-todo", AuthorId = author, Title = "Restricted to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee), // the stranger is not granted
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateTodoCommentAsync("cmt-5-todo", stranger, MemberRoles,
+                "Intrusion", "en"));
+
+        // The to-do's comment set is still empty.
+        await using var q = store.QuerySession();
+        var ct = TestContext.Current.CancellationToken;
+        Assert.Equal(0, await q.Query<TodoComment>()
+            .Where(c => c.TodoId == "cmt-5-todo").CountAsync(ct));
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (the ADR 0024 author-soft-delete shape): only the
+    /// comment's **author** may soft-delete it — a non-author is refused with
+    /// <see cref="UnauthorizedAccessException"/> (403, there is no moderator /
+    /// GlobalAdmin override branch on a comment's own delete, the ADR 0016
+    /// reply-delete precedent). The record is untouched by the refused write.
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodoComment_NonAuthorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-6-author";
+        const string commenter = "u-cmt-6-commenter";
+        const string stranger = "u-cmt-6-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-6-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        var comment = await svc.CreateTodoCommentAsync(
+            "cmt-6-todo", commenter, MemberRoles, "Mine", "en");
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteTodoCommentAsync("cmt-6-todo", comment.Id, stranger, MemberRoles));
+
+        await using var q = store.QuerySession();
+        var reloaded = (await q.LoadAsync<TodoComment>(comment.Id))!;
+        Assert.Null(reloaded.DeletedAt); // untouched by the refused write
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b> (ADR 0024): the **author** soft-deletes their own
+    /// comment — <see cref="TodoComment.DeletedAt"/> is stamped forward (the
+    /// record is **kept**, never hard-deleted), a <c>todo.comment.delete</c>
+    /// audit row commits atomically (C3), and the read lane still returns the
+    /// row (so the detail view can render the placeholder in place of the body).
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodoComment_Author_SoftDeletesAndKeepsRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-7-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-7-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        var comment = await svc.CreateTodoCommentAsync(
+            "cmt-7-todo", author, MemberRoles, "To be deleted", "en");
+        Assert.Null(comment.DeletedAt);
+
+        var deleted = await svc.DeleteTodoCommentAsync("cmt-7-todo", comment.Id, author, MemberRoles);
+        Assert.NotNull(deleted.DeletedAt);
+
+        // C3 audit row for the delete.
+        Assert.Contains(await TodoAuditRows(store, "cmt-7-todo"),
+            a => a.Action == "todo.comment.delete");
+
+        // The record is kept — the read lane still returns it (now deleted).
+        var detail = await svc.GetTodoAsync("cmt-7-todo", author);
+        var row = Assert.Single(detail.Comments);
+        Assert.NotNull(row.DeletedAt);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b>: the read lane returns the to-do's comments ordered by
+    /// <see cref="TodoComment.Created"/> ascending (the detail view lists them in
+    /// chronological order, replies under their parent).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_ReturnsCommentsInCreatedOrder()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-8-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-8-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Older", "en");
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Newer", "en");
+
+        var detail = await svc.GetTodoAsync("cmt-8-todo", author);
+        var bodies = detail.Comments.Select(c => c.Body).ToList();
+        // Created ascending — the older comment precedes the newer one.
+        Assert.Equal(["Older", "Newer"], bodies);
+    }
+
+    /// <summary>
+    /// <b>ADR 0100</b>: a comment with a **blank** <c>body</c> is refused with
+    /// <see cref="ArgumentException"/> (the service-side guard — the web layer
+    /// also validates, but the service is the gate). Nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateTodoComment_BlankBodyRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-cmt-9-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "cmt-9-todo", AuthorId = author, Title = "Commentable to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateTodoCommentAsync("cmt-9-todo", author, MemberRoles, "   ", "en"));
+
+        await using var q = store.QuerySession();
+        var ct = TestContext.Current.CancellationToken;
+        Assert.Equal(0, await q.Query<TodoComment>()
+            .Where(c => c.TodoId == "cmt-9-todo").CountAsync(ct));
     }
 
     private static async Task<IReadOnlyList<AccessAudit>> GoalAuditRows(IDocumentStore store, string goalId)

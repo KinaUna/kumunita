@@ -132,4 +132,70 @@ public sealed class GroupsViewModelTests
                  { "GroupId", "InvitedBy", "Status", "InvitedAt", "ResolvedAt", "ResolvedBy", "Email", "Phone" })
             Assert.DoesNotContain(field, props);
     }
+
+    // ── ADR 0094 drift lane: the two join-request-projection records ─────
+
+    /// <summary>
+    /// ADR 0094 shape pin: <see cref="JoinRequestViewModel"/> (the "/groups"
+    /// list's "Your join requests" card row) is the strict 2-tuple
+    /// <c>{ GroupId, GroupName }</c> — the <see
+    /// cref="Kumunita.Core.UserInfo.GroupJoinRequest"/> source row's
+    /// <c>UserId</c>/<c>Status</c>/<c>RequestedAt</c>/<c>ResolvedAt</c> and
+    /// resolution fields never reach the UI: a pending row is always
+    /// <c>Pending</c> (the read lane filters it), the requester has no subject
+    /// channel (they are the actor), and "who resolved it, when" is an
+    /// <c>AccessAudit</c> lane fact.
+    /// </summary>
+    [Fact]
+    public void JoinRequestViewModel_Has_Exactly_Two_Projected_Fields()
+    {
+        var fields = typeof(JoinRequestViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.Equal(new[] { "GroupId", "GroupName" }, fields.ToArray());
+
+        var props = typeof(JoinRequestViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .ToHashSet();
+
+        foreach (var field in new[]
+                 { "UserId", "Status", "RequestedAt", "ResolvedAt", "ResolvedBy" })
+            Assert.DoesNotContain(field, props);
+    }
+
+    /// <summary>
+    /// ADR 0094 shape pin: <see cref="PendingJoinRequestViewModel"/> (the
+    /// "/groups/{id}" join-request lane's pending row) is the strict 2-tuple
+    /// <c>{ SubjectId, DisplayName }</c> — the <see
+    /// cref="Kumunita.Core.UserInfo.PendingInvitationViewModel"/> pin carried
+    /// to the join-request axis. <c>SubjectId</c> is the requester's opaque
+    /// subject (the approve/decline route's <c>{subjectId}</c> segment); the
+    /// source row's <c>RequestedAt</c>/<c>Status</c>/<c>ResolvedAt</c>
+    /// never reach the model (audit-lane and read-lane facts, not a
+    /// member-list-shaped UI).
+    /// </summary>
+    [Fact]
+    public void PendingJoinRequestViewModel_Has_Exactly_Two_Projected_Fields()
+    {
+        var fields = typeof(PendingJoinRequestViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.Equal(new[] { "DisplayName", "SubjectId" }, fields.ToArray());
+
+        var props = typeof(PendingJoinRequestViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .ToHashSet();
+
+        foreach (var field in new[]
+                 { "GroupId", "Status", "RequestedAt", "ResolvedAt", "ResolvedBy", "Email", "Phone" })
+            Assert.DoesNotContain(field, props);
+    }
 }

@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_TwentyOne_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_TwentyTwo_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -107,6 +107,10 @@ public sealed class GroupsDetailViewModelTests
                 "PagerEvents",
                 "PagerPosts",
                 "PendingInvitations",
+                // ADR 0094 — the join-request lane's review projection: the
+                // pending requests for this group (subject + display name),
+                // the owner ∪ GlobalAdmin approve/decline surface.
+                "PendingJoinRequests",
                 "ResidentCandidates",
             },
             fields.ToArray());

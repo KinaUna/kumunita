@@ -883,7 +883,9 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             "notification:post.reply:reply-adr85", "New reply on your post",
             targetId: null,
             linkPath: linkPath,
-            TestContext.Current.CancellationToken);
+            acceptPath: null,
+            declinePath: null,
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // A stored row is the contract (the synthetic recipient is not a
@@ -925,6 +927,198 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Null(row!.LinkPath);
         var email = Assert.Single(staged);
         Assert.DoesNotContain("http://localhost:5123", email.Body);
+    }
+
+    // ── ADR 0095 — the accept / decline action-link lane (the group-invite
+    //    surface) ────────────────────────────────────────────────────────────
+    //
+    // When an emitter supplies an <c>AcceptPath</c> and/or a
+    // <c>DeclinePath</c> (a same-origin relative path to the accept / decline
+    // action), the stored inbox row carries them verbatim (the inbox renders
+    // them as its own clickable buttons) and the **email** body has each
+    // appended as an **absolute** link (the instance BaseUrl + the relative
+    // path), each prefixed by its localized
+    // <c>notifications.accept</c> / <c>notifications.decline</c> label — the
+    // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
+    // precedent. The two are independent (either may be absent); a kind with
+    // neither appends nothing.
+
+    [Fact]
+    public async Task Emit_WithAcceptAndDeclinePath_Stores_Relative_Both_And_Appends_Absolute_Both_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95-invitee";
+        await PlantProfile(store, invitee, "adr95-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        const string acceptPath = "/groups/grp-adr95/invitations/accept";
+        const string declinePath = "/groups/grp-adr95/invitations/decline";
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95:u-adr95-invitee", "Garden Club",
+            targetId: null,
+            linkPath: null,
+            acceptPath: acceptPath,
+            declinePath: declinePath,
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        // The inbox row carries **both** relative paths verbatim (the inbox
+        // renders them as its own clickable buttons), and no LinkPath (the
+        // group-invite lane isn't a content/reply "View" lane).
+        Assert.Equal(acceptPath, row!.AcceptPath);
+        Assert.Equal(declinePath, row.DeclinePath);
+        Assert.Null(row.LinkPath);
+
+        // The email body carries **both** as absolute links (BaseUrl +
+        // relative path), each prefixed by its localized label (the
+        // RecordingTranslator resolves each to a key-derived marker).
+        var email = Assert.Single(staged);
+        Assert.Contains(baseUrl + acceptPath, email.Body);
+        Assert.Contains(baseUrl + declinePath, email.Body);
+        Assert.Contains("notifications.accept-en", email.Body);
+        Assert.Contains("notifications.decline-en", email.Body);
+    }
+
+    [Fact]
+    public async Task Emit_WithOnlyAcceptPath_Stores_Only_Accept_And_Appends_Only_Accept_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95b-invitee";
+        await PlantProfile(store, invitee, "adr95b-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        const string acceptPath = "/groups/grp-adr95b/invitations/accept";
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95b:u-adr95b-invitee", "Garden Club",
+            targetId: null,
+            linkPath: null,
+            acceptPath: acceptPath,
+            declinePath: null,
+            ct: TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(acceptPath, row!.AcceptPath);
+        Assert.Null(row.DeclinePath);
+
+        var email = Assert.Single(staged);
+        Assert.Contains(baseUrl + acceptPath, email.Body);
+        Assert.Contains("notifications.accept-en", email.Body);
+        // No decline link, no decline label.
+        Assert.DoesNotContain("notifications.decline", email.Body);
+    }
+
+    [Fact]
+    public async Task Emit_WithoutAcceptOrDeclinePath_Appends_No_Action_Links_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95c-invitee";
+        await PlantProfile(store, invitee, "adr95c-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95c:u-adr95c-invitee", "Garden Club",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Null(row!.AcceptPath);
+        Assert.Null(row.DeclinePath);
+        var email = Assert.Single(staged);
+        Assert.DoesNotContain("notifications.accept", email.Body);
+        Assert.DoesNotContain("notifications.decline", email.Body);
+    }
+
+    // ── ADR 0096 — the single-row read / unread state lanes ──────────────────
+    //
+    // C-M6·3 (D3 / F11): the single-row read/unread lanes are **personal** —
+    // a <c>Notification</c> row is loaded and gated on its
+    // <see cref="Notification.RecipientId"/>; a row the actor does **not**
+    // own is a <see cref="KeyNotFoundException"/>, never a cross-recipient
+    // write (no <c>IAuthorizationService</c> call, no audit row — the
+    // <c>RecipientId</c> *is* the whole access story). The toggle touches
+    // exactly **one** row (unlike <c>MarkAllReadAsync</c>, which sets every
+    // unread row).
+
+    [Fact]
+    public async Task MarkRead_Sets_ReadAt_On_Owned_Row_Only()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-mr1";
+        await PlantProfile(store, recipient, "mr1@kumunita");
+
+        // One unread target + one unread sibling — MarkRead must touch only
+        // the target (the single-row lane, not the all-read lane).
+        var target = await PlantRow(store, recipient, NotificationKinds.PostReply,
+            "notification:post.reply:mr1-target");
+        var sibling = await PlantRow(store, recipient, NotificationKinds.PostReply,
+            "notification:post.reply:mr1-sib");
+
+        await svc.MarkReadAsync(recipient, target.Id, TestContext.Current.CancellationToken);
+
+        var targetAfter = await LoadRow(store, target.Id);
+        var siblingAfter = await LoadRow(store, sibling.Id);
+        Assert.NotNull(targetAfter?.ReadAt);                 // the named row is now read
+        Assert.Null(siblingAfter?.ReadAt);                   // the sibling is untouched
+    }
+
+    [Fact]
+    public async Task MarkUnread_Clears_ReadAt_On_Owned_Row_Only()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-mu1";
+        await PlantProfile(store, recipient, "mu1@kumunita");
+
+        var target = await PlantRow(store, recipient, NotificationKinds.GroupPost,
+            "notification:group.post:mu1-target", readAt: DateTimeOffset.UtcNow);
+        var sibling = await PlantRow(store, recipient, NotificationKinds.GroupPost,
+            "notification:group.post:mu1-sib", readAt: DateTimeOffset.UtcNow);
+
+        await svc.MarkUnreadAsync(recipient, target.Id, TestContext.Current.CancellationToken);
+
+        var targetAfter = await LoadRow(store, target.Id);
+        var siblingAfter = await LoadRow(store, sibling.Id);
+        Assert.Null(targetAfter?.ReadAt);                    // the named row is now unread
+        Assert.NotNull(siblingAfter?.ReadAt);                // the sibling is untouched
+    }
+
+    /// <summary>
+    /// The **personal gate** (C-M6·3): an actor may not flip the read state
+    /// of a row they do not own — a cross-recipient id (here, an unknown id,
+    /// which is the cross-recipient case for a foreign recipient) throws
+    /// <see cref="KeyNotFoundException"/> and leaves no row modified. This is
+    /// the Core wall the thin controller route relies on: the
+    /// <c>RecipientId</c> is the whole access story, no
+    /// <c>IAuthorizationService</c>, no audit row.
+    /// </summary>
+    [Fact]
+    public async Task MarkRead_Foreign_Recipient_Throws_KeyNotFound()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string owner = "u-0096-owner";
+        const string intruder = "u-0096-intruder";
+        await PlantProfile(store, owner, "0096-owner@kumunita");
+        await PlantProfile(store, intruder, "0096-intruder@kumunita");
+
+        var row = await PlantRow(store, owner, NotificationKinds.PostReply,
+            "notification:post.reply:0096-row");
+
+        // The intruder names the owner's row — the personal gate rejects it.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.MarkReadAsync(intruder, row.Id, TestContext.Current.CancellationToken));
+
+        // And the owner's row is untouched (still unread).
+        Assert.Null((await LoadRow(store, row.Id))?.ReadAt);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -1052,6 +1246,39 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// <summary>Emits a notification **and commits** the session — the
     /// caller's responsibility per the design-doc contract ("the caller
     /// commits the session — the service does not").</summary>
+    /// <summary>Plants a <see cref="Notification"/> row directly (bypassing
+    /// <c>EmitAsync</c> / the mailer) for the single-row state-lane tests —
+    /// the Web test's <c>PlantNotification</c> shape.</summary>
+    private static async Task<Notification> PlantRow(
+        IDocumentStore store, string recipientId, string kind, string key,
+        DateTimeOffset? readAt = null)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var row = new Notification
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            RecipientId = recipientId,
+            Kind = kind,
+            IdempotencyKey = key,
+            SourceId = key.Split(':')[^1],
+            Subject = "S",
+            Body = "B",
+            Created = DateTimeOffset.UtcNow,
+            ReadAt = readAt,
+        };
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(row);
+        await w.SaveChangesAsync(ct);
+        return row;
+    }
+
+    private static async Task<Notification?> LoadRow(IDocumentStore store, string notificationId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Notification>(notificationId, ct);
+    }
+
     private static async Task<Notification> Emit(
         NotificationService svc, IDocumentSession session,
         string recipientId, string kind, string key, string? body)

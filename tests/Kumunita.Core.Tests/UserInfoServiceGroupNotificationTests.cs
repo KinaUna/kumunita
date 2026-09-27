@@ -123,9 +123,44 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
             row.IdempotencyKey);
         Assert.Contains(GroupName, row.Body);
 
+        // ADR 0095 — the group-invite row carries the accept / decline action
+        // links as **relative** same-origin paths (the inbox renders them as
+        // clickable buttons; the email carries them BaseUrl-prefixed — the
+        // BaseUrl-bound test below pins that). The non-actionable group.added
+        // row (the D1 test above) leaves both null.
+        Assert.Equal($"/groups/{GroupId}/invitations/accept", row.AcceptPath);
+        Assert.Equal($"/groups/{GroupId}/invitations/decline", row.DeclinePath);
+
         var email = Assert.Single(boot.Staged);
-        Assert.Equal($"notification:{NotificationKinds.GroupInvite}:{GroupId}:{InvitedResident}", email.Key);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.GroupInvite}:{GroupId}:{InvitedResident}", email.Key);
         Assert.Equal(InvitedResident + "@ex.net", email.Recipient);
+    }
+
+    // ── ADR 0095 — the group-invite accept / decline links (BaseUrl-bound) ──
+
+    [Fact]
+    public async Task InviteGroupMember_AcceptDeclineLinks_Stored_Relative_And_Appended_Absolute_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var boot = await BootAsync(baseUrl);
+
+        await boot.UserInfo.InviteGroupMemberAsync(GroupId, InvitedResident, OwnerId);
+
+        var rows = await NotificationsFor(boot.Store, InvitedResident, NotificationKinds.GroupInvite);
+        var row = Assert.Single(rows);
+        // The row carries the **relative** same-origin paths verbatim.
+        Assert.Equal($"/groups/{GroupId}/invitations/accept", row.AcceptPath);
+        Assert.Equal($"/groups/{GroupId}/invitations/decline", row.DeclinePath);
+
+        // The **email** body carries both as **absolute** links (BaseUrl +
+        // relative path) — the VerificationOptions.BaseUrl precedent — each
+        // prefixed by its localized label (the RecordingTranslator here
+        // resolves to the key itself; no language marker in this harness).
+        var email = Assert.Single(boot.Staged);
+        Assert.Contains(baseUrl + $"/groups/{GroupId}/invitations/accept", email.Body);
+        Assert.Contains(baseUrl + $"/groups/{GroupId}/invitations/decline", email.Body);
+        Assert.Contains("notifications.accept", email.Body);
+        Assert.Contains("notifications.decline", email.Body);
     }
 
     [Fact]
@@ -197,7 +232,7 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
     /// seam that breaks the DI cycle (see the UserInfoService class
     /// doc-comment).
     /// </summary>
-    private async Task<Boot> BootAsync()
+    private async Task<Boot> BootAsync(string? baseUrl = null)
     {
         var ct = TestContext.Current.CancellationToken;
         var conn = await fixture.NewDatabaseAsync(ct);
@@ -273,7 +308,16 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
         // recipient's Profile from — the real UserInfoService over the same
         // store (GetProfileAsync is a pure document read).
         var userInfoForNs = new UserInfoService(store);
-        var ns = new NotificationService(store, userInfoForNs, translator, mailer);
+        // ADR 0095 — the accept/decline lane: when a BaseUrl is supplied, bind
+        // it to VerificationOptions so the service appends the two action
+        // links to the email as absolute links (the
+        // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
+        // precedent). null = no BaseUrl (the relative-path fallback).
+        Microsoft.Extensions.Options.IOptions<Kumunita.Core.Identity.VerificationOptions>? baseUrlOptions =
+            baseUrl is null
+                ? null
+                : Microsoft.Extensions.Options.Options.Create(new Kumunita.Core.Identity.VerificationOptions { BaseUrl = baseUrl });
+        var ns = new NotificationService(store, userInfoForNs, translator, mailer, null, baseUrlOptions);
 
         // The IServiceProvider the UserInfoService resolves the
         // NotificationService from at emission time (the ADR 0083

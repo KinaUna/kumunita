@@ -153,6 +153,7 @@ public sealed class PageController(
             var title = titleByPageId.TryGetValue(p.Id, out var t) ? t : p.Title;
             return new PageNode(
                 p.Id, title, PagePaths.Href(byId, p), p.IsDraft,
+                p.Kind == PageKind.System,
                 kids.Select(ToNode).ToList());
         }
 
@@ -176,14 +177,27 @@ public sealed class PageController(
             .Select(p => p.Id)
             .ToHashSet(StringComparer.Ordinal);
 
-        var roots = visible
-            .Where(p => !containerIds.Contains(p.Id)
-                && (p.ParentId is null
-                    || !visibleSet.ContainsKey(p.ParentId)
-                    || containerIds.Contains(p.ParentId)))
-            .ToList();
+        // A page is a root of the browse when its parent is not itself a
+        // visible (non-container) node: it has no parent, its parent is
+        // denied, or its parent is the hoisted `system` container.
+        Func<Page, bool> IsRoot = p =>
+            !containerIds.Contains(p.Id)
+            && (p.ParentId is null
+                || !visibleSet.ContainsKey(p.ParentId)
+                || containerIds.Contains(p.ParentId));
 
-        return View(new PageTreeViewModel(roots.Select(ToNode).ToList()));
+        // The browse's two sections (ADR 0040's kind split, surfaced in the
+        // UI): the platform's own <c>PageKind.System</c> pages (the seeded
+        // terms / help / privacy / conduct tree) render apart from the
+        // residents' <c>PageKind.User</c> pages. Display partitioning only —
+        // storage is untouched (each section's nodes still carry their real
+        // ancestor-chain hrefs).
+        var systemRoots = visible.Where(p => p.Kind == PageKind.System && IsRoot(p)).ToList();
+        var userRoots = visible.Where(p => p.Kind != PageKind.System && IsRoot(p)).ToList();
+
+        return View(new PageTreeViewModel(
+            userRoots.Select(ToNode).ToList(),
+            systemRoots.Select(ToNode).ToList()));
     }
 
     // ── GET /pages/{**path} — the post view (404 absent / 403 denied) ───────

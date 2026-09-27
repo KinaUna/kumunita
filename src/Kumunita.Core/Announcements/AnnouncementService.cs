@@ -1121,4 +1121,231 @@ public sealed class AnnouncementService : IAnnouncementService
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
     }
+
+    // ── ADR 0101 — resident comments on an announcement (top-level only) ──
+    // The ADR 0100 TodoComment shape (a top-level-only POCO + create/delete
+    // write lanes + a signed-in-gated read) carried to the Announcements
+    // bounded context, with the **flat scope split** (not the to-do's
+    // <c>CanAsync(Read)</c> decision) standing in for the comment's visibility,
+    // and an admin **toggle** (<see cref="LocaleSettings.AnnouncementCommentsEnabled"/>)
+    // that the to-do lane does not have: a
+    // signed-in user may comment only while it is on, and a visitor may
+    // comment / read under no configuration.
+
+    /// <summary>
+    /// Whether the announcement the given (actor, roles) may see under its
+    /// flat <see cref="AnnouncementScope"/> split (the exact predicate
+    /// <see cref="GetAsync"/> applies to a live row). The comment lanes reuse
+    /// it so a comment is never visible where the announcement is not.
+    /// </summary>
+    private static bool IsAnnouncementVisible(
+        Announcement announcement,
+        (bool authed, bool admin, IReadOnlyList<string> communities) resolver)
+    {
+        return (announcement.CommunityId == null &&
+                (announcement.Scope == AnnouncementScope.Public ||
+                 (resolver.authed && announcement.Scope == AnnouncementScope.Community)))
+            || (announcement.CommunityId != null &&
+                (resolver.admin || resolver.communities.Contains(announcement.CommunityId!)));
+    }
+
+    public async Task<bool> AreAnnouncementCommentsEnabledAsync()
+    {
+        using var session = _store.QuerySession();
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
+            .ConfigureAwait(false);
+        // The <c>true</c> floor: a missing singleton reads as "comments on"
+        // (the IsSignupOpen / NotifyAdminsOnSignup precedent).
+        return settings is null || settings.AnnouncementCommentsEnabled;
+    }
+
+    public async Task SetAnnouncementCommentsEnabledAsync(bool enabled, string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to change the announcement-comments gate.");
+
+        await using var session = _store.OpenSession(new SessionOptions());
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (settings is null)
+            settings = new LocaleSettings { AnnouncementCommentsEnabled = enabled };
+        else
+            settings.AnnouncementCommentsEnabled = enabled;
+
+        // The singleton-toggle audit row (the signup.set-open / timezone.set-default
+        // shape — the <c>true</c> floor, ADR 0004 §B.1 additive field).
+        session.Store(settings);
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementcomments.set-enabled",
+            TargetKind = "announcementcomments",
+            TargetId = "announcementcomments",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<AnnouncementComment>> GetAnnouncementCommentsAsync(
+        string announcementId, string? actorId, IReadOnlySet<string> actorRoles)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (string.IsNullOrEmpty(announcementId))
+            throw new KeyNotFoundException("An announcement id is required.");
+
+        // ADR 0101 — signed-in only: a visitor (no subject id) is refused the
+        // comment list outright (the 403 shape — a comment surface, not a
+        // content read, so the Web maps this to Forbid).
+        if (string.IsNullOrWhiteSpace(actorId))
+            throw new UnauthorizedAccessException("Comments are visible to signed-in residents only.");
+
+        using var session = _store.QuerySession();
+        var announcement = await session
+            .LoadAsync<Announcement>(announcementId, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found.");
+
+        // The comment is visible only under the announcement's own flat scope
+        // split (the GetAsync predicate) — a community-targeted announcement's
+        // comments go to that community's members / moderators / a GlobalAdmin
+        // only; a public one to any signed-in user. A non-visible announcement
+        // is a 404 (non-leaky, the announcement lane's posture) — the Web maps
+        // KeyNotFound to NotFound.
+        var resolver = await ResolveReadVisibilityAsync(actorId, actorRoles).ConfigureAwait(false);
+        if (announcement.IsDraft || !IsAnnouncementVisible(announcement, resolver))
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found.");
+
+        return (await session
+            .Query<AnnouncementComment>()
+            .Where(c => c.AnnouncementId == announcementId)
+            .OrderBy(c => c.Created)
+            .ToListAsync(CancellationToken.None)
+            .ConfigureAwait(false)).ToList();
+    }
+
+    public async Task<AnnouncementComment> CreateAnnouncementCommentAsync(
+        string announcementId,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        string body,
+        string? languageCode,
+        IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrEmpty(announcementId))
+            throw new KeyNotFoundException("An announcement id is required.");
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A comment body is required.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to comment on an announcement.");
+
+        // ADR 0101 — signed-in only (enforced above by the actorId check) and
+        // admin-toggle-gated.
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (settings is not null && !settings.AnnouncementCommentsEnabled)
+            throw new UnauthorizedAccessException("Commenting on announcements is currently disabled.");
+
+        // The announcement must exist and be visible to the actor under its
+        // flat scope split (a missing / not-visible id is a 404, non-leaky).
+        var announcement = await session
+            .LoadAsync<Announcement>(announcementId, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found; nothing to comment on.");
+        var resolver = await ResolveReadVisibilityAsync(actorId, actorRoles).ConfigureAwait(false);
+        if (announcement.IsDraft || !IsAnnouncementVisible(announcement, resolver))
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found; nothing to comment on.");
+
+        var now = DateTimeOffset.UtcNow;
+        var comment = new AnnouncementComment
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            AnnouncementId = announcementId,
+            AuthorId = actorId,
+            Body = body,
+            Created = now,
+            LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false) // ADR 0018 — the authored-in tag (instance-default floor).
+        };
+
+        // Audit row (the ADR 0029 / ADR 0100 write-lane precedent — a hand-written
+        // row; the C3 atomic commit).
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementcomment.create",
+            TargetKind = "announcement",
+            TargetId = announcementId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(comment);
+        session.Store(audit);
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+        return comment;
+    }
+
+    public async Task<AnnouncementComment> DeleteAnnouncementCommentAsync(
+        string announcementId,
+        string commentId,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrEmpty(announcementId))
+            throw new KeyNotFoundException("An announcement id is required.");
+        if (string.IsNullOrEmpty(commentId))
+            throw new KeyNotFoundException("A comment id is required.");
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to delete a comment.");
+
+        var comment = await session
+            .LoadAsync<AnnouncementComment>(commentId, CancellationToken.None)
+            .ConfigureAwait(false);
+        if (comment is null)
+            throw new KeyNotFoundException($"Comment '{commentId}' was not found in the session; nothing to delete.");
+        if (!string.Equals(comment.AnnouncementId, announcementId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Comment '{commentId}' is not on announcement '{announcementId}'; nothing to delete.");
+
+        // Standing (ADR 0016 / ADR 0024 shape): author-only. A non-author is
+        // refused before any write (the ADR 0016 reply-delete precedent — no
+        // moderator / GlobalAdmin branch on a comment's own delete).
+        if (!string.Equals(comment.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException($"Actor is not the author of comment '{commentId}'.");
+
+        comment.DeletedAt = DateTimeOffset.UtcNow; // ADR 0024 — the soft-delete stamp.
+        var now = comment.DeletedAt!.Value;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementcomment.delete",
+            TargetKind = "announcement",
+            TargetId = announcementId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(comment);
+        session.Store(audit);
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+        return comment;
+    }
 }

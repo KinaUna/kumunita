@@ -1,0 +1,28 @@
+@model Kumunita.Web.Controllers.AdminMessagingController.MessagingAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Messaging";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.messaging_title">Direct messaging</kw-l></h1>
+
+<p class="text-muted">
+    <kw-l key="admin.messaging_lede">Whether signed-in residents may open direct 1:1 conversations. Closing the gate hides the Messages entry and refuses every conversation seam — no one can open a thread or send a message. The gate is off by default; it only controls new messaging, and existing conversations and messages are never touched by it. Even a GlobalAdmin who is not a participant cannot read a conversation.</kw-l>
+</p>
+
+<form method="post" action="/admin/messaging">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="enabled" class="form-label"><kw-l key="admin.messaging_title">Direct messaging</kw-l></label>
+            <select class="form-select" name="enabled" id="enabled">
+                <option value="True" selected="@(Model.Enabled ? "selected" : null)"><kw-l key="admin.messaging_on">Open — signed-in residents can message each other</kw-l></option>
+                <option value="False" selected="@(!Model.Enabled ? "selected" : null)"><kw-l key="admin.messaging_off">Closed — no resident can open or send messages</kw-l></option>
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.anncomments_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

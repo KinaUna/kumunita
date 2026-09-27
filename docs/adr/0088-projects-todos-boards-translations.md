@@ -193,9 +193,19 @@ never touches a dangling / not-visible parent.
   groups (`"project-title"` / `"project-description"`) that share the same
   variant set + chip row. Either way the authored-in variant is the first /
   default-visible one, one hidden variant per translation, a chip row
-  (original always present, TD·1), and one add / edit / remove form per
-  language (edit + remove per existing row, add per missing enabled language)
-  gated on `CanTranslate`. **ADR 0049** applies: when
+  (original always present, TD·1). The add / edit / remove controls are
+  **presented with the ADR 0082 idiom** — the shared `⋮` action dropdown +
+  Bootstrap modal (the Community-post / Event / Announcement surface's
+  translation idiom, not inline `<details>` blocks): one **Edit** dropdown item
+  per existing translation and one **Add** item per enabled-but-missing
+  language, each opening a modal form (Edit: title + a plain body `<textarea>`;
+  Add: a title input prefilled from the parent's title + the ADR 0025
+  `rc-editor` body, `data-rich-editor-no-image`), plus a **Remove** form per
+  existing translation in the menu (CSRF-tokenized, `data-confirm`), all gated
+  on `CanTranslate`. The routes, form `action`s, field names, and the
+  server-side standing are unchanged — only the presentation of these
+  three surfaces (Project already shipped this way; To-do and Board now match
+  it). **ADR 0049** applies: when
   the viewer's current language has a translation, that variant is the
   default-visible one.
 - **Feed** (`/projects/todos`, `/projects/boards`, `/projects`): per **ADR

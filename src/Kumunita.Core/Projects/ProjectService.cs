@@ -238,7 +238,153 @@ public sealed class ProjectService : IProjectService
             }
         }
 
-        return new TodoDetailResult { Todo = todo, Subtasks = subtasks, Blocker = blocker };
+        // ADR 0100 — the to-do's comments + replies (C-M3·1: the parent to-do's
+        // single Read decision already ran above; a comment carries no own
+        // audience, so it is returned as-is — no per-comment decision, no
+        // per-row audit on READ). Ordered by Created ascending (the
+        // GetTodoAsync list-order pin — the subtask read's shape).
+        var comments = await session.Query<TodoComment>()
+            .Where(c => c.TodoId == todoItemId)
+            .OrderBy(c => c.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return new TodoDetailResult { Todo = todo, Subtasks = subtasks, Blocker = blocker, Comments = comments };
+    }
+
+    /// <summary>
+    /// **Add a comment** (or a reply to another comment) on a to-do (ADR 0100).
+    /// A new <see cref="TodoComment"/> row with the to-do's id as
+    /// <see cref="TodoComment.TodoId"/> and, when <paramref name="parentId"/>
+    /// is non-null, that comment's id as
+    /// <see cref="TodoComment.ParentId"/> (the sole hierarchy mechanism —
+    /// C-M5·7: a <c>null</c> parent is a top-level comment, a non-null parent
+    /// is a reply). **Standing:** any actor who passes the to-do's
+    /// <c>CanAsync(Read)</c> decision (the to-do's audience is the sole access
+    /// boundary — a comment inherits it, C-M3·1; there is no separate
+    /// comment-level standing matrix). A <paramref name="parentId"/> that is
+    /// missing, already soft-deleted, or on a *different* to-do is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>LanguageCode</c> is
+    /// materialized from the instance default when <paramref
+    /// name="languageCode"/> is null/empty (ADR 0018 — the
+    /// <see cref="ResolveLanguageCodeAsync"/> shape). One
+    /// <see cref="AccessAudit"/> row (<c>todo.comment.create</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3 —
+    /// the <see cref="StoreAuditRow"/> shape).
+    /// </summary>
+    public async Task<TodoComment> CreateTodoCommentAsync(
+        string todoId, string actorId, IReadOnlySet<string> actorRoles,
+        string body, string? languageCode, string? parentId = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrWhiteSpace(body)) throw new ArgumentException("A comment body is required.", nameof(body));
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to comment on a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        // C3 — the write session owns both the domain write and the audit row
+        // (the M5 self-composed-session convention, ADR 0067 §4).
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        var todo = await session.LoadAsync<TodoItem>(todoId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoId}' was not found in the session; nothing to comment on.");
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoId}' was not found in the session; nothing to comment on.");
+
+        // Standing (C-M3·1): the to-do's single Read decision is the access
+        // boundary — a comment inherits it. There is no comment-level standing
+        // matrix; the audience decision here is the gate (the GetTodoAsync
+        // shape, run against the stored row).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(todo))
+            .ConfigureAwait(false);
+        if (!decision.Allowed)
+            throw new UnauthorizedAccessException($"Actor may not comment on to-do '{todoId}'.");
+
+        // ADR 0100 / C-M5·7 — the reply parent (when non-null) must exist, be
+        // live, and be on the **same** to-do (a parent on a different to-do is
+        // a 404 — non-leaky; the C3 404-vs-403 split). The parent's own
+        // DeletedAt is the ADR 0024 soft-delete flag.
+        string? parentIdOrNull = null;
+        if (!string.IsNullOrEmpty(parentId))
+        {
+            var parent = await session.LoadAsync<TodoComment>(parentId, ct).ConfigureAwait(false);
+            if (parent is null)
+                throw new KeyNotFoundException($"Comment '{parentId}' (the would-be parent) was not found; a reply parent must exist.");
+            if (parent.DeletedAt is not null)
+                throw new KeyNotFoundException($"Comment '{parentId}' (the would-be parent) was not found; a reply parent must not be soft-deleted.");
+            if (!string.Equals(parent.TodoId, todoId, StringComparison.Ordinal))
+                throw new KeyNotFoundException($"Comment '{parentId}' (the would-be parent) is not on to-do '{todoId}'; a reply parent must be on the same to-do.");
+            parentIdOrNull = parentId;
+        }
+
+        var comment = new TodoComment
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TodoId = todoId,
+            ParentId = parentIdOrNull,                  // C-M5·7 — the sole hierarchy mechanism (null = top-level).
+            AuthorId = actorId,
+            Body = body,
+            Created = DateTimeOffset.UtcNow,
+            LanguageCode = await ResolveLanguageCodeAsync(languageCode, session, ct).ConfigureAwait(false) // ADR 0018 — the authored-in tag (instance-default floor).
+        };
+
+        session.Store(comment);
+        StoreAuditRow(session, actorId, "todo.comment.create", todoId, TargetKindTodo, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return comment;
+    }
+
+    /// <summary>
+    /// **Soft-delete a comment** the actor authored on a to-do (ADR 0100, the
+    /// ADR 0024 author-soft-delete shape carried from
+    /// <see cref="Kumunita.Core.Posts.PostReply.DeletedAt"/>): stamps
+    /// <see cref="TodoComment.DeletedAt"/> forward (the record is kept, never
+    /// hard-deleted). **Standing:** author-only (the comment's
+    /// <see cref="TodoComment.AuthorId"/> == the actor — the ADR 0016
+    /// reply-delete precedent: a non-author is refused, there is no
+    /// moderator / GlobalAdmin override branch on a comment's own delete).
+    /// The comment must exist and be under the given to-do (a comment on a
+    /// different to-do is a <see cref="KeyNotFoundException"/> — 404,
+    /// non-leaky). One <see cref="AccessAudit"/> row
+    /// (<c>todo.comment.delete</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    public async Task<TodoComment> DeleteTodoCommentAsync(
+        string todoId, string commentId, string actorId, IReadOnlySet<string> actorRoles,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(commentId)) throw new KeyNotFoundException("A comment id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a comment.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        var todo = await session.LoadAsync<TodoItem>(todoId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoId}' was not found in the session; nothing to delete a comment on.");
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoId}' was not found in the session; nothing to delete a comment on.");
+
+        var comment = await session.LoadAsync<TodoComment>(commentId, ct).ConfigureAwait(false);
+        if (comment is null)
+            throw new KeyNotFoundException($"Comment '{commentId}' was not found in the session; nothing to delete.");
+        if (!string.Equals(comment.TodoId, todoId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Comment '{commentId}' is not on to-do '{todoId}'; nothing to delete.");
+
+        // Standing (ADR 0016 / ADR 0024 shape): author-only. A non-author is
+        // refused before any write (the ADR 0016 reply-delete precedent — no
+        // moderator / GlobalAdmin branch on a comment's own delete).
+        if (!string.Equals(comment.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException($"Actor is not the author of comment '{commentId}'.");
+
+        comment.DeletedAt = DateTimeOffset.UtcNow;       // ADR 0024 — the soft-delete stamp.
+        session.Store(comment);
+        StoreAuditRow(session, actorId, "todo.comment.delete", todoId, TargetKindTodo, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return comment;
     }
 
     /// <summary>
@@ -704,6 +850,27 @@ public sealed class ProjectService : IProjectService
             : AccessVia.Admin;
 
     /// <summary>
+    /// Structural equality over two <see cref="Audience"/> values (ADR 0098 —
+    /// <c>UpdateBoardAsync</c>'s "did the audience actually change?" test):
+    /// the <c>Mode</c>, the <c>Community</c> / <c>AllResidents</c> flags, and
+    /// the grant list element-for-element (order-sensitive — the Web editor
+    /// posts a deterministic order). Two <c>null</c> values are equal (both
+    /// "public"); a <c>null</c> vs a value is not (public vs restricted is a
+    /// real change).
+    /// </summary>
+    private static bool AudiencesEqual(Authorization.Audience? left, Authorization.Audience? right)
+    {
+        if (left is null && right is null) return true;
+        if (left is null || right is null) return false;
+        if (left.Mode != right.Mode || left.Community != right.Community || left.AllResidents != right.AllResidents)
+            return false;
+        if (left.Grants.Count != right.Grants.Count) return false;
+        for (var i = 0; i < left.Grants.Count; i++)
+            if (left.Grants[i] != right.Grants[i]) return false;
+        return true;
+    }
+
+    /// <summary>
     /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
     /// audit tag for a **board / lane** mutation (design doc §2.5): the creator
     /// (<see cref="AccessVia.Owner"/>); a GlobalAdmin (<see
@@ -1043,7 +1210,36 @@ public sealed class ProjectService : IProjectService
         // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6) —
         // evaluated against the **pre-assignment** row (the current assignee
         // keeps standing until the write rewrites the field).
-        CheckTodoStanding(actorId, actorRoles, todo);
+        //
+        // ADR 0106 — **self-assign pick-up** (the claim generalized): a
+        // resident who can **see** the to-do (Read-allowed) may assign it
+        // onto **themself** while it is **unassigned** — a pick-up, not a
+        // take-over. This bypasses `CheckTodoStanding` (which requires
+        // creator ∪ assignee ∪ GlobalAdmin) for that one case. An already-
+        // assigned to-do still requires standing (no take-over), and
+        // assigning to **someone else** still requires standing.
+        var isSelfAssign = string.Equals(assigneeId, actorId, StringComparison.Ordinal);
+        if (isSelfAssign && string.IsNullOrEmpty(todo.AssigneeId))
+        {
+            // The to-do must be visible to the actor (the audience decision is
+            // the sole access boundary). A resident in the community (or any
+            // audience grant holder) passes; a stranger denied Read is
+            // refused. This is the same gate ClaimTodoAsync applies (the
+            // claim lane's "community membership or group membership" is a
+            // subset of Read-allowed; here we simply use the Read decision
+            // directly — broader but equally safe: if you can see it, you
+            // may take it onto yourself while it is unassigned).
+            var decision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(todo))
+                .ConfigureAwait(false);
+            if (!decision.Allowed)
+                throw new UnauthorizedAccessException(
+                    $"Actor may not assign to-do '{todoItemId}' onto themselves (Read denied).");
+        }
+        else
+        {
+            CheckTodoStanding(actorId, actorRoles, todo);
+        }
 
         todo.AssigneeId = assigneeId;                      // `null` = unassign.
         todo.Modified = DateTimeOffset.UtcNow;
@@ -1521,11 +1717,16 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
-    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
-    /// the board edit lane). A **full update** of those two fields (the edit
-    /// page posts both; a blank <c>Description</c> clears it to <c>null</c>).
-    /// The board's standing, audience, component, and language are
-    /// creation-time choices — **not** editable here (ADR 0070). <see
+    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070
+    /// — the board edit lane), and — when supplied (ADR 0098) — its
+    /// <see cref="KanbanBoard.Audience"/>: a <c>null</c>
+    /// <see cref="UpdateBoardRequest.Audience"/> leaves the stored audience
+    /// **unchanged**; a non-null value is the actor's complete choice, written
+    /// verbatim (ADR 0001-B — never mutated, never grant-validated against the
+    /// store). A **full update** of the two text fields (the edit page posts
+    /// both; a blank <c>Description</c> clears it to <c>null</c>). The board's
+    /// standing, component, and language remain creation-time choices —
+    /// **not** editable here (ADR 0070). <see
     /// cref="KanbanBoard.Modified"/> is stamped **only on a real change**
     /// (the <see cref="UpdateLaneAsync"/> no-op shape — a no-op re-save
     /// leaves the stamp untouched). Standing (server-side, C3): **creator ∪
@@ -1560,13 +1761,19 @@ public sealed class ProjectService : IProjectService
         // A "real change" is either field differing from the stored row (the
         // UpdateLaneAsync `changed` shape — a no-op re-save leaves the stamp
         // untouched). A blank Description clears it to null (full-update
-        // semantics — the edit page always posts both fields).
+        // semantics — the edit page always posts both fields). A non-null
+        // Audience differing from the stored one is a real change too (ADR
+        // 0098); a null Audience leaves the stored one untouched.
         var normalizedDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        var audienceChanged = request.Audience is not null && !AudiencesEqual(board.Audience, request.Audience);
         var changed = board.Title != request.Title
-            || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal);
+            || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal)
+            || audienceChanged;
 
         board.Title = request.Title;
         board.Description = normalizedDescription;
+        if (request.Audience is not null)
+            board.Audience = request.Audience;     // written verbatim (ADR 0001-B — the create lane's shape).
         if (changed)
             board.Modified = DateTimeOffset.UtcNow;
 
@@ -2510,7 +2717,7 @@ public sealed class ProjectService : IProjectService
             Id = Guid.NewGuid().ToString("N"),
             Title = title,
             AuthorId = actorId,                            // C-M5·6 — the actor becomes the standing owner.
-            Audience = null,                               // public — the board's Audience is the gate (C-M5·3); the placement is not itself an auditable resource.
+            Audience = board.Audience,                     // inherit the board's audience (C-M5·3 — a card's visibility is the board's): `null` board audience = public; carried verbatim, never re-derived (the copy-verbatim shape, ADR 0001-B — the CopyTodoToBoardAsync precedent).
             IsDeleted = false,                             // published on creation (D8a — no draft lane).
             LanguageCode = "",                             // ADR 0018 — materialized below (instance default floor).
             TagIds = [],
@@ -2716,6 +2923,95 @@ public sealed class ProjectService : IProjectService
         lane.Order = targetPos;
         lane.Modified = now;
         return lane;
+    }
+
+    /// <summary>
+    /// **Delete a lane** from a board (ADR 0097): the <see cref="KanbanLane"/>
+    /// row is **deleted** (the <see cref="KanbanLane"/> /
+    /// <see cref="BoardItemPlacement"/> shape — lanes are the board's own
+    /// rows, not documents with their own <c>IsDeleted</c> flag — the
+    /// <see cref="DeleteBoardAsync"/> cascade shape applied to one lane) and
+    /// the lane's <see cref="BoardItemPlacement"/> rows are **deleted** (the
+    /// **to-dos are untouched** — a to-do keeps its standalone form and any
+    /// placements on other boards, C-M5·2). The board's **remaining** lanes
+    /// are re-settled to a clean <c>0..n-1</c> <c>Order</c> sequence (the
+    /// <see cref="MoveLaneToPositionAsync"/> park-then-settle shape — the
+    /// <c>(BoardId, Order)</c> unique index is enforced row-by-row, so the
+    /// lanes are parked to a guaranteed-free band and settled in a second
+    /// commit); deleting the **last** lane is a renumber no-op (the lane is
+    /// still deleted — the board is left with zero lanes, which the detail
+    /// view renders as the <c>projects.board.no_lanes</c> empty state).
+    /// Standing (server-side, C3): **creator ∪ GlobalAdmin over the board**
+    /// (the <see cref="CheckBoardStanding"/> shape; the assignee branch does
+    /// not apply to a lane — C-M5·6). A missing lane or board is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>board.delete_lane</c>,
+    /// <c>TargetKind = "board"</c>, the **board's** id as the target — the
+    /// lane is not an auditable resource of its own) commits atomically with
+    /// the write (C3).
+    /// </summary>
+    public async Task DeleteLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(laneId)) throw new KeyNotFoundException("A lane id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a lane.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var lane = await session.LoadAsync<KanbanLane>(laneId, ct).ConfigureAwait(false);
+        if (lane is null)
+            throw new KeyNotFoundException($"Lane '{laneId}' was not found in the session; nothing to delete.");
+
+        var board = await session.LoadAsync<KanbanBoard>(lane.BoardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"The board '{lane.BoardId}' for lane '{laneId}' was not found in the session; nothing to delete.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{board.Id}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the **board**
+        // (C-M5·6): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a lane (the CheckBoardStanding shape).
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // The lane's placements are the lane's own rows — they are
+        // hard-deleted in the same session (the DeleteBoardAsync cascade
+        // shape). The **to-dos are untouched** (C-M5·2 — a to-do on this lane
+        // is still standalone; its placements on other boards keep working).
+        var placements = await session.Query<BoardItemPlacement>()
+            .Where(p => p.LaneId == lane.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        foreach (var placement in placements)
+            session.Delete(placement);
+
+        session.Delete(lane);
+
+        // Re-settle the board's **remaining** lanes to a clean 0..n-1 Order
+        // sequence (the MoveLaneToPositionAsync park-then-settle shape). The
+        // deleted lane's slot is now free — parking the survivors to a band
+        // above their current max (unchanged) is a no-op for the Order
+        // values, so the two commits collapse into the settle commit below:
+        // each lane is written once, to its final 0-based index.
+        var remaining = (await session.Query<KanbanLane>()
+            .Where(l => l.BoardId == lane.BoardId && l.Id != lane.Id)
+            .OrderBy(l => l.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false))
+            .ToList();
+        var now = DateTimeOffset.UtcNow;
+        for (var i = 0; i < remaining.Count; i++)
+        {
+            if (remaining[i].Order != i)
+            {
+                remaining[i].Order = i;
+                remaining[i].Modified = now;
+            }
+            session.Store(remaining[i]);
+        }
+
+        StoreAuditRow(session, actorId, "board.delete_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>

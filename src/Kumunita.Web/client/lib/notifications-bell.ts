@@ -30,7 +30,15 @@
  *    header — the `api.ts` note), parse it through a `<template>`
  *    (inert fragment — never `innerHTML` the whole page into the
  *    dropdown), and render the **first five** `<li>` items into the
- *    dropdown. Each item links to `/notifications` (the inbox).
+ *    dropdown. **ADR 0103:** each item's label is read from a clone
+ *    of its `<li>` with the per-row read-toggle `<form>` (ADR 0096)
+ *    removed — a bare `textContent` would leak the inline
+ *    "Mark as read"/"Mark as unread" button copy into the label — and
+ *    each item deep-links to `/notifications#notif-{id}` (the row's
+ *    anchor, rendered by the inbox view) so a click navigates to the
+ *    inbox, scrolls that row into view, highlights it, and marks it
+ *    read (that behavior is `notification-open.js`). Items without a
+ *    row anchor fall back to the plain inbox.
  *    **No `kw-l` resolution client-side** — the server-rendered HTML
  *    already carries the localized text.
  *
@@ -119,10 +127,28 @@
 
       dropdownEl.innerHTML = '';
       for (const item of items) {
+        // ADR 0103 — the label excludes the row's per-row read toggle
+        // (ADR 0096). A bare `item.textContent` would flatten the inline
+        // "Mark as read"/"Mark as unread" button text into the label; clone
+        // the <li>, drop its <form> descendants, then read the text (the
+        // localized server-rendered copy — never re-resolved client-side).
+        const clone = item.cloneNode(true) as HTMLElement;
+        clone.querySelectorAll('form').forEach((f) => f.remove());
+        const label = (clone.textContent ?? '').trim();
+
+        // The deep link: each rendered row carries id="notif-{id}" (ADR 0103,
+        // Views/Notifications/Index.cshtml) — link to the inbox anchored at
+        // that row so notification-open.js scrolls / highlights / marks it
+        // read. Fall back to the plain inbox when a row lacks the anchor
+        // (defensive — every rendered row carries one).
+        const href = item.id.startsWith('notif-')
+          ? `${INBOX_PATH}#${item.id}`
+          : INBOX_PATH;
+
         const a = document.createElement('a');
-        a.href = INBOX_PATH; // each item links to the inbox (the unit pin)
+        a.href = href;
         a.className = 'dropdown-item text-dark notifications-dropdown-item';
-        a.textContent = item.textContent?.trim() ?? ''; // localized, from the server
+        a.textContent = label;
         dropdownEl.appendChild(a);
       }
       // The "View all" footer (the account dropdown's

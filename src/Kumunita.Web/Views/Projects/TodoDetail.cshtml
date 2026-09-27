@@ -3,8 +3,14 @@
 @using Kumunita.Core.Projects
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Todo.Title) ? "To-do" : Model.Todo.Title;
+    // ADR 0049 — the resident's current effective language (the comment
+    // form's language picker default: "write in the language you're reading
+    // in"), resolved through the same chain the <c>&lt;kw-l&gt;</c>
+    // TagHelper resolves UI strings in.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     // ADR 0069 — the fixed status vocabulary's label keys (the same closed
     // set the Kanban lane's Set-status select offers: None + the four codes).
     static string StatusLabelKey(string code) => code switch
@@ -15,6 +21,11 @@
         KanbanStatuses.Cancelled => "projects.board.status.cancelled",
         _ => "projects.board.status.none",
     };
+    // ADR 0082 — the LangName helper: resolve a language code to its native
+    // name from Model.Languages (the ADR 0082 idiom; the fallback is the raw
+    // code). Used by the ⋮ dropdown's translation add / edit / remove items.
+    var langNames = (Model.Languages ?? []).ToDictionary(l => l.Code, l => l.NativeName);
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
 <div class="row justify-content-center">
@@ -47,7 +58,7 @@
                 </span>
             }
             <div class="dropdown ms-auto">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                         data-bs-toggle="dropdown" aria-expanded="false"
                         aria-label="Actions for @Model.Todo.Title">⋮</button>
                 <ul class="dropdown-menu dropdown-menu-end">
@@ -57,6 +68,22 @@
                             <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
+                            </form>
+                        </li>
+                    }
+                    @* ADR 0106 — "Assign to me" (the self-assign pick-up
+                       lane, the claim generalized): visible only when the
+                       to-do is **unassigned** and the actor is authenticated.
+                       Posts the assign route with the actor's own subject id.
+                       The service's self-assign allowance (Read-allowed +
+                       unassigned) is the server-side gate. *@
+                    @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                    {
+                        <li>
+                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
                             </form>
                         </li>
                     }
@@ -77,6 +104,55 @@
                             <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
                         </button>
                     </li>
+                    @* ADR 0082 — the translation add / edit / remove as
+                       dropdown items opening the modals below (replacing the
+                       prior inline <details> blocks): one "Edit" per existing
+                       translation + one "Add" per enabled-but-missing language
+                       (both open modals), then a "Remove" per existing.
+                       Server-side gate on CanTranslate (the ADR 0088
+                       translator lane); the items are localized (the ADR 0015
+                       kw-l tags — the same posts.translation_* keys the
+                       Community-post and Project surfaces use). *@
+                    @if (Model.CanTranslate)
+                    {
+                        @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                        {
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#todo-trans-edit-{existing.LanguageCode}")">
+                                    <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                </button>
+                            </li>
+                        }
+                        @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                        {
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#todo-trans-add-{lang.Code}")">
+                                    <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                </button>
+                            </li>
+                        }
+                        @if (Model.Translations is { Count: > 0 })
+                        {
+                            <li><hr class="dropdown-divider" /></li>
+                            @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
+                                          data-confirm="Remove this translation?" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </form>
+                                </li>
+                            }
+                        }
+                    }
                     <li>
                         <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
                               data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
@@ -156,6 +232,121 @@
                     </div>
                 </div>
             </div>
+
+            @* ADR 0082 — the translation add / edit modals (siblings of the
+               Add-subtask modal, opened from the ⋮ dropdown above): one per
+               existing translation (edit — title + body, plain textarea) and
+               one per enabled-but-missing language (add — title prefilled
+               from the original + an rc-editor body, the ADR 0025 rich-body
+               lane; data-rich-editor-no-image keeps the to-do translation
+               body text-only, mirroring the Project/Announcement
+               translation lanes). Gated on CanTranslate (ADR 0088). The
+               routes/form actions/field names are the ADR 0088 U09/U10/U11
+               lanes — only the presentation moves from <details> to a modal. *@
+            @if (Model.CanTranslate)
+            {
+                @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                {
+                    <div class="modal fade" id="@($"todo-trans-edit-{existing.LanguageCode}")" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/update")"
+                                      id="@($"todo-trans-edit-form-{existing.LanguageCode}")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"todo-trans-edit-label-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="@($"todo-trans-edit-title-{existing.LanguageCode}")">
+                                                <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control" type="text" name="title"
+                                                   id="@($"todo-trans-edit-title-{existing.LanguageCode}")"
+                                                   maxlength="120" value="@existing.Title" />
+                                        </div>
+                                        <div>
+                                            <label class="form-label" for="@($"todo-trans-edit-body-{existing.LanguageCode}")">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <textarea class="form-control" name="body" rows="4"
+                                                      id="@($"todo-trans-edit-body-{existing.LanguageCode}")"
+                                                      placeholder="…">@existing.Body</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"todo-trans-edit-form-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+                @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                {
+                    <div class="modal fade" id="@($"todo-trans-add-{lang.Code}")" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations")"
+                                      id="@($"todo-trans-add-form-{lang.Code}")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"todo-trans-add-label-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="@($"todo-trans-add-title-{lang.Code}")">
+                                                <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control" type="text" name="title"
+                                                   id="@($"todo-trans-add-title-{lang.Code}")"
+                                                   maxlength="120" value="@Model.Todo.Title" />
+                                        </div>
+                                        <div>
+                                            <label class="form-label" for="@($"todo-trans-add-body-{lang.Code}")">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <div class="rc-editor">
+                                                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                    <partial name="_RichEditorToggle" />
+                                                </div>
+                                                <textarea class="form-control" name="body" id="@($"todo-trans-add-body-{lang.Code}")" data-rich-editor></textarea>
+                                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"todo-trans-add-form-{lang.Code}")">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
         </div>
 
         <div class="card mb-4">
@@ -196,6 +387,14 @@
                                         @tr.Title
                                     }
                                 </h1>
+                                @* ADR 0025 shape (the BoardDetail/ProjectDetail
+                                   detail idiom) — a read surface renders the
+                                   translation's body as plain rendered
+                                   Markdown. *@
+                                @if (!string.IsNullOrWhiteSpace(tr.Body))
+                                {
+                                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(tr.Body))</div>
+                                }
                             </div>
                         }
 
@@ -213,118 +412,12 @@
                     }
                 </div>
 
-                @* ADR 0088 — the translation management (add / edit / remove),
-                   gated on the standing (the same shape as the ADR 0059 /
-                   ADR 0027 / ADR 0039 translation sections). *@
-                @if (Model.CanTranslate)
-                {
-                    @* The add surface (one <details> per enabled language that
-                       does not yet have a translation, the ADR 0027 / ADR 0048
-                       shape — the <kw-l> fallback is the English gloss; the
-                       posts.translation_* keys are the Event lane's). The
-                       rich editor uses the canonical rc-editor markup
-                       (data-rich-editor + data-rich-editor-preview). *@
-                    <div class="card mb-3">
-                        <div class="card-body p-2">
-                            <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
-
-                            @foreach (var opt in (Model.Languages ?? []))
-                            {
-                                bool hasTranslation = Model.Translations is not null
-                                    && Model.Translations.Any(t => t.LanguageCode == opt.Code);
-                                if (hasTranslation) continue;
-
-                                <details class="mb-1 mt-2">
-                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                        <kw-l key="posts.translation_add">Add</kw-l> <b>@opt.NativeName</b>
-                                    </summary>
-                                    <form class="ms-2" method="post"
-                                          action="@($"/projects/todos/{Model.Todo.Id}/translations")">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@opt.Code" />
-                                        <label class="form-label small" for="todo-t-title-@opt.Code">
-                                            @opt.NativeName <kw-l key="posts.translation_title_label">title</kw-l>
-                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                        </label>
-                                        <input class="form-control form-control-sm mb-2" id="todo-t-title-@opt.Code"
-                                               name="title" value="@Model.Todo.Title" />
-                                        <label class="form-label small" for="todo-t-body-@opt.Code">
-                                            <kw-l key="posts.translation_body_label">Body</kw-l>
-                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                        </label>
-                                        <div class="rc-editor">
-                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                                <partial name="_RichEditorToggle" />
-                                            </div>
-                                            <textarea class="form-control form-control-sm mb-2" id="todo-t-body-@opt.Code"
-                                                      name="body" rows="3" placeholder="…" data-rich-editor></textarea>
-                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                                        </div>
-                                        <button type="submit" class="btn btn-sm btn-primary">
-                                            <kw-l key="posts.translation_save">Save translation</kw-l>
-                                        </button>
-                                    </form>
-                                </details>
-                            }
-                        </div>
-                    </div>
-
-                    @if (Model.Translations is { Count: > 0 })
-                    {
-                        <div class="card mb-3">
-                            <div class="card-body p-2">
-                                <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
-                                @foreach (var tr in Model.Translations)
-                                {
-                                    <details class="mb-1 border rounded p-2">
-                                        <summary class="small"><b>@tr.LanguageCode</b>
-                                            @if (!string.IsNullOrWhiteSpace(tr.Title))
-                                            {
-                                                <span class="text-body-tertiary"> — @tr.Title</span>
-                                            }
-                                        </summary>
-                                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/update")" class="mt-2">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
-                                            <div class="mb-2">
-                                                <label class="form-label small"><kw-l key="common.title">Title</kw-l></label>
-                                                <input type="text" name="title" value="@tr.Title" class="form-control" maxlength="120" />
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small"><kw-l key="posts.translation_body_label">Body</kw-l></label>
-                                                <div class="rc-editor">
-                                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                                        <partial name="_RichEditorToggle" />
-                                                    </div>
-                                                    <textarea class="form-control form-control-sm mb-2" name="body" rows="3" placeholder="…" data-rich-editor>@tr.Body</textarea>
-                                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                                                </div>
-                                            </div>
-                                            <button type="submit" class="btn btn-sm btn-outline-primary"><kw-l key="posts.translation_save">Save translation</kw-l></button>
-                                        </form>
-                                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
-                                              class="mt-2 d-inline"
-                                              onsubmit="return confirm('Remove this translation?');">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
-                                            <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="posts.translation_remove">Remove</kw-l></button>
-                                        </form>
-                                    </details>
-                                }
-                            </div>
-                        </div>
-                    }
-                }
+                @* ADR 0082 — the to-do's translation management (add / edit /
+                   remove) now lives in the ⋮ action dropdown above (dropdown
+                   items opening the modals beside this card) rather than as
+                   these inline <details> blocks. The ADR 0088 U09/U10/U11
+                   lanes (routes / form fields / server-side CanTranslate gate)
+                   are unchanged — only the presentation moved. *@
 
                 @* The assignee avatar (the BoardDetail card pattern, the same
                    fail-closed contract every other avatar <img> uses: the
@@ -439,25 +532,13 @@
                     </div>
                 }
 
-                @* The body (the U09 spec's rich-editor shape — the
-                   rc-editor-toolbar / data-rich-editor /
-                   data-rich-editor-preview pattern, the ADR 0031 pin, the
-                   M3/M4 precedent): shown + editable in place. *@
+                @* The body (the ADR 0025 shape — the BoardDetail / ProjectDetail
+                   detail idiom): a read surface renders the Markdown as plain
+                   text through the one MarkdownRenderer; editing lives in its
+                   own view (GET /projects/todos/{id}/edit). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.Body))
                 {
-                    <div class="rc-editor">
-                        <div class="rc-editor-toolbar" data-rich-editor>
-                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                            <partial name="_RichEditorToggle" />
-                        </div>
-                        <textarea class="form-control" id="body" name="Body" rows="6" data-rich-editor>@Model.Todo.Body</textarea>
-                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                    </div>
+                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Todo.Body))</div>
                 }
                 else
                 {
@@ -525,9 +606,169 @@
                 </div>
             </section>
         }
+
+        @* ADR 0100 — the comments + replies (C-M3·1: the to-do's single Read
+           decision already ran; a comment inherits it — no per-comment
+           decision). The list groups replies under their top-level parent; the
+           composer is the M3 reply-form shape (rc-editor + language picker). *@
+        <section class="mb-4" id="todo-comments">
+            <h2 class="h5 mb-3"><kw-l key="projects.todo.comments">Comments</kw-l></h2>
+
+            @{
+                var comments = Model.Comments ?? [];
+                var topLevel = comments
+                    .Where(c => c.ParentId is null)
+                    .OrderBy(c => c.Created)
+                    .ToList();
+                var repliesByParent = comments
+                    .Where(c => c.ParentId is not null)
+                    .GroupBy(c => c.ParentId!)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Created).ToList());
+                string CommentBodyHtml(string body) => Kumunita.Web.Security.MarkdownRenderer.RenderHtml(body);
+            }
+
+            @if (topLevel.Count == 0)
+            {
+                <p class="text-body-tertiary mb-3"><kw-l key="projects.todo.comment_empty">No comments yet. If you can see this to-do, you can comment on it.</kw-l></p>
+            }
+            else
+            {
+                <div class="list-group mb-3">
+                    @foreach (var c in topLevel)
+                    {
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-inline-flex align-items-center me-2">
+                                    <img class="avatar avatar-sm" src="/profile/avatar/@c.AuthorId" alt="" data-avatar-fallback>
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="fw-semibold">@c.AuthorDisplayName</span>
+                                        <span class="text-muted small"><kw-dt dt="@c.Created" format="g"></kw-dt></span>
+                                        @if (c.DeletedAt is not null)
+                                        {
+                                            <span class="badge text-bg-light border"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                        }
+                                        @if (c.IsAuthor && c.DeletedAt is null)
+                                        {
+                                            <form class="d-inline ms-2" method="post"
+                                                  action="@($"/projects/todos/{Model.Todo.Id}/comments/{c.Id}/delete")"
+                                                  style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-link text-danger p-0"><kw-l key="projects.todo.comment_delete">Delete</kw-l></button>
+                                            </form>
+                                        }
+                                    </div>
+                                    @if (c.DeletedAt is null)
+                                    {
+                                        <div class="rc-body mt-1">@Html.Raw(CommentBodyHtml(c.Body))</div>
+                                    }
+                                </div>
+                            </div>
+
+                            @* Replies under this top-level comment (C-M5·7 — the
+                               sole hierarchy mechanism). *@
+                            @if (repliesByParent.TryGetValue(c.Id, out var replies) && replies.Count > 0)
+                            {
+                                <div class="mt-3 ms-3">
+                                    @foreach (var r in replies)
+                                    {
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div class="d-inline-flex align-items-center me-2">
+                                                <img class="avatar avatar-sm" src="/profile/avatar/@r.AuthorId" alt="" data-avatar-fallback>
+                                            </div>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <span class="fw-semibold">@r.AuthorDisplayName</span>
+                                                    <span class="text-muted small"><kw-dt dt="@r.Created" format="g"></kw-dt></span>
+                                                    @if (r.DeletedAt is not null)
+                                                    {
+                                                        <span class="badge text-bg-light border"><kw-l key="projects.todo.comment_deleted">This comment has been deleted by its author.</kw-l></span>
+                                                    }
+                                                    @if (r.IsAuthor && r.DeletedAt is null)
+                                                    {
+                                                        <form class="d-inline ms-2" method="post"
+                                                              action="@($"/projects/todos/{Model.Todo.Id}/comments/{r.Id}/delete")"
+                                                              style="margin:0;">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0"><kw-l key="projects.todo.comment_delete">Delete</kw-l></button>
+                                                        </form>
+                                                    }
+                                                </div>
+                                                @if (r.DeletedAt is null)
+                                                {
+                                                    <div class="rc-body mt-1">@Html.Raw(CommentBodyHtml(r.Body))</div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @* The composer (any signed-in resident who can see the to-do may
+               comment — C-M3·1). The M3 reply-form shape: rc-editor + language
+               picker (ADR 0018 — the authored-in tag). *@
+            <div class="card">
+                <div class="card-body">
+                    <form class="mb-0" method="post" action="@($"/projects/todos/{Model.Todo.Id}/comments")">
+                        @Html.AntiForgeryToken()
+                        <label class="form-label" for="todo-comment-body" style="font-weight:600;">
+                            <kw-l key="projects.todo.comment_reply">Comment</kw-l>
+                        </label>
+                        <div class="rc-editor">
+                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                <partial name="_RichEditorToggle" />
+                            </div>
+                            <textarea class="form-control mb-3" id="todo-comment-body" name="body" rows="3"
+                                      required placeholder="…" data-rich-editor></textarea>
+                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                        </div>
+                        @{
+                            var commentLanguages =
+                                (ViewData["TodoComment_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
+                                ?? new List<(string Code, string NativeName)>();
+                        }
+                        <div class="mb-3">
+                            <label class="form-label" for="todo-comment-language" style="font-weight:600;">
+                                <kw-l key="posts.reply_language_label">Language</kw-l>
+                            </label>
+                            <select class="form-control" id="todo-comment-language" name="languageCode">
+                                @foreach (var (languageCode, nativeName) in commentLanguages)
+                                {
+                                    @* ADR 0049 — default to the language the resident is reading in *@
+                                    <option value="@languageCode" selected="@(String.Equals(languageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
+                                }
+                            </select>
+                            <div class="text-muted small mt-1">
+                                <kw-l key="posts.reply_language_note">The language you're replying in — a tag, not a translation.</kw-l>
+                            </div>
+                        </div>
+                        <div class="text-muted small mb-3">
+                            <kw-l key="projects.todo.comment_audience_note">Comments have no own audience — they are visible under this to-do's single audience decision (the C-M3·1 "comment-inherits" rule). You are commenting only where the to-do itself is visible.</kw-l>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><kw-l key="projects.todo.comment_submit">Comment</kw-l></button>
+                    </form>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
 @section Scripts {
+    @* ADR 0100 — the rich editor (self-wires every .rc-editor block on this
+       page: the translation modals above + the comment composer below); the
+       image button is omitted (data-rich-editor-no-image). One include covers
+       every .rc-editor root the module finds. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
 }

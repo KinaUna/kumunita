@@ -155,7 +155,14 @@ import { getAntiForgeryToken } from './api.js';
   // endpoint) + the view's antiforgery token.
   // The server is authoritative (C3 / C-M5·9) — the redirect re-renders
   // the board; no optimistic updates.
-  board.addEventListener('change', (e: Event) => {
+  //
+  // The listener is on `document`, NOT the board: while the lane ⋮ menu
+  // is open, detach-menu.ts re-homes the menu (select included) onto
+  // <body> to escape the board's overflow clipping — so a change fired on
+  // the detached select never bubbles through the board, and a board-level
+  // listener would silently never fire. The class gate below keeps the
+  // handler inert for any other `.kanban-lane-autosubmit` on the page.
+  document.addEventListener('change', (e: Event) => {
     const el = e.target as HTMLElement & { name?: string; value?: string };
     if (!el.classList.contains('kanban-lane-autosubmit')) return;
     const form = el.closest<HTMLFormElement>('form');

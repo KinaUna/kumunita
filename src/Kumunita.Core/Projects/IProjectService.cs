@@ -78,6 +78,59 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// </summary>
     Task<TodoDetailResult> GetTodoAsync(string todoItemId, string actorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// **Add a comment** (or a reply to another comment) on a to-do (ADR 0100).
+    /// A new <see cref="TodoComment"/> row with the to-do's id as
+    /// <see cref="TodoComment.TodoId"/> and, when <paramref name="parentId"/>
+    /// is non-null, that comment's id as
+    /// <see cref="TodoComment.ParentId"/> (the sole hierarchy mechanism —
+    /// C-M5·7: a <c>null</c> parent is a top-level comment, a non-null parent
+    /// is a reply). **Standing:** any actor who passes the to-do's
+    /// <c>CanAsync(Read)</c> decision (the to-do's audience is the sole access
+    /// boundary — a comment inherits it, C-M3·1; there is no separate
+    /// comment-level standing matrix). A <paramref name="parentId"/> that is
+    /// missing, already soft-deleted, or on a *different* to-do is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>LanguageCode</c> is
+    /// materialized from the instance default when <paramref
+    /// name="languageCode"/> is null/empty (ADR 0018). One
+    /// <see cref="AccessAudit"/> row (<c>todo.comment.create</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do id is not found, the
+    /// to-do is soft-deleted, or a non-null <paramref name="parentId"/> does
+    /// not resolve to a live comment on the same to-do.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor may not read
+    /// the to-do.</exception>
+    Task<TodoComment> CreateTodoCommentAsync(
+        string todoId, string actorId, IReadOnlySet<string> actorRoles,
+        string body, string? languageCode, string? parentId = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// **Soft-delete a comment** the actor authored on a to-do (ADR 0100, the
+    /// ADR 0024 author-soft-delete shape carried from
+    /// <see cref="Kumunita.Core.Posts.PostReply.DeletedAt"/>): stamps
+    /// <see cref="TodoComment.DeletedAt"/> forward (the record is kept, never
+    /// hard-deleted), and the detail view renders a placeholder in place of
+    /// the body. **Standing:** author-only (the comment's
+    /// <see cref="TodoComment.AuthorId"/> == the actor — the ADR 0016
+    /// reply-delete precedent: a non-author is refused, there is no
+    /// moderator / GlobalAdmin override branch on a comment's own delete).
+    /// The comment must exist and be under the given to-do (a comment on a
+    /// different to-do is a <see cref="KeyNotFoundException"/> — 404,
+    /// non-leaky). One <see cref="AccessAudit"/> row
+    /// (<c>todo.comment.delete</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do id is not found, the
+    /// to-do is soft-deleted, or the <paramref name="commentId"/> does not
+    /// resolve to a comment under that to-do.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the
+    /// comment's author.</exception>
+    Task<TodoComment> DeleteTodoCommentAsync(
+        string todoId, string commentId, string actorId, IReadOnlySet<string> actorRoles,
+        CancellationToken ct = default);
+
         /// <summary>
         /// The **blocker picker** read lane (ADR 0087 D7) — the actor's readable,
         /// non-deleted to-dos (the candidates are <c>!IsDeleted</c>; the
@@ -236,11 +289,15 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// <summary>
     /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
     /// the board edit lane, <c>GET /projects/boards/{id}/edit</c> +
-    /// <c>POST /projects/boards/{id}</c>). A **full update** of those two
-    /// fields (the edit page posts both; a blank description clears it to
-    /// <c>null</c> — the <see cref="UpdateBoardRequest"/> shape). The board's
-    /// standing, audience, component, and language are creation-time choices
-    /// — **not** editable here (ADR 0070). <see cref="KanbanBoard.Modified"/>
+    /// <c>POST /projects/boards/{id}</c>) and — when supplied (ADR 0098) —
+    /// its <c>Audience</c> (the board edit page posts the audience editor
+    /// alongside both text fields). A **full update** of the two text fields
+    /// (the edit page posts both; a blank description clears it to
+    /// <c>null</c>); a <c>null</c> <see cref="UpdateBoardRequest.Audience"/>
+    /// leaves the stored audience **unchanged**, a non-null value is written
+    /// verbatim (ADR 0001-B). The board's standing, component, and language
+    /// remain creation-time choices — **not** editable here (ADR 0070).
+    /// <see cref="KanbanBoard.Modified"/>
     /// is stamped **only on a real change** (the
     /// <see cref="UpdateLaneAsync"/> no-op shape). Standing (server-side,
     /// C3): **creator ∪ GlobalAdmin** over the board (the
@@ -299,6 +356,14 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// <see cref="BoardItemPlacement"/> row placing it on the given lane at
     /// the **end** of the lane (the max <c>Order</c> + 1 — the
     /// <see cref="MoveTodoToAdjacentLaneAsync"/> end-of-lane shape). **The
+    /// audience inheritance (C-M5·3):** the new to-do's <see
+    /// cref="TodoItem.Audience"/> is the board's
+    /// <see cref="KanbanBoard.Audience"/>, carried verbatim (a
+    /// <c>null</c> board audience is public; a non-null one is copied as-is,
+    /// the copy-verbatim shape, ADR 0001-B) — a card's visibility is the
+    /// board's, so the card is gated by the same audience whether read on the
+    /// board (the two-level decision) or in the standalone to-do feed (which
+    /// gates on the to-do's own <c>Audience</c>). **The
     /// lane-status auto-update (C-M5·4):** if the lane's <c>Status</c> is
     /// non-null, the to-do's <c>Status</c> is set to that lane's status in the
     /// same transaction (C3); a null lane <c>Status</c> leaves the to-do's
@@ -392,6 +457,28 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// session (C3).
     /// </summary>
     Task<BoardItemPlacement> MoveTodoToLanePositionAsync(string placementId, string targetLaneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Delete a lane** from a board (ADR 0097): the <see cref="KanbanLane"/>
+    /// row is **deleted** + the lane's <see cref="BoardItemPlacement"/> rows
+    /// are **deleted** (the **to-dos are untouched** — a to-do keeps its
+    /// standalone form and any placements on other boards, C-M5·2). The
+    /// board's remaining lanes are **re-settled to a clean <c>0..n-1</c>
+    /// <c>Order</c> sequence** (the
+    /// <see cref="MoveLaneToPositionAsync"/> park-then-settle shape — the
+    /// <c>(BoardId, Order)</c> unique index is enforced row-by-row, so the
+    /// lanes are parked to a guaranteed-free band and settled in a second
+    /// commit); deleting the **last** lane is a renumber no-op. **Creator ∪
+    /// GlobalAdmin** over the **board** (the lane's standing is the board's —
+    /// the <c>CheckBoardStanding</c> shape; the assignee branch does not apply
+    /// to a lane, C-M5·6). A missing lane or board is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see cref="AccessAudit"/>
+    /// row (<c>board.delete_lane</c>, <c>TargetKind = "board"</c>, the
+    /// **board's** id as the target — the lane is not an auditable resource of
+    /// its own) commits atomically with the write (C3).
+    /// </summary>
+    Task DeleteLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
     /// <summary>
     /// **Soft-delete** a board — sets <c>IsDeleted = true</c> (the ADR 0024

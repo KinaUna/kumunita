@@ -126,8 +126,22 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Created",
             ["projects.todo.modified"]       = "Modified",
             ["projects.todo.no_body"]        = "No body — this to-do is title-only.",
+            // ADR 0106 — self-assign lane + card details expander.
+            ["projects.todo.assign_to_me"]   = "Assign to me",
+            ["projects.todo.details"]        = "Details",
+            ["projects.todo.community"]      = "Community",
             ["projects.todo.subtasks"]       = "Subtasks",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — the comments + replies section (C-M3·1 — comments
+            // inherit the to-do's single Read decision, so the section is
+            // visible to exactly the audience the to-do itself is).
+            ["projects.todo.comments"]       = "Comments",
+            ["projects.todo.comment_empty"]  = "No comments yet. If you can see this to-do, you can comment on it.",
+            ["projects.todo.comment_reply"]  = "Comment",
+            ["projects.todo.comment_submit"] = "Comment",
+            ["projects.todo.comment_deleted"] = "This comment has been deleted by its author.",
+            ["projects.todo.comment_delete"] = "Delete",
+            ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision (the C-M3·1 \"comment-inherits\" rule). You are commenting only where the to-do itself is visible.",
             ["projects.todo.back"]           = "← Back to to-dos",
             ["projects.todo.untitled"]       = "Untitled to-do",
             ["projects.todo.edit"]           = "Edit",
@@ -158,7 +172,7 @@ public static class KnownTranslationKeys
             ["projects.board.delete"]        = "Delete board",
             ["projects.board.edit"]          = "Edit board",
             ["projects.board.edit_heading"]  = "Edit board",
-            ["projects.board.edit_lead"]     = "Update this board's title and description. Its audience, community, and language are fixed when the board is created.",
+            ["projects.board.edit_lead"]     = "Update this board's title, description, and audience. Its community and language are fixed when the board is created.",
             ["projects.board.save"]          = "Save changes",
             ["projects.board.create"]        = "Create board",
             ["projects.board.empty"]         = "No boards yet — create one to start arranging the shared work.",
@@ -177,6 +191,7 @@ public static class KnownTranslationKeys
             ["projects.board.lane.set_status"] = "Set status",
             ["projects.board.lane.move_left"] = "Move left",
             ["projects.board.lane.move_right"] = "Move right",
+            ["projects.board.lane.delete"] = "Delete lane",
             ["projects.board.lane.add_todo"] = "Add to-do",
             ["projects.board.lane.add_lane"] = "Add lane",
             ["projects.board.lane.add_todo_placeholder"] = "To-do title",
@@ -202,6 +217,10 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Add",
             ["common.remove"]   = "Remove",
             ["common.filter"]   = "Filter",
+            ["common.full_page"]    = "Full page",
+            ["common.exit_full_page"] = "Exit full page",
+            ["common.fullscreen"]   = "Full screen",
+            ["common.exit_fullscreen"] = "Exit full screen",
             ["common.name"]         = "Name",
             ["common.display_name"] = "Display name",
             ["common.email"]        = "Email",
@@ -432,6 +451,33 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "On — admins are notified of new sign-ups and verifications",
             ["admin.signup_notify_off"]     = "Off — no admin notifications on sign-up / verification",
 
+            // ── admin — the announcement-comments gate (the
+            // /admin/announcements/comments surface; ADR 0101) ───────────────
+            ["admin.anncomments_title"]     = "Announcement comments",
+            ["admin.anncomments_lede"]      =
+                "Whether signed-in residents may comment on announcements. " +
+                "Closing the gate hides the comment list and composer on every " +
+                "announcement — no one can add a comment. Visitors can never " +
+                "comment, and existing comments are not removed — the gate " +
+                "only controls new comments.",
+            ["admin.anncomments_on"]        = "Open — signed-in residents can comment",
+            ["admin.anncomments_off"]       = "Closed — no signed-in resident can add a comment",
+            ["admin.anncomments_save"]      = "Save",
+
+            // ── admin — the direct-messaging gate (the /admin/messaging
+            // surface; M9, ADR 0105) ────────────────────────────────────────
+            ["admin.messaging_title"]   = "Direct messaging",
+            ["admin.messaging_lede"]    =
+                "Whether signed-in residents may open direct 1:1 conversations. " +
+                "Closing the gate hides the Messages entry and refuses every " +
+                "conversation seam — no one can open a thread or send a message. " +
+                "The gate is off by default; it only controls new messaging, and " +
+                "existing conversations and messages are never touched by it. " +
+                "Even a GlobalAdmin who is not a participant cannot read a " +
+                "conversation.",
+            ["admin.messaging_on"]      = "Open — signed-in residents can message each other",
+            ["admin.messaging_off"]     = "Closed — no resident can open or send messages",
+
             // ── account — sign-up-closed notice (the /account/signup and
             // /account/login surfaces when the admin gate is closed; ADR 0050) ─
             ["account.signup_closed_title"] = "Sign-up is closed",
@@ -541,9 +587,9 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "How the picks combine",
             ["posts.audience_restrict_hint"] =
-                "These picks are ADDITIONAL — “Everyone in this community” " +
-                "stays on unless you turn it off, so the post is visible to " +
-                "the whole community and the picks you make here.",
+                "These picks are hidden while “Everyone in this community” is " +
+                "on — the post is visible to everyone in the community. Turn " +
+                "that off to narrow who can see it with the picks here.",
             ["posts.audience_only_picks"] =
                 "Whatever you pick here becomes the post's audience — nothing " +
                 "above or below this form is added to it. An empty pick (with " +
@@ -585,6 +631,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Private group",
             ["groups.private_hint"]         =
                 "A private group (e.g. a family) is hidden from everyone else; only the people you add as members can see and use it. Clear the box to make the group public again.",
+            ["groups.danger_heading"]   = "Danger zone",
+            ["groups.danger_delete_hint"] =
+                "Deleting the group removes it, its members, and any pending invitations. This cannot be undone.",
+            ["groups.danger_delete_button"] = "Delete this group",
             ["groups.new_title"]      = "Post to this group",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
@@ -609,6 +659,16 @@ public static class KnownTranslationKeys
             ["groups.invited_by"]     = "Invited by",
             ["groups.invite_accept"]  = "Accept",
             ["groups.invite_decline"] = "Decline",
+            // ── ADR 0094 — the resident self-initiated join-request lane ──
+            ["groups.join_requests"]              = "Join requests",
+            ["groups.join_requests_pending"]      = "pending",
+            ["groups.join_requests_note"]         = "Waiting for the group owner.",
+            ["groups.join_withdraw"]              = "Withdraw",
+            ["groups.other_public"]               = "Other public groups",
+            ["groups.request_join"]               = "Request to join",
+            ["groups.join_requests_pending_heading"] = "Pending join requests",
+            ["groups.join_approve"]               = "Approve",
+            ["groups.join_decline"]               = "Decline",
             ["groups.members_one"]    = "member",
             ["groups.members_many"]   = "members",
             // ── community feed (the Airy layout — the left rail + the
@@ -794,6 +854,13 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Delete",
             ["pages.resetSeeded"] = "Reset to seeded text",
             ["pages.untitled"]    = "Untitled page",
+            // The /pages browse's two sections (ADR 0040's kind split,
+            // surfaced in the UI — resident pages apart from platform pages).
+            ["pages.section_community"] = "Community pages",
+            ["pages.section_platform"]  = "Platform pages",
+            ["pages.section_platform_lede"] =
+                "Published by the platform — terms, help, privacy, and the " +
+                "code of conduct.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             // The /blog/{userId} feed — a resident's own User-kind pages,
@@ -1092,6 +1159,20 @@ public static class KnownTranslationKeys
             ["announcements.banner_read_more"] = "Read more",
             ["announcements.banner_all"] = "All announcements",
 
+            // ── announcement comments (the Detail.cshtml comment lane;
+            //    signed-in-only, admin-toggleable; ADR 0101) ──────────────────
+            ["announcements.comments"] = "Comments",
+            ["announcements.comment_empty"] = "No comments yet. Be the first to say something.",
+            ["announcements.comment_deleted"] = "This comment has been deleted by its author.",
+            ["announcements.comment_delete"] = "Delete",
+            ["announcements.comment_reply"] = "Write a comment",
+            ["announcements.comment_submit"] = "Comment",
+            ["announcements.comment_audience_note"] =
+                "Comments are visible to signed-in residents only, even on a " +
+                "public announcement, and follow this announcement's own " +
+                "audience (a community-targeted one is visible to that " +
+                "community's residents).",
+
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Last updated:",
 
@@ -1343,9 +1424,13 @@ public static class KnownTranslationKeys
             ["notifications.inbox"] = "Notifications",
             ["notifications.preferences"] = "Preferences",
             ["notifications.mark_all_read"] = "Mark all as read",
+            ["notifications.mark_read"] = "Mark as read",
+            ["notifications.mark_unread"] = "Mark as unread",
             ["notifications.empty"] = "Nothing yet — things that happen to you will show up here.",
             ["notifications.bell"] = "Notifications",
             ["notifications.view"] = "View",
+            ["notifications.accept"] = "Accept",
+            ["notifications.decline"] = "Decline",
             ["notifications.preferences.title"] = "Notification preferences",
             ["notifications.preferences.intro"] = "Choose which notifications you also get by email. The inbox always records every notification.",
             ["notifications.preferences.save"] = "Save preferences",
@@ -1429,6 +1514,21 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "New posts in communities",
             ["notifications.subscription.group.post.label"] = "New posts in groups",
             ["notifications.subscription.page.child.label"] = "New sub-pages",
+            // ── M9 (ADR 0105, U03) — the message.new kind + nudge templates ──
+            ["notifications.kind.message.new"] = "New message",
+            ["notifications.preference.message.new.label"] = "Messages from other residents",
+            ["notification.message.new.subject"] = "A new message",
+            ["notification.message.new.body"] = "A resident sent you a message: ",
+            // ── M9 (ADR 0105, U04) — the resident surface: nav, list, thread, composer ──
+            ["message.nav"] = "Messages",
+            ["message.title"] = "Messages",
+            ["message.new"] = "New conversation",
+            ["message.thread.empty"] = "No messages yet — say hello.",
+            ["message.compose.placeholder"] = "Write a message…",
+            ["message.compose.send"] = "Send",
+            ["message.unread"] = "unread",
+            ["message.disabled"] = "Direct messaging is turned off on this instance.",
+            ["message.other"] = "the other person",
             ["pages.subscribe"] = "Subscribe to updates",
             ["pages.unsubscribe"] = "Unsubscribe from updates",
 
@@ -1584,8 +1684,21 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Erstellt",
             ["projects.todo.modified"]       = "Geändert",
             ["projects.todo.no_body"]        = "Kein Text — diese Aufgabe hat nur einen Titel.",
+            // ADR 0106 — Selbstzuweisungs-Spur + Kartendetailaufklapper.
+            ["projects.todo.assign_to_me"]   = "Mir zuweisen",
+            ["projects.todo.details"]        = "Details",
+            ["projects.todo.community"]      = "Community",
             ["projects.todo.subtasks"]       = "Unteraufgaben",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — Kommentare + Antworten (C-M3·1 — Kommentare erben die
+            // einzelne Read-Entscheidung der Aufgabe).
+            ["projects.todo.comments"]       = "Kommentare",
+            ["projects.todo.comment_empty"]  = "Noch keine Kommentare. Wenn du diese Aufgabe sehen kannst, kannst du sie kommentieren.",
+            ["projects.todo.comment_reply"]  = "Kommentar",
+            ["projects.todo.comment_submit"] = "Kommentieren",
+            ["projects.todo.comment_deleted"] = "Dieser Kommentar wurde von seinem Autor gelöscht.",
+            ["projects.todo.comment_delete"] = "Löschen",
+            ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar (die C-M3·1-\"Kommentar-erbt\"-Regel). Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
             ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
             ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
             ["projects.todo.edit"]           = "Bearbeiten",
@@ -1616,7 +1729,7 @@ public static class KnownTranslationKeys
             ["projects.board.delete"]        = "Board löschen",
             ["projects.board.edit"]          = "Board bearbeiten",
             ["projects.board.edit_heading"]  = "Board bearbeiten",
-            ["projects.board.edit_lead"]     = "Aktualisiere Titel und Beschreibung dieses Boards. Zielgruppe, Gemeinschaft und Sprache sind bei der Erstellung festgelegt.",
+            ["projects.board.edit_lead"]     = "Aktualisiere Titel, Beschreibung und Zielgruppe dieses Boards. Gemeinschaft und Sprache sind bei der Erstellung festgelegt.",
             ["projects.board.save"]          = "Änderungen speichern",
             ["projects.board.create"]        = "Board erstellen",
             ["projects.board.empty"]         = "Noch keine Boards — erstelle eines, um die gemeinsame Arbeit anzuordnen.",
@@ -1635,6 +1748,7 @@ public static class KnownTranslationKeys
             ["projects.board.lane.set_status"] = "Status setzen",
             ["projects.board.lane.move_left"] = "Nach links verschieben",
             ["projects.board.lane.move_right"] = "Nach rechts verschieben",
+            ["projects.board.lane.delete"] = "Lane löschen",
             ["projects.board.lane.add_todo"] = "To-do hinzufügen",
             ["projects.board.lane.add_lane"] = "Lane hinzufügen",
             ["projects.board.lane.add_todo_placeholder"] = "Aufgabentitel",
@@ -1660,6 +1774,10 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Hinzufügen",
             ["common.remove"]   = "Entfernen",
             ["common.filter"]   = "Filter",
+            ["common.full_page"]    = "Vollseite",
+            ["common.exit_full_page"] = "Vollseite beenden",
+            ["common.fullscreen"]   = "Vollbild",
+            ["common.exit_fullscreen"] = "Vollbild beenden",
             ["common.name"]         = "Name",
             ["common.display_name"] = "Anzeigename",
             ["common.email"]        = "E-Mail",
@@ -1886,6 +2004,32 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "An — Admins werden bei neuen Registrierungen und Verifizierungen benachrichtigt",
             ["admin.signup_notify_off"]     = "Aus — keine Admin-Benachrichtigungen bei Registrierung / Verifizierung",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Ankündigungen kommentieren",
+            ["admin.anncomments_lede"]      =
+                "Ob angemeldete Anwohner:innen Ankündigungen kommentieren dürfen. " +
+                "Geschlossen werden die Kommentarliste und das Eingabefeld auf " +
+                "jeder Ankündigung ausgeblendet — niemand kann mehr einen " +
+                "Kommentar hinzufügen. Besucher:innen konnten nie kommentieren, " +
+                "und bereits vorhandene Kommentare bleiben erhalten — das " +
+                "Schalterfeld steuert nur neue Kommentare.",
+            ["admin.anncomments_on"]        = "Offen — angemeldete Anwohner:innen können kommentieren",
+            ["admin.anncomments_off"]       = "Geschlossen — keine:r kann einen Kommentar hinzufügen",
+            ["admin.anncomments_save"]      = "Speichern",
+
+            // ── admin — Direkt-Nachrichten-Schalter (M9, ADR 0105) ─────────
+            ["admin.messaging_title"]   = "Direktnachrichten",
+            ["admin.messaging_lede"]    =
+                "Ob angemeldete Anwohner:innen direkte 1:1-Gespräche eröffnen dürfen. " +
+                "Geschlossen wird der Nachrichten-Eintrag ausgeblendet und jede " +
+                "Gesprächs-Anfrage abgelehnt — niemand kann ein Gespräch eröffnen " +
+                "oder eine Nachricht senden. Der Schalter ist standardmäßig aus; " +
+                "er steuert nur neue Nachrichten, und bestehende Gespräche und " +
+                "Nachrichten bleiben erhalten. Auch eine:r GlobalAdmin ohne " +
+                "Gesprächsteilnahme kann ein Gespräch nicht lesen.",
+            ["admin.messaging_on"]      = "Offen — angemeldete Anwohner:innen können sich direkt Nachrichten schreiben",
+            ["admin.messaging_off"]     = "Geschlossen — niemand kann Gespräche eröffnen oder Nachrichten senden",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Die Registrierung ist geschlossen",
             ["account.signup_closed_body"]  =
@@ -1981,9 +2125,10 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Wie die Auswahl kombiniert wird",
             ["posts.audience_restrict_hint"] =
-                "Diese Auswahl ist zusätzlich — „Alle in dieser Gemeinschaft“ " +
-                "bleibt an, solange du es nicht ausschaltest, der Beitrag ist also " +
-                "für die ganze Gemeinschaft und die hier gewählten Personen sichtbar.",
+                "Diese Auswahl ist ausgeblendet, solange „Alle in dieser " +
+                "Gemeinschaft“ an ist — der Beitrag ist für alle in der " +
+                "Gemeinschaft sichtbar. Schalte sie ab, um mit den Auswahl " +
+                "hier zu bestimmen, wer ihn sehen kann.",
             ["posts.audience_only_picks"] =
                 "Was du hier wählst, wird das Publikum des Beitrags — es wird " +
                 "nichts darüber oder darunter hinzugefügt. Eine leere Auswahl (mit " +
@@ -2020,6 +2165,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Private Gruppe",
             ["groups.private_hint"]         =
                 "Eine private Gruppe (z. B. eine Familie) ist für alle anderen unsichtbar; nur die Menschen, die du als Mitglieder hinzufügst, können sie sehen und nutzen. Das Häkchen aufheben, um die Gruppe wieder öffentlich zu machen.",
+            ["groups.danger_heading"]   = "Gefahrenzone",
+            ["groups.danger_delete_hint"] =
+                "Das Löschen der Gruppe entfernt sie, ihre Mitglieder und ausstehende Einladungen. Dies kann nicht rückgängig gemacht werden.",
+            ["groups.danger_delete_button"] = "Diese Gruppe löschen",
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
@@ -2042,6 +2191,16 @@ public static class KnownTranslationKeys
             ["groups.invited_by"]     = "Eingeladen von",
             ["groups.invite_accept"]  = "Annehmen",
             ["groups.invite_decline"] = "Ablehnen",
+            // ── ADR 0094 — the resident self-initiated join-request lane ──
+            ["groups.join_requests"]              = "Beitrittsanfragen",
+            ["groups.join_requests_pending"]      = "ausstehend",
+            ["groups.join_requests_note"]         = "Warten auf den Gruppeninhaber.",
+            ["groups.join_withdraw"]              = "Zurückziehen",
+            ["groups.other_public"]               = "Weitere öffentliche Gruppen",
+            ["groups.request_join"]               = "Beitritt anfragen",
+            ["groups.join_requests_pending_heading"] = "Ausstehende Beitrittsanfragen",
+            ["groups.join_approve"]               = "Genehmigen",
+            ["groups.join_decline"]               = "Ablehnen",
             ["groups.members_one"]    = "Mitglied",
             ["groups.members_many"]   = "Mitglieder",
             // ── community feed (the Airy layout — the left rail + the
@@ -2222,6 +2381,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Löschen",
             ["pages.resetSeeded"] = "Auf Seed-Text zurücksetzen",
             ["pages.untitled"]    = "Unbenannte Seite",
+            ["pages.section_community"] = "Seiten der Gemeinschaft",
+            ["pages.section_platform"]  = "Plattformseiten",
+            ["pages.section_platform_lede"] =
+                "Von der Plattform veröffentlicht — Nutzungsbedingungen, Hilfe, " +
+                "Datenschutz und Verhaltenskodex.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Neue Blogseite",
@@ -2516,6 +2680,19 @@ public static class KnownTranslationKeys
             ["announcements.banner_read_more"] = "Mehr lesen",
             ["announcements.banner_all"] = "Alle Ankündigungen",
 
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Kommentare",
+            ["announcements.comment_empty"] = "Noch keine Kommentare. Schreib als Erster etwas.",
+            ["announcements.comment_deleted"] = "Dieser Kommentar wurde von seiner Autorin bzw. seinem Autor gelöscht.",
+            ["announcements.comment_delete"] = "Löschen",
+            ["announcements.comment_reply"] = "Kommentar schreiben",
+            ["announcements.comment_submit"] = "Kommentieren",
+            ["announcements.comment_audience_note"] =
+                "Kommentare sind nur für angemeldete Anwohner:innen sichtbar — " +
+                "auch bei einer öffentlichen Ankündigung — und folgen dem " +
+                "eigenen Publikum dieser Ankündigung (eine an eine " +
+                "Community gerichtete ist deren Anwohner:innen sichtbar).",
+
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Zuletzt aktualisiert:",
 
@@ -2734,9 +2911,13 @@ public static class KnownTranslationKeys
             ["notifications.inbox"] = "Benachrichtigungen",
             ["notifications.preferences"] = "Einstellungen",
             ["notifications.mark_all_read"] = "Alle als gelesen markieren",
+            ["notifications.mark_read"] = "Als gelesen markieren",
+            ["notifications.mark_unread"] = "Als ungelesen markieren",
             ["notifications.empty"] = "Noch nichts — Dinge, die dir passieren, erscheinen hier.",
             ["notifications.bell"] = "Benachrichtigungen",
             ["notifications.view"] = "Ansehen",
+            ["notifications.accept"] = "Annehmen",
+            ["notifications.decline"] = "Ablehnen",
             ["notifications.preferences.title"] = "Benachrichtigungseinstellungen",
             ["notifications.preferences.intro"] = "Wähle, welche Benachrichtigungen du zusätzlich per E-Mail bekommst. Der Posteingang erfasst jede Benachrichtigung.",
             ["notifications.preferences.save"] = "Einstellungen speichern",
@@ -2811,6 +2992,21 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "Neue Beiträge in Communities",
             ["notifications.subscription.group.post.label"] = "Neue Beiträge in Gruppen",
             ["notifications.subscription.page.child.label"] = "Neue Unterseiten",
+            // ── M9 (ADR 0105, U03) — die message.new-Art + Vorlagen ──
+            ["notifications.kind.message.new"] = "Neue Nachricht",
+            ["notifications.preference.message.new.label"] = "Nachrichten von anderen Bewohnern",
+            ["notification.message.new.subject"] = "Neue Nachricht",
+            ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
+            // ── M9 (ADR 0105, U04) — die Bewohner-Fläche: Navigation, Liste, Thread, Composer ──
+            ["message.nav"] = "Nachrichten",
+            ["message.title"] = "Nachrichten",
+            ["message.new"] = "Neue Unterhaltung",
+            ["message.thread.empty"] = "Noch keine Nachrichten — melde dich einfach.",
+            ["message.compose.placeholder"] = "Nachricht schreiben…",
+            ["message.compose.send"] = "Senden",
+            ["message.unread"] = "ungelesen",
+            ["message.disabled"] = "Direktnachrichten sind auf dieser Instanz deaktiviert.",
+            ["message.other"] = "die andere Person",
             ["pages.subscribe"] = "Aktualisierungen abonnieren",
             ["pages.unsubscribe"] = "Abonnierung aufheben",
 
@@ -2930,6 +3126,10 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Ajouter",
             ["common.remove"]   = "Retirer",
             ["common.filter"]   = "Filtrer",
+            ["common.full_page"]    = "Page entière",
+            ["common.exit_full_page"] = "Quitter la page entière",
+            ["common.fullscreen"]   = "Plein écran",
+            ["common.exit_fullscreen"] = "Quitter le plein écran",
             ["common.name"]         = "Nom",
             ["common.display_name"] = "Nom affiché",
             ["common.email"]        = "E-mail",
@@ -3009,8 +3209,21 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Créé le",
             ["projects.todo.modified"]       = "Modifié le",
             ["projects.todo.no_body"]        = "Pas de texte — cette tâche n'a qu'un titre.",
+            // ADR 0106 — voie d'auto-attribution + panneau de détails de carte.
+            ["projects.todo.assign_to_me"]   = "M'attribuer",
+            ["projects.todo.details"]        = "Détails",
+            ["projects.todo.community"]      = "Communauté",
             ["projects.todo.subtasks"]       = "Sous-tâches",
             ["projects.todo.boards"]         = "Tableaux",
+            // ADR 0100 — Commentaires + réponses (C-M3·1 — les commentaires
+            // héritent de la décision de lecture unique de la tâche).
+            ["projects.todo.comments"]       = "Commentaires",
+            ["projects.todo.comment_empty"]  = "Pas encore de commentaires. Si vous pouvez voir cette tâche, vous pouvez la commenter.",
+            ["projects.todo.comment_reply"]  = "Commentaire",
+            ["projects.todo.comment_submit"] = "Commenter",
+            ["projects.todo.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
+            ["projects.todo.comment_delete"] = "Supprimer",
+            ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche (la règle \"commentaire-hérite\" C-M3·1). Vous ne commentez que là où la tâche elle-même est visible.",
             ["projects.todo.back"]           = "← Retour aux tâches",
             ["projects.todo.untitled"]       = "Tâche sans titre",
             ["projects.todo.edit"]           = "Modifier",
@@ -3037,7 +3250,7 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "Un libellé court pour le tableau — l'étiquette du flux.",
             ["projects.board.edit"]          = "Modifier le tableau",
             ["projects.board.edit_heading"]  = "Modifier le tableau",
-            ["projects.board.edit_lead"]     = "Mettez à jour le titre et la description de ce tableau. Son public, sa communauté et sa langue sont fixés à la création.",
+            ["projects.board.edit_lead"]     = "Mettez à jour le titre, la description et le public de ce tableau. Sa communauté et sa langue sont fixés à la création.",
             ["projects.board.save"]          = "Enregistrer les modifications",
             ["projects.board.description_hint"] = "Une description optionnelle de ce que ce tableau suit. Un tableau est utilisable avec un titre seul.",
             ["projects.board.back"]          = "← Retour aux tableaux",
@@ -3060,6 +3273,7 @@ public static class KnownTranslationKeys
             ["projects.board.lane.set_status"] = "Définir le statut",
             ["projects.board.lane.move_left"] = "Déplacer à gauche",
             ["projects.board.lane.move_right"] = "Déplacer à droite",
+            ["projects.board.lane.delete"] = "Supprimer la colonne",
             ["projects.board.lane.add_todo"] = "Ajouter une tâche",
             ["projects.board.lane.add_lane"] = "Ajouter une colonne",
             ["projects.board.lane.add_todo_placeholder"] = "Titre de la tâche",
@@ -3265,6 +3479,32 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "Activé — les admins sont notifiés des nouvelles inscriptions et vérifications",
             ["admin.signup_notify_off"]     = "Désactivé — aucune notification admin sur inscription / vérification",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Commentaires sur les annonces",
+            ["admin.anncomments_lede"]      =
+                "Si les habitants connectés peuvent commenter les annonces. " +
+                "Désactivé, la liste des commentaires et le champ de saisie " +
+                "sont masqués sur chaque annonce — personne ne peut plus en " +
+                "ajouter. Les visiteurs ne pouvaient de toute façon pas " +
+                "commenter, et les commentaires existants sont conservés — " +
+                "le bouton ne contrôle que les nouveaux commentaires.",
+            ["admin.anncomments_on"]        = "Ouvert — les habitants connectés peuvent commenter",
+            ["admin.anncomments_off"]       = "Fermé — aucun habitant ne peut ajouter de commentaire",
+            ["admin.anncomments_save"]      = "Enregistrer",
+
+            // ── admin — la passerelle de messagerie directe (M9, ADR 0105) ──
+            ["admin.messaging_title"]   = "Messagerie directe",
+            ["admin.messaging_lede"]    =
+                "Si les habitants connectés peuvent ouvrir des conversations directes 1:1. " +
+                "Désactivé, l'entrée Messages est masquée et toute demande de " +
+                "conversation est refusée — personne ne peut ouvrir un fil ni " +
+                "envoyer un message. La passerelle est fermée par défaut ; elle ne " +
+                "contrôle que la messagerie nouvelle, et les conversations et " +"messages " +
+                "existants ne sont jamais touchés. Même une GlobalAdmin qui n'est " +
+                "pas participante ne peut pas lire une conversation.",
+            ["admin.messaging_on"]      = "Ouverte — les habitants connectés peuvent s'envoyer des messages directs",
+            ["admin.messaging_off"]     = "Fermée — aucun habitant ne peut ouvrir de conversation ni envoyer de message",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "L'inscription est fermée",
             ["account.signup_closed_body"]  =
@@ -3360,9 +3600,10 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Combinaison des sélections",
             ["posts.audience_restrict_hint"] =
-                "Ces sélections sont additionnelles — « Tout le monde dans cette communauté » " +
-                "reste actif sauf si tu le désactives, donc la publication est visible par " +
-                "toute la communauté et les sélections que tu fais ici.",
+                "Ces sélections sont masquées tant que « Tout le monde dans cette " +
+                "communauté » est actif — la publication est visible par toute la " +
+                "communauté. Désactive-le pour restreindre l'accès avec les " +
+                "sélections ci-dessous.",
             ["posts.audience_only_picks"] =
                 "Ce que tu sélectionnes ici devient l'audience de la publication — rien " +
                 "au-dessus ou en dessous de ce formulaire n'y est ajouté. Une sélection vide (avec " +
@@ -3399,6 +3640,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Groupe privé",
             ["groups.private_hint"]         =
                 "Un groupe privé (p. ex. une famille) est masqué à tous les autres ; seules les personnes que tu ajoutes comme membres peuvent le voir et l'utiliser. Décocher la case pour rendre le groupe public à nouveau.",
+            ["groups.danger_heading"]   = "Zone de danger",
+            ["groups.danger_delete_hint"] =
+                "Supprimer le groupe le retire, ainsi que ses membres et toutes les invitations en attente. Cette action est irréversible.",
+            ["groups.danger_delete_button"] = "Supprimer ce groupe",
             ["groups.new_title"]      = "Publier dans ce groupe",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
@@ -3421,6 +3666,16 @@ public static class KnownTranslationKeys
             ["groups.invited_by"]     = "Invité par",
             ["groups.invite_accept"]  = "Accepter",
             ["groups.invite_decline"] = "Refuser",
+            // ── ADR 0094 — the resident self-initiated join-request lane ──
+            ["groups.join_requests"]              = "Demandes d'adhésion",
+            ["groups.join_requests_pending"]      = "en attente",
+            ["groups.join_requests_note"]         = "En attente du propriétaire du groupe.",
+            ["groups.join_withdraw"]              = "Retirer",
+            ["groups.other_public"]               = "Autres groupes publics",
+            ["groups.request_join"]               = "Demander à rejoindre",
+            ["groups.join_requests_pending_heading"] = "Demandes d'adhésion en attente",
+            ["groups.join_approve"]               = "Approuver",
+            ["groups.join_decline"]               = "Refuser",
             ["groups.members_one"]    = "membre",
             ["groups.members_many"]   = "membres",
             // ── community feed (the Airy layout — the left rail + the
@@ -3601,6 +3856,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Supprimer",
             ["pages.resetSeeded"] = "R\u00e9initialiser au texte seed\u00e9",
             ["pages.untitled"]    = "Page sans titre",
+            ["pages.section_community"] = "Pages de la communaut\u00e9",
+            ["pages.section_platform"]  = "Pages de la plateforme",
+            ["pages.section_platform_lede"] =
+                "Publi\u00e9es par la plateforme — conditions, aide, confidentialit\u00e9 " +
+                "et r\u00e8gles de conduite.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Nouvelle page de blog",
@@ -3897,6 +4157,19 @@ public static class KnownTranslationKeys
             ["announcements.banner_read_more"] = "Lire la suite",
             ["announcements.banner_all"] = "Toutes les annonces",
 
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Commentaires",
+            ["announcements.comment_empty"] = "Pas encore de commentaires. Sois le premier à dire quelque chose.",
+            ["announcements.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
+            ["announcements.comment_delete"] = "Supprimer",
+            ["announcements.comment_reply"] = "Écrire un commentaire",
+            ["announcements.comment_submit"] = "Commenter",
+            ["announcements.comment_audience_note"] =
+                "Les commentaires ne sont visibles que par les habitants " +
+                "connectés — même sur une annonce publique — et suivent le " +
+                "public de cette annonce (une annonce destinée à une " +
+                "communauté est visible par les habitants de celle-ci).",
+
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Dernière mise à jour :",
 
@@ -4115,9 +4388,13 @@ public static class KnownTranslationKeys
             ["notifications.inbox"] = "Notifications",
             ["notifications.preferences"] = "Préférences",
             ["notifications.mark_all_read"] = "Tout marquer comme lu",
+            ["notifications.mark_read"] = "Marquer comme lu",
+            ["notifications.mark_unread"] = "Marquer comme non lu",
             ["notifications.empty"] = "Rien pour l'instant — les choses qui t'arrivent apparaîtront ici.",
             ["notifications.bell"] = "Notifications",
             ["notifications.view"] = "Voir",
+            ["notifications.accept"] = "Accepter",
+            ["notifications.decline"] = "Refuser",
             ["notifications.preferences.title"] = "Préférences de notification",
             ["notifications.preferences.intro"] = "Choisis quelles notifications tu reçois aussi par courriel. La boîte d'arrivée enregistre toujours chaque notification.",
             ["notifications.preferences.save"] = "Enregistrer les préférences",
@@ -4187,11 +4464,26 @@ public static class KnownTranslationKeys
             ["notifications.preference.community.post.label"] = "Nouvelles publications dans mes communautés",
             ["notifications.preference.page.child.label"] = "Nouvelles sous-pages sur les pages que je suis",
             ["notifications.subscriptions.title"] = "Abonnements aux notifications",
+            // ── M9 (ADR 0105, U04) — la surface résident : navigation, liste, fil, rédaction ──
+            ["message.nav"] = "Messages",
+            ["message.title"] = "Messages",
+            ["message.new"] = "Nouvelle conversation",
+            ["message.thread.empty"] = "Pas encore de messages — dites bonjour.",
+            ["message.compose.placeholder"] = "Écrire un message…",
+            ["message.compose.send"] = "Envoyer",
+            ["message.unread"] = "non lu",
+            ["message.disabled"] = "La messagerie directe est désactivée sur cette instance.",
+            ["message.other"] = "l'autre personne",
             ["notifications.subscriptions.intro"] = "Choisis quelles communautés, quels groupes et quelles pages t'informent. Les préférences décident des types que tu reçois aussi par e-mail ; ces interrupteurs décident des cibles qui t'informent.",
             ["notifications.subscription.announcement.label"] = "Nouvelles annonces",
             ["notifications.subscription.community.post.label"] = "Nouvelles publications dans les communautés",
             ["notifications.subscription.group.post.label"] = "Nouvelles publications dans les groupes",
             ["notifications.subscription.page.child.label"] = "Nouvelles sous-pages",
+            // ── M9 (ADR 0105, U03) — l'espèce message.new + les modèles ──
+            ["notifications.kind.message.new"] = "Nouveau message",
+            ["notifications.preference.message.new.label"] = "Messages d'autres résidents",
+            ["notification.message.new.subject"] = "Nouveau message",
+            ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
             ["pages.subscribe"] = "S'abonner aux mises à jour",
             ["pages.unsubscribe"] = "Se désabonner des mises à jour",
 
@@ -4312,6 +4604,10 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Tilføj",
             ["common.remove"]   = "Fjern",
             ["common.filter"]   = "Filtrér",
+            ["common.full_page"]    = "Hele siden",
+            ["common.exit_full_page"] = "Afslut hele siden",
+            ["common.fullscreen"]   = "Fuldskærm",
+            ["common.exit_fullscreen"] = "Afslut fuldskærm",
             ["common.name"]         = "Navn",
             ["common.display_name"] = "Vistnavn",
             ["common.email"]        = "E-mail",
@@ -4391,8 +4687,21 @@ public static class KnownTranslationKeys
             ["projects.todo.created"]        = "Oprettet",
             ["projects.todo.modified"]       = "Ændret",
             ["projects.todo.no_body"]        = "Ingen tekst — denne opgave har kun et navn.",
+            // ADR 0106 — selvtildelings-sporet + kortdetaljs udvidelsesfelt.
+            ["projects.todo.assign_to_me"]   = "Tildel mig",
+            ["projects.todo.details"]        = "Detaljer",
+            ["projects.todo.community"]      = "Fællesskab",
             ["projects.todo.subtasks"]       = "Delopgaver",
             ["projects.todo.boards"]         = "Boards",
+            // ADR 0100 — Kommentarer + svar (C-M3·1 — kommentarer arver
+            // opgavens enkelte Read-afgørelse).
+            ["projects.todo.comments"]       = "Kommentarer",
+            ["projects.todo.comment_empty"]  = "Ingen kommentarer endnu. Hvis du kan se denne opgave, kan du kommentere den.",
+            ["projects.todo.comment_reply"]  = "Kommentar",
+            ["projects.todo.comment_submit"] = "Kommentér",
+            ["projects.todo.comment_deleted"] = "Denne kommentar er slettet af dens forfatter.",
+            ["projects.todo.comment_delete"] = "Slet",
+            ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse (C-M3·1-\"kommentar-arver\"-reglen). Du kommenterer kun hvor opgaven selv er synlig.",
             ["projects.todo.back"]           = "← Tilbage til opgaverne",
             ["projects.todo.untitled"]       = "Opgave uden navn",
             ["projects.todo.edit"]           = "Rediger",
@@ -4419,7 +4728,7 @@ public static class KnownTranslationKeys
             ["projects.board.title_hint"]    = "Et kort navn til brættet — feed-labelen.",
             ["projects.board.edit"]          = "Redigér bræt",
             ["projects.board.edit_heading"]  = "Redigér bræt",
-            ["projects.board.edit_lead"]     = "Opdater brættets navn og beskrivelse. Publikum, fællesskab og sprog er fastlagt ved oprettelsen.",
+            ["projects.board.edit_lead"]     = "Opdater brættets navn, beskrivelse og publikum. Fællesskab og sprog er fastlagt ved oprettelsen.",
             ["projects.board.save"]          = "Gem ændringer",
             ["projects.board.description_hint"] = "En valgfri beskrivelse af, hvad brættet følger. Et bræt kan bruges kun med et navn.",
             ["projects.board.back"]          = "← Tilbage til brætter",
@@ -4441,6 +4750,7 @@ public static class KnownTranslationKeys
             ["projects.board.lane.set_limit"] = "Sæt grænse",
             ["projects.board.lane.set_status"] = "Sæt status",
             ["projects.board.lane.move_left"] = "Flyt venstre",
+            ["projects.board.lane.delete"] = "Slet lane",
             ["projects.board.lane.move_right"] = "Flyt højre",
             ["projects.board.lane.add_todo"] = "Tilføj to-do",
             ["projects.board.lane.add_lane"] = "Tilføj lane",
@@ -4646,6 +4956,31 @@ public static class KnownTranslationKeys
             ["admin.signup_notify_on"]      = "Til — adminer får besked ved nye tilmeldinger og bekræftelser",
             ["admin.signup_notify_off"]     = "Fra — ingen besked til adminer ved tilmelding / bekræftelse",
 
+            // ── admin — announcement-comments gate (ADR 0101) ────────────────
+            ["admin.anncomments_title"]     = "Kommentarer på meddelelser",
+            ["admin.anncomments_lede"]      =
+                "Om loggede indboere må kommentere meddelelser. Slukker du " +
+                "den, skjules kommentarlisten og skrivefeltet på alle " +
+                "meddelelser — ingen kan længere tilføje en kommentar. " +
+                "Besøgende kunne aldrig kommentere, og eksisterende " +
+                "kommentarer beholdes — knappen styrer kun nye kommentarer.",
+            ["admin.anncomments_on"]        = "Åben — loggede indboere kan kommentere",
+            ["admin.anncomments_off"]       = "Lukket — ingen kan tilføje en kommentar",
+            ["admin.anncomments_save"]      = "Gem",
+
+            // ── admin — direkte besked-skydedæksel (M9, ADR 0105) ──────────
+            ["admin.messaging_title"]   = "Direkte beskeder",
+            ["admin.messaging_lede"]    =
+                "Om loggede indboere må åbne direkte 1:1-samtaler. Slukker du " +
+                "den, skjules Beskeder-indgangen og alle samtaleanmodninger " +
+                "afvises — ingen kan åbne en tråd eller sende en besked. " +
+                "Skydedækningen er lukket som udgangspunkt; den styrer kun " +
+                "nye beskeder, og eksisterende samtaler og beskeder røres aldrig. " +
+                "Bemærk, at en GlobalAdmin uden deltagelse i samtalen kan ikke " +
+                "læse den.",
+            ["admin.messaging_on"]      = "Åben — loggede indboere kan sende hinanden direkte beskeder",
+            ["admin.messaging_off"]     = "Lukket — ingen kan åbne samtaler eller sende beskeder",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Tilmeldingen er lukket",
             ["account.signup_closed_body"]  =
@@ -4741,9 +5076,9 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Sådan kombineres valgene",
             ["posts.audience_restrict_hint"] =
-                "Disse valg er yderligere — \"Alle i dette fællesskab\" " +
-                "bliver tændt, medmindre du slår det fra, så indlægget er synligt " +
-                "for hele fællesskabet og de valg, du træffer her.",
+                "Disse valg er skjult, mens \"Alle i dette fællesskab\" er " +
+                "tændt — indlægget er synligt for alle i fællesskabet. Slå det " +
+                "fra for at begrænse adgang med valgene her.",
             ["posts.audience_only_picks"] =
                 "Det, du vælger her, bliver indlæggets modtagerkreds — der " +
                 "tilføjes intet ovenfor eller nedenfor denne formular. Et tomt valg (med " +
@@ -4780,6 +5115,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Privat gruppe",
             ["groups.private_hint"]         =
                 "En privat gruppe (f. eks. en familie) er skjult for alle andre; kun de mennesker, du tilføjer som medlemmer, kan se og bruge den. Fjern afkrydsningen for at gøre gruppen offentlig igen.",
+            ["groups.danger_heading"]   = "Farerzone",
+            ["groups.danger_delete_hint"] =
+                "Sletning af gruppen fjerner den, dens medlemmer og eventuelle afventende invitationer. Dette kan ikke fortrydes.",
+            ["groups.danger_delete_button"] = "Slet denne gruppe",
             ["groups.new_title"]      = "Skriv til denne gruppe",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",
@@ -4802,6 +5141,16 @@ public static class KnownTranslationKeys
             ["groups.invited_by"]     = "Inviteret af",
             ["groups.invite_accept"]  = "Acceptér",
             ["groups.invite_decline"] = "Afvis",
+            // ── ADR 0094 — the resident self-initiated join-request lane ──
+            ["groups.join_requests"]              = "Medlemskabsansøgninger",
+            ["groups.join_requests_pending"]      = "ventende",
+            ["groups.join_requests_note"]         = "Venter på gruppeejeren.",
+            ["groups.join_withdraw"]              = "Trække tilbage",
+            ["groups.other_public"]               = "Andre offentlige grupper",
+            ["groups.request_join"]               = "Ansøg om at deltage",
+            ["groups.join_requests_pending_heading"] = "Ventende medlemskabsansøgninger",
+            ["groups.join_approve"]               = "Godkend",
+            ["groups.join_decline"]               = "Afvis",
             ["groups.members_one"]    = "medlem",
             ["groups.members_many"]   = "medlemmer",
             // ── community feed (the Airy layout — the left rail + the
@@ -4981,6 +5330,11 @@ public static class KnownTranslationKeys
             ["pages.delete"]      = "Slet",
             ["pages.resetSeeded"] = "Nulstil til seedet tekst",
             ["pages.untitled"]    = "Side uden titel",
+            ["pages.section_community"] = "Sider f\u00f8llesskabet",
+            ["pages.section_platform"]  = "Platformsider",
+            ["pages.section_platform_lede"] =
+                "Udgivet af platformen — vilk\u00e5r, hj\u00e6lp, privatliv og " +
+                "adf\u00e6rskode.",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
             ["blog.new_page"]     = "Ny blogside",
@@ -5272,6 +5626,19 @@ public static class KnownTranslationKeys
             ["announcements.banner_read_more"] = "Læs mere",
             ["announcements.banner_all"] = "Alle meddelelser",
 
+            // ── announcement comments (ADR 0101) ─────────────────────────────
+            ["announcements.comments"] = "Kommentarer",
+            ["announcements.comment_empty"] = "Ingen kommentarer endnu. Vær den første til at sige noget.",
+            ["announcements.comment_deleted"] = "Denne kommentar er blevet slettet af dens forfatter.",
+            ["announcements.comment_delete"] = "Slet",
+            ["announcements.comment_reply"] = "Skriv en kommentar",
+            ["announcements.comment_submit"] = "Kommentar",
+            ["announcements.comment_audience_note"] =
+                "Kommentarer er kun synlige for loggede indboere — også på en " +
+                "officiel meddelelse — og følger denne meddelelses eget " +
+                "publikum (en meddelelse rettet til et fællesskab er synligt " +
+                "for dets indboere).",
+
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Sidst opdateret:",
 
@@ -5491,9 +5858,13 @@ public static class KnownTranslationKeys
             ["notifications.inbox"] = "Notifikationer",
             ["notifications.preferences"] = "Indstillinger",
             ["notifications.mark_all_read"] = "Markér alle som læst",
+            ["notifications.mark_read"] = "Markér som læst",
+            ["notifications.mark_unread"] = "Markér som ulæst",
             ["notifications.empty"] = "Ingenting endnu — ting, der hænder dig, vises her.",
             ["notifications.bell"] = "Notifikationer",
             ["notifications.view"] = "Se",
+            ["notifications.accept"] = "Acceptér",
+            ["notifications.decline"] = "Afvis",
             ["notifications.preferences.title"] = "Notifikationsindstillinger",
             ["notifications.preferences.intro"] = "Vælg, hvilke notifikationer du også får på e-mail. Indbakken noterer altid hver notifikation.",
             ["notifications.preferences.save"] = "Gem indstillinger",
@@ -5563,11 +5934,26 @@ public static class KnownTranslationKeys
             ["notifications.preference.community.post.label"] = "Nye indlæg i mine lokalsamfund",
             ["notifications.preference.page.child.label"] = "Nye undersider på sider, jeg følger",
             ["notifications.subscriptions.title"] = "Notifikationsabonnementer",
+            // ── M9 (ADR 0105, U04) — beboerfladen: navigation, liste, tråd, skrivefelt ──
+            ["message.nav"] = "Beskeder",
+            ["message.title"] = "Beskeder",
+            ["message.new"] = "Nyt samtale",
+            ["message.thread.empty"] = "Ingen beskeder endnu — sig hej.",
+            ["message.compose.placeholder"] = "Skriv en besked…",
+            ["message.compose.send"] = "Send",
+            ["message.unread"] = "ulæst",
+            ["message.disabled"] = "Direkte beskeder er slået fra på denne instans.",
+            ["message.other"] = "den anden person",
             ["notifications.subscriptions.intro"] = "Vælg hvilke lokalsamfund, grupper og sider, der giver dig besked. Indstillinger afgør hvilke typer du også får på e-mail; disse indstillingsknapper afgør hvilke mål der giver dig besked.",
             ["notifications.subscription.announcement.label"] = "Nye meddelelser",
             ["notifications.subscription.community.post.label"] = "Nye indlæg i lokalsamfund",
             ["notifications.subscription.group.post.label"] = "Nye indlæg i grupper",
             ["notifications.subscription.page.child.label"] = "Nye undersider",
+            // ── M9 (ADR 0105, U03) — message.new-arten + skabeloner ──
+            ["notifications.kind.message.new"] = "Ny besked",
+            ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
+            ["notification.message.new.subject"] = "Ny besked",
+            ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
             ["pages.subscribe"] = "Abonner på opdateringer",
             ["pages.unsubscribe"] = "Opsig abonnement",
 

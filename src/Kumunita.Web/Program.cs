@@ -23,6 +23,15 @@ using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Local overrides (the appsettings.*.Local.json convention, gitignored — see
+// .gitignore). The host's config chain loads appsettings.json and
+// appsettings.{Environment}.json only; the .Local files are machine-specific
+// (dev connection strings etc.) and must be added explicitly. `optional: true`
+// so a machine without one (deploy, CI) boots unchanged. Added before any
+// service reads configuration; env vars still override (later source wins).
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: false);
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
@@ -133,6 +142,16 @@ var marten = builder.Services.AddMarten(opts =>
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
     M6DocTypes.Configure(opts);
+
+    // M9 (ADR 0105 D1, plan U01): the Messaging bounded context's documents
+    // (Conversation + Message, ADR 0004 §B.1 — the (ParticipantA,
+    // ParticipantB) unique business-key index on Conversation (the F1
+    // idempotency witness) and the (ConversationId, Created) thread-ordering
+    // index on Message). Without this call the docs are invisible to Marten
+    // (the M3/Media/Page/Tag/M4/M5/M6 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M9DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

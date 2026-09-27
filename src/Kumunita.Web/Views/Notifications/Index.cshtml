@@ -66,7 +66,11 @@
             <ul class="list-group">
                 @foreach (var n in Model.Notifications)
                 {
-                    <li class="list-group-item p-3 @(n.ReadAt is null ? "border-start border-4 border-primary" : "text-muted")">
+                    @* ADR 0103 — the row anchor: the navbar dropdown deep-links
+                       here (#notif-{id}); notification-open.js resolves it,
+                       scrolls, highlights, and marks it read. The per-row
+                       mark read/unread toggle (ADR 0096) stays as-is below. *@
+                    <li id="notif-@n.Id" class="list-group-item p-3 @(n.ReadAt is null ? "border-start border-4 border-primary" : "text-muted")">
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             @* The kind badge — a dynamic kw-l key
                                (notifications.kind.{kind}); the key set is
@@ -76,7 +80,64 @@
                             <span class="badge text-bg-light text-dark">
                                 <kw-l key="notifications.kind.@n.Kind">@n.Kind</kw-l>
                             </span>
-                            <span class="ms-auto small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
+                            @* ADR 0096 — the per-row read toggle: one inline
+                               form per row (the same
+                               [ValidateAntiForgeryToken] shape as the header's
+                               mark-all-read). An unread row offers "Mark as
+                               read" (POST /notifications/{id}/mark-read); a
+                               read row offers "Mark as unread" (POST
+                               /notifications/{id}/mark-unread). Both gate on
+                               the same [Authorize] self-lane — the recipient
+                               owns the row (the service's personal gate). *@
+                            <span class="ms-auto d-flex align-items-center gap-2">
+                                <span class="small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
+                                @* ADR 0096 — the per-row read toggle: one inline
+                                   form per row (the same
+                                   [ValidateAntiForgeryToken] shape as the header's
+                                   mark-all-read). An unread row offers "Mark as
+                                   read" (POST /notifications/{id}/mark-read); a
+                                   read row offers "Mark as unread" (POST
+                                   /notifications/{id}/mark-unread). Both gate on
+                                   the same [Authorize] self-lane — the recipient
+                                   owns the row (the service's personal gate).
+                                   ADR 0103 — both forms are always rendered (the
+                                   mark-unread form carries d-none on unread rows)
+                                   so the client's open-then-read lane can flip
+                                   visibility without re-rendering the label
+                                   (the repo's client-side localization rule: the
+                                   localized copy is server-rendered, never
+                                   injected client-side). *@
+                                @if (n.ReadAt is null)
+                                {
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-read")" class="m-0 d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <kw-l key="notifications.mark_read">Mark as read</kw-l>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-unread")" class="m-0 d-inline d-none">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <kw-l key="notifications.mark_unread">Mark as unread</kw-l>
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-read")" class="m-0 d-inline d-none">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                                            <kw-l key="notifications.mark_read">Mark as read</kw-l>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="@($"/notifications/{n.Id}/mark-unread")" class="m-0 d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <kw-l key="notifications.mark_unread">Mark as unread</kw-l>
+                                        </button>
+                                    </form>
+                                }
+                            </span>
                         </div>
 
                         @* todo.assign rows (SourceId = the TodoItem.Id) carry a
@@ -207,13 +268,38 @@
                                    (absolute); the inbox carries it relative
                                    (same-origin). Gated on the field being set — a
                                    kind with no <c>LinkPath</c> (reports, to-dos,
-                                   group add/invite, the account lanes) renders
-                                   nothing here. *@
+                                   the account lanes) renders nothing here. *@
                                 <p class="mb-0 mt-2">
                                     <a href="@n.LinkPath" class="small">
                                         <kw-l key="notifications.view">View</kw-l>
                                         <span class="text-muted" aria-hidden="true">→</span>
                                     </a>
+                                </p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(n.AcceptPath) || !string.IsNullOrWhiteSpace(n.DeclinePath))
+                            {
+                                @* ADR 0095 — the accept / decline actions (the
+                                   group-invite lane): the stored <c>AcceptPath</c>
+                                   / <c>DeclinePath</c> (same-origin relative paths,
+                                   e.g. <c>/groups/{id}/invitations/accept</c>)
+                                   rendered as clickable buttons — the inbox form of
+                                   the email's absolute links (the two share the
+                                   same [Authorize] self-lane GET actions in
+                                   GroupsController). Gated on each field being
+                                   set; either may be absent. *@
+                                <p class="mb-0 mt-2">
+                                    @if (!string.IsNullOrWhiteSpace(n.AcceptPath))
+                                    {
+                                        <a href="@n.AcceptPath" class="btn btn-sm btn-primary me-2">
+                                            <kw-l key="notifications.accept">Accept</kw-l>
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(n.DeclinePath))
+                                    {
+                                        <a href="@n.DeclinePath" class="btn btn-sm btn-outline-secondary">
+                                            <kw-l key="notifications.decline">Decline</kw-l>
+                                        </a>
+                                    }
                                 </p>
                             }
                         }
@@ -223,3 +309,17 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    @* ADR 0103 — the open-then-read lane (client/lib/notification-open.ts,
+       tsc-built). On load, if the URL hash is a row anchor (#notif-{id},
+       the deep link the navbar's dropdown — notifications-bell.js — emits),
+       scroll that row into view, flash the .reply-highlight CSS (the ADR 0085
+       D5 generic flash, reused), and — if the row is still unread — POST
+       /notifications/{id}/mark-read (the ADR 0096 route,
+       [ValidateAntiForgeryToken]) and flip the row to its read styling + the
+       "Mark as unread" toggle. The app's CSP is script-src 'self' with no
+       'unsafe-inline' (OPS §10 "code discipline"), so the behavior must live
+       in a tsc-built ES module, not an inline <script>. *@
+    <script type="module" src="~/js/lib/notification-open.js"></script>
+}

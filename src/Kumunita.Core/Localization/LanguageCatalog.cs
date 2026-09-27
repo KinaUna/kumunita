@@ -89,4 +89,40 @@ public sealed class LocaleSettings
     /// if the signal becomes noise.
     /// </summary>
     public bool NotifyAdminsOnSignup { get; set; } = true;
+
+    /// <summary>
+    /// Whether signed-in residents may **comment on platform announcements**
+    /// (ADR 0101). The <see cref="Kumunita.Core.Announcements"/> comment lane
+    /// is the one that reads this: when <c>true</c> a signed-in user who can
+    /// see an announcement may comment on it (and the comment list is shown
+    /// on the detail page); when <c>false</c> the composer is hidden and no
+    /// signed-in user may add a comment. A visitor (not signed in) can never
+    /// comment regardless of this flag, and comments are always visible to
+    /// signed-in users only — even on a public-scope announcement — under the
+    /// announcement's own flat scope split (ADR 0101). An *additive* field on
+    /// the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="NotifyAdminsOnSignup"/>.
+    /// Defaults to <c>true</c> so a fresh instance ships with the discussion
+    /// lane open out of the box (the M6 lean-default <c>true</c> floor); an
+    /// admin tightens it to <c>false</c> to silence the surface.
+    /// </summary>
+    public bool AnnouncementCommentsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Whether direct 1:1 resident <b>messaging</b> is live on this instance
+    /// (ADR 0105, M9). The <see cref="Kumunita.Core.Messaging"/> context is
+    /// the one that reads this: when <c>true</c> signed-in residents may open
+    /// conversations and exchange messages; when <c>false</c> the surface is
+    /// hidden and every messaging seam refuses (the toggle is enforced in
+    /// the service, never only the view — C-M9·2). An *additive* field on
+    /// the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="AnnouncementCommentsEnabled"/>.
+    /// Defaults to <c>false</c> — the deliberate <b>inverse</b> of the
+    /// codebase <c>true</c>-floor convention, because messaging is a
+    /// privacy-sensitive <b>opt-in</b>, not a public-surface default: a
+    /// missing settings row reads as <b>off</b> (the <c>false</c> floor,
+    /// design doc §D2). A GlobalAdmin opts the instance in at
+    /// <c>/admin/messaging</c>.
+    /// </summary>
+    public bool MessagingEnabled { get; set; } = false;
 }

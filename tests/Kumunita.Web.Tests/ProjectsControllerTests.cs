@@ -738,6 +738,57 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(await deniedController.MoveLanePost(boardId, laneId, 0));
     }
 
+    // ── 10b — Board_DeleteLane (ADR 0097) ────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/delete</c>: the
+    /// controller forwards to the seam's
+    /// <see cref="IProjectService.DeleteLaneAsync"/> (the cascade + renumber +
+    /// standing, F17, are the seam's — not re-derived here) and redirects
+    /// back to the board with <c>TempData["info"] = "Lane deleted."</c> on
+    /// success; the C3 404/403 split is the same as the other board write
+    /// lanes.
+    /// </summary>
+    [Fact]
+    public async Task Board_DeleteLane()
+    {
+        const string actor = "subj-deletelane-actor";
+        const string boardId = "board-deletelane";
+        const string laneId = "lane-deletelane";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteLaneAsync(
+                laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.LaneDeletePost(boardId, laneId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
+        Assert.Equal("Lane deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteLaneAsync(
+            laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing lane is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no lane")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.LaneDeletePost(boardId, laneId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.LaneDeletePost(boardId, laneId));
+    }
+
     // ── 11 — Board_MoveCard_DropPosition (ADR 0069) ──────────────────────────
 
     /// <summary>
@@ -1508,6 +1559,131 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(projectId, vm.ProjectId);
         await projects.Received(1).ListProjectsAsync(
             null, null, actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0098 — <c>GET /projects/boards/{id}/edit</c> prefills the board's
+    /// **audience** editor from the stored <see cref="KanbanBoard.Audience"/>
+    /// (the <see cref="AudienceEditorModel.FromAudience"/> round-trip: mode,
+    /// grants, and the community flag) and seeds the grant-picker option
+    /// lists on <c>ViewData</c>. A <c>null</c> stored audience (public) is
+    /// the default "everyone" shape (mode "Any", empty grants).
+    /// </summary>
+    [Fact]
+    public async Task BoardEdit_AudienceEditorPrefilledFromStoredAudience()
+    {
+        const string actor = "subj-board-edit-aud-actor";
+        const string boardId = "board-edit-aud";
+        const string granteeId = "subj-board-edit-aud-grantee";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Audience board", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                    Audience = new Audience(AudienceMode.Any,
+                        new[] { new AudienceGrant(GrantKind.User, granteeId) })
+                    {
+                        Community = true,
+                    },
+                },
+                Lanes = [],
+            });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ProjectPage([], false));
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.BoardEditGet(boardId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<BoardUpdateModel>(view.ViewData.Model);
+        // The editor prefills the stored audience (mode + grants + community).
+        Assert.Equal("Any", vm.Audience.Mode);
+        Assert.True(vm.Audience.CommunityVisible);
+        Assert.NotNull(vm.Audience.Grants);
+        var grants = Assert.IsAssignableFrom<AudienceGrant[]>(
+            System.Text.Json.JsonSerializer.Deserialize<AudienceGrant[]>(
+                vm.Audience.Grants!,
+                new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+                {
+                    Converters =
+                    {
+                        new System.Text.Json.Serialization.JsonStringEnumConverter(),
+                    },
+                }));
+        Assert.NotNull(grants);
+        Assert.Single(grants!);
+        Assert.Equal(GrantKind.User, grants[0].Kind);
+        Assert.Equal(granteeId, grants[0].Id);
+        // The grant-picker option lists seed on ViewData (empty candidate
+        // sets here — the valid shape).
+        Assert.IsType<List<GrantOption>>(view.ViewData["Audience_Users"]);
+        Assert.IsType<List<GrantOption>>(view.ViewData["Audience_Groups"]);
+    }
+
+    /// <summary>
+    /// ADR 0098 — <c>POST /projects/boards/{id}</c> maps the posted audience
+    /// editor through <see cref="AudienceEditorModel.BuildAudience()"/> onto the
+    /// frozen <see cref="UpdateBoardRequest.Audience"/> (the single
+    /// deserialization site, ADR 0001-B) and writes it through the
+    /// <see cref="IProjectService.UpdateBoardAsync"/> seam.
+    /// </summary>
+    [Fact]
+    public async Task BoardEditPost_AudienceEditorWrittenOntoRequest()
+    {
+        const string actor = "subj-board-edit-post-actor";
+        const string boardId = "board-edit-post";
+        const string granteeId = "subj-board-edit-post-grantee";
+
+        UpdateBoardRequest? sent = null;
+        var projects = Substitute.For<IProjectService>();
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ProjectPage([], false));
+        projects.UpdateBoardAsync(
+                Arg.Is(boardId), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+                Arg.Do<UpdateBoardRequest>(c => sent = c), Arg.Any<CancellationToken>())
+            .Returns(new KanbanBoard
+            {
+                Id = boardId,
+                Title = "Board",
+                AuthorId = actor,
+                Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            });
+
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new BoardUpdateModel
+        {
+            Title = "Board",
+            Description = "Body",
+            Audience = new AudienceEditorModel
+            {
+                Mode = "Any",
+                CommunityVisible = true,
+                Grants = System.Text.Json.JsonSerializer.Serialize(
+                    new[] { new AudienceGrant(GrantKind.User, granteeId) },
+                    new System.Text.Json.JsonSerializerOptions(
+                        System.Text.Json.JsonSerializerDefaults.Web)),
+            },
+        };
+        var result = await controller.BoardEditPost(boardId, model);
+
+        // A clean redirect-after-POST.
+        Assert.IsType<RedirectResult>(result);
+
+        // The audience editor was built onto the request (verbatim, ADR 0001-B).
+        Assert.NotNull(sent);
+        Assert.NotNull(sent!.Audience);
+        Assert.True(sent.Audience!.Community);
+        Assert.Single(sent.Audience.Grants);
+        Assert.Equal(granteeId, sent.Audience.Grants[0].Id);
     }
 
     /// <summary>

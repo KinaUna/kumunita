@@ -226,6 +226,120 @@ body.kmb-page-fullbleed .navbar {
   margin-bottom: 0; /* the full-bleed hero starts flush below the navbar */
 }
 
+/* ── Full-page expand mode (the board full-screen's sibling) ─────────────
+   A second display mode shared by the Kanban board (Projects/BoardDetail)
+   and the events calendar (Event/Calendar). Unlike the browser Fullscreen
+   API (the board's ⛶ — the browser hides everything, including the tab
+   bar), this stays in the normal viewport and pushes the page chrome out
+   of the way, then stretches the surface (the .kanban-board / the
+   #events-calendar chain) to fill 100% of the page's width and height.
+   client/lib/expand-page.js (loaded in _Layout.cshtml) toggles the
+   body.kmb-page-expanded class; Escape collapses (expand-page.js
+   listens). Each view renders its .page-expand-toggle ⛶ next to its own
+   header actions, and one .page-expand-close ✕ in its content — the close
+   is shown only while expanded, pinned top-right (the
+   .kanban-fullscreen-close shape, reused). */
+body.kmb-page-expanded {
+  margin-bottom: 0;
+}
+/* The page chrome goes away — the surface IS the page. display:none is
+   safe even on pages where the flash / pinned-announcement partials are
+   absent. (Specificity: each rule carries the body.kmb-page-expanded
+   prefix, so it beats the plain .btn / .pb-3 utilities even though
+   Bootstrap loads after this file.) */
+body.kmb-page-expanded .navbar,
+body.kmb-page-expanded .kmb-footer,
+body.kmb-page-expanded .kumunita-pinned-announcement,
+body.kmb-page-expanded .kmb-flash-toast {
+  display: none;
+}
+/* The flex-fill chain: main → .container → .row → .col hand their height
+   down to the surface, each with min-height:0 so the last link may scroll
+   internally instead of overflowing the viewport. The Bootstrap gutter
+   padding/margins on .row / .col are zeroed for the 100% width. */
+body.kmb-page-expanded main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0;
+}
+body.kmb-page-expanded .container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+body.kmb-page-expanded .container > .row {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+body.kmb-page-expanded .container .col-md-10 {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The board surface (the title/actions head stays; the lane strip fills
+   the remaining height and the lanes stretch — their card stacks scroll
+   internally, as on a normal page). */
+body.kmb-page-expanded .kanban-board {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The calendar surface fills the remaining height: Month's 5–6 rows
+   distribute evenly (grid-auto-rows), Day/Week's 24-hour grid is taller
+   than the viewport and scrolls inside #events-calendar. */
+body.kmb-page-expanded #events-calendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+body.kmb-page-expanded #events-calendar .events-calendar-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-auto-rows: minmax(0, 1fr);
+}
+/* While expanded, the full-screen buttons are redundant — the surface
+   already owns the whole page — so the board's ⛶-zoom and the calendar's
+   full-screen toggles hide (the ✕ close stays; the native Esc also exits). */
+body.kmb-page-expanded .kanban-fullscreen-toggle,
+body.kmb-page-expanded .calendar-fullscreen-toggle {
+  display: none;
+}
+/* The same padding as each surface's full-screen mode (.kanban-board:
+   fullscreen's 1rem / #events-calendar:fullscreen's 1.5rem), so the two
+   modes are indistinguishable apart from the browser chrome. */
+body.kmb-page-expanded .kanban-board {
+  padding: 1rem;
+}
+body.kmb-page-expanded #events-calendar {
+  padding: 1.5rem;
+}
+/* The ✕ close button: hidden normally, fixed top-right while expanded. */
+.page-expand-close {
+  display: none;
+}
+body.kmb-page-expanded .page-expand-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 100;
+  background: #fff;
+}
+
 .lead {
   font-weight: 400;
   line-height: 1.6;
@@ -453,6 +567,32 @@ body.kmb-page-fullbleed .navbar {
 .kumunita-pinned-announcement .btn-link {
   color: #1c4532;
   font-weight: 600;
+}
+
+/* Responsive (mobile-first): on a narrow phone the single flex row squishes
+   the text between the badge and the fixed-width links. Stack it instead —
+   the badge and title/body preview flow at the top, and the "Read more" /
+   "All announcements" actions sit on their own row (the close button stays
+   at the far right of that row). Only the preview span (`.me-auto`) takes
+   the full row — the badge stays its natural width. */
+@media (max-width: 767.98px) {
+  .kumunita-pinned-announcement .d-flex {
+    flex-wrap: wrap;
+    row-gap: 0.25rem;
+  }
+  .kumunita-pinned-announcement .d-flex .me-auto {
+    flex: 1 1 100%;
+    order: 1;
+  }
+  .kumunita-pinned-announcement .d-flex .badge {
+    order: 0;
+  }
+  .kumunita-pinned-announcement .d-flex .btn {
+    order: 2;
+  }
+  .kumunita-pinned-announcement .d-flex .btn-close {
+    order: 3;
+  }
 }
 
 /* --- Badges ------------------------------------------------------------------ */
@@ -1678,20 +1818,21 @@ body.kmb-page-fullbleed .navbar {
   flex: none;
 }
 
-/* The ⋮ action triggers in the board head + lane heads (ADR 0070) —
-   borderless: no outline border and a transparent ground, so the glyph
-   reads as a quiet affordance next to the title, not a button. Bootstrap
-   loads AFTER this file, so we also pin the hover/focus/active ground (a
-   faint tint, not the .btn-outline-secondary grey fill) and clear any
-   border it might restore on those states. */
-.kanban-glyph-btn {
+/* The ⋮ action triggers (ADR 0070 introduced it on the Kanban board heads
+   and lane heads; ADR 0092 generalized it to every `⋮` dropdown trigger in
+   the app) — borderless: no outline border and a transparent ground, so the
+   glyph reads as a quiet affordance next to the title, not a button.
+   Bootstrap loads AFTER this file, so we also pin the hover/focus/active
+   ground (a faint tint, not the .btn-outline-secondary grey fill) and clear
+   any border it might restore on those states. */
+.action-glyph-btn {
   border: 0;
   background-color: transparent;
   color: var(--bs-body-color);
 }
-.kanban-glyph-btn:hover,
-.kanban-glyph-btn:focus,
-.kanban-glyph-btn:active {
+.action-glyph-btn:hover,
+.action-glyph-btn:focus,
+.action-glyph-btn:active {
   border-color: transparent;
   background-color: rgba(0, 0, 0, 0.06);
   color: var(--bs-body-color);
@@ -1916,6 +2057,51 @@ body.kmb-page-fullbleed .navbar {
   background: #fff;
 }
 
+/* ── The full-screen calendar (the header ⛶-zoom toggle —
+   client/lib/calendar-fullscreen.ts adds .calendar-full when
+   #events-calendar enters the browser Fullscreen API and removes it on
+   exit) ─────────────────────────────────────────────────────────────────
+   The same sibling of the board's full-screen mode (and of the shared
+   full-page expand mode above): the calendar fills the viewport, gets a
+   neutral white ground, the Month grid's rows distribute to fill it, and
+   the Day/Week 24-hour grid (taller than the viewport) scrolls inside. */
+#events-calendar:fullscreen {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  overflow-y: auto;
+  background: #fff;
+  padding: 1.5rem;
+}
+#events-calendar:fullscreen .events-calendar-grid {
+  min-height: calc(100vh - 3rem); /* the padding above; rows distribute via grid-auto-rows */
+  grid-auto-rows: minmax(0, 1fr);
+}
+/* The full-screen close button (✕, inside #events-calendar). Hidden
+   outside full-screen; while full-screen it is fixed to the top-right of
+   the fullscreen element (the :fullscreen element is the containing block
+   for fixed-position descendants, and the calendar's own overflow cannot
+   scroll it away). While BOTH modes are active (expand + full-screen),
+   the page-expand-close is hidden instead — one ✕, the full-screen
+   element's, stays visible. */
+.calendar-fullscreen-close {
+  display: none;
+}
+#events-calendar:fullscreen .calendar-fullscreen-close,
+#events-calendar.calendar-full .calendar-fullscreen-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 100;
+  background: #fff;
+}
+body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
+  display: none;
+}
+
 @media (max-width: 767.98px) {
   .kanban-board {
     min-width: 0;
@@ -1976,9 +2162,14 @@ body.kmb-page-fullbleed .navbar {
 /* The compact list-item density — the dropdown's items are
    .dropdown-item elements (the module builds them), tighter than
    the default dropdown padding so a five-item list reads at a
-   glance. */
+   glance. `white-space: normal` + `overflow-wrap: anywhere` keep
+   wide unbroken text (URLs, long words) inside the fixed 320px
+   width — wrapping onto multiple lines instead of growing a
+   horizontal scrollbar under the menu. */
 .notifications-dropdown .dropdown-item {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 

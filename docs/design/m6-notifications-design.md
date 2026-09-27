@@ -99,10 +99,13 @@ that landing.
 - The **one surface** (`M6DocTypes`, the `M5DocTypes` pattern verbatim).
 - The **one service** (`NotificationService` — the `EmitAsync` writer, the
   `ListInboxAsync` / `CountUnreadAsync` / `MarkAllReadAsync` read + state
-  lanes, the `GetPreferencesAsync` / `SetPreferencesAsync` preference lanes).
+  lanes, the `MarkReadAsync` / `MarkUnreadAsync` per-row state lanes (ADR
+  0096), the `GetPreferencesAsync` / `SetPreferencesAsync` preference lanes).
 - The **one Web controller** (`NotificationsController` — the `/notifications`
   inbox + the `/notifications/preferences` editor + the `/notifications/
-  unread-count` poller endpoint + the `/notifications/mark-all-read` POST).
+  unread-count` poller endpoint + the `/notifications/mark-all-read` POST +
+  the `/notifications/{id}/mark-read` and `/notifications/{id}/mark-unread`
+  per-row toggles (ADR 0096)).
 - The **one layout bell** (the unread count badge + the dropdown + the
   poller, on the `_AccountNav` partial).
 - The **one plain TS module** (`client/lib/notifications-bell.ts` — tsc-only,
@@ -321,9 +324,15 @@ count** (a Bootstrap `badge text-bg-danger` on the bell icon in the
 `_AccountNav` partial); **the dropdown is a plain `fetch` + DOM render** (the
 `client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6** (a
 WebSocket / SSE lane is a follow-on lane; the 30-second poll is the "good
-enough" shape for a neighborhood-scale platform). *Forbids:* a WebSocket, SSE,
-or push mechanism; a new UI dependency. *Precedent reused:* the
-`client/lib/api.ts` CSRF-aware fetch shape and the ADR 0031 tsc-only pin.
+enough" shape for a neighborhood-scale platform). *ADR 0103 amends the
+dropdown's link shape:* each item's label is the row's body with the per-row
+toggle text (ADR 0096) stripped, and each item deep-links to the inbox row's
+anchor (`/notifications#notif-{id}`); landing on that row auto-marks it read
+(the ADR 0096 single-row lane, 404-tolerated) and highlights it (the ADR 0085
+D5 `.reply-highlight` flash) — that open-then-read behavior lives in
+`client/lib/notification-open.ts` (tsc-only, the same pin). *Forbids:* a
+WebSocket, SSE, or push mechanism; a new UI dependency. *Precedent reused:*
+the `client/lib/api.ts` CSRF-aware fetch shape and the ADR 0031 tsc-only pin.
 
 ### 5.11 Reuse, don't reinvent (D11)
 
@@ -608,6 +617,28 @@ public sealed class NotificationService
     public Task MarkAllReadAsync(string recipientId, CancellationToken ct = default);
 
     /// <summary>
+    /// The per-row "mark read" state lane (ADR 0096): sets <c>ReadAt = now</c>
+    /// on the **single** row <paramref name="notificationId"/> names, only if
+    /// that row belongs to <paramref name="recipientId"/>. A state lane, not
+    /// a read — no audit row (D3, F11). A row that does not exist or is owned
+    /// by another recipient throws a <see cref="KeyNotFoundException"/> (the
+    /// recipient-id-is-the-whole-access-story shape, C-M6·3 — no
+    /// <c>IAuthorizationService</c> call).
+    /// </summary>
+    public Task MarkReadAsync(string recipientId, string notificationId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The per-row "mark unread" state lane (ADR 0096): clears <c>ReadAt</c>
+    /// (sets it to <c>null</c>) on the **single** row
+    /// <paramref name="notificationId"/> names, only if that row belongs to
+    /// <paramref name="recipientId"/>. A state lane, not a read — no audit
+    /// row (D3, F11). The same foreign/unknown-row
+    /// <see cref="KeyNotFoundException"/> wall as
+    /// <c>MarkReadAsync</c> (C-M6·3).
+    /// </summary>
+    public Task MarkUnreadAsync(string recipientId, string notificationId, CancellationToken ct = default);
+
+    /// <summary>
     /// The preference read (D9): the recipient's
     /// <see cref="NotificationPreference"/>; returns a **default** instance
     /// (<c>KindsEnabled = null</c> = all enabled) when none exists — the
@@ -711,7 +742,7 @@ under test, the FACE it pins, and the expectation). The **exact** test names
 | 12 | `Emit_Email_In_Recipients_Language_UgcSnippet_In_Senders_Language` | F12 | C-M6·6 |
 
 **Web — `Kumunita.Web.Tests.NotificationsControllerTests`** (NSubstitute; the
-5 route pins — the **exact** route + method + expectation):
+7 route pins — the **exact** route + method + expectation):
 
 | # | Route | Method | Expectation |
 |---|-------|--------|-------------|
@@ -720,6 +751,8 @@ under test, the FACE it pins, and the expectation). The **exact** test names
 | 3 | `/notifications/mark-all-read` | `POST` | 302 + the `ReadAt` set on all unread rows |
 | 4 | `/notifications/preferences` | `GET` | 200 + the toggles (the nine `NotificationKinds.Known` entries) |
 | 5 | `/notifications/preferences` | `POST` | 302 + the `KindsEnabled` update |
+| 6 | `/notifications/{id}/mark-read` | `POST` | 302 + the `ReadAt` set on that one row (ADR 0096) |
+| 7 | `/notifications/{id}/mark-unread` | `POST` | 302 + the `ReadAt` cleared on that one row (ADR 0096) |
 
 ### 6.5 Acceptance gate
 

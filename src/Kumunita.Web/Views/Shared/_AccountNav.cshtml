@@ -7,6 +7,7 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
 @inject IUserInfoService UserInfo
+@inject Kumunita.Core.Messaging.IMessagingService Messaging
 @*
     Right-hand nav actions (the public section links live in the layout's
     left nav). Signed in: a single account dropdown (toggle labelled with the
@@ -34,12 +35,25 @@
     // A read of the signed-in resident's own row — never another resident's.
     string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
     string navAvatarInitial = string.Empty;
+    // The dropdown toggle's label: the resident's display name, falling back to
+    // their email when no name is set. Capped at 15 characters so the navbar
+    // toggle stays narrow — the full text survives in the title attribute, and
+    // when neither name nor email is available the translated "Account" key
+    // renders instead.
+    string navToggleLabel = string.Empty;
+    string navToggleLabelFull = string.Empty;
     if (!string.IsNullOrEmpty(navAvatarSubject))
     {
         var navProfile = await UserInfo.GetProfileAsync(navAvatarSubject);
         navAvatarInitial = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
             ? char.ToUpperInvariant(navProfile.DisplayName.TrimStart()[0]).ToString()
             : string.Empty;
+        navToggleLabelFull = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
+            ? navProfile.DisplayName.Trim()
+            : navProfile?.Email?.Trim() ?? string.Empty;
+        navToggleLabel = navToggleLabelFull.Length > 15
+            ? navToggleLabelFull[..15]
+            : navToggleLabelFull;
     }
 
     // The nav-bar language switcher: the enabled catalog (in SortOrder), and the
@@ -118,7 +132,14 @@
                         <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
                     </span>
                 }
-                <kw-l key="nav.account">Account</kw-l>
+                @if (!string.IsNullOrEmpty(navToggleLabel))
+                {
+                    <span title="@navToggleLabelFull">@navToggleLabel</span>
+                }
+                else
+                {
+                    <kw-l key="nav.account">Account</kw-l>
+                }
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
                 <li class="nav-item">
@@ -141,6 +162,17 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/notifications/subscriptions"><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></a>
                 </li>
+                @* M9 (ADR 0105, U04) — the resident messaging surface: rendered only
+                   when signed in AND the instance toggle is on (the F5 pin — a read of
+                   the toggle, never of data; the /messages controller repeats the gate
+                   first in every action). One <li> in the existing dropdown — no
+                   navbar reflow. *@
+                @if (await Messaging.IsMessagingEnabledAsync())
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
+                    </li>
+                }
                 @if (isGlobalAdmin)
                 {
                     <li class="nav-item">

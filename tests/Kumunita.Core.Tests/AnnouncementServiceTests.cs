@@ -3,6 +3,7 @@ using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.UserInfo;
+using Kumunita.Core.Localization;
 using Marten;
 using Xunit;
 
@@ -1896,6 +1897,402 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             svc.RemoveAnnouncementTranslationAsync(
                 "pub-rm", "fr",
                 "u-admin", new HashSet<string> { Roles.GlobalAdmin }, session));
+    }
+
+    // ── ADR 0101 — signed-in resident comments on an announcement ─────────
+
+    /// <summary>
+    /// The admin toggle reads as **on** when no settings row exists (the
+    /// <c>true</c> floor — the <c>IsSignupOpen</c> / <c>NotifyAdminsOnSignup</c>
+    /// precedent, ADR 0004 §B.1 additive field).
+    /// </summary>
+    [Fact]
+    public async Task AreAnnouncementCommentsEnabled_DefaultOn()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        Assert.True(await svc.AreAnnouncementCommentsEnabledAsync());
+    }
+
+    /// <summary>
+    /// Closing the gate persists the flag **and** commits an
+    /// <c>announcementcomments.set-enabled</c> / <c>Via = Admin</c> audit row
+    /// (the signup.set-open singleton-toggle shape). A subsequent read sees
+    /// the flag as **off**.
+    /// </summary>
+    [Fact]
+    public async Task SetAnnouncementCommentsEnabled_Closed_StoresFlagAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await svc.SetAnnouncementCommentsEnabledAsync(false, "u-admin");
+
+        Assert.False(await svc.AreAnnouncementCommentsEnabledAsync());
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.Action == "announcementcomments.set-enabled");
+        Assert.Equal(Authorization.AccessVia.Admin, row.Via);
+        Assert.Equal("announcementcomments", row.TargetKind);
+        Assert.Equal("announcementcomments", row.TargetId);
+        Assert.Equal(Authorization.AccessOutcome.Allow, row.Outcome);
+        Assert.Equal("u-admin", row.ActorId);
+    }
+
+    /// <summary>
+    /// An empty actor is refused the toggle write (a 403 shape) — the admin
+    /// surface is the only caller, so an anonymous write is never legal.
+    /// </summary>
+    [Fact]
+    public async Task SetAnnouncementCommentsEnabled_NoActorRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetAnnouncementCommentsEnabledAsync(false, ""));
+    }
+
+    /// <summary>
+    /// The admin toggle **off** refuses a new comment (a 403 shape) — the
+    /// gate controls *new* comments only; existing rows are untouched. Nothing
+    /// is written for the comment.
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_ToggleOff_Refused_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new LocaleSettings
+        {
+            Id = LocaleSettings.SingletonId,
+            AnnouncementCommentsEnabled = false,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "pub-c", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "pub-c", "u-resident", new HashSet<string>(), "hi there", null, session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<AnnouncementComment>()
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// An empty actor (a visitor) is refused a new comment (a 403 shape) —
+    /// comments are **signed-in-only**, even on a public announcement.
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_AnonymousRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-c2", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "pub-c2", "", new HashSet<string>(), "hi", null, session));
+    }
+
+    /// <summary>
+    /// A missing announcement is a 404 (non-leaky).
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_MissingAnnouncementRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "does-not-exist", "u-resident", new HashSet<string>(), "hi", null, session));
+    }
+
+    /// <summary>
+    /// A **draft** announcement is a 404 to the comment write lane (a draft is
+    /// not live content to discuss).
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_DraftRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "draft-c", Scope = AnnouncementScope.Public,
+            Title = "Draft", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow, IsDraft = true,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "draft-c", "u-resident", new HashSet<string>(), "hi", null, session));
+    }
+
+    /// <summary>
+    /// A community-targeted announcement's comment write is refused to a
+    /// signed-in resident who is **not** a member of that community (the flat
+    /// split stands in for the comment's visibility — the comment is never
+    /// writable where the announcement is not).
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_NotVisibleRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "comm-c", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Community notice", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "comm-c", "u-resident", new HashSet<string>(), "hi", null, session));
+    }
+
+    /// <summary>
+    /// A signed-in resident comments on a **public** announcement: the row
+    /// stores the body, materializes <c>LanguageCode = en</c> (the instance-
+    /// default floor, ADR 0018), commits an
+    /// <c>announcementcomment.create</c> / <c>Via = Owner</c> audit row, and is
+    /// returned by the read lane.
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_Public_StoresRowAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-store", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var created = await svc.CreateAnnouncementCommentAsync(
+            "pub-store", "u-resident", new HashSet<string>(), "great thanks", null, session);
+
+        Assert.Equal("pub-store", created.AnnouncementId);
+        Assert.Equal("u-resident", created.AuthorId);
+        Assert.Equal("great thanks", created.Body);
+        Assert.Equal("en", created.LanguageCode); // ADR 0018 floor
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.Action == "announcementcomment.create" && a.TargetId == "pub-store");
+        Assert.Equal(Authorization.AccessVia.Owner, row.Via);
+        Assert.Equal("announcement", row.TargetKind);
+        Assert.Equal(Authorization.AccessOutcome.Allow, row.Outcome);
+        Assert.Equal("u-resident", row.ActorId);
+
+        // The read lane returns the comment (the comment-inherits-visibility
+        // pin — a public announcement's comment is visible to a signed-in user).
+        var comments = await svc.GetAnnouncementCommentsAsync("pub-store", "u-resident", new HashSet<string>());
+        Assert.Single(comments, c => c.Id == created.Id);
+    }
+
+    /// <summary>
+    /// A blank body is an <c>ArgumentException</c> (a 400 shape) and nothing
+    /// is written.
+    /// </summary>
+    [Fact]
+    public async Task CreateAnnouncementComment_BlankBodyRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-b", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateAnnouncementCommentAsync(
+                "pub-b", "u-resident", new HashSet<string>(), "   ", null, session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<AnnouncementComment>()
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// An anonymous read of the comment list is refused (a 403 shape) —
+    /// comments are **signed-in-only**, even on a public announcement.
+    /// </summary>
+    [Fact]
+    public async Task GetAnnouncementComments_AnonymousRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-r", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.GetAnnouncementCommentsAsync("pub-r", "", new HashSet<string>()));
+    }
+
+    /// <summary>
+    /// The read lane refuses a **draft** announcement (a 404, non-leaky) — a
+    /// draft is not live content to discuss.
+    /// </summary>
+    [Fact]
+    public async Task GetAnnouncementComments_DraftRefused()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "draft-r", Scope = AnnouncementScope.Public,
+            Title = "Draft", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow, IsDraft = true,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetAnnouncementCommentsAsync("draft-r", "u-resident", new HashSet<string>()));
+    }
+
+    /// <summary>
+    /// The read lane returns the announcement's comments in <c>Created</c>
+    /// **ascending** order (the comment-inherits-visibility pin — the public
+    /// announcement is visible to the signed-in user, so its comments are).
+    /// </summary>
+    [Fact]
+    public async Task GetAnnouncementComments_InCreatedOrder()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-o", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new AnnouncementComment
+        {
+            Id = "c-2", AnnouncementId = "pub-o", AuthorId = "u-r2",
+            Body = "second", Created = new DateTimeOffset(2026, 2, 2, 12, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new AnnouncementComment
+        {
+            Id = "c-1", AnnouncementId = "pub-o", AuthorId = "u-r1",
+            Body = "first", Created = new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero),
+        });
+
+        var comments = await svc.GetAnnouncementCommentsAsync("pub-o", "u-resident", new HashSet<string>());
+        Assert.Equal(new[] { "c-1", "c-2" }, comments.Select(c => c.Id).ToArray());
+    }
+
+    /// <summary>
+    /// A non-author is refused the delete (a 403 shape, author-only — ADR
+    /// 0016 precedent) and the row is untouched (no <c>DeletedAt</c> stamp).
+    /// </summary>
+    [Fact]
+    public async Task DeleteAnnouncementComment_NonAuthorRefused_NotTouched()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-d", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new AnnouncementComment
+        {
+            Id = "c-author", AnnouncementId = "pub-d", AuthorId = "u-author",
+            Body = "mine", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteAnnouncementCommentAsync(
+                "pub-d", "c-author", "u-stranger", new HashSet<string>(), session));
+
+        await using var q = store.QuerySession();
+        var stored = (await q.LoadAsync<AnnouncementComment>("c-author", TestContext.Current.CancellationToken))!;
+        Assert.Null(stored.DeletedAt);
+    }
+
+    /// <summary>
+    /// The author soft-deletes their own comment: <c>DeletedAt</c> is stamped
+    /// (the row is **kept**, never hard-deleted — ADR 0024), an
+    /// <c>announcementcomment.delete</c> / <c>Via = Owner</c> audit row
+    /// commits, and the read lane still returns the (now-deleted) row.
+    /// </summary>
+    [Fact]
+    public async Task DeleteAnnouncementComment_Author_SoftDeletesAndKeepsRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store, new UserInfoService(store));
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-da", Scope = AnnouncementScope.Public,
+            Title = "Maintenance", Body = "body", AuthorId = "u-author",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new AnnouncementComment
+        {
+            Id = "c-self", AnnouncementId = "pub-da", AuthorId = "u-author",
+            Body = "mine", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var deleted = await svc.DeleteAnnouncementCommentAsync(
+            "pub-da", "c-self", "u-author", new HashSet<string>(), session);
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.Action == "announcementcomment.delete" && a.TargetId == "pub-da");
+        Assert.Equal(Authorization.AccessVia.Owner, row.Via);
+        Assert.Equal("announcement", row.TargetKind);
+        Assert.Equal(Authorization.AccessOutcome.Allow, row.Outcome);
+        Assert.Equal("u-author", row.ActorId);
+
+        // The read lane still returns the (now-deleted) row — the view renders
+        // a placeholder in place of the body.
+        var comments = await svc.GetAnnouncementCommentsAsync("pub-da", "u-resident", new HashSet<string>());
+        var stored = Assert.Single(comments, c => c.Id == "c-self");
+        Assert.NotNull(stored.DeletedAt);
     }
 
     // ── Shared helpers ─────────────────────────────────────────────────────

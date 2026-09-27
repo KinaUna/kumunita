@@ -167,11 +167,14 @@ exactly "the id is in scope but the resident is not handed the address").
 **D5 — The post-detail reply gets an `id="reply-{id}"` anchor + a
 hash-match scroll-and-highlight.** `Views/Posts/Detail.cshtml` sets
 `id="reply-@r.Id"` on each reply `<li>` (the id that the `post.reply` link's
-`#reply-{replyId}` fragment points at). A new `@section Scripts` inline
-module reads `location.hash`; when it is a `#reply-{id}` anchor, it finds the
-matching element, `scrollIntoView({ behavior: "smooth", block: "center" })`
-it, and adds a `.reply-highlight` class (removed after 4 s so a re-click can
-re-trigger). The `.reply-highlight` CSS (in `wwwroot/css/site.css`) is a
+`#reply-{replyId}` fragment points at). A new `@section Scripts` module
+(`client/lib/reply-highlight.ts`, tsc-built — the app's CSP is `script-src
+'self'` with no 'unsafe-inline' (OPS §10), so this is a self-hosted module,
+not an inline `<script>`; the same `client/*.ts` pattern as
+`translation-swap.ts`) reads `location.hash`; when it is a `#reply-{id}`
+anchor, it finds the matching element, `scrollIntoView({ behavior: "smooth",
+block: "center" })` it, and adds a `.reply-highlight` class (removed after 4
+s so a re-click can re-trigger). The `.reply-highlight` CSS (in `wwwroot/css/site.css`) is a
 tinted background + a soft primary outline that fades over ~1.5 s via a
 `@keyframes`, with a `prefers-reduced-motion: reduce` fallback to a static
 tint (the fade is gated; the color still lands). *Forbids:* a server-rendered
@@ -260,7 +263,13 @@ read over the `ParentId` chain; the Read decision is the Web layer's, ADR
   lanes) or their "item" is the recipient's own settings/group (not the
   content the resident is acting on). If a follow-on wants a "view" link on
   any of these, it is a one-line `linkPath` on the existing emitter — this ADR
-  deliberately does not reach for them.
+  deliberately does not reach for them. **Note:** ADR 0095 amends this
+  clause for the `group.invite` kind — it makes the group-invite
+  notification *actionable* by adding two **separate** action-path fields
+  (`AcceptPath` / `DeclinePath`, the accept/decline link targets), which are
+  **not** a `LinkPath` "View" link and do not change this ADR's single-`LinkPath`
+  item-link contract. The other non-content kinds (including `group.added`)
+  remain no-link under this clause.
 - A "view" deep-link into the inbox itself (a `/notifications?open={id}`
   affordance that pre-opens a specific row). The inbox is a flat list; the
   "View" link on each row already carries the recipient to the item, which is

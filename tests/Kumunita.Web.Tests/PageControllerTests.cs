@@ -284,8 +284,8 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
     {
         const string visibleId = "page-visible-001";
         const string hiddenId  = "page-hidden-001";
-        var visible = new Page { Id = visibleId, Slug = "visible", Title = "Visible page", AuthorId = "someone", IsDraft = false, IsDeleted = false };
-        var hidden  = new Page { Id = hiddenId,  Slug = "hidden",  Title = "Hidden page",  AuthorId = "someone", IsDraft = false, IsDeleted = false };
+        var visible = new Page { Id = visibleId, Slug = "visible", Title = "Visible page", AuthorId = "someone", IsDraft = false, IsDeleted = false, Kind = PageKind.User };
+        var hidden  = new Page { Id = hiddenId,  Slug = "hidden",  Title = "Hidden page",  AuthorId = "someone", IsDraft = false, IsDeleted = false, Kind = PageKind.User };
         var pages = Substitute.For<IPageService>();
         pages.GetTreeAsync().Returns(new List<Page> { visible, hidden });
 
@@ -328,8 +328,8 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
     {
         const string draftId   = "page-draft-001";
         const string liveId    = "page-live-001";
-        var draft = new Page { Id = draftId, Slug = "draft", Title = "A draft",  AuthorId = "the-author", IsDraft = true,  IsDeleted = false };
-        var live  = new Page { Id = liveId,  Slug = "live",  Title = "A live",   AuthorId = "the-author", IsDraft = false, IsDeleted = false };
+        var draft = new Page { Id = draftId, Slug = "draft", Title = "A draft",  AuthorId = "the-author", IsDraft = true,  IsDeleted = false, Kind = PageKind.User };
+        var live  = new Page { Id = liveId,  Slug = "live",  Title = "A live",   AuthorId = "the-author", IsDraft = false, IsDeleted = false, Kind = PageKind.User };
         var pages = Substitute.For<IPageService>();
         pages.GetTreeAsync().Returns(new List<Page> { draft, live });
 
@@ -352,6 +352,56 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Single(model!.Roots);
         Assert.Equal(liveId, model.Roots[0].Id);
         Assert.False(model.Roots[0].IsDraft);
+    }
+
+    // ── Tree browse kind split (system vs. resident sections) ─────────────
+
+    /// <summary>
+    /// <see cref="PageController.Index"/> partitions the browse's roots by
+    /// <see cref="Kumunita.Core.Pages.PageKind"/> (the ADR 0040 split, now
+    /// surfaced in the UI): <c>PageKind.System</c> pages land in
+    /// <see cref="PageTreeViewModel.SystemRoots"/> and <c>PageKind.User</c>
+    /// pages in <see cref="PageTreeViewModel.Roots"/> — the view renders the
+    /// two as separate sections. The pin: the split is on the kind field, is
+    /// display-only (every node still carries its real ancestor-chain path),
+    /// and is carried on every node (<see cref="PageNode.IsSystem"]), not
+    /// only the roots.
+    /// </summary>
+    [Fact]
+    public async Task Index_Splits_Roots_By_Kind_SystemAndUser_LandInSeparateSections()
+    {
+        const string sysId  = "page-sys-001";
+        const string userId = "page-user-001";
+        var sys  = new Page { Id = sysId,  Slug = "terms", Title = "Terms",    IsDraft = false, IsDeleted = false, Kind = PageKind.System };
+        var user = new Page { Id = userId, Slug = "notes", Title = "My notes", AuthorId = "the-author", IsDraft = false, IsDeleted = false, Kind = PageKind.User };
+        var pages = Substitute.For<IPageService>();
+        pages.GetTreeAsync().Returns(new List<Page> { sys, user });
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanSeeAsync("subj-resident-001", Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                Visible: new List<(string Id, AccessVia Via)> { (sysId, AccessVia.Audience), (userId, AccessVia.Audience) },
+                HiddenCount: 0));
+
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var view = (await controller.Index()) as ViewResult;
+        Assert.NotNull(view);
+
+        var model = view!.ViewData.Model as PageTreeViewModel;
+        Assert.NotNull(model);
+
+        // One root in each section, each carrying only its own kind.
+        Assert.Single(model!.Roots);
+        Assert.Equal(userId, model.Roots[0].Id);
+        Assert.False(model.Roots[0].IsSystem);
+        Assert.Single(model.SystemRoots);
+        Assert.Equal(sysId, model.SystemRoots[0].Id);
+        Assert.True(model.SystemRoots[0].IsSystem);
+
+        // Display-only: the hrefs still derive from the real path.
+        Assert.Equal("/pages/terms", model.SystemRoots[0].Path);
+        Assert.Equal("/pages/notes", model.Roots[0].Path);
     }
 
     // ── Mount-point resolver (display, not access) ────────────────────────

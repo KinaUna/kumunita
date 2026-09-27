@@ -67,10 +67,11 @@ public sealed class GroupsController(
     /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>. Read through
     /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
     /// seam, ADR 0005 D) — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses. The composer/reply form
-    /// leaves the selection empty by default so the *instance default* is what
-    /// the service materializes server-side at write time — the picker is the
-    /// set of choices, not the choice.
+    /// <see cref="LocaleController.Index"/> page uses. The create lane
+    /// pre-selects the actor's current effective language (ADR 0049 —
+    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
+    /// highlights the language the resident is reading the platform in; the
+    /// reply/comment forms mark the same code selected in their option list.
     /// </summary>
     private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
     {
@@ -80,6 +81,25 @@ public sealed class GroupsController(
             .OrderBy(l => l.SortOrder)
             .Select(l => (l.Id, l.NativeName))
             .ToList();
+    }
+
+    /// <summary>
+    /// The create-lane composer's <b>default authored-in language</b> (the
+    /// picker's pre-selection): the actor's per-request **effective**
+    /// language (ADR 0049 — the <c>kumunita.locale</c> cookie → first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor, the
+    /// exact <see cref="EffectiveLanguageCode.ResolveAsync"/> chain the
+    /// <c>&lt;kw-l&gt;</c> TagHelper resolves UI strings through) — "write in
+    /// the language you're reading in", the ADR 0018 "instance default"
+    /// pre-selection generalized. A null <see cref="ITranslationProvider"/>
+    /// (test-construction site) falls back to the instance default — the
+    /// legacy behavior, so the existing mock sites keep passing.
+    /// </summary>
+    private async Task<string> ResolveComposeDefaultLanguageAsync()
+    {
+        if (translationProvider is null)
+            return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+        return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -127,7 +147,44 @@ public sealed class GroupsController(
                 by?.DisplayName ?? inv.InvitedBy));
         }
 
-        return View(new GroupListViewModel { Groups = rows, Invitations = invitations });
+        // ADR 0094 — the "Other public groups" directory: the public groups the
+        // actor is NOT yet in (GetPublicGroupsAsync minus the actor's own
+        // owner∪member set — a group the actor already belongs to or owns is on
+        // the Groups list above, so requesting to join it would be a no-op).
+        // Same GroupViewModel 3-tuple projection + the same per-row member-count
+        // read; the only difference is the view's affordance (a request button).
+        var myGroupIds = groups.Select(g => g.Id).ToHashSet(StringComparer.Ordinal);
+        var publicGroups = await userInfo.GetPublicGroupsAsync();
+        var publicRows = new List<GroupViewModel>();
+        foreach (var g in publicGroups)
+        {
+            if (myGroupIds.Contains(g.Id))
+                continue;
+            var members = await userInfo.GetGroupMembersAsync(g.Id);
+            publicRows.Add(new GroupViewModel(g.Id, g.Name, members.Count));
+        }
+
+        // ADR 0094 — the actor's OWN pending join requests (the "Your join
+        // requests" card; the withdraw self-lane's UI). Read lane (no audit,
+        // C-M2·2 carried); the group name per row comes from the single-group
+        // read — same shape as the invitations card above.
+        List<JoinRequestViewModel> myJoinRequests = [];
+        var pendingRequests = await userInfo.GetPendingJoinRequestsForUserAsync(subject);
+        foreach (var req in pendingRequests)
+        {
+            var group = await userInfo.GetGroupAsync(req.GroupId);
+            myJoinRequests.Add(new JoinRequestViewModel(
+                req.GroupId,
+                group?.Name ?? req.GroupId));
+        }
+
+        return View(new GroupListViewModel
+        {
+            Groups = rows,
+            Invitations = invitations,
+            PublicGroups = publicRows,
+            MyJoinRequests = myJoinRequests
+        });
     }
 
     /// <summary>
@@ -345,6 +402,20 @@ public sealed class GroupsController(
             pendingInvitations.Add(new PendingInvitationViewModel(inv.UserId, p?.DisplayName ?? inv.UserId));
         }
 
+        // ADR 0094 — the group's pending join requests (the owner ∪ GlobalAdmin
+        // review surface: the pending list + approve/decline links). Read lane
+        // (no audit, C-M2·2 carried); each row's display name via the same
+        // catalog read as the member rows above (the PendingInvitations shape
+        // carried to the join-request axis).
+        List<PendingJoinRequestViewModel> pendingJoinRequests = [];
+        var pendingRequests = await userInfo.GetPendingJoinRequestsForGroupAsync(group.Id);
+        foreach (var req in pendingRequests)
+        {
+            Profile? p;
+            bySubject.TryGetValue(req.UserId, out p);
+            pendingJoinRequests.Add(new PendingJoinRequestViewModel(req.UserId, p?.DisplayName ?? req.UserId));
+        }
+
         // The "Add a member" dropdown rows: the catalog minus the group's
         // current members (adding someone already in is a no-op the form
         // should not offer), sorted by display name — the view filters
@@ -405,6 +476,9 @@ public sealed class GroupsController(
             GroupTranslations = groupTranslations,
             Languages = groupLanguages,
             CanTranslate = canTranslate,
+            // ADR 0094 — the owner ∪ GlobalAdmin's pending join requests to
+            // review (approve/decline); empty when the group holds none.
+            PendingJoinRequests = pendingJoinRequests,
             // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
             // one-page no-render pin: null on a single page so the _Pager
             // partial renders nothing). The group is the route (D9) — no
@@ -890,6 +964,49 @@ public sealed class GroupsController(
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
+    // ── ADR 0093: the group's delete (the owner ∪ GlobalAdmin lane, the
+    // destructive counterpart of the privacy toggle above) ────────────────
+
+    /// <summary>
+    /// Delete a group (ADR 0093): <c>POST /groups/{id}/delete</c>. The SoD
+    /// lane is <see cref="TryResolveOwnerSurface"/> (owner ∪ GlobalAdmin —
+    /// ADR 0007's new-lane rule, identical to the add/remove/invite/
+    /// description/privacy lanes): a plain member's POST 404s, the same
+    /// consistent failure shape as every other group write lane. The form
+    /// carries no actor id — the actor is minted from the signed-in
+    /// principal and passed as <c>deletedBy</c> (never a form field; the
+    /// seam's <c>Via</c> derivation is the single SoD source, exactly the U10
+    /// add-member pin). The Core seam
+    /// <see cref="IUserInfoService.DeleteGroupAsync"/> hard-deletes the group
+    /// document, its membership rows, and its invitation rows in one session
+    /// (invariant C3) and appends the <c>group.delete</c> audit row; group-
+    /// scoped posts / events / translations are left in storage and become
+    /// unreachable (the group lane is membership-only, ADR 0013, and the
+    /// membership rows are gone) rather than cascaded.
+    /// <para>
+    /// The redirect goes to <see cref="Index"/>, never
+    /// <see cref="Detail"/>: the actor is out of the owner ∪ member
+    /// projection on the very next read (the ADR 0008
+    /// <see cref="LeaveGroup"/> redirect shape), so a redirect to the detail
+    /// page would 404.
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroup(string id)
+    {
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        await userInfo.DeleteGroupAsync(
+            groupId: resolved.Group.Id,
+            deletedBy: resolved.Actor);
+
+        TempData["info"] = $"Group “{resolved.Group.Name}” deleted.";
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── M2b: owner-invited membership (invite → accept/decline; the
     // immediate add/remove above is kept side-by-side — U10/F7 pin
     // untouched). docs/design/m2b-group-invitations.md ────────────────
@@ -955,7 +1072,12 @@ public sealed class GroupsController(
             userId: subjectId!,
             invitedBy: resolved.Actor);
 
-        TempData["info"] = $"Invited {subjectId} to “{resolved.Group.Name}”.";
+        // The toast must show the resident's name, not their opaque subject id —
+        // resolve the profile's display name (fall back to the subject id only
+        // if no profile row exists, consistent with the invitations card's
+        // <c>by?.DisplayName ?? inv.InvitedBy</c> shape).
+        var invitee = await userInfo.GetProfileAsync(subjectId!);
+        TempData["info"] = $"Invited {invitee?.DisplayName ?? subjectId} to “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1035,6 +1157,83 @@ public sealed class GroupsController(
     }
 
     /// <summary>
+    /// Accept a pending invitation **from a link** (ADR 0095):
+    /// <c>GET /groups/{id}/invitations/accept</c>. The link-clickable form of
+    /// <see cref="AcceptInvitation"/> — the group-invite email's "Accept" link
+    /// and the inbox's accept button both land here. Same self-lane gate (the
+    /// row must be in MY pending list, C-M2b·2) and the same Core seam
+    /// (<c>AcceptGroupInvitationAsync</c>) and the same invalid-transition
+    /// wall (C-M2b·3 → <c>InvalidOperationException</c> → the error message)
+    /// as the POST action; the only difference is that a GET must be
+    /// link-clickable (it carries <b>no</b> anti-forgery token — the M1
+    /// <c>/account/verify</c> one-time-link GET precedent, the link's
+    /// integrity is the subject-bearing self-lane gate, not a CSRF token).
+    /// An unauthenticated invitee (a fresh cookie after clicking the email
+    /// link) is bounced to sign-in by the controller's
+    /// <c>[Authorize]</c> (the cookie's
+    /// <c>LoginPath</c>/<c>ReturnUrl</c> round-trip) and lands back here
+    /// signed in.
+    /// </summary>
+    [HttpGet("{id}/invitations/accept")]
+    public async Task<IActionResult> AcceptInvitationLink(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        if (pending.All(inv => inv.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.AcceptGroupInvitationAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That invitation is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Invitation accepted — you are now a member.";
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    /// <summary>
+    /// Decline a pending invitation **from a link** (ADR 0095):
+    /// <c>GET /groups/{id}/invitations/decline</c>. The link-clickable form of
+    /// <see cref="DeclineInvitation"/> — identical gate, seam, wall, and
+    /// redirect shape; the only difference is that a GET carries <b>no</b>
+    /// anti-forgery token (it must be link-clickable). An unauthenticated
+    /// invitee is bounced to sign-in by <c>[Authorize]</c> and lands back
+    /// here signed in.
+    /// </summary>
+    [HttpGet("{id}/invitations/decline")]
+    public async Task<IActionResult> DeclineInvitationLink(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        if (pending.All(inv => inv.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.DeclineGroupInvitationAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That invitation is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Invitation declined.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
     /// Cancel a pending invitation (m2b lane C-M2b·1 — owner ∪ GlobalAdmin
     /// only, the <see cref="TryResolveInviteSurface"/> gate):
     /// <c>POST /groups/{id}/invitations/{subjectId}/cancel</c>. The
@@ -1068,6 +1267,173 @@ public sealed class GroupsController(
         }
 
         TempData["info"] = $"Cancelled the invitation for {subjectId}.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── ADR 0094: resident self-initiated join requests (public groups) — the
+    // reverse of the m2b invitation lane above: the resident starts it
+    // (request/withdraw self-lane) and the owner ∪ GlobalAdmin resolves it
+    // (approve → membership / decline). docs/adr/0094-group-join-request-lane.md ──
+
+    /// <summary>
+    /// Request to join a group (ADR 0094 self-lane):
+    /// <c>POST /groups/{id}/join/request</c>. The actor is always
+    /// <c>SubjectId(User)</c> (never a form field). The Core writes the
+    /// <see cref="Kumunita.Core.UserInfo.GroupJoinRequest"/> row
+    /// (<c>Pending</c>, re-request resets a resolved row — the ADR 0094 state
+    /// machine) and appends the <c>group.join.request</c> audit row; it touches
+    /// <b>no</b> membership — that lands only on
+    /// <see cref="ApproveJoinRequest"/>. The route 404s when the group is
+    /// missing (the Core's fail-safe) or when the actor already belongs to it
+    /// (a request to join one's own group is a no-op — the Index view only
+    /// offers the button for public non-member groups, this is the route's own
+    /// wall).
+    /// </summary>
+    [HttpPost("{id}/join/request")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestToJoin(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        // Fail-safe: the group must exist and be one the actor can request to
+        // join (public, and not already a member of). The Core does not
+        // re-check membership (it is a write lane, not a projection), so the
+        // Web asserts it here — the same "what is offered is what the route
+        // accepts" rule the invite lane uses.
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null || group.IsPrivate)
+            return NotFound();
+
+        var myGroups = await userInfo.GetGroupsForUserAsync(actor);
+        if (myGroups.Any(g => g.Id == id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.RequestToJoinGroupAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "Could not record that request.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = $"Requested to join “{group.Name}”.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Withdraw the actor's own pending join request (ADR 0094 self-lane):
+    /// <c>POST /groups/{id}/join/withdraw</c>. Same gate and shape as
+    /// <see cref="RequestToJoin"/>; the Core verifies actor == row.UserId (the
+    /// self-lane wall) and moves the row to its terminal <c>Withdrawn</c> state
+    /// (the m2b owner's <c>Cancelled</c> analogue — the row drops off both the
+    /// requester's "Your join requests" card and the owner's review list) — the
+    /// actor may re-request afterward (a re-request resets it to <c>Pending</c>).
+    /// </summary>
+    [HttpPost("{id}/join/withdraw")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WithdrawJoinRequest(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        // Self-lane gate: the row must be in MY pending list.
+        var pending = await userInfo.GetPendingJoinRequestsForUserAsync(actor);
+        if (pending.All(r => r.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.WithdrawJoinRequestAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            // Resolved (approved/declined) in the gap between the click and this
+            // commit — the Core's invalid-transition wall.
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Join request withdrawn.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Approve a pending join request (ADR 0094 owner ∪ GlobalAdmin lane):
+    /// <c>POST /groups/{id}/join-requests/{subjectId}/approve</c>. The
+    /// <see cref="TryResolveOwnerSurface"/> gate (owner ∪ GlobalAdmin on top of
+    /// the owner ∪ member projection — a plain member's POST 404s). The
+    /// <c>subjectId</c> is the requester's opaque subject, route-carried the
+    /// way <see cref="CancelInvitation"/> carries its form field. On success the
+    /// <see cref="Kumunita.Core.UserInfo.GroupMembership"/> row is live on the
+    /// very next read (C4). A row already resolved maps to an error message,
+    /// never a 500.
+    /// </summary>
+    [HttpPost("{id}/join-requests/{subjectId}/approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveJoinRequest(string id, string subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.ApproveJoinRequestAsync(
+                groupId: resolved.Group.Id,
+                userId: subjectId!,
+                resolvedBy: resolved.Actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+        }
+
+        TempData["info"] = $"Approved {subjectId}'s request to join “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    /// <summary>
+    /// Decline a pending join request (ADR 0094 owner ∪ GlobalAdmin lane):
+    /// <c>POST /groups/{id}/join-requests/{subjectId}/decline</c>. The same
+    /// <see cref="TryResolveOwnerSurface"/> gate and shape as
+    /// <see cref="ApproveJoinRequest"/>, but <b>no</b> membership row is
+    /// written — the requester simply never becomes a member; they may
+    /// re-request afterward.
+    /// </summary>
+    [HttpPost("{id}/join-requests/{subjectId}/decline")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclineJoinRequest(string id, string subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.DeclineJoinRequestAsync(
+                groupId: resolved.Group.Id,
+                userId: subjectId!,
+                resolvedBy: resolved.Actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+        }
+
+        TempData["info"] = $"Declined {subjectId}'s request to join “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
@@ -1222,10 +1588,10 @@ public sealed class GroupsController(
         return View("New", new GroupPostComposeViewModel
         {
             Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
-            // ADR 0018 — pre-select the instance default so the picker
-            // highlights the right option and a no-change submit is a
-            // concrete BCP-47 code (never an empty row).
-            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
         });
     }
 
@@ -1868,10 +2234,10 @@ public sealed class GroupsController(
         return View("EventNew", new GroupEventComposeViewModel
         {
             Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
-            // Pre-select the instance default (the ADR 0018 idiom) so the
-            // picker highlights the right option and a no-change submit is a
-            // concrete BCP-47 code (never an empty row).
-            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             // Default the time range to the actor's *current* local date/time
             // (the M4 CreateGet idiom: now rounded to the minute, End one hour
             // after Start — the author adjusts both on the form).

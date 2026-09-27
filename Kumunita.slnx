@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/.tmp/">
     <Project Path=".tmp/marten_inspect/marten_inspect.csproj" />
+    <Project Path=".tmp/smoke_toggle/smoke_toggle.csproj" />
   </Folder>
   <Folder Name="/.tmp/identityprobe/" />
   <Folder Name="/src/">

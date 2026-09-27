@@ -139,6 +139,27 @@ public sealed class ProjectsController : Controller
 
         ViewData["Audience_Users"] = userOptions;
         ViewData["Audience_Groups"] = groupOptions;
+
+        // ADR 0106 — the **assign** people list includes the actor themself:
+        // "Assign to…" should let a resident take a to-do onto themselves
+        // (the self-assign lane, the claim generalized), so the current user
+        // must appear as an option. This is a *separate* list from the
+        // grant-picker `Audience_Users` (which deliberately excludes self —
+        // a grant of "addressed to me" is meaningless; the single-source
+        // audience editor and the subtask assignee picker keep reading
+        // `Audience_Users`). Same verified/non-blocked set, same order,
+        // self included.
+        var assignUserOptions = profiles
+            .Where(p => !p.Blocked)
+            .Select(p => new GrantOption
+            {
+                Id    = p.SubjectId,
+                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+                Kind  = "User",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        ViewData["Assign_Users"] = assignUserOptions;
     }
 
     /// <summary>
@@ -147,11 +168,30 @@ public sealed class ProjectsController : Controller
     /// ordered by <c>SortOrder</c>, read through
     /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
     /// seam, ADR 0005 D — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses). The composer leaves
-    /// the selection empty by default so the *instance default* is what the
-    /// service materializes server-side at write time — the picker is the set
-    /// of choices, not the choice.
+    /// <see cref="LocaleController.Index"/> page uses). The create lane
+    /// pre-selects the actor's current effective language (ADR 0049 —
+    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
+    /// highlights the language the resident is reading the platform in.
     /// </summary>
+    /// <summary>
+    /// The create-lane composer's <b>default authored-in language</b> (the
+    /// picker's pre-selection): the actor's per-request **effective**
+    /// language (ADR 0049 — the <c>kumunita.locale</c> cookie → first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor, the
+    /// exact <see cref="EffectiveLanguageCode.ResolveAsync"/> chain the
+    /// <c>&lt;kw-l&gt;</c> TagHelper resolves UI strings through) — "write in
+    /// the language you're reading in", the ADR 0018 "instance default"
+    /// pre-selection generalized. A null <see cref="ITranslationProvider"/>
+    /// (test-construction site) falls back to the instance default — the
+    /// legacy behavior, so the existing mock sites keep passing.
+    /// </summary>
+    private async Task<string> ResolveComposeDefaultLanguageAsync()
+    {
+        if (translationProvider is null)
+            return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+        return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
+    }
+
     private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
     {
         var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
@@ -725,6 +765,29 @@ public sealed class ProjectsController : Controller
         var canTranslateTodo = !string.IsNullOrEmpty(actorId)
             && ProjectService.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
 
+        // ADR 0100 — the to-do's comments + replies (C-M3·1: the to-do's single
+        // Read decision already ran in GetTodoAsync; a comment inherits it —
+        // no per-comment decision). The comment authors' display names are a
+        // **read** lookup (a display convenience, never an access decision —
+        // the M4/M5 idiom). IsAuthor is the row-level delete affordance
+        // (author-only, ADR 0016 — the authoritative gate is the service's
+        // DeleteTodoCommentAsync lane).
+        var commentRows = new List<CommentRow>(result.Comments.Count);
+        foreach (var c in result.Comments)
+        {
+            var authorProfile = await userInfo.GetProfileAsync(c.AuthorId);
+            commentRows.Add(new CommentRow(
+                Id: c.Id,
+                ParentId: c.ParentId,
+                AuthorId: c.AuthorId,
+                AuthorDisplayName: authorProfile?.DisplayName ?? c.AuthorId,
+                Body: c.Body,
+                LanguageCode: c.LanguageCode,
+                Created: c.Created,
+                DeletedAt: c.DeletedAt,
+                IsAuthor: string.Equals(c.AuthorId, actorId, StringComparison.Ordinal)));
+        }
+
         var vm = new TodoDetailViewModel(
             Todo: row,
             Subtasks: subtasks,
@@ -735,11 +798,16 @@ public sealed class ProjectsController : Controller
             Languages: todoLanguages,
             CanTranslate: canTranslateTodo,
             OriginalLanguageCode: result.Todo.LanguageCode,
-            Blocker: result.Blocker);
+            Blocker: result.Blocker,
+            Comments: commentRows);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
         await SeedGrantPickerOptionsAsync();
+
+        // ADR 0100 — the comment composer's authored-in language picker (the
+        // M3 reply-form idiom; the <see cref="SeedLanguagePickerAsync"/> seed).
+        ViewData["TodoComment_Languages"] = await SeedLanguagePickerAsync();
 
         return View(vm);
     }
@@ -858,6 +926,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             ParentOptions = parentCandidates
                 .Select(t => (Id: t.Id, Title: t.Title))
@@ -1353,6 +1425,86 @@ public sealed class ProjectsController : Controller
         return Redirect("/projects/todos");
     }
 
+    // ── Comment write lanes (ADR 0100) ──────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/comments</c> — the add-comment write lane
+    /// (ADR 0100). The form posts a <c>body</c> (required), an optional
+    /// <c>languageCode</c> (ADR 0018 — the authored-in tag), and an optional
+    /// <c>parentId</c> (non-null = a reply to that comment, the C-M5·7 sole
+    /// hierarchy mechanism). **Standing:** any actor who passes the to-do's
+    /// <c>CanAsync(Read)</c> decision (C-M3·1 — a comment inherits the to-do's
+    /// single audience decision). A missing / soft-deleted to-do is 404, a
+    /// denied actor 403, a <c>parentId</c> that is missing / soft-deleted / on
+    /// a different to-do is 404 (the C3 split — the service's decision is the
+    /// gate; the controller is the thin shape, ADR 0006-D).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/comments")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddCommentPost(
+        string id, [FromForm] string? body, [FromForm] string? languageCode, [FromForm] string? parentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            ModelState.AddModelError(string.Empty, "A comment needs some text.");
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.CreateTodoCommentAsync(
+                id, actorId, RoleSet(User), body,
+                string.IsNullOrWhiteSpace(languageCode) ? null : languageCode,
+                string.IsNullOrWhiteSpace(parentId) ? null : parentId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Comment added.";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/comments/{commentId}/delete</c> — the
+    /// soft-delete-a-comment write lane (ADR 0100, the ADR 0024 shape).
+    /// **Author-only** (ADR 0016 precedent): a non-author is refused (403), a
+    /// missing comment / to-do is 404 (the C3 split). The record is kept
+    /// (<see cref="Kumunita.Core.Projects.TodoComment.DeletedAt"/> stamped) —
+    /// the detail view renders a placeholder in its place.
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/comments/{commentId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteCommentPost(string id, string commentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        try
+        {
+            await projects.DeleteTodoCommentAsync(
+                id, commentId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Comment deleted.";
+        return Redirect($"/projects/todos/{id}");
+    }
+
     // ── Board read lanes (U08) ──────────────────────────────────────────────
 
     /// <summary>
@@ -1542,7 +1694,16 @@ public sealed class ProjectsController : Controller
                     // (`null` = no date; the card gates the line on non-null).
                     StartAt: card.StartAt,
                     DueAt: card.DueAt,
-                    Blocker: blocker);
+                    Blocker: blocker,
+                    // ADR 0106 — the "Details" expander surface: the body
+                    // verbatim (the view renders it as markdown; a title-only
+                    // to-do leaves it empty → the "no body" hint), and the
+                    // community display name resolved from `ComponentId` via
+                    // the enabled-component `componentNames` map (`null` when
+                    // unscoped / unresolvable → the view omits that line).
+                    Body: card.Body,
+                    CommunityDisplayName: card.ComponentId is not null
+                        && componentNames.TryGetValue(card.ComponentId, out var cn) ? cn : null);
             }).ToList();
 
             laneRows.Add(new LaneDetailRow(
@@ -1668,10 +1829,11 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
-    /// <c>GET /projects/boards/{id}/edit</c> — the board edit page (ADR 0070)
-    /// — the board's own <c>Title</c> + <c>Description</c> (the
-    /// <see cref="BoardUpdateModel"/> shape; the audience / component /
-    /// language are creation-time choices, not editable here). The board is
+    /// <c>GET /projects/boards/{id}/edit</c> — the board edit page (ADR 0070,
+    /// amended by ADR 0098) — the board's own <c>Title</c> +
+    /// <c>Description</c> + <c>Audience</c> editor (the
+    /// <see cref="BoardUpdateModel"/> shape; the component / language are
+    /// creation-time choices, not editable here). The board is
     /// loaded through the frozen seam's <see
     /// cref="IProjectService.GetBoardAsync"/> (the audience gate is the
     /// service's single entry <c>CanAsync(Read)</c>, C-M5·3) — a missing
@@ -1679,6 +1841,10 @@ public sealed class ProjectsController : Controller
     /// decision (creator ∪ GlobalAdmin) is the service's on write; the view
     /// renders the form (the board-head ⋮ menu's "Edit board" item is
     /// <see cref="BoardDetailViewModel.CanEdit"/>-gated, the same matrix).
+    /// The audience editor prefills from the stored
+    /// <see cref="KanbanBoard.Audience"/> (ADR 0098 — a <c>null</c> stored
+    /// audience is the default "everyone" shape) and the grant-picker option
+    /// lists seed alongside the create lane's shape.
     /// </summary>
     [HttpGet("/projects/boards/{id}/edit")]
     public async Task<IActionResult> BoardEditGet(string id)
@@ -1703,6 +1869,10 @@ public sealed class ProjectsController : Controller
         {
             Title = board.Title,
             Description = board.Description,
+            // ADR 0098 — the board's **audience** editor prefilled from the
+            // stored value (a `null` stored audience is the default "everyone"
+            // shape — the <c>FromAudience(null)</c> default).
+            Audience = AudienceEditorModel.FromAudience(board.Audience),
             // ADR 0086 D9 — the **project picker** (display surface, never a
             // gate — C-PL·3): prefill the current association + seed the
             // actor's readable, non-deleted project options (a `null`
@@ -1710,15 +1880,20 @@ public sealed class ProjectsController : Controller
             ProjectId = board.ProjectId,
             Projects = await SeedProjectPickerAsync(),
         };
+        // The _GrantPickers partial reads these from ViewData (the M2/M3/M4
+        // shared shape — the create lane's precedent).
+        await SeedGrantPickerOptionsAsync();
         ViewData["boardId"] = id; // the edit form's POST action (POST /projects/boards/{id}).
         return View("BoardEdit", model);
     }
 
     /// <summary>
     /// <c>POST /projects/boards/{id}</c> — the board update write lane (ADR
-    /// 0070 — the service's <see cref="IProjectService.UpdateBoardAsync"/>:
-    /// a full update of the board's <c>Title</c> + <c>Description</c>, a
-    /// blank description clearing it to <c>null</c>). **Creator ∪
+    /// 0070, amended by ADR 0098 — the service's <see
+    /// cref="IProjectService.UpdateBoardAsync"/>: a full update of the
+    /// board's <c>Title</c> + <c>Description</c>, a blank description
+    /// clearing it to <c>null</c>, + the posted audience editor written
+    /// verbatim). **Creator ∪
     /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
     /// standing gate; a missing id is 404, a denied actor 403 (the C3
     /// split); a blank title is a form error (the M4 "a form is a shape"
@@ -1731,10 +1906,17 @@ public sealed class ProjectsController : Controller
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // Re-seed the pickers so a failed-shape re-render below still shows
+        // the project + grant options (the create lane's precedent).
+        model.Projects = await SeedProjectPickerAsync();
+        await SeedGrantPickerOptionsAsync();
+
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Title))
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            if (model.Audience is null || !model.Audience.IsValid)
+                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
             return View("BoardEdit", model);
         }
 
@@ -1742,6 +1924,9 @@ public sealed class ProjectsController : Controller
         {
             Title = model.Title!,
             Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            // ADR 0098 — the posted audience is the actor's complete choice,
+            // written verbatim (ADR 0001-B — the single deserialization site).
+            Audience = model.Audience.BuildAudience(),
         };
 
         try
@@ -1825,12 +2010,33 @@ public sealed class ProjectsController : Controller
     {
         var model = new BoardEditorModel
         {
+            // ADR 0106 — the new-board default audience is "Everyone in this
+            // community" (the ADR 0036 community-visible flag, the Posts
+            // precedent): checked by default so a board is visible to every
+            // signed-in resident out of the box. A `null`/empty
+            // `ComponentId` makes the ADR 0036 branch the whole decision
+            // (any signed-in actor sees it — the resident-only standing), and
+            // the "granular" audience panel (the _GrantPickers block) hides
+            // while the flag is on, exactly as the view's copy promises ("By
+            // default the board is visible to everyone; turn that off … only
+            // if you want to narrow who can see it."). Without this seed the
+            // flag is `false` + empty grants, which under `EvaluateAudience`
+            // (an empty audience always denies) left a fresh board
+            // author-only — contradicting the view's own "default is
+            // everyone" text. The view's checkbox already renders from
+            // `Model.Audience?.CommunityVisible ?? true`; seeding `true`
+            // makes the rendered state and the submitted state agree.
             Audience = new AudienceEditorModel
             {
                 Mode = "Any",
                 Grants = "[]",
+                CommunityVisible = true,
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             // ADR 0086 D9 — the **project picker** on the new form (a
             // display surface, never a gate — C-PL·3); a new board has no
@@ -2123,6 +2329,38 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = "Lane moved.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/delete</c> — the
+    /// lane-delete write lane (ADR 0097 — the service's
+    /// <see cref="IProjectService.DeleteLaneAsync"/>: the lane + its card
+    /// placements are removed, the to-dos are kept standalone (C-M5·2), and
+    /// the board's remaining lanes are renumbered 0..n-1). **Creator ∪
+    /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LaneDeletePost(string id, string laneId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.DeleteLaneAsync(laneId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Lane deleted.";
         return Redirect($"/projects/boards/{id}");
     }
 
@@ -2732,6 +2970,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
         };
         await SeedGrantPickerOptionsAsync();
@@ -3117,6 +3359,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             Goals = await SeedGoalPickerAsync(),
         };

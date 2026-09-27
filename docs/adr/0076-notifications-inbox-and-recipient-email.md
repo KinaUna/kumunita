@@ -88,8 +88,9 @@ unregistered kind reaching the inbox.
 
 **D3 — A notification is a *personal read*, not an `AccessAction`
 decision.** A `Notification` row is **the recipient's own data** — the
-`RecipientId` is the whole access story. The inbox read lane
-(`ListInboxAsync` / `CountUnreadAsync` / `MarkAllReadAsync`) does **not**
+`RecipientId` is the whole access story. The inbox read + state lanes
+(`ListInboxAsync` / `CountUnreadAsync` / `MarkAllReadAsync`, and the
+ADR 0096 per-row `MarkReadAsync` / `MarkUnreadAsync`) do **not**
 call `IAuthorizationService` (there is no audience to evaluate, no
 `AccessAction` to check — the recipient is the recipient). **No
 `NotificationToAuditableResource` adapter exists** (a notification is not an
@@ -207,7 +208,11 @@ a new UI dependency.
   GET + POST), one view set + one layout bell, one plain-TS module
   (`client/lib/notifications-bell.ts`), and the `kw-l` keys × 4 languages
   (en/de/fr/da) for the UI strings + the per-kind subject / body templates.
-  That is the whole delta.
+  That is the whole delta. *(Extended by **ADR 0096**: the per-row
+  `MarkReadAsync` / `MarkUnreadAsync` state lanes + the
+  `/notifications/{id}/mark-read` and `/notifications/{id}/mark-unread`
+  POSTs + the per-row toggle buttons, and the `notifications.mark_read` /
+  `notifications.mark_unread` `kw-l` keys.)*
 - **The no-ADD pin:** no new `AccessAction`, no new `AccessVia`, no new
   `IAuditableResource` adapter, no new email mechanism, no new UI dependency,
   no new seam on `IAuthorizationService` / `IUserInfoService` /
