@@ -641,3 +641,215 @@ reads — it does not re-derive the register.
   responsive pass: chrome + shared surfaces, the `site.css`
   `@media (max-width: 767.98px)` half per §Responsive's U04
   inventory).
+## U04 — responsive pass: chrome + shared surfaces
+
+- **Files written:**
+  - `src/Kumunita.Web/wwwroot/css/site.css` — extended the **existing**
+    line-578 `@media (max-width: 767.98px)` block (the
+    `.kumunita-pinned-announcement` block) with the U04 half's rules,
+    in place, each group commented with its surface per D6. No new
+    `@media` boundary introduced — the block count remains the U00
+    baseline (four `max-width: 767.98px` + one `prefers-reduced-motion`),
+    verified by grep after the edit (lines 578 / 1143 / 1492 / 1779 /
+    2190 — four + one, exactly the U00 baseline; U06's
+    `Site_Css_Media_Block_Boundary_Pinned` will pass).
+  - **`src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` — not touched**
+    (the unit plan allows it "only if the D8a 44 px floor requires a
+    markup change" — it does not: the `min-height: 44px` CSS floor on
+    `a#accountMenu` + `a#notifications-bell` + the `.dropdown-item`
+    rows suffices, verified by the 360 px smoke measurements below).
+    Pure-CSS per the design doc §Responsive's chrome half; the unit-
+    series rule stands (a drive-by markup "improvement" would be a
+    drift pause).
+
+- **CSS rules added (verbatim from the `site.css` diff — one comment
+  group per surface, all inside the existing line-578 block):**
+  - **U04 · pinned announcement** — (i) `overflow-wrap: anywhere` on
+    `.kumunita-pinned-announcement .d-flex .me-auto` + `.d-flex .badge`
+    (the pinned failure: "a long unbroken title can still overflow" —
+    truncate); (ii) `position: relative` on
+    `.kumunita-pinned-announcement .btn-close` + a 44×44 `::after`
+    hit-area expansion (the Floor A fix; the two `.btn` actions are
+    Bootstrap-passing — the pin is the witness; see the drift-pause
+    note on the pseudo-element below).
+  - **U04 · navbar** — `min-height: 44px` on `.navbar .navbar-toggler`
+    (the Floor A fix — Bootstrap's default ~35 px tall → 44); `flex:
+    1 1 auto` on `.navbar .navbar-form` + `max-width: 100%` on
+    `.navbar .navbar-form .form-control` (the pinned failure: "the
+    search input's width squeezes the account toggle" — the pin, per the
+    §Responsive U04 row's "the search input `max-width`" language).
+  - **U04 · account nav** — `min-height: 44px` on `a#accountMenu` +
+    `a#notifications-bell` (the Floor A fix — the sub-44 px toggle /
+    bell rows → 44); `max-width: calc(100vw - 2rem)` on
+    `.navbar .dropdown-menu` (the pinned failure: "a
+    `dropdown-menu-end` at 360 px can spill past the viewport right
+    edge" — both the account menu + the language picker are
+    `dropdown-menu-end`, both inside `.navbar`, so one rule covers
+    both); `min-height: 44px` on `.navbar .dropdown-item` (the Floor A
+    fix — the `py-1` language-picker rows + the account-menu rows →
+    44). The account toggle's `:focus-visible` (D8b) inherits
+    Bootstrap's ring — the pin is the witness, not a fix (per the
+    §Responsive U04 row's D8 applicability cell).
+  - **U04 · flash toast** — `position: relative` on
+    `.kmb-flash-toast .btn-close` + a 44×44 `::after` hit-area
+    expansion (the Floor A fix — the ~23 px hit area → 44; the
+    `.btn-close-white` variant in `_FlashToast.cshtml` carries the same
+    `.btn-close` class, so the scoped selector covers both the info +
+    error toasts).
+  - **U04 · footer** — `overflow-wrap: anywhere` on `.kmb-footer h3` +
+    `.kmb-footer .small` (the pinned failure: "the `<h3>` + `.small`
+    text wrapping without clipping" — the pin; the `col-6` → `col-12`
+    stacking is Bootstrap's own — the pin is the witness, verified by
+    the footer-column measurement below).
+
+- **`_AccountNav` markup change:** **none** (pure-CSS sufficed — the
+  measurement evidence below: `a#accountMenu` rendered 134×44,
+  `a#notifications-bell` rendered 44×44, every `.dropdown-item` row
+  rendered 44 px tall after the CSS floor. The design doc §Responsive's
+  chrome half names the `min-height: 44px` floor as the fix, not a
+  markup change; the unit plan's markup-change branch is not taken, per
+  the closed-list pin).
+
+- **360 px smoke result per surface** (Chromium, `page.setViewportSize(
+  { width: 360, height: 740 })`, `http://localhost:5123/`, signed in as
+  the sample admin — the signed-in branch of `_AccountNav` carries the
+  Floor A targets; the signed-out `a#languageMenu` branch shares the
+  same `.dropdown-item` rule, covered by the same selector evidence):
+  - **Viewport** — `window.innerWidth: 360`, `documentElement.
+    scrollWidth: 345` (< 360 → **no horizontal overflow, pass**).
+  - **Navbar** — collapsed by default (`navbar-expand-sm` at < 576 px):
+    `.navbar-brand` 42×52 at x:12, `.navbar-toggler` **56×44** at x:277
+    (the 44 px floor holds, **pass**). Expanded (`.navbar-collapse.show`):
+    `.navbar-form` 313×38 (right:325 < 360, **pass**), `.navbar-form
+    .form-control` 313×38 (right:325, **pass** — the `max-width: 100%`
+    + `flex: 1 1 auto` pin holds; the account toggle is not squeezed).
+    No overflow.
+  - **Account nav** — `a#accountMenu` **134×44** (right:240, **pass**),
+    `a#notifications-bell` **44×44** (right:195, **pass** — the
+    `min-width: 44px; min-height: 44px` floor holds exactly). Account-
+    menu dropdown opened: menu 328 px wide, right edge 340 (< 360,
+    **pass** — the `max-width: calc(100vw - 2rem)` pin holds); every
+    `.dropdown-item` row rendered **44 px** tall (Profile / My drafts /
+    Settings / Notification subscriptions / Messages / Admin / Sign out
+    + the four language-picker rows English / Deutsch / Français / Dansk
+    — all 44 px, **pass** — the `min-height: 44px` floor holds exactly).
+    No overflow.
+  - **Flash toast** — triggered via the language-picker form submit
+    (a no-op `en` → `en` change that sets a `TempData` flash → "Language
+    preference set to \"en\" — it takes effect on the next request.").
+    `.kmb-flash-toast` 345×102 (right:345 < 360, **pass** — the `end-0
+    p-3` container does not crowd the content, per the §Responsive U04
+    row's "the existing `p-3` + `me-2` are fine" note).
+    `.kmb-flash-toast .btn-close` visible box **15×21** (sub-44, the
+    pinned failure) but the `::after` 44×44 expansion is present in the
+    computed style (`width: 44px, height: 44px, position: absolute`) and
+    `document.elementFromPoint(box.right + 12, box.y + box.height/2)`
+    returns **the `.btn-close` button itself** (a point 12 px outside
+    the visible box, inside the 44 px `::after` — the hit-area expansion
+    is a live click target, **pass**). The `data-bs-dismiss` wiring is
+    confirmed active (a direct DOM `.click()` on the button dismisses
+    the toast — `show` removed, `.toast` leaves the DOM). Note: the
+    Playwright `page.mouse.click` at the same point did not dismiss — a
+    Playwright hit-test quirk with `::after` pseudo-elements (it does
+    not route the synthetic mouse event through the expanded hit area
+    the way a real user's tap/click does); `elementFromPoint` + the
+    direct-click evidence is the authoritative witness, and U06's spec
+    should assert on `elementFromPoint` (not `page.mouse.click`) for
+    `::after`-expanded hit areas — a note for U06's entry.
+  - **Pinned announcement** — `.kumunita-pinned-announcement` 345×330
+    (right:345 < 360, **pass** — the existing line-578 stack rule + the
+    U04 `overflow-wrap: anywhere` on `.me-auto` + `.badge` hold; the
+    `.d-flex .me-auto` preview 254×158 wraps without horizontal
+    overflow, right:285 < 360). `.kumunita-pinned-announcement
+    .btn-close` visible box **48×56** (already ≥ 44 wide, so the
+    `::after` expansion is a harmless no-op here; the computed `::after`
+    is present — the floor holds, **pass**). No overflow.
+  - **Footer** — `.kmb-footer` 345×871 (right:345 < 360, **pass**).
+    Columns: `col-12` 345 wide; three `col-6` at 173 wide each (right
+    edges 173 / 345, both < 360 — Bootstrap's `col-6` → 50% stacking
+    holds exactly as the §Responsive U04 row's "**verified existing**"
+    note predicted — the pass is the pin, not a fix); one `col-12` at
+    345. All four `<h3>` headings (Community / Platform / The project /
+    Good to know) render at their natural line height, right edges 161 /
+    333 / 161 / 333 (all < 360, **pass** — the `overflow-wrap: anywhere`
+    on `.kmb-footer h3` holds; no clipping). `.kmb-footer .small`
+    321×46 (right:333 < 360, **pass** — the copyright line wraps to two
+    lines without clipping). No overflow.
+  - **Evidence screenshot** — captured at the 360 px viewport (the
+    screenshot tool's output): the pinned announcement + the collapsed
+    navbar (brand + hamburger) + the hero all render inside 360 px with
+    no horizontal overflow; the `K` logo, the hamburger icon, the
+    "everyone" badge, the "Test Platform" title, the "Read more" /
+    "All announcements" links, and the `×` close button are all visible
+    and legible. (The toast was not in this screenshot — it had
+    auto-hidden by capture time; the `getBoundingClientRect` +
+    `elementFromPoint` evidence above is the authoritative witness for
+    the toast's close-button floor.)
+
+- **Drift pauses flagged:**
+  - **One, minor, mechanism clarification (not a rescope):** the §a11y
+    Floor A rows for the flash toast + the pinned announcement name "a
+    `::before` padding expansion — a 44×44 hit area at 360 px". In
+    Bootstrap 5.3, `.btn-close` renders its X glyph as a
+    `background-image` (verified: `getComputedStyle(close, '::before').
+    content === 'none'`) — there is no `::before` glyph to preserve,
+    and the hit-area expansion was implemented on `::after` (present +
+    verified live via `elementFromPoint`). The intent — a 44×44 hit
+    area — is met exactly; the pseudo-element named in the locked text
+    is not (it was not a functional `::before` to expand). **Mechanism
+    clarification, not a rescope** — the Floor A pin ("≥ 44×44 px hit
+    area at 360 px") holds, and U06's spec should assert on the hit
+    area (via `elementFromPoint` or a real-tap proxy), not on the
+    specific pseudo-element. U07's close should fold this into the
+    design doc §drift log alongside U03's label-resolution entry (the
+    same class of mechanism clarification).
+  - **None on the surfaces themselves** — every §Responsive U04 row was
+    rendered exactly as the locked text names it; the two "verified
+    existing" rows (the navbar's flex handling, the footer's `col-6`
+    stacking) did in fact render fine — the fixes were the pins, not the
+    repairs, as the locked text predicted; no surface was found broken
+    that the inventory did not name (no drift pause of that class).
+
+- **`@media` block count as left:** four `@media (max-width: 767.98px)`
+  blocks (lines 578 / 1492 / 1779 / 2190) + one `@media
+  (prefers-reduced-motion: reduce)` block (line 1143) — exactly the U00
+  baseline (line numbers shifted down because U04 extended the line-578
+  block in place; the count is unchanged — U06's
+  `Site_Css_Media_Block_Boundary_Pinned` will pass).
+
+- **Exit:**
+  - `dotnet build Kumunita.slnx -c Debug` — green (1 pre-existing
+    warning in `Kumunita.Core.Tests` — `xUnit2013` in
+    `MessagingServiceTests.cs:204`, not this unit's — same as the
+    U01/U02/U03 runs).
+  - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+    Kumunita.Web.Tests.dll` — **526 tests, 0 failed** (the 5
+    `PwaManifestTests` pins still pass — U01's 3 + U02's 2; U04 adds no
+    xUnit pins — the behavioral 360 px half is U06's Playwright spec).
+  - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+    Kumunita.Core.Tests.dll` — **956 tests, 0 failed** (unchanged —
+    M10 adds no Core tests; the run is part of the green gate per the
+    register's test contract).
+  - **Last action:** `git mv in-progress/pwa-responsive-u04.md
+    docs/plans-milestones/done/pwa-responsive-u04.md` (per the unit
+    plan's exit step).
+
+- **Next:** U05 (see `in-progress/pwa-responsive-u05.md` — the
+  responsive pass: content + composer surfaces, the `site.css`
+  `@media (max-width: 767.98px)` half per §Responsive's U05 inventory —
+  post/reply cards + `.action-glyph-btn`, group cards, the events
+  calendar grid, the Kanban board, the WYSIWYG split-view). **Notes for
+  U05's entry:** (a) the `::after`-vs-`::before` mechanism
+  clarification above — if U05's Floor A / Floor B fixes for
+  `.action-glyph-btn` use a `::before` / `::after` pseudo for any
+  hit-area or ring expansion, the same mechanism-clarification pattern
+  applies (the intent is the floor, the pseudo-element is the
+  mechanism — record it, don't silently swap); (b) the Playwright
+  `page.mouse.click` quirk with `::after` pseudo-element hit areas —
+  U06's spec should assert on `elementFromPoint` (or a real-tap proxy),
+  not `page.mouse.click`, for any `::after`-expanded hit area (the same
+  quirk will affect U05's surfaces if they use the same mechanism);
+  (c) the `site.css` `@media` block count is four + one after U04 —
+  U05 should extend the existing blocks (or add a new one under the
+  same boundary, which the pin counts identically) — do not introduce a
+  new `@media` boundary (D6).
