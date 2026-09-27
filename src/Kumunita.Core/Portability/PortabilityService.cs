@@ -109,6 +109,26 @@ public sealed class PortabilityService(
             mediaManifest,
             DateTimeOffset.UtcNow);
 
+        // U04 — the one `portability.export` AccessAudit row (C-M11·6, the
+        // ADR 0105 `messaging.toggle` one-audit-row shape — the controller adds
+        // none; `Action` is the verb, `TargetKind`/`TargetId` are
+        // "portability"). Emitted after the archive is built (a failed build
+        // throws before this point, so no audit row for a refused export).
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = System.Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "portability.export",
+            TargetKind = "portability",
+            TargetId = "portability",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
         var stream = new MemoryStream();
         await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
         stream.Position = 0;
@@ -117,5 +137,5 @@ public sealed class PortabilityService(
 
     /// <inheritdoc />
     public Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default) =>
-        throw new NotImplementedException("M11 U01 shell — the import body lands in U05–U06 (the validate-then-apply, the identity re-creation with secrets reset, the config apply).");
+        throw new NotImplementedException("M11 U01 shell — the import body lands in U05–U06 (the validate-then-apply, the identity re-creation with secrets reset, the config apply, and the one `portability.import` audit row).");
 }

@@ -1624,6 +1624,20 @@ public static class KnownTranslationKeys
             // closed-key registry + KnownTranslationKeys_ParityTests enforce
             // the × 4). D5: no banner, no modal — one button.
             ["pwa.install"] = "Install app",
+
+            // M11 (ADR 0108 D10) — the portability operator surface (the
+            // /admin/portability index: the export button, the import form +
+            // its destructive-action guard, and the two status renders).
+            // closed-key registry + KnownTranslationKeys_ParityTests enforce
+            // the × 4; the confirm() message + the status toasts are
+            // attribute/TempData strings (outside the kw-l TagHelper's reach)
+            // resolved through the provider (the ADR 0072 attribute idiom).
+            ["portability.index.title"]  = "Portability",
+            ["portability.export"]       = "Export",
+            ["portability.import"]       = "Import",
+            ["portability.confirm.import"] = "Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback).",
+            ["portability.status.ok"]    = "Done.",
+            ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
         };
 
     /// <summary>
@@ -3103,6 +3117,16 @@ public static class KnownTranslationKeys
             // M10 (ADR 0107 D10) — das eine stille Install-Affordance-Label
             // (U03, pwa-install.ts). Kein Banner, kein Modal — ein Button.
             ["pwa.install"] = "App installieren",
+
+            // M11 (ADR 0108 D10) — die Portabilitäts-Operator-Oberfläche
+            // (der /admin/portability Index: Export-Button, Import-Formular
+            // + seine Destruktivitätsabsicherung, die zwei Status-Renderings).
+            ["portability.index.title"]  = "Portabilität",
+            ["portability.export"]       = "Exportieren",
+            ["portability.import"]       = "Importieren",
+            ["portability.confirm.import"] = "Dieses Archiv importieren? Es ersetzt den Inhalt der Instanz (der Wiederherstellungspfad — das Vorkopie-Backup des Operators ist der Rollback).",
+            ["portability.status.ok"]    = "Fertig.",
+            ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
         };
 
     /// <summary>
@@ -4584,6 +4608,16 @@ public static class KnownTranslationKeys
             // M10 (ADR 0107 D10) — le libellé du seul affordance d'installation
             // (U03, pwa-install.ts). Pas de bannière, pas de modale — un bouton.
             ["pwa.install"] = "Installer l'application",
+
+            // M11 (ADR 0108 D10) — la surface opérateur de portabilité
+            // (l'index /admin/portability : le bouton d'export, le formulaire
+            // d'import + sa garde destructive, les deux rendus de statut).
+            ["portability.index.title"]  = "Portabilité",
+            ["portability.export"]       = "Exporter",
+            ["portability.import"]       = "Importer",
+            ["portability.confirm.import"] = "Importer cette archive ? Elle remplace le contenu de l'instance (le chemin de restauration — la sauvegarde pré-import de l'opérateur est le retour arrière).",
+            ["portability.status.ok"]    = "Terminé.",
+            ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
         };
 
     /// <summary>
@@ -6058,6 +6092,16 @@ public static class KnownTranslationKeys
             // M10 (ADR 0107 D10) — det ene stille installations-affordance
             // (U03, pwa-install.ts). Ingen banner, ingen modal — én knap.
             ["pwa.install"] = "Installér app",
+
+            // M11 (ADR 0108 D10) — portabilitetsoperatøroverfladen
+            // (indexen /admin/portability: eksportknap, importformular + dens
+            // destruktive vagt, de to status-renderinger).
+            ["portability.index.title"]  = "Portabilitet",
+            ["portability.export"]       = "Eksportér",
+            ["portability.import"]       = "Importér",
+            ["portability.confirm.import"] = "Importér denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien — operatørens backup før import er tilbageskrivningen).",
+            ["portability.status.ok"]    = "Færdig.",
+            ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

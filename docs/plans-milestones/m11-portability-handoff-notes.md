@@ -630,6 +630,133 @@ The loop iterates **every `MediaObject` in the catalog** (the
 `docs/MediaObject.json` rows — order-3 entry of the D7 registry). The
 `media` dict has one entry per catalog row (content id → payload bytes);
 the `media_manifest` list has one `PortabilityMediaEntry` per catalog row
+
+
+---
+
+## U04 — the GlobalAdmin web surface (the export half) + the service audit row + the kw-l keys
+
+**Deliverables shipped:**
+
+1. **`IPortabilityService.ExportAsync`'s one-audit-row** — the `GET
+   /admin/portability/export` action's `portability.export` audit row,
+   emitted **by the service** (ADR 0105 shape — the controller adds none).
+   The service's `ExportAsync(actorId, ct)` now, after building the
+   manifest + the docs/media/principals/config (the U02/U03 body) and
+   **before** the `MemoryStream` write, opens a `LightweightSession`,
+   stores the one `AccessAudit` row, and `SaveChangesAsync`'s it:
+   `Action="portability.export"`, `TargetKind="portability"`,
+   `TargetId="portability"` (the one closed TargetKind — the design doc's
+   §surface), `Via=Admin`, `Outcome=Allow`, `ActorId`/`EffectivePrincipalId`
+   = the actor's `subjectId`. This mirrors the **exact** shape of
+   `MessagingService.SetMessagingEnabledAsync`'s `messaging.toggle` row
+   (the ADR 0105/0106 "service emits the audit" precedent).
+2. **`AdminPortabilityController`** (new, `src/Kumunita.Web/Controllers/`)
+   — `[Route("admin/portability")] [Authorize(Roles = Roles.GlobalAdmin)]`
+   (the same pattern as `AdminMessagingController` / `AnnouncementCommentsController`).
+   Two actions:
+   - `GET Index()` → `View()` (the operator-facing page).
+   - `GET Export()` → `await portability.ExportAsync(actor)`, sets
+     `X-Content-Type-Options: nosniff` + `Content-Disposition:
+     attachment; filename="kumunita.kumunita"`, returns
+     `File(stream, "application/octet-stream")` (the ADR 0034 attachment
+     shape — the archive streams as a download, the loop closes out of the
+     platform).
+   - The **`POST Import` action is intentionally absent** — that is **U06's**
+     deliverable ("`POST Import` action completes"). The view's import form
+     is rendered now (so the surface is whole and the operator sees the
+     export + import pair), but it targets `/admin/portability/import`
+     which will 404 until U06 wires the action. This is the "no partial
+     scope creep" boundary: U04 ships the export half; U06 completes the
+     import half.
+3. **`Views/Admin/Portability.cshtml`** (new) — the operator-facing page.
+   Mirrors the `AdminMessaging/Index.cshtml` house shape (the back-link,
+   the `<h1>` via `<kw-l>`, the card grid). Two cards: **Export** (a plain
+   `<a href="~/admin/portability/export">` button — no form, the archive
+   streams as a download) and **Import** (a `<form method="post"
+   enctype="multipart/form-data" data-confirm="...">` with a file input
+   `name="archive"` + a submit button). The `data-confirm` attribute is
+   resolved through the provider (the ADR 0072 attribute idiom —
+   `await Translation.GetAsync("portability.confirm.import", _kwL)` with
+   `_kwL` from `EffectiveLanguageCode.ResolveAsync(...)`) because the
+   `confirm.js` interceptor reads the raw attribute (outside the kw-l
+   TagHelper's reach). The status area is the `_FlashToast` partial
+   (rendered by `_Layout`) reading the `TempData` the U06 import action
+   writes — no inline markup here.
+4. **The one nav link** — a "Portability" card in
+   `Views/Admin/Index.cshtml` (the admin dashboard), matching the ADR 0105
+   "Direct messaging" / "Announcement comments" section-card precedent
+   (the register named `_AdminNav.cshtml` as an option, but the actual
+   ADR 0105 nav-entry for the additional operator sections is the
+   **dashboard card** — the `_AdminNav` strip is the FIVE core admin pages
+   only). Links to `/admin/portability`.
+5. **The six kw-l keys** (locked in the design doc §kw-l, U00) — added to
+   `KnownTranslationKeys.cs`'s all four `EnValues`/`DeValues`/`FrValues`/
+   `DaValues` dictionaries, immediately after the last existing entry
+   (`pwa.install`) in each:
+
+   | Key | EN | DE | FR | DA |
+   |---|---|---|---|---|
+   | `portability.index.title` | Portability | Portabilität | Portabilité | Portabilitet |
+   | `portability.export` | Export | Export | Exporter | Eksportér |
+   | `portability.import` | Import | Import | Importer | Importér |
+   | `portability.confirm.import` | Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback). | Dieses Archiv importieren? Dadurch wird der Inhalt der Instanz ersetzt (der Wiederherstellungspfad — das Vorbackup des Betreibers ist die Rückmeldung). | Importer cet archive ? Cela remplace le contenu de l'instance (le chemin de restauration — la sauvegarde préalable de l'opérateur est le point de retour). | Importér dette arkiv? Dette erstatter instansen's indhold (gendannelsesvejen — operatørens backup før import er tilbageskrivningen). |
+   | `portability.status.ok` | Done. | Fertig. | Terminé. | Færdig. |
+   | `portability.status.failure` | Refused — the archive was rejected before anything was written: | Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde: | Refusé — l'archive a été rejeté avant qu'aucune donnée ne soit écrite : | Afvist — arkivet blev afvist, før noget blev skrevet: |
+
+   All six are in the view (`Portability.cshtml`: `index.title`, `export`
+   ×2, `import` ×2, and the `confirm.import` attribute) — the
+   `KwLRegistryConsistencyTests` test confirms every `kw-l key="..."` in
+   views is registered, and the `KnownTranslationKeys_ParityTests` test
+   confirms all four languages have the identical key set + non-empty
+   values. Both green.
+
+**Build + tests:** `dotnet build Kumunita.slnx -c Debug` → 0 errors, 2
+warnings (both pre-existing: `CS9113 mediaFileStore` unread — U05/U06
+consume it; `xUnit2013` in an existing `MessagingServiceTests` test,
+unrelated). **Both suites in-process (per AGENTS.md):** Web **528 passed /
+0 failed**, Core **956 passed / 0 failed** (the parity + registry
+consistency tests green with the 6 new keys).
+
+**The U05/U06 seam (what the next units consume):**
+
+- `PortabilityService.ImportAsync(actorId, Stream archive, ct)` — still
+  `NotImplementedException`. U05 implements the **validate-then-apply**
+  (read the archive via `KumunitaArchive.ReadAsync`, run the 4 §validate
+  checks, emit the closed-failure-set as a `PortabilityImportResult`); U06
+  implements the **apply** (the `ApplyAsync` order: docs, then media, then
+  principals, then config) + the `portability.import` audit row (the exact
+  same shape as U04's `portability.export` row, just `Action=
+  "portability.import"`) + the `POST Import` action + the TempData
+  status-area wiring.
+- The **`mediaFileStore` ctor param** is now read by U05/U06 (clearing the
+  `CS9113` warning). The §apply media copy uses `IMediaStore.PutAsync`
+  (U01's seam) to write each catalog entry's bytes to disk under the
+  `MediaFiles/` root.
+- **`KumunitaArchive.ReadAsync(Stream, ct)`** (U01) returns
+  `KumunitaArchiveData` — the `manifest` (the `PortabilityManifest` with
+  the `docCounts` + the `media_manifest` + the `principals` count + the
+  `config`), the `docs` dict (the `docType` → the JSON string map), the
+  `media` dict (the content id → the bytes map), the `principals` (the
+  `IReadOnlyList<PortabilityPrincipal>`), and the `config` (the
+  `PortabilityConfig`). U05's validate reads all four; U06's apply writes
+  all four back in the §apply order.
+- **The `POST /admin/portability/import` action** (U06) — the view's form
+  already targets it. It takes the `IFormFile` (`name="archive"`),
+  streams it to `portability.ImportAsync(actor, file.OpenReadStream(),
+  ct)`, writes the result to `TempData["info"]` (the `portability.status.
+  ok` string) or `TempData["error"]` (the `portability.status.failure`
+  string + the failure list), and redirects back to `GET Index()`. The
+  `_FlashToast` partial renders the `TempData` — the status area is
+  uniform.
+- **The `portability.import` audit row** (U06) — the **exact** same shape
+  as U04's `portability.export` row, with `Action="portability.import"`
+  (the one closed verb pair). Emitted by the service (not the controller),
+  **after** the apply succeeds (the design doc §surface: "the one
+  `portability.import` row" — not on the failure path; the failure is
+  returned as a `PortabilityImportResult` to the controller, which writes
+  the `TempData`).
+
 (manifest order = catalog order). **Count = the number of `MediaObject`
 rows in the store** — not a fixed number (it is data, not a constant).
 
