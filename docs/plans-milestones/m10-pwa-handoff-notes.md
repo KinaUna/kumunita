@@ -318,3 +318,146 @@ reads — it does not re-derive the register.
 - **Next:** U02 (see `in-progress/pwa-responsive-u02.md` — the service
   worker: the 15-path allowlist + the versioning rule + the fall-
   through; extend `PwaManifestTests.cs` with the two SW pins).
+
+## U02 — service worker: `wwwroot/sw.js` + the two structural pins
+
+- **Files written:**
+  - `src/Kumunita.Web/wwwroot/sw.js` (new) — the §SW contract rendered
+    exactly: the four gates (same-origin / GET-only / exact-path /
+    no `Authorization` header) in `isAllowlistedShellRequest`, the
+    closed 15-path `ALLOWLIST` array (verbatim from the design doc
+    §SW), stale-while-revalidate on `kumunita-shell-v1`, the exact
+    fall-through line, the `activate` clear-prior-versions logic, no
+    precache, no `skipWaiting` / `clients.claim`.
+  - `tests/Kumunita.Web.Tests/PwaManifestTests.cs` — extended
+    (additive, U01's three pins untouched) with the two U02 pins:
+    `ServiceWorker_File_Exists_And_Is_SameOrigin_Wwwroot` +
+    `ServiceWorker_Allowlist_Matches_Design_Doc_Verbatim`. Two new
+    private helpers (`ExtractAllowlistFromSw` / `ExtractAllowlistFrom
+    DesignDoc`) + one `using System.Text.RegularExpressions;` added at
+    the top of the file. No other test in the class was touched.
+
+- **SW allowlist as implemented (the exact set, verbatim in `sw.js`'s
+  `ALLOWLIST` array — set-equal to the design doc §SW's 15-path list,
+  asserted by the `ServiceWorker_Allowlist_Matches_Design_Doc_Verbatim`
+  pin):**
+  `/` · `/about` · `/css/site.css` · `/js/lib/audience-toggle.js` ·
+  `/js/lib/avatar-upload.js` · `/js/lib/avatar.js` ·
+  `/js/lib/confirm.js` · `/js/lib/detach-menu.js` ·
+  `/js/lib/directory-card.js` · `/js/lib/dom-to-markdown.js` ·
+  `/js/lib/expand-page.js` · `/js/lib/flash-toast.js` ·
+  `/js/lib/rich-editor.js` · `/js/lib/translation-swap.js` ·
+  `/manifest.webmanifest`
+
+- **Cache version string:** `kumunita-shell-v1` (the `CACHE_NAME`
+  const, verbatim from the design doc §SW's locked text).
+
+- **`activate` clear logic (the exact code in `sw.js`):**
+  ```js
+  self.addEventListener('activate', (event) => {
+    // Versioned cleanup: delete every cache name other than the current one.
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+        )
+    );
+  });
+  ```
+  (Matches the design doc §SW's locked shape: "for every name in
+  `caches.keys()` other than `kumunita-shell-v1`,
+  `caches.delete(name)`; then `event.waitUntil(...)` complete. No
+  `self.skipWaiting()`, no `clients.claim()` — the locked honesty
+  pin.)
+
+- **Fall-through line (verbatim in `sw.js`, the `fetch` handler's
+  non-allowlisted branch — the C-M10·2 code-shape pin, the design doc
+  §SW's locked text):**
+  ```js
+  event.respondWith(fetch(event.request));
+  ```
+  Every request that fails any of the four gates (same-origin /
+  GET-only / exact-path / no `Authorization` header) reaches this
+  line — a pass-through, never a cache-lookup-then-fallback. No
+  `caches.match` on a signed-in path exists anywhere in the file
+  (structural fall-through, the unit plan's exit witness).
+
+- **Caching rule as implemented (stale-while-revalidate on
+  `kumunita-shell-v1`; the design doc §SW's locked text, verbatim in
+  substance):**
+  - `install`: no precache — `event.waitUntil(Promise.resolve())`.
+  - `fetch` (allowlisted only): on a hit, serve the cached copy +
+    `fetch(request)` in the background + `cache.put(request, fresh)`
+    (revalidate) — the fresh response is stored only if it is a 2xx
+    same-origin response; on a miss, `fetch(request)` and, on a 2xx
+    same-origin response, `cache.put(request, fresh.clone())`. A
+    non-2xx or a network failure falls through to the browser's own
+    error — the SW never serves a stale copy of a route it failed to
+    load fresh for the first time (the negative pin's witness: a
+    route that 404s/403s is never cached).
+  - Same-origin response check: `new URL(response.url).origin ===
+    self.location.origin` (the `isSameOriginResponse` helper) — a
+    redirect to a cross-origin URL is refused for cache storage.
+
+- **Drift pauses flagged:** **none.** All locked values rendered
+  verbatim:
+  - The 15-path allowlist in `sw.js` is set-equal to the design doc
+    §SW's list — the `ServiceWorker_Allowlist_Matches_Design_Doc_
+    Verbatim` pin parses both (a regex over the `ALLOWLIST = [ ... ];
+    ` array literal in the JS; a line-scan of the `The closed
+    allowlist` code block in the doc) and asserts set-equality +
+    exactly 15 distinct paths on each side. It passes.
+  - The four gates are in the design doc §SW's exact order (same-
+    origin, GET-only, allowlisted path, no `Authorization` header)
+    — `isAllowlistedShellRequest` checks them in that order, each
+    with a comment naming the gate + the design doc §SW reference.
+  - The fall-through line is byte-identical to the locked text.
+  - The cache name is byte-identical to the locked text.
+  - `Program.cs` was not touched (the CSP is unchanged; the SW is a
+    same-origin `wwwroot/` asset satisfying `script-src 'self'` —
+    confirmed by reading the CSP block at ~line 499–512; the
+    `script-src 'self'` directive is present, no `unsafe-inline` is
+    granted for scripts). `site.css` was not touched (the unit-series
+    rule). `_Layout.cshtml` was not touched — U01's manifest link is
+    present (line 28, the drift-check pass), and the SW registration
+    call is U03's module's job (the ADR 0031 self-wiring shape), not a
+    `<script>` in the layout.
+  - No D-item text was rewritten.
+
+- **Test notes (for U03/U04/U05/U06's additive extensions):**
+  - xUnit v3's `Assert.Equal(expected, actual, message)` overload no
+    longer exists (the v2 message-carrying form was removed; the v3
+    `Assert.Equal` takes `Func<int,int,bool>` / `IEqualityComparer` as
+    later args). The house shape for a message-carrying equality
+    assertion is `Assert.True(condition, message)` — U02's two pins
+    use it. U06's two pins (`Pwa_Install_Kw_L_Key_Registered_In_All_
+    Four_Languages` + `Site_Css_Media_Block_Boundary_Pinned`) should
+    mirror the `Assert.True(...)` shape for any message-carrying
+    assertions.
+  - `ExtractAllowlistFromSw` reads the `const ALLOWLIST = [ ... ];`
+    array literal by regex (a known-shape pin — the design doc §SW's
+    locked code shape, `ServiceWorker_Allowlist_Matches_Design_Doc_
+    Verbatim`). If a future unit renames the `ALLOWLIST` const or
+    restructures the array, that pin will fail by design (the
+    closed-set witness).
+  - `ExtractAllowlistFromDesignDoc` reads the design doc's `The
+    closed allowlist` code block (the lines starting with `/` between
+    the first opening and the next closing ` ``` ` fence after the
+    heading). If the design doc's §SW allowlist is rewritten (a
+    drift-guard event), that pin will fail by design — the closed-
+    set witness.
+  - The `RepoRoot` private helper (U01's) is reused by both U02 pins
+    — the house shape, correct regardless of the output depth.
+
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green;
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` — **526 tests, 0 failed** (the 5
+  `PwaManifestTests` pins pass: U01's 3 + U02's 2);
+  `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+  Kumunita.Core.Tests.dll` — **956 tests, 0 failed** (unchanged —
+  M10 adds no Core tests, the run is part of the green gate per the
+  register's test contract).
+- **Next:** U03 (see `in-progress/pwa-responsive-u03.md` — the
+  install affordance: `client/lib/pwa-install.ts` + the `_Layout`
+  script tag + the SW registration call).

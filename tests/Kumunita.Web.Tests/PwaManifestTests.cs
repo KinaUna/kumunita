@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Kumunita.Web.Tests;
@@ -140,6 +141,122 @@ public class PwaManifestTests
             "_Layout.cshtml must carry the <link rel=\"manifest\"> in <head>");
         Assert.True(layout.Contains("manifest.webmanifest"),
             "the manifest link must point at manifest.webmanifest");
+    }
+
+    // ── (4) C-M10·3 — the SW file is a same-origin wwwroot/ text asset ──────
+
+    /// <summary>
+    /// <c>wwwroot/sw.js</c> exists and is a **text JS file** (its first
+    /// non-whitespace byte is a printable ASCII char, not a binary marker) —
+    /// the C-M10·3 location witness: a same-origin <c>wwwroot/</c> asset that
+    /// satisfies <c>script-src 'self'</c> (the ADR 0043 SP-U04 string-pin
+    /// idiom; no TestServer, no browser).
+    /// </summary>
+    [Fact(DisplayName = "M10 U02: wwwroot/sw.js exists and is a text JS file (C-M10·3 location witness)")]
+    public void ServiceWorker_File_Exists_And_Is_SameOrigin_Wwwroot()
+    {
+        var swPath = Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "sw.js");
+        Assert.True(File.Exists(swPath), $"sw.js not found at {swPath}.");
+
+        var bytes = File.ReadAllBytes(swPath);
+        Assert.True(bytes.Length > 0, "sw.js is empty.");
+
+        // First non-whitespace byte: a text JS file starts with a printable
+        // ASCII token (a comment `/`, `*`, or an identifier lead). A binary
+        // (PNG magic 0x89, a zip 0x50 'PK', etc.) would fail this. This is
+        // the "not a binary" witness the unit plan names.
+        int i = 0;
+        while (i < bytes.Length && (bytes[i] is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n'))
+            i++;
+        Assert.True(i < bytes.Length, "sw.js is all whitespace.");
+        byte first = bytes[i];
+        Assert.True(
+            (first >= 0x21 && first < 0x7f),
+            $"first non-whitespace byte 0x{first:X2} is not a printable ASCII char — not a text JS file.");
+    }
+
+    // ── (5) C-M10·2 — the SW allowlist set-equals the design doc §SW ────────
+
+    /// <summary>
+    /// The <c>ALLOWLIST</c> array in <c>sw.js</c> **set-equals** the closed
+    /// 15-path allowlist in the design doc §SW (the C-M10·2 closed-set
+    /// witness — the structural half of the negative pin; the *behavioral*
+    /// half is U06's Playwright spec). Both are parsed straight from the
+    /// committed text (a closed-set witness, not a behavior pin).
+    /// </summary>
+    [Fact(DisplayName = "M10 U02: sw.js ALLOWLIST set-equals the design doc §SW closed allowlist")]
+    public void ServiceWorker_Allowlist_Matches_Design_Doc_Verbatim()
+    {
+        var swPath = Path.Combine(RepoRoot, "src", "Kumunita.Web", "wwwroot", "sw.js");
+        var docPath = Path.Combine(RepoRoot, "docs", "design", "m10-pwa-responsive-design.md");
+        Assert.True(File.Exists(swPath), $"sw.js not found at {swPath}.");
+        Assert.True(File.Exists(docPath), $"design doc not found at {docPath}.");
+
+        var jsPaths = ExtractAllowlistFromSw(File.ReadAllText(swPath));
+        var docPaths = ExtractAllowlistFromDesignDoc(File.ReadAllText(docPath));
+
+        Assert.True(jsPaths.Count > 0, "no paths extracted from sw.js ALLOWLIST.");
+        Assert.True(docPaths.Count > 0, "no paths extracted from the design doc §SW allowlist.");
+
+        // Closed set: exactly 15, and the two sets are equal (order-
+        // independent). (xUnit v3: Assert.Equal no longer takes a message
+        // string — use the Assert.True(condition, message) shape.)
+        Assert.True(jsPaths.Distinct().Count() == 15,
+            $"sw.js ALLOWLIST is not 15 distinct paths: [{string.Join(", ", jsPaths)}]");
+        Assert.True(docPaths.Distinct().Count() == 15,
+            $"design doc allowlist is not 15 distinct paths: [{string.Join(", ", docPaths)}]");
+
+        Assert.True(new HashSet<string>(docPaths).SetEquals(jsPaths),
+            "the sw.js ALLOWLIST does not set-equal the design doc §SW allowlist.");
+    }
+
+    /// <summary>
+    /// Extracts the quoted strings from the <c>const ALLOWLIST = [ ... ];</c>
+    /// array literal in <c>sw.js</c> (the design doc §SW's locked code shape).
+    /// </summary>
+    private static List<string> ExtractAllowlistFromSw(string sw)
+    {
+        const string marker = "const ALLOWLIST = [";
+        int start = sw.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "the `const ALLOWLIST = [` array literal is not present in sw.js.");
+        int blockStart = start + marker.Length;
+        int blockEnd = sw.IndexOf("];", blockStart, StringComparison.Ordinal);
+        Assert.True(blockEnd > blockStart, "the ALLOWLIST closing `];` is not present in sw.js.");
+        string block = sw.Substring(blockStart, blockEnd - blockStart);
+
+        var re = new Regex("'([^']*)'");
+        var paths = re.Matches(block).Cast<Match>().Select(m => m.Groups[1].Value).ToList();
+        return paths;
+    }
+
+    /// <summary>
+    /// Extracts the closed allowlist code block that follows the
+    /// "The closed allowlist" heading in the design doc — the lines that
+    /// start with <c>/</c> between the first opening and the next closing
+    /// <c>```</c> fence.
+    /// </summary>
+    private static List<string> ExtractAllowlistFromDesignDoc(string doc)
+    {
+        const string heading = "The closed allowlist";
+        int headIdx = doc.IndexOf(heading, StringComparison.Ordinal);
+        Assert.True(headIdx >= 0, "the `The closed allowlist` heading is not present in the design doc.");
+
+        int fenceStart = doc.IndexOf("```", headIdx, StringComparison.Ordinal);
+        Assert.True(fenceStart >= headIdx, "no code fence follows the allowlist heading in the design doc.");
+        // Skip to the end of the opening-fence line (a bare ``` or ```lang).
+        int lineEnd = doc.IndexOf('\n', fenceStart);
+        int bodyStart = lineEnd < 0 ? doc.Length : lineEnd + 1;
+
+        int fenceEnd = doc.IndexOf("```", bodyStart, StringComparison.Ordinal);
+        Assert.True(fenceEnd >= bodyStart, "no closing code fence for the allowlist block in the design doc.");
+
+        string body = doc.Substring(bodyStart, fenceEnd - bodyStart);
+        var paths = body
+            .Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.StartsWith("/"))
+            .ToList();
+        return paths;
     }
 
     // ── shared helper ───────────────────────────────────────────────────────
