@@ -309,6 +309,22 @@ body.kmb-page-expanded #events-calendar .events-calendar-grid {
   min-height: 0;
   grid-auto-rows: minmax(0, 1fr);
 }
+/* While expanded, the full-screen buttons are redundant — the surface
+   already owns the whole page — so the board's ⛶-zoom and the calendar's
+   full-screen toggles hide (the ✕ close stays; the native Esc also exits). */
+body.kmb-page-expanded .kanban-fullscreen-toggle,
+body.kmb-page-expanded .calendar-fullscreen-toggle {
+  display: none;
+}
+/* The same padding as each surface's full-screen mode (.kanban-board:
+   fullscreen's 1rem / #events-calendar:fullscreen's 1.5rem), so the two
+   modes are indistinguishable apart from the browser chrome. */
+body.kmb-page-expanded .kanban-board {
+  padding: 1rem;
+}
+body.kmb-page-expanded #events-calendar {
+  padding: 1.5rem;
+}
 /* The ✕ close button: hidden normally, fixed top-right while expanded. */
 .page-expand-close {
   display: none;
