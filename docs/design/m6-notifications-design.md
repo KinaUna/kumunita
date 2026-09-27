@@ -324,9 +324,15 @@ count** (a Bootstrap `badge text-bg-danger` on the bell icon in the
 `_AccountNav` partial); **the dropdown is a plain `fetch` + DOM render** (the
 `client/lib/api.ts` CSRF-aware fetch shape). **No live update in M6** (a
 WebSocket / SSE lane is a follow-on lane; the 30-second poll is the "good
-enough" shape for a neighborhood-scale platform). *Forbids:* a WebSocket, SSE,
-or push mechanism; a new UI dependency. *Precedent reused:* the
-`client/lib/api.ts` CSRF-aware fetch shape and the ADR 0031 tsc-only pin.
+enough" shape for a neighborhood-scale platform). *ADR 0103 amends the
+dropdown's link shape:* each item's label is the row's body with the per-row
+toggle text (ADR 0096) stripped, and each item deep-links to the inbox row's
+anchor (`/notifications#notif-{id}`); landing on that row auto-marks it read
+(the ADR 0096 single-row lane, 404-tolerated) and highlights it (the ADR 0085
+D5 `.reply-highlight` flash) — that open-then-read behavior lives in
+`client/lib/notification-open.ts` (tsc-only, the same pin). *Forbids:* a
+WebSocket, SSE, or push mechanism; a new UI dependency. *Precedent reused:*
+the `client/lib/api.ts` CSRF-aware fetch shape and the ADR 0031 tsc-only pin.
 
 ### 5.11 Reuse, don't reinvent (D11)
 
