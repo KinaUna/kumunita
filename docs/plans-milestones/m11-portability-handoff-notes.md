@@ -557,3 +557,177 @@ Per the register's U03 entry reads:
   `MediaManifest = []`) U03 replaces.
 - `docs/design/m11-portability-design.md` — §layout (`media/` section
   pin), §manifest (`media_manifest` entry shape).
+
+---
+
+## U03 — Export: the media bytes + the manifest finalization
+
+### Exit status
+
+`dotnet build Kumunita.slnx -c Debug` → **green** (0 errors; Core + Web).
+The single warning `CS9113: Parameter 'mediaFileStore' is unread` on
+`PortabilityService`'s ctor is **expected** — U05/U06's import path
+(apply-media) consumes it; the warning disappears when `ImportAsync`
+lands. `Kumunita.Web.Tests` → **528 total, 0 failed**.
+`Kumunita.Core.Tests` → **956 total, 0 failed**.
+
+### Files written
+
+- **Created** `src/Kumunita.Core/Portability/MediaExport.cs` — the media
+  byte copy (D6 / C-M11·3): for every `MediaObject` in the catalog (read
+  via one `session.Query<MediaObject>().ToListAsync()` over a
+  `LightweightSession` — the same seam `IMediaStore` uses), `OpenReadAsync`
+  the payload bytes, guard the `size_bytes` + `content_type` integrity
+  (fail-closed at the source), and accumulate the `(media, manifest)` pair
+  (content id → payload bytes + the ordered
+  `List<PortabilityMediaEntry>`). The `media/` section layout itself
+  (`media/{Id[0..2]}/{Id}`) is applied by `KumunitaArchive.WriteAsync`
+  (U01's writer) — this unit hands it the bytes keyed by content id, the
+  same key the archive writer + U05's validator use.
+- **Created** `src/Kumunita.Core/Portability/ManifestFinalize.cs` — the
+  `manifest.json` finalize (C-M11·1 / §manifest): `Build(communityName,
+  docCounts, mediaManifest, generatedAt)` → the exact locked
+  `PortabilityManifest` field set, no more no less.
+- **Modified** `src/Kumunita.Core/Portability/PortabilityService.cs` — the
+  `ExportAsync` body completes: U02's docs + principals + config, then
+  `MediaExport.ExportAsync(documentStore, mediaStore, ct)` →
+  `ManifestFinalize.Build(…)` → `KumunitaArchive.WriteAsync(…)`, one
+  `ExportAsync` producing a complete `*.kumunita` archive stream (position
+  reset to 0 for the U04 stream surface). `ImportAsync` still throws
+  `NotImplementedException` (U05–U06).
+
+### ⚠ U02 build-blocker fixed in the same pass (out-of-unit, documented)
+
+**U03's deliverables are complete, but the build was RED on a file outside
+U03's scope — U02's committed `PortabilityExportDocuments.cs`** (two
+reflection-dispatch bugs U02's "green" handoff note did not catch):
+
+1. `QueryMethod.MakeGenericType(docType)` — `MakeGenericType` is a
+   `Type` method, not a `MethodInfo` one (it must be
+   `MakeGenericMethod`). CS1061.
+2. `var listTask = (Task)ToListAsyncMethod…Invoke(…)!; …
+   await listTask` — awaiting the **non-generic** `Task` yields `void`,
+   then casting `void` to `IList` (CS0030). The terminal returns a
+   **typed** `Task<IReadOnlyList<T>>` (confirmed against the real Marten
+   9.31.2 DLL: `Marten.QueryableExtensions.ToListAsync<T>(IQueryable<T>,
+   CancellationToken) -> Task<IReadOnlyList<T>>`).
+
+**Fix applied (source-faithful — restores exactly what U02 intended, the
+same uniform reflection loop, no behavior change):** keep the boxed
+`Task<IReadOnlyList<T>>` object (don't drop the result with a non-generic
+`Task` cast), `await` it for completion, then read its `Result` property
+off the concrete task type. This is a **U02 file** (already committed in
+`d02aba4`); it was the hard blocker for U03's "green build + both suites"
+exit criterion, so it was resolved rather than escalated (AGENTS.md "stop
+only on a real blocker" — this was the blocker, and the fix is
+deterministic + grounded in the probed API, not a guess). **No** U02
+behavior changed: same 44-entry loop, same JSON round-trip, same
+`docCounts`. U07's round-trip test will witness the runtime path end-to-end.
+
+### Media-copy entry count (matches the catalog)
+
+The loop iterates **every `MediaObject` in the catalog** (the
+`docs/MediaObject.json` rows — order-3 entry of the D7 registry). The
+`media` dict has one entry per catalog row (content id → payload bytes);
+the `media_manifest` list has one `PortabilityMediaEntry` per catalog row
+(manifest order = catalog order). **Count = the number of `MediaObject`
+rows in the store** — not a fixed number (it is data, not a constant).
+
+### Media-manifest field set (the C-M11·3 locked shape — U05 copies verbatim)
+
+`PortabilityMediaEntry` (in `KumunitaArchive.cs`, U01) carries **exactly**
+three fields — the §manifest `{ id, size_bytes, content_type }` set:
+
+| Field | Source |
+|-------|--------|
+| `Id` | `MediaObject.Id` (the lowercase-hex SHA-256 content hash — the archive path `media/{Id[0..2]}/{Id}`) |
+| `SizeBytes` | `MediaObject.SizeBytes` (guarded: the read payload's `LongLength` must equal it) |
+| `ContentType` | `MediaObject.ContentType` (guarded: non-blank) |
+
+**Fail-closed guards added (C-M11·3 "both present or rejected", export
+side):** a catalog row with a blank `ContentType`, or whose read payload
+byte-length ≠ `SizeBytes`, throws `InvalidOperationException` before any
+archive bytes are written — the export never ships a catalog doc whose
+bytes it cannot carry (the complement of U05's §validate (d) reject).
+
+### Finalized manifest field set (the §manifest locked shape — U05 copies verbatim)
+
+`ManifestFinalize.Build` → `PortabilityManifest` with **exactly** the
+locked fields:
+
+| Field | Value |
+|-------|-------|
+| `Format` | `PortabilityManifest.FormatVersion` = **`kumunita/portability/1`** (the C-M11·1 authority) |
+| `GeneratedAt` | `DateTimeOffset.UtcNow` (a witness, not a decision) |
+| `CommunityName` | `CommunityOptions.Name` (the §config instance identity) |
+| `DocCounts` | U02's `docCounts` (one entry per §inventory content doc type) |
+| `MediaManifest` | U03's `mediaManifest` (one entry per catalog `MediaObject`) |
+
+### `ExportAsync` public signature (U04 web surface + U07 test target verbatim)
+
+```csharp
+Task<Stream> ExportAsync(string actorId, CancellationToken ct = default);
+```
+
+`actorId` is the GlobalAdmin actor's `subjectId` (the one-audit-row actor,
+emitted by the service in U04 — the controller adds none). The returned
+`Stream` is a `MemoryStream` positioned at 0 holding the complete
+`*.kumunita` ZIP (manifest + docs + media + identity + config).
+
+### Drift from the plan's text
+
+1. **The `media/` section layout is applied by `KumunitaArchive` (U01),
+   not `MediaExport`.** The unit plan says `MediaExport` "writes them into
+   the archive at the `{Id[0..2]}/{Id}` layout (the `KumunitaArchive`
+   writer's media seam)". Resolved in favor of U01's actual seam: the
+   archive writer already maps content id → `media/{Id[0..2]}/{Id}`
+   (U01's `MediaEntryName`), so `MediaExport` hands it the id → bytes
+   dict (not raw file writes). Same C-M11·3 outcome (byte-identical
+   layout), fewer duplicated layout rules.
+2. **The media manifest list type is `List<PortabilityMediaEntry>`, and
+   `ManifestFinalize.Build` takes `IReadOnlyList<PortabilityMediaEntry>`**
+   (the unit plan's "the media manifest (from U03)" is type-neutral). The
+   `PortabilityManifest.MediaManifest` property (U01) is
+   `List<PortabilityMediaEntry>`; `Build` copies the input list into a
+   fresh `List<>` (no shared reference between the finalize input and the
+   manifest).
+3. **The `size_bytes` / `content_type` guards are new** (not in the unit
+   plan's literal text) — they enforce the C-M11·3 "both present or
+   rejected" pin at the export source (a null/blank `ContentType` or a
+   length mismatch would otherwise round-trip silently into a manifest
+   that U05's §validate (d) would reject anyway; failing at the source is
+   the stricter, earlier guard). No invariant contradicted.
+
+### Compile warnings
+
+- 1× `CS9113: Parameter 'mediaFileStore' is unread` on
+  `PortabilityService` — **expected** (U05/U06 consume it; the warning
+  disappears when the import apply-media path lands).
+- The U02 `CS9113` on `documentStore` / `userManager` / `appDbContext` /
+  `communityOptions` are **resolved** (the `ExportAsync` body reads them
+  all).
+- **No new packages.** `Kumunita.Core.csproj` is untouched (the
+  `System.IO.Compression` / `System.Text.Json` BCL pin holds; D2).
+
+### Next unit's entry reads (U04 — the web surface + `portability.export` audit + the kw-l keys)
+
+Per the register's U04 entry reads (plus U03's actual seams):
+- `src/Kumunita.Core/Portability/PortabilityService.cs` — the complete
+  `ExportAsync(string actorId, CancellationToken)` (the U04 stream
+  target; the service is where the one `portability.export` audit row is
+  emitted — the controller adds none, ADR 0105 shape).
+- `src/Kumunita.Core/Portability/KumunitaArchive.cs` — the
+  `PortabilityManifest` POCO (the `Format` / `GeneratedAt` /
+  `CommunityName` / `DocCounts` / `MediaManifest` field set U04's
+  response headers / the U07 pins read).
+- `src/Kumunita.Web/Controllers/` (an ADR 0101/0105 GlobalAdmin admin
+  controller — the `[Authorize(Roles = GlobalAdmin)]` + one-audit-row
+  house shape to mirror) + the `Content-Disposition: attachment` streaming
+  shape (`AttachmentController` / the ADR 0034 attachment lane) the
+  `export` action reuses for the `File(stream, "application/octet-stream",
+  "kumunita.kumunita")` response.
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` + the 4-language
+  parity test — the `portability.*` kw-l insertion point (the D10 list ×
+  4 languages).
+- `src/Kumunita.Core/Identity/AccessAudit.cs` + the `AccessVia.Admin` /
+  `TargetKind` shapes (the one-audit-row contract the service emits).

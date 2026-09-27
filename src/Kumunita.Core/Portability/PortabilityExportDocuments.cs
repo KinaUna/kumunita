@@ -146,11 +146,18 @@ public static class PortabilityExportDocuments
             // resolved Type — the "not per-type code" pin):
             //   IQuerySession.Query<T>() → IMartenQueryable<T> (a real IQueryable<T>)
             //   Marten.QueryableExtensions.ToListAsync<T>(IQueryable<T>, CancellationToken)
-            //     → Task<List<T>>
-            var queryable = (IQueryable)QueryMethod.MakeGenericType(docType).Invoke(session, null)!;
-            var listTask = (Task)ToListAsyncMethod.MakeGenericMethod(docType)
+            //     → Task<IReadOnlyList<T>> (the concrete materialized value is a List<T>)
+            //
+            // Both dispatches are reflection-driven on the resolved Type (the
+            // "not per-type code" pin). The terminal returns Task<IReadOnlyList<T>>
+            // — a typed Task — so we keep the boxed object (not a cast to the
+            // non-generic Task, which would drop the result) and read its Result
+            // property off the concrete Task<IReadOnlyList<T>> after it completes.
+            var queryable = QueryMethod.MakeGenericMethod(docType).Invoke(session, null)!;
+            var listTask = ToListAsyncMethod.MakeGenericMethod(docType)
                 .Invoke(null, new object?[] { queryable, ct })!;
-            var list = (System.Collections.IList)(await listTask.ConfigureAwait(false))!;
+            await ((Task)listTask).ConfigureAwait(false);
+            var list = (System.Collections.IList)listTask.GetType().GetProperty("Result")!.GetValue(listTask)!;
 
             // Generic JSON round-trip: one Serialize over the List<T> (the
             // same options as KumunitaArchive.ToJson<T>).

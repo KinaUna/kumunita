@@ -91,28 +91,23 @@ public sealed class PortabilityService(
     /// <inheritdoc />
     public async Task<Stream> ExportAsync(string actorId, CancellationToken ct = default)
     {
-        // U02 (this unit) — the docs + the no-secret principals + the config
-        // (the media bytes + the manifest finalize are U03's — the reserved
-        // seam below).
+        // U02 — the docs + the no-secret principals + the config.
         var (docs, docCounts) = await PortabilityExportDocuments.ExportAsync(documentStore, ct);
         var principals = await PrincipalsExport.ExportAsync(appDbContext, userManager, documentStore, ct);
         var config = await ConfigExport.ExportAsync(documentStore, communityOptions, ct);
 
-        // U03 — the media bytes (the `media/` section) + the manifest finalize
-        // (the `format` / `generated_at` / `community_name` / `doc_counts` /
-        // `media_manifest` head). Until U03 lands, this is a minimal
-        // placeholder (the media section empty, the manifest's doc counts
-        // populated, the media manifest empty) so the archive is
-        // structurally complete over the three U02 sections.
-        var media = new Dictionary<string, byte[]>();
-        var manifest = new PortabilityManifest
-        {
-            Format = PortabilityManifest.FormatVersion,
-            GeneratedAt = DateTimeOffset.UtcNow,
-            CommunityName = communityOptions.Value.Name,
-            DocCounts = docCounts,
-            MediaManifest = [],
-        };
+        // U03 (this unit) — the media bytes (the `media/` section, the
+        // `{Id[0..2]}/{Id}` content-addressed layout the C-M11·3 pin) + the
+        // media manifest + the manifest finalize (the `format` /
+        // `generated_at` / `community_name` / `doc_counts` / `media_manifest`
+        // head). After this the export produces a complete, valid
+        // `*.kumunita` archive (the U04 web surface just streams it).
+        var (media, mediaManifest) = await MediaExport.ExportAsync(documentStore, mediaStore, ct);
+        var manifest = ManifestFinalize.Build(
+            communityOptions.Value.Name,
+            docCounts,
+            mediaManifest,
+            DateTimeOffset.UtcNow);
 
         var stream = new MemoryStream();
         await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
