@@ -930,20 +930,8 @@
        content/reply notification link carries). On load, if the URL hash is a
        reply anchor (#reply-{id}), scroll that reply into view and flash the
        .reply-highlight CSS (a tinted background + a soft outline that fades).
-       No module import needed — a plain inline script reading location.hash
-       and the DOM. *@
-    <script type="module">
-        (function highlightReplyFromHash() {
-            var hash = window.location.hash || "";
-            if (!hash.startsWith("#reply-")) return;
-            var el = document.getElementById(hash.slice(1));
-            if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("reply-highlight");
-            // Auto-clear after the flash (the CSS animation owns the fade;
-            // the class removal is the belt-and-suspenders reset so a
-            // re-click can re-trigger it).
-            window.setTimeout(function () { el.classList.remove("reply-highlight"); }, 4000);
-        })();
-    </script>
+       Lives in client/lib/reply-highlight.ts (tsc-built, the OPS §10
+       no-inline-script rule — the app CSP is script-src 'self' with no
+       'unsafe-inline', so an inline <script> here would be blocked). *@
+    <script type="module" src="~/js/lib/reply-highlight.js"></script>
 }

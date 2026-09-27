@@ -167,11 +167,14 @@ exactly "the id is in scope but the resident is not handed the address").
 **D5 — The post-detail reply gets an `id="reply-{id}"` anchor + a
 hash-match scroll-and-highlight.** `Views/Posts/Detail.cshtml` sets
 `id="reply-@r.Id"` on each reply `<li>` (the id that the `post.reply` link's
-`#reply-{replyId}` fragment points at). A new `@section Scripts` inline
-module reads `location.hash`; when it is a `#reply-{id}` anchor, it finds the
-matching element, `scrollIntoView({ behavior: "smooth", block: "center" })`
-it, and adds a `.reply-highlight` class (removed after 4 s so a re-click can
-re-trigger). The `.reply-highlight` CSS (in `wwwroot/css/site.css`) is a
+`#reply-{replyId}` fragment points at). A new `@section Scripts` module
+(`client/lib/reply-highlight.ts`, tsc-built — the app's CSP is `script-src
+'self'` with no 'unsafe-inline' (OPS §10), so this is a self-hosted module,
+not an inline `<script>`; the same `client/*.ts` pattern as
+`translation-swap.ts`) reads `location.hash`; when it is a `#reply-{id}`
+anchor, it finds the matching element, `scrollIntoView({ behavior: "smooth",
+block: "center" })` it, and adds a `.reply-highlight` class (removed after 4
+s so a re-click can re-trigger). The `.reply-highlight` CSS (in `wwwroot/css/site.css`) is a
 tinted background + a soft primary outline that fades over ~1.5 s via a
 `@keyframes`, with a `prefers-reduced-motion: reduce` fallback to a static
 tint (the fade is gated; the color still lands). *Forbids:* a server-rendered
