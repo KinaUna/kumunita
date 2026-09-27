@@ -247,9 +247,10 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // adds the two admin-lane kinds — account.signup / account.verified;
         // ADR 0083 adds the two group-membership kinds — group.added /
         // group.invite; ADR 0084 adds the three per-target subscription
-        // kinds — announcement / community.post / page.child).
+        // kinds — announcement / community.post / page.child; ADR 0105
+        // (M9) adds message.new — the direct-messaging nudge kind).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(16, vm.AllKinds.Count);
+        Assert.Equal(17, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

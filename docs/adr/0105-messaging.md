@@ -135,7 +135,10 @@ calls the **existing** `NotificationService.EmitAsync` (the 9-arg
 overload) for the *other* participant: kind **`message.new`** (one new
 constant on the closed `NotificationKinds` set — the ADR
 0077/0083/0084 append precedent; not in `OptInKinds`, so opt-OUT
-default = enabled), idempotency key **`notification:message.new:{messageId}`**
+default = enabled; **also in the `Known` list** — the settings-page
+closed set — so the recipient owns a per-kind mail toggle and a stored
+preference list cannot silently suppress this kind's mail; the
+`AllKinds.Count` pin re-pinned 16 → 17), idempotency key **`notification:message.new:{messageId}`**
 (stable, content-derived — the ADR 0076 D4 dedup anchor; a re-emission
 is a no-op), `linkPath = /messages/{conversationId}` (ADR 0085 — stored
 relative, rendered as inbox link + absolute email link), `targetId =

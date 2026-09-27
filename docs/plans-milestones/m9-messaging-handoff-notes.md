@@ -943,12 +943,54 @@ not re-derive the register.
   immutable); **read receipts / delivery confirmation** (the M6
   deferral, unchanged); **group messaging** (the ADR 0013 membership
   lane is the entry — a follow-on surface, not a widening of M9's
-  participant-by-id shape); **`message.new` on the notification
-  settings page** (its `NotificationKinds.Known` entry, the 16 → 17
-  re-pin) — U06's drift note 1 records the pin as shipped (16) and this
-  Summary carries that forward: re-pin in the lane that adds it.
+  participant-by-id shape). ~~**`message.new` on the notification
+  settings page**~~ — **shipped post-close** (see the
+  "## Post-close" section below): `MessageNew` now joins
+  `NotificationKinds.Known` (17 entries) and the `AllKinds.Count` pin is
+  re-pinned 16 → 17 — the resident owns the per-kind mail toggle.
 - **Milestone state:** M9 is **done**; the single-in-progress pointer is
   **M10 (PWA and responsive design)**; M11–M14 remain planned. The
   doc-parity trio (README ↔ `Milestones.cs` ↔ `MilestonesTests.cs`) moved
   together in this unit. **This `## Summary` is the last line the handoff
   note receives — the M9 milestone is closed.**
+
+## Post-close — `message.new` joins `Known` (the U06 drift note 1 lane, shipped)
+
+- **Entry state:** U06's drift note 1 recorded that `NotificationKinds
+  .MessageNew` (ADR 0105 D6) was defined but **not** appended to the
+  `Known` closed set, and that U07 must not re-pin `AllKinds.Count`
+  (16) — the settings page had no `message.new` toggle.
+- **Why the lane was pulled forward (the seam audit):** the verification
+  pass over the closed M9 surface found the consequence U06 had only
+  recorded: a recipient who stores *any* per-kind preference gets a
+  non-empty `KindsEnabled` list, and `EmailEnabledForAsync`
+  (`NotificationService.cs`) suppresses email for any kind not in that
+  list — so `message.new` mail was **silently suppressed for exactly the
+  residents who had customized their notifications**, with no settings
+  toggle to fix it. That is a broken feedback loop (the philosophy's
+  "a signal with no owner and no response decays into noise"), not a
+  missing feature.
+- **What shipped (2 lines + 1 pin):**
+  1. `src/Kumunita.Core/Notifications/NotificationKinds.cs` — `MessageNew`
+     appended to `Known` (17 entries). It remains **outside
+     `OptInKinds`**, so the default stays opt-OUT / enabled — matching
+     the design doc §D6 and the `MessageNew` constant's own doc comment
+     ("not in `OptInKinds`").
+  2. `tests/Kumunita.Web.Tests/NotificationsControllerTests.cs` — the
+     `AllKinds.Count` pin re-pinned 16 → 17 (the sanctioned re-pin U06's
+     drift note 1 held in escrow for "the lane that adds it").
+- **What did not ship:** no new code path, no new key (the
+  `notifications.kind.message.new` + `notification.message.new.*` keys
+  already landed in U03/U04), no view change (the preferences view
+  renders `NotificationKinds.Known` generically — the toggle appears
+  automatically with the label "New message" / "Neue Nachricht" /
+  "Nouveau message" / "Ny besked").
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Web.Tests` **521/521** (the re-pinned count passes; no other
+  test references `Known` membership); Core assembly unaffected (nothing
+  there pins `Known` membership — `MessagingServiceTests` 14/14 within
+  the 956/956 run of the closed surface).
+- **Net effect:** the resident now has the per-kind mail toggle for
+  `message.new` on `/notifications/preferences`, and a stored preference
+  list can no longer silently suppress message mail — the loop is closed
+  and the resident owns the signal.

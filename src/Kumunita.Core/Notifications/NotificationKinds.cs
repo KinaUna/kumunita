@@ -148,6 +148,6 @@ public static class NotificationKinds
         EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
-        Announcement, CommunityPost, PageChild,
+        Announcement, CommunityPost, PageChild, MessageNew,
     ];
 }
