@@ -461,3 +461,183 @@ reads — it does not re-derive the register.
 - **Next:** U03 (see `in-progress/pwa-responsive-u03.md` — the
   install affordance: `client/lib/pwa-install.ts` + the `_Layout`
   script tag + the SW registration call).
+
+## U03 — install affordance: `client/lib/pwa-install.ts` + the `_Layout` wiring
+
+- **Files written:**
+  - `src/Kumunita.Web/client/lib/pwa-install.ts` (new) — the §install
+    contract rendered: the guard on
+    `typeof window === 'undefined'`, the guarded SW registration
+    (`'serviceWorker' in navigator` →
+    `navigator.serviceWorker.register('/sw.js')` with the rejection
+    absorbed via `.catch(() => undefined)`), the
+    `window 'beforeinstallprompt'` listener (`preventDefault()` +
+    stash + reveal the affordance), the click path
+    (`stored.prompt()` + `await stored.userChoice`), the
+    `window 'appinstalled'` listener (removes the affordance), and the
+    no-op path (no `beforeinstallprompt` → nothing renders, nothing
+    logs; an untrusted / synthetic event — no `prompt()` function —
+    degrades to a no-op, the testable iOS-equivalent path). No
+    `export` at all (the ADR 0031 self-wiring shape, the
+    `flash-toast.ts` IIFE precedent). A local
+    `interface BeforeInstallPromptEvent extends Event` declares the
+    non-standard `prompt()` / `userChoice` pair (absent from the TS
+    DOM lib); the event is duck-typed
+    (`typeof (e as BeforeInstallPromptEvent).prompt !== 'function'`)
+    because the interface is not a runtime constructor (an
+    `instanceof` against it fails to compile — TS2693).
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — two additions,
+    both M10-commented:
+    1. In `<head>`-adjacent `<body>` top, just before the
+       `<script>` block: the hidden label source —
+       `<a id="pwa-install" class="btn btn-outline-primary btn-sm d-none"
+       href="#" aria-hidden="true"><kw-l key="pwa.install">Install
+       app</kw-l></a>` (the `kw-l` TagHelper resolves the label
+       server-side — the repo's no-client-side-`kw-l` rule — the
+       `data-ie-label-*` / `_RichEditorToggle` pattern; the `en`
+       inner text is the M·1 floor).
+    2. At the bottom of `<body>`, after the `expand-page.js` tag and
+       before `RenderSectionAsync("Scripts")`:
+       `<script type="module" src="~/js/lib/pwa-install.js"></script>`.
+  - `src/Kumunita.Web/wwwroot/js/lib/pwa-install.js` — emitted by the
+    tsc build (**4941 bytes**, the provenance witness).
+
+- **Event-listener set (the exact set, verbatim intent from the
+  design doc §install):**
+  - `navigator.serviceWorker.register('/sw.js')` — once, at module
+    init, guarded by `'serviceWorker' in navigator`; rejection
+    absorbed (a registration failure must never break the page).
+  - `window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)`
+    — `event.preventDefault()` + stash + reveal the affordance
+    (one element, cloned from the `#pwa-install` label source's
+    text).
+  - The affordance's own `click` — `preventDefault()` +
+    `storedEvent.prompt()` + `await storedEvent.userChoice` (the
+    resident's choice is the whole interaction — no banner, no
+    modal).
+  - `window.addEventListener('appinstalled', removeButton)` — the
+    affordance is gone; the OS home screen is the next surface.
+
+- **Affordance DOM shape (the locked D5 shape as implemented):**
+  `<a href="#" class="btn btn-outline-primary btn-sm" role="button"
+  aria-label="{pwa.install label}">{pwa.install label}</a>` with
+  inline `position: fixed; bottom: 1rem; right: 1rem; z-index:
+  1050;` (the locked §install style values). The label text is the
+  `pwa.install` `kw-l`-resolved string from the server-rendered
+  `#pwa-install` anchor — **the literal key never reaches the
+  resident** (the `kw-l` TagHelper's floor is the `en` source text
+  `Install app`, not the key).
+
+- **`tsconfig.json` glob check:** `include: ["client/**/*.ts"]`
+  covers `client/lib/pwa-install.ts` — the file was picked up
+  automatically, **no `tsconfig.json` edit** (no drift pause).
+
+- **Drift pause (one, flagged for U00's drift log at U07):**
+  the design doc §install step 2 says the **module** "renders one
+  quiet affordance — a single `<a>`-styled button (… the
+  `pwa.install` `kw-l`-resolved label) appended to
+  `document.body`". The repo's standing rule (ADR 0103 / ADR 0105
+  both name it: "no client-side `kw-l` — the server-rendered HTML
+  already carries the localized text"; the `data-ie-label-*` /
+  `_RichEditorToggle` pattern is the locked precedent for
+  client-rendered elements with a localized label) forbids the
+  client resolving a `KnownTranslationKeys` key itself. These two
+  locked texts conflict: a pure client-side render cannot satisfy
+  "`pwa.install` `kw-l`-resolved label" under the no-client-side-
+  `kw-l` rule. **Resolution (the only shape satisfying both pins):**
+  the label source is server-rendered (`#pwa-install` anchor with a
+  `<kw-l>` TagHelper, hidden via `d-none`) and the module clones its
+  resolved text — exactly the `_RichEditorToggle` pattern the
+  `rich-editor.ts` comment names as the house shape for this
+  case. The module's observable behavior (one quiet fixed button,
+  resolved label, `appinstalled` removal, iOS no-op) is unchanged
+  from §install's locked text; the *mechanism* of the label
+  resolution moves server-side. No D-item text was rewritten; the
+  §install contract item in the drift guard ("the event-listener set
+  + the no-op rule + the `pwa.install` key's four language strings —
+  U03 copies verbatim") is met: the listener set, the no-op rule,
+  and the four language strings are all verbatim. **This is a
+  mechanism clarification, not a rescope** — but it is a drift-guard
+  entry, recorded here per the unit-series rule, and U07's close
+  should fold it into the design doc §drift log.
+
+- **Build (the mandatory order, both green):**
+  1. `npm --prefix src/Kumunita.Web run build` — green (tsc only;
+     the first pass had 4 TS errors — `instanceof` against a
+     non-runtime interface (TS2693) + `source` possibly-null
+     narrowing across the closure — fixed by the duck-type guard +
+     capturing `label` ahead of the closures; the second pass is
+     clean). Emitted: `wwwroot/js/lib/pwa-install.js`, **4941
+     bytes**.
+  2. `dotnet build Kumunita.slnx -c Debug` — green (1 pre-existing
+     warning in `Kumunita.Core.Tests` — `xUnit2013` in
+     `MessagingServiceTests.cs:204`, not this unit's).
+
+- **Test pins (the 5 `PwaManifestTests` still pass):**
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` — **526 tests, 0 failed** (U03 adds no
+  xUnit pins — the behavioral half is U06's Playwright spec).
+
+- **App smoke (`dotnet run` + the integrated browser at
+  `http://localhost:5123/` — the `http` launch profile's URL, not
+  the Playwright config's `5199`; the Playwright spec (U06) runs
+  against `5199`, the dev `dotnet run` against `5123` — a note for
+  U06's entry):**
+  - **SW registration** — `navigator.serviceWorker.getRegistration('/')`
+    is **non-null** in Chromium (`scope:
+    http://localhost:5123/`; `installing` / `waiting` / `active` all
+    `false` — the registration object is present + resolving,
+    which is what `ServiceWorker_Registered_In_Chromium`'s pin
+    needs; the `active` flip is a SW lifecycle timing question the
+    U06 spec should assert on `present` not on `active`). `/sw.js`
+    itself serves `200` with `text/javascript` (5567 bytes) —
+    `script-src 'self'` satisfied (C-M10·3).
+  - **The `#pwa-install` label source** — present in the DOM,
+    `class="btn btn-outline-primary btn-sm d-none"`,
+    `textContent.trim() === "Install app"` (the resolved `en`
+    value, not the literal `pwa.install` key) — the kw-l chain
+    resolved server-side (this session's effective language is
+    `en`).
+  - **The no-op path (before a prompt)** — no fixed-position install
+    button in the DOM (`document.querySelectorAll('a')` filtered by
+    `getComputedStyle(a).position === 'fixed'` returns `[]`) —
+    exactly the iOS / no-`beforeinstallprompt` state. **No console
+    error from the module** (the only console errors on the page
+    are three pre-existing `404 /profile/avatar/{guid}` for
+    sample-data residents with no avatar set — the `avatar.ts`
+    monogram fallback covers them; they exist on every page
+    regardless of M10 and are not this unit's surface).
+  - **The full affordance lifecycle (simulated in-page, the
+    `beforeinstallprompt` / `appinstalled` are Chromium-only APIs
+    the dev harness cannot natively fire):**
+    - A trusted-simulated `beforeinstallprompt` (an `Event` with a
+      `prompt()` + `userChoice` pair, `cancelable: true`):
+      `defaultPrevented === true`, the fixed button appears with
+      `text === "Install app"` + `class === "btn btn-outline-primary
+      btn-sm"` (the resolved label, the locked classes).
+    - `appinstalled`: the button is removed
+      (`buttonGone === true`) — the locked "it is gone" state.
+    - A second, **untrusted** synthetic `beforeinstallprompt` (a
+      bare `Event`, no `prompt()`): **no button appears**
+      (`noButton === true`) — the no-op path (C-M10·7) holds for
+      the synthetic / untrusted shape (the iOS-equivalent testable
+      path).
+  - **The CSP is untouched** — the compiled module is a same-origin
+    `js/lib/` asset; `Program.cs` was not modified (U02's drift
+    note holds).
+
+- **`tsconfig.json`:** not touched (the `client/**/*.ts` glob picks
+  the new file up automatically — confirmed by the tsc build
+  emitting `wwwroot/js/lib/pwa-install.js`).
+
+- **`site.css`:** not touched (the unit-series rule — the
+  responsive pass is U04/U05's; U03's surface is the module + the
+  layout).
+
+- **No `tsconfig.json` edit, no `tsconfig` drift pause** (the glob
+  covered the new file on the first build).
+
+- **Next:** U04 (see `in-progress/pwa-responsive-u04.md` — the
+  responsive pass: chrome + shared surfaces, the `site.css`
+  `@media (max-width: 767.98px)` half per §Responsive's U04
+  inventory).

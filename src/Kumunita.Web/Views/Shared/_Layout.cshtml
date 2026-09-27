@@ -199,6 +199,15 @@
             </div>
         </div>
     </footer>
+    @* M10 U03 (ADR 0107 D5/D10) — the PWA install affordance's label
+       source: hidden, server-rendered, and the `pwa.install` key's
+       label resolved here (the kw-l chain), so the client never
+       resolves a key (the repo's no-client-side-kw-l rule — the
+       data-ie-label-* / _RichEditorToggle pattern). pwa-install.ts
+       clones this anchor as the one quiet fixed button when the
+       browser fires beforeinstallprompt; it stays hidden (and the
+       module is a no-op) where the browser never fires it (iOS). *@
+    <a id="pwa-install" class="btn btn-outline-primary btn-sm d-none" href="#" aria-hidden="true"><kw-l key="pwa.install">Install app</kw-l></a>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
@@ -248,6 +257,12 @@
          (site.css does the filling/hiding). Self-guards on pages without
          either button, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/expand-page.js"></script>
+    <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
+         service-worker registration (client/lib/pwa-install.ts, tsc-built).
+         Registers /sw.js (U02's passive SW) and reveals the #pwa-install
+         label source as one quiet fixed button on beforeinstallprompt;
+         a clean no-op where the browser never fires it (iOS). -->
+    <script type="module" src="~/js/lib/pwa-install.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
