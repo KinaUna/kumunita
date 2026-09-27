@@ -29,11 +29,12 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M6** notifications | **shared awareness** — the platform reaches out to the resident where they are |
   | **M7** pagination and filtering | **navigation** — a growing archive stays browsable |
   | **M8** search | **understanding** — finding what already exists in the neighborhood's memory |
-  | **M9** PWA and responsive design | **portability of the surface** — the same platform in the resident's pocket |
-  | **M10** portability (import/export) | **outcome + world seams** — the loop closes *into* the residents' lives |
-  | **M11** iCal | **outcome + world seams** — events land in the calendars residents already check |
-  | **M12** logging and analytics | **feedback** — the operator sees how the platform is used |
-  | **M13** integration of Events and Projects | **coordination** — the two coordination surfaces interlock |
+  | **M9** messaging | **shared awareness ↔ understanding** — a direct 1:1 channel between residents; a signal finds its recipient without the public surface |
+  | **M10** PWA and responsive design | **portability of the surface** — the same platform in the resident's pocket |
+  | **M11** portability (import/export) | **outcome + world seams** — the loop closes *into* the residents' lives |
+  | **M12** iCal | **outcome + world seams** — events land in the calendars residents already check |
+  | **M13** logging and analytics | **feedback** — the operator sees how the platform is used |
+  | **M14** integration of Events and Projects | **coordination** — the two coordination surfaces interlock |
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
