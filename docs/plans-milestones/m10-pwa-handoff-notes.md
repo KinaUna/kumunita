@@ -188,3 +188,133 @@ reads — it does not re-derive the register.
   `0106` is the to-do self-assign lane).
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` green (docs only).
 - **Next:** U01 (see `in-progress/pwa-responsive-u01.md`).
+
+## U01 — static assets: manifest + icons + the `_Layout` link + the one key
+
+- **Files written:**
+  - `src/Kumunita.Web/wwwroot/manifest.webmanifest` (new) — the D3
+    locked field set + the 192/512 icon pair (512 `any maskable`).
+  - `src/Kumunita.Web/wwwroot/images/pwa/icon-192.png` (new, 3397 bytes,
+    192×192 RGBA, background-composited).
+  - `src/Kumunita.Web/wwwroot/images/pwa/icon-512.png` (new, 7098 bytes,
+    512×512 RGBA, background-composited).
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — one `<link
+    rel="manifest" href="~/manifest.webmanifest" />` added in `<head>`,
+    directly after the existing `<link rel="apple-touch-icon">` line
+    (the line-19 sibling the design doc named as the insertion site);
+    a comment names the M10 (ADR 0107 D3) provenance.
+  - `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — one new
+    key `pwa.install` in all four language tables (the en/de/fr/da
+    dictionaries' last entry, after the `search.*` block). Each entry
+    carries a `// M10 (ADR 0107 D10)` comment naming the unit. The
+    four `KnownTranslationKeys_ParityTests` pass unchanged (the × 4
+    parity invariant holds — confirmed by the 956-test Core suite run).
+  - `tests/Kumunita.Web.Tests/PwaManifestTests.cs` (new) — the three
+    U01 pins: `Manifest_Json_Parses_And_Has_Required_Fields`,
+    `Manifest_Icon_192_And_512_Exist_In_Repo`,
+    `Layout_Contains_Manifest_Link`. The class shape is
+    additive-friendly for U02's two SW pins + U06's two pins (one
+    private `RepoRoot` helper, one `[Fact]` per pinned name, no other
+    state to refactor).
+  - `.tmp/generate-pwa-icons.mjs` (new, gitignored per the AGENTS.md
+    `.tmp/` scratch discipline) — the D4 dependency-free icon generator
+    (Node + `node:zlib`; no `sharp` — `package.json` stays
+    typescript-only). Reads the source PNG (64×64 RGBA, verified),
+    resamples nearest-neighbor, composites over the locked
+    `--bs-body-bg` ground (`#fbfaf7`), writes the two target PNGs with
+    a minimal PNG encoder (filter-0 rows + `zlib.deflateSync`).
+    Re-runnable: `node .tmp/generate-pwa-icons.mjs`.
+
+- **Manifest exact field values as written** (verbatim from
+  `wwwroot/manifest.webmanifest`; the D3 locked text):
+  ```json
+  {
+    "name": "Kumunita",
+    "short_name": "Kumunita",
+    "start_url": "/",
+    "id": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#fbfaf7",
+    "theme_color": "#1c4532",
+    "icons": [
+      { "src": "/images/pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+      { "src": "/images/pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    ]
+  }
+  ```
+  The two hexes were copied verbatim from `site.css` `:root`
+  (`--bs-body-bg: #fbfaf7` line 78, `--bs-primary: #1c4532` line 106 —
+  verified at U01, matches U00's locked values; no drift).
+
+- **Icon provenance witness** (the D4 byte sizes):
+  - `src/Kumunita.Web/wwwroot/images/pwa/icon-192.png` — **3397 bytes**,
+    192×192, RGBA (bit depth 8, color type 6, filter 0, interlace 0 —
+    the minimal PNG encoder's output shape).
+  - `src/Kumunita.Web/wwwroot/images/pwa/icon-512.png` — **7098 bytes**,
+    512×512, same shape.
+  - Both composite the 64×64 logo over the locked `#fbfaf7` ground
+    (the maskable safe-zone is the full-bleed canvas — the design doc
+    §icons' locked text).
+  - Source: `src/Kumunita.Web/wwwroot/images/logo/kumunita_k_logo_64x64.png`
+    (the U00 drift-log entry (d) — the `apple-touch-icon` source).
+  - Generator script: `.tmp/generate-pwa-icons.mjs` (the
+    reproducibility note, not a runtime dependency; `package.json`
+    unchanged — typescript-only, no `sharp`).
+
+- **`pwa.install` key's four language strings (verbatim):**
+  - `en` `Install app`
+  - `de` `App installieren`
+  - `fr` `Installer l'application`
+  - `da` `Installér app`
+
+- **`_Layout` insertion line:** the new `<link rel="manifest"
+  href="~/manifest.webmanifest" />` is on the line directly after the
+  existing `<link rel="apple-touch-icon" ...>` line (the design doc's
+  named insertion site — the `_Layout.cshtml` line-19 sibling), with a
+  4-line comment naming the M10 (ADR 0107 D3) provenance. No other line
+  of the file was touched (the unit-series rule).
+
+- **Drift pauses flagged:** **none.** All locked values rendered
+  verbatim:
+  - The two `:root` hexes match U00's locked values exactly (drift-log
+    entry (c) — verified again at U01, no drift).
+  - The icon source file exists at the locked path (drift-log entry (d)
+    — verified, no drift).
+  - The icon generation script is dependency-free per the locked text
+    (the `package.json` is typescript-only — confirmed; no `sharp`
+    added).
+  - No D-item text was rewritten.
+
+- **Icon provenance check (the unit plan's exit step):** both PNGs are
+  the correct dimensions — the `PwaManifestTests
+  .Manifest_Icon_192_And_512_Exist_In_Repo` pin reads the PNG IHDR
+  bytes 16–24 (big-endian via `BinaryPrimitives.ReadInt32BigEndian` —
+  `BitConverter` is platform-order and the PNG spec is big-endian) and
+  asserts 192×192 / 512×512 respectively. The pin passes.
+
+- **Test notes (for U02's additive extension):**
+  - `PwaManifestTests` uses `System.Buffers.Binary.BinaryPrimitives`
+    (big-endian read) — U02 should not need it (the SW pins are
+    string/file-location pins, the ADR 0043 SP-U04 idiom).
+  - The house idiom for string containment is
+    `Assert.True(string.Contains(...))` — xUnit v3's
+    `Assert.Contains(string, string)` no longer exists (the v2
+    overload was removed; the v3 `Assert.Contains` expects an
+    `IAsyncEnumerable`). The U01 test file uses the `Assert.True(...)`
+    shape; U02 should mirror it.
+  - The `RepoRoot` private helper walks up from
+    `AppContext.BaseDirectory` to the dir holding `Kumunita.slnx` —
+    the house shape (`StaticPagesSP_U04Tests.ResolveLayout` /
+    `KwLRegistryConsistencyTests.ResolveViewsDir`), correct regardless
+    of the output depth. U02's two SW pins can reuse it.
+
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green;
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` — **524 tests, 0 failed** (the 3 U01 pins
+  pass); `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+  Kumunita.Core.Tests.dll` — **956 tests, 0 failed** (the registry
+  parity tests pass unchanged; the new key × 4 holds).
+- **Next:** U02 (see `in-progress/pwa-responsive-u02.md` — the service
+  worker: the 15-path allowlist + the versioning rule + the fall-
+  through; extend `PwaManifestTests.cs` with the two SW pins).

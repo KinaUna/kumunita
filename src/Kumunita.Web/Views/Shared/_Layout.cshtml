@@ -20,6 +20,12 @@
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
+    @* M10 (ADR 0107 D3) — the PWA web-app manifest: the installable app shell
+       (wwwroot/manifest.webmanifest — D3's closed field set + the 192/512
+       icon pair). Same-origin static asset, so script-src 'self' (C-M10·3) is
+       untouched; the install affordance (U03, pwa-install.ts) is the only
+       consumer of the beforeinstallprompt this enables. *@
+    <link rel="manifest" href="~/manifest.webmanifest" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>

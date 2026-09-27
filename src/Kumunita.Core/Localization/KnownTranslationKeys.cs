@@ -1618,6 +1618,12 @@ public static class KnownTranslationKeys
             ["search.scope.community"] = "Community",
             ["search.scope.groups"] = "Groups",
             ["search.empty.hint"] = "Find posts, events, pages and announcements by text — the results only show content you can already read.",
+
+            // M10 (ADR 0107 D10) — the one quiet install affordance's label
+            // (U03's pwa-install.ts renders it on beforeinstallprompt; the
+            // closed-key registry + KnownTranslationKeys_ParityTests enforce
+            // the × 4). D5: no banner, no modal — one button.
+            ["pwa.install"] = "Install app",
         };
 
     /// <summary>
@@ -3093,6 +3099,10 @@ public static class KnownTranslationKeys
             ["search.scope.community"] = "Gemeinschaft",
             ["search.scope.groups"] = "Gruppen",
             ["search.empty.hint"] = "Finde Beiträge, Events, Seiten und Ankündigungen nach Text — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
+
+            // M10 (ADR 0107 D10) — das eine stille Install-Affordance-Label
+            // (U03, pwa-install.ts). Kein Banner, kein Modal — ein Button.
+            ["pwa.install"] = "App installieren",
         };
 
     /// <summary>
@@ -4570,6 +4580,10 @@ public static class KnownTranslationKeys
             ["search.scope.community"] = "Communauté",
             ["search.scope.groups"] = "Groupes",
             ["search.empty.hint"] = "Retrouvez des publications, événements, pages et annonces par texte — seules les contenus que vous pouvez déjà lire s'affichent.",
+
+            // M10 (ADR 0107 D10) — le libellé du seul affordance d'installation
+            // (U03, pwa-install.ts). Pas de bannière, pas de modale — un bouton.
+            ["pwa.install"] = "Installer l'application",
         };
 
     /// <summary>
@@ -6040,6 +6054,10 @@ public static class KnownTranslationKeys
             ["search.scope.community"] = "Fællesskab",
             ["search.scope.groups"] = "Grupper",
             ["search.empty.hint"] = "Find indlæg, arrangementer, sider og meddelelser efter tekst — kun indhold, du allerede kan læse, vises.",
+
+            // M10 (ADR 0107 D10) — det ene stille installations-affordance
+            // (U03, pwa-install.ts). Ingen banner, ingen modal — én knap.
+            ["pwa.install"] = "Installér app",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
