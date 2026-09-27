@@ -1334,6 +1334,41 @@ public static class FirstBootSeeder
              "for announcements.\n\n" +
              "You can mark the whole inbox as read in one click. What you " +
              "follow and what you get by email is always up to you.\n"),
+            ("projects", "Projects",
+             "## Projects\n\n" +
+             "Projects is where the neighborhood's shared work lives — the " +
+             "to-dos you and your neighbors write down, who they're assigned " +
+             "to, and the boards that keep the whole picture visible.\n\n" +
+             "**Writing a to-do.** Open **Projects** in the top bar and start " +
+             "a new to-do. Give it a title, and a body if you need to explain " +
+             "the why. A to-do is a full piece of work on its own — it can be " +
+             "assigned to a neighbor, a group, or the community as a whole, " +
+             "and it can hold subtasks.\n\n" +
+             "**Assigning it.** A to-do with no assignee is on the table for " +
+             "anyone. Pick a neighbor and it lands in their list; pick a group " +
+             "and it lands in the group's. You can reassign it at any time — " +
+             "the assignment is always up to date with who you last chose.\n\n" +
+             "**Subtasks.** Break a big to-do into smaller ones with subtasks. " +
+             "A subtask is a full to-do — it has its own title, assignee, and " +
+             "status — but it stays kept under the parent, so the big picture " +
+             "and the pieces stay together.\n\n" +
+             "**Boards.** A board arranges to-dos in lanes. A lane can carry " +
+             "a status — a to-do moved into it picks that status up — and an " +
+             "optional limit on how many cards it holds. Use lanes to show " +
+             "where the work is at, not to gate it: moving a card is a view " +
+             "of the state, not a lock on it.\n\n" +
+             "**Waiting on.** A to-do can point at another one it's waiting " +
+             "on. That's a hint to the reader, not a rule — it doesn't block " +
+             "anyone, it just says \"this comes after that.\"\n\n" +
+             "**Comments.** Anyone who can see a to-do can leave a comment on " +
+             "it, and reply to comments, the way they would on a post.\n\n" +
+             "By default a to-do, a board, and a goal are visible to everyone " +
+             "in the community. You can narrow who can see it in the audience " +
+             "section, the same way you do for a post. What a to-do is " +
+             "written in, and who may translate it, follows the same rules as " +
+             "a post — see " +
+             "[Language](/pages/system/help/language) and " +
+             "[Translators](/pages/system/help/translator).\n"),
         ];
     }
 
@@ -1672,6 +1707,49 @@ public static class FirstBootSeeder
              "Du kannst das ganze Postfach mit einem Klick als gelesen " +
              "markieren. Was du folgst und was dir per E-Mail kommt, " +
              "entscheidest du allein.\n"),
+            ("projects", "Projekte",
+             "## Projekte\n\n" +
+             "Projekte ist der Ort für die gemeinsame Arbeit des Viertels — " +
+             "die Aufgaben, die du und deine Nachbarn aufgeschrieben habt — " +
+             "wem sie zugeteilt sind — und die Boards, die das Gesamtbild " +
+             "sichtbar halten.\n\n" +
+             "**Eine Aufgabe anlegen.** Öffne **Projekte** in der Leiste oben " +
+             "und starte eine neue Aufgabe. Gib ihr einen Titel, und einen " +
+             "Text, wenn du das Warum erklären willst. Eine Aufgabe ist in " +
+             "sich ein vollständiges Arbeitsvorhaben — sie kann einem Nachbarn, " +
+             "einer Gruppe oder der ganzen Gemeinschaft zugeteilt werden, " +
+             "und sie kann Unteraufgaben tragen.\n\n" +
+             "**Zuweisen.** Eine Aufgabe ohne Zuweisung liegt für jeden auf " +
+             "dem Tisch. Wähle eine Nachbarin oder einen Nachbarn, und sie " +
+             "landet in deren Liste; wähle eine Gruppe, und sie landet in " +
+             "der der Gruppe. Du kannst sie jederzeit umzuweisen — die " +
+             "Zuweisung ist immer aktuell mit der Person, die du zuletzt " +
+             "gewählt hast.\n\n" +
+             "**Unteraufgaben.** Zerlege eine große Aufgabe in kleinere mit " +
+             "Unteraufgaben. Eine Unteraufgabe ist eine volle Aufgabe — sie " +
+             "hat ihren eigenen Titel, ihre eigene Zuweisung und ihren " +
+             "eigenen Status — bleibt aber unter der übergeordneten Aufgabe, " +
+             "damit das große Bild und die Teile zusammen bleiben.\n\n" +
+             "**Boards.** Ein Board richtet Aufgaben in Spuren an. Eine Spur " +
+             "kann einen Status tragen — eine Aufgabe, die dort hingelegt " +
+             "wird, übernimmt diesen Status — und eine optionale Begrenzung " +
+             "für die Anzahl der Karten. Nutze Spuren, um zu zeigen, wo die " +
+             "Arbeit steht, nicht um sie abzugreifen: eine Karte zu bewegen " +
+             "ist eine Ansicht des Zustands, kein Schloss darauf.\n\n" +
+             "**Wartet auf.** Eine Aufgabe kann auf eine andere zeigen, auf " +
+             "die sie wartet. Das ist ein Hinweis für die Leserin, keine " +
+             "Regel — es blockiert niemanden, es sagt nur: \"Das kommt nach " +
+             "jenem.\"\n\n" +
+             "**Kommentare.** Jede Person, die eine Aufgabe sehen kann, kann " +
+             "dazu einen Kommentar hinterlassen und auf Kommentare antworten, " +
+             "wie bei einem Beitrag.\n\n" +
+             "Standardmäßig sind eine Aufgabe, ein Board und ein Ziel für die " +
+             "ganze Gemeinschaft sichtbar. Wer sie sehen darf, lässt sich in " +
+             "dem Empfängerbereich einschränken, so wie bei einem Beitrag. " +
+             "In welcher Sprache eine Aufgabe geschrieben ist und wer sie " +
+             "übersetzen darf, folgt denselben Regeln wie ein Beitrag — sie " +
+             "sehen unter [Sprache](/pages/system/help/language) und " +
+             "[Übersetzer](/pages/system/help/translator).\n"),
         ];
     }
 
@@ -1998,6 +2076,47 @@ public static class FirstBootSeeder
              "Tu peux marquer toute la boîte de réception comme lue d'un " +
              "seul clic. Ce que tu suis et ce qui t'arrive par e-mail " +
              "reste ton choix.\n"),
+            ("projects", "Projets",
+             "## Projets\n\n" +
+             "Les projets sont l'endroit où vit le travail partagé du quartier " +
+             "— les tâches que tu écris, à qui elles sont attribuées, et les " +
+             "tableaux qui gardent l'ensemble visible.\n\n" +
+             "**Écrire une tâche.** Ouvre **Projets** en haut de l'écran et " +
+             "crée une nouvelle tâche. Donne-lui un titre, et un corps si tu " +
+             "veux expliquer le pourquoi. Une tâche est en soi une unité de " +
+             "travail complète — elle peut être attribuée à un voisin, à un " +
+             "groupe, ou à toute la communauté, et elle peut porter des " +
+             "sous-tâches.\n\n" +
+             "**L'attribuer.** Une tâche sans assignation est posée pour " +
+             "tout le monde. Choisis un voisin et elle arrive dans sa liste ; " +
+             "choisis un groupe et elle arrive dans le sien. Tu peux la " +
+             "réattribuer à tout moment — l'assignation est toujours à jour " +
+             "avec la personne que tu as choisie en dernier.\n\n" +
+             "**Les sous-tâches.** Découpe une grande tâche en plus petites " +
+             "avec des sous-tâches. Une sous-tâche est une tâche complète — " +
+             "elle a son propre titre, sa propre assignation et son propre " +
+             "statut — mais elle reste sous la tâche principale, pour que la " +
+             "vue d'ensemble et les pièces restent ensemble.\n\n" +
+             "**Les tableaux.** Un tableau range les tâches en voies. Une voie " +
+             "peut porter un statut — une tâche qui y est posée reprend ce " +
+             "statut — et une limite optionnelle sur le nombre de cartes. " +
+             "Sers-toi des voies pour montrer où en est le travail, pas pour " +
+             "le bloquer : déplacer une carte est une vue de l'état, pas un " +
+             "cadenas dessus.\n\n" +
+             "**En attente de.** Une tâche peut pointer vers une autre dont " +
+             "elle dépend. C'est un indice pour le lecteur, pas une règle — " +
+             "elle ne bloque personne, elle dit simplement : \"ça vient après " +
+             "ça.\"\n\n" +
+             "**Les commentaires.** Quiconque peut voir une tâche peut y " +
+             "laisser un commentaire et répondre aux commentaires, comme sur " +
+             "un message.\n\n" +
+             "Par défaut, une tâche, un tableau et un objectif sont visibles " +
+             "par toute la communauté. Tu peux restreindre qui peut les voir " +
+             "dans la section public, comme pour un message. La langue dans " +
+             "laquelle une tâche est écrite et qui peut la traduire suit les " +
+             "mêmes règles qu'un message — voir " +
+             "[Langue](/pages/system/help/language) et " +
+             "[Traducteurs](/pages/system/help/translator).\n"),
         ];
     }
 
@@ -2302,6 +2421,43 @@ public static class FirstBootSeeder
              "for meddelelser.\n\n" +
              "Du kan markere hele indbakken som læst med ét klik. Hvad du " +
              "følger, og hvad du får på e-mail, bestemmer du selv.\n"),
+            ("projects", "Projekter",
+             "## Projekter\n\n" +
+             "Projekter er det sted, hvor nabolagets fælles arbejde bor — de " +
+             "opgaver, du og dine naboer skriver ned, hvem de er tildelt, og " +
+             "de brætter, der holder hele billedet synligt.\n\n" +
+             "**At skrive en opgave.** Åbn **Projekter** i bjælken øverst og " +
+             "start en ny opgave. Giv den en titel, og en tekst, hvis du vil " +
+             "forklare hvorfor. En opgave er i sig selv et helt stykke " +
+             "arbejde — den kan gives til en nabo, en gruppe, eller hele " +
+             "fællesskabet, og den kan bære underopgaver.\n\n" +
+             "**At tildele.** En opgave uden en tildeles ligger fremme for " +
+             "alle. Vælg en nabo, og den lander i deres liste; vælg en gruppe, " +
+             "og den lander i gruppens. Du kan tildele den om igen når som " +
+             "helst — tildelelsen er altid opdateret med den, du sidst " +
+             "vælgte.\n\n" +
+             "**Underopgaver.** Del en stor opgave op i mindre med " +
+             "underopgaver. En underopgave er en hel opgave — den har sin " +
+             "egen titel, sin egen tildelelse og sin egen status — men den " +
+             "bliver holdt under overopgaven, så det store billede og " +
+             "delene forbliver sammen.\n\n" +
+             "**Brætter.** Et bræt arrangerer opgaver i baner. En bane kan " +
+             "bære en status — en opgave, der lægges ind der, overtager den " +
+             "status — og en valgfri grænse for antallet af kort. Brug baner " +
+             "til at vise, hvor arbejdet står, ikke til at låse det: at flytte " +
+             "et kort er et billede af tilstanden, ikke et lås på det.\n\n" +
+             "**Venter på.** En opgave kan pege på en anden, den venter på. " +
+             "Det er en hint til læseren, ikke en regel — den blokerer " +
+             "ingen, den siger bare: \"det kommer efter det.\"\n\n" +
+             "**Kommentarer.** Alle, der kan se en opgave, kan skrive en " +
+             "kommentar til den og svare på kommentarer, som ved et indlæg.\n\n" +
+             "Som standard kan en opgave, et bræt og et mål ses af hele " +
+             "fællesskabet. Du kan indskrænke, hvem der kan se dem, i " +
+             "modtagerfeltet, som ved et indlæg. Hvilket sprog en opgave er " +
+             "skrevet på, og hvem der må oversætte den, følger de samme " +
+             "regler som et indlæg — se " +
+             "[Sprog](/pages/system/help/language) og " +
+             "[Oversættere](/pages/system/help/translator).\n"),
         ];
     }
 
@@ -2365,7 +2521,8 @@ public static class FirstBootSeeder
              "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
              "- [Admins](/pages/system/help/admins) — what a global admin does, and what keeps it in check\n" +
-             "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n\n" +
+             "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n" +
+             "- [Projects](/pages/system/help/projects) — to-dos, assignments, boards, and the neighborhood's shared work\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -2461,7 +2618,8 @@ public static class FirstBootSeeder
              "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
              "- [Administratoren](/pages/system/help/admins) — Was ein globaler Admin macht, und was die Rolle bremst\n" +
-             "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n\n" +
+             "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n" +
+             "- [Projekte](/pages/system/help/projects) — Aufgaben, Zuweisungen, Boards und die gemeinsame Arbeit des Viertels\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -2562,7 +2720,8 @@ public static class FirstBootSeeder
              "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
              "- [Administrateurs](/pages/system/help/admins) — Ce qu'un administrateur global fait, et ce qui freine le rôle\n" +
-             "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n\n" +
+             "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n" +
+             "- [Projets](/pages/system/help/projects) — les tâches, les attributions, les tableaux et le travail partagé du quartier\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -2660,7 +2819,8 @@ public static class FirstBootSeeder
              "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +
              "- [Administrerende](/pages/system/help/admins) — Hvad en global admin gør, og hvad der holder rollen i skak\n" +
-             "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n\n" +
+             "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n" +
+             "- [Projekter](/pages/system/help/projects) — opgaver, tildelelser, brætter og nabolagets fælles arbejde\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",
