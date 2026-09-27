@@ -271,8 +271,7 @@
                        stays the ONLY form-bound grant field (the single-
                        source pin) regardless of visibility. *@
                     <div id="audience-restricted" data-audience-panel
-                         class="audience-restricted"
-                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
+                         class="audience-restricted @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)">
                         @foreach (var m in modes)
                         {
                             var checkedMark =

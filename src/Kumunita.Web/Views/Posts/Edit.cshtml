@@ -201,8 +201,7 @@
                        ONLY form-bound grant field (the U11 / F13 single-
                        source pin) regardless of visibility. *@
                     <div id="audience-restricted" data-audience-panel
-                         class="audience-restricted"
-                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
+                         class="audience-restricted @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)">
                         <div class="form-label mt-2" style="font-weight:600;">
                             <kw-l key="posts.audience_combine">How the picks combine</kw-l>
                         </div>
