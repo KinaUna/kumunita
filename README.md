@@ -13,13 +13,14 @@ not a code concern.
 
 ## Status
 
-**M10 in progress** (PWA and responsive design);
-M1–M9 and all named lanes
+**M11 in progress** (portability — import/export);
+M1–M10 and all named lanes
 are done — identity, groups & delegation, directory & profiles, posts +
 moderation, multilingual (`ML`/`ML-UI`), rich content (`RC`), guardian
 controls (`GU`), pages (`PG`), events + calendar (`M4`/`GE`/`EV-DWM`),
-projects (`M5`), notifications (`M6`), pagination (`M7`), search (`M8`) and
-messaging (`M9`), on one server-rendered stack over a single Postgres.
+projects (`M5`), notifications (`M6`), pagination (`M7`), search (`M8`),
+messaging (`M9`) and PWA + responsive design (`M10`), on one
+server-rendered stack over a single Postgres.
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
 milestone-by-milestone breakdown is in the Roadmap below.
@@ -236,8 +237,8 @@ stays trivial and the authorization rules can grow freely.
 - **M7** — Pagination and filtering: the one canonical paging contract — a `HasMore` signal on every paged seam, the `FeedResult.Total` correction (candidate count, not page count), the shared `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, and the D7 filter-reset pin (the filter set is frozen — text search is M8). **Done** (ADR 0090).
 - **M8** — Search: one `/search` surface (a nav search box, anonymous + signed-in) over the four resident content surfaces (community + group posts, community + group events, pages, announcements): `all` renders the top 5 hits per surface (a search-box answer, no pager); a single surface renders a paged list on the M7 `HasMore` signal + the shared `_Pager` partial (the ADR 0090 hand-off — no new pager idiom); the `groups` scope is signed-in-only and rides the **frozen** ADR 0013 group seams (`CanSeeGroupAsync` / `CanSeeGroupFeedAsync` — a group the viewer can't see contributes no hit and no count; anonymous degrades silently to community, no 403); case-insensitive substring match over authored-in `Title` + `Body` with a truncated, HTML-escaped context window — **zero schema change** (no index, no migration, ADR 0004 §B untouched); zero new authorization surface (no new `AccessAction` / `AccessVia` / adapter); one aggregate audit row per (query, surface, scope) decision (`TargetKind = "search:<surface>"`, zero-candidate visits emit no row); the render surface is hits + `HasMore` only — never a `Total`/`HiddenCount`. **Done** (ADR 0091). *Deliberately not in M8 (follow-on lanes, own ADRs): search over UGC translations (ADR 0018's "language-scoped search" consequence), `tsvector` full-text search (a versioned migration by construction), the project-family surfaces (M5's scope — a one-line predicate when wanted).*
 - **M9** — Messaging: 1:1 resident messaging — a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; a new `Conversation` + `Message` doc in a new `Kumunita.Core.Messaging` context, participant-only access (no `Audience`, no `GlobalAdmin` break-glass — the `RecipientId`-style personal read, ADR 0076 D3 shape), a per-recipient read state, a "new message" nudge through the M6 `Notification` lane, one `LocaleSettings` admin toggle (a GlobalAdmin can enable or disable the surface instance-wide, the ADR 0101 shape), `message.*` `kw-l` keys × 4 languages, zero new `AccessAction` / `AccessVia` / adapter. **Done.** (ADR 0105)
-- **M10** — PWA and responsive design. **In progress.**
-- **M11** — Portability (import/export).
+- **M10** — PWA and responsive design. **Done.** (ADR 0107)
+- **M11** — Portability (import/export). **In progress.**
 - **M12** — iCal.
 - **M13** — Logging and analytics.
 - **M14** — Integration of Events and Projects.

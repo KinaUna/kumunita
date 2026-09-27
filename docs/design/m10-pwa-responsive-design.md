@@ -810,6 +810,43 @@ carries the per-unit entries):
   number confirmed free: **0107** (the index ran 0001–0106; `0106` is
   the to-do self-assign lane, the current highest — verified against
   `docs/adr/README.md`).
+- **U03 (2026-09-27) — the install-label resolution moved
+  server-side (mechanism clarification, not a rescope).** The §install
+  locked text says the *module* renders the `pwa.install`
+  `kw-l`-resolved label appended to `document.body`. The repo's
+  standing rule (ADR 0103 / ADR 0105 both name it; the
+  `data-ie-label-*` / `_RichEditorToggle` pattern is the locked
+  precedent) forbids the client resolving a `KnownTranslationKeys`
+  key itself. The resolution: the label source is **server-rendered**
+  (the `#pwa-install` anchor with a `<kw-l>` TagHelper in
+  `_Layout.cshtml`, hidden via `d-none`) and the module clones its
+  resolved text. The closed event-listener set, the no-op rule, and
+  the four language strings are all verbatim from §install — the
+  observable behavior (one quiet fixed button, the resolved label,
+  removal on `appinstalled`, the iOS no-op) is unchanged; only the
+  *mechanism* of the label resolution moves server-side. See
+  `m10-pwa-handoff-notes.md` § U03.
+- **U04 (2026-09-27) — the close-button hit-area pseudo-element
+  (mechanism clarification, not a rescope).** The §a11y Floor A rows
+  for the flash toast + the pinned announcement name "a `::before`
+  padding expansion — a 44×44 hit area at 360 px". Bootstrap 5.3's
+  `.btn-close` renders its glyph as a `background-image` (verified:
+  the `::before` `content` is `none`) — there is no `::before` glyph
+  to preserve, so the 44×44 hit-area expansion was implemented on
+  `::after` instead. The Floor A pin ("≥ 44×44 px hit area at 360 px")
+  holds exactly (verified live via `elementFromPoint`); only the
+  pseudo-element named in the locked text is not the one used. See
+  `m10-pwa-handoff-notes.md` § U04.
+- **U05 (2026-09-27) — the WYSIWYG split-view is 1-column-only
+  (mechanism clarification, not a rescope).** The §Responsive U05 row
+  references the existing "1 column on mobile, 2 columns on desktop"
+  comment — `.rc-editor` was **always** `grid-template-columns: 1fr`
+  at the class home; no 2-column state exists in the codebase. The
+  explicit `grid-template-columns: 1fr` rule under the 360 px block
+  is the **pin** (the witness), the same pattern as U04's "verified
+  existing" rows. The 1-column intent is met exactly; there was no
+  2-column mechanism to collapse. See `m10-pwa-handoff-notes.md`
+  § U05.
 - **U06 (2026-09-27) — the Playwright spec is authored + the
   author-not-run precedent recorded, not run.** The 9 Playwright
   pins in `e2e-pwa-responsive.spec.ts` are authored with the
@@ -826,6 +863,25 @@ carries the per-unit entries):
   the witness the Playwright runtime unit records when the `kumunita`
   fixture's `signup` / `login` are implemented. See
   `m10-pwa-handoff-notes.md` § U06.
+- **U07 (2026-09-27) — milestone close; drift log sealed.** The three
+  U03 / U04 / U05 entries above are folded into this log at the
+  close (their unit handoff entries already recorded them per the
+  unit-series rule; this is the drift-guard's fold, not a rewrite).
+  All are mechanism clarifications, not rescopes — no locked rule was
+  violated. One drift pause remains **open** (carried to the
+  deferred-lane list, not a drive-by fix): `Admin/Platform.cshtml:56`
+  — the one shipped `<table>` (3 columns, short cell content) lacking
+  a `.table-responsive` wrap (the other five shipped tables have it);
+  at 360 px it can overflow the viewport (the §Responsive tables row's
+  pinned failure). A follow-on lane (or U06's Playwright spec's
+  drift-pause assertion) should add the wrap. The deferred lanes
+  (PWA push; the tablet pass; offline authenticated pages; per-OS
+  adaptive icons; `screenshots` / `shortcuts` manifest enrichment)
+  each carry their own follow-on ADR under this doc's drift-guard.
+  The milestone is **sealed** (the M9 U07 close shape):
+  `m10-pwa-handoff-notes.md` `## Summary` is the last line the
+  handoff note receives; the unit plans U00–U06 all hold their own
+  files under `done/`.
 
 ## §the three acceptance tests (template)
 

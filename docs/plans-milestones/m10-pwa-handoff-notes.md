@@ -1241,10 +1241,173 @@ reads — it does not re-derive the register.
 - **No view / Core changes** (the unit-series rule — U06 is tests
   only).
 
-- **Next:** **U07 close** (see `in-progress/pwa-responsive-u07.md`)
-  — the milestone close-out: fold the U03 + U05 + U06 drift pauses
-  (the `Admin/Platform.cshtml:56` `.table-responsive` gap; the
-  WYSIWYG 1-column mechanism clarification; the U06 author-not-run
-  spec status) into the design doc §drift log, and close the
-  milestone (the `Milestones.cs` + README roadmap row + the
-  `MilestonesTests.cs` pin, if the milestone flips to done).
+## U07 — close: the milestone flip + the doc-parity trio + the drift-log fold
+
+- **Files flipped (the doc-parity trio + the drift fold — 5 files):**
+  - `src/Kumunita.Web/Milestones.cs` — the M10 row
+    `StatusNext` → `StatusDone`; the M11 row `StatusPlanned` →
+    `StatusNext` (the single-`StatusNext` invariant now points at M11);
+    M12–M14 stay `StatusPlanned`.
+  - `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the shipped-done
+    list gains M10; the single-`StatusNext` pin is retargeted to M11
+    + renamed `M10_Is_The_Single_InProgress_Milestone_And_M11_Through_
+    M14_Are_Planned` → `M11_Is_The_Single_InProgress_Milestone_And_M12_
+    Through_M14_Are_Planned` (the M9 U07 precedent's exact test-name
+    change pattern); the planned list is M12–M14; the exact-order pin
+    (M0…M14) is unchanged.
+  - `README.md` — the Status line: the "M10 in progress (PWA and
+    responsive design)" sentence moves to "M11 in progress (portability
+    — import/export); M1–M10 and all named lanes are done …"; the
+    Roadmap section: the M10 entry's `**In progress.**` → `**Done.**`
+    (citing ADR 0107) + the M11 entry's `**Planned.**` →
+    `**In progress.**`.
+  - `docs/STATUS.md` — the "M9 is done …; next is M10 — PWA and
+    responsive design. Then M11–M14" sentence becomes "M10 is done —
+    PWA and responsive design (ADR 0107); next is M11 — portability
+    (import/export). Then M12–M14 (iCal, logging & analytics,
+    Events+Projects integration — see the 'Roadmap' below)."
+  - `docs/design/m10-pwa-responsive-design.md` — the §drift log fold:
+    the U03 (install-label resolution moved server-side), U04 (close-
+    button hit-area `::after`-vs-`::before`), and U05 (WYSIWYG
+    1-column-only) mechanism clarifications are folded into the log
+    (chronological order: U00, U03, U04, U05, U06, U07); the U07 entry
+    names the one **open** drift pause (the
+    `Admin/Platform.cshtml:56` table lacking a `.table-responsive`
+    wrap — the other five shipped tables have it) as carried to the
+    deferred-lane list, and seals the log.
+  - `docs/ARCHITECTURE.md` — **no change** (the value-chain table
+    carries no status column, and M10 adds zero Core surface; the
+    register's "if present" wording is the pin — the row was read and
+    judged, not skipped).
+
+- **Unit-plan archive:** the seven unit plans U00–U06 all already hold
+  their own files under `docs/plans-milestones/done/` (U00–U06 each
+  moved their own file at their own exit — the M9 U07 precedent's "move
+  this unit's own plan file" step, applied per unit); U07's own plan is
+  authored directly at the close (the register's U07 convention — no
+  in-progress file to move) as
+  `docs/plans-milestones/done/pwa-responsive-u07.md`. After this close
+  `in-progress/` is empty and `done/` holds all seven `pwa-responsive-
+  u*.md` plans — the milestone's plan is fully archived.
+
+- **Exit (the green gate, both assemblies):**
+  - `dotnet build Kumunita.slnx -c Debug` — **green** (0 errors; the
+    1 pre-existing `xUnit2013` warning in `Kumunita.Core.Tests /
+    MessagingServiceTests.cs:204` is unchanged — not this unit's).
+  - `dotnet exec
+    tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    — **Total: 528, Errors: 0, Failed: 0** (`MilestonesTests` green
+    with the M11 single-in-progress pin retargeted; all 7
+    `PwaManifestTests` pins green).
+  - `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    — **Total: 956, Errors: 0, Failed: 0** (unchanged — M10 adds no
+    Core tests; the run is part of the green gate per the register's
+    test contract).
+
+## Summary
+
+- **The capability (M10, ADR 0107):** an installable PWA app shell —
+  the honest static `manifest.webmanifest` (the D3 closed field set,
+  no shortcuts / screenshots) + the two new icon PNGs
+  (192 / 512, the 512 `any maskable`) + the `<link rel="manifest">`
+  (U01); a GET-only, same-origin, closed-15-path-allowlist service
+  worker (`wwwroot/sw.js`) with the stale-while-revalidate
+  `kumunita-shell-v1` cache, the `activate` clear rule, and the exact
+  fall-through line — **never touching signed-in content** (the C-M10·2
+  privacy pin) (U02); the one quiet, localized install affordance
+  (`client/lib/pwa-install.ts`, the ADR 0031 self-wiring shape — the
+  SW registration call + the `beforeinstallprompt` / `appinstalled`
+  listeners + the iOS no-op) (U03); a single `@media (max-width:
+  767.98px)` phone-width pass over a **closed** surface inventory
+  (U04's chrome + shared half + U05's content + composer half) with
+  two pinned a11y floors (Floor A the ≥ 44×44 px hit areas, Floor B the
+  visible `:focus-visible` ring on the `.kmb-*` custom pieces)
+  (U04/U05); the 7 xUnit pins in `PwaManifestTests` + the 9 authored
+  Playwright pins in `e2e-pwa-responsive.spec.ts` (the M3 U13 / M4 U11
+  author-not-run precedent — the `kumunita` fixture is a documented
+  throw) (U06); the milestone flip + the doc-parity trio + the
+  drift-log fold (U07). **Zero Core change** (C-M10·6): no document, no
+  service seam, no audit verb, no schema, no `LocaleSettings` toggle.
+
+- **The seams (the FIG lens):** M10 adds **no** service seam, adapter,
+  or document — the design's "Seams & contracts" (the mandatory
+  section) is the honest "no new seams" answer, with the real
+  contracts (manifest / SW / install-module / responsive / a11y) each
+  named and test-pinned. The load-bearing contract of the milestone is
+  the **SW cache as a privacy boundary** (C-M10·2) — the direct
+  analogue of the access model's "most load-bearing contract" principle
+  in `docs/philosophy/in-code.md`: the negative pin (a signed-in route
+  is *not* cached) is the seam most tested. The FACES check names the
+  trade in full: *consumes a slice of stable (a new browser-side cache
+  to reason about) to gain adaptive + energizing (installability +
+  offline)*, priced in full here (the versioned cache name + the
+  `activate` clear + the negative pin) — "a design that claims no cost
+  has not priced it; this one does." The three acceptance tests
+  (closed-loop / handoff / part-vs-whole) all pass: the portability the
+  roadmap row names (the whole's value — "the same platform in the
+  resident's pocket") is what M10 delivers, bounded by the closed
+  allowlist + closed inventory + closed a11y lists + the one closed
+  key.
+
+- **The invariants (C-M10·1–8, as landed):** C-M10·1 (the manifest is
+  honest + complete) · C-M10·2 (the SW never caches signed-in content —
+  the negative pin) · C-M10·3 (the SW survives the CSP — same-origin
+  `wwwroot/` asset, `script-src 'self'` unchanged) · C-M10·4 (the
+  responsive pass is closed + pinned) · C-M10·5 (the two a11y floors
+  hold) · C-M10·6 (zero Core change) · C-M10·7 (the install affordance
+  is quiet + localized, no-op on browsers without an install path) ·
+  C-M10·8 (docs parity holds at the flip — **this close** is the render
+  of that invariant).
+
+- **The drift pauses (all mechanism clarifications, not rescopes —
+  folded into the design doc §drift log at this close):** the U03
+  install-label resolution moved server-side (the no-client-side-`kw-l`
+  rule); the U04 close-button hit-area pseudo-element (`::after` vs
+  the `::before` named in the locked text — Bootstrap's `.btn-close`
+  glyph is a `background-image`, not a `::before`); the U05 WYSIWYG
+  split-view is 1-column-only (no 2-column state exists to collapse).
+  One **open** drift pause is carried to the deferred-lane list (not a
+  drive-by fix): the `Admin/Platform.cshtml:56` table lacking a
+  `.table-responsive` wrap.
+
+- **The deferred lanes (each named, each a follow-on ADR under the
+  design doc §drift-guard):** **PWA push notifications** (the M6/M9
+  deferral notes' "push / PWA push (M9 owns PWA)" is now the M10
+  substrate's follow-on — a `PushManager` lane under ADR 0076) · **the
+  tablet responsive pass** (D6's single-breakpoint rule pins the phone
+  width; the 768–991 px `md` range is a polish lane) · **offline
+  authenticated pages** (C-M10·2's negative pin is the M10 contract;
+  lifting it is a follow-on lane with its own threat model) · **per-OS
+  adaptive icons** (D4's 512 `any maskable` is the W3C minimum;
+  Android's `any` + `maskable` split + iOS's `apple-touch-icon` 180×180
+  is a polish lane) · **`screenshots` / `shortcuts` manifest
+  enrichment** (D3's honesty pinned the manifest to the required
+  fields; the W3C optional fields are a follow-on lane).
+
+- **The Playwright spec's run-status:** **authored + the author-not-run
+  precedent recorded, not run** (the M3 U13 / M4 U11 precedent — the
+  `kumunita` fixture is a documented throw in `e2e-m2.spec.ts` /
+  `e2e-m3.spec.ts` / `e2e-m4.spec.ts` and this file; no M10 unit U0–U06
+  implements the runtime). The register § U06 Exit explicitly permits
+  this path (the spec is *authored + the precedent recorded*, not
+  retried). The *structural* half of every pin is exercised by the 7
+  xUnit pins in `PwaManifestTests`; the *behavioral* half (the 9
+  Playwright pins) is the witness the Playwright runtime unit records
+  when the `kumunita` fixture's `signup` / `login` are implemented.
+
+- **The M11 pointer:** the next milestone is **M11 — portability
+  (import/export)**, now the single `StatusNext` in `Milestones.cs`.
+  Its register (the `plan-m11-…` + unit plans) is **to be authored
+  when M11 kicks off** (this close flips the state; it does not author
+  the next register — the M9 U07 precedent's "next milestone's
+  register, when it is authored" wording). The M11 value-chain step is
+  already named in `docs/ARCHITECTURE.md` ("outcome + world seams — the
+  loop closes *into* the residents' lives").
+
+**The milestone is sealed.** This `## Summary` is the last line the
+handoff note receives. `in-progress/` is empty; `done/` holds all seven
+`pwa-responsive-u*.md` plans (U00–U06 + U07). The register
+`docs/plans-milestones/plan-m10-pwa-responsive.md` is **sealed** (the
+M9 U07 precedent's "sealed unit register" close, the
+`done/messaging-u07.md` shape).
