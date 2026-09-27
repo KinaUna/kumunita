@@ -34,12 +34,25 @@
     // A read of the signed-in resident's own row — never another resident's.
     string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
     string navAvatarInitial = string.Empty;
+    // The dropdown toggle's label: the resident's display name, falling back to
+    // their email when no name is set. Capped at 15 characters so the navbar
+    // toggle stays narrow — the full text survives in the title attribute, and
+    // when neither name nor email is available the translated "Account" key
+    // renders instead.
+    string navToggleLabel = string.Empty;
+    string navToggleLabelFull = string.Empty;
     if (!string.IsNullOrEmpty(navAvatarSubject))
     {
         var navProfile = await UserInfo.GetProfileAsync(navAvatarSubject);
         navAvatarInitial = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
             ? char.ToUpperInvariant(navProfile.DisplayName.TrimStart()[0]).ToString()
             : string.Empty;
+        navToggleLabelFull = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
+            ? navProfile.DisplayName.Trim()
+            : navProfile?.Email?.Trim() ?? string.Empty;
+        navToggleLabel = navToggleLabelFull.Length > 15
+            ? navToggleLabelFull[..15]
+            : navToggleLabelFull;
     }
 
     // The nav-bar language switcher: the enabled catalog (in SortOrder), and the
@@ -118,7 +131,14 @@
                         <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
                     </span>
                 }
-                <kw-l key="nav.account">Account</kw-l>
+                @if (!string.IsNullOrEmpty(navToggleLabel))
+                {
+                    <span title="@navToggleLabelFull">@navToggleLabel</span>
+                }
+                else
+                {
+                    <kw-l key="nav.account">Account</kw-l>
+                }
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
                 <li class="nav-item">
