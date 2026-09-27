@@ -455,6 +455,129 @@ not re-derive the register.
      implementations need the directory + nudge seams.
   5. **`IQuerySession` vs `IDocumentSession` in
      `CountUnreadForAsync`** — the plan's text (and the design doc §D8)
+
+## U04 — resident surface
+
+- **Files written (the 5 deliverables, exactly):**
+  1. `src/Kumunita.Web/Controllers/MessagesController.cs` (new).
+  2. `src/Kumunita.Web/Views/Messages/Index.cshtml` (new).
+  3. `src/Kumunita.Web/Views/Messages/Thread.cshtml` (new).
+  4. `src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` (edited — the
+     gated nav entry).
+  5. `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (edited —
+     9 keys × 4 languages).
+- **Controller shape (what U06 pins against):**
+  - `public sealed class MessagesController(IMessagingService messaging,
+    IUserInfoService userInfo) : Controller`, `[Authorize]` on the class.
+    (A stray unused `ITranslationProvider` param was removed — CS9113.)
+  - **`GET /messages`** `Index(int? page)`: actor null → `NotFound()`;
+    toggle off → `View(new MessagesIndexViewModel { Disabled = true })`
+    with **no `ListConversationsAsync` call** (the F5 pin); else
+    `ListConversationsAsync(actorId, pageNum)`; picker candidates =
+    `GetProfilesAsync(verifiedOnly: false)` minus the actor and blocked
+    residents, projected to `record PickerCandidate(string SubjectId,
+    string DisplayName)`, ordered by display name; `Pager =
+    PagedViewModel.ForRoute("/messages", pageNum, MessagingService.PageSize,
+    list.HasMore)` only when `HasMore || pageNum > 1`.
+  - **`POST /messages/open`** `Open([FromForm] string? otherId)`: toggle off
+    → `View("Index", { Disabled = true })`; success →
+    `Redirect($"/messages/{conversation.Id}")`; `ArgumentException` →
+    `View("Index", { Error = true })`; `KeyNotFoundException` →
+    `NotFound()`; `UnauthorizedAccessException` → disabled view.
+  - **`GET /messages/{id}`** `Thread(string id, int? page)`: toggle off →
+    `NotFound()`; `GetConversationAsync` — `KeyNotFoundException` →
+    `NotFound()` (the non-leaky 404, C-M9·1), `UnauthorizedAccessException`
+    → `StatusCode(403)`; best-effort `MarkReadAsync` on entry (catching
+    KNF/UAEE so marking never breaks the render); `ActorDisplayName` via
+    `GetProfileAsync(actorId)` (null-tolerant); pager on the
+    `/messages/{id}` route.
+  - **`POST /messages/{id}/send`** `Send(string id, [FromForm] string?
+    body)`: the **blank-body check is in the controller, before any service
+    call** (`string.IsNullOrWhiteSpace(body)` → `View("Thread", { Error =
+    true })` — the `Messages_Send_BlankBody_RendersError_NoServiceCall`
+    pin); `SendAsync` — `ArgumentException` → error view, KNF → 404,
+    UAEE → 403; success → `TempData["info"] = "Sent."` + redirect to the
+    thread.
+  - Nested types: `MessagesIndexViewModel` (Disabled, Error,
+    `Conversations IReadOnlyList<ConversationRef>`, `Candidates
+    IReadOnlyList<PickerCandidate>`, Page, `Pager PagedViewModel?`),
+    `MessagesThreadViewModel` (Conversation `ConversationRef?`, Messages
+    `IReadOnlyList<Message>`, ActorId, ActorDisplayName `string?`, Page,
+    Pager, Error, Disabled), `PickerCandidate`.
+- **Views:**
+  - `Index.cshtml` — the `Disabled || Error` state renders the
+    `message.disabled` alert and returns (no list column, no picker);
+    otherwise the two-column layout: conversation list (empty state →
+    `message.thread.empty`; row = other-person name with the
+    `message.other` fallback, unread badge `title="@unreadWord"`
+    (`message.unread`), truncated `LastMessageBody`, `<kw-dt>` timestamp)
+    + the new-conversation picker (select `name="otherId"` → POST
+    `/messages/open` with anti-forgery token, button `message.new`);
+    `<partial name="_Pager" model="Model.Pager" />` when non-null (the M8
+    search pattern, reused exactly).
+  - `Thread.cshtml` — header (back link + other person's name, falling
+    back to `message.other`), `Disabled`/`Error` alert states, the message
+    list (row = sender label — own messages labeled with
+    `ActorDisplayName` — timestamp `<kw-dt>`, unread badge when
+    `!mine && m.ReadBy is null`, unread rows get a
+    `border-start border-primary border-4` accent), `_Pager` when
+    non-null, and the composer (POST `/messages/{id}/send`, textarea
+    `name="body"` `required` `maxlength` =
+    `MessagingService.MaxBodyChars` (the public const), placeholder
+    `message.compose.placeholder`, submit `message.compose.send`).
+  - Both views resolve placeholder/attribute strings through
+    `EffectiveLanguageCode.ResolveAsync` + `ITranslationProvider`
+    (the ADR 0072 pattern; `@using Kumunita.Web.Security` required).
+- **Nav entry (`_AccountNav.cshtml`):** injected
+  `IMessagingService`; inside the signed-in account dropdown, after
+  "Notification subscriptions" and before the `@if (isGlobalAdmin)`
+  block: `@if (await Messaging.IsMessagingEnabledAsync()) { <li>…
+  <a href="/messages"><kw-l key="message.nav">Messages</kw-l></a>…</li> }`
+  — the `IsMessagingEnabledAsync()` gate is the whole toggle story on the
+  nav (no list call, C-M9·1).
+- **9 new keys × 4 languages (en/de/fr/da)** in
+  `KnownTranslationKeys.cs`, anchored after `notification.message.new.body`:
+  `message.nav`, `message.title`, `message.new`,
+  `message.thread.empty`, `message.compose.placeholder`,
+  `message.compose.send`, `message.unread`, `message.disabled`,
+  `message.other` (the en/de/fr/da values are in the file;
+  `message.title` is the Index page heading) — all enforced by the
+  parity tests.
+- **Verified:** `dotnet build Kumunita.slnx -c Debug` green;
+  `Kumunita.Web.Tests` 511/511 (incl. `KwLRegistryConsistencyTests` —
+  every view `kw-l` key is registered); `KnownTranslationKeys_ParityTests`
+  7/7.
+- **Browser smoke (all pass):** toggle **off** → `/messages` renders the
+  `message.disabled` notice with no list, the nav entry is hidden; toggle
+  **on** → list + picker render (picker shows the 6 other residents, the
+  actor excluded), nav entry present in the right position; Open →
+  redirect to the thread; thread renders (header, empty state, composer);
+  Send → "Sent." toast + message row with correct sender/timestamp/body;
+  **two-account pass** — signed in as Ben Nowak, the same thread shows
+  Anna's message with the **unread badge** (Ben hadn't read it), replied
+  through the composer, thread shows both messages in order.
+- **Drift / caveats (record, don't pause):**
+  1. **The toggle smoke was driven by a scratch helper**,
+     `.tmp/smoke_toggle/` (a small console app against the dev DB:
+     `on` / `off` / `state` modes, calling `SetMessagingEnabledAsync`
+     directly) — U05's admin toggle surface doesn't exist yet, so the
+     browser toggle flip was done out-of-band. This left dev-DB residue:
+     `messaging.toggle` `AccessAudit` rows with actor `"smoke-test"`
+     (plus the earlier toggle states), and the toggle was **left ON** in
+     the dev DB (the smoke left it that way).
+  2. **Dev-DB conversation residue:** conversation
+     `ab366b3ee0694ec9804e1b43a4ae68b9` now holds two messages (Anna →
+     Ben, Ben → Anna) from the two-account smoke — expected test residue
+     in the throwaway dev DB.
+  3. **Stray console 404 on page loads** is the pre-existing avatar
+     fallback 404 (the avatar-missing pattern from earlier milestones),
+     **not** a Messages regression — the pages render correctly.
+- **Not touched:** no service-layer files, no `IAuthorizationService`
+  (C-M9·1 — U03's non-leaky 404 is the whole access story), no tests
+  (U06 owns them), no files outside the 5 deliverables.
+- **Next:** U05 (the admin toggle surface — the first thing to replace the
+  `.tmp/smoke_toggle` helper with a real page), then U06 (Web tests,
+  including re-pinning any `Known`-count pin to 17 per U03's drift note 2).
      don't name the session type. The two read paths (`GetConversationAsync`
      / `ListConversationsAsync`) use `IQuerySession` (read-only); the
      write paths (`OpenConversationAsync` / `SendAsync` /

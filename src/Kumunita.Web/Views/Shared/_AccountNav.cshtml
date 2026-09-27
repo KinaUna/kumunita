@@ -7,6 +7,7 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
 @inject IUserInfoService UserInfo
+@inject Kumunita.Core.Messaging.IMessagingService Messaging
 @*
     Right-hand nav actions (the public section links live in the layout's
     left nav). Signed in: a single account dropdown (toggle labelled with the
@@ -161,6 +162,17 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/notifications/subscriptions"><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></a>
                 </li>
+                @* M9 (ADR 0105, U04) — the resident messaging surface: rendered only
+                   when signed in AND the instance toggle is on (the F5 pin — a read of
+                   the toggle, never of data; the /messages controller repeats the gate
+                   first in every action). One <li> in the existing dropdown — no
+                   navbar reflow. *@
+                @if (await Messaging.IsMessagingEnabledAsync())
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
+                    </li>
+                }
                 @if (isGlobalAdmin)
                 {
                     <li class="nav-item">
