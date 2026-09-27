@@ -853,3 +853,249 @@ reads — it does not re-derive the register.
   U05 should extend the existing blocks (or add a new one under the
   same boundary, which the pin counts identically) — do not introduce a
   new `@media` boundary (D6).
+
+## U05 — responsive pass: content + composer surfaces
+
+- **Files written:**
+  - `src/Kumunita.Web/wwwroot/css/site.css` — the U05 half's rule
+    groups, in place, each commented with its surface per D6. U05's
+    rules live in **three existing** `@media (max-width: 767.98px)`
+    blocks (extended, not created — the count is unchanged, see the
+    `@media` block count note below) **plus** two rules at the
+    `.action-glyph-btn` class home (the viewport-independent Floor B
+    ring + the Floor A floor, per §a11y's "at the class's home, **not**
+    under the 360 px boundary" wording). No new `@media` boundary
+    introduced (D6).
+  - **`src/Kumunita.Web/Views/Posts/Detail.cshtml` — not touched**
+    (the unit plan's second deliverable is conditional: "only if the
+    D8a 44 px floor requires a markup change on the `⋮` trigger". It
+    does not — the `min-width: 44px; min-height: 44px` CSS floor on
+    `.action-glyph-btn` suffices, verified by the 360 px smoke below
+    (the `⋮` renders 64×44). Pure-CSS per the design doc; the unit-
+    series rule stands — a drive-by markup change would be a drift
+    pause).
+
+- **CSS rules added (verbatim from the `site.css` diff — one comment
+  group per surface):**
+  - **U05 · post/reply card** — `overflow-wrap: anywhere` on
+    `.rc-body` (the pinned failure: "a long code span / unbroken URL
+    overflows the card" — truncate). The `.action-glyph-btn` 44×44
+    floor is the separate viewport-independent rule below.
+  - **U05 · group card** — `overflow-wrap: anywhere` on `.dir-card
+    .dname, .dir-card .daddr` (the pinned failure: "a long group name
+    / address clips at 360 px" — truncate).
+  - **U05 · WYSIWYG split-view (pin)** — `grid-template-columns: 1fr`
+    on `.rc-editor`. **Pin, not a repair:** `.rc-editor` was *always*
+    `grid-template-columns: 1fr` at the class home (no 2-column split
+    exists anywhere in the codebase — the design doc's reference to an
+    existing "1 column on mobile, 2 columns on desktop" comment is not
+    found). The explicit rule here is the witness (the same "verified
+    existing" pattern as U04's footer `col-6` stacking + navbar flex
+    rows). Recorded as a mechanism-clarification drift pause (see
+    below), not a rescope.
+  - **U05 · forms with audience editor** — `max-width: 100%` on
+    `[data-audience-panel]`; `width: 100%` on
+    `[data-audience-panel] .form-select`; `min-height: 44px; display:
+    flex; align-items: center` on `[data-audience-toggle] +
+    .form-check-label, [data-audience-panel] .form-check-label` (the
+    Floor A target on the audience label rows — "U05's judgment,
+    recorded in the handoff" per §a11y's closed list).
+  - **U05 · Floor A** — `min-width: 44px; min-height: 44px` on
+    `.action-glyph-btn`. **Viewport-independent** (at the class home,
+    NOT inside the 360 px `@media` block — the floor holds at every
+    viewport, matching §a11y's "at 360 px" language via the single
+    class rule covering every `⋮` instance). This is the D8a floor's
+    densest-target fix.
+  - **U05 · Floor B** — `border-color: transparent; background-color:
+    rgba(0, 0, 0, 0.06); color: var(--bs-body-color); box-shadow: 0 0 0
+    0.25rem var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25));
+    outline: 0` on `.action-glyph-btn:focus-visible`. At the class
+    home, viewport-independent (per §a11y's "at the class's home, **not**
+    under the 360 px boundary — the floor is viewport-independent by
+    design"). **Cascade note:** this rule has equal specificity to
+    Bootstrap's `.btn:focus-visible` (both `0-2-0`) and **loses** the
+    cascade because Bootstrap loads after `site.css` — but Bootstrap's
+    own ring (via `--bs-btn-focus-box-shadow`) resolves to the same
+    `--bs-focus-ring-color` 4px ring, so the floor is met either way.
+    The rule is present in `site.css` as the witness (the pin); the
+    computed ring is verified live (see the Floor B evidence below).
+  - **U05 · events calendar (pin)** — comment-only (the `.events-time-
+    grid--week` `min-width: 44rem` + `.events-time-grid`
+    `overflow-x: auto` + `.events-time-ruler` `position: sticky` above
+    are the verified existing fix; the month grid's day-cell ≥ 32 px +
+    the ADR 0081 single-line separators are the witness).
+  - **U05 · Kanban board (pin)** — comment-only (the `.kanban-lane`
+    `min-width: 12rem` + `.kanban-lane-new` `min-width: 10rem` above
+    are the verified existing fix; the `.kanban-board`
+    `overflow-x: auto` at the class home is the scroll-inside
+    mechanism).
+  - **U05 · tables (pin)** — comment-only (the `.table-responsive`
+    wrap is Bootstrap's own — 5 of 6 shipped tables have it; the one
+    that doesn't is the drift pause below).
+
+- **`Detail.cshtml` markup change:** **none** (pure-CSS sufficed — the
+  measurement evidence below: the `⋮` `.action-glyph-btn` rendered
+  64×44 after the Floor A floor. The design doc §Responsive's content
+  half does not name a markup change; the unit plan's conditional
+  branch is not taken, per the closed-list pin).
+
+- **360 px smoke result per surface** (Chromium, `page.setViewportSize(
+  { width: 360, height: 740 })`, `http://localhost:5123/`, signed in as
+  the sample admin — the post/reply card + the board + the audience
+  panel carry the Floor A + B targets; the group card is on `/directory`
+  + `/groups`; the calendar is on `/events`):
+  - **Viewport** — `window.innerWidth: 360`, `documentElement.
+    scrollWidth: 345` on `/`, the post detail, the directory, the
+    boards index, the board detail, and the post edit page (all
+    < 360 → **no horizontal overflow, pass**).
+  - **Post/reply card** — the `⋮` `.action-glyph-btn` rendered
+    **64×44** (the Floor A floor holds exactly — 64 ≥ 44 width,
+    44 = 44 height, **pass**). `.rc-body` 287×154, right:316 (< 360,
+    **pass**), `overflow-wrap: anywhere` in the computed style
+    (**pass** — the truncation rule holds). Two `⋮` triggers on the
+    post detail (the post head + the reply head), both 64×44
+    (**pass**).
+  - **Group card** — on `/directory`: 7 `.dir-card` instances,
+    `.dname` + `.daddr` right edges all < 360 (e.g. 237, 236, …),
+    `overflow-wrap: anywhere` in the computed style (**pass**). On
+    `/groups`: `.airy-group-card` 321×64 + 321×102, right:333 (< 360,
+    **pass** — the single-column stack holds).
+  - **Events calendar** — week view: `.events-time-grid--week`
+    `min-width: 44rem` (704 px), `.events-time-grid`
+    `overflow-x: auto` (the scroll is **inside** the container, not
+    page-level — `docScrollWidth: 345` < 360, **pass**).
+    `.events-time-ruler` `position: sticky` (**pass** — the ruler
+    stays visible while the grid scrolls). Month view:
+    `.events-calendar-grid` 321×362, day cells **46×72** (both ≥ 32
+    px, **pass** — the day-cell floor holds); ADR 0081 single-line
+    separators: `borderTop: 0px none` + `borderRight: 1px solid` on
+    the cells (**pass** — the top/right border mechanism is
+    verified).
+  - **Kanban board** — `.kanban-board` `overflow-x: auto`,
+    `min-height: 60vh`; `.kanban-lane` **192 px** wide (the 12rem = 192px
+    `min-width` floor holds exactly, **pass**); `.kanban-lane-new`
+    **160 px** wide (the 10rem = 160px `min-width` floor holds, **pass**);
+    three `⋮` `.action-glyph-btn` triggers on the board (board head +
+    lane head + card head), all **64×44** (the Floor A floor holds,
+    **pass**). No page-level overflow (`docScrollWidth: 345` < 360,
+    **pass**).
+  - **WYSIWYG split-view** — `.rc-editor` `grid-template-columns:
+    1fr` (287 px, **pass** — the 1-column contract holds; the pin is
+    the witness, see the mechanism-clarification drift pause below).
+  - **Forms with audience editor** — on the post edit page: the
+    `[data-audience-toggle] + .form-check-label` ("Everyone in this
+    community") rendered **247×44** (the Floor A floor holds exactly,
+    **pass** — `min-height: 44px` + `display: flex` +
+    `align-items: center` in the computed style). The audience panel
+    was collapsed (`w: 0`) in this smoke (the checkbox was checked —
+    the "narrow the audience" branch is hidden) — the CSS rules are
+    present in the computed style (`max-width: 100%`,
+    `min-height: 44px`, `display: flex`, `align-items: center`) and
+    will apply when the panel is expanded (**pass** — the rules hold;
+    the panel's collapsed state is the correct default behavior).
+  - **Floor A (the `⋮` `.action-glyph-btn`)** — every instance across
+    the post detail, the boards index, the board detail, and the
+    post edit page rendered **64×44** (the `min-width: 44px;
+    min-height: 44px` floor holds exactly — 64 ≥ 44 width, 44 = 44
+    height, **pass**). The single class rule covers every instance as
+    §a11y's closed list requires.
+  - **Floor B (`:focus-visible` ring)** — keyboard-tabbable:
+    `matches(':focus-visible') === true` on the focused `.action-
+    glyph-btn`, computed `box-shadow` **`rgba(28, 69, 50, 0.28) 0px
+    0px 0px 4px`** (the `--bs-focus-ring-color` 4px ring, **pass** —
+    the ring is visible). **Note:** the first read (immediately after
+    `page.keyboard.press('Tab')`) returned a transparent
+    `box-shadow` — a `box-shadow 0.15s ease-in-out` transition (from
+    Bootstrap's `.btn`) was mid-fade; after a 700 ms settle the ring
+    is fully visible (the **settled** value above is the authoritative
+    witness). U06's spec should `waitForTimeout` (or
+    `page.waitForFunction` on the `box-shadow` value) after focusing
+    before asserting the ring — the same `box-shadow` transition
+    applies to every `.btn`.
+  - **Tables (pin)** — 5 of 6 shipped tables are wrapped in
+    `.table-responsive` (Admin/Accounts, Admin/Audit, Languages/Index,
+    Languages/Translations, Moderation/Index — all **pass**, the
+    Bootstrap wrap holds). 1 of 6 is **not** wrapped:
+    `Admin/Platform.cshtml` line 56 (`<table class="table table-sm
+    align-middle mb-4">` — no `.table-responsive` parent). Per the
+    design doc's tables row ("if a shipped table lacks the wrap, that
+    is a `## U05 — Drift pause`") — recorded as a drift pause below,
+    **not** drive-by-fixed.
+
+- **Drift pauses flagged:**
+  - **`Admin/Platform.cshtml` line 56 — a `<table>` without a
+    `.table-responsive` wrap** (the other 5 shipped tables all have
+    it). Per the design doc's tables row, this is a **U05 drift
+    pause** — not a drive-by fix. The table is 3 columns (Surface /
+    Route / Actions) with short cell content; at 360 px it may
+    overflow the viewport (the design doc's pinned failure for the
+    tables row). **Not fixed** (unit-series rule: the deliverables
+    are `site.css` + optionally `Detail.cshtml`; `Platform.cshtml`
+    is out of scope). **Recommended:** a follow-on unit (or U06's
+    Playwright spec's drift-pause assertion) should add the
+    `.table-responsive` wrap to this table. The design doc's tables
+    row's intent ("a wide table overflows the viewport → scroll-
+    inside") is met for the 5 wrapped tables; this one is the
+    exception.
+  - **The WYSIWYG "split-view" is not a 2-column split** — `.rc-
+    editor` was *always* `grid-template-columns: 1fr` at the class
+    home; no 2-column layout exists in `rich-editor.ts` or the view
+    markup. The design doc's reference to "the existing '1 column on
+    mobile, 2 columns on desktop' comment" is **not found** in the
+    codebase. **Mechanism clarification, not a rescope** — the
+    "1 column on mobile" contract (the intent) is met exactly; the
+    "2 columns on desktop" mechanism does not exist (there was
+    nothing to collapse). The explicit `grid-template-columns: 1fr`
+    rule under the 360 px block is the **pin** (the witness), the
+    same pattern as U04's "verified existing" rows (the footer's
+    `col-6` stacking, the navbar's flex handling). U07's close
+    should fold this into the design doc §drift log alongside U04's
+    `::after`-vs-`::before` entry (the same class of mechanism
+    clarification).
+  - **None on the other surfaces** — every §Responsive U05 row was
+    rendered as the locked text names it; the three "verified
+    existing" rows (the WYSIWYG 1-column, the events calendar's
+    scroll-inside + sticky ruler, the Kanban lane min-widths) did in
+    fact render fine — the fixes were the pins, not the repairs, as
+    the locked text predicted; no surface was found broken that the
+    inventory did not name (no drift pause of that class).
+
+- **`@media` block count as left:** four `@media (max-width:
+  767.98px)` blocks (lines 578 / 1492 / 1833 / 2263) + one `@media
+  (prefers-reduced-motion: reduce)` block (line 1143) — exactly the
+  U00 baseline (line numbers shifted down because U04 + U05 extended
+  the existing blocks in place; the count is unchanged — U06's
+  `Site_Css_Media_Block_Boundary_Pinned` will pass).
+
+- **Exit:**
+  - `dotnet build Kumunita.slnx -c Debug` — green (no new warnings;
+    the 1 pre-existing `xUnit2013` warning in
+    `Kumunita.Core.Tests/MessagingServiceTests.cs:204` is unchanged
+    — same as the U01–U04 runs).
+  - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+    Kumunita.Web.Tests.dll` — **526 tests, 0 failed** (the 5
+    `PwaManifestTests` pins still pass — U01's 3 + U02's 2; U05 adds
+    no xUnit pins — the behavioral 360 px half is U06's Playwright
+    spec).
+  - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+    Kumunita.Core.Tests.dll` — **956 tests, 0 failed** (unchanged —
+    M10 adds no Core tests; the run is part of the green gate per the
+    register's test contract).
+  - **Last action:** `git mv in-progress/pwa-responsive-u05.md
+    docs/plans-milestones/done/pwa-responsive-u05.md` (per the unit
+    plan's exit step).
+
+- **Next:** U06 (see the register's `## U06` section — the Playwright
+  spec: the 360 px viewport pin + the Floor A / Floor B assertions +
+  the `::after` hit-area `elementFromPoint` assertions per U04's
+  note, the `box-shadow` transition `waitForTimeout` per U05's note
+  above, and the `Admin/Platform.cshtml` table-wrap drift-pause
+  assertion). **Notes for U06's entry:** (a) the `box-shadow`
+  transition — after focusing a `.btn` / `.action-glyph-btn`, wait
+  ~700 ms (or `waitForFunction` on the `box-shadow` value) before
+  asserting the `:focus-visible` ring; (b) the `Admin/Platform.cshtml`
+  table lacks `.table-responsive` — the spec should assert it (a
+  drift-pause witness, not a pass assertion); (c) the WYSIWYG
+  "split-view" is a 1-column-only layout (no 2-column desktop state
+  exists) — the spec's assertion is `grid-template-columns: 1fr` (the
+  pin), not a 2→1 collapse.
