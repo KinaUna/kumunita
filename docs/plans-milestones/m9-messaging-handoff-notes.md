@@ -825,3 +825,130 @@ not re-derive the register.
   The plan is at `in-progress/messaging-u07.md`. **Carry the drift note 1
   correction into the U07 close-out: do not re-pin `AllKinds.Count` to
   17 — it is 16 in the shipped code and its pin is green.**
+
+## U07 — close the milestone
+
+- **Files touched (the doc-parity trio, moved together + the two doc
+  updates — exactly the deliverables, six groups):**
+  1. `src/Kumunita.Web/Milestones.cs` — M9 Messaging
+     `StatusNext` → `StatusDone`; M10 (PWA and responsive design)
+     `StatusPlanned` → `StatusNext`; M11–M14 stay `StatusPlanned`
+     (the single-in-progress invariant now points at M10).
+  2. `tests/Kumunita.Web.Tests/MilestonesTests.cs` — `M9` added to the
+     shipped-done list; the in-progress pin renamed to
+     `M10_Is_The_Single_InProgress_Milestone_And_M11_Through_M14_Are_Planned`
+     (single `StatusNext` = `M10`; planned list retargeted to
+     `M11–M14`); the exact-order pin (`M0…M14` + the named lanes) was
+     already in step and needed no change.
+  3. `README.md` — Status line → "**M10 in progress** (PWA and responsive
+     design); M1–M9 and all named lanes are done … messaging (`M9`),
+     on one server-rendered stack over a single Postgres."; Roadmap M9
+     entry `**In progress**` (ADR 0105) → `**Done.**` (ADR 0105); M10
+     entry gains `**In progress.**`.
+  4. `docs/STATUS.md` — the "next is M9" sentence → "**M9 is done** —
+     messaging (1:1 resident messaging, admin-toggleable, off by default;
+     ADR 0105); **next is M10** — PWA and responsive design. Then M11–M14
+     (portability, iCal, logging & analytics, Events+Projects
+     integration …)".
+  5. `docs/ARCHITECTURE.md` (shape-of-code, three additive insertions):
+     the `Messaging/` context row added to the solution tree (after the
+     `Search/` row — the M9 ✓ ADR 0105 shape: the two docs + the
+     `M9DocTypes` surface + the `IMessagingService` / `MessagingService`
+     seams + the participant-by-id access story + the write audit
+     `TargetKind`s `message` / `messaging.toggle` + the M6-lane
+     `message.new` nudge); the §3 feature-modules list gains
+     "Messaging (M9 ✓ — ADR 0105)"; the §2 "shape of the code" paragraph
+     gains the `Messaging/` (M9) is-now-live block (seam list, zero-new
+     authorization-surface statement, the audit `TargetKind`s, the nudge
+     kind) alongside the M5/M6/M8 blocks.
+  6. **U06's carry-in honored:** the `NotificationsControllerTests`
+     `AllKinds.Count == 16` pin was **not** re-pinned (U06's drift note 1
+     is correct as shipped — `message.new` never joined the `Known`
+     list; the 16 pin is green in the 521/521 run below).
+- **Exit — everything green (2026-09-27):**
+  `dotnet build Kumunita.slnx -c Debug` — 0 errors (the single warning
+  is U03's pre-existing `MessagingServiceTests.cs` xUnit2013, recorded in
+  the U05 entry). `Kumunita.Core.Tests` **956/956** (0 failed, 92.9s —
+  incl. `MessagingServiceTests` 14/14). `Kumunita.Web.Tests` **521/521**
+  (0 failed, 14.2s — incl. `MilestonesTests` green with M10 sole
+  in-progress and `MessagesControllerTests` 10/10).
+- **Not touched:** no production code, no tests beyond the retargeted
+  `MilestonesTests` pins (no new tests — the unit plan's own rule), no
+  files outside the six deliverable groups.
+- **Plan file moved:** `in-progress/messaging-u07.md` → `done/` (this
+  unit is the last one — `in-progress/` is now empty; `done/` holds all
+  eight `messaging-u*.md` plans, U00–U07).
+
+## Summary
+
+- **Capability shipped (M9, ADR 0105):** 1:1 resident messaging — a
+  signed-in resident opens a conversation with another resident,
+  exchanges plain-text messages (≤ 2000 chars, immutable in M9), and both
+  participants see per-recipient read state. The feature is
+  **admin-toggleable and OFF by default** (`LocaleSettings.MessagingEnabled`
+  `false` floor — the deliberate inverse of the codebase `true`-floor
+  convention); the GlobalAdmin flips it at `/admin/messaging`
+  (`AdminMessagingController`, the ADR 0101 shape). Participant-only
+  access — a non-participant (GlobalAdmin included) gets a **non-leaky
+  404**; no `Audience`, no `IAuthorizationService` call, zero new
+  `AccessAction` / `AccessVia` / `IAuditableResource` adapter. New
+  messages nudge the recipient through the existing M6 `Notification`
+  lane (kind `message.new`).
+- **The seams (frozen as of M9 close):** `IMessagingService` —
+  `IsMessagingEnabledAsync()` · `SetMessagingEnabledAsync(bool, actorId)`
+  · `OpenConversationAsync(actorId, otherId) → ConversationRef` ·
+  `GetConversationAsync(conversationId, actorId, page) →
+  ConversationDetail` · `ListConversationsAsync(actorId, page) →
+  ConversationList` · `SendAsync(conversationId, actorId, body)` ·
+  `MarkReadAsync(conversationId, actorId)`; the `ConversationRef` /
+  `ConversationList` / `ConversationDetail` records on the ADR 0090
+  `HasMore` discipline. `MessagingService` composes the
+  `IDocumentStore` + optional `IUserInfoService` / `NotificationService`
+  (the ADR 0077 idiom). `M9DocTypes` carries the two docs
+  (`Conversation` + `Message`), the unique `(ParticipantA, ParticipantB)`
+  pair index (the F1 idempotency witness) + the
+  `(ConversationId, Created)` thread index.
+- **The invariants, as landed (C-M9·1–7):**
+  1. **C-M9·1** participant-only, no operator peek — non-leaky 404,
+     pinned (`GetConversation_NonParticipant_404_Not403`,
+     `GetConversation_GlobalAdminNonParticipant_404`,
+     `Messages_Thread_NonParticipant_404_NoView`).
+  2. **C-M9·2** the toggle is a hard service gate — every seam refuses
+     (403) when off, pinned (`ToggleOff_AllSeamsRefuse_403`,
+     `Messages_Index_ToggleOff_RendersDisabled_NoListCall`).
+  3. **C-M9·3** audit always-on, in-transaction, one row per write —
+     `message.open` / `message.send` (`Via = Owner`, `TargetKind =
+     "message"`), `messaging.toggle` (`Via = Admin`, `TargetId =
+     "messaging.toggle"`), pinned (`SetMessagingEnabled_Toggle_StoresFlagAndAuditRow`).
+  4. **C-M9·4** reads never audit — list / thread / mark-read emit zero
+     rows.
+  5. **C-M9·5** zero new authorization surface — verified at every unit's
+     entry-reads against `Decision.cs` / `AccessAudit.cs` (no enum
+     append was needed).
+  6. **C-M9·6** plain-text, capped (2000), immutable —
+     `Send_BlankBody_ArgumentException` / `Send_OverCap_ArgumentException`.
+  7. **C-M9·7** Marten-native documents, one new surface —
+     `M9DocTypes` delta-detected, idempotent, wired into the dev-loop
+     boot path (the `SchemaBootstrap.ApplyAsync` apply path consumes it
+     via `ApplyAllConfiguredChangesToDatabaseAsync`).
+- **The test floor as closed:** `MessagingServiceTests` **14/14**
+  (U02's 2 toggle pins + U03's 12 behavior pins);
+  `MessagesControllerTests` **10/10** (U06); `MilestonesTests` green
+  (M9 done, M10 sole in-progress, M11–M14 planned); full assemblies
+  green — Core **956/956**, Web **521/521**.
+- **The deferred lanes (the follow-on entries, own ADRs):**
+  **rich content** on messages (the ADR 0025/0031/0034 machinery is the
+  entry, not M9's value); **edit / delete** of a sent message (the ADR
+  0024 soft-delete shape is the entry — M9's `Message` is deliberately
+  immutable); **read receipts / delivery confirmation** (the M6
+  deferral, unchanged); **group messaging** (the ADR 0013 membership
+  lane is the entry — a follow-on surface, not a widening of M9's
+  participant-by-id shape); **`message.new` on the notification
+  settings page** (its `NotificationKinds.Known` entry, the 16 → 17
+  re-pin) — U06's drift note 1 records the pin as shipped (16) and this
+  Summary carries that forward: re-pin in the lane that adds it.
+- **Milestone state:** M9 is **done**; the single-in-progress pointer is
+  **M10 (PWA and responsive design)**; M11–M14 remain planned. The
+  doc-parity trio (README ↔ `Milestones.cs` ↔ `MilestonesTests.cs`) moved
+  together in this unit. **This `## Summary` is the last line the handoff
+  note receives — the M9 milestone is closed.**
