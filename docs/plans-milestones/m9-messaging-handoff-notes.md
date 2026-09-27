@@ -591,3 +591,111 @@ not re-derive the register.
   Postgres up/down clean).
 - **Next:** U04 (see `in-progress/messaging-u04.md`) — the Web surface
   (the `/messages` list + thread + nav entry + the `message.*` `kw-l` keys).
+
+## U05 — admin toggle surface
+
+- **Files written (the deliverables, exactly):**
+  1. `src/Kumunita.Web/Controllers/AdminMessagingController.cs` (new).
+  2. `src/Kumunita.Web/Views/AdminMessaging/Index.cshtml` (new).
+  3. `src/Kumunita.Web/Views/Admin/Index.cshtml` (edited — the admin-link
+     card, one block, after the `Announcement comments` sibling card).
+  4. `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (edited —
+     5 keys × 4 languages: `admin.messaging_title`, `admin.messaging_lede`,
+     `admin.messaging_on`, `admin.messaging_off`; the Save button reuses the
+     sibling's `admin.anncomments_save` key — see Drift note 1).
+- **Controller shape (what U06 pins against):**
+  - `public sealed class AdminMessagingController(IMessagingService
+    messaging) : Controller`, `[Route("admin/messaging")]` +
+    `[Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]` — the
+    `AdminAnnouncementCommentsController` shape verbatim (confirmed against
+    the sibling: same route attribute, same authorization attribute, same
+    `KumunitaPrincipal.SubjectId(User)` actorId mapping).
+  - **`GET /admin/messaging`** `Index()`: reads
+    `IsMessagingEnabledAsync()` into the nested
+    `MessagingAdminViewModel { Enabled }` (default `false`, the D2 floor) —
+    the controller adds **no** audit row (C-M9·3 — the service owns it).
+  - **`POST /admin/messaging`** `Save(bool enabled)`:
+    `[ValidateAntiForgeryToken]`, maps `actorId` via
+    `KumunitaPrincipal.SubjectId(User) ?? string.Empty`, calls
+    `SetMessagingEnabledAsync(enabled, actor)`, sets
+    `TempData["info"]` (open/closed text), redirects to `Index`. The
+    `messaging.toggle` audit row is committed by the **service** — the
+    controller adds none.
+- **View (`Views/AdminMessaging/Index.cshtml`):** the
+  `AdminAnnouncementComments/Index.cshtml` layout copied (back-link to
+  `/admin`, `<h1>` title, `<p class="text-muted">` lede, the
+  `row g-2 align-items-end` form with the `<select name="enabled">` True/
+  False options + Save button, anti-forgery token, `action="/admin/messaging"`).
+  The five `admin.messaging_*` keys drive the title/lede/on/off; the Save
+  button reuses `admin.anncomments_save`.
+- **Admin link:** `src/Kumunita.Web/Views/Admin/Index.cshtml` — the sibling
+  `announcementcomments` card link lives in the `row g-3` section-card grid
+  (not in `_AccountNav` — that is the resident-side nav). Added the
+  `Direct messaging` card (`href="/admin/messaging"`) immediately after the
+  `Announcement comments` card. Verified rendering in the admin dashboard
+  during smoke (e103/e104).
+- **Verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors, the
+  1 pre-existing warning is U03's `MessagingServiceTests.cs` xUnit2013).
+  App smoke (all pass, toggle left **ON** in the dev DB after):
+  - **Non-admin (Ben Nowak)** → `GET /admin/messaging` → Access denied
+    page (the `[Authorize(Roles=GlobalAdmin)]` shape — 403 path, same as
+    the sibling).
+  - **GlobalAdmin (Alex Admin, `admin@examplium.com`) GET** → renders
+    current state (ON, `selected` on the Open option — U04 left it ON).
+  - **GlobalAdmin POST → Closed** → "Messaging is now closed" toast, form
+    re-renders with Closed selected, **and the resident `Messages` nav
+    entry is gone** from the account dropdown (the F5 gate — the
+    `IsMessagingEnabledAsync()` read in `_AccountNav`).
+  - **GlobalAdmin POST → Open** → "Messaging is now open" toast, **and the
+    `Messages` nav entry is back** — full round-trip of the toggle driving
+    the resident surface.
+  - **Admin dashboard** → the `Direct messaging` card renders and links to
+    `/admin/messaging`.
+- **Drift / caveats (record, don't pause):**
+  1. **The Save button reuses `admin.anncomments_save`** rather than a new
+     `admin.messaging_save` key — the sibling's lede/title/on/off got their
+     own `admin.anncomments_*` keys (ADR 0101 precedent), so F7's "sibling
+     keys if the sibling added any" reads as: follow the sibling's
+     *pattern* of dedicated keys (done: `admin.messaging_title` / `_lede` /
+     `_on` / `_off`). The `Save` verb, however, is a generic action button
+     whose sibling value is the identical word in all four languages
+     (Save/Speichern/Enregistrer/Gem) — registering a 5th key for the same
+     string is pure duplication, so the view points at the existing
+     `admin.anncomments_save` key. If U06/U07 want strict per-surface key
+     ownership, that's a one-line key rename in the view + one registry
+     entry × 4 languages; nothing in the controller changes.
+  2. **The `dotnet run --launch-profile http` exit-code-1 quirk** from the
+     context block was reproduced this session: the profile's
+     `ASPNETCORE_ENVIRONMENT=Development` is set, but
+     `WebApplication.CreateBuilder` does **not** auto-load
+     `appsettings.Development.Local.json` (the host's config chain is
+     `appsettings.json` + `appsettings.{env}.json` only), so
+     `ConnectionStrings:Kumunita` is missing and the app throws at
+     `Program.cs:59`. The working launch command for smoke on this machine
+     is to run the built DLL from `src/Kumunita.Web` with the env var the
+     error message itself names:
+     `ConnectionStrings__Kumunita='Host=localhost;Port=5433;Database=kumunita;Username=kumunita;Password=kumunita'`.
+     That is a pre-existing launch-config gap (the sibling admin surfaces
+     would hit it identically) — **not** a U05 regression, and fixing the
+     config chain is out of U05's scope.
+  3. **The non-admin smoke hit the AccessDenied page, not a bare 403** — the
+     route returns a 403 status with the app's AccessDenied view (the
+     sibling's `[Authorize(Roles=GlobalAdmin)]` shape routes unauthorized
+     calls through the `AccessDenied` page; the HTTP status is 403, the
+     body is the branded denied page). U06 should pin the **status code**
+     (403), not the body, for the non-admin case — matching how the sibling
+     is tested.
+  4. **Dev-DB residue:** two more `messaging.toggle` `AccessAudit` rows
+     (actor = Alex Admin's subject id, `Via = Admin`,
+     `TargetKind = "messaging.toggle"`) from the ON→OFF→ON round-trip, on
+     top of U04's `"smoke-test"` actor rows. Expected throwaway-dev-DB
+     residue; the toggle is **left ON** (the U04 state, restored by the
+     final POST→Open).
+- **Not touched:** no service-layer files, no `IMessagingService` seams
+  (U02/U03's `IsMessagingEnabledAsync` / `SetMessagingEnabledAsync`
+  consumed as-is, no new seams on the frozen interface), no
+  `IAuthorizationService` (C-M9·5), no tests (U06 owns them), no files
+  outside the 4 deliverables.
+- **Next:** U06 (Web tests — `MessagesControllerTests` + the admin
+  Get/Post pair; re-pin any `Known`-count pin to 17 per U03's drift note
+  2). The plan is at `in-progress/messaging-u06.md`.

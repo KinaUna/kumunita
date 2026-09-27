@@ -23,6 +23,15 @@ using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Local overrides (the appsettings.*.Local.json convention, gitignored — see
+// .gitignore). The host's config chain loads appsettings.json and
+// appsettings.{Environment}.json only; the .Local files are machine-specific
+// (dev connection strings etc.) and must be added explicitly. `optional: true`
+// so a machine without one (deploy, CI) boots unchanged. Added before any
+// service reads configuration; env vars still override (later source wins).
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Local.json", optional: true, reloadOnChange: false);
+
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 

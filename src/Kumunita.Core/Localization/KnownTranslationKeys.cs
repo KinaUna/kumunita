@@ -460,6 +460,20 @@ public static class KnownTranslationKeys
             ["admin.anncomments_off"]       = "Closed — no signed-in resident can add a comment",
             ["admin.anncomments_save"]      = "Save",
 
+            // ── admin — the direct-messaging gate (the /admin/messaging
+            // surface; M9, ADR 0105) ────────────────────────────────────────
+            ["admin.messaging_title"]   = "Direct messaging",
+            ["admin.messaging_lede"]    =
+                "Whether signed-in residents may open direct 1:1 conversations. " +
+                "Closing the gate hides the Messages entry and refuses every " +
+                "conversation seam — no one can open a thread or send a message. " +
+                "The gate is off by default; it only controls new messaging, and " +
+                "existing conversations and messages are never touched by it. " +
+                "Even a GlobalAdmin who is not a participant cannot read a " +
+                "conversation.",
+            ["admin.messaging_on"]      = "Open — signed-in residents can message each other",
+            ["admin.messaging_off"]     = "Closed — no resident can open or send messages",
+
             // ── account — sign-up-closed notice (the /account/signup and
             // /account/login surfaces when the admin gate is closed; ADR 0050) ─
             ["account.signup_closed_title"] = "Sign-up is closed",
@@ -1995,6 +2009,19 @@ public static class KnownTranslationKeys
             ["admin.anncomments_off"]       = "Geschlossen — keine:r kann einen Kommentar hinzufügen",
             ["admin.anncomments_save"]      = "Speichern",
 
+            // ── admin — Direkt-Nachrichten-Schalter (M9, ADR 0105) ─────────
+            ["admin.messaging_title"]   = "Direktnachrichten",
+            ["admin.messaging_lede"]    =
+                "Ob angemeldete Anwohner:innen direkte 1:1-Gespräche eröffnen dürfen. " +
+                "Geschlossen wird der Nachrichten-Eintrag ausgeblendet und jede " +
+                "Gesprächs-Anfrage abgelehnt — niemand kann ein Gespräch eröffnen " +
+                "oder eine Nachricht senden. Der Schalter ist standardmäßig aus; " +
+                "er steuert nur neue Nachrichten, und bestehende Gespräche und " +
+                "Nachrichten bleiben erhalten. Auch eine:r GlobalAdmin ohne " +
+                "Gesprächsteilnahme kann ein Gespräch nicht lesen.",
+            ["admin.messaging_on"]      = "Offen — angemeldete Anwohner:innen können sich direkt Nachrichten schreiben",
+            ["admin.messaging_off"]     = "Geschlossen — niemand kann Gespräche eröffnen oder Nachrichten senden",
+
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Die Registrierung ist geschlossen",
             ["account.signup_closed_body"]  =
@@ -3452,6 +3479,19 @@ public static class KnownTranslationKeys
             ["admin.anncomments_on"]        = "Ouvert — les habitants connectés peuvent commenter",
             ["admin.anncomments_off"]       = "Fermé — aucun habitant ne peut ajouter de commentaire",
             ["admin.anncomments_save"]      = "Enregistrer",
+
+            // ── admin — la passerelle de messagerie directe (M9, ADR 0105) ──
+            ["admin.messaging_title"]   = "Messagerie directe",
+            ["admin.messaging_lede"]    =
+                "Si les habitants connectés peuvent ouvrir des conversations directes 1:1. " +
+                "Désactivé, l'entrée Messages est masquée et toute demande de " +
+                "conversation est refusée — personne ne peut ouvrir un fil ni " +
+                "envoyer un message. La passerelle est fermée par défaut ; elle ne " +
+                "contrôle que la messagerie nouvelle, et les conversations et " +"messages " +
+                "existants ne sont jamais touchés. Même une GlobalAdmin qui n'est " +
+                "pas participante ne peut pas lire une conversation.",
+            ["admin.messaging_on"]      = "Ouverte — les habitants connectés peuvent s'envoyer des messages directs",
+            ["admin.messaging_off"]     = "Fermée — aucun habitant ne peut ouvrir de conversation ni envoyer de message",
 
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "L'inscription est fermée",
@@ -4911,6 +4951,19 @@ public static class KnownTranslationKeys
             ["admin.anncomments_on"]        = "Åben — loggede indboere kan kommentere",
             ["admin.anncomments_off"]       = "Lukket — ingen kan tilføje en kommentar",
             ["admin.anncomments_save"]      = "Gem",
+
+            // ── admin — direkte besked-skydedæksel (M9, ADR 0105) ──────────
+            ["admin.messaging_title"]   = "Direkte beskeder",
+            ["admin.messaging_lede"]    =
+                "Om loggede indboere må åbne direkte 1:1-samtaler. Slukker du " +
+                "den, skjules Beskeder-indgangen og alle samtaleanmodninger " +
+                "afvises — ingen kan åbne en tråd eller sende en besked. " +
+                "Skydedækningen er lukket som udgangspunkt; den styrer kun " +
+                "nye beskeder, og eksisterende samtaler og beskeder røres aldrig. " +
+                "Bemærk, at en GlobalAdmin uden deltagelse i samtalen kan ikke " +
+                "læse den.",
+            ["admin.messaging_on"]      = "Åben — loggede indboere kan sende hinanden direkte beskeder",
+            ["admin.messaging_off"]     = "Lukket — ingen kan åbne samtaler eller sende beskeder",
 
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Tilmeldingen er lukket",
