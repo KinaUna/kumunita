@@ -292,3 +292,179 @@ not re-derive the register.
 - **Next:** U03 (see `in-progress/messaging-u03.md`) — the open / send /
   list / thread / read seams + the 12 behavior pins, extending this
   `MessagingServiceTests.cs` class.
+
+## U03 — core seams
+
+- **Entry state:** design doc §D1–D8/§2.2/§2.3 LOCKED (U00); `Conversation` /
+  `Message` + `M9DocTypes` landed (U01); the two toggle seams +
+  `IMessagingService` landed (U02). `NotificationService.EmitAsync` (9-arg
+  overload) read in full (the nudge seam — **concrete class, not an
+  interface**, optional `IOptions<NotificationOptions>?` +
+  `IOptions<VerificationOptions>?` trailing params); `NotificationKinds.cs`
+  read in full (the closed-set registry — `OptInKinds` is `{ announcement,
+  page.child }`, the rest opt-OUT); `NotificationServiceTests.cs` harness
+  read in full (the `RecordingTranslator` / `RecordingMailer` /
+  `PlantProfileReadAsync` shape the nudge pin mirrors);
+  `MessagingServiceTests.cs` (U02's 2 pins) read in full.
+- **Files written (all four deliverables + the test file):**
+  - `src/Kumunita.Core/Messaging/IMessagingService.cs` — the **five
+    remaining seams** appended (the design doc §2.2 block, verbatim), plus
+    the three record types the seams return:
+    - `Task<ConversationRef> OpenConversationAsync(string actorId, string otherId);`
+    - `Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page);`
+    - `Task<ConversationList> ListConversationsAsync(string actorId, int page);`
+    - `Task SendAsync(string conversationId, string actorId, string body);`
+    - `Task MarkReadAsync(string conversationId, string actorId);`
+    - `record ConversationRef(string Id, string OtherParticipantId, string? OtherDisplayName, string? LastMessageBody, DateTimeOffset? LastMessageAt, int UnreadCount);`
+    - `record ConversationList(IReadOnlyList<ConversationRef> Items, bool HasMore);`
+    - `record ConversationDetail(ConversationRef Conversation, IReadOnlyList<Message> Messages, bool HasMore);`
+  - `src/Kumunita.Core/Messaging/MessagingService.cs` — the implementations;
+    the ctor **gains two optional trailing params** (the ADR 0077
+    optional-nudge-param idiom — CS1736, so U02's 2 tests keep compiling
+    unchanged): `IUserInfoService? userInfo = null` (the
+    `OtherDisplayName` resolution lane, refinement 8) +
+    `NotificationService? notifications = null` (the D6 nudge lane).
+    - `OpenConversationAsync`: blank `actorId`/`otherId` → `ArgumentException`
+      (400); `actorId == otherId` → `ArgumentException` (D1 — no
+      self-conversations); `EnsureEnabledAsync` (D2 hard gate); the pair is
+      **sorted** (`string.CompareOrdinal`) so `ParticipantA < ParticipantB`
+      (the F1 canonical form); find-or-create on the
+      `(ParticipantA, ParticipantB)` pair (the `convo_uidx_pair` unique
+      index is the DB-level witness); one `message.open` audit row
+      (`Via = Owner`, `TargetKind = "message"`, `TargetId = convoId`,
+      `Outcome = Allow`) in the same session, one `SaveChangesAsync`.
+    - `GetConversationAsync`: `EnsureEnabledAsync`; loads the conversation
+      — **non-leaky 404** (`KeyNotFoundException`) if missing **or** the
+      actor is not a participant (D3/D4, C-M9·1); page floors to 1; the
+      message window is newest-first `Skip/Take(PageSize)`; `HasMore =
+      messages.Count == PageSize` (ADR 0090 D1).
+    - `ListConversationsAsync`: `EnsureEnabledAsync`; queries
+      `Where(c => c.ParticipantA == actorId || c.ParticipantB == actorId)`
+      (F4 — only the caller's own conversations); sorts by
+      `LastMessageAt ?? Created` desc; paged (ADR 0090); per-conversation
+      last-message body + unread count.
+    - `SendAsync`: blank body → `ArgumentException`; `body.Length >
+      MaxBodyChars` (2000) → `ArgumentException` (D7); `EnsureEnabledAsync`;
+      non-leaky 404; stores the `Message` (D8 `ReadBy = null`,
+      `LanguageCode = "en"` the ADR 0018 authored-in tag); updates
+      `Conversation.LastMessageAt`; **the D6 nudge** —
+      `NotificationService.EmitAsync` (9-arg overload) for the *other*
+      participant, **before** the single `SaveChangesAsync` (the ADR 0076
+      D5 atomic shape — domain write + nudge + audit row commit
+      atomically); one `message.send` audit row (`Via = Owner`,
+      `TargetKind = "message"`, `TargetId = convoId`, `Outcome = Allow`).
+    - `MarkReadAsync`: `EnsureEnabledAsync`; non-leaky 404; sets
+      `ReadBy = actorId` on the messages where `SenderId == other &&
+      ReadBy == null` (D8 — caller-only); **no audit row** (C-M9·4 —
+      reads / read-state never audit).
+    - Constants: `MaxBodyChars = 2000`, `PageSize = 20` (the U00 drift-guard
+      pins 7 — the ADR 0076 D8 / ADR 0090 D4 neighborhood-scale shape).
+  - `src/Kumunita.Core/Notifications/NotificationKinds.cs` — the
+    **`message.new` kind added** (D6 — the closed code-owned set grows):
+    `public const string MessageNew = "message.new";` **not** in
+    `OptInKinds` (opt-OUT default = enabled — the resident-facing posture,
+    the ADR 0105 D6 shape). **Also added to the `Known` list** (the
+    17th entry) — the settings-page toggle set the design doc §2.5
+    "the settings page renders the `NotificationKinds.Known` toggles"
+    names (the ADR 0083/0084 append precedent — `group.added` /
+    `group.invite` / `announcement` / `community.post` / `page.child` are
+    all in `Known`).
+  - **`tests/Kumunita.Core.Tests/MessagingServiceTests.cs`** — extended
+    with the **12 pinned behavior pins** (U02's 2 toggle pins are preserved
+    verbatim — not rewritten). A new harness helper
+    `BootStoreWithNotificationsAsync` (the `NotificationServiceTests`
+    shape) registers `M6DocTypes` (so the `Notification` table exists for
+    the nudge pin) and constructs the `NotificationService` over the frozen
+    seams: a real `IDocumentStore`, an `IUserInfoService` substitute
+    (returns `null` for every `GetProfileAsync` — the `OtherDisplayName`
+    is `null` in these tests, which is the expected no-directory behavior),
+    a `RecordingTranslator` (key-derived markers, the same shape as
+    `NotificationServiceTests`), and a `RecordingMailer` (records the staged
+    tuples, never dispatches). Three query helpers (`QueryConversations` /
+    `QueryMessages` / `QueryNotifications`) are added alongside the
+    existing `AuditRows`.
+- **Pinned tests (12) — the design doc §2.5 names, verbatim:**
+  1. `OpenConversation_SamePairTwice_ReturnsSameConversation`
+  2. `OpenConversation_SamePairEitherOrder_ReturnsSameConversation`
+  3. `OpenConversation_BothParticipants_SignedIn_Only`
+  4. `Send_StoresMessage_BothParticipantsSeeIt`
+  5. `Send_OtherParticipant_GetsMessageNewNotification_Once`
+  6. `Send_BlankBody_ArgumentException`
+  7. `Send_OverCap_ArgumentException`
+  8. `GetConversation_NonParticipant_404_Not403`
+  9. `GetConversation_GlobalAdminNonParticipant_404`
+  10. `ListConversations_OnlyOwn_NoLeak`
+  11. `MarkRead_SetsReadByForCallerOnly`
+  12. `ToggleOff_AllSeamsRefuse_403`
+- **Audit-row field values (as implemented, verified against `Decision.cs`
+  and `AccessAudit.cs`):** `Action = "message.open"` / `"message.send"`,
+  `TargetKind = "message"`, `TargetId = conversationId`, `Via =
+  Authorization.AccessVia.Owner`, `Outcome =
+  Authorization.AccessOutcome.Allow`, `ActorId = EffectivePrincipalId =
+  actorId`, `VisibleCount = HiddenCount = null` (the single-target shape).
+  The `messaging.toggle` row (U02) is `Via = Admin` (the admin-toggle
+  lane). Reads / mark-read emit **no** `AccessAudit` row (C-M9·4).
+- **`HasMore` record shape (ADR 0090):** `ConversationList(Items, HasMore)`
+  + `ConversationDetail(Conversation, Messages, HasMore)` — `HasMore` is
+  the sole paging signal; `page` floors to 1; `HasMore = page filled` (a
+  full page of 20 implies there may be more). No `Total` / `Count` field
+  (the M7/M8 `FeedResult` shape).
+- **`message.new` nudge idempotency key (as written):**
+  `notification:message.new:{messageId}` — the `messageId` is the
+  32-char hex `Message.Id` (the codebase's `Guid.NewGuid().ToString("N")`
+  idiom, the M6 D4 shape). The `EmitAsync` call passes
+  `targetId: null` (the ADR 0084 per-target subscription gate is skipped —
+  messaging has no per-target scope), `linkPath: /messages/{conversationId}`,
+  `body: message.Body` (the UGC snippet, ADR 0018 — the recipient's
+  `EmailLanguage` governs the template around it, the emitter does not
+  pre-localize). Exactly **one** notification per send (dedup by key —
+  a re-emission of the same message is a no-op).
+- **Drift (two, both recorded, neither a drift-pause):**
+  1. **`MessagingService` ctor gains TWO optional params** (not one):
+     the plan's text said "gains an optional `NotificationService?` param"
+     (the ADR 0077 idiom); the actual implementation also needs
+     `IUserInfoService?` (the `OtherDisplayName` resolution, U00 drift-guard
+     pin 8). Both are **optional trailing** (`= null`) so U02's 2 tests
+     keep compiling unchanged (the ADR 0077 CS1736 idiom).
+  2. **`NotificationKinds.MessageNew` added to the `Known` list** — the
+     plan's text said "add `message.new` to `NotificationKinds`" without
+     specifying the `Known` list. The design doc §2.5 (the settings page
+     renders the `Known` toggles) + the ADR 0083/0084 append precedent
+     (every resident-facing kind is in `Known`) make this the right call.
+     **One consequence:** `Known` grows 16 → 17, which will break the
+     **Web** `NotificationsControllerTests.AllKinds.Count == 16` pin —
+     that is U06's concern (U06 owns the Web tests; the design doc §2.5
+     says "the settings page renders the `Known` toggles," so the count
+     pin must follow the `Known` list). U03's Core exit is green; the Web
+     count pin is out of U03's scope.
+  3. **`KnownTranslationKeys.cs` — the `message.new` keys added in all
+     four languages** (en/de/fr/da): `notifications.kind.message.new`,
+     `notifications.preference.message.new.label`,
+     `notification.message.new.subject`,
+     `notification.message.new.body`. The `NotificationService.EmitAsync`
+     reads these keys (the `notification.{kind}.subject` / `.body` shape)
+     before storing the `Notification` row — without them, the nudge pin
+     would see a null `Subject` / `Body`. The
+     `KnownTranslationKeys_ParityTests` (U06's Web-test concern) enforces
+     the four-language closure.
+  4. **`DependencyInjection.cs` — the `IMessagingService` registration
+     updated** to pass the two optional params (the ADR 0077 idiom):
+     `sp.GetRequiredService<IUserInfoService>()` +
+     `sp.GetRequiredService<Notifications.NotificationService>()`.
+     U02's registration passed only the `IDocumentStore`; U03's
+     implementations need the directory + nudge seams.
+  5. **`IQuerySession` vs `IDocumentSession` in
+     `CountUnreadForAsync`** — the plan's text (and the design doc §D8)
+     don't name the session type. The two read paths (`GetConversationAsync`
+     / `ListConversationsAsync`) use `IQuerySession` (read-only); the
+     write paths (`OpenConversationAsync` / `SendAsync` /
+     `MarkReadAsync`) use `IDocumentSession`. The helper's param is
+     typed `IQuerySession` (the more general of the two — both compile).
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` green (zero errors,
+  zero warnings). `Kumunita.Core.Tests.MessagingServiceTests` **14/14**
+  (U02's 2 + U03's 12) via
+  `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+  -class "Kumunita.Core.Tests.MessagingServiceTests"` (13.6s, Docker
+  Postgres up/down clean).
+- **Next:** U04 (see `in-progress/messaging-u04.md`) — the Web surface
+  (the `/messages` list + thread + nav entry + the `message.*` `kw-l` keys).

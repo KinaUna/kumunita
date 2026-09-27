@@ -114,6 +114,21 @@ public static class NotificationKinds
     /// .IsSubscriptionEnabledAsync"/> consults this table to resolve the
     /// effective default for a given kind.
     /// </summary>
+    // ── M9 — direct 1:1 messaging (ADR 0105) ─────────────────────────
+
+    /// <summary>
+    /// M9 (ADR 0105, U03) — the recipient of a direct 1:1 message gets a
+    /// nudge through the M6 lane (D6). Opt-OUT default (not in
+    /// <see cref="OptInKinds"/>): the kind is enabled until the resident
+    /// stores an explicit <c>Enabled = false</c> row (the resident-facing
+    /// posture — the same shape as <c>group.post</c> / <c>post.reply</c>).
+    /// The emitter is <see cref="Messaging.MessagingService".SendAsync}/>
+    /// (the ADR 0105 D6 shape: idempotency key
+    /// <c>notification:message.new:{messageId}</c>, <c>LinkPath =
+    /// /messages/{conversationId}</c>, <c>targetId = null</c>).
+    /// </summary>
+    public const string MessageNew = "message.new";
+
     public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         Announcement, PageChild,

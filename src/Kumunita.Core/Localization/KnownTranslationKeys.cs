@@ -1496,6 +1496,11 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "New posts in communities",
             ["notifications.subscription.group.post.label"] = "New posts in groups",
             ["notifications.subscription.page.child.label"] = "New sub-pages",
+            // ── M9 (ADR 0105, U03) — the message.new kind + nudge templates ──
+            ["notifications.kind.message.new"] = "New message",
+            ["notifications.preference.message.new.label"] = "Messages from other residents",
+            ["notification.message.new.subject"] = "A new message",
+            ["notification.message.new.body"] = "A resident sent you a message: ",
             ["pages.subscribe"] = "Subscribe to updates",
             ["pages.unsubscribe"] = "Unsubscribe from updates",
 
@@ -2942,6 +2947,11 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "Neue Beiträge in Communities",
             ["notifications.subscription.group.post.label"] = "Neue Beiträge in Gruppen",
             ["notifications.subscription.page.child.label"] = "Neue Unterseiten",
+            // ── M9 (ADR 0105, U03) — die message.new-Art + Vorlagen ──
+            ["notifications.kind.message.new"] = "Neue Nachricht",
+            ["notifications.preference.message.new.label"] = "Nachrichten von anderen Bewohnern",
+            ["notification.message.new.subject"] = "Neue Nachricht",
+            ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
             ["pages.subscribe"] = "Aktualisierungen abonnieren",
             ["pages.unsubscribe"] = "Abonnierung aufheben",
 
@@ -4387,6 +4397,11 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "Nouvelles publications dans les communautés",
             ["notifications.subscription.group.post.label"] = "Nouvelles publications dans les groupes",
             ["notifications.subscription.page.child.label"] = "Nouvelles sous-pages",
+            // ── M9 (ADR 0105, U03) — l'espèce message.new + les modèles ──
+            ["notifications.kind.message.new"] = "Nouveau message",
+            ["notifications.preference.message.new.label"] = "Messages d'autres résidents",
+            ["notification.message.new.subject"] = "Nouveau message",
+            ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
             ["pages.subscribe"] = "S'abonner aux mises à jour",
             ["pages.unsubscribe"] = "Se désabonner des mises à jour",
 
@@ -5825,6 +5840,11 @@ public static class KnownTranslationKeys
             ["notifications.subscription.community.post.label"] = "Nye indlæg i lokalsamfund",
             ["notifications.subscription.group.post.label"] = "Nye indlæg i grupper",
             ["notifications.subscription.page.child.label"] = "Nye undersider",
+            // ── M9 (ADR 0105, U03) — message.new-arten + skabeloner ──
+            ["notifications.kind.message.new"] = "Ny besked",
+            ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
+            ["notification.message.new.subject"] = "Ny besked",
+            ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
             ["pages.subscribe"] = "Abonner på opdateringer",
             ["pages.unsubscribe"] = "Opsig abonnement",
 

@@ -104,14 +104,19 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<UserInfo.IUserInfoService>(),
             sp.GetRequiredService<Notifications.NotificationService>()));
 
-        // M9 (ADR 0105, plan U02): the messaging-side service seam (bounded
+        // M9 (ADR 0105, plan U02/U03): the messaging-side service seam (bounded
         // context Kumunita.Core.Messaging — direct 1:1 signed-in resident
         // messaging, off by default). The same "AddTransient with the store
         // injected" shape as IAnnouncementService above; U02 ships the two
-        // admin-toggle seams (ctor over IDocumentStore only), U03 appends
-        // the conversation / message seams.
+        // admin-toggle seams, U03 appends the conversation / message seams and
+        // the two optional read/nudge lanes (IUserInfoService for the
+        // OtherDisplayName resolution, the M6 NotificationService for the
+        // message.new nudge — both composed so production sends fire the
+        // nudge, the same optional-nudge-param idiom as PostService above).
         services.AddTransient<Messaging.IMessagingService>(sp => new Messaging.MessagingService(
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
