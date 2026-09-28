@@ -2047,6 +2047,17 @@ body.kmb-page-expanded .page-expand-close {
   flex: none;
 }
 
+/* The card's "Details" toggle arrow (ADR 0106) — its own row at the card's
+   foot, right-aligned (the row's .text-end). Points down by default; while
+   the collapse is open the Bootstrap collapse sets aria-expanded="true" on
+   this button, so the arrow rotates to point up (collapse = "retract"). */
+.kanban-details-toggle svg {
+  transition: transform 120ms ease;
+}
+.kanban-details-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
 /* The ⋮ action triggers (ADR 0070 introduced it on the Kanban board heads
    and lane heads; ADR 0092 generalized it to every `⋮` dropdown trigger in
    the app) — borderless: no outline border and a transparent ground, so the
