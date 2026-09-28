@@ -141,6 +141,45 @@
     </div>
 </section>
 
+<!-- ══════════ What's new (the VN lane, ADR 0110) ══════════ -->
+<section class="kmb-section" id="whats-new" aria-label="What's new">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-12 col-lg-8">
+                <div class="eyebrow"><kw-l key="whatsnew.eyebrow">What's new</kw-l></div>
+                <h2 class="h3 mt-2"><kw-l key="whatsnew.heading">What's new, version by version</kw-l></h2>
+                <p class="kmb-section-lead mx-auto mt-3" style="max-width: 42rem;">
+                    <kw-l key="whatsnew.lead">Every release is dated and listed here — read what landed in each minor version of the platform you are using.</kw-l>
+                </p>
+            </div>
+        </div>
+        <div class="row justify-content-center mt-5">
+            <div class="col-12 col-lg-9">
+                <ol class="list-unstyled d-flex flex-column gap-4 mb-0">
+                    @foreach (var v in WhatsNew.All)
+                    {
+                        <li class="kmb-whatsnew-entry border rounded p-3 p-md-4">
+                            <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+                                <span class="fw-semibold">
+                                    <kw-l key="whatsnew.version">Version</kw-l>
+                                    <span>@v.Version</span>
+                                </span>
+                                <time datetime="@v.Date" class="text-secondary">@v.Date</time>
+                            </div>
+                            <ul class="mb-0">
+                                @foreach (var change in v.Changes)
+                                {
+                                    <li>@change</li>
+                                }
+                            </ul>
+                        </li>
+                    }
+                </ol>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- ══════════ 5. Contact CTA band ══════════ -->
 <section class="kmb-cta-band" aria-label="Get in touch">
     <div class="container d-flex flex-column flex-md-row align-items-center justify-content-between gap-4">

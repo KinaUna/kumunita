@@ -44,6 +44,11 @@
        author placed them. *@
     @await Html.PartialAsync("_FlashToast")
     @await Html.PartialAsync("_PinnedAnnouncement")
+    @* What's-new toast (the VN lane, ADR 0110) — announces the current
+       platform version (WhatsNew.Latest) with a link to the About page's
+       "What's new" section. Dismissal is remembered per browser (see
+       _WhatsNewToast.cshtml + client/lib/whatsnew-toast.ts). *@
+    @await Html.PartialAsync("_WhatsNewToast")
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
@@ -242,6 +247,10 @@
          data-bs-autohide / data-bs-delay attributes drive the 5 s
          auto-dismiss + fade-out. -->
     <script type="module" src="~/js/lib/flash-toast.js"></script>
+    <!-- What's-new toast (the VN lane, ADR 0110; see _WhatsNewToast.cshtml):
+         hides the toast on load if this version was already seen in this
+         browser (localStorage), otherwise records it + arms the auto-hide. -->
+    <script type="module" src="~/js/lib/whatsnew-toast.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class

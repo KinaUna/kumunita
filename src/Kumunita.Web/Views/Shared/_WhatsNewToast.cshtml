@@ -1,0 +1,69 @@
+@*
+    _WhatsNewToast.cshtml — the "Kumunita {v} is now in use" toast (the VN
+    lane, ADR 0110).
+
+    Rendered at the top of <body> in _Layout.cshtml, next to _FlashToast /
+    _PinnedAnnouncement. It announces the current platform version
+    (WhatsNew.Latest.Version) so a resident who signs in on an upgraded
+    deployment sees what's new, with a link straight to the "What's new"
+    section of the About page (#whats-new).
+
+    Dismissal is remembered per browser via localStorage
+    ("kumunita-whatsnew-seen-version") — see client/lib/whatsnew-toast.ts.
+    The server renders the toast unconditionally (it does not know the
+    client's localStorage); the module hides it on load if the current
+    version has already been seen. The `show` class is in the markup so a
+    JS-less / no-DOM user who has never seen this version still gets the
+    announcement (and screen readers hear it immediately) — exactly the
+    _FlashToast contract.
+
+    The {v} placeholder in the kw-l values is substituted server-side (the
+    kw-l TagHelper does not interpolate): the effective-language value is
+    resolved here and .Replace("{v}", …) applied, mirroring how
+    _PinnedAnnouncement resolves its strings per request.
+*@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var version = WhatsNew.Latest.Version;
+
+    // Effective-language resolution (ADR 0049 chain: cookie → Accept-Language
+    // → instance default → en), the same seam the pinned-announcement banner
+    // uses. A null request (e.g. a unit render) degrades to "no preference".
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+
+    // The kw-l TagHelper does not interpolate {v}, so the two toast strings are
+    // resolved here (the ADR 0049 effective-language chain) and the version is
+    // substituted in C#. A null provider, a blank value, or an unregistered key
+    // (the provider's last-resort is the key itself) all degrade to the en
+    // floor — a resident never sees a blank or a raw key.
+    string? labelRaw = Translation is null ? null : await Translation.GetAsync("whatsnew.toast_label", effLang);
+    string label = (string.IsNullOrWhiteSpace(labelRaw) || labelRaw == "whatsnew.toast_label")
+        ? $"Kumunita {version} is now in use."
+        : labelRaw.Replace("{v}", version);
+
+    string? seeRaw = Translation is null ? null : await Translation.GetAsync("whatsnew.toast_see", effLang);
+    string seeLabel = (string.IsNullOrWhiteSpace(seeRaw) || seeRaw == "whatsnew.toast_see")
+        ? "See what's new"
+        : seeRaw.Replace("{v}", version);
+}
+<div class="toast-container position-fixed top-0 end-0 p-3 kmb-whatsnew-toast"
+     id="whatsnew-toast-container" aria-label="What's new"
+     data-whatsnew-version="@version">
+    <div class="toast align-items-center text-bg-primary border-0 show"
+         role="status" aria-live="polite" aria-atomic="true"
+         data-whatsnew-version="@version">
+        <div class="d-flex">
+            <div class="toast-body">
+                @label
+                <a class="link-light ms-1 text-decoration-underline" href="/about#whats-new">
+                    @seeLabel
+                </a>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>

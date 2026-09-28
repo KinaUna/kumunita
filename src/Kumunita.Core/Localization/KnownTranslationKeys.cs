@@ -1255,6 +1255,16 @@ public static class KnownTranslationKeys
                 "If you're curious how it works — or if you're about to host " +
                 "it for your neighbourhood — everything is public.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "What's new",
+            ["whatsnew.heading"]        = "What's new, version by version",
+            ["whatsnew.lead"] =
+                "Every release is dated and listed here — read what landed in " +
+                "each minor version of the platform you are using.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.toast_label"]    = "Kumunita {v} is now in use.",
+            ["whatsnew.toast_see"]      = "See what's new",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
             ["tags.list.lede"] =
@@ -2778,6 +2788,16 @@ public static class KnownTranslationKeys
                 "Wenn du neugierig bist, wie es funktioniert — oder wenn du es " +
                 "gleich für deine Nachbarschaft hosten willst — ist alles öffentlich.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "Was ist neu",
+            ["whatsnew.heading"]        = "Was ist neu — Version für Version",
+            ["whatsnew.lead"] =
+                "Jede Veröffentlichung ist hier mit Datum gelistet — lies nach, " +
+                "was in jeder Minor-Version der Plattform, die du nutzt, eingezogen ist.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.toast_label"]    = "Kumunita {v} ist jetzt im Einsatz.",
+            ["whatsnew.toast_see"]      = "Was ist neu?",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
             ["tags.list.lede"] =
@@ -4274,6 +4294,16 @@ public static class KnownTranslationKeys
                 "Si tu es curieux de savoir comment ça marche — ou si tu " +
                 "t'apprêtes à l'héberger pour ton quartier — tout est public.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "Nouveautés",
+            ["whatsnew.heading"]        = "Nouveautés, version par version",
+            ["whatsnew.lead"] =
+                "Chaque publication est datée et listée ici — lis ce qui est " +
+                "arrivé dans chaque version mineure de la plateforme que tu utilises.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.toast_label"]    = "Kumunita {v} est désormais en service.",
+            ["whatsnew.toast_see"]      = "Voir les nouveautés",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Étiquettes",
             ["tags.list.lede"] =
@@ -5762,6 +5792,15 @@ public static class KnownTranslationKeys
             ["about.project.lead"] =
                 "Er du nysgerrig på, hvordan det fungerer — eller om du " +
                 "er ved at hoste det til dit nabolag — så er alt offentligt.",
+
+            // ── what's new (the VN lane, ADR 0110) ──────────────────────────
+            ["whatsnew.eyebrow"]        = "Nyheder",
+            ["whatsnew.heading"]        = "Nyheder, version for version",
+            ["whatsnew.lead"] =
+                "Hver udgivelse er datoeret og listet her — læs, hvad der er landet i hver minor-version af platformen, du bruger.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.toast_label"]    = "Kumunita {v} er nu i brug.",
+            ["whatsnew.toast_see"]      = "Se nyhederne",
 
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
