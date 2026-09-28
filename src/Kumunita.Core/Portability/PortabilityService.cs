@@ -136,6 +136,60 @@ public sealed class PortabilityService(
     }
 
     /// <inheritdoc />
-    public Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default) =>
-        throw new NotImplementedException("M11 U01 shell — the import body lands in U05–U06 (the validate-then-apply, the identity re-creation with secrets reset, the config apply, and the one `portability.import` audit row).");
+    public async Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default)
+    {
+        // ── Read the archive (the §layout inverse) ─────────────────────
+        var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+
+        // ── §validate — the fail-closed gate (C-M11·4) ─────────────────
+        // Runs to completion before ANY write (the C-M11·4 pin). A
+        // failure returns the closed failure set and writes ZERO rows
+        // (the U07 fail-closed test witnesses it: the fresh instance
+        // has zero rows after a failed import).
+        var validation = PortabilityValidate.Run(data);
+        if (!validation.Ok)
+            return new PortabilityImportResult(Ok: false, Failures: validation.Failures);
+
+        // ── §apply — one commit, the pinned dependency order (C-M11·4) ─
+        // The locked order (design doc §validate "apply phase"):
+        //   1. Re-create the Identity principals (U06's
+        //      ApplyIdentityAsync — secrets reset, C-M11·2 import
+        //      boundary).
+        //   2. Store the domain documents in the §inventory import
+        //      order (U05 — this unit).
+        //   3. Copy the media bytes into the volume at the
+        //      {Id[0..2]}/{Id} layout (U05 — this unit, C-M11·3).
+        //   4. Apply the config (U06's ApplyConfigAsync — the
+        //      CommunityOptions + LocaleSettings + LanguageCatalog,
+        //      the §config field set).
+        //
+        // U06 SEAM (step 1): the identity re-creation (from
+        // identity/principals.json, keyed by the exported subjectId,
+        // secrets reset — a fresh non-portable password + a fresh
+        // security stamp — the C-M11·2 import boundary) + the role
+        // re-apply. U06 inserts this call BEFORE the docs apply.
+        //
+        // Step 2 (U05): store the domain documents in the registry's
+        // import order (parents before children — the D7 order).
+        await PortabilityApplyDocuments.ApplyAsync(documentStore, data, ct).ConfigureAwait(false);
+
+        // Step 3 (U05): copy the media bytes into the volume at the
+        // {Id[0..2]}/{Id} content-addressed layout (C-M11·3 — the
+        // same layout as the local volume; the dedup-by-content-hash
+        // is preserved).
+        await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
+
+        // U06 SEAM (step 4): the config apply (the CommunityOptions +
+        // the LocaleSettings + the LanguageCatalog — the §config field
+        // set; the U02 ConfigExport mirror, verbatim). U06 inserts this
+        // call AFTER the media apply.
+        //
+        // U06 SEAM (audit row): the one portability.import AccessAudit
+        // row (TargetKind "portability", Via = Admin, verb import) —
+        // emitted by the service (the controller adds none, the ADR
+        // 0105 messaging.toggle shape). U06 inserts this call after a
+        // clean apply.
+
+        return PortabilityImportResult.Success;
+    }
 }

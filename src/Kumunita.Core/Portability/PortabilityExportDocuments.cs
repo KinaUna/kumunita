@@ -63,9 +63,14 @@ public static class PortabilityExportDocuments
     /// <summary>
     /// The 44 registry name → POCO <see cref="Type"/> map (data, parallel to
     /// the <see cref="PortabilityDocTypes.Entries"/> string names — every
-    /// registry entry has exactly one <see cref="Type"/> here).
+    /// registry entry has exactly one <see cref="Type"/> here). <see
+    /// cref="internal"/> (not <see cref="private"/>) so U05's validate (b)
+    /// + the apply loop can dispatch their per-type <c>List&lt;T&gt;</c>
+    /// deserialization / storage against the <em>same</em> frozen table —
+    /// the single name→<see cref="Type"/> map in the context, not three
+    /// copies.
     /// </summary>
-    private static readonly Dictionary<string, Type> NameToType = new(StringComparer.Ordinal)
+    internal static readonly Dictionary<string, Type> NameToType = new(StringComparer.Ordinal)
     {
         ["Group"]                    = typeof(Kumunita.Core.UserInfo.Group),
         ["Component"]                = typeof(Kumunita.Core.UserInfo.Component),

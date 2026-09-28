@@ -858,3 +858,263 @@ Per the register's U04 entry reads (plus U03's actual seams):
   4 languages).
 - `src/Kumunita.Core/Identity/AccessAudit.cs` + the `AccessVia.Admin` /
   `TargetKind` shapes (the one-audit-row contract the service emits).
+
+## U05 — Import: the validate-then-apply of documents + media, fail-closed (2026-09-28)
+
+**Exit status:** `dotnet build Kumunita.slnx -c Debug` → **green** (0
+errors; the single `xUnit2013` warning at
+`tests/Kumunita.Core.Tests/MessagingServiceTests.cs(204)` is pre-existing
+and unrelated). The U04-noted `CS9113: Parameter 'mediaFileStore' is
+unread` on `PortabilityService`'s ctor is now **resolved** (U05's media
+apply consumes it). `Kumunita.Web.Tests` → **528 total, 0 failed**.
+`Kumunita.Core.Tests` → **956 total, 0 failed**.
+
+### Files written / touched
+
+- **Created** `src/Kumunita.Core/Portability/PortabilityValidate.cs` —
+  the §validate phase (the C-M11·4 fail-closed gate). The four locked
+  checks (a)–(d) run to completion **before any write** (the C-M11·4
+  pin). The closed failure set is emitted as a
+  `PortabilityValidationResult(bool Ok, IReadOnlyList<string> Failures)`
+  — the U06 web surface + the U07 fail-closed pin render / assert
+  <em>exactly</em> it. The data-driven referential-integrity loop
+  iterates `PortabilityDocTypes.InOrder()` + each entry's
+  `ReferenceFields` generically (the D7 reference map, **not**
+  per-type code). The media verification (check (d)) verifies the
+  content-hash match via `Convert.ToHexString(SHA256.HashData(bytes)).
+  ToLowerInvariant() == m.Id` (the C-M11·3 "content-hash matches the
+  path" pin — the `LocalVolumeMediaStore.Sha256Hex` convention).
+- **Created** `src/Kumunita.Core/Portability/PortabilityApplyDocuments.cs`
+  — the §apply step 2: store the domain documents in the registry's
+  import order (parents before children — the D7 order) as **one
+  commit** (a single `SaveChangesAsync` — the C-M11·4 "one commit"
+  pin). The loop is uniform (the
+  `PortabilityExportDocuments.NameToType` table lookup + `List<T>`
+  deserialization + `session.Store(row)` — **not** per-type code). The
+  non-generic `session.Store(object)` call is the same seam U04's
+  `ExportAsync` uses for the `AccessAudit` row (no reflection needed —
+  the `Marten.ISession` interface in .NET 10's Marten 9.31.2 does not
+  expose a generic `Store<T>` method that compiles without a type
+  argument; the non-generic `Store(object)` is the in-repo idiom).
+- **Created** `src/Kumunita.Core/Portability/PortabilityApplyMedia.cs`
+  — the §apply step 3: copy the media bytes into the volume at the
+  `{Id[0..2]}/{Id}` content-addressed layout (the C-M11·3 pin — the
+  **same** layout as the local volume, so import is a byte-copy and the
+  dedup-by-content-hash is preserved). The `IMediaFileStore.PutAsync`
+  seam applies the layout (the C-MED·3/4/7 convention — the same as
+  `LocalVolumeMediaStore.PutAsync`'s byte write). Idempotent (C-MED·4):
+  a re-import of the same file is a no-op at the byte layer. The
+  `MediaObject` catalog doc is **not** stored here — it is one of the
+  44 content docs already stored by `PortabilityApplyDocuments.ApplyAsync`
+  (order 3 in the D7 registry).
+- **Modified** `src/Kumunita.Core/Portability/PortabilityExportDocuments.cs`
+  — the `NameToType` map's visibility widened from `private` to
+  `internal` (U05's validate (b) + the apply loop dispatch their
+  per-type `List<T>` deserialization / storage against the **same**
+  frozen table — the single name→`Type` map in the context, not three
+  copies).
+- **Modified** `src/Kumunita.Core/Portability/PortabilityService.cs`
+  — the `ImportAsync(actorId, Stream archive, ct)` body filled in (the
+  U01 shell's `NotImplementedException` replaced with the
+  validate-then-apply composition): `KumunitaArchive.ReadAsync` →
+  `PortabilityValidate.Run(data)` (a failure ⇒ return the closed
+  failure set, **zero writes**, C-M11·4) → on a clean validate:
+  `PortabilityApplyDocuments.ApplyAsync(documentStore, data, ct)` →
+  `PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct)` →
+  `PortabilityImportResult.Success`. **U06's seam is reserved**: the
+  identity re-creation (step 1, `ApplyIdentityAsync` — secrets reset,
+  the C-M11·2 import boundary) + the config apply (step 4,
+  `ApplyConfigAsync` — the `CommunityOptions` + the `LocaleSettings` +
+  the `LanguageCatalog`, the §config field set) + the one
+  `portability.import` `AccessAudit` row (the ADR 0105 `messaging.
+  toggle` shape) are **not** implemented — the `ImportAsync` body has
+  explicit `// U06 SEAM` comments marking the three insertion points.
+- **Moved** `docs/plans-milestones/in-progress/portability-u05.md` →
+  `docs/plans-milestones/done/portability-u05.md` (the unit is
+  complete; the unit-series rule).
+- **Touched** this handoff note — this `## U05` section appended
+  (existing sections untouched, per the "never rewrite existing
+  handoff sections" rule).
+- **Not touched** (per the unit's scope): no tests (the U07
+  round-trip / no-secret / fail-closed tests are U07's deliverable —
+  the U07 round-trip test witnesses U05's apply path end-to-end; the
+  U07 fail-closed test witnesses U05's validate path end-to-end), no
+  Web surface (the U06 `POST Import` action + the `portability.import`
+  audit row + the `portability.*` kw-l keys are U06's deliverables),
+  no `Milestones.cs` / README / `docs/STATUS.md` / `docs/ARCHITECTURE.md`
+  / `MilestonesTests.cs` change (the U07 flip, C-M11·8).
+
+### Exact validate-check set (as written — the U07 fail-closed test
+asserts exactly these)
+
+The four locked checks (the design doc §validate, copied verbatim):
+
+| # | Check | Failure code(s) | Invariant |
+|---|-------|-----------------|-----------|
+| (a) | `format` is one the build understands (the closed set: `kumunita/portability/1`) | `format.unsupported` | C-M11·1 |
+| (b) | each `docs/{Type}.json` in the §inventory deserializes into its declared POCO set; a malformed / missing / unexpected `docs/` file is rejected | `docs.missing:{Type}` / `docs.malformed:{Type}` | C-M11·4 |
+| (c) | every id referenced by the §inventory reference map resolves to a row within the archive (data-driven loop over `PortabilityDocTypes.InOrder()` + each entry's `ReferenceFields`) | `ref.dangling:{Type}.{field}` | C-M11·4 |
+| (d) | every `MediaObject` listed in the `media_manifest` has its bytes present in `media/{Id[0..2]}/{Id}` AND the byte content matches (the size + the content hash implied by the path) | `media.missing:{id}` / `media.mismatch:{id}` | C-M11·3 |
+
+**Any failure ⇒ zero writes** (C-M11·4) — the validate phase is
+read-only over the in-memory archive; the apply phase runs only on a
+clean validate.
+
+### Exact closed failure-set shape (as written — the U06 web surface +
+the U07 pin render / assert exactly this)
+
+```
+format.unsupported
+docs.missing:{Type}
+docs.malformed:{Type}
+ref.dangling:{Type}.{field}
+media.missing:{id}
+media.mismatch:{id}
+```
+
+The `PortabilityValidationResult(bool Ok, IReadOnlyList<string>
+Failures)` record carries the failure list — the U06 web surface
+renders the `portability.status.failure` kw-l key + the failure list in
+the `TempData["error"]`; the U07 fail-closed pin asserts the exact
+closed set (no more, no less).
+
+### Apply-order entry count (matches the registry)
+
+**44 entries.** The apply loop iterates `PortabilityDocTypes.InOrder()`
+— orders 1→44 in the 9 locked order-groups (parents before children,
+the D7 order). One `session.Store(row)` per deserialized row (the
+`List<T>` rows from `docs/{Type}.json`). One `SaveChangesAsync` at the
+end (the C-M11·4 "one commit" pin).
+
+### `ImportAsync` public signature (the U06 + the U07 target verbatim)
+
+```csharp
+Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default);
+```
+
+The body (as written — U06's seams marked):
+
+```csharp
+public async Task<PortabilityImportResult> ImportAsync(string actorId, Stream archive, CancellationToken ct = default)
+{
+    var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+    var validation = PortabilityValidate.Run(data);
+    if (!validation.Ok)
+        return new PortabilityImportResult(Ok: false, Failures: validation.Failures);
+
+    // U06 SEAM (step 1): ApplyIdentityAsync — the identity re-creation
+    // (secrets reset, the C-M11·2 import boundary) + the role re-apply.
+    // U06 inserts this call BEFORE the docs apply.
+
+    // Step 2 (U05): store the domain documents in the registry's
+    // import order (parents before children — the D7 order).
+    await PortabilityApplyDocuments.ApplyAsync(documentStore, data, ct).ConfigureAwait(false);
+
+    // Step 3 (U05): copy the media bytes into the volume at the
+    // {Id[0..2]}/{Id} content-addressed layout (C-M11·3).
+    await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
+
+    // U06 SEAM (step 4): ApplyConfigAsync — the CommunityOptions +
+    // the LocaleSettings + the LanguageCatalog (the §config field set).
+    // U06 inserts this call AFTER the media apply.
+
+    // U06 SEAM (audit row): the one portability.import AccessAudit row
+    // (TargetKind "portability", Via = Admin, verb import) — emitted
+    // by the service (the controller adds none, the ADR 0105 shape).
+    // U06 inserts this call after a clean apply.
+
+    return PortabilityImportResult.Success;
+}
+```
+
+### "Zero writes on validate failure" pin confirmed (C-M11·4 source boundary)
+
+The `PortabilityValidate.Run(data)` is **read-only** over the
+in-memory `KumunitaArchiveData` — it does not open a Marten session,
+does not call `IMediaFileStore.PutAsync`, does not touch the Identity
+`UserManager`, does not write any file. The apply phase
+(`PortabilityApplyDocuments.ApplyAsync` + `PortabilityApplyMedia.
+ApplyAsync`) runs **only** after `validation.Ok` is `true`. A
+validate failure returns the closed failure set **before** any apply
+call — the C-M11·4 "zero writes" pin is enforced at the source (the
+U07 fail-closed test witnesses it: the fresh instance has zero rows
+after a failed import).
+
+### Drift from the plan's text
+
+1. **The `NameToType` map's visibility is widened from `private` to
+   `internal`** (not in the unit plan's literal text) — U05's validate
+   (b) + the apply loop need the same name→`Type` map U02's export
+   loop uses; widening to `internal` (not `public`) keeps it
+   context-internal (the C-M11·7 "zero new authorization surface"
+   pin is unaffected — no new public API). The single map in the
+   context is now shared by U02's export loop + U05's validate (b) +
+   U05's apply loop (no three copies to drift).
+2. **The `Marten.ISession` generic `Store<T>` is not accessible** in
+   .NET 10's Marten 9.31.2 (the `Marten.ISession` type does not
+   exist in the namespace `Marten` — CS0234). The in-repo idiom is
+   the non-generic `session.Store(object)` (U04's `ExportAsync` uses
+   it for the `AccessAudit` row; `LocalVolumeMediaStore.PutAsync`
+   uses it for the `MediaObject` doc; the 76 `session.Store(...)`
+   calls in the tree are all non-generic). U05's apply loop uses the
+   same non-generic `session.Store(row)` — no reflection needed, no
+   new public API, the same in-repo idiom.
+3. **The multi-kind `TargetId` resolution (Notification /
+   NotificationSubscription) is a sentinel-tolerant check** (not in
+   the unit plan's literal text, but grounded in source): the
+   design doc §inventory names the union as
+   `Component|Group|Page|Announcement`, but the emitters in source
+   use **non-id sentinels** for several kinds (`"announcements"` /
+   `"announcementcomments"` / `"signup"` / `"messaging.toggle"` —
+   the `NotificationKinds` closed set). A multi-kind `TargetId` value
+   that matches **none** of the four named kinds' id sets is treated
+   as a **sentinel** (a non-reference by design — it does not point
+   at a doc row) and is **skipped** (satisfied, not dangling). This
+   is the drift-guard rule applied: the source (the emitters'
+   closed sentinel set) is the authority; the §inventory's union
+   names the <em>doc-id</em> resolution, not the sentinel case. The
+   U07 round-trip test will witness this at runtime (the Notification
+   / NotificationSubscription rows in the plant will have sentinel
+   `TargetId`s that resolve as satisfied — the integrity loop skips
+   them, not rejects them).
+
+### Compile warnings
+
+- 0 new warnings in `Kumunita.Core` / `Kumunita.Web`.
+- The U04-noted `CS9113: Parameter 'mediaFileStore' is unread` on
+  `PortabilityService` is **resolved** (U05's `PortabilityApplyMedia.
+  ApplyAsync(mediaFileStore, ...)` consumes it).
+- The single pre-existing `xUnit2013` warning at
+  `tests/Kumunita.Core.Tests/MessagingServiceTests.cs(204)` is
+  unrelated to U05 (it was present at U04's exit).
+- **No new packages.** `Kumunita.Core.csproj` is untouched (the
+  `System.IO.Compression` / `System.Text.Json` BCL pin holds; D2).
+
+### Next unit's entry reads (U06 — the identity re-creation + the
+config apply + the Web surface + the `portability.import` audit + the
+kw-l keys)
+
+Per the register's U06 entry reads (plus U05's actual seams):
+- `docs/design/m11-portability-design.md` — §principals (the locked
+  no-secret field set the re-creator consumes), §config (the locked
+  config field set), §surface (the D5 `import` route + action + the
+  one-audit-row shape), §kw-l (the locked key list).
+- `src/Kumunita.Core/Portability/PortabilityService.cs` — the
+  complete `ImportAsync(actorId, Stream archive, ct)` (the U05 body
+  with the three `// U06 SEAM` comments marking the identity
+  re-creation + the config apply + the `portability.import` audit
+  row insertion points).
+- `src/Kumunita.Core/Portability/PrincipalsExport.cs` +
+  `ConfigExport.cs` — U02's principals/config extractors (the exact
+  field set U06's re-creator + applier mirror, verbatim).
+- `src/Kumunita.Core/Identity/UserManager.cs` (or the Identity
+  `UserManager` setup in `DependencyInjection.cs`) — the
+  `UserManager.CreateAsync` + the `AddToRoleAsync` + the **reset**
+  shape (the `PasswordHasher` / the fresh password + the
+  security-stamp reset the C-M11·2 import boundary enforces).
+- `src/Kumunita.Web/Controllers/AdminPortabilityController.cs` —
+  U04's export surface (the `import` action + the view form U06
+  completes, the D5 shape).
+- `src/Kumunita.Web/Views/Admin/Portability.cshtml` — U04's index
+  view (the import upload form U04 rendered, U06 wires the `POST` +
+  the status render).
