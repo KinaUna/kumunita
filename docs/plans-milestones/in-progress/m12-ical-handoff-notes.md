@@ -118,6 +118,63 @@ capability. (2) `CATEGORIES` resolution is the **Web layer's**, not the
 emitter's — the emitter is pure Core and takes the already-resolved names
 (`categoriesByEventId`).
 
+## U01 — IcsWriter
+
+**Status:** complete. `IcsWriter` (the pure emitter) + its 10 pinned pure
+tests land; build green; all 10 discovered + passing; no other Core test
+regressed.
+
+**`Build` signature as implemented** (locked D6 surface, verbatim):
+
+```csharp
+public static string Build(
+    IReadOnlyList<Event> events,
+    DateTimeOffset nowUtc,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? categoriesByEventId = null);
+```
+
+`IcsWriter` is a `public static class` in `Kumunita.Core/Events/` (the
+`AuditPurgeService` precedent) — one public method, private ctor, BCL-only
+(`System` + `System.Text` + `System.Collections.Generic`; **no** new package
+in `Kumunita.Core.csproj` — D1 holds). Pure: no store, no clock, no
+`ITagService`, no reflection.
+
+**Emitted subset (the §ics closed list, in the §field-map order):**
+`VCALENDAR` = `VERSION:2.0` / `PRODID:-//Kumunita//community calendar//EN`
+/ `CALSCALE:GREGORIAN` / `METHOD:PUBLISH` + one `VEVENT` per event:
+`UID:kw-eve-{Id}@kumunita` / `DTSTAMP:{nowUtc}Z` / `DTSTART:{Start}Z` /
+`DTEND:{End}Z` / `SUMMARY:{Title}`; conditionally `DESCRIPTION` (Body
+Markdown **source**, non-empty only), `LOCATION` (set only), `CATEGORIES`
+(names passed, each escaped then joined with the literal list-separator
+comma), `STATUS:CANCELLED` (`IsDeleted` only). CRLF endings; 75-octet fold
+(split at a ≤ 75-octet boundary on UTF-16 char boundaries so multi-byte
+UTF-8 sequences are never broken; single leading space on continuations);
+escape `\`→`\\` first, then `;`→`\;`, `,`→`\,`, CR/LF→`\n`. Never:
+`ORGANIZER`/`ATTENDEE`/`RSVP`/`RRULE`/`VTODO`/`Color`/`AuthorId`/any `X-…`
+or other vendor prop. Empty `events` ⇒ the bare `VCALENDAR` envelope.
+
+**Tests (10 pinned, exact names, `tests/Kumunita.Core.Tests/IcsWriterTests.cs`,
+no Testcontainers):** `IcsWriter_Emits_Only_The_Pinned_Subset` ·
+`IcsWriter_Escapes_Backslash_Semicolon_Comma_Newline` ·
+`IcsWriter_Folds_A_Line_Longer_Than_75_Octets` ·
+`IcsWriter_Uses_CRLF_Line_Endings` ·
+`IcsWriter_Keeps_UID_Stable_Per_Event_Id` ·
+`IcsWriter_Writes_DTSTART_DTEND_As_UTC_Z_Suffixed` ·
+`IcsWriter_DESCRIPTION_Carries_Markdown_Source_Not_Html` ·
+`IcsWriter_Emits_STATUS_CANCELLED_On_A_Deleted_Event` ·
+`IcsWriter_Categories_From_Resolved_Tags` ·
+`IcsWriter_Empty_Feed_Is_A_Valid_Empty_Calendar`.
+
+**Deviation:** none. Every pin implemented exactly as the LOCKED design
+doc states; no source drift found (the `Event` POCO, `IcsWriter`
+precedent shape, and BCL-only D1 all matched the frozen pins).
+
+**Handoff for U02:** `Build` is ready to be called from
+`EventController.EventIcs` as `IcsWriter.Build([ev], DateTimeOffset.UtcNow,
+categoriesForEv)` — resolve `categoriesForEv` via the §field-map idiom
+(`ITagService.ListForActorAsync` → `DisplayedName`, drop dangling,
+`OrderBy(Ordinal)`) and pass `null`/skip when no names resolve.
+
 **Open items for U01–U05:** U01 writes `IcsWriter` + the 10 pure pins + the
 1 composition pin (reads the design doc §ics/§field-map/§pinned tests
 verbatim); U02 adds the lane-1 route + CATEGORIES call (confirm the
