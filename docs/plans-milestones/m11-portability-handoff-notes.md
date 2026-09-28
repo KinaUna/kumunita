@@ -1118,3 +1118,324 @@ Per the register's U06 entry reads (plus U05's actual seams):
 - `src/Kumunita.Web/Views/Admin/Portability.cshtml` — U04's index
   view (the import upload form U04 rendered, U06 wires the `POST` +
   the status render).
+
+## U06 — Import: the identity re-creation (secrets reset) + the config apply + the web surface + the `portability.import` audit + the kw-l keys (2026-09-28)
+
+**Exit status:** `dotnet build Kumunita.slnx -c Debug` → **green**
+(0 errors; the single `xUnit2013` warning at
+`tests/Kumunita.Core.Tests/MessagingServiceTests.cs(204)` is the
+pre-existing, unrelated one U05 carried forward). `Kumunita.Web.Tests`
+→ **528 total, 0 failed**. `Kumunita.Core.Tests` → **956 total, 0
+failed**. The U04/U05-noted `CS9113: Parameter 'mediaFileStore' is
+unread` stays resolved (U05's media apply still consumes it; U06 adds
+no new unread ctor param — the new `RoleManager` seam is consumed by
+`PortabilityApplyIdentity.ApplyAsync`).
+
+### Files written / touched
+
+- **Created** `src/Kumunita.Core/Portability/PortabilityApplyIdentity.cs`
+  — the §apply step 1: the **identity re-creation** (D3 / C-M11·2 import
+  boundary). For every `identity/principals.json` row, re-create the
+  Identity `User` **keyed by the exported `subjectId`** (the §principals
+  "key" column — the stable id the rest of the graph references), **reset
+  the secrets** (a fresh non-portable password via
+  `UserManager.CreateAsync(user, freshPassword)` + a fresh security stamp
+  via `UpdateSecurityStampAsync` — the C-M11·2 import boundary, the single
+  most load-bearing M11 invariant enforced on the import side), and
+  **re-apply the roles** (`AddToRoleAsync`, the elevated role rows
+  ensured-exist via `RoleManager.CreateAsync` — the `SampleDataSeeder`
+  `EnsureUserAsync` idiom). The `displayName` / `verified` / `blocked`
+  fields are the `Profile` doc's state — re-materialized by U05's
+  `PortabilityApplyDocuments.ApplyAsync` (step 2, order 5 in the §inventory);
+  this unit is the Identity `User` + role standing only. `RandomPassword()`
+  reuses the `SampleDataSeeder.RandomPassword` CSPRNG idiom verbatim (the
+  fresh non-portable credential — 32 chars, upper + lower + digit
+  guaranteed, the app's Identity policy).
+- **Created** `src/Kumunita.Core/Portability/PortabilityApplyConfig.cs`
+  — the §apply step 4: the **config apply** (D2 / §config). Mirrors U02's
+  `ConfigExport` field set **verbatim**: the `LocaleSettings` singleton
+  (the seven instance-level locale fields, verbatim) + every
+  `LanguageCatalog` row (the §config `languages[]` field set) — the
+  load-then-`Store` idempotent shape (the `FirstBootSeeder` idiom), one
+  commit (the C-M11·4 "one commit" pin; the last apply step, so the
+  `LanguageCatalog` / `LocaleSettings` re-materialize after the
+  `*Translation` rows that reference them). The `community` block
+  (`CommunityOptions.Name` / `SupportEmail`) is **not applied** — it is a
+  host-config value (the `Community__*` env vars, ADR 0002 / OPS.md), not
+  store state; the archive carries it as the self-description + the
+  `manifest.json` `community_name`.
+- **Modified** `src/Kumunita.Core/Portability/PortabilityService.cs` — the
+  `ImportAsync` body completes (the three `// U06 SEAM` insertion points
+  filled, the locked order — principals → docs → media → config, §validate
+  "apply phase"): after `PortabilityValidate.Run(data)` (a failure ⇒ return
+  the closed failure set, **zero writes**, C-M11·4), on a clean validate:
+  `KumunitaArchive.FromJson<List<PortabilityPrincipal>>(data.Principals)` →
+  `PortabilityApplyIdentity.ApplyAsync(userManager, roleManager, principals, ct)`
+  (step 1, **before** the docs apply) → `PortabilityApplyDocuments.ApplyAsync`
+  (step 2, U05) → `PortabilityApplyMedia.ApplyAsync` (step 3, U05) →
+  `KumunitaArchive.FromJson<PortabilityConfig>(data.Config)` →
+  `PortabilityApplyConfig.ApplyAsync(documentStore, config, ct)` (step 4) →
+  the **one** `portability.import` `AccessAudit` row (`TargetKind
+  "portability"`, `Via = Admin`, verb `import` — the ADR 0105
+  `messaging.toggle` shape; emitted **after** a clean apply, the same "no
+  audit for a refused action" posture as the export lane) →
+  `PortabilityImportResult.Success`. The ctor gains the `RoleManager<IdentityRole>`
+  seam (consumed by `PortabilityApplyIdentity`).
+- **Modified** `src/Kumunita.Core/DependencyInjection.cs` — the
+  `IPortabilityService` factory adds
+  `sp.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>()`
+  (the role-row source; `AddIdentity<User, IdentityRole>` registers it,
+  `Program.cs`).
+- **Modified** `src/Kumunita.Web/Controllers/AdminPortabilityController.cs`
+  — the **`POST /admin/portability/import`** action completes: the
+  `[ValidateAntiForgeryToken]` + `IFormFile archive` → open the read stream →
+  `portability.ImportAsync(actor, stream)` → on success
+  `TempData["info"] = portability.status.ok` + redirect; on the closed
+  failure set `TempData["error"] = portability.status.failure` + the failure
+  list (one per line) + redirect (the `_FlashToast` partial renders either —
+  the house `AdminMessagingController` `TempData` + redirect idiom; the
+  C-M11·4 fail-closed render, the U07 fail-closed pin). The one
+  `portability.import` audit row is the **service's** (the controller adds
+  none). The ctor gains the optional translation seams
+  (`ILocalizationService localization`, `ITranslationProvider? translationProvider
+  = null`) + a private `T(key)` helper (the house
+  `EffectiveLanguageCode.ResolveAsync` + `ITranslationProvider.GetAsync`
+  pattern, so the `portability.*` kw-l keys resolve in the operator's
+  language — the `TranslationProvider` floor guarantees the `en` string; the
+  optional param preserves the no-context test-construction shape).
+- **Not touched** (per the unit's scope / the kw-l deliverable is already
+  satisfied): the **kw-l keys are all six registered × 4 languages** by U04
+  (`portability.index.title` / `portability.export` / `portability.import` /
+  `portability.confirm.import` / `portability.status.ok` /
+  `portability.status.failure`, in `en` / `de` / `fr` / `da`) — U06 **reuses**
+  the import-side keys (`portability.import` / `portability.confirm.import` /
+  `portability.status.ok` / `portability.status.failure`), **not duplicated**
+  (the D10 "U04's export-side keys are reused, not duplicated" — the
+  `KnownTranslationKeys` parity test still passes, 528 Web / 956 Core green).
+  No tests (the U07 round-trip / no-secret / fail-closed tests are U07's
+  deliverable — the U07 round-trip witnesses U06's apply identity + config
+  path end-to-end; the U07 fail-closed witnesses U05's validate + U06's
+  zero-writes-on-failure render), no `Milestones.cs` / README /
+  `docs/STATUS.md` / `docs/ARCHITECTURE.md` / `MilestonesTests.cs` change
+  (the U07 flip, C-M11·8).
+
+### Exact identity re-creation shape (as written — the U07 round-trip test
+witnesses it end-to-end)
+
+```csharp
+// PortabilityApplyIdentity.ApplyAsync(userManager, roleManager, principals, ct)
+foreach (var p in principals) {
+    var user = new User {
+        Id = p.SubjectId,                       // keyed by the exported subjectId (the §principals "key")
+        Email = p.Email,
+        NormalizedEmail = p.NormalizedEmail,
+        UserName = string.IsNullOrEmpty(p.Username) ? p.Email : p.Username,
+    };
+    var freshPassword = RandomPassword();       // 32-char CSPRNG (SampleDataSeeder idiom) — the C-M11·2 secret reset
+    var r = await userManager.CreateAsync(user, freshPassword);   // a fresh non-portable password
+    if (!r.Succeeded) throw new InvalidOperationException(...);
+    foreach (var role in p.Roles) {             // the role re-apply (Member / Moderator / GlobalAdmin / Translator, ADR 0030)
+        if (string.IsNullOrEmpty(role)) continue;
+        if (await roleManager.FindByNameAsync(role) is null)
+            await roleManager.CreateAsync(new IdentityRole(role)); // ensure-exist (SampleData EnsureUserAsync idiom)
+        await userManager.AddToRoleAsync(user, role);
+    }
+    await userManager.UpdateSecurityStampAsync(user);   // a fresh security stamp (no replayed secret — C-M11·2)
+}
+```
+
+The **C-M11·2 import boundary** is enforced at the source: the
+`PortabilityPrincipal` POCO has **no** `PasswordHash` / `SecurityStamp` /
+`AccessToken` / `RefreshToken` / `RecoveryCode` field (the U07 no-secret
+field-shape pin), and `ApplyAsync` **never reads** one (there is none in the
+archive, by C-M11·2 — the secrets are **reset**, never replayed; the
+resident re-authenticates). The `displayName` / `verified` / `blocked`
+fields are the `Profile` doc's state (re-materialized by U05's docs apply,
+step 2) — this unit is the Identity `User` + role standing only.
+
+### Exact config-apply field set (as written — matches U02's ConfigExport
+verbatim)
+
+```csharp
+// PortabilityApplyConfig.ApplyAsync(documentStore, config, ct)
+var locale = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+    ?? new LocaleSettings { Id = LocaleSettings.SingletonId };
+locale.DefaultLanguageCode      = config.Locale.DefaultLanguageCode!;
+locale.DefaultTimezone          = config.Locale.DefaultTimezone!;
+locale.DefaultDateFormat        = config.Locale.DefaultDateFormat!;
+locale.IsSignupOpen             = config.Locale.IsSignupOpen;
+locale.NotifyAdminsOnSignup     = config.Locale.NotifyAdminsOnSignup;
+locale.AnnouncementCommentsEnabled = config.Locale.AnnouncementCommentsEnabled;
+locale.MessagingEnabled         = config.Locale.MessagingEnabled;
+session.Store(locale);
+foreach (var l in config.Languages) {
+    var row = await session.LoadAsync<LanguageCatalog>(l.Id, ct)
+        ?? new LanguageCatalog { Id = l.Id };
+    row.NativeName = l.NativeName;
+    row.Enabled    = l.Enabled;
+    row.SortOrder  = l.SortOrder;
+    session.Store(row);
+}
+await session.SaveChangesAsync(ct);   // one commit (the C-M11·4 pin) — the last apply step
+```
+
+The `community` block (`CommunityOptions.Name` / `SupportEmail`) is the
+host-config self-description (the `Community__*` env vars, ADR 0002 / OPS.md)
+— **not** a store write; the archive carries it as the self-description +
+the `manifest.json` `community_name`.
+
+### The one-audit-row shape (as written — the U07 Web pin targets it verbatim)
+
+Emitted by the **service** (`PortabilityService.ImportAsync`, after a clean
+apply; the controller adds none — the ADR 0105 `messaging.toggle` shape):
+
+```csharp
+session.Store(new Authorization.AccessAudit {
+    Id = System.Guid.NewGuid().ToString("N"),
+    At = DateTimeOffset.UtcNow,
+    ActorId = actorId,
+    EffectivePrincipalId = actorId,
+    Action = "portability.import",        // the verb
+    TargetKind = "portability",
+    TargetId = "portability",
+    Via = Authorization.AccessVia.Admin,
+    Outcome = Authorization.AccessOutcome.Allow
+});
+await session.SaveChangesAsync(ct);
+```
+
+No audit row on the **failure** path (a validate failure returns the closed
+failure set before this point — the same "no audit for a refused action"
+posture as the export lane, U04).
+
+### The POST Import + the closed-failure-set render (as written — the U07
+pin targets it verbatim)
+
+```csharp
+[HttpPost("import")]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> Import(IFormFile archive) {
+    var actor = ActorId(User) ?? string.Empty;
+    if (archive is null || archive.Length == 0) {
+        TempData["error"] = await T("portability.status.failure");
+        return RedirectToAction(nameof(Index));
+    }
+    await using var stream = archive.OpenReadStream();
+    var result = await portability.ImportAsync(actor, stream);
+    if (result.Ok) {
+        TempData["info"] = await T("portability.status.ok");
+        return RedirectToAction(nameof(Index));
+    }
+    var failures = string.Join("\n", result.Failures);   // the closed failure set (the C-M11·4 pin)
+    TempData["error"] = $"{await T("portability.status.failure")}\n{failures}";
+    return RedirectToAction(nameof(Index));
+}
+```
+
+The `_FlashToast` partial (the one, uniform flash surface) renders
+`TempData["info"]` (success) / `TempData["error"]` (the failure + the closed
+failure set, one per line) — the house `AdminMessagingController` idiom.
+
+### The exact import-side portability.* kw-l keys (as written — reused, not
+duplicated)
+
+U04 already registered **all six** `portability.*` keys × 4 languages
+(`en` / `de` / `fr` / `da`) in `KnownTranslationKeys` — the D10 list. U06
+**reuses** the import-side ones (does not add new keys):
+`portability.import` (the form label + button), `portability.confirm.import`
+(the `data-confirm` guard, the view's `importConfirm`), `portability.status.ok`
+(the success `TempData["info"]`), `portability.status.failure` (the
+closed-failure-set `TempData["error"]` prefix). The controller's `T(key)`
+helper resolves each through the operator's effective language (the house
+`EffectiveLanguageCode.ResolveAsync` + `ITranslationProvider.GetAsync` seam;
+the `TranslationProvider` floor guarantees the `en` string). The `portability.*`
+parity test still passes (the `KnownTranslationKeys_ParityTests` enforces the
+4-language set — 528 Web green).
+
+### Drift from the plan's text
+
+1. **The `PortabilityApplyConfig` uses `documentStore.OpenSession(...)` (the
+   full session), not `QuerySession()`** (not in the unit plan's literal text,
+   but grounded in source): the `IQuerySession` does not expose `Store` /
+   `SaveChangesAsync` (CS1061) — U05's `PortabilityApplyDocuments.ApplyAsync`
+   uses the same `OpenSession(new SessionOptions())` idiom (the in-repo
+   write-session shape). Same one-commit shape; the full session is the write
+   seam.
+2. **The `community` block (`CommunityOptions.Name` / `SupportEmail`) is not
+   applied** to a store (not in the unit plan's literal text — the plan says
+   "the community name + the `LocaleSettings` + the language-catalog state",
+   but `CommunityOptions` is a host-config value, the `Community__*` env vars,
+   ADR 0002 / OPS.md — there is no store row to write; the archive carries it
+   as the self-description + the `manifest.json` `community_name`). The
+   **applied** instance state is the store-backed `LocaleSettings` +
+   `LanguageCatalog` docs (the §config `locale` + `languages[]` blocks). The
+   U07 round-trip test (which plants via the same seed path) will witness the
+   `LocaleSettings` / `LanguageCatalog` re-materialization; the community
+   name is host-config on both sides of a self-hosted round-trip (the same
+   instance image, the ADR 0002 posture).
+3. **The `RoleManager<IdentityRole>` seam is added to the
+   `PortabilityService` ctor + the DI factory** (not in U01's shell — the
+   plan's U06 deliverable names `RoleManager` / the `AddToRoleAsync` re-apply
+   as the re-creation shape; the `FirstBootSeeder` + `SampleDataSeeder`
+   `EnsureUserAsync` idiom is the in-repo role-row ensure + add pattern).
+   `AddIdentity<User, IdentityRole>` (Program.cs) registers it; the factory
+   resolves it the same way it resolves `UserManager<User>`.
+4. **The `UserName` falls back to the email when the principal's username is
+   blank** (not in the unit plan's literal text, but grounded in source):
+   `User.UserName` is the Identity sign-in name; a blank username would leave
+   the re-created principal un-signable-by-username. The email is the
+   sign-in credential (the §principals "the sign-in credential" note) and is
+   always present (the `AddIdentity` `RequireUniqueEmail` + the `Profile`
+   email). A no-op for any well-formed export (U02's `PrincipalsExport`
+   always sets `UserName = user.UserName`, which `RegisterAsync` sets to the
+   email).
+5. **The three `LocaleSettings` string fields use `!` (nullable-forgiving)
+   on assignment** (CS8601 suppression): the §config POCO fields
+   (`PortabilityConfigLocale`) are nullable strings; the `LocaleSettings`
+   fields are non-nullable with POCO defaults. U05's `PortabilityApplyDocuments`
+   uses the same `!` idiom (`List<T>` deserialization + `!`). The
+   `TranslationProvider` floor + the `LocaleSettings` POCO defaults guarantee
+   a non-null value on a well-formed archive; a null (malformed archive) is a
+   validate-phase failure (check (b)) — the archive is rejected before apply,
+   so the `!` never dereferences a real null on a pre-validated archive.
+
+### Compile warnings
+
+- 0 new warnings in `Kumunita.Core` / `Kumunita.Web` (the CS8601
+  nullable-assignment warnings on the three `LocaleSettings` string fields
+  are suppressed with `!`, the U05 idiom).
+- The single pre-existing `xUnit2013` warning at
+  `tests/Kumunita.Core.Tests/MessagingServiceTests.cs(204)` is unrelated to
+  U06 (it was present at U04's + U05's exit).
+- The U04-noted `CS9113: Parameter 'mediaFileStore' is unread` on
+  `PortabilityService`'s ctor stays **resolved** (U05's media apply consumes
+  it; the new `RoleManager` seam is consumed by
+  `PortabilityApplyIdentity.ApplyAsync`).
+- **No new packages.** `Kumunita.Core.csproj` is untouched (the
+  `System.IO.Compression` / `System.Text.Json` / `System.Security.Cryptography`
+  BCL pin holds; D2).
+
+### Next unit's entry reads (U07 — the Core round-trip / no-secret /
+fail-closed tests + the Web-surface pins + the milestone flip)
+
+Per the register's U07 entry reads (plus U06's actual seams):
+- `docs/design/m11-portability-design.md` — §pinned tests (the exact test
+  names + the closed failure set), §Invariants (the C-M11 pins the tests
+  witness), §FACES (the F1–F5 the tests close).
+- `src/Kumunita.Core/Portability/PortabilityService.cs` — the complete
+  `ExportAsync` + `ImportAsync` (the U02–U06 bodies: the export
+  doc/principal/config + media + manifest + audit; the import
+  validate-then-apply (principals → docs → media → config) + the audit) —
+  the two methods the U07 tests target verbatim.
+- `src/Kumunita.Core/Portability/PortabilityApplyIdentity.cs` +
+  `PortabilityApplyConfig.cs` — the U06 identity re-creation (the
+  `subjectId` keying + the secret reset + the role re-apply) + the config
+  apply (the `LocaleSettings` + `LanguageCatalog` field set) the round-trip
+  test asserts end-to-end.
+- `src/Kumunita.Core.Tests/PostgresFixture.cs` — the test harness shape —
+  the `postgres:18` Testcontainers + the media temp-dir the round-trip /
+  no-secret / fail-closed tests need.
+- `src/Kumunita.Web/Milestones.cs` + `README.md` (the Roadmap section) +
+  `docs/STATUS.md` + `docs/ARCHITECTURE.md` (the value-chain table — the four
+  parity surfaces the flip touches) + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
+  (the single-in-progress pin the re-pin moves M11 → M12).

@@ -84,6 +84,7 @@ public sealed class PortabilityService(
     Marten.IDocumentStore documentStore,
     Identity.AppDbContext appDbContext,
     UserManager<Identity.User> userManager,
+    RoleManager<IdentityRole> roleManager,
     IOptions<CommunityOptions> communityOptions,
     IMediaStore mediaStore,
     IMediaFileStore mediaFileStore) : IPortabilityService
@@ -152,43 +153,65 @@ public sealed class PortabilityService(
 
         // ── §apply — one commit, the pinned dependency order (C-M11·4) ─
         // The locked order (design doc §validate "apply phase"):
-        //   1. Re-create the Identity principals (U06's
+        //   1. Re-create the Identity principals (the
         //      ApplyIdentityAsync — secrets reset, C-M11·2 import
-        //      boundary).
+        //      boundary) + the role re-apply.
         //   2. Store the domain documents in the §inventory import
-        //      order (U05 — this unit).
+        //      order (the D7 order, parents before children).
         //   3. Copy the media bytes into the volume at the
-        //      {Id[0..2]}/{Id} layout (U05 — this unit, C-M11·3).
-        //   4. Apply the config (U06's ApplyConfigAsync — the
-        //      CommunityOptions + LocaleSettings + LanguageCatalog,
-        //      the §config field set).
-        //
-        // U06 SEAM (step 1): the identity re-creation (from
-        // identity/principals.json, keyed by the exported subjectId,
-        // secrets reset — a fresh non-portable password + a fresh
-        // security stamp — the C-M11·2 import boundary) + the role
-        // re-apply. U06 inserts this call BEFORE the docs apply.
-        //
-        // Step 2 (U05): store the domain documents in the registry's
+        //      {Id[0..2]}/{Id} layout (C-M11·3).
+        //   4. Apply the config (the ApplyConfigAsync — the
+        //      LocaleSettings + LanguageCatalog, the §config field set).
+
+        // Step 1 — the identity re-creation (from identity/principals.json,
+        // keyed by the exported subjectId, secrets reset — a fresh
+        // non-portable password + a fresh security stamp — the C-M11·2
+        // import boundary) + the role re-apply. Runs BEFORE the docs apply
+        // (the §apply order — the subjectId sign-in works before the
+        // content graph is stored).
+        var principals = KumunitaArchive.FromJson<List<PortabilityPrincipal>>(data.Principals)
+            ?? new List<PortabilityPrincipal>();
+        await PortabilityApplyIdentity.ApplyAsync(userManager, roleManager, principals, ct).ConfigureAwait(false);
+
+        // Step 2 — store the domain documents in the registry's
         // import order (parents before children — the D7 order).
         await PortabilityApplyDocuments.ApplyAsync(documentStore, data, ct).ConfigureAwait(false);
 
-        // Step 3 (U05): copy the media bytes into the volume at the
+        // Step 3 — copy the media bytes into the volume at the
         // {Id[0..2]}/{Id} content-addressed layout (C-M11·3 — the
         // same layout as the local volume; the dedup-by-content-hash
         // is preserved).
         await PortabilityApplyMedia.ApplyAsync(mediaFileStore, data, ct).ConfigureAwait(false);
 
-        // U06 SEAM (step 4): the config apply (the CommunityOptions +
-        // the LocaleSettings + the LanguageCatalog — the §config field
-        // set; the U02 ConfigExport mirror, verbatim). U06 inserts this
-        // call AFTER the media apply.
-        //
-        // U06 SEAM (audit row): the one portability.import AccessAudit
-        // row (TargetKind "portability", Via = Admin, verb import) —
-        // emitted by the service (the controller adds none, the ADR
-        // 0105 messaging.toggle shape). U06 inserts this call after a
-        // clean apply.
+        // Step 4 — the config apply (the LocaleSettings + the
+        // LanguageCatalog — the §config field set; the U02 ConfigExport
+        // mirror, verbatim). The last apply step (the §apply order —
+        // the LanguageCatalog / LocaleSettings re-materialize after the
+        // *Translation rows that reference them are stored).
+        var config = KumunitaArchive.FromJson<PortabilityConfig>(data.Config) ?? new PortabilityConfig();
+        await PortabilityApplyConfig.ApplyAsync(documentStore, config, ct).ConfigureAwait(false);
+
+        // The one portability.import AccessAudit row (TargetKind
+        // "portability", Via = Admin, verb import) — emitted by the
+        // service (the controller adds none, the ADR 0105
+        // messaging.toggle shape). After a clean apply (a validate
+        // failure returned the closed failure set before this point, so
+        // no audit row for a refused import — the same "no audit for a
+        // refused action" posture as the export lane above).
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = System.Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "portability.import",
+            TargetKind = "portability",
+            TargetId = "portability",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return PortabilityImportResult.Success;
     }

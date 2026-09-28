@@ -310,6 +310,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Identity.AppDbContext>(),
             sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.RoleManager<Microsoft.AspNetCore.Identity.IdentityRole>>(),
             sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CommunityOptions>>(),
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<IMediaFileStore>()));
