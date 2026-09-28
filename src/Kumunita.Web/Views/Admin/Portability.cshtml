@@ -1,0 +1,78 @@
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@{
+    ViewData["Title"] = "Admin — Portability";
+    // The import form's destructive-action guard (the confirm() message is an
+    // attribute — outside the kw-l TagHelper's reach, resolved through the
+    // provider the ADR 0072 attribute idiom; confirm.js intercepts the submit).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var importConfirm = await Translation.GetAsync("portability.confirm.import", _kwL);
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="portability.index.title">Portability</kw-l></h1>
+
+<p class="text-muted">
+    The whole instance as one portable archive — the content, the media, the
+    identity graph (without the credential material), and the settings. Export
+    it as a <code>*.kumunita</code> file, or restore an existing archive into
+    this instance.
+</p>
+
+@* Export — the operator downloads the one complete, versioned archive
+   (the loop closes out of the platform — F1). A plain link (no form): the
+   archive streams as a download (the ADR 0034 attachment shape). *@
+<div class="card mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center gap-3 flex-wrap">
+        <div>
+            <div class="fw-semibold"><kw-l key="portability.export">Export</kw-l></div>
+            <small class="text-muted">
+                One <code>*.kumunita</code> archive — the content, the media,
+                the identity graph (never the credential material), and the
+                instance settings.
+            </small>
+        </div>
+        <a class="btn btn-primary" href="~/admin/portability/export">
+            <kw-l key="portability.export">Export</kw-l>
+        </a>
+    </div>
+</div>
+
+@* Import — the upload form (U06's POST /admin/portability/import target).
+   Rendered now so the surface is whole; the destructive-action guard is the
+   client confirm() (confirm.js) driven by data-confirm (the ~18-view house
+   pattern). *@
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="fw-semibold mb-2"><kw-l key="portability.import">Import</kw-l></div>
+        <small class="text-muted d-block mb-3">
+            Restore a <code>*.kumunita</code> archive into this instance.
+            Importing replaces the instance's state — keep a pre-import
+            backup; residents re-authenticate after the restore (passwords
+            are reset).
+        </small>
+        <form method="post" action="/admin/portability/import" enctype="multipart/form-data"
+              data-confirm="@importConfirm">
+            @Html.AntiForgeryToken()
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-8">
+                    <input type="file" name="archive" id="archive" class="form-control" accept=".kumunita" required />
+                </div>
+                <div class="col-sm-4">
+                    <button type="submit" class="btn btn-primary"><kw-l key="portability.import">Import</kw-l></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* The status area — the success (portability.status.ok) / the
+   closed-failure-set render (portability.status.failure) — the
+   _FlashToast partial (rendered by _Layout) reads the TempData the U06
+   import action writes. The keys resolve through the provider (they are
+   TempData strings, outside the kw-l TagHelper's reach). *@
+@* No inline markup here — the _FlashToast partial is the one, uniform
+   flash surface (the house convention). *@

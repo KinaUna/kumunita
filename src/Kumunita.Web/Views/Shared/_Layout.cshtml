@@ -20,6 +20,12 @@
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
+    @* M10 (ADR 0107 D3) — the PWA web-app manifest: the installable app shell
+       (wwwroot/manifest.webmanifest — D3's closed field set + the 192/512
+       icon pair). Same-origin static asset, so script-src 'self' (C-M10·3) is
+       untouched; the install affordance (U03, pwa-install.ts) is the only
+       consumer of the beforeinstallprompt this enables. *@
+    <link rel="manifest" href="~/manifest.webmanifest" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -193,6 +199,15 @@
             </div>
         </div>
     </footer>
+    @* M10 U03 (ADR 0107 D5/D10) — the PWA install affordance's label
+       source: hidden, server-rendered, and the `pwa.install` key's
+       label resolved here (the kw-l chain), so the client never
+       resolves a key (the repo's no-client-side-kw-l rule — the
+       data-ie-label-* / _RichEditorToggle pattern). pwa-install.ts
+       clones this anchor as the one quiet fixed button when the
+       browser fires beforeinstallprompt; it stays hidden (and the
+       module is a no-op) where the browser never fires it (iOS). *@
+    <a id="pwa-install" class="btn btn-outline-primary btn-sm d-none" href="#" aria-hidden="true"><kw-l key="pwa.install">Install app</kw-l></a>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
@@ -242,6 +257,12 @@
          (site.css does the filling/hiding). Self-guards on pages without
          either button, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/expand-page.js"></script>
+    <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
+         service-worker registration (client/lib/pwa-install.ts, tsc-built).
+         Registers /sw.js (U02's passive SW) and reveals the #pwa-install
+         label source as one quiet fixed button on beforeinstallprompt;
+         a clean no-op where the browser never fires it (iOS). -->
+    <script type="module" src="~/js/lib/pwa-install.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

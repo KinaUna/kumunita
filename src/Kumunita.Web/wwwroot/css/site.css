@@ -593,6 +593,91 @@ body.kmb-page-expanded .page-expand-close {
   .kumunita-pinned-announcement .d-flex .btn-close {
     order: 3;
   }
+  /* U04 · pinned announcement — M10 (ADR 0107) §Responsive U04 row + §a11y
+     Floor A: the stack rule above is the existing (locked) fix — this
+     extends the same block in place (D6). Long unbroken title can still
+     overflow → truncate (overflow-wrap: anywhere); the .btn-close hit
+     area is sub-44 px → the 44×44 floor (the two .btn actions are
+     Bootstrap .btn — the pin is the witness, not a fix). The expansion
+     lives on ::after, NOT ::before — Bootstrap renders the .btn-close
+     X glyph in ::before, and content:none there would destroy it. */
+  .kumunita-pinned-announcement .d-flex .me-auto,
+  .kumunita-pinned-announcement .d-flex .badge {
+    overflow-wrap: anywhere;
+  }
+  .kumunita-pinned-announcement .btn-close {
+    position: relative;
+  }
+  .kumunita-pinned-announcement .btn-close::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+  }
+  /* U04 · navbar — M10 (ADR 0107) §Responsive U04 row + §a11y Floor A:
+     the .navbar-toggler hit area is ~35 px (Bootstrap's default) → the
+     44×44 floor; the search form's .form-control is a Bootstrap-passing
+     width target — the pass is the max-width pin + the container-fluid
+     padding (the flex collapse already wraps — the pin is the witness). */
+  .navbar .navbar-toggler {
+    min-height: 44px;
+  }
+  .navbar .navbar-form {
+    flex: 1 1 auto;
+  }
+  .navbar .navbar-form .form-control {
+    max-width: 100%;
+  }
+  /* U04 · account nav — M10 (ADR 0107) §Responsive U04 row + §a11y Floor A:
+     the account toggle + the bell anchor are sub-44 px tall → the floor;
+     the two dropdown menus (account + language picker) can spill past the
+     viewport right edge at 360 px → max-width pin; the .dropdown-item
+     rows (py-1) are sub-44 px → the floor. The account toggle's
+     :focus-visible inherits Bootstrap's ring — the pin is the witness
+     (D8b), not a fix here. */
+  .navbar a#accountMenu {
+    min-height: 44px;
+  }
+  .navbar a#notifications-bell {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .navbar .dropdown-menu {
+    max-width: calc(100vw - 2rem);
+  }
+  .navbar .dropdown-item {
+    min-height: 44px;
+  }
+  /* U04 · flash toast — M10 (ADR 0107) §Responsive U04 row + §a11y Floor A:
+     the .btn-close hit area is ~23 px → the 44×44 floor. The expansion
+     lives on ::after, NOT ::before — Bootstrap renders the .btn-close
+     X glyph in ::before, and content:none there would destroy it.
+     (The design doc's "a ::before padding expansion" names the intent —
+     a hit-area expansion — not the pseudo-element; the mechanism uses
+     ::after so the icon survives. No rescope.) */
+  .kmb-flash-toast .btn-close {
+    position: relative;
+  }
+  .kmb-flash-toast .btn-close::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+  }
+  /* U04 · footer (pin) — M10 (ADR 0107) §Responsive U04 row: the
+     col-6 → col-12 stacking is Bootstrap's own (the pin is the
+     witness); the pass is the <h3> + .small text wrapping without
+     clipping at 360 px. */
+  .kmb-footer h3,
+  .kmb-footer .small {
+    overflow-wrap: anywhere;
+  }
 }
 
 /* --- Badges ------------------------------------------------------------------ */
@@ -1415,6 +1500,60 @@ body.kmb-page-expanded .page-expand-close {
   .airy-page-list li { padding: 0.75rem 1rem; }
   .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
   .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 1rem; }
+  /* U05 · post/reply card — M10 (ADR 0107) §Responsive U05 row:
+     the .rc-body rendered body's long code spans / unbroken URLs
+     overflow the card → truncate (overflow-wrap: anywhere). The
+     .airy-ann-row single-column rule above is the verified existing
+     fix (the pin). The ⋮ .action-glyph-btn 44×44 floor is the
+     viewport-independent Floor A rule below (not repeated here). */
+  .rc-body {
+    overflow-wrap: anywhere;
+  }
+  /* U05 · group card — M10 (ADR 0107) §Responsive U05 row:
+     the .dname + .daddr stack can clip a long group name / address
+     at 360 px → overflow-wrap: anywhere. The .airy-group-grid
+     single-column rule above is the verified existing fix (the pin).
+     The .dfoot min-height is already set at the class home (the pin). */
+  .dir-card .dname,
+  .dir-card .daddr {
+    overflow-wrap: anywhere;
+  }
+  /* U05 · WYSIWYG split-view (pin) — M10 (ADR 0107) §Responsive U05
+     row: the .rc-editor is already grid-template-columns: 1fr (the
+     class home) — the "1 column on mobile" contract is verified
+     existing. The explicit rule here is the pin (the witness). */
+  .rc-editor {
+    grid-template-columns: 1fr;
+  }
+  /* U05 · forms with audience editor — M10 (ADR 0107) §Responsive U05
+     row: the audience panel + the community switch can overflow at
+     360 px → stack (max-width: 100% on the panel + width: 100% on
+     the select). The checkbox label rows are the Floor A target
+     (min-height: 44px — U05's judgment, the smoke verifies). */
+  [data-audience-panel] {
+    max-width: 100%;
+  }
+  [data-audience-panel] .form-select {
+    width: 100%;
+  }
+  [data-audience-toggle] + .form-check-label,
+  [data-audience-panel] .form-check-label {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  /* U05 · Floor A — M10 (ADR 0107) §a11y Floor A: the ⋮
+     .action-glyph-btn hit area is ~23 px (btn btn-sm) at 360 px →
+     the 44×44 floor. The single class rule covers every instance
+     (post/reply/group/event/board/lane/card heads). */
+  .action-glyph-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* U05 · tables (pin) — M10 (ADR 0107) §Responsive U05 row:
+     a wide table overflows the viewport → scroll-inside. The
+     .table-responsive wrap is Bootstrap's own (the pin is the
+     witness). */
 }
 
 /* The shared base for the Month chip (.event-chip) and the Day/Week block
@@ -1703,6 +1842,13 @@ body.kmb-page-expanded .page-expand-close {
     left: 0;
     z-index: 2;
   }
+  /* U05 · events calendar (pin) — M10 (ADR 0107) §Responsive U05 row:
+     the week-grid horizontal scroll + sticky ruler above is the
+     verified existing fix (the pin). The month grid's day-cell
+     ≥ 32 px + the ADR 0081 single-line separators are the pin's
+     witness (the .events-calendar-grid's border + the cell's
+     top/right borders are the single-line mechanism, verified at
+     the class home). */
 }
 
 /* M5 (ADR 0067) — the kanban board (Views/Projects/BoardDetail.cshtml):
@@ -1836,6 +1982,18 @@ body.kmb-page-expanded .page-expand-close {
   border-color: transparent;
   background-color: rgba(0, 0, 0, 0.06);
   color: var(--bs-body-color);
+}
+/* U05 · Floor B — M10 (ADR 0107) §a11y Floor B: the .action-glyph-btn
+   already carries a :focus rule (the faint tint above) but no visible
+   ring — the floor's fix is a :focus-visible rule with the
+   --bs-focus-ring-color box-shadow, at the class's home, viewport-
+   independent by design. */
+.action-glyph-btn:focus-visible {
+  border-color: transparent;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--bs-body-color);
+  box-shadow: 0 0 0 0.25rem var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25));
+  outline: 0;
 }
 
 /* The add-to-do form at the lane's foot (the "Add to-do" button + the
@@ -2112,6 +2270,12 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
   .kanban-lane-new {
     min-width: 10rem;
   }
+  /* U05 · Kanban board (pin) — M10 (ADR 0107) §Responsive U05 row:
+     the lane min-widths above (12rem / 10rem) are the verified
+     existing fix (the pin). The drag target stays usable at
+     ≥ 192 px (the 12rem floor). The ⋮ .action-glyph-btn 44×44
+     floor is the viewport-independent Floor A rule (the class home,
+     not repeated here). */
 }
 
 /* ── M6 (U08) — the notification bell: badge + dropdown ──
