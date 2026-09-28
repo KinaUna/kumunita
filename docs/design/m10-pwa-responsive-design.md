@@ -389,19 +389,33 @@ the **U00 refinement**: the closed set above is narrower than the
 register's prose ("the fonts, the images"), and narrower is the safe
 direction for a privacy pin (C-M10·2). Recorded in the drift log.
 
-**Caching rule (locked).** Stale-while-revalidate, cache-name
-**`kumunita-shell-v1`**:
+**Caching rule (locked; refined M11 for the nav-layout-lag fix).** Cache-name
+**`kumunita-shell-v1`**. The two HTML pages (`/`, `/about`) and the static
+assets use **different strategies**:
 
 - `install`: no precache (the cache fills on first intercepted
   response — no wasted bytes, no stale precache to clear).
-- `fetch` (allowlisted only): `caches.open('kumunita-shell-v1')` →
-  `match(request)` — on a hit, `fetch(request)` in the background and
-  `.then(cache.put(request, fresh))` (revalidate); on a miss,
-  `fetch(request)` and, on a **2xx same-origin** response,
-  `cache.put(request, response.clone())`. A non-2xx or a network
+- `fetch`, **the two HTML pages** (`/`, `/about`) on a navigation
+  (`event.request.mode === 'navigate'`): **network-first** —
+  `fetch(request)`; on a **2xx same-origin** response,
+  `cache.put(request, response.clone())` and serve the fresh render; on a
+  network failure, fall back to the cached copy when present, else the
+  browser's own error. A fresh render always reflects the current
+  `kumunita.nav` / `kumunita.lang` preference cookies (the server resolves
+  both per request), so a preference switch shows immediately on
+  navigation. This is the **M11 refinement** of the original
+  stale-while-revalidate rule: SWR served the *cached* page first, which
+  kept the old nav layout / language visible until the next visit — the
+  nav-layout "doesn't change right away" bug.
+- `fetch`, **the static assets** (the allowlist's `/*.css` / `/*.js` /
+  `/manifest.webmanifest` paths): **stale-while-revalidate** —
+  `caches.open('kumunita-shell-v1')` → `match(request)` — on a hit,
+  `fetch(request)` in the background and `.then(cache.put(request, fresh))`
+  (revalidate); on a miss, `fetch(request)` and, on a **2xx same-origin**
+  response, `cache.put(request, response.clone())`. A non-2xx or a network
   failure falls through to the browser's own error — the SW never
-  serves a stale copy of a page it failed to load fresh for the first
-  time (the negative pin's witness: a route that 404s/403s is never
+  serves a stale copy of an asset it failed to load fresh for the first
+  time (a route that 404s/403s is never cached).
   cached).
 - `activate`: for every name in `caches.keys()` other than
   `kumunita-shell-v1`, `caches.delete(name)`; then

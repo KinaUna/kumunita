@@ -111,6 +111,18 @@ is preserved.
   not selected. A DB-backed per-resident preference was rejected as
   over-reach for a display preference (D2/D3 mirror the language-cookie
   precedent; there is no cross-device continuity requirement stated).
+- **Service-worker interaction (M11, refined after ship):** "takes effect
+  immediately on redirect" (D3) holds only because the M10 service worker
+  (`wwwroot/sw.js`) caches the two shell pages (`/`, `/about`). Under the
+  original stale-while-revalidate rule the *cached* page is served first, so
+  the redirect back after a switch returned the old layout until the next
+  visit — the reported "doesn't change right away" bug. The fix makes the
+  two HTML pages **network-first** in `sw.js` (fresh render wins, cache is
+  the offline fallback) while the static assets keep SWR. The `kumunita.nav`
+  switch therefore **depends on** the M10 SW's per-page caching strategy: if
+  the SW is ever reverted to serving the cached page first, the switch will
+  appear to lag again. The M10 design doc §SW caching rule is the source of
+  truth for that strategy (refined, with this rationale).
 
 ## Affected files
 
@@ -127,3 +139,8 @@ is preserved.
 - `src/Kumunita.Web/wwwroot/css/site.css` — the `kmb-rail*` / `kmb-topbar*`
   surface + the fullbleed/expand extensions (responsive rules in the existing
   media block).
+- **M11 (refined after ship):** `src/Kumunita.Web/wwwroot/sw.js` — the two
+  HTML shell pages go network-first so the switch renders immediately on
+  navigation (see the Service-worker interaction note above); the M10 design
+  doc `§SW` caching rule is updated to match. The switch's immediacy depends
+  on this strategy.
