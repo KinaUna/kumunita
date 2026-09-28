@@ -13,8 +13,8 @@ not a code concern.
 
 ## Status
 
-**M12 in progress** (iCal);
-M1–M11 and all named lanes
+**M13 in progress** (logging and analytics);
+M1–M12 and all named lanes
 are done — identity, groups & delegation, directory & profiles, posts +
 moderation, multilingual (`ML`/`ML-UI`), rich content (`RC`), guardian
 controls (`GU`), pages (`PG`), events + calendar (`M4`/`GE`/`EV-DWM`),
@@ -240,8 +240,8 @@ stays trivial and the authorization rules can grow freely.
 - **M9** — Messaging: 1:1 resident messaging — a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; a new `Conversation` + `Message` doc in a new `Kumunita.Core.Messaging` context, participant-only access (no `Audience`, no `GlobalAdmin` break-glass — the `RecipientId`-style personal read, ADR 0076 D3 shape), a per-recipient read state, a "new message" nudge through the M6 `Notification` lane, one `LocaleSettings` admin toggle (a GlobalAdmin can enable or disable the surface instance-wide, the ADR 0101 shape), `message.*` `kw-l` keys × 4 languages, zero new `AccessAction` / `AccessVia` / adapter. **Done.** (ADR 0105)
 - **M10** — PWA and responsive design. **Done.** (ADR 0107)
 - **M11** — Portability (import/export). **Done.** (ADR 0108)
-- **M12** — iCal. **In progress.**
-- **M13** — Logging and analytics.
+- **M12** — iCal: a **resident-facing calendar world seam** — a per-event file (`GET /events/{id}.ics`, one `VEVENT`) + a subscription feed (`GET /events.ics`, the caller's visible upcoming set), both `[Authorize]` (no subscription token — authorization rides the cookie, re-run on every fetch), served `text/calendar; charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control: no-store`; the hand-written BCL-only `IcsWriter` (a pure function over already-authorized `Event` rows, the RFC 5545 pinned subset — CRLF, 75-octet fold, full escaping, stable `UID`s, `PRODID: -//Kumunita//community calendar//EN`) — **zero Core schema change**, **zero new dependency**, zero new authorization surface; two `kw-l` affordances (the detail page's "Add to calendar" + the feed/calendar "Calendar feed (iCal)") × en/de/fr/da. **Done.** (ADR 0112)
+- **M13** — Logging and analytics. **In progress.**
 - **M14** — Integration of Events and Projects.
 
 ## Deferred (future, by design)

@@ -18,7 +18,15 @@
                         <kw-l key="events.lede">Upcoming events around the neighborhood — see what's on, and RSVP.</kw-l>
                     </p>
                 </div>
-                <a class="btn btn-outline-primary" href="/events/new"><kw-l key="events.new_event">New event</kw-l></a>
+                @* M12 (ADR 0112, U04) — the "Calendar feed (iCal)" affordance:
+                   a plain link to the lane-2 subscription (GET /events.ics,
+                   U03). Quiet, beside the New event action (the head-row
+                   idiom); flex-wrap (the head-row's own rule) lets it wrap
+                   below at 360 px without a CSS change (M10 re-check). *@
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <a class="btn btn-outline-secondary" href="/events.ics"><kw-l key="events.ics.feed">Calendar feed (iCal)</kw-l></a>
+                    <a class="btn btn-outline-primary" href="/events/new"><kw-l key="events.new_event">New event</kw-l></a>
+                </div>
             </div>
         </header>
 

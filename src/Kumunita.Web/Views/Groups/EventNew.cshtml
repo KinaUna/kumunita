@@ -60,12 +60,12 @@
                         <div class="col">
                             <label class="form-label" for="start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
                             <input class="form-control" type="datetime-local" id="start" name="Start" required
-                                   value="@Model.Start.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                                   value="@Model.Start.ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                         <div class="col">
                             <label class="form-label" for="end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
                             <input class="form-control" type="datetime-local" id="end" name="End" required
-                                   value="@Model.End.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                                   value="@Model.End.ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                     </div>
                     <div class="text-muted small mb-3">

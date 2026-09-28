@@ -50,8 +50,8 @@ public static class Milestones
         new("M9", "Messaging — 1:1 resident messaging: a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; an admin can enable or disable the feature instance-wide (ADR 0105)", StatusDone),
         new("M10", "PWA and responsive design", StatusDone),
         new("M11", "Portability (import/export)", StatusDone),
-        new("M12", "iCal", StatusNext),
-        new("M13", "Logging and analytics", StatusPlanned),
+        new("M12", "iCal", StatusDone),
+        new("M13", "Logging and analytics", StatusNext),
         new("M14", "Integration of Events and Projects", StatusPlanned),
     };
 

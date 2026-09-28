@@ -511,15 +511,23 @@ public sealed class ProjectComposerViewModel
     /// names it); a blank value clears it.</summary>
     public string? Status { get; set; }
 
-    /// <summary>The optional start date (ADR 0079; <c>null</c> = no date).
-    /// Bound from a <c>type="datetime-local"</c> input; a blank field posts
-    /// <c>null</c>.</summary>
-    public DateTimeOffset? StartAt { get; set; }
+    /// <summary>The optional **start** wall-clock time (ADR 0079; <c>null</c>
+    /// = no date). A <see cref="DateTime"/> (no offset) because the
+    /// browser's <c>datetime-local</c> posts a local wall-clock string with no
+    /// offset, and the server is authoritative for the conversion to a stored
+    /// UTC instant (ADR 0019 — the platform default, overridden per
+    /// account). The controller resolves the actor's effective time zone via
+    /// <c>EffectiveTimezoneResolver</c> and converts this wall-clock value to
+    /// a UTC <see cref="DateTimeOffset"/> at write time; the edit lane
+    /// re-converts the stored UTC instant back into the actor's zone for
+    /// display. A blank field posts <c>null</c>.</summary>
+    public DateTime? StartAt { get; set; }
 
-    /// <summary>The optional due date (ADR 0079; <c>null</c> = no date).
-    /// Bound from a <c>type="datetime-local"</c> input; a blank field posts
+    /// <summary>The optional **due** wall-clock time (ADR 0079; <c>null</c> =
+    /// no date). Same zone + conversion contract as <see cref="StartAt"/>
+    /// — bound from a <c>type="datetime-local"</c> input; a blank field posts
     /// <c>null</c>.</summary>
-    public DateTimeOffset? DueAt { get; set; }
+    public DateTime? DueAt { get; set; }
 
     /// <summary>The feed organizer (a <c>Component</c> id) — a
     /// <b>filter, never a gate</b> (C-M3·2).</summary>

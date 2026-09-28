@@ -80,6 +80,15 @@ public static class KnownTranslationKeys
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "More",
+            ["nav_variant.label"] = "Navigation style",
+            ["nav_variant.row"]   = "Top row",
+            ["nav_variant.rail"]  = "Icon rail",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
             ["events.created"]    = "Created",
@@ -1255,6 +1264,18 @@ public static class KnownTranslationKeys
                 "If you're curious how it works — or if you're about to host " +
                 "it for your neighbourhood — everything is public.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "What's new",
+            ["whatsnew.heading"]        = "What's new, version by version",
+            ["whatsnew.lead"] =
+                "Every release is dated and listed here — read what landed in " +
+                "each minor version of the platform you are using.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Show more versions",
+            ["whatsnew.show_more_remaining"] = "Show the {n} earlier versions",
+            ["whatsnew.toast_label"]    = "Kumunita {v} is now in use.",
+            ["whatsnew.toast_see"]      = "See what's new",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
             ["tags.list.lede"] =
@@ -1358,6 +1379,11 @@ public static class KnownTranslationKeys
             ["events.upcoming"] = "Upcoming",
             ["events.past"] = "Past",
             ["events.past_empty"] = "No past events yet.",
+
+            // ── events.ics (the M12 iCal affordances — the detail page's
+            //    "Add to calendar" link + the feed/calendar feed link, ADR 0112) ──
+            ["events.ics.download"] = "Add to calendar",
+            ["events.ics.feed"] = "Calendar feed (iCal)",
 
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
@@ -1663,6 +1689,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Mehr",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Obere Reihe",
+            ["nav_variant.rail"]  = "Icon-Leiste",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
@@ -2778,6 +2813,18 @@ public static class KnownTranslationKeys
                 "Wenn du neugierig bist, wie es funktioniert — oder wenn du es " +
                 "gleich für deine Nachbarschaft hosten willst — ist alles öffentlich.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "Was ist neu",
+            ["whatsnew.heading"]        = "Was ist neu — Version für Version",
+            ["whatsnew.lead"] =
+                "Jede Veröffentlichung ist hier mit Datum gelistet — lies nach, " +
+                "was in jeder Minor-Version der Plattform, die du nutzt, eingezogen ist.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Weitere Versionen anzeigen",
+            ["whatsnew.show_more_remaining"] = "Die {n} älteren Versionen anzeigen",
+            ["whatsnew.toast_label"]    = "Kumunita {v} ist jetzt im Einsatz.",
+            ["whatsnew.toast_see"]      = "Was ist neu?",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
             ["tags.list.lede"] =
@@ -2881,6 +2928,10 @@ public static class KnownTranslationKeys
             ["events.upcoming"] = "Bevorstehend",
             ["events.past"] = "Vergangen",
             ["events.past_empty"] = "Noch keine vergangenen Veranstaltungen.",
+
+            // ── events.ics (die M12-iCal-Oberflächen — Detailseite + Feed/Kalenderansicht, ADR 0112) ──
+            ["events.ics.download"] = "Zum Kalender hinzufügen",
+            ["events.ics.feed"] = "Kalender-Feed (iCal)",
 
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
@@ -3159,6 +3210,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Plus",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Barre supérieure",
+            ["nav_variant.rail"]  = "Barre d’icônes",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
@@ -4274,6 +4334,18 @@ public static class KnownTranslationKeys
                 "Si tu es curieux de savoir comment ça marche — ou si tu " +
                 "t'apprêtes à l'héberger pour ton quartier — tout est public.",
 
+            // ── what's new (the VN lane, ADR 0110 — version changelog + toast) ──
+            ["whatsnew.eyebrow"]        = "Nouveautés",
+            ["whatsnew.heading"]        = "Nouveautés, version par version",
+            ["whatsnew.lead"] =
+                "Chaque publication est datée et listée ici — lis ce qui est " +
+                "arrivé dans chaque version mineure de la plateforme que tu utilises.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Afficher plus de versions",
+            ["whatsnew.show_more_remaining"] = "Afficher les {n} versions précédentes",
+            ["whatsnew.toast_label"]    = "Kumunita {v} est désormais en service.",
+            ["whatsnew.toast_see"]      = "Voir les nouveautés",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Étiquettes",
             ["tags.list.lede"] =
@@ -4377,6 +4449,10 @@ public static class KnownTranslationKeys
             ["events.upcoming"] = "À venir",
             ["events.past"] = "Passés",
             ["events.past_empty"] = "Aucun événement passé pour l'instant.",
+
+            // ── events.ics (les surfaces iCal M12 — page de détail + feed/calendrier, ADR 0112) ──
+            ["events.ics.download"] = "Ajouter à l'agenda",
+            ["events.ics.feed"] = "Flux de calendrier (iCal)",
 
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
@@ -4656,6 +4732,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Mere",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Øverste række",
+            ["nav_variant.rail"]  = "Ikonrail",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",
@@ -5763,6 +5848,17 @@ public static class KnownTranslationKeys
                 "Er du nysgerrig på, hvordan det fungerer — eller om du " +
                 "er ved at hoste det til dit nabolag — så er alt offentligt.",
 
+            // ── what's new (the VN lane, ADR 0110) ──────────────────────────
+            ["whatsnew.eyebrow"]        = "Nyheder",
+            ["whatsnew.heading"]        = "Nyheder, version for version",
+            ["whatsnew.lead"] =
+                "Hver udgivelse er datoeret og listet her — læs, hvad der er landet i hver minor-version af platformen, du bruger.",
+            ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Vis flere versioner",
+            ["whatsnew.show_more_remaining"] = "Vis de {n} tidligere versioner",
+            ["whatsnew.toast_label"]    = "Kumunita {v} er nu i brug.",
+            ["whatsnew.toast_see"]      = "Se nyhederne",
+
             // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
             ["tags.list.heading"]       = "Tags",
             ["tags.list.lede"] =
@@ -5866,6 +5962,10 @@ public static class KnownTranslationKeys
             ["events.upcoming"] = "Kommende",
             ["events.past"] = "Forløbne",
             ["events.past_empty"] = "Ingen forløbne arrangementer endnu.",
+
+            // ── events.ics (M12's iCal-overflader — detaljesiden + feed/kalender, ADR 0112) ──
+            ["events.ics.download"] = "Tilføj til kalender",
+            ["events.ics.feed"] = "Kalenderfeed (iCal)",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

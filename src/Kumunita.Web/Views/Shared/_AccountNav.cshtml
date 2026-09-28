@@ -236,6 +236,41 @@
                         }
                     </ul>
                 </li>
+
+                @* ADR 0111 — the nav-variant picker: the resident chooses between
+                   variant B (the compact top row, the default) and variant C
+                   (the icon rail). The active choice is marked with a ✓.
+                   Picking a variant POSTs to /nav-layout (the public, CSRF-
+                   protected endpoint) and redirects back — the new layout
+                   renders on the return trip, which doubles as the
+                   confirmation. *@
+                @{ var currentNavVariant = httpReq is null ? NavLayoutCookie.Row : NavLayoutCookie.Read(httpReq); }
+                <li><hr class="dropdown-divider" /></li>
+                <li class="px-3 pt-2 pb-1 small text-secondary">
+                    <kw-l key="nav_variant.label">Navigation style</kw-l>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var (variantId, variantKey) in new[] {
+                            (NavLayoutCookie.Row, "nav_variant.row"),
+                            (NavLayoutCookie.Rail, "nav_variant.rail"),
+                        })
+                        {
+                            var navActive = currentNavVariant == variantId;
+                            <li class="px-3">
+                                <form method="post" action="/nav-layout" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="variant" value="@variantId" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(navActive ? "fw-semibold" : "")">
+                                        <kw-l key="@variantKey"></kw-l>
+                                        @(navActive ? " ✓" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
             </ul>
         </li>
     }

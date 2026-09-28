@@ -1,10 +1,22 @@
 @using Kumunita.Web
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.HomeViewModel
 @{
     ViewData["Title"] = "About";
     // Landing-style page: opt out of the shared .container so sections
     // run full-bleed (see _Layout.cshtml and the .kmb-* rules in site.css).
     ViewData["FullBleed"] = true;
+
+    // Effective-language resolution (ADR 0049 chain: cookie → Accept-Language
+    // → instance default → en), the same seam the "What's new" toast partial
+    // uses for its {v}-substituted strings. Used to resolve the changelog's
+    // "show more" remaining-count label (the kw-l TagHelper does not
+    // substitute {n}, so the value is resolved here and passed to the JS
+    // module via data-whatsnew-label).
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
 }
 
 <!-- ══════════ 1. Hero ══════════ -->
@@ -137,6 +149,74 @@
                     <span aria-hidden="true">&#8599;</span>
                 </a>
             }
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ What's new (the VN lane, ADR 0110) ══════════ -->
+<section class="kmb-section" id="whats-new" aria-label="What's new">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-12 col-lg-8">
+                <div class="eyebrow"><kw-l key="whatsnew.eyebrow">What's new</kw-l></div>
+                <h2 class="h3 mt-2"><kw-l key="whatsnew.heading">What's new, version by version</kw-l></h2>
+                <p class="kmb-section-lead mx-auto mt-3" style="max-width: 42rem;">
+                    <kw-l key="whatsnew.lead">Every release is dated and listed here — read what landed in each minor version of the platform you are using.</kw-l>
+                </p>
+            </div>
+        </div>
+        <div class="row justify-content-center mt-5">
+            <div class="col-12 col-lg-9">
+                @{ int _whi = 0; }
+                <ol class="list-unstyled d-flex flex-column gap-4 mb-0" id="whatsnew-list">
+                    @foreach (var v in WhatsNew.All)
+                    {
+                        bool _hidden = _whi >= 3;
+                        <li class="kmb-whatsnew-entry border rounded p-3 p-md-4"
+                            @if (_hidden) { <text>hidden</text> }>
+                            <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+                                <span class="fw-semibold">
+                                    <kw-l key="whatsnew.version">Version</kw-l>
+                                    <span>@v.Version</span>
+                                </span>
+                                <time datetime="@v.Date" class="text-secondary">@v.Date</time>
+                            </div>
+                            <ul class="mb-0">
+                                @foreach (var change in v.Changes)
+                                {
+                                    <li>@change</li>
+                                }
+                            </ul>
+                        </li>
+                        _whi++;
+                    }
+                </ol>
+                @if (WhatsNew.All.Count > 3)
+                {
+                    // The "N earlier" label is resolved server-side (the kw-l
+                    // TagHelper cannot substitute {n}), then the count is filled
+                    // in with the same C# `.Replace` the toast partial uses for
+                    // its {v} — so the button's initial text is already correct
+                    // on first paint, and the JS module just refreshes it as
+                    // the resident clicks.
+                    var _remainingCount = WhatsNew.All.Count - 3;
+                    var _remainingLabelRaw = Translation is null
+                        ? null
+                        : await Translation.GetAsync("whatsnew.show_more_remaining", effLang);
+                    var _initialLabel = (string.IsNullOrWhiteSpace(_remainingLabelRaw) || _remainingLabelRaw == "whatsnew.show_more_remaining")
+                        ? "Show the {n} earlier versions"
+                        : _remainingLabelRaw;
+                    <div class="text-center mt-4" id="whatsnew-more-wrap">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm kmb-whatsnew-show-more"
+                                data-whatsnew-batch-size="10"
+                                data-whatsnew-label="@_initialLabel"
+                                aria-label="@(_initialLabel.Replace("{n}", _remainingCount.ToString()))">
+                            @(_initialLabel.Replace("{n}", _remainingCount.ToString()))
+                        </button>
+                    </div>
+                }
+            </div>
         </div>
     </div>
 </section>

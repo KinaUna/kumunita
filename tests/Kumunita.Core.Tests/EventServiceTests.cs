@@ -90,8 +90,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "f1-ev", AuthorId = author,
             Title = "Cleanup day", Body = "body f1",
-            Start = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 1, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 1, 13, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = Audience(GrantKind.User, grantee),
         });
@@ -125,8 +125,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "f2-ev", AuthorId = author,
             Title = "Town hall", Body = "body f2",
-            Start = new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 2, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 2, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 2, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = null, // public — branch 5
         });
@@ -165,8 +165,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "f3-ev", AuthorId = author, ComponentId = comp,
             Title = "Safety drill", Body = "body f3",
-            Start = new DateTimeOffset(2026, 3, 3, 8, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 3, 9, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 3, 8, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 3, 9, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = new Audience { Community = true }, // branch 4
         });
@@ -218,8 +218,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "f4-ev", AuthorId = author,
             Title = "Book club", Body = "body f4",
-            Start = new DateTimeOffset(2026, 3, 4, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 4, 19, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 4, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 4, 19, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = Audience(GrantKind.Group, group),
         });
@@ -251,8 +251,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "f5-ev", AuthorId = author,
             Title = "Unpublished", Body = "draft body",
-            Start = new DateTimeOffset(2026, 3, 5, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 5, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 5, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 5, 10, 0, 0, TimeSpan.Zero),
             IsDraft = true,
             Audience = null, // would be public if it were published
         });
@@ -288,7 +288,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string author = "u-u03-f6-author";
         const string resident = "u-u03-f6-resident";
 
-        var t = new DateTimeOffset(2026, 3, 10, 9, 0, 0, TimeSpan.Zero);
+        var t = new DateTimeOffset(2099, 3, 10, 9, 0, 0, TimeSpan.Zero);
         // Plant in an order deliberately different from the expected sort
         // order, so the test would fail if the query returned insertion
         // order instead of Start ascending.
@@ -321,15 +321,15 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event
         {
             Id = "f7-live", AuthorId = author, Title = "Live", Body = "b",
-            Start = new DateTimeOffset(2026, 3, 11, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 11, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 11, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 11, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = "f7-deleted", AuthorId = author, Title = "Deleted", Body = "b",
-            Start = new DateTimeOffset(2026, 3, 11, 11, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 11, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 11, 11, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 11, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
@@ -368,19 +368,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event
         {
             Id = "f8-ev", AuthorId = author, Title = "BBQ", Body = "b",
-            Start = new DateTimeOffset(2026, 3, 12, 17, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 12, 21, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 12, 17, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 12, 21, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new EventRsvp
         {
             Id = "r1", EventId = "f8-ev", UserId = rsvp1,
-            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero),
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2099, 3, 1, 10, 0, 0, TimeSpan.Zero),
         });
         await Plant(store, new EventRsvp
         {
             Id = "r2", EventId = "f8-ev", UserId = rsvp2,
-            Status = RsvpStatus.Maybe, At = new DateTimeOffset(2026, 3, 1, 11, 0, 0, TimeSpan.Zero),
+            Status = RsvpStatus.Maybe, At = new DateTimeOffset(2099, 3, 1, 11, 0, 0, TimeSpan.Zero),
         });
 
         var rsvps = await svc.GetRsvpsAsync("f8-ev");
@@ -412,20 +412,20 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event
         {
             Id = "f9-ev", AuthorId = author, Title = "Walk", Body = "b",
-            Start = new DateTimeOffset(2026, 3, 13, 7, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 13, 8, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 13, 7, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 13, 8, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null, // public
         });
         await Plant(store, new EventRsvp
         {
             Id = "f9-r-me", EventId = "f9-ev", UserId = me,
-            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 2, 9, 0, 0, TimeSpan.Zero),
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2099, 3, 2, 9, 0, 0, TimeSpan.Zero),
         });
         // Another resident's RSVP — must not be returned for `me`.
         await Plant(store, new EventRsvp
         {
             Id = "f9-r-other", EventId = "f9-ev", UserId = other,
-            Status = RsvpStatus.No, At = new DateTimeOffset(2026, 3, 2, 9, 30, 0, TimeSpan.Zero),
+            Status = RsvpStatus.No, At = new DateTimeOffset(2099, 3, 2, 9, 30, 0, TimeSpan.Zero),
         });
 
         // The actor's own RSVP is returned (not the other resident's).
@@ -461,14 +461,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event
         {
             Id = "f10-ev", AuthorId = author, Title = "Draft BBQ", Body = "b",
-            Start = new DateTimeOffset(2026, 3, 14, 17, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 3, 14, 21, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 3, 14, 17, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 3, 14, 21, 0, 0, TimeSpan.Zero),
             IsDraft = true, IsDeleted = false, Audience = null,
         });
         await Plant(store, new EventRsvp
         {
             Id = "f10-r", EventId = "f10-ev", UserId = stranger,
-            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 3, 9, 0, 0, TimeSpan.Zero),
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2099, 3, 3, 9, 0, 0, TimeSpan.Zero),
         });
 
         // The non-author's own RSVP of a draft event is a 404 (denied).
@@ -479,7 +479,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new EventRsvp
         {
             Id = "f10-r-author", EventId = "f10-ev", UserId = author,
-            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 3, 9, 1, 0, TimeSpan.Zero),
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2099, 3, 3, 9, 1, 0, TimeSpan.Zero),
         });
         var authorRsvp = await svc.GetMyRsvpAsync("f10-ev", author);
         Assert.NotNull(authorRsvp);
@@ -619,8 +619,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "Cleanup day",
             Body = "Bring gloves",
-            Start = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 1, 12, 0, 0, TimeSpan.Zero),
             Audience = null,            // public (branch 5)
             IsDraft = true,             // ADR 0037 — a new event is a draft
         });
@@ -661,8 +661,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "Members only", Body = "b",
-            Start = new DateTimeOffset(2026, 4, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 2, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 2, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 2, 11, 0, 0, TimeSpan.Zero),
             Audience = Audience(GrantKind.User, grantee),
             IsDraft = false,                            // published so the feed/decision path runs.
         });
@@ -706,7 +706,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u04-u1-author";
-        var created = new DateTimeOffset(2026, 4, 3, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 3, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -741,7 +741,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u04-u2-author";
-        var created = new DateTimeOffset(2026, 4, 4, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 4, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -771,7 +771,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u04-u3-author";
-        var created = new DateTimeOffset(2026, 4, 5, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 5, 9, 0, 0, TimeSpan.Zero);
 
         // The Web layer would parse these from the body (ContentImageIds /
         // AttachmentIds.Extract*); here we pass the parsed ids verbatim to the
@@ -811,7 +811,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-u4-author";
         const string stranger = "u-u04-u4-stranger";
-        var created = new DateTimeOffset(2026, 4, 6, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 6, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -847,7 +847,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-p1-author";
         const string resident = "u-u04-p1-resident";
-        var created = new DateTimeOffset(2026, 4, 7, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 7, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -882,7 +882,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-p2-author";
         const string stranger = "u-u04-p2-stranger";
-        var created = new DateTimeOffset(2026, 4, 8, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 8, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -906,7 +906,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         const string author = "u-u04-p3-author";
-        var created = new DateTimeOffset(2026, 4, 9, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 9, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -933,7 +933,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-d1-author";
         const string resident = "u-u04-d1-resident";
-        var created = new DateTimeOffset(2026, 4, 10, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 10, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -964,7 +964,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-d2-author";
         const string stranger = "u-u04-d2-stranger";
-        var created = new DateTimeOffset(2026, 4, 11, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 11, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -989,7 +989,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-r1-author";
         const string rsvp1 = "u-u04-r1-user";
-        var created = new DateTimeOffset(2026, 4, 12, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 12, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -1023,7 +1023,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string author = "u-u04-r2-author";
         const string u1 = "u-u04-r2-u1";
         const string u2 = "u-u04-r2-u2";
-        var created = new DateTimeOffset(2026, 4, 13, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 13, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -1064,7 +1064,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         const string author = "u-u04-r4-author";
         const string rsvp1 = "u-u04-r4-user";
-        var created = new DateTimeOffset(2026, 4, 14, 9, 0, 0, TimeSpan.Zero);
+        var created = new DateTimeOffset(2099, 4, 14, 9, 0, 0, TimeSpan.Zero);
 
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -1109,8 +1109,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "t02-ev", AuthorId = author,
             Title = "Open to all", Body = "body t02",
-            Start = new DateTimeOffset(2026, 4, 20, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 20, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 20, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 20, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = null,   // null = public (branch 5)
         });
@@ -1145,8 +1145,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(resident, new CreateEventRequest
         {
             Title = "Plain member event", Body = "body t06",
-            Start = new DateTimeOffset(2026, 4, 21, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 21, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 21, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 21, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1173,8 +1173,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "original", Body = "body t07",
-            Start = new DateTimeOffset(2026, 4, 22, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 22, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 22, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 22, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1212,8 +1212,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned", Body = "body t08",
-            Start = new DateTimeOffset(2026, 4, 23, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 23, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 23, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 23, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1244,8 +1244,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Id = "t09-ev",
             AuthorId = "u-u09-t09-author",
             Title = "owned", Body = "body t09",
-            Start = new DateTimeOffset(2026, 4, 24, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 24, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 24, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 24, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
         };
 
@@ -1280,8 +1280,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned", Body = "body t15",
-            Start = new DateTimeOffset(2026, 4, 25, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 25, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 25, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 25, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1324,8 +1324,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "live", Body = "body t16",
-            Start = new DateTimeOffset(2026, 4, 26, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 26, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 26, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 26, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1362,8 +1362,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "BBQ", Body = "body t14",
-            Start = new DateTimeOffset(2026, 4, 25, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 25, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 25, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 25, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1401,8 +1401,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "BBQ", Body = "body t15",
-            Start = new DateTimeOffset(2026, 4, 26, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 26, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 26, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 26, 11, 0, 0, TimeSpan.Zero),
             Audience = Audience(GrantKind.User, author),  // grantee = author only
             IsDraft = false,
         });
@@ -1434,8 +1434,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "shape", Body = "body t17",
-            Start = new DateTimeOffset(2026, 4, 27, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 27, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 27, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 27, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1466,8 +1466,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Body = "Bring gloves and boots",
             AuthorId = "u-u09-t18-author",
             ComponentId = "c-u09-t18",
-            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 28, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = null,   // public (null)
         };
@@ -1489,8 +1489,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Title = null!,                // null → the adapter falls back to the body.
             Body = body,
             AuthorId = "u-u09-t18-author2",
-            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 28, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = null,
         };
@@ -1505,8 +1505,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Title = "t",
             Body = "b",
             AuthorId = "u-u09-t18-author3",
-            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 28, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = new Audience { Community = true },
         };
@@ -1533,8 +1533,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "t01-ev", AuthorId = author,
             Title = "Feed event", Body = "body t01",
-            Start = new DateTimeOffset(2026, 4, 29, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 29, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 29, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 29, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = Audience(GrantKind.User, member),   // the member is the grantee.
         });
@@ -1569,8 +1569,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "t03-ev", AuthorId = author, ComponentId = comp,
             Title = "Community event", Body = "body t03",
-            Start = new DateTimeOffset(2026, 4, 30, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 4, 30, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 4, 30, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 4, 30, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = new Audience { Community = true },   // the Community branch.
         });
@@ -1609,8 +1609,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = "t04-ev", AuthorId = author,
             Title = "Book club", Body = "body t04",
-            Start = new DateTimeOffset(2026, 5, 1, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 5, 1, 19, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 5, 1, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 5, 1, 19, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Audience = Audience(GrantKind.Group, group),   // the grant-list branch.
         });
@@ -1639,8 +1639,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "live", Body = "body t11",
-            Start = new DateTimeOffset(2026, 5, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 5, 2, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 5, 2, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 5, 2, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1678,8 +1678,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned", Body = "body t12",
-            Start = new DateTimeOffset(2026, 5, 3, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 5, 3, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 5, 3, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 5, 3, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1697,8 +1697,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev2 = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned2", Body = "body t12b",
-            Start = new DateTimeOffset(2026, 5, 3, 12, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 5, 3, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 5, 3, 12, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 5, 3, 13, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
         });
@@ -1769,8 +1769,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Cleanup day", Body = "body a059-a1",
-            Start = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -1821,8 +1821,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Potluck", Body = "body a059-a2",
-            Start = new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 2, 18, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 2, 14, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 2, 18, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -1856,8 +1856,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Meetup", Body = "body a059-a3",
-            Start = new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 3, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 3, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -1890,8 +1890,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Garden", Body = "body a059-a4",
-            Start = new DateTimeOffset(2026, 6, 4, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 4, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 4, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 4, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -1936,8 +1936,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Original", Body = "body a059-a6",
-            Start = new DateTimeOffset(2026, 6, 5, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 5, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 5, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 5, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -1964,8 +1964,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "Cleanup", Body = "body a059-u1",
-            Start = new DateTimeOffset(2026, 6, 6, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 6, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 6, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 6, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
         await svc.AddEventTranslationAsync(evId, "de", "alt titel", "alt body", author, EmptyRoles);
@@ -2004,8 +2004,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "t", Body = "body a059-u2",
-            Start = new DateTimeOffset(2026, 6, 7, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 7, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 7, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 7, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
         await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
@@ -2035,8 +2035,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "t", Body = "body a059-u3",
-            Start = new DateTimeOffset(2026, 6, 8, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 8, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 8, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 8, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -2062,8 +2062,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "t", Body = "body a059-r1",
-            Start = new DateTimeOffset(2026, 6, 9, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 9, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 9, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 9, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
         await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
@@ -2097,8 +2097,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "t", Body = "body a059-r2",
-            Start = new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 10, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 10, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
         await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
@@ -2124,8 +2124,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Id = evId, AuthorId = author,
             Title = "t", Body = "body a059-r3",
-            Start = new DateTimeOffset(2026, 6, 11, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 11, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 11, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 11, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -2150,15 +2150,15 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event
         {
             Id = evA, AuthorId = author, Title = "A", Body = "b",
-            Start = new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 12, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 12, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 12, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = evB, AuthorId = author, Title = "B", Body = "b",
-            Start = new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 6, 12, 11, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 6, 12, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 12, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
 
@@ -2201,7 +2201,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         const string me = "u-a065-1-me";
         const string otherAuthor = "u-a065-1-otherAuthor";
 
-        var past = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+        var past = new DateTimeOffset(2099, 1, 1, 9, 0, 0, TimeSpan.Zero);
         var future = DateTimeOffset.UtcNow.AddHours(2);
 
         // An upcoming event I RSVPed "Maybe" to (another resident's).
@@ -2401,13 +2401,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Contains("p1-past", past);
         Assert.DoesNotContain("p1-future", past);
 
-        // ADR 0109 decision: ListUpcomingAsync is **untouched** — it carries no
-        // time-window predicate (the ~30 pinned feed tests rely on that), so it
-        // lists *both* the future and the past event. The past lane is the
-        // additive, windowed read beside it (the ADR 0063 EV-CAL precedent).
+        // The upcoming lane (Start >= nowUtc) shows the future event but NOT
+        // the past one — the two lanes are exact mirrors (the bug fix that
+        // added Start >= nowUtc to ListUpcomingAsync).
         var upcoming = (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p1-future", upcoming);
-        Assert.Contains("p1-past", upcoming);
+        Assert.DoesNotContain("p1-past", upcoming);
     }
 
     // ── ADR 0109·2 — M4_PastFeed_OrderedStartDescending ─────────────────────

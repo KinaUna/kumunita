@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
@@ -83,6 +84,10 @@ public class EventControllerTests
 
         Assert.Equal("/events", Route("Index"));
         Assert.Equal("/events/{id}", Route("Detail"));
+        // M12 (ADR 0112) — the per-event iCal file lane (lane 1) + the
+        // /events.ics subscription feed (lane 2, U03).
+        Assert.Equal("/events/{id}.ics", Route("EventIcs"));
+        Assert.Equal("/events.ics", Route("CalendarFeed"));
         Assert.Equal("/events/new", Route("CreateGet"));
         Assert.Equal("/events/new", Route("CreatePost"));
         Assert.Equal("/events/{id}/edit", Route("EditGet"));
@@ -588,8 +593,8 @@ public class EventControllerTests
         {
             Title = "Cleanup day",
             Body = "Bring gloves. Meet at the common shed.",
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 13, 0, 0),
             Location = "Common shed",
             SaveAsDraft = true, // ADR 0037 — the composer posts "save as draft".
             ReminderEnabled = true,
@@ -637,8 +642,8 @@ public class EventControllerTests
         {
             Title = "Cleanup day",
             Body = "   ", // malformed — empty body.
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
         };
         var controller = Build(events, subjectId: "subj-resident-001");
@@ -675,8 +680,8 @@ public class EventControllerTests
             Body = "   ", // blank — the quick-create modal posts no body.
             QuickCreate = true, // the marker (the modal's hidden field).
             SaveAsDraft = true, // the modal saves as draft (ADR 0037 floor).
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 10, 0, 0),
             Audience = new AudienceEditorModel
             {
                 Mode = "Any",
@@ -775,8 +780,8 @@ public class EventControllerTests
             Id = id,
             Title = "New title",
             Body = "New body",
-            Start = new DateTimeOffset(2026, 10, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 2, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 2, 9, 0, 0),
+            End = new DateTime(2026, 10, 2, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
         };
         var controller = Build(events, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin-001");
@@ -812,8 +817,8 @@ public class EventControllerTests
         var result = await controller.EditPost(id, new EventEditorModel
         {
             Title = "t", Body = "b",
-            Start = new DateTimeOffset(2026, 10, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 2, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 2, 9, 0, 0),
+            End = new DateTime(2026, 10, 2, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
         });
 
@@ -1843,6 +1848,219 @@ public class EventControllerTests
         // Month → the month name + year (the EV-CAL shape).
         Assert.Contains(fmt.GetMonthName(9), monthVm.Label, System.StringComparison.OrdinalIgnoreCase);
         Assert.Contains("2026", monthVm.Label);
+    }
+
+    // ── M12 (ADR 0112) — the iCal lane-1 Web pins (design doc §pinned tests) ──
+
+    /// <summary>
+    /// M12 lane 1 (the D3 pin, <c>docs/design/m12-ical-design.md</c> §routes /
+    /// §pinned tests): <c>GET /events/{id}.ics</c> exists with the locked
+    /// route string, sits under the class-level <c>[Authorize]</c> (the
+    /// anonymous caller gets the sign-in challenge — F3), and returns
+    /// <c>200</c> + <c>Content-Type: text/calendar; charset=utf-8</c> for a
+    /// visible event.
+    /// </summary>
+    [Fact]
+    public async Task EventIcs_Route_Exists_Is_Authorize_And_Returns_Text_Calendar()
+    {
+        // Route exists (the locked D3 lane-1 string, verbatim).
+        var action = typeof(EventController).GetMethod(nameof(EventController.EventIcs))!;
+        var route = action
+            .GetCustomAttributes(typeof(HttpGetAttribute), inherit: true)
+            .OfType<HttpGetAttribute>()
+            .First();
+        Assert.Equal("/events/{id}.ics", route.Template);
+
+        // [Authorize] — the class-level pin (no anonymous iCal surface, F3).
+        Assert.NotNull(typeof(EventController).GetCustomAttribute<AuthorizeAttribute>());
+
+        // 200 + the locked content type for a visible event.
+        const string id = "ev-ics-route";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, authorId: "subj-author-001"));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        var result = await controller.EventIcs(id);
+
+        // The locked content type (the serve shape's second arg); a FileResult
+        // with no explicit status is the framework's 200 default.
+        var file = Assert.IsType<FileResult>(result, exactMatch: false);
+        Assert.Equal("text/calendar; charset=utf-8", file.ContentType);
+    }
+
+    /// <summary>
+    /// M12 lane 1 (the D3 serve-shape pin): the response carries
+    /// <c>Content-Disposition: attachment; filename="kumunita-event-{id}.ics"</c>
+    /// — the ADR 0034 / 0108 serve idiom (<c>AttachmentController.ServeFile</c>),
+    /// with the event's <c>id</c> in the filename.
+    /// </summary>
+    [Fact]
+    public async Task EventIcs_Content_Disposition_Filename_Is_Kumunita_Event_Id_Ics()
+    {
+        const string id = "ev-ics-filename";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, authorId: "subj-author-001"));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        await controller.EventIcs(id);
+
+        Assert.Equal(
+            "attachment; filename=\"kumunita-event-ev-ics-filename.ics\"",
+            controller.HttpContext.Response.Headers["Content-Disposition"]);
+    }
+
+    /// <summary>
+    /// M12 (the D3 serve-shape pin, both lanes): the ICS lanes set
+    /// <c>Cache-Control: no-store</c> (the content is per-caller +
+    /// re-authorized every fetch — never cached by a proxy or the PWA service
+    /// worker, C-M12·6) + <c>X-Content-Type-Options: nosniff</c> (the
+    /// <c>ServeFile</c> idiom). Lane 1 (<c>/{id}.ics</c>) and lane 2
+    /// (<c>/events.ics</c>, <c>CalendarFeed</c>) are both covered here.
+    /// </summary>
+    [Fact]
+    public async Task Ics_Routes_Set_Cache_Control_No_Store()
+    {
+        // Lane 1 — the per-event file.
+        const string id = "ev-ics-cache";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, authorId: "subj-author-001"));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        await controller.EventIcs(id);
+
+        var headers = controller.HttpContext.Response.Headers;
+        Assert.Equal("no-store", headers["Cache-Control"]);
+        Assert.Equal("nosniff", headers["X-Content-Type-Options"]);
+
+        // Lane 2 — the /events.ics feed (U03). The seam returns one visible
+        // event; the pin is the serve-shape headers, not the VEVENT set (the
+        // Core composition pin owns that).
+        var feedEvents = Substitute.For<IEventService>();
+        feedEvents.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-cache", authorId: "subj-author-001") }, false));
+        var feedController = Build(feedEvents, subjectId: "subj-resident-001");
+
+        await feedController.CalendarFeed();
+
+        var feedHeaders = feedController.HttpContext.Response.Headers;
+        Assert.Equal("no-store", feedHeaders["Cache-Control"]);
+        Assert.Equal("nosniff", feedHeaders["X-Content-Type-Options"]);
+    }
+
+    /// <summary>
+    /// M12 lane 1 (the C3 / C-M12·6 non-leaky split): a <c>/{id}.ics</c>
+    /// request for an event the caller **cannot see** (<see
+    /// cref="UnauthorizedAccessException"/>) — or one that is **absent**
+    /// (<see cref="KeyNotFoundException"/>) — returns a clean <c>404</c>
+    /// (<see cref="NotFoundResult"/>), **not** a <c>403</c>
+    /// (<see cref="ForbidResult"/>): an event a caller cannot see neither
+    /// downloads nor 403s into existence.
+    /// </summary>
+    [Fact]
+    public async Task EventIcs_Denied_Or_Absent_Returns_404_Not_403()
+    {
+        // Denied (the service's UnauthorizedAccessException) → 404, not 403.
+        const string deniedId = "ev-ics-denied";
+        var denied = Substitute.For<IEventService>();
+        denied.GetAsync(deniedId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Event>(new UnauthorizedAccessException($"Actor may not read event '{deniedId}'.")));
+        var deniedController = Build(denied, subjectId: "subj-resident-001");
+
+        var deniedResult = await deniedController.EventIcs(deniedId);
+
+        Assert.IsType<NotFoundResult>(deniedResult);
+        Assert.IsNotType<ForbidResult>(deniedResult);
+
+        // Absent (the service's KeyNotFoundException) → 404.
+        const string absentId = "ev-ics-absent";
+        var absent = Substitute.For<IEventService>();
+        absent.GetAsync(absentId, Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Event>(new KeyNotFoundException($"Event '{absentId}' was not found.")));
+        var absentController = Build(absent, subjectId: "subj-resident-001");
+
+        var absentResult = await absentController.EventIcs(absentId);
+
+        Assert.IsType<NotFoundResult>(absentResult);
+    }
+
+    /// <summary>
+    /// M12 (the F3 pin, both lanes): an **anonymous** caller to the ICS lanes
+    /// gets the **standard sign-in challenge** — the unit-level shape is that
+    /// the action sits under the class-level <c>[Authorize]</c> and carries
+    /// no <c>[AllowAnonymous]</c> opt-out (the challenge is then MVC's
+    /// default for the route — the "no anonymous iCal surface" posture). Both
+    /// lanes are covered: lane 1 (<c>EventIcs</c>) and lane 2
+    /// (<c>CalendarFeed</c>).
+    /// </summary>
+    [Fact]
+    public void Ics_Routes_Anonymous_Return_Sign_In_Challenge()
+    {
+        // The class carries [Authorize] …
+        Assert.NotNull(typeof(EventController).GetCustomAttribute<AuthorizeAttribute>());
+
+        // … and the lane-1 action does not opt out via [AllowAnonymous], so
+        // the anonymous caller gets the framework's standard sign-in
+        // challenge (the [Authorize] default — F3).
+        var action = typeof(EventController).GetMethod(nameof(EventController.EventIcs))!;
+        Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
+
+        // … and the lane-2 feed action does not opt out either (U03).
+        var feed = typeof(EventController).GetMethod(nameof(EventController.CalendarFeed))!;
+        Assert.Null(feed.GetCustomAttribute<AllowAnonymousAttribute>());
+    }
+
+    /// <summary>
+    /// M12 lane 2 (U03, the D3 route pin): the <c>/events.ics</c> feed action
+    /// exists, sits under the class-level <c>[Authorize]</c>, and — when the
+    /// frozen feed seam returns a page — returns a <see cref="FileResult"/>
+    /// carrying <c>text/calendar; charset=utf-8</c> (the serve shape, the
+    /// design doc §routes). The VEVENT-set composition is the Core
+    /// composition pin's job; this pin is the route + auth + Content-Type.
+    /// </summary>
+    [Fact]
+    public async Task CalendarFeed_Route_Exists_Is_Authorize_And_Returns_Text_Calendar()
+    {
+        // The route + auth shape.
+        var method = typeof(EventController).GetMethod(nameof(EventController.CalendarFeed))!;
+        var route = method.GetCustomAttribute<HttpGetAttribute>()!.Template;
+        Assert.Equal("/events.ics", route);
+        Assert.NotNull(typeof(EventController).GetCustomAttribute<AuthorizeAttribute>());
+
+        // The serve Content-Type (the File(...) second arg).
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-route", authorId: "subj-author-001") }, false));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        var result = await controller.CalendarFeed();
+
+        var file = Assert.IsAssignableFrom<FileResult>(result);
+        Assert.Equal("text/calendar; charset=utf-8", file.ContentType);
+    }
+
+    /// <summary>
+    /// M12 lane 2 (U03, the D3 serve-shape pin): the feed response carries
+    /// <c>Content-Disposition: attachment; filename="kumunita-events.ics"</c>
+    /// — the ADR 0034 / 0108 serve idiom with the lane-2 filename
+    /// (<c>kumunita-events.ics</c>, not the per-event
+    /// <c>kumunita-event-{id}.ics</c>).
+    /// </summary>
+    [Fact]
+    public async Task CalendarFeed_Content_Disposition_Filename_Is_Kumunita_Events_Ics()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-filename", authorId: "subj-author-001") }, false));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        await controller.CalendarFeed();
+
+        Assert.Equal(
+            "attachment; filename=\"kumunita-events.ics\"",
+            controller.HttpContext.Response.Headers["Content-Disposition"]);
     }
 
     // ── Harness ────────────────────────────────────────────────────────────────

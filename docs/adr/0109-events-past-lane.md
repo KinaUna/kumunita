@@ -1,7 +1,19 @@
 # ADR 0109 — Events "Past" lane (the /events past-events option)
 
-Status: Accepted
+Status: Accepted (amended 2026-09-28 — see **Amendment** below)
 Date: 2026-09-28
+
+> **Amendment (2026-09-28, same-day).** The reported bug — "upcoming still
+> shows past events; past still shows upcoming" — confirmed that the
+> upcoming lane needed the window after all. `ListUpcomingAsync` **now
+> carries `Start >= nowUtc`** (the exact mirror of `ListPastAsync`'s
+> `Start < nowUtc`), so the two `/events` options are clean complementary
+> lanes. This reverses the three "no time-window predicate / byte-for-byte
+> unchanged / untouched" statements below. The ~30 feed-positive Core pins
+> that planted fixed past dates (2026-03) now plant future dates (2099) so
+> they remain inside the upcoming window; `M4_PastFeed_ShowsPast_ExcludesUpcoming`
+> now pins that the upcoming lane *excludes* the past event. The "additive
+> past lane" of this ADR is unchanged and still holds.
 Extends the **shipped M4 events surface** (ADR 0054 the read/write lane
 seam + the frozen `IEventService` convention; ADR 0063 the `EV-CAL`
 calendar window; ADR 0065 the `EV-MINE` "your events" section; ADR 0090
@@ -13,26 +25,32 @@ was missing: **an option on `/events` to show past events**.
 ## Context
 
 The `/events` feed (`EventController.Index`, ADR 0054) lists a
-community's events ordered by `Start` ascending, and its candidate set
-(`EventService.ListUpcomingAsync`) carries **no time-window predicate** —
-a past, published, community-channel event is already *in* the feed,
-interleaved with upcoming ones (the `EventServiceTests` pins, e.g. the
-2026-03-01 events, rely on that). There is no way for a resident to see
-the neighborhood's **history** in a focused, most-recent-first list, nor a
-way to view "what's coming up" without scrolling past the back-catalog.
+community's events ordered by `Start` ascending. **At the time this was
+written** its candidate set (`EventService.ListUpcomingAsync`) carried no
+time-window predicate — a past, published, community-channel event was
+*in* the feed, interleaved with upcoming ones. (See the Amendment: that
+"full feed" behavior was later confirmed to be the reported bug, and the
+upcoming lane now carries `Start >= nowUtc`.) There was no way for a
+resident to see the neighborhood's **history** in a focused,
+most-recent-first list, nor a way to view "what's coming up" without
+scrolling past the back-catalog.
 
 The shape is already fixed by the surface's own precedents:
 
-- **The feed's semantics are pinned and must not change.** A large body of
-  `EventServiceTests` (`M4_FeedVisibleToAudienceMember`,
-  `M4_FeedOrderedStartAscending`, the draft/deleted exclusion pins, the
-  audience/grant pins) plants events with fixed 2026-03 dates and asserts
-  them *in* `ListUpcomingAsync`. Re-scoping that method to add a
-  `Start > now` predicate would silently change the feed and break the
-  whole suite. The `EV-CAL` lane (ADR 0063) solved the analogous problem —
-  "the feed is the full set, I want a windowed read" — by adding a
-  **separate** lane (`ListInRangeAsync`) rather than redefining the feed.
-  Past-events is the same problem with a different window.
+- **The feed's semantics were pinned (and must not be silently
+  re-scoped).** At the time, a large body of `EventServiceTests`
+  (`M4_FeedVisibleToAudienceMember`, `M4_FeedOrderedStartAscending`, the
+  draft/deleted exclusion pins, the audience/grant pins) planted events
+  with fixed 2026-03 dates and asserted them *in* `ListUpcomingAsync`, so
+  re-scoping that method to add a `Start > now` predicate would have
+  broken the whole suite. (See the Amendment: once the full-feed
+  behavior was reported as a bug, the fix did exactly this re-scope —
+  adding `Start >= nowUtc` — *and* re-pointed those feed-positive plants
+  to future dates (2099) rather than silently changing semantics.) The
+  `EV-CAL` lane (ADR 0063) solved the analogous problem — "the feed is
+  the full set, I want a windowed read" — by adding a **separate** lane
+  (`ListInRangeAsync`); past-events is the same problem with a different
+  window, and the upcoming window now mirrors it.
 - **The paging + filter contract is frozen (ADR 0090).** A new feed-shaped
   read must return the same `EventPage(Items, HasMore)` shape, compute
   `HasMore` the same way (candidates filled the page), take the
@@ -48,9 +66,12 @@ The shape is already fixed by the surface's own precedents:
 
 The events feed gains **one additive read lane** — a "Past" option on
 `/events` — exposed as one new Core seam method, one new controller query
-param, one view toggle, and three `kw-l` keys. **`ListUpcomingAsync` is
-untouched** (the ADR 0097 / 0089 named-lane precedent: an additive surface
-on an already-shipped lane, never a re-scope of a pinned method). No schema
+param, one view toggle, and three `kw-l` keys. ~~**`ListUpcomingAsync` is
+untouched**~~ (the ADR 0097 / 0089 named-lane precedent: an additive
+surface on an already-shipped lane, never a re-scope of a pinned method) —
+**superseded by the Amendment**: `ListUpcomingAsync` was re-scoped to add
+the `Start >= nowUtc` window so the two `/events` options are clean
+complements rather than overlapping sets. No schema
 change, no new index, no new bounded context, no new `kw-l` key *family*
 (the three keys join the existing `events.*` set), and the
 `Milestones.cs` / README Roadmap / `MilestonesTests.cs` triple is
@@ -124,14 +145,17 @@ and the `ListPastAsync` denial maps to a `ForbidResult` 403 split).
 
 - A resident can now open `/events` and see the neighborhood's **history**
   in a focused, most-recent-first list, or view "what's coming up" in
-  isolation — the feed's own default is unchanged, and the upcoming and
-  past lanes are two pure reads over the same documents, the same gate,
-  and the same audit shape.
-- **`ListUpcomingAsync` is byte-for-byte unchanged** — its pinned
-  semantics (no time window, `Start` ascending) and the ~30 existing Core
-  pins survive untouched; the past option is a strictly additive surface
-  (the ADR 0063 `EV-CAL` precedent for "a windowed read beside the full
-  feed").
+  isolation — the upcoming and past lanes are two pure reads over the same
+  documents, the same gate, and the same audit shape, and (post-Amendment)
+  two **clean complements**: upcoming `Start >= nowUtc`, past
+  `Start < nowUtc`, so an event appears in exactly one of the two views.
+- ~~**`ListUpcomingAsync` is byte-for-byte unchanged**~~ — **superseded by
+  the Amendment**: it now carries `Start >= nowUtc` (the exact mirror of
+  `ListPastAsync`'s `Start < nowUtc`), `Start` ascending. The ~30
+  feed-positive Core pins that planted fixed past dates were re-pointed to
+  future dates (2099) so they stay inside the upcoming window, and
+  `M4_PastFeed_ShowsPast_ExcludesUpcoming` now pins that the upcoming lane
+  *excludes* a past event.
 - The past lane reuses the feed's frozen contract end-to-end (paging,
   filter-not-gate, single `CanSeeAsync` decision + one audit row,
   0-candidate no-decision), so there is no new authorization or audit

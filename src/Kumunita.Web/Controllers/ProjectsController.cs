@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
+using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Marten;
@@ -75,19 +76,33 @@ public sealed class ProjectsController : Controller
     // construction sites pass no value, which is a no-op).
     private readonly ITranslationProvider? translationProvider;
 
+    // ADR 0019 — the effective-timezone resolver (optional: test construction
+    // sites that don't pass one get the UTC-floor fallback).
+    private readonly EffectiveTimezoneResolver? _timezone;
+
     public ProjectsController(
         IProjectService projects,
         IUserInfoService userInfo,
         ILocalizationService localization,
         IDocumentStore store,
-        ITranslationProvider? translationProvider = null)
+        ITranslationProvider? translationProvider = null,
+        EffectiveTimezoneResolver? timezone = null)
     {
         this.projects = projects;
         this.userInfo = userInfo;
         this.localization = localization;
         this.store = store;
         this.translationProvider = translationProvider;
+        this._timezone = timezone;
     }
+
+    // ADR 0019 — the actor's effective time zone (resident override →
+    // platform default → UTC floor). The UTC-floor fallback fires only when
+    // no resolver was injected (test construction without DI wiring).
+    private async Task<TimeZoneInfo> ResolveZoneAsync() =>
+        _timezone is not null
+            ? await _timezone.GetAsync()
+            : TimeZoneInfo.FindSystemTimeZoneById("UTC");
 
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -840,6 +855,10 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0079 / ADR 0019 — the stored StartAt / DueAt are UTC instants;
+        // convert to wall-clock in the actor's effective zone so the form
+        // shows the local time the author chose.
+        var zone = await ResolveZoneAsync();
         var model = new TodoEditorModel
         {
             Title       = todo.Title,
@@ -847,11 +866,11 @@ public sealed class ProjectsController : Controller
             Status      = todo.Status,
             AssigneeId  = todo.AssigneeId,
             ParentId    = todo.ParentId,
-            // ADR 0079 — the optional dates prefill from the stored values
-            // (a blank field on POST is the clear intent — the
-            // UpdateTodoRequest partial shape).
-            StartAt     = todo.StartAt,
-            DueAt       = todo.DueAt,
+            // ADR 0079 / ADR 0019 — the optional dates prefill as wall-clock
+            // in the actor's effective zone (a blank field on POST is the
+            // clear intent — the UpdateTodoRequest partial shape).
+            StartAt     = todo.StartAt is not null ? TimeZoneInfo.ConvertTime(todo.StartAt.Value, zone).DateTime : null,
+            DueAt       = todo.DueAt   is not null ? TimeZoneInfo.ConvertTime(todo.DueAt.Value,   zone).DateTime : null,
             ComponentId = todo.ComponentId,
             Audience    = AudienceEditorModel.FromAudience(todo.Audience),
             LanguageCode = todo.LanguageCode,
@@ -997,6 +1016,9 @@ public sealed class ProjectsController : Controller
             return View("Create", model);
         }
 
+        // ADR 0079 / ADR 0019 — the optional dates are wall-clock in the
+        // actor's effective zone; convert to UTC instants (null = no date).
+        var zone = await ResolveZoneAsync();
         var request = new CreateTodoRequest
         {
             // `!` — Title is guaranteed non-null: the `if (!model.IsValid)` gate
@@ -1014,10 +1036,10 @@ public sealed class ProjectsController : Controller
             // server-side refusal (a self-ref is an `InvalidOperationException`
             // — the F13 pin).
             BlockedByTodoId = string.IsNullOrWhiteSpace(model.BlockedByTodoId) ? null : model.BlockedByTodoId,
-            // ADR 0079 — the optional dates pass through verbatim (`null`
-            // = no date).
-            StartAt = model.StartAt,
-            DueAt = model.DueAt,
+            // ADR 0079 / ADR 0019 — the optional dates are wall-clock in the
+            // actor's effective zone; convert to UTC instants (null = no date).
+            StartAt = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : null,
+            DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
             TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
@@ -1164,6 +1186,9 @@ public sealed class ProjectsController : Controller
             return View("Edit", model);
         }
 
+        // ADR 0079 / ADR 0019 — the optional dates are wall-clock in the
+        // actor's effective zone; convert to UTC instants (null clears).
+        var zone = await ResolveZoneAsync();
         var request = new UpdateTodoRequest
         {
             Title = string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
@@ -1172,19 +1197,14 @@ public sealed class ProjectsController : Controller
             Status = model.Status,
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
             ClearParent = model.ClearParent,
-            // ADR 0087 — the **blocker** ("waiting on" target): a blank
-            // picker posts as `null` (the service's `ClearBlockedBy` flag —
-            // or a non-null target re-points the pointer, the C-TBD·3 cycle
-            // guard applying; a self-ref is an `InvalidOperationException`
-            // — the F13 pin, re-rendered as a form error).
+            // ADR 0087 — the **blocker** (C-TBD·3 cycle guard): same shape as
+            // the create lane.
             BlockedByTodoId = string.IsNullOrWhiteSpace(model.BlockedByTodoId) ? null : model.BlockedByTodoId,
             ClearBlockedBy = model.ClearBlockedBy,
-            // ADR 0079 — the optional dates: non-null applied, null *clears*
-            // (the edit form posts a blank `datetime-local` as null — the
-            // field is always in the form, unlike the other partial fields
-            // where null means "leave untouched").
-            StartAt = model.StartAt,
-            DueAt = model.DueAt,
+            // ADR 0079 / ADR 0019 — the optional dates are wall-clock in the
+            // actor's effective zone; convert to UTC instants (null clears).
+            StartAt = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : null,
+            DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
             TagIds = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds),
         };
@@ -3410,14 +3430,18 @@ public sealed class ProjectsController : Controller
             return View("ProjectNew", model);
         }
 
+        // ADR 0079 / ADR 0019 — convert wall-clock to UTC before the write.
+        var zone = await ResolveZoneAsync();
+        var startUtc = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : (DateTime?)null;
+        var dueUtc   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : (DateTime?)null;
         var request = new CreateProjectRequest
         {
             Title = model.Title!,
             Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
             GoalId = string.IsNullOrWhiteSpace(model.GoalId) ? null : model.GoalId,
             Status = string.IsNullOrWhiteSpace(model.Status) ? null : model.Status,
-            StartAt = model.StartAt,
-            DueAt = model.DueAt,
+            StartAt = startUtc is not null ? new DateTimeOffset(startUtc.Value, TimeSpan.Zero) : null,
+            DueAt   = dueUtc   is not null ? new DateTimeOffset(dueUtc.Value,   TimeSpan.Zero) : null,
             ComponentId = string.IsNullOrWhiteSpace(model.ComponentId) ? null : model.ComponentId,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
@@ -3484,14 +3508,18 @@ public sealed class ProjectsController : Controller
         // goal picker's empty choice → ClearGoal). The model round-trips
         // those; the creation-time choices (audience / community / language)
         // are not shown.
+        // ADR 0079 / ADR 0019 — the stored StartAt / DueAt are UTC instants;
+        // convert to wall-clock in the actor's effective zone so the form
+        // shows the local time the author chose.
+        var zone = await ResolveZoneAsync();
         var model = new ProjectComposerViewModel
         {
             Title = project.Title,
             Description = project.Description,
             GoalId = project.GoalId,
             Status = project.Status,
-            StartAt = project.StartAt,
-            DueAt = project.DueAt,
+            StartAt = project.StartAt is not null ? TimeZoneInfo.ConvertTime(project.StartAt.Value, zone).DateTime : null,
+            DueAt   = project.DueAt   is not null ? TimeZoneInfo.ConvertTime(project.DueAt.Value,   zone).DateTime : null,
             Goals = await SeedGoalPickerAsync(),
         };
         ViewData["projectId"] = id; // the edit form's POST action (POST /projects/projects/{id}).
@@ -3527,6 +3555,10 @@ public sealed class ProjectsController : Controller
         }
 
         var goalChosen = !string.IsNullOrWhiteSpace(model.GoalId);
+        // ADR 0079 / ADR 0019 — convert wall-clock to UTC before the write.
+        var zone = await ResolveZoneAsync();
+        var startUtc = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : (DateTime?)null;
+        var dueUtc   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : (DateTime?)null;
         var request = new UpdateProjectRequest
         {
             Title = model.Title!,
@@ -3534,8 +3566,8 @@ public sealed class ProjectsController : Controller
             GoalId = goalChosen ? model.GoalId : null,
             ClearGoal = !goalChosen, // the goal picker's empty choice is an explicit un-goal (D10).
             Status = string.IsNullOrWhiteSpace(model.Status) ? null : model.Status,
-            StartAt = model.StartAt,
-            DueAt = model.DueAt,
+            StartAt = startUtc is not null ? new DateTimeOffset(startUtc.Value, TimeSpan.Zero) : null,
+            DueAt   = dueUtc   is not null ? new DateTimeOffset(dueUtc.Value,   TimeSpan.Zero) : null,
         };
 
         try

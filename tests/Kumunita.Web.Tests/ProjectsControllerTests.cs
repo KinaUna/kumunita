@@ -115,8 +115,12 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     [Fact]
     public void TodoEditorModel_DueBeforeStart_IsInvalid()
     {
-        var startAt = new DateTimeOffset(2026, 9, 5, 9, 0, 0, TimeSpan.Zero);
-        var dueAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+        // ADR 0019 — the form model is wall-clock (DateTime, not DateTime
+        // Offset); the controller is responsible for the zone conversion. This
+        // test only pins the Web-boundary date-coherence rule, so UTC instants
+        // are irrelevant here — we compare the wall-clock values directly.
+        var startAt = new DateTime(2026, 9, 5, 9, 0, 0);
+        var dueAt = new DateTime(2026, 9, 1, 9, 0, 0);
 
         // A well-formed audience ("Any" mode, empty grants) so the assertion
         // isolates the date-coherence rule — the <see cref="AudienceEditorModel"/>
@@ -1303,8 +1307,10 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("the body", vm.Description);
         Assert.Equal("goal-edit", vm.GoalId);
         Assert.Equal("Doing", vm.Status);
-        Assert.Equal(start, vm.StartAt);
-        Assert.Equal(due, vm.DueAt);
+        // ADR 0019 — vm.StartAt/DueAt are wall-clock DateTime (converted from
+        // the stored UTC via the effective zone; UTC fallback in tests).
+        Assert.Equal(start.DateTime, vm.StartAt);
+        Assert.Equal(due.DateTime, vm.DueAt);
         Assert.Equal(projectId, (string)view.ViewData["projectId"]!);
         await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
 

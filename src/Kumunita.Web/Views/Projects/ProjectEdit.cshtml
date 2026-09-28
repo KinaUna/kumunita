@@ -124,12 +124,12 @@
                         <div class="col">
                             <label class="form-label" for="start-at" style="font-weight:600;"><kw-l key="pl.project.start_date">Start</kw-l></label>
                             <input class="form-control" type="datetime-local" id="start-at" name="StartAt"
-                                   value="@Model.StartAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                                   value="@Model.StartAt?.ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                         <div class="col">
                             <label class="form-label" for="due-at" style="font-weight:600;"><kw-l key="pl.project.due_date">Due</kw-l></label>
                             <input class="form-control" type="datetime-local" id="due-at" name="DueAt"
-                                   value="@Model.DueAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                                   value="@Model.DueAt?.ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                     </div>
                     <div class="text-muted small mt-2">

@@ -43,11 +43,11 @@ namespace Kumunita.Core.Tests;
 /// </summary>
 public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
-    // The pinned test window — 2026-09-01T00:00Z (inclusive) …
-    // 2026-10-01T00:00Z (exclusive). A 31-day span (the controller's 30-day
+    // The pinned test window — 2099-09-01T00:00Z (inclusive) …
+    // 2099-10-01T00:00Z (exclusive). A 31-day span (the controller's 30-day
     // policy is not the seam's business — the seam is window-span-agnostic).
-    private static readonly DateTimeOffset WindowStart = new(2026, 9, 1, 0, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset WindowEnd = new(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset WindowStart = new(2099, 9, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset WindowEnd = new(2099, 10, 1, 0, 0, 0, TimeSpan.Zero);
 
     // ── 1 — EV_Range_IncludesEventStartingInWindow (§5.3 #1) ────────────────
     //
@@ -69,8 +69,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "in-window", AuthorId = author,
             Title = "In window", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 15, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 15, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null, // public
         });
         await Plant(store, new Event
@@ -189,8 +189,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "draft", AuthorId = author,
             Title = "Unpublished", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 10, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 10, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 10, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 10, 10, 0, 0, TimeSpan.Zero),
             IsDraft = true, IsDeleted = false, Audience = null,
         });
 
@@ -226,8 +226,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "draft", AuthorId = author,
             Title = "Unpublished", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 11, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 11, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 11, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 11, 10, 0, 0, TimeSpan.Zero),
             IsDraft = true, IsDeleted = false, Audience = null,
         });
 
@@ -257,8 +257,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "deleted", AuthorId = author,
             Title = "Deleted", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 12, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 12, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 12, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 12, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
@@ -284,8 +284,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "granted", AuthorId = author,
             Title = "Members only", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 13, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 13, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 13, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false,
             Audience = Audience(GrantKind.User, grantee),
         });
@@ -313,8 +313,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "granted", AuthorId = author,
             Title = "Members only", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 14, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 14, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 14, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false,
             Audience = Audience(GrantKind.User, grantee),
         });
@@ -347,16 +347,16 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "public-ev", AuthorId = author,
             Title = "Public", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 15, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 15, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null, // public
         });
         await Plant(store, new Event
         {
             Id = "restricted-ev", AuthorId = author,
             Title = "Restricted", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 16, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 16, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 16, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false,
             Audience = Audience(GrantKind.User, otherGrantee),
         });
@@ -405,8 +405,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "ev-a", AuthorId = author, ComponentId = compA,
             Title = "On comp A", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 17, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 17, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 17, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 17, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false,
             Audience = Audience(GrantKind.User, member),
         });
@@ -414,8 +414,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             Id = "ev-b", AuthorId = author, ComponentId = compB,
             Title = "On comp B", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 18, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 18, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 18, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 18, 10, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null, // public
         });
 
@@ -460,33 +460,33 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         const string author = "u-dwm-1-author";
         const string resident = "u-dwm-1-resident";
 
-        // Anchor day = 2026-09-15 (UTC-midnight bounds — the zone is the
+        // Anchor day = 2099-09-15 (UTC-midnight bounds — the zone is the
         // controller's display concern, not the seam's; the seam is UTC).
-        var dayStartUtc = new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero);
+        var dayStartUtc = new DateTimeOffset(2099, 9, 15, 0, 0, 0, TimeSpan.Zero);
         var dayEndUtc = dayStartUtc.AddDays(1);
 
         await Plant(store, new Event
         {
             Id = "on-anchor-day", AuthorId = author,
             Title = "On anchor day", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 15, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 15, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null, // public
         });
         await Plant(store, new Event
         {
             Id = "day-before", AuthorId = author,
             Title = "Day before", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 14, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 14, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 14, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = "day-after", AuthorId = author,
             Title = "Day after", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 16, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 16, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 16, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
@@ -514,39 +514,39 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
 
         // A 7-day window anchored on 2026-09-14 (a Monday) through
         // 2026-09-20 (inclusive), i.e. [2026-09-14T00:00Z, 2026-09-21T00:00Z).
-        var weekStartUtc = new DateTimeOffset(2026, 9, 14, 0, 0, 0, TimeSpan.Zero);
+        var weekStartUtc = new DateTimeOffset(2099, 9, 14, 0, 0, 0, TimeSpan.Zero);
         var weekEndUtc = weekStartUtc.AddDays(7);
 
         await Plant(store, new Event
         {
             Id = "in-week-1", AuthorId = author,
             Title = "In week (day 1)", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 14, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 14, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 14, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = "in-week-2", AuthorId = author,
             Title = "In week (last day)", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 20, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 20, 20, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 20, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 20, 20, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = "day-before-week", AuthorId = author,
             Title = "Day before week", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 13, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 13, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 13, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
         await Plant(store, new Event
         {
             Id = "day-after-week", AuthorId = author,
             Title = "Day after week", Body = "b",
-            Start = new DateTimeOffset(2026, 9, 21, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero),
+            Start = new DateTimeOffset(2099, 9, 21, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 9, 21, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 

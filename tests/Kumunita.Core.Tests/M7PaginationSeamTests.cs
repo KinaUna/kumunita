@@ -528,7 +528,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
     /// empty <c>GroupId</c>, ordered by <c>Start</c> ascending).</summary>
     private static async Task PlantPublicEvents(IDocumentStore store, int count, string prefix)
     {
-        var baseStart = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
+        var baseStart = new DateTimeOffset(2099, 3, 1, 9, 0, 0, TimeSpan.Zero);
         for (var i = 0; i < count; i++)
             await Plant(store, new Event
             {
@@ -547,7 +547,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
     /// by <c>Created</c> descending).</summary>
     private static async Task PlantPublicTodos(IDocumentStore store, int count, string prefix)
     {
-        var baseCreated = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+        var baseCreated = new DateTimeOffset(2099, 1, 1, 9, 0, 0, TimeSpan.Zero);
         for (var i = 0; i < count; i++)
             await Plant(store, new TodoItem
             {

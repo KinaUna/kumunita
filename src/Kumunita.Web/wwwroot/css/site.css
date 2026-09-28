@@ -752,6 +752,311 @@ body.kmb-page-expanded .page-expand-close {
   .kmb-footer .small {
     overflow-wrap: anywhere;
   }
+  /* ADR 0111 · variant C rail — the rail narrows and its 46 px buttons
+     meet the 44 px Floor A at this width. The body variable is updated so
+     the main / footer / banner shift stays in sync (the rail + the shift
+     both read --kmb-rail-w). The topbar already inherits the .navbar rules
+     above (it carries the .navbar class) — no new width block is added
+     (the U06 D6 drift pin). */
+  body.kmb-nav-rail-mode {
+    --kmb-rail-w: 56px;
+  }
+  .kmb-rail-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .kmb-topbar-search {
+    max-width: 100%;
+  }
+  /* The rail hover-tips would overflow the viewport at this width. */
+  .kmb-rail-tip {
+    display: none !important;
+  }
+}
+
+/* --- Navbar variant C (icon rail + slim topbar) — ADR 0111 ----------------
+   The rail is a fixed left column of icon buttons (the 8 nav sections).
+   The topbar is a slim navbar (the e2e-frozen header .navbar pin) carrying
+   search + the _AccountNav partial (bell, account dropdown, language,
+   sign in/up). Because <main> and <footer> are siblings of <header>, the
+   whole page content (main + footer + the pinned-announcement banner) is
+   shifted right by --kmb-rail-w via the body.kmb-nav-rail-mode class the
+   layout sets, rather than margin on a header wrapper. The rail is hidden
+   (and the shift removed) in expand mode. The margin shifts create a 68px
+   of horizontal slack, so clip it to keep the page from horizontally
+   scrolling (the rail itself is position:fixed and never contributes width). */
+body.kmb-nav-rail-mode {
+  --kmb-rail-w: 68px;
+  overflow-x: hidden;
+}
+.kmb-rail {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--kmb-rail-w, 68px);
+  background: var(--bs-light-bg-subtle, #faf9f5);
+  border-right: 1px solid var(--kmb-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem 0;
+  gap: 0.25rem;
+  z-index: 1030;
+}
+.kmb-rail-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+.kmb-rail-brand img {
+  width: 34px;
+  height: 34px;
+}
+.kmb-rail-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kmb-ink-soft);
+  position: relative;
+  text-decoration: none;
+}
+.kmb-rail-btn:hover,
+.kmb-rail-btn:focus {
+  background: var(--kmb-tint-a);
+  color: #1c4532;
+  text-decoration: none;
+}
+.kmb-rail-tip {
+  display: none;
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  z-index: 20;
+  background: var(--kmb-ink, #1a1a1a);
+  color: #fff;
+  font-family: var(--bs-font-sans-serif);
+  font-size: 0.8125rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.kmb-rail-btn:hover .kmb-rail-tip,
+.kmb-rail-btn:focus .kmb-rail-tip {
+  display: block;
+}
+.kmb-rail-body {
+  flex: 1;
+  min-width: 0;
+}
+/* The topbar keeps the SAME 1rem bottom gap as variant B's navbar (its mb-3):
+   the .kmb-tab-under-navbar section strips pull up exactly that far
+   (--kmb-navbar-tab-offset) to hang from the bar's bottom border, so the tab
+   pages flush up to the bar without overlapping it (ADR 0111 D6). */
+.kmb-topbar {
+  flex: none;
+  margin-bottom: 1rem;
+}
+.kmb-topbar .container-fluid {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.kmb-topbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end; /* pack search + account to the right (variant B parity) */
+}
+.kmb-topbar .navbar-toggler {
+  order: 1; /* the toggler sits rightmost when it is the visible item (mobile) */
+}
+.kmb-topbar-collapse {
+  flex-grow: 1;
+  justify-content: flex-end; /* right-align search + account within the bar */
+}
+.kmb-topbar-search {
+  width: 280px; /* a fixed box, not a grow-fill — so the row packs right */
+  max-width: 100%;
+}
+/* Shift the page content clear of the fixed rail (main + footer + the
+   pinned-announcement banner all run beside it, not under it). */
+body.kmb-nav-rail-mode main,
+body.kmb-nav-rail-mode .kmb-footer,
+body.kmb-nav-rail-mode .kumunita-pinned-announcement,
+body.kmb-nav-rail-mode .kmb-topbar {
+  margin-left: var(--kmb-rail-w, 68px);
+}
+/* The pinned-announcement banner pins an explicit width:100% (see its base
+   rule), which would make margin-left push it past the right edge and clip
+   its action buttons. Drop that so it shrinks to the free width instead. */
+body.kmb-nav-rail-mode .kumunita-pinned-announcement {
+  width: auto;
+}
+/* Expand mode: the rail goes away with the rest of the chrome, and the
+   content shift is removed so the surface fills 100% of the width. */
+body.kmb-nav-rail-mode.kmb-page-expanded .kmb-rail {
+  display: none;
+}
+body.kmb-nav-rail-mode.kmb-page-expanded main,
+body.kmb-nav-rail-mode.kmb-page-expanded .kmb-footer,
+body.kmb-nav-rail-mode.kmb-page-expanded .kumunita-pinned-announcement,
+body.kmb-nav-rail-mode.kmb-page-expanded .kmb-topbar {
+  margin-left: 0;
+}
+/* Fullbleed: same as the row variant — no bottom margin on the topbar. */
+body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
+  margin-bottom: 0;
+}
+
+/* --- Collapsed (mobile) navbar — ADR 0111, the ≤575.98px breakpoint ---------
+   Bootstrap's navbar-expand-sm collapses the bar below sm (575.98px), a
+   NARROWER boundary than the app's 767.98px mobile block, so the collapsed-
+   menu styling lives in its own breakpoint (the drift-guard media-block pin in
+   PwaManifestTests records this as the 5th width block and the 6th media
+   rule overall). When the bar is collapsed
+   the toggler is rightmost (parity with variant B) and the three widget-style
+   items — the "More" dropdown, the notification bell, and the account toggle
+   — are re-shown as full-width rows like the section links (Home, Groups, …),
+   instead of the compact inline widgets they are when the bar is expanded.
+   The "More" submenu (the one id-less dropdown-toggle's menu) is de-boxed into
+   indented inline rows so it reads as part of the stacked menu, not a floating
+   panel. These rules are scoped to the collapsed state's selectors and do not
+   affect the expanded (≥sm) bar, which keeps its floating dropdowns. */
+@media (max-width: 575.98px) {
+  /* Variant C topbar: the toggler is the only visible item when collapsed,
+     so push it right (matching variant B). The selector needs the .kmb-topbar
+     parent to beat Bootstrap's .navbar > .container-fluid space-between rule
+     (same specificity, later source order). */
+  .kmb-topbar .kmb-topbar-inner {
+    justify-content: flex-end;
+  }
+
+  /* The bell + account toggles are compact inline widgets (d-inline-flex) when
+     the bar is expanded. In the collapsed menu, match the section-link rows and
+     the "More" toggle — display:block, content-width, centered on the same axis
+     as the rest of the stacked menu (the .navbar-nav column is align-items:
+     center). !important is required because the d-inline-flex utility is
+     itself !important. */
+  #notifications-bell,
+  #accountMenu {
+    display: block !important;
+    width: auto;
+    padding: 0.5rem 1rem;
+  }
+  /* Keep the account avatar + name on one line (they are inline spans) even
+     though the toggle itself is block. */
+  #accountMenu .d-inline-flex {
+    display: inline-flex !important;
+  }
+
+  /* De-box EVERY collapsed submenu (the "More" second-tier, the account menu,
+     and the notification list) into inline, full-width rows that read as part
+     of the stacked menu — no card background / border / shadow, no fixed
+     width, no min-height. Each property is !important because Bootstrap's
+     .dropdown-menu (background-color/border via --bs-dropdown-*) and its
+     [data-bs-popper] / .dropdown-menu-end / the bell's .notifications-dropdown
+     rules vary in specificity; forcing here guarantees the collapse reads as
+     one stacked list regardless. The block is scoped to max-width 575.98px,
+     so the expanded bar (which keeps its floating panels) is untouched. */
+
+  /* Keep the toggler at the TOP of the collapsed bar when a submenu (account,
+     notifications) is open and grows tall. The two variants need different
+     handling because their flex rows differ:
+
+     Variant B — .navbar is a single flex row (brand, toggler, .navbar-collapse)
+     whose default align-items:center vertically centers EVERY child against the
+     tallest one. Anchor children to the top so the toggler no longer sinks to
+     the vertical center of the menu. (Harmless to variant C's .navbar, which
+     is display:block there.) */
+  .navbar {
+    align-items: flex-start !important;
+  }
+
+  /* Variant C — .kmb-topbar-inner is the flex row (toggler + .kmb-topbar-collapse)
+     and it has flex-wrap:wrap with a fixed 280px search box inside the collapse.
+     As the collapse grows tall, the toggler (order:1, set so it is rightmost
+     when it is the only visible item) drops to a second line BELOW the menu.
+     Turn the collapsed topbar into a vertical stack — toggler row on top, the
+     collapse beneath — so the menu always flows UNDER the toggler. The toggler
+     keeps its right position (Bootstrap's .navbar-toggler has an explicit
+     42px width, so it stays a right-anchored 42px box rather than stretching),
+     matching the closed single-item look. */
+  .kmb-topbar .kmb-topbar-inner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  /* In a flex column, ORDER still controls the stacking sequence: the base
+     rule's order:1 would sort the toggler AFTER the collapse (to the bottom).
+     Reset it to 0 so it is first (top), and align-self:flex-end keeps the 42px
+     toggler right-anchored instead of stretching full width under
+     align-items:stretch. */
+  .kmb-topbar .navbar-toggler {
+    order: 0 !important;
+    align-self: flex-end;
+  }
+
+  /* Scoped to .navbar (not .navbar-collapse) so it covers BOTH variants'
+     collapsed bars: variant B's .navbar-collapse and variant C's
+     .kmb-topbar-collapse — every nav bar in this app is nav.navbar, and only
+     the nav dropdowns (More, account, notifications, language) live inside it. */
+  .navbar .dropdown-menu,
+  .navbar .dropdown-menu[data-bs-popper],
+  .navbar .dropdown-menu > li {
+    background: none !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .navbar .dropdown-menu,
+  .navbar .dropdown-menu[data-bs-popper] {
+    position: static !important;
+    float: none !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .navbar .dropdown-menu .dropdown-item {
+    padding: 0.5rem 1rem 0.5rem 1.5rem !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    background: none !important;
+  }
+  /* The notification list — the client-built .notifications-dropdown the
+     notifications-bell.ts module appends to the bell's <li>. Its base rule is
+     a fixed-width (320px) positioned panel; in the collapse, reset it to the
+     same inline full-width list as the other submenus. */
+  .navbar .notifications-dropdown,
+  .navbar .notifications-dropdown .dropdown-item {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: none !important;
+    background-color: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    right: auto !important;
+    left: auto !important;
+    top: auto !important;
+  }
 }
 
 /* --- Badges ------------------------------------------------------------------ */
@@ -955,6 +1260,18 @@ body.kmb-page-expanded .page-expand-close {
 }
 .kmb-cta-band p {
   color: rgba(247, 246, 242, 0.85);
+}
+/* Inline links (e.g. the support mailto on the About page): the global link
+   color is dark green — invisible on this dark green band, so keep a local
+   cream scale here, out of the global link color. */
+.kmb-cta-band a:not(.btn) {
+  color: var(--kmb-cream);
+  text-decoration-color: rgba(247, 246, 242, 0.6);
+}
+.kmb-cta-band a:not(.btn):hover,
+.kmb-cta-band a:not(.btn):focus {
+  color: #f0c97e;
+  text-decoration-color: #f0c97e;
 }
 
 /* --- Footer ------------------------------------------------------------------------- */

@@ -245,12 +245,19 @@
 
         <div class="card mb-4">
             <div class="card-body">
-                @* Shared metadata (author / time / location) — outside the
-                   translation variants: it is not language-specific. *@
-                <div class="text-muted mb-3">
-                    @Model.AuthorDisplayName —
-                    <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
-                    <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
+                @* M12 (ADR 0112, U04) — the "Add to calendar" affordance: a
+                   plain link to the lane-1 file (GET /events/{id}.ics, U02).
+                   Gated on nothing extra — this page only renders for an
+                   event the caller passed GetAsync's Read decision (the
+                   C-M12·6 "quiet" pin). The d-inline-flex wrapper keeps it on
+                   the metadata's line and lets it wrap below at 360 px
+                   (M10 phone-width re-check — no CSS change needed). *@
+                <div class="text-muted mb-3 d-inline-flex gap-2 align-items-center flex-wrap">
+                    <span>
+                        @Model.AuthorDisplayName —
+                        <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
+                        <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
+                    </span>
                     @if (string.IsNullOrWhiteSpace(Model.Event.Location))
                     {
                         <!-- no location -->
@@ -259,6 +266,9 @@
                     {
                         <span class="ms-2">· @Model.Event.Location</span>
                     }
+                    <a class="btn btn-outline-secondary btn-sm" href="@($"/events/{Model.Event.Id}.ics")">
+                        <kw-l key="events.ics.download">Add to calendar</kw-l>
+                    </a>
                 </div>
 
                 @* ADR 0059 (ADR 0027 chip-swap) — the authored-in language is the

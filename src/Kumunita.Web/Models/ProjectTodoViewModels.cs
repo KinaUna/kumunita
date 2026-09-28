@@ -293,18 +293,27 @@ public sealed class TodoEditorModel
     /// <b>filter, never a gate</b> (C-M3·2).</summary>
     public string? ComponentId { get; set; }
 
-    /// <summary>The optional **start** (ADR 0079 — the Event Start/End
-    /// shape, but optional). Model-bound from the <c>datetime-local</c>
-    /// form field; null (a blank field) = no date, which on the edit
-    /// lane *clears* the stored value (the <c>UpdateTodoRequest</c>
-    /// partial-update shape).</summary>
-    public DateTimeOffset? StartAt { get; set; }
+    /// <summary>The optional **start** wall-clock time (ADR 0079 — the Event
+    /// Start/End shape, but optional; <c>null</c> = no date). A
+    /// <see cref="DateTime"/> (no offset) because the browser's
+    /// <c>datetime-local</c> posts a local wall-clock string with no offset,
+    /// and the server is authoritative for the conversion to a stored UTC
+    /// instant (ADR 0019 — the platform default, overridden per account).
+    /// The controller resolves the actor's effective time zone via
+    /// <c>EffectiveTimezoneResolver</c> and converts this wall-clock value to
+    /// a UTC <see cref="DateTimeOffset"/> at write time; the edit lane
+    /// re-converts the stored UTC instant back into the actor's zone for
+    /// display. On the edit lane a blank field posts <c>null</c> (clears the
+    /// stored value — the <c>UpdateTodoRequest</c> partial-update shape).
+    /// </summary>
+    public DateTime? StartAt { get; set; }
 
-    /// <summary>The optional **due date** (ADR 0079). Same binding +
-    /// clearing shape as <see cref="StartAt"/>; <see cref="IsValid"/>
-    /// requires it to not precede the start when both are set (the Event
-    /// "the end time must be after the start" precedent).</summary>
-    public DateTimeOffset? DueAt { get; set; }
+    /// <summary>The optional **due** wall-clock time (ADR 0079). Same
+    /// binding + clearing shape as <see cref="StartAt"/>; <see
+    /// cref="IsValid"/> requires it to not precede the start when both are
+    /// set (the Event "the end time must be after the start" precedent).
+    /// </summary>
+    public DateTime? DueAt { get; set; }
 
     /// <summary>The to-do's **audience** editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the single-source pin; the

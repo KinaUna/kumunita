@@ -22,8 +22,11 @@ namespace Kumunita.Web.Models;
 /// <item><see cref="ComponentId"/> — a feed organizer (C-M3·2: a filter,
 /// never a gate); the <see cref="Audience"/> is the sole access boundary
 /// (ADR 0001-B / 0036).</item>
-/// <item><see cref="Start"/> / <see cref="End"/> — the event's time
-/// (UTC <see cref="DateTimeOffset"/>); <see cref="Start"/> drives feed
+/// <item><see cref="Start"/> / <see cref="End"/> — the event's time as
+/// wall-clock <see cref="DateTime"/>s in the author's effective time zone
+/// (ADR 0019) — the browser's <c>datetime-local</c> posts a local string
+/// with no offset, the server resolves the actor's zone and converts to a
+/// UTC instant at write time; <see cref="Start"/> drives feed
 /// ordering.</item>
 /// <item><see cref="Location"/> / <see cref="Capacity"/> — display
 /// metadata; <see cref="Capacity"/> is **not** a gate (no admission
@@ -109,14 +112,29 @@ public sealed class EventEditorModel
     /// a component (visible in the unfiltered feed).</summary>
     public string? ComponentId { get; set; }
 
-    /// <summary>The event's start instant (UTC <see cref="DateTimeOffset"/>).
-    /// Drives feed ordering + the reminder window.</summary>
+    /// <summary>
+    /// The event's start **wall-clock** time in the **author's effective time
+    /// zone** (ADR 0019) — a <see cref="DateTime"/> (no offset) because the
+    /// browser's <c>datetime-local</c> posts a local wall-clock string with no
+    /// offset, and the server is authoritative for the conversion to a stored
+    /// UTC instant. The controller resolves the actor's effective time zone
+    /// (resident override → platform default → UTC floor, via
+    /// <c>EffectiveTimezoneResolver</c>) and converts this wall-clock value to
+    /// a UTC <see cref="DateTimeOffset"/> at write time; the edit lane
+    /// re-converts the stored UTC instant back into the actor's zone for
+    /// display. A <see cref="DateTimeOffset"/> here would be an ambiguous
+    /// round-trip: the framework's model binder would assign an offset from
+    /// the *server's* zone, defeating the user's zone (the ADR 0019 bug the
+    /// ADR 0019 "the platform default, overridden per account" pin exists to
+    /// avoid). Drives feed ordering + the reminder window.
+    /// </summary>
     [Required(ErrorMessage = "A start time is required.")]
-    public DateTimeOffset Start { get; set; }
+    public DateTime Start { get; set; }
 
-    /// <summary>The event's end instant (UTC <see cref="DateTimeOffset"/>).</summary>
+    /// <summary>The event's end wall-clock time (the same zone + conversion
+    /// contract as <see cref="Start"/>).</summary>
     [Required(ErrorMessage = "An end time is required.")]
-    public DateTimeOffset End { get; set; }
+    public DateTime End { get; set; }
 
     /// <summary>A free-text location (display metadata, not a gate).</summary>
     public string? Location { get; set; }
