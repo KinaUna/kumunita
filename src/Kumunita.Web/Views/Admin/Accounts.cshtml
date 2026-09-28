@@ -4,14 +4,17 @@
     ViewData["Title"] = "Admin — Accounts";
 }
 
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
 <h1>Accounts</h1>
 <p class="text-muted">
     @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.
     Per-account roles, scope, and membership live on each account's manage page;
     Block / Unblock are the quick row-level actions here.
 </p>
-
-@await Html.PartialAsync("_AdminNav.cshtml")
 
 @if (Model.UnverifiedCount > 0)
 {

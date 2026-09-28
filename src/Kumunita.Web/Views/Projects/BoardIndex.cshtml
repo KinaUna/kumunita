@@ -6,6 +6,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The To-dos / Boards tab strip (the _AdminNav.cshtml idiom): start from
+           a to-do or from a board — both entry points are first-class. *@
+        <partial name="_ProjectsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -17,10 +21,6 @@
                 <a class="btn btn-outline-primary" href="/projects/boards/new"><kw-l key="projects.board.new">New board</kw-l></a>
             </div>
         </header>
-
-        @* The To-dos / Boards tab strip (the _AdminNav.cshtml idiom): start from
-           a to-do or from a board — both entry points are first-class. *@
-        <partial name="_ProjectsTabs" />
 
         @if (Model.Components.Count > 0)
         {

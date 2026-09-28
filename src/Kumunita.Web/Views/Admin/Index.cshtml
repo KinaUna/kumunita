@@ -3,13 +3,16 @@
     ViewData["Title"] = "Admin";
 }
 
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
 <h1><kw-l key="admin.title">Admin</kw-l></h1>
 <p class="text-muted">
     One neighborhood, instance-wide: accounts, communities, platform settings, and
     the security surfaces. Pick a section below.
 </p>
-
-@await Html.PartialAsync("_AdminNav.cshtml")
 
 @* Overview cards — the counts at a glance. The numbers are the dashboard's job:
    a quick status read before drilling into a section. *@

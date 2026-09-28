@@ -102,6 +102,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
+           the feed and the calendar are both first-class entry points. *@
+        <partial name="_EventsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -153,10 +157,6 @@
                 </div>
             </div>
         </header>
-
-        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
-           the feed and the calendar are both first-class entry points. *@
-        <partial name="_EventsTabs" />
 
         <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
             <a class="btn btn-outline-secondary" href="@NavHref(Model.PrevAnchor)"><kw-l key="events.calendar.prev">Prev</kw-l></a>

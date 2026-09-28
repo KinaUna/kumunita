@@ -6,6 +6,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
+           the feed and the calendar are both first-class entry points. *@
+        <partial name="_EventsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -17,10 +21,6 @@
                 <a class="btn btn-outline-primary" href="/events/new"><kw-l key="events.new_event">New event</kw-l></a>
             </div>
         </header>
-
-        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
-           the feed and the calendar are both first-class entry points. *@
-        <partial name="_EventsTabs" />
 
         @* ADR 0109 (EV-PAST) — the "Past" option: an Upcoming / Past toggle on
            the feed surface (the calendar's events-view-toggle idiom). The links

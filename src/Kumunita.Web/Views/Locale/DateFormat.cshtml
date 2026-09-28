@@ -4,8 +4,12 @@
     ViewData["Title"] = "Settings — Date & time format";
 }
 
-<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+@* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
+   the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
 @await Html.PartialAsync("_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
 
 @if (Model.DateFormat is var df && df is not null)
 {

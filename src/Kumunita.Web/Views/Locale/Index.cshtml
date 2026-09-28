@@ -5,8 +5,12 @@
     ViewData["Title"] = "Settings — Language";
 }
 
-<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+@* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
+   the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
 @await Html.PartialAsync("_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
 
 <h2 class="mt-1"><kw-l key="locale.language_heading">Language</kw-l></h2>
 <p class="text-muted">
