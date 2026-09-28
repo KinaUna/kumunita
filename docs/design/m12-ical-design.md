@@ -813,6 +813,48 @@ literal `kw-l` key used in the three touched views is registered.
   consistent — the single-in-progress is now M13, the exact order M0…M14
   unchanged). *(Part-vs-whole: every part green implies the whole green.)*
 
+### Run result (M12 acceptance gate — 2026-09-28)
+
+Run by U05 (the close unit), **both** test assemblies in full, after the
+C-M12·7 docs flip (M12 → `StatusDone`, M13 → `StatusNext`):
+
+- **(a) Closed loop — PASS.** The visible community event planted for the
+  gate arrives through the frozen `EventService.GetAsync` 404-vs-403 split
+  as a `200` `FileResult` with `Content-Type: text/calendar; charset=utf-8`
+  (Web pin `EventIcs_Route_Exists_Is_Authorize_And_Returns_Text_Calendar`,
+  `EventControllerTests`), and its `VEVENT` carries the event's `SUMMARY`
+  (its `Title`), `LOCATION` (its `Location`), and `DTSTART` (its `Start`,
+  UTC `Z`-suffixed) — exactly the §field-map rows — as pinned by the U01
+  pure pins (`IcsWriter_Writes_DTSTART_DTEND_As_UTC_Z_Suffixed` + the
+  pinned-subset / DESCRIPTION pins in `IcsWriterTests`): the event the
+  resident sees in-app lands in a calendar file.
+- **(b) Handoff — PASS (recorded as the pin-level invariant).** The
+  load-bearing claim is the one the composition pin exercises: the feed
+  seam the `CalendarFeed` action calls — the frozen
+  `ListUpcomingAsync(null, actorId, 0, ct)` — is re-authorized **on every
+  fetch** (D2: no token, the cookie rides the decision), so a grantee's
+  fetch **after** the author added them to the event's `Audience` contains
+  the event (the `CanSeeAsync(Read)` gate admits it) and a fetch **after**
+  removal does not (it is filtered from the visible set). Pinned by
+  `IcsFeed_ContainsExactlyTheVisibleUpcomingSet` (`IcsFeedTests`,
+  `PostgresFixture`) — the grantee-restricted event is planted as excluded
+  by that very decision — and by the handoff's own definition: there is no
+  state to propagate; the next fetch re-derives the set.
+- **(c) Part-vs-whole — PASS.** Both assemblies green **after** the flip:
+  `Kumunita.Web.Tests` **575/575** (Errors: 0, Failed: 0 — the re-pinned
+  `MilestonesTests.M13_Is_The_Single_InProgress_Milestone_And_M14_Is_Planned`
+  + the `Shipped_Milestones_Are_Marked_Done` / exact-order M0…M14 pins +
+  the 8 Web iCal pins + `KwLRegistryConsistencyTests`) and
+  `Kumunita.Core.Tests` **976/976** (Errors: 0, Failed: 0 — the 10 `IcsWriter`
+  pure pins + the composition pin + the `KnownTranslationKeys_ParityTests`
+  family covering the two new `events.ics.*` keys in en/de/fr/da).
+
+**Gate status: 3/3 PASS (2026-09-28).** The drift-guard's frozen list is
+confirmed untouched by U01–U04 (the handoff note's `## U01`–`## U04`
+entries record zero drift pauses; U00 locked the two source-driven
+refinements before any code ran). M12 is closed at U05; the register's
+six unit plans are moved to `docs/plans-milestones/done/`.
+
 ## §deferred lanes — the Consequences hand-off (each a named follow-on, own ADR)
 
 - **RSVP state in the calendar file** (`ATTENDEE` / `RSVP` / the

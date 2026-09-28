@@ -454,3 +454,72 @@ pattern copied for each of the four language sections).
 
 **Open items for U05:** flip the docs (M12→Done, M13→Next) +
 `MilestonesTests` re-pin + record the gate run in §gate.
+
+## U05 — Close: acceptance gate recorded + docs flip + register close
+
+**Status:** complete — **M12 is closed.** Build green (`dotnet build
+Kumunita.slnx -c Debug` — Build succeeded, 0 errors); **both** test
+assemblies green in full **after** the flip: `Kumunita.Web.Tests`
+**575/575** (Errors: 0, Failed: 0) and `Kumunita.Core.Tests` **976/976**
+(Errors: 0, Failed: 0, ~96 s via `PostgresFixture`; `docker container
+prune -f` after). The re-pin is the proof the flip is consistent — the
+single-in-progress is now **M13**, the exact-order M0…M14 pin unchanged,
+`Shipped_Milestones_Are_Marked_Done` now covers M12.
+
+**The gate (recorded in the design doc §gate as `### Run result (M12
+acceptance gate — 2026-09-28)`):** **(a) closed loop — PASS** (the visible
+event's `VEVENT` carries its `SUMMARY` / `LOCATION` / `DTSTART` — the
+U01 pure pins + the U02 Web pin `EventIcs_Route_Exists_Is_Authorize_And_
+Returns_Text_Calendar`); **(b) handoff — PASS, recorded at pin level**
+(the D2 "re-authorized every fetch" invariant is the composition pin
+`IcsFeed_ContainsExactlyTheVisibleUpcomingSet` — the grantee-restricted
+event is excluded by the frozen `CanSeeAsync(Read)` decision on the very
+fetch; no state to propagate); **(c) part-vs-whole — PASS** (the full
+pinned list green: 10 `IcsWriter` pure pins + the composition pin + 8 Web
+pins + the `KnownTranslationKeys_ParityTests` family + `KwLRegistryConsist
+encyTests` + the re-pinned `MilestonesTests`).
+
+**The docs flip (all in this unit, C-M12·7):** `src/Kumunita.Web/
+Milestones.cs` (M12 → `StatusDone`, M13 → `StatusNext`) · `README.md`
+(Status line → "M13 in progress", M1–M12 done; Roadmap → M12 **Done**
+(ADR 0112) + the M12 scope sentence, M13 **In progress**) · `docs/
+STATUS.md` (the "next is M13 — logging & analytics" line, the M11-close
+shape) · `tests/Kumunita.Web.Tests/MilestonesTests.cs` (the re-pin:
+`M13_Is_The_Single_InProgress_Milestone_And_M14_Is_Planned`, the exact
+done-list extended with `M12`, the planned list now just `M14`). `docs/
+ARCHITECTURE.md` **read first, no status to flip** — the M12 row is a
+value-chain table row ("outcome + world seams — events land in the
+calendars residents already check"), which carries **no** status column
+(the M11 row is the same shape); drift note: the flip's fourth target is
+naturally a no-op for this table, exactly as the register's "if it
+carries a status — read first" clause anticipated.
+
+**The register close:** the six unit plan files `ical-u00.md`…`ical-u05.md`
+moved `in-progress/` → `done/` (one `Move-Item` per file, a single
+terminal command); the register `plan-m12-ical.md` header flipped
+"In progress." → "**Done** (closed U05, 2026-09-28)"; this `## Summary`
+appended last. This is the **last M12 handoff entry — it is for the M13
+agent** (logging and analytics); there is no U06.
+
+## Summary
+
+| Unit | Goal (one line) | Outcome | Tests (as green) | Drift pauses |
+|---|---|---|---|---|
+| U00 | Lock the design (`m12-ical-design.md`) + ADR 0112 | LOCKED — D1–D8, C-M12·1–7, F1–F5, §ics/§field-map/§routes/§kw-l/§pinned tests/§gate/§deferred lanes all locked verbatim; ADR 0112 Accepted + indexed | docs only — build green | 2 source-driven refinements locked **before** code (drift-guard entries 1–2: `STATUS:CANCELLED` = emitter capability, not an HTTP-lane path; `CATEGORIES` resolution = Web layer's) |
+| U01 | `IcsWriter` pure emitter (D1/D4) + its 10 pure pins | `Kumunita.Core/Events/IcsWriter.cs` — one static `Build` method, BCL-only, closed pinned subset, empty feed = valid empty calendar | `IcsWriterTests` 10/10; Core suite green | none |
+| U02 | `GET /events/{id}.ics` lane + serve shape + Web pins | `EventIcs` on `EventController` — `[Authorize]`, the frozen `GetAsync` 404-not-403 split, the four serve headers; the `.ics`-literal-in-`{id}` routing question **did not bite** (recorded for U03) | Web 573/573; `EventControllerTests` 55/55 | none |
+| U03 | `GET /events.ics` feed lane + composition pin + feed Web pins | `CalendarFeed` on `EventController` — always 200 (empty set = valid empty calendar); the composition pin plants the five-case set and asserts exactly the visible one; the four feed pins + the two shared-pin extensions | Web 575/575; Core 976/976 (composition pin via `PostgresFixture`) | none (one judgment call, recorded: the Core pin passes `null` for `categoriesByEventId` — drift-guard entry 2 keeps CATEGORIES in the Web layer) |
+| U04 | The two `kw-l` affordances × en/de/fr/da + the phone-width re-check | The three view links (Detail / Index / Calendar — all plain `<a>`, no JS) + `events.ics.download` / `events.ics.feed` × en/de/fr/da in the closed registry; the 360 px re-check passed with **no** CSS change (the rows already `flex-wrap`) | Web 575/575 (incl. `KwLRegistryConsistencyTests`); Core 976/976 (incl. `KnownTranslationKeys_ParityTests`) | none |
+| U05 | Acceptance gate recorded + docs flip + register close | Gate **3/3 PASS** recorded in the design doc §gate; M12 → Done / M13 → Next across `Milestones.cs` + `README.md` + `STATUS.md` + the `MilestonesTests` re-pin (M13 the single in-progress); the ARCHITECTURE.md M12 row read and confirmed status-free; the six unit plans moved to `done/`; this Summary last | Web 575/575 + Core 976/976, both **after** the flip | none |
+
+**Open items carried out of M12 (named, own lanes — the §deferred lanes
+/ ADR 0112 Consequences, untouched by the close):** RSVP state in the
+calendar file (privacy, own ADR) · `RRULE` recurring (M14's home) ·
+`VTODO` for projects (own lane) · ICS import (own lane) · per-component
+feeds (own lane). **One pre-existing gap flagged by U00 (not fixed —
+outside U00's "one index row" deliverable, and out of M12's scope):**
+`docs/adr/README.md`'s index **ends at 0110** — the ADR **0111** file
+(`0111-nav-layout-variants-b-and-c.md`) is not indexed (the 0112 row was
+appended after the actual last row, 0110). A human should decide whether
+to back-fill the 0111 row. **No other open items — M12 is Done; M13
+(logging and analytics) is the single in-progress milestone.**

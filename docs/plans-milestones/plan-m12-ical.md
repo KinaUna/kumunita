@@ -1,6 +1,6 @@
 # Plan: M12 — iCal (calendar export of visible events)
 
-> **In progress.** Unit register (secondary tier). Living handoff note:
+> **Done** (closed U05, 2026-09-28). Unit register (secondary tier). Living handoff note:
 > `docs/plans-milestones/in-progress/m12-ical-handoff-notes.md` (scratch tier — one
 > `## U#` section per unit, appended, never rewritten). The authoritative
 > design (primary tier) — `docs/design/m12-ical-design.md` — is authored by
