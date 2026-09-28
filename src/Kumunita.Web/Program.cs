@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Bootstrap;
+using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Web;
@@ -15,6 +16,7 @@ using Marten;
 using Marten.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Mail;
 using Wolverine;
@@ -39,6 +41,17 @@ builder.Services.AddControllersWithViews();
 // call AddLogging for us), so even LoggerFactory was missing from DI. AddLogging
 // registers LoggerFactory, ILoggerFactory, and the open-generic ILogger<T>.
 builder.Services.AddLogging();
+
+// M13 file log sink (ADR 0114 D6): the dated app-*.log files under a
+// configurable directory, BCL-only (no logging package). ADDITIVE — the
+// console sink above (docker logs) stays; this is a second ILoggerProvider
+// on the same ILoggerFactory. The call runs one RollingFileSink.Retain boot
+// pass (delete files older than RetentionDays by mtime), then registers the
+// provider. The config read follows the CommunityOptions / MediaOptions
+// bind shape (Logging__File__Directory /
+// Logging__File__RetentionDays, defaulted by the FileSinkOptions POCO).
+var fileSinkOptions = builder.Configuration.GetSection(FileSinkOptions.SectionName).Get<FileSinkOptions>() ?? new FileSinkOptions();
+builder.Logging.AddFileSink(fileSinkOptions.Directory, fileSinkOptions.RetentionDays);
 
 // SchemaBootstrap and FirstBootSeeder are static classes and resolve the non-generic
 // ILogger: they can't be ILogger<T> type arguments (CS0718 — static types), and the

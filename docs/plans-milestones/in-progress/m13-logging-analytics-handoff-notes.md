@@ -179,3 +179,125 @@ authority; U01 implements the `Kumunita.Core.Logging` surface
 `AddFileSink` call next to the `AddLogging()` line, the
 `Logging__File__Directory` / `Logging__File__RetentionDays` config read,
 the `appsettings.json` `Logging:File` section) + the 3 D6 sink pins.
+
+---
+
+## U01 — RollingFileSink + AddFileSink (2026-09-28)
+
+**Role.** D6 rendered as code — the `Kumunita.Core.Logging` surface
+(BCL-only, zero new NuGet dependency), the `Program.cs` wiring, the
+`appsettings.json` `Logging:File` section, and the 3 D6 sink pins.
+Touched only the U01 deliverables (the `Logging/` folder, `Program.cs`,
+`appsettings.json`, `LoggingTests.cs`). Did **not** touch the `Usage`
+context, the middleware, the admin surface, or the retention tick
+(U02–U05).
+
+**Deliverables landed (U01's scope, 8):**
+
+- `src/Kumunita.Core/Logging/FileSinkOptions.cs`
+- `src/Kumunita.Core/Logging/LogLine.cs`
+- `src/Kumunita.Core/Logging/RollingFileSink.cs`
+- `src/Kumunita.Core/Logging/FileLoggerProvider.cs`
+- `src/Kumunita.Core/Logging/FileLogger.cs`
+- `src/Kumunita.Core/Logging/AddFileSink.cs`
+- `tests/Kumunita.Core.Tests/LoggingTests.cs` (the 3 D6 sink pins)
+- `src/Kumunita.Web/Program.cs` (one `AddFileSink` call) +
+  `src/Kumunita.Web/appsettings.json` (one `Logging:File` section)
+
+**(a) The `FileSinkOptions` fields as written:**
+
+- `SectionName` — `const string = "Logging__File"`
+- `Directory` — `string`, default `"logs"`
+- `RetentionDays` — `int`, default `14`
+
+(the `CommunityOptions` / `MediaOptions` bind shape — a `SectionName`
+constant + two POCO properties, bound in `Program.cs` by the
+`GetSection(FileSinkOptions.SectionName).Get<FileSinkOptions>()` read.)
+
+**(b) The three D6 pin test names + pass/red:**
+
+- `RollingFileSink_LogLine_Is_ValidJsonLines` — **pass**
+- `RollingFileSink_FileNaming_Is_Daily` — **pass**
+- `RollingFileSink_Retention_Deletes_Older_Files` — **pass**
+
+Run via `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.LoggingTests"` →
+`Total: 3, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`. (The repo's
+`dotnet test` discovery path is broken — see AGENTS.md; the in-process
+xunit.v3 runner is the reliable path.)
+
+**(c) The `Program.cs` wiring:** line **53** (the
+`builder.Logging.AddFileSink(...)` call; the config read is line **52**,
+the `var fileSinkOptions = ...Get<FileSinkOptions>()` read, both between
+`builder.Services.AddLogging()` at line 41 and the
+`AddSingleton<ILogger>` bootstrap bridge at line 56). The sink is
+**additive** — the console sink above stays; the file sink is a second
+`ILoggerProvider` on the same `ILoggerFactory`.
+
+**(d) The `appsettings.json` `Logging:File` section as written:**
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "Microsoft.AspNetCore": "Warning"
+  },
+  "File": {
+    "Directory": "logs",
+    "RetentionDays": 14
+  }
+},
+```
+
+**(e) Compile warnings:** **0** warnings, 0 errors on
+`dotnet build Kumunita.slnx -c Debug`.
+
+**Drift found (the design sketch's `LoggingBuilder` was an older-version
+API; U01 reconciled to the .NET 10 public surface — the D6 intent is
+unchanged, only the concrete type names moved):**
+
+1. **`LoggingBuilder` is `internal` in .NET 10** — the public surface is
+   `ILoggingBuilder`. The design doc's §sink sketch names
+   `LoggingBuilder AddFileSink(this LoggingBuilder b, ...)`; U01's
+   `AddFileSink.cs` uses `ILoggingBuilder` (the `ILoggerProvider` /
+   `AddProvider` / `Retain` shape is byte-for-byte the D6 sketch). This is
+   the "memory is an older major version" trap AGENTS.md flags — the
+   concrete `LoggingBuilder` type became internal across the
+   `Microsoft.Extensions.Logging` line; only the `ILoggingBuilder`
+   interface is public.
+2. **`ILogger.BeginScope` is the 1-arg form in .NET 10** — the design
+   sketch's `BeginScope<TState>(TState state, Func<TState, string> factory)`
+   no longer matches the `ILogger` interface (the 2-arg factory overload
+   was dropped from the public interface). U01's `FileLogger` implements
+   `IDisposable BeginScope<TState>(TState state) where TState : notnull`
+   returning a no-op `NullScope.Instance` (the file sink carries no
+   structured scope state; the `Log` formatter already receives the
+   `TState`). The design sketch's `IDisposable?` return was also
+   tightened to non-nullable to avoid a CS8603 nullability warning —
+   the `NullScope` singleton keeps the contract honest.
+3. **The wiring is `builder.Logging.AddFileSink(...)`, not
+   `builder.Services.Logging.AddFileSink(...)`.** The design doc's §sink
+   sketch names `builder.Services.Logging.AddFileSink(dir, days)`; the
+   `WebApplicationBuilder`'s `Logging` property (an `ILoggingBuilder`) is
+   the canonical, host-blessed surface (no need to reach into
+   `services` for the builder). `builder.Services.Log` /
+   `builder.Services.Logging` do not resolve on this .NET 10 surface
+   (CS1061 — the extension property is not exposed on
+   `IServiceCollection` in this closure), so `builder.Logging` is the
+   correct idiom. Recorded here so U07's docs flip (the ADR / design-doc
+   reference to the `Program.cs` wiring) names the line that actually
+   ships (line 53), not the sketch's.
+4. **The test's `SetLastWriteTimeUtc` takes a `DateTime`, not a
+   `DateTimeOffset`.** The design sketch's retention pin plants files with
+   "distinct mtimes"; the BCL `File.SetLastWriteTimeUtc` signature is
+   `(string, DateTime)`. U01's test converts the `DateTimeOffset`
+   `now`-offsets via `.UtcDateTime` when planting the mtimes — the
+   `Retain` contract (the `File.GetLastWriteTimeUtc(f) < cutoff`
+   comparison over `DateTimeOffset`) is unchanged.
+
+**Gap left for U02.** The `Kumunita.Core.Usage` context
+(`UsageEvent` POCO + the pure `UsageCapturePolicy.Decide`), the
+`SurfaceKey.Map` closed-list normalization, and the D1/D2 pins. The
+`sink` lane is complete — the host's logs land in
+`app-YYYYMMDD.log` under the configured directory, a file older than
+`RetentionDays` is deleted at boot, and the `docker logs` console sink is
+unchanged (F5).
