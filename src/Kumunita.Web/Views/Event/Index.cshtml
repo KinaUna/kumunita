@@ -6,6 +6,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
+           the feed and the calendar are both first-class entry points. *@
+        <partial name="_EventsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -18,9 +22,25 @@
             </div>
         </header>
 
-        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
-           the feed and the calendar are both first-class entry points. *@
-        <partial name="_EventsTabs" />
+        @* ADR 0109 (EV-PAST) — the "Past" option: an Upcoming / Past toggle on
+           the feed surface (the calendar's events-view-toggle idiom). The links
+           are plain GETs that carry the current community filter (?componentId)
+           so the selection survives the switch; the server re-renders and the
+           authorization re-runs per request (C-M3·2 — past is a selector, never
+           an access input). *@
+        @{
+            string FeedToggleHref(bool showPast)
+            {
+                var href = showPast ? "/events?past=true" : "/events";
+                if (Model.CurrentComponentId is not null)
+                    href += (showPast ? "&" : "?") + "componentId=" + Uri.EscapeDataString(Model.CurrentComponentId);
+                return href;
+            }
+        }
+        <div class="btn-group btn-group-sm mb-4 events-feed-toggle" role="group" aria-label="Event time range">
+            <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><kw-l key="events.upcoming">Upcoming</kw-l></a>
+            <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><kw-l key="events.past">Past</kw-l></a>
+        </div>
 
         @if (Model.Components.Count > 0)
         {
@@ -76,7 +96,14 @@
         <div class="airy-ann-list">
             @if (Model.Events.Count == 0)
             {
-                <div class="p-4 text-muted"><kw-l key="events.empty">No upcoming events yet.</kw-l></div>
+                @if (Model.Past)
+                {
+                    <div class="p-4 text-muted"><kw-l key="events.past_empty">No past events yet.</kw-l></div>
+                }
+                else
+                {
+                    <div class="p-4 text-muted"><kw-l key="events.empty">No upcoming events yet.</kw-l></div>
+                }
             }
             @foreach (var row in Model.Events)
             {

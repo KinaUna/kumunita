@@ -208,6 +208,13 @@
   --kmb-space-section-sm: 3rem;
   --kmb-overlap: 3.25rem;    /* how far feature cards sink into the next band */
   --kmb-card-shadow-dark: 0 12px 28px rgba(13, 26, 20, 0.22);
+  /* How far a .kmb-tab-under-navbar strip is pulled up under the navbar:
+     1rem — exactly the navbar's mb-3, so the tab bar's top edge lands
+     flush with the navbar's bottom border line and reads as extending
+     from behind it (the attached two-tier-nav pattern). Safe at every
+     width: the pull-up merely fills the navbar's own mb-3 gap, it never
+     overlaps the bar. */
+  --kmb-navbar-tab-offset: 1rem;
 }
 
 /* --- Base ----------------------------------------------------------------- */
@@ -548,6 +555,73 @@ body.kmb-page-expanded .page-expand-close {
    own anchor). */
 .navbar .navbar-nav {
   align-items: center;
+}
+
+/* Tabs that hang from the navbar — the section tab strips (the ADR 0062
+   nav-tabs idiom: _AdminNav / _EventsTabs / _SettingsTabs / _ProjectsTabs
+   + Groups/Detail). The bar is pulled up so its top edge sits flush with
+   the navbar's bottom border line (see --kmb-navbar-tab-offset in :root),
+   and the outline is flipped upside down vs Bootstrap's default: the seam
+   rides the TOP of the strip (the navbar's bottom edge acts as the line the
+   tabs hang from) and the active tab's top border is opened up to the
+   navbar's white, so it reads as one continuous surface extending down from
+   the nav bar. Corners are rounded at the bottom. The links keep the
+   navbar's own voice (its --kmb-ink-soft color + 0.9375rem size) and the
+   active tab picks up the navbar brand pine (#1c4532). */
+.kmb-tab-under-navbar {
+  margin-top: calc(-1 * var(--kmb-navbar-tab-offset));
+  border-top: var(--bs-border-width) solid var(--bs-border-color);
+  border-bottom: 0;
+}
+.kmb-tab-under-navbar .nav-link {
+  color: var(--kmb-ink-soft);
+  font-size: 0.9375rem;
+  background-color: var(--bs-body-bg);
+  margin-bottom: 0;
+  margin-top: calc(-1 * var(--bs-border-width));
+  /* A permanent U outline — bottom + both sides in the border color — so
+     each tab reads as a shape hanging down from the navbar. The top is left
+     open (transparent) where it meets the strip's top seam; the active tab
+     below fills that top with white to merge into the navbar. Rounded at
+     the bottom. (Bootstrap's default .nav-tabs link border is all
+     transparent and only shows on hover — this makes the outline stand on
+     its own.) */
+  border-color: var(--bs-border-color);
+  border-top-color: transparent;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: var(--bs-border-radius);
+  border-bottom-right-radius: var(--bs-border-radius);
+}
+.kmb-tab-under-navbar .nav-link:hover,
+.kmb-tab-under-navbar .nav-link:focus {
+  color: #1c4532;
+  /* Keep the same U outline on hover/focus (don't let Bootstrap's hover
+     border repaint the top) — the only change is the label going pine. */
+  border-color: var(--bs-border-color);
+  border-top-color: transparent;
+}
+.kmb-tab-under-navbar .nav-link.active,
+.kmb-tab-under-navbar .nav-item.show .nav-link {
+  color: #1c4532;
+  font-weight: 600;
+  /* Re-assert the U outline: Bootstrap's own .nav-tabs .nav-link.active
+     rule (same specificity as this one, but ours must win as the later
+     stylesheet) repaints the bottom border to the body background — its
+     way of hiding the seam in the default orientation. In the flipped
+     orientation the bottom IS the seam, so put it back. */
+  border-color: var(--bs-border-color);
+  /* Open the top edge into the navbar (its bg is white) and give the tab
+     the same white surface, so the active tab reads as one surface with
+     the nav bar above it. */
+  border-top-color: #fff;
+  background-color: #fff;
+  /* Slightly raised over the other tabs (the soft "hover" shadow — the
+     design system's only small shadow). z-index keeps the shadow from
+     being overpainted by the neighbouring links' backgrounds. */
+  box-shadow: var(--bs-box-shadow-sm);
+  position: relative;
+  z-index: 1;
 }
 
 /* --- Pinned announcement (Views/Shared/_PinnedAnnouncement.cshtml) --------
@@ -1236,6 +1310,18 @@ body.kmb-page-expanded .page-expand-close {
   flex-wrap: wrap;
 }
 
+/* Calendar header (Event/Calendar, ADR 0104) — the full-page + full-screen
+   toggles share the lede's line, floated right; below the wrap threshold
+   they stack after the lede, before the Day/Week/Month + New event
+   controls (the DOM order keeps that on every viewport). */
+.airy-head .lede-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
 /* A: the announcements ledger — one bordered container, generous rows. */
 .airy-ann-list {
   background: #fff;
@@ -1283,7 +1369,13 @@ body.kmb-page-expanded .page-expand-close {
   align-items: flex-end;
   gap: 0.5rem;
 }
-.airy-ann-actions { display: flex; gap: 0.75rem; }
+/* Edit / Delete are intentionally in *different* places so a misclick on one
+   can't hit the other (ADR 0017 edit lane + the admin delete lane): wide
+   screens stack them vertically (Edit on top, Delete below), small screens lay
+   them out horizontally (Edit left, Delete right) — both follow the DOM order
+   above. The wide-screen column is the base rule; the mobile row override
+   lives in the (max-width: 767.98px) block below. */
+.airy-ann-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; }
 .link-quiet { font-size: 0.875rem; font-weight: 500; color: var(--kmb-muted); }
 .link-quiet:hover { color: var(--bs-primary); }
 
@@ -1493,6 +1585,9 @@ body.kmb-page-expanded .page-expand-close {
   .airy-head h1 { font-size: 2rem; }
   .airy-ann-row { grid-template-columns: 1fr; padding: 1.25rem 1.25rem; }
   .airy-ann-side { align-items: flex-start; }
+  /* Edit left, Delete right on small screens (the base rule above stacks them
+     vertically for wide screens). */
+  .airy-ann-actions { flex-direction: row; align-items: center; }
   .airy-comm-layout { grid-template-columns: 1fr; gap: 1.5rem; }
   .airy-side-list { flex-direction: row; flex-wrap: wrap; gap: 0.375rem; }
   .airy-side-note { display: none; } /* the mandatory badge reappears in the head */
@@ -1962,6 +2057,17 @@ body.kmb-page-expanded .page-expand-close {
 }
 .kanban-arrow-submit svg {
   flex: none;
+}
+
+/* The card's "Details" toggle arrow (ADR 0106) — its own row at the card's
+   foot, right-aligned (the row's .text-end). Points down by default; while
+   the collapse is open the Bootstrap collapse sets aria-expanded="true" on
+   this button, so the arrow rotates to point up (collapse = "retract"). */
+.kanban-details-toggle svg {
+  transition: transform 120ms ease;
+}
+.kanban-details-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
 }
 
 /* The ⋮ action triggers (ADR 0070 introduced it on the Kanban board heads

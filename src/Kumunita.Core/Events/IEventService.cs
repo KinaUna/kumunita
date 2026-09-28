@@ -41,6 +41,37 @@ public interface IEventService
     Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
 
     /// <summary>
+    /// The <b>past events</b> lane (ADR 0109, the <c>EV-PAST</c> lane) — the
+    /// <c>/events</c> feed's "Past" option: the candidate set is the
+    /// <see cref="ListUpcomingAsync"/> filter plus a time window predicate
+    /// <c>Start &lt; nowUtc</c> (an event is past on the moment it starts,
+    /// mirroring <see cref="ListInRangeAsync"/>'s start-day rule), ordered by
+    /// <c>Start</c> <b>descending</b> (the most recent past event first — the
+    /// "history" reading order, unlike the feed's "next" reading order). The
+    /// <paramref name="componentId"/> is a *filter, never a gate* (C-M3·2);
+    /// group-channel events never reach the community feed (GE·2, ADR 0089);
+    /// drafts and deleted events are excluded (the same candidate filter as the
+    /// feed — the actor's own draft is surfaced by
+    /// <see cref="ListMineAsync"/>/the draft lanes, not by this one).
+    /// <para>
+    /// Same authorization posture as the feed (C-EV·2 / C6): one standalone
+    /// <c>CanSeeAsync(Read)</c> over the page's candidates via
+    /// <see cref="EventToAuditableResource"/> — one aggregate
+    /// <c>AccessAudit</c> row, <c>TargetKind = "event"</c>; the 0-candidate
+    /// early return runs <b>before</b> any decision (no audit row, C-M7·5) and
+    /// reports no further page (ADR 0090 D1).
+    /// </para>
+    /// <para>
+    /// <see cref="EventPage.HasMore"/> (ADR 0090 D1 / D3) is the sole paging
+    /// signal: <c>true</c> iff the page's candidate set filled the page
+    /// (<c>candidates.Count == PageSize</c>). Additive on the frozen seam —
+    /// <see cref="ListUpcomingAsync"/> is untouched (the ADR 0097 named-lane
+    /// precedent).
+    /// </para>
+    /// </summary>
+    Task<EventPage> ListPastAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+
+    /// <summary>
     /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set
     /// restricted to <c>[windowStartUtc, windowEndUtc)</c>: an event is in the
     /// window on the day it <b>starts</b> (<c>Start &gt;= windowStartUtc &amp;&amp;

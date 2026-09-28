@@ -201,7 +201,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
         Assert.Equal("alice",     aliceView.Messages[0].SenderId);
 
         var messages = await QueryMessages(store, convo.Id);
-        Assert.Equal(1, messages.Count);
+        Assert.Single(messages);
         Assert.Equal("alice",  messages[0].SenderId);
         Assert.Equal("Hello Bob", messages[0].Body);
         // ReadBy is null (unread by the recipient) — D8.

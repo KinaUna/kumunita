@@ -2,13 +2,16 @@
     ViewData["Title"] = "Admin — Security";
 }
 
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
 <h1>Security</h1>
 <p class="text-muted">
     The security surfaces — the always-on access-decision log and the one-time
     break-glass elevation path. Both are their own pages; this is the section hub.
 </p>
-
-@await Html.PartialAsync("_AdminNav.cshtml")
 
 <div class="list-group">
     <a asp-action="Audit" class="list-group-item list-group-item-action">

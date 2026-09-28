@@ -3,14 +3,17 @@
     ViewData["Title"] = "Admin — Platform";
 }
 
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
 <h1>Platform</h1>
 <p class="text-muted">
     Instance-wide management — the platform's languages and translated UI strings,
     the default time zone and date &amp; time format, the sign-up gate, the access
     audit log, and the break-glass elevation path.
 </p>
-
-@await Html.PartialAsync("_AdminNav.cshtml")
 
 @* Each surface is a list-group item with a title + one-line description, so an
    admin can tell what each one does without clicking. The copy is plain English —

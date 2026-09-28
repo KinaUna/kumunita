@@ -1354,6 +1354,11 @@ public static class KnownTranslationKeys
             ["events.mine.title"] = "Your upcoming events",
             ["events.mine.hint"] = "Events you've RSVPed to or organized.",
 
+            // ── events.past (the EV-PAST toggle + empty state on /events — ADR 0109) ──
+            ["events.upcoming"] = "Upcoming",
+            ["events.past"] = "Past",
+            ["events.past_empty"] = "No past events yet.",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2872,6 +2877,11 @@ public static class KnownTranslationKeys
             ["events.mine.title"] = "Deine kommenden Veranstaltungen",
             ["events.mine.hint"] = "Veranstaltungen, die du bestätigt hast oder organisiert.",
 
+            // ── events.past (der EV-PAST-Umschalter + Leerzustand auf /events — ADR 0109) ──
+            ["events.upcoming"] = "Bevorstehend",
+            ["events.past"] = "Vergangen",
+            ["events.past_empty"] = "Noch keine vergangenen Veranstaltungen.",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -4363,6 +4373,11 @@ public static class KnownTranslationKeys
             ["events.mine.title"] = "Tes prochains événements",
             ["events.mine.hint"] = "Événements auxquels tu as répondu ou que tu as organisés.",
 
+            // ── events.past (le basculement EV-PAST + état vide sur /events — ADR 0109) ──
+            ["events.upcoming"] = "À venir",
+            ["events.past"] = "Passés",
+            ["events.past_empty"] = "Aucun événement passé pour l'instant.",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -5846,6 +5861,11 @@ public static class KnownTranslationKeys
             // ── events.mine (sektionen „Dine kommende arrangementer“ på /events — ADR 0065) ──
             ["events.mine.title"] = "Dine kommende arrangementer",
             ["events.mine.hint"] = "Arrangementer, du har svaret på eller arrangerer.",
+
+            // ── events.past (skifteren EV-PAST + tom tilstand på /events — ADR 0109) ──
+            ["events.upcoming"] = "Kommende",
+            ["events.past"] = "Forløbne",
+            ["events.past_empty"] = "Ingen forløbne arrangementer endnu.",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

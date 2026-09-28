@@ -379,7 +379,13 @@ public sealed record EventIndexViewModel(
     // single page). The <c>_Pager</c> partial renders nothing when null.
     // Carries the <c>componentId</c> filter (D7 — the pager preserves the
     // filter) as <see cref="PagedViewModel.FilterParams"/>.
-    PagedViewModel? Pager = null);
+    PagedViewModel? Pager = null,
+    // ADR 0109 (EV-PAST) — the "Past" option: true when the feed is the past
+    // lane (Start < now, most-recent-first). Default false ⇒ the upcoming feed.
+    // The view uses this to render the Upcoming/Past toggle's active state and
+    // the correct empty-state key; it is a *display* echo of the ?past= query
+    // selector, never an access input.
+    bool Past = false);
 
 /// <summary>
 /// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read

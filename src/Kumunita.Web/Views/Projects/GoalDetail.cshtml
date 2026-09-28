@@ -6,14 +6,16 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
+           idiom) — the goal detail is part of the /projects section; placed
+           at the top of the page (above the back link) so the strip sits
+           just under the navbar (the kmb-tab-under-navbar treatment,
+           site.css). *@
+        <partial name="_ProjectsTabs" />
+
         <p>
             <a href="/projects" class="btn btn-link p-0 kanban-back"><kw-l key="pl.index.title">Projects</kw-l></a>
         </p>
-
-        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
-           idiom) — the goal detail is part of the /projects section; placed
-           at the top of the page (after the back link), not the bottom. *@
-        <partial name="_ProjectsTabs" />
 
         <header class="airy-head">
             <div class="head-row">

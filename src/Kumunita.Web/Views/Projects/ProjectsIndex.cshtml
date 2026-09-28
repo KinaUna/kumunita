@@ -6,6 +6,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml idiom):
+           the landing is the first-class entry point of the /projects section. *@
+        <partial name="_ProjectsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -20,10 +24,6 @@
                 </div>
             </div>
         </header>
-
-        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml idiom):
-           the landing is the first-class entry point of the /projects section *@
-        <partial name="_ProjectsTabs" />
 
         @if (Model.ComponentPickerOptions.Count > 0)
         {

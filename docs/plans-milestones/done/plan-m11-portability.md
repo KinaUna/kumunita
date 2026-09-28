@@ -1,7 +1,7 @@
 # Plan: M11 — Portability (import/export)
 
 > **In progress.** Unit register (secondary tier). Living handoff note:
-> `docs/plans-milestones/m11-portability-handoff-notes.md` (scratch tier — one
+> `docs/plans-milestones/done/m11-portability-handoff-notes.md` (scratch tier — one
 > `## U#` section per unit, appended, never rewritten). The authoritative
 > design (primary tier) — `docs/design/m11-portability-design.md` — is
 > authored by **U00** and locked before any code unit runs; the decision

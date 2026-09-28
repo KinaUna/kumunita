@@ -2,8 +2,8 @@
 
 **Unit plan (secondary tier, self-contained).** Read **this file + your
 entry reads** and you can execute. The register is
-`docs/plans-milestones/plan-m11-portability.md`; the scratch handoff
-note is `docs/plans-milestones/m11-portability-handoff-notes.md`; the
+`docs/plans-milestones/done/plan-m11-portability.md`; the scratch handoff
+note is `docs/plans-milestones/done/m11-portability-handoff-notes.md`; the
 atomicity contract and unit-series rule are in the register header.
 
 ## Goal

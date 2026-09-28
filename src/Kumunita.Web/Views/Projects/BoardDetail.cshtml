@@ -800,21 +800,6 @@
                                             {
                                                 <span class="ms-1"><kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
                                             }
-                                            @* ADR 0106 — the card's "Details" expander
-                                               (a Bootstrap collapse): reveals the body
-                                               (rendered as markdown), the Start / Due
-                                               dates if set, the waiting-on if set, and
-                                               the community name if set. Always available
-                                               on a card — the "at a glance" summary is the
-                                               metadata line above; the expander gives the
-                                               full picture without navigating to the detail. *@
-                                            <button type="button" class="btn btn-sm btn-link text-dark text-decoration-none p-0 ms-1"
-                                                    data-bs-toggle="collapse"
-                                                    data-bs-target="@($"#details-{card.TodoId}")"
-                                                    aria-expanded="false"
-                                                    aria-controls="@($"details-{card.TodoId}")">
-                                                <kw-l key="projects.todo.details">Details</kw-l>
-                                            </button>
                                         </div>
                                         @* ADR 0106 — the card details collapse content.
                                            Rendered markdown body (the same
@@ -1254,6 +1239,32 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                                @* ADR 0106 — the card's "Details" expander
+                                   (a Bootstrap collapse): reveals the body
+                                   (rendered as markdown), the Start / Due
+                                   dates if set, the waiting-on if set, and
+                                   the community name if set. Always available
+                                   on a card — the "at a glance" summary is the
+                                   metadata line above; the expander gives the
+                                   full picture without navigating to the detail.
+                                   Rendered as an arrow-icon toggle on its own
+                                   row at the card's foot (the repo's inline
+                                   lucide-style SVG convention, no icon font);
+                                   the localized label is kept for assistive
+                                   tech via a visually-hidden span. The arrow
+                                   sits at the row's right; .kanban-details-toggle
+                                   (site.css) rotates it to point up while the
+                                   card is expanded (aria-expanded is set on the
+                                   button by the Bootstrap collapse). *@
+                                <div class="mt-1 text-end">
+                                    <button type="button" class="btn btn-sm btn-link text-dark text-decoration-none p-0 kanban-details-toggle"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="@($"#details-{card.TodoId}")"
+                                            aria-expanded="false"
+                                            aria-controls="@($"details-{card.TodoId}")">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span class="visually-hidden"><kw-l key="projects.todo.details">Details</kw-l></span>
+                                    </button>
                                 </div>
                             </div>
                         }

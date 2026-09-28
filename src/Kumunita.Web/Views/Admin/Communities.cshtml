@@ -3,14 +3,17 @@
     ViewData["Title"] = "Admin — Communities";
 }
 
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
 <h1>Communities</h1>
 <p class="text-muted">
     @Model.Communities.Count community(ies), @Model.DisabledCommunityCount disabled.
     Adding a community creates a new <code>/community/{id}</code> feed. Disabling one
     hides it from the feed but keeps its posts and assignments (re-enable to restore).
 </p>
-
-@await Html.PartialAsync("_AdminNav.cshtml")
 
 @* ── Add community ── *@
 <div class="card mb-4">

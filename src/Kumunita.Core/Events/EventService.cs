@@ -118,6 +118,53 @@ public sealed class EventService : IEventService
     }
 
     /// <summary>
+    /// The <b>past events</b> lane (ADR 0109, <c>EV-PAST</c>) — mirrors
+    /// <see cref="ListUpcomingAsync"/> verbatim except the time-window predicate
+    /// (<c>Start &lt; nowUtc</c>) and the ordering (<c>Start</c> <b>descending</b> —
+    /// the most recent past event first, the "history" reading order). Same
+    /// candidate filter (<c>!IsDeleted &amp;&amp; !IsDraft</c>, group-channel
+    /// exclusion GE·2, optional <c>ComponentId</c> filter — C-M3·2, a filter
+    /// never a gate), the same single standalone <see
+    /// cref="IAuthorizationService.CanSeeAsync(string, AccessAction, System.Collections.Generic.IEnumerable{IAuditableResource})"/>
+    /// gate (C6, one matching pass; C3, one aggregate <see
+    /// cref="AccessAudit"/> row <c>TargetKind = "event"</c> via the <see
+    /// cref="EventToAuditableResource"/>), and the same 0-candidate
+    /// no-decision early return (C-M7·5) + <c>HasMore</c> signal (ADR 0090
+    /// D1 / D3).
+    /// </summary>
+    public async Task<EventPage> ListPastAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        var nowUtc = DateTimeOffset.UtcNow;
+        IQueryable<Event> q = session.Query<Event>()
+            .Where(e => !e.IsDeleted && !e.IsDraft && e.GroupId == string.Empty) // GE·2 (ADR 0089) — a group-channel event (non-empty GroupId) never reaches the community feed.
+            .Where(e => e.Start < nowUtc);
+        if (componentId is not null)
+            q = q.Where(e => e.ComponentId == componentId);
+        var candidates = await q.OrderByDescending(e => e.Start).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+
+        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
+        // decision (no audit row) and reports no further page (ADR 0090 D1).
+        if (candidates.Count == 0)
+            return new EventPage(Array.Empty<Event>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "event"), from that single call (the ListUpcomingAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(e => new EventToAuditableResource(e)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return new EventPage(candidates.Where(e => visibleIds.Contains(e.Id)).ToList(), hasMore);
+    }
+
+    /// <summary>
     /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — <see
     /// cref="ListUpcomingAsync"/> restricted to the window predicate
     /// <c>Start &gt;= windowStartUtc &amp;&amp; Start &lt; windowEndUtc</c>

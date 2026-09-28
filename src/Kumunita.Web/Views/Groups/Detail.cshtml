@@ -65,6 +65,44 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
+        @*
+            ADR 0083 — the tab bar (the _ProjectsTabs.cshtml Bootstrap nav-tabs
+            idiom, ADR 0062). Three tabs:
+            · Feed — the membership-scoped posts (ADR 0013).
+            · Members — the member list + the owner's invite / add lanes (m2b).
+            · Settings — About (description edit) + Privacy (ADR 0010) +
+              Translations (ADR 0026); owner ∪ GlobalAdmin only (canManage).
+            The active tab is derived server-side from ?tab= (the deep link),
+            so a link to /groups/{id}?tab=settings lands on Settings.
+
+            The bar is the first thing in the content column (above the back
+            link) so it sits just under the navbar (the kmb-tab-under-navbar
+            treatment, site.css) — consistent with the other section tab
+            strips. *@
+        <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link @(activeTab == "feed" ? "active" : string.Empty)"
+                   href="@TabHref("feed")">
+                    <kw-l key="groups.tab.feed">Feed</kw-l>
+                </a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link @(activeTab == "members" ? "active" : string.Empty)"
+                   href="@TabHref("members")">
+                    <kw-l key="groups.tab.members">Members</kw-l>
+                </a>
+            </li>
+            @if (canManage)
+            {
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
+                       href="@TabHref("settings")">
+                        <kw-l key="groups.tab.settings">Settings</kw-l>
+                    </a>
+                </li>
+            }
+        </ul>
+
         <p><a class="text-muted" href="@Url.Action("Index", "Groups")"><kw-l key="groups.back_all">← All groups</kw-l></a></p>
 
         @* ADR 0082 — the group's action surface: one ⋮ dropdown (the
@@ -246,46 +284,14 @@
             resident-facing since ADR 0009): rendered for everyone who reaches
             the detail (owner ∪ member gate) when it holds one. The *edit* form
             moved to the Settings tab (ADR 0083); the read stays in the header
-            (the group's blurb sits above the tabs, like a profile's bio).
+            (the group's blurb, like a profile's bio). The tab bar moved to the
+            top of the column (under the navbar) so the blurb now reads above
+            the tab panes, not above the bar.
         *@
         @if (!string.IsNullOrWhiteSpace(Model.Description))
         {
             <p>@Model.Description</p>
         }
-
-        @*
-            ADR 0083 — the tab bar (the _ProjectsTabs.cshtml Bootstrap nav-tabs
-            idiom, ADR 0062). Three tabs:
-            · Feed — the membership-scoped posts (ADR 0013).
-            · Members — the member list + the owner's invite / add lanes (m2b).
-            · Settings — About (description edit) + Privacy (ADR 0010) +
-              Translations (ADR 0026); owner ∪ GlobalAdmin only (canManage).
-            The active tab is derived server-side from ?tab= (the deep link),
-            so a link to /groups/{id}?tab=settings lands on Settings.
-        *@
-        <ul class="nav nav-tabs mb-4" role="tablist">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link @(activeTab == "feed" ? "active" : string.Empty)"
-                   href="@TabHref("feed")">
-                    <kw-l key="groups.tab.feed">Feed</kw-l>
-                </a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link @(activeTab == "members" ? "active" : string.Empty)"
-                   href="@TabHref("members")">
-                    <kw-l key="groups.tab.members">Members</kw-l>
-                </a>
-            </li>
-            @if (canManage)
-            {
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link @(activeTab == "settings" ? "active" : string.Empty)"
-                       href="@TabHref("settings")">
-                        <kw-l key="groups.tab.settings">Settings</kw-l>
-                    </a>
-                </li>
-            }
-        </ul>
 
         <div class="tab-content">
 

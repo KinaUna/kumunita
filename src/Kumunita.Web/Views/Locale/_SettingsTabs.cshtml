@@ -26,7 +26,7 @@
             _                    => "Language",
         };
 }
-<ul class="nav nav-tabs mb-4" role="tablist">
+<ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
     @foreach (var tab in tabs)
     {
         var isActive = tab.Label == activeLabel;
@@ -37,3 +37,12 @@
         </li>
     }
 </ul>
+@* M10 U03 (ADR 0107 D5/D10) — the PWA install affordance's label source:
+   hidden, server-rendered, and the `pwa.install` key's label resolved here
+   (the kw-l chain), so the client never resolves a key (the repo's
+   no-client-side-kw-l rule — the data-ie-label-* / _RichEditorToggle
+   pattern). pwa-install.ts looks for this anchor at module-load time:
+   present → it clones the label into a fixed-position button when the
+   browser fires beforeinstallprompt; absent (every non-settings page) →
+   the module is a clean no-op and the button never appears. *@
+<a id="pwa-install" class="btn btn-outline-primary btn-sm d-none" href="#" aria-hidden="true"><kw-l key="pwa.install">Install app</kw-l></a>
