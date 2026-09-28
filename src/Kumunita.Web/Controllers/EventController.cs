@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
@@ -67,6 +68,15 @@ public sealed class EventController : Controller
     private readonly IDocumentStore store;
     private readonly EffectiveTimezoneResolver timezone;
     private readonly ITranslationProvider? translationProvider;
+    // M12 (ADR 0112, §field-map) — the tag read seam, resolving the
+    // <c>CATEGORIES</c> display names the iCal lanes hand to the pure
+    // <see cref="IcsWriter"/> emitter (a read, not a decision — C-TG·8).
+    // **Optional** (default null) so the existing test-construction sites
+    // that build this controller without a tag service keep compiling —
+    // the CATEGORIES surface is a no-op when the seam is absent (the
+    // <see cref="PostsController"/> idiom). DI always supplies the live
+    // <c>ITagService</c> in the app.
+    private readonly ITagService? tags;
 
     public EventController(
         IEventService events,
@@ -74,7 +84,8 @@ public sealed class EventController : Controller
         ILocalizationService localization,
         IDocumentStore store,
         EffectiveTimezoneResolver timezone,
-        ITranslationProvider? translationProvider = null)
+        ITranslationProvider? translationProvider = null,
+        ITagService? tags = null)
     {
         this.events = events;
         this.userInfo = userInfo;
@@ -82,6 +93,7 @@ public sealed class EventController : Controller
         this.store = store;
         this.timezone = timezone;
         this.translationProvider = translationProvider;
+        this.tags = tags;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -769,6 +781,95 @@ public sealed class EventController : Controller
             OriginalLanguageCode: ev.LanguageCode);
 
         return View(vm);
+    }
+
+    // ── M12 (ADR 0112) — the iCal lane (lane 1: the per-event file) ──────────
+
+    /// <summary>
+    /// <c>GET /events/{id}.ics</c> — the M12 per-event calendar file (the D3
+    /// lane-1 contract, <c>docs/design/m12-ical-design.md</c> §routes, locked):
+    /// the frozen <see cref="IEventService.GetAsync"/> (a single
+    /// <c>CanAsync(Read)</c> decision) renders one <c>VEVENT</c> through the
+    /// pure <see cref="IcsWriter"/> over the already-authorized row. The
+    /// decision never leaks into the file (C-M12·2) — the ICS text is display
+    /// fields only (C-M12·4 closed subset).
+    /// <para>
+    /// **404-not-403 (C3 / C-M12·6, the non-leaky pin):** <em>both</em>
+    /// <see cref="KeyNotFoundException"/> (absent) *and*
+    /// <see cref="UnauthorizedAccessException"/> (denied) map to
+    /// <see cref="NotFoundResult"/> — an event a caller cannot see neither
+    /// downloads nor 403s into existence. (Unlike the in-app <see
+    /// cref="Detail"/> lane, which 403s a denial, the file lane must not even
+    /// distinguish the two.)
+    /// </para>
+    /// <para>
+    /// **Anonymous ⇒ the standard sign-in challenge** (the class-level
+    /// <c>[Authorize]</c> default — F3; there is no anonymous iCal surface).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, ADR 0034 / 0108 idiom —
+    /// <c>AttachmentController.ServeFile</c>):**
+    /// <c>Content-Type: text/calendar; charset=utf-8</c> (the
+    /// <see cref="FileResult"/> second arg) +
+    /// <c>Content-Disposition: attachment;
+    /// filename="kumunita-event-{id}.ics"</c> +
+    /// <c>Cache-Control: no-store</c> (per-caller, re-authorized content —
+    /// never cached by a proxy or the PWA service worker) +
+    /// <c>X-Content-Type-Options: nosniff</c>, the three headers set on
+    /// <see cref="HttpResponse.Headers"/> before the return.
+    /// </para>
+    /// </summary>
+    [HttpGet("/events/{id}.ics")]
+    public async Task<IActionResult> EventIcs(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        Event ev;
+        try
+        {
+            ev = await this.events.GetAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(); // absent — the non-leaky split (C3)
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(); // denied — the file lane does not 403 into existence (C-M12·6)
+        }
+
+        // §field-map — resolve CATEGORIES for the caller before the pure
+        // emitter (a read, not a decision — C-TG·8; a dangling TagId is
+        // dropped, the C-TG·1 "renders as nothing" pin; stable Ordinal order).
+        // A null <see cref="ITagService"/> (a test-construction site) ⇒ no
+        // CATEGORIES on the VEVENT (the PostsController no-op idiom).
+        Dictionary<string, IReadOnlyList<string>>? categories = null;
+        if (tags is not null && ev.TagIds.Count > 0)
+        {
+            var readable = await tags.ListForActorAsync(actorId);
+            var readableById = readable.ToDictionary(t => t.Tag.Id, StringComparer.Ordinal);
+            var names = ev.TagIds
+                .Where(readableById.ContainsKey)
+                .Select(tid => readableById[tid].DisplayedName)
+                .OrderBy(n => n, StringComparer.Ordinal)
+                .ToList();
+            if (names.Count > 0)
+                categories = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+                {
+                    [ev.Id] = names,
+                };
+        }
+
+        var icsText = IcsWriter.Build([ev], DateTimeOffset.UtcNow, categories);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom:
+        // Content-Disposition + nosniff + no-store on the response, the
+        // Content-Type as the File(...) second arg.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-event-" + id + ".ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
     }
 
     // ── Write lanes ────────────────────────────────────────────────────────────

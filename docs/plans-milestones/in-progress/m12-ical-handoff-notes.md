@@ -182,3 +182,91 @@ verbatim); U02 adds the lane-1 route + CATEGORIES call (confirm the
 U04 registers the two `kw-l` keys × 4 langs + the 3 view links + the parity
 pin; U05 flips the docs (M12→Done, M13→Next) + `MilestonesTests` re-pin +
 records the gate run in §gate.
+
+## U02 — Web: the `GET /events/{id}.ics` lane + serve shape + its Web pins
+
+**Status:** complete. `EventIcs` action on the existing `EventController`;
+build green (`dotnet build Kumunita.slnx -c Debug` — Build succeeded, 0
+errors); `Kumunita.Web.Tests` 573/573 green (the U02 pins discovered +
+passing, no other Web test regressed; `EventControllerTests` class alone:
+55/55 green).
+
+**Action + route (as registered, verbatim):** `EventIcs` on
+`EventController`, `[HttpGet("/events/{id}.ics")]` — the design doc §routes
+pin, verbatim. **The `.ics`-literal-in-`{id}` routing question did not bite
+for lane 1:** the template is the literal string `/events/{id}.ics` (no
+route constraint needed — a literal segment after the `{id}` token is legal
+in an MVC attribute route, and `GET /events/abc.ics` binds `id = "abc"`).
+For **U03's** `/events.ics` sibling: the design doc §routes risk note holds
+— ASP.NET Core ranks the **literal** `"/events.ics"` route above the
+parameterized `"/events/{id}"` (detail) route, so `GET /events.ics` resolves
+to `CalendarFeed`, not to a detail with `id=".ics"`; and it does **not**
+collide with `/events/{id}.ics` (that template requires an `id` *segment*
+plus a literal `.ics` suffix — `GET /events.ics` has no `{id}` segment to
+bind). No workaround was needed; U03 should inherit this as-is.
+
+**The three (four) header values as implemented** (the ADR 0034 / 0108
+`AttachmentController.ServeFile` idiom, set on `Response.Headers` before
+the return):
+
+- `Content-Type: text/calendar; charset=utf-8` — the `File(bytes, …)`
+  second arg (the `FileResult.ContentType`).
+- `Content-Disposition: attachment; filename="kumunita-event-{id}.ics"`
+  (the route's `{id}` verbatim in the filename).
+- `Cache-Control: no-store`.
+- `X-Content-Type-Options: nosniff`.
+
+Return: `File(Encoding.UTF8.GetBytes(icsText), "text/calendar;
+charset=utf-8")`.
+
+**The two named pins (both passing):**
+
+- `EventIcs_Denied_Or_Absent_Returns_404_Not_403` — **both**
+  `KeyNotFoundException` (absent) *and* `UnauthorizedAccessException`
+  (denied) from the frozen `GetAsync` map to `NotFound()` (the non-leaky
+  C3 / C-M12·6 split — deliberately unlike the in-app `Detail` lane, which
+  403s a denial).
+- `Ics_Routes_Anonymous_Return_Sign_In_Challenge` — the unit-level shape:
+  the class carries `[Authorize]` and the action carries **no**
+  `[AllowAnonymous]` opt-out, so the framework's standard sign-in
+  challenge applies (F3 — no anonymous iCal surface).
+
+**The other U02 Web pins (all passing, exact design-doc names):**
+`EventIcs_Route_Exists_Is_Authorize_And_Returns_Text_Calendar` (route
+string + class `[Authorize]` + `200` FileResult + content type) ·
+`EventIcs_Content_Disposition_Filename_Is_Kumunita_Event_Id_Ics` ·
+`Ics_Routes_Set_Cache_Control_No_Store` (lane-1 scope — the test carries a
+comment: **U03 extends the assertion to `CalendarFeed`** once the feed
+lane lands, keeping the single shared test name per the design doc's pin
+list). The route map pin `RouteMap_MatchesDocumentedSurface` was extended
+with `Assert.Equal("/events/{id}.ics", Route("EventIcs"))`.
+
+**CATEGORIES call (as implemented, the §field-map idiom verbatim):** an
+**optional** `ITagService? tags = null` constructor parameter (the
+`PostsController` idiom — the existing test-construction sites in
+`EventControllerTests` keep compiling unchanged; DI always supplies the
+live `ITagService` in the app). When present + `ev.TagIds` non-empty:
+`tags.ListForActorAsync(actorId)` → `TagId → DisplayedName` map, dangling
+ids dropped (the `Where(readableById.ContainsKey)` pin),
+`OrderBy(DisplayedName, Ordinal)`, handed to `IcsWriter.Build([ev],
+DateTimeOffset.UtcNow, categories)`; `null`/empty ⇒ no `CATEGORIES`.
+
+**Deviation:** none. No drift pause — the design doc, the frozen
+`IEventService` seams, and the `AttachmentController` serve idiom all
+matched the pins; nothing was resolved "in favor of the source" beyond the
+D6 `ITagService?` optional-constructor shape (which U00's §field-map
+already prescribed as the `PostsController` idiom).
+
+**Files touched (the 3 deliverables only):**
+`src/Kumunita.Web/Controllers/EventController.cs` ·
+`tests/Kumunita.Web.Tests/EventControllerTests.cs` · this handoff note.
+
+**Handoff for U03:** the lane-2 sibling `CalendarFeed`
+(`[HttpGet("/events.ics")]`) places beside `EventIcs`; reuse the same
+serve-shape block (filename `"kumunita-events.ics"`); the CATEGORIES loop
+is the §field-map idiom over `page.Items`; extend the existing
+`Ics_Routes_Set_Cache_Control_No_Store` + `Ics_Routes_Anonymous_Return_Sign_
+In_Challenge` tests with the `CalendarFeed` assertions (keep the single
+shared test name per the design doc pin list); add the two
+`CalendarFeed_*` pins; the composition pin (`IcsFeed_
+ContainsExactlyTheVisibleUpcomingSet`) is U03's (Core, `PostgresFixture`).
