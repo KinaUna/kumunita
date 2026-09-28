@@ -1,7 +1,17 @@
 # ADR 0079 — To-do optional start and due dates
 
-Status: Accepted
+Status: Accepted (amended 2026-09-28 — see **Amendment** below)
 Date: 2026-09-25
+
+> **Amendment (2026-09-28, same-day).
+> form-side binding changed from `DateTimeOffset?` to wall-clock `DateTime?`
+> (per ADR 0019). The controller converts wall-clock → UTC at the Web
+> boundary before the write, and stored UTC → wall-clock when seeding the
+> edit form. The **storage** type is unchanged (`DateTimeOffset?`, UTC
+> instant) — the conversion is entirely at the Web boundary, mirroring the
+> ADR 0054 Event `Start`/`End` treatment. The `<kw-dt>` TagHelper display
+> path is unchanged (already correct).**
+
 Amends: **0067** (the M5 to-do surface — the `TodoItem` document gains two
 optional `DateTimeOffset?` fields; the create / update request DTOs gain the
 matching two optional fields; the standing matrix is untouched) and **0054**
@@ -24,9 +34,13 @@ reuses it verbatim:
   in the viewer's effective timezone (ADR 0019) — so a date a resident sets
   "on the 5th" is *shown* in every viewer's own timezone without any per-row
   storage of a zone.
-- **`type="datetime-local"`** form inputs, bound model-side to a nullable
+- ~~**`type="datetime-local"`** form inputs, bound model-side to a nullable
   `DateTimeOffset?`, the value round-tripped as
-  `yyyy-MM-ddTHH:mm` of the local instant.
+  `yyyy-MM-ddTHH:mm` of the local instant.~~
+  **Superseded by the Amendment above** — the form model is now wall-clock
+  `DateTime?`; the controller handles the zone conversion. The `yyyy-MM-ddTHH:mm`
+  round-trip shape is unchanged; the zone source moved from "local instant"
+  to "the actor's effective zone (ADR 0019)".
 
 The one deliberate departure from the Event is **optionality**. An Event is
 defined by its start and end — an event with no times is a contradiction, so
