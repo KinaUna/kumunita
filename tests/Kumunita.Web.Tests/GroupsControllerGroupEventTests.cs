@@ -312,8 +312,8 @@ public class GroupsControllerGroupEventTests
     {
         Title = "A group event",
         Body = "body ge",
-        Start = DateTimeOffset.UtcNow,
-        End = DateTimeOffset.UtcNow.AddHours(2),
+        Start = DateTime.UtcNow,
+        End = DateTime.UtcNow.AddHours(2),
     };
 
     private sealed class NoOpTempDataProvider : ITempDataProvider

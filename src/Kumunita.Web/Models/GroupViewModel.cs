@@ -598,8 +598,11 @@ public sealed record GroupEventListItem(
 /// <c>ComponentId = string.Empty</c>, GE·2). The group's identity is the route's
 /// <c>{id}</c> — never form-bound (a form-bound group id would be a lane-bypass
 /// hole; the create gate's membership decision is the authoritative deny, GE·3).
-/// The time fields are <see cref="DateTimeOffset"/>s the browser posts as
-/// <c>datetime-local</c> (the M4 <see cref="EventEditorModel.Start"/> shape).
+/// The time fields are wall-clock <see cref="DateTime"/>s in the author's
+/// effective time zone (ADR 0019) — the M4
+/// <see cref="EventEditorModel.Start"/> shape (a <c>datetime-local</c> posts a
+/// local string with no offset; the server resolves the actor's zone and
+/// converts to a UTC instant at write time).
 /// </summary>
 public sealed class GroupEventComposeViewModel
 {
@@ -607,16 +610,19 @@ public sealed class GroupEventComposeViewModel
 
     public string Body { get; set; } = string.Empty;
 
-    /// <summary>The event's start instant (the form's <c>datetime-local</c>
-    /// <c>Start</c> field; the M4 <see cref="EventEditorModel.Start"/> shape —
-    /// a <c>DateTimeOffset</c> the browser posts as <c>datetime-local</c>).</summary>
+    /// <summary>The event's start wall-clock time (the form's
+    /// <c>datetime-local</c> <c>Start</c> field; the M4
+    /// <see cref="EventEditorModel.Start"/> shape — a <c>DateTime</c> in the
+    /// author's effective time zone, converted to a UTC instant by the
+    /// controller before it reaches the service).</summary>
     [Required(ErrorMessage = "A start time is required.")]
-    public DateTimeOffset Start { get; set; }
+    public DateTime Start { get; set; }
 
-    /// <summary>The event's end instant (the form's <c>datetime-local</c>
-    /// <c>End</c> field; the M4 <see cref="EventEditorModel.End"/> shape).</summary>
+    /// <summary>The event's end wall-clock time (the M4
+    /// <see cref="EventEditorModel.End"/> shape; the same zone + conversion
+    /// contract as <see cref="Start"/>).</summary>
     [Required(ErrorMessage = "An end time is required.")]
-    public DateTimeOffset End { get; set; }
+    public DateTime End { get; set; }
 
     public string? Location { get; set; }
 

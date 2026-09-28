@@ -75,9 +75,13 @@ public sealed class EventService : IEventService
     /// <summary>
     /// The upcoming-events feed (ADR 0054 §4 — U03). Mirrors
     /// <see cref="Posts.PostService.ListFeedAsync"/>: the candidate set is the
-    /// non-draft, non-deleted events ordered by <see cref="Event.Start"/>
-    /// ascending (the feed-ordering index, <see cref="M4DocTypes.Configure"/>);
-    /// the <paramref name="componentId"/> is a *filter, never a gate*
+    /// non-draft, non-deleted events whose <see cref="Event.Start"/> is at or
+    /// after now (the <c>Start &gt;= nowUtc</c> time-window predicate — an
+    /// event is "upcoming" until it starts; the <see cref="ListPastAsync"/>
+    /// lane is its exact mirror on <c>Start &lt; nowUtc</c>), ordered by
+    /// <see cref="Event.Start"/> ascending (the feed-ordering index,
+    /// <see cref="M4DocTypes.Configure"/>); the
+    /// <paramref name="componentId"/> is a *filter, never a gate*
     /// (C-M3·2); the survivors are <see
     /// cref="IAuthorizationService.CanSeeAsync(string, AccessAction, System.Collections.Generic.IEnumerable{IAuditableResource})"/>
     /// -filtered (C6, the one shared matching pass; C3, the single aggregate
@@ -89,8 +93,10 @@ public sealed class EventService : IEventService
         if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
+        var nowUtc = DateTimeOffset.UtcNow;
         IQueryable<Event> q = session.Query<Event>()
-            .Where(e => !e.IsDeleted && !e.IsDraft && e.GroupId == string.Empty); // GE·2 (ADR 0089) — a group-channel event (non-empty GroupId) never reaches the community feed.
+            .Where(e => !e.IsDeleted && !e.IsDraft && e.GroupId == string.Empty) // GE·2 (ADR 0089) — a group-channel event (non-empty GroupId) never reaches the community feed.
+            .Where(e => e.Start >= nowUtc); // upcoming lane: not yet started (the ListPastAsync mirror, <c>Start &lt; nowUtc</c>).
         if (componentId is not null)
             q = q.Where(e => e.ComponentId == componentId);
         var candidates = await q.OrderBy(e => e.Start).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);

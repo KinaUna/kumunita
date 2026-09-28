@@ -2,6 +2,7 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
+using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Marten;
@@ -50,6 +51,13 @@ public sealed class GroupsController(
     // optional translationProvider so the test-construction site (which now
     // passes a null for it) keeps the required-params shape.
     IEventService events,
+    // ADR 0019 — the effective-timezone resolver for the group-event
+    // compose/edit lanes (wall-clock DateTime → UTC instant conversion at
+    // write time; UTC-instant → wall-clock for edit GET seeding). **Optional**
+    // (null default) so the existing test-construction sites (5 positional
+    // args) keep compiling; when null the zone falls back to UTC (the test
+    // harness shape). DI always supplies the live resolver in the app.
+    EffectiveTimezoneResolver? timezone = null,
     // Back-link display name (the group name on the post-detail page's
     // "back to the group" link) — the per-request translation read seam,
     // used to resolve the group's stored name into the viewer's current
@@ -58,6 +66,14 @@ public sealed class GroupsController(
     // compiling; DI always supplies the live ITranslationProvider in the app.
     ITranslationProvider? translationProvider = null) : Controller
 {
+    private readonly EffectiveTimezoneResolver? _timezone = timezone;
+
+    // ADR 0019 — resolves the actor's effective time zone (or the UTC floor
+    // when the resolver is null — the test harness shape).
+    private async Task<TimeZoneInfo> ResolveZoneAsync() =>
+        _timezone is not null ? await _timezone.GetAsync() :
+        System.TimeZoneInfo.FindSystemTimeZoneById("UTC");
+
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
 
@@ -2231,6 +2247,14 @@ public sealed class GroupsController(
         if (group is null)
             return NotFound();
 
+        // ADR 0019 — the composer's time range defaults to the actor's
+        // *current* wall-clock date/time in their effective zone (the M4
+        // CreateGet idiom: now rounded to the minute, End one hour after
+        // Start — the author adjusts both on the form).
+        var zone = await ResolveZoneAsync();
+        var nowInZone = DateTimeOffset.UtcNow.ToOffset(zone.GetUtcOffset(DateTimeOffset.UtcNow));
+        var startWall = nowInZone.DateTime; // wall-clock (no offset) — the form's shape.
+
         return View("EventNew", new GroupEventComposeViewModel
         {
             Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
@@ -2238,11 +2262,8 @@ public sealed class GroupsController(
             // language so the picker highlights the right option and a
             // no-change submit is a concrete BCP-47 code (never an empty row).
             LanguageCode = await ResolveComposeDefaultLanguageAsync(),
-            // Default the time range to the actor's *current* local date/time
-            // (the M4 CreateGet idiom: now rounded to the minute, End one hour
-            // after Start — the author adjusts both on the form).
-            Start = DateTime.Now,
-            End = DateTime.Now.AddHours(1),
+            Start = startWall,
+            End = startWall.AddHours(1),
         });
     }
 
@@ -2297,12 +2318,19 @@ public sealed class GroupsController(
             return View("EventNew", model);
         }
 
+        // ADR 0019 — the form's Start/End are wall-clock (no offset) in the
+        // actor's effective zone. Convert to a UTC instant using the zone's
+        // DST-aware offset at that wall-clock moment.
+        var zone = await ResolveZoneAsync();
+        var startUtc = new DateTimeOffset(model.Start, zone.GetUtcOffset(model.Start)).UtcDateTime;
+        var endUtc = new DateTimeOffset(model.End, zone.GetUtcOffset(model.End)).UtcDateTime;
+
         var draft = new GroupEventDraft(
             GroupId: id,
             Title: string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title,
             Body: model.Body.Trim(),
-            StartUtc: model.Start,
-            EndUtc: model.End,
+            StartUtc: new DateTimeOffset(startUtc, TimeSpan.Zero),
+            EndUtc: new DateTimeOffset(endUtc, TimeSpan.Zero),
             Location: string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
             Capacity: model.Capacity,
             Color: string.IsNullOrWhiteSpace(model.Color) ? null : model.Color,
@@ -2364,12 +2392,17 @@ public sealed class GroupsController(
         if (@event is null || !string.Equals(@event.AuthorId, actor, StringComparison.Ordinal))
             return NotFound();
 
+        // ADR 0019 — the form is a wall-clock DateTime in the editor's
+        // effective zone; `ToOffset(zone)` re-expresses the stored UTC
+        // instant in that zone (DST-aware) so the author sees the local
+        // wall-clock they (or a prior editor) chose.
+        var zone = await ResolveZoneAsync();
         return View("EventEdit", new GroupEventComposeViewModel
         {
             Title = @event.Title,
             Body = @event.Body,
-            Start = @event.Start,
-            End = @event.End,
+            Start = TimeZoneInfo.ConvertTime(@event.Start, zone).DateTime,
+            End = TimeZoneInfo.ConvertTime(@event.End, zone).DateTime,
             Location = @event.Location,
             Capacity = @event.Capacity,
             Color = @event.Color,
@@ -2421,11 +2454,18 @@ public sealed class GroupsController(
             return View("EventEdit", model);
         }
 
+        // ADR 0019 — the form's Start/End are wall-clock (no offset) in the
+        // editor's effective zone. Convert to a UTC instant using the
+        // zone's DST-aware offset at that wall-clock moment.
+        var zone = await ResolveZoneAsync();
+        var startUtc = new DateTimeOffset(model.Start, zone.GetUtcOffset(model.Start)).UtcDateTime;
+        var endUtc = new DateTimeOffset(model.End, zone.GetUtcOffset(model.End)).UtcDateTime;
+
         var update = new GroupEventUpdate(
             Title: string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title,
             Body: model.Body.Trim(),
-            StartUtc: model.Start,
-            EndUtc: model.End,
+            StartUtc: new DateTimeOffset(startUtc, TimeSpan.Zero),
+            EndUtc: new DateTimeOffset(endUtc, TimeSpan.Zero),
             Location: string.IsNullOrWhiteSpace(model.Location) ? null : model.Location.Trim(),
             Capacity: model.Capacity,
             Color: string.IsNullOrWhiteSpace(model.Color) ? null : model.Color,

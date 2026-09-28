@@ -438,7 +438,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         const string owner = "u-ge-g13-owner";
 
         var group = await userInfo.CreateGroupAsync(owner, "GE13 family", null);
-        var start = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
+        var start = new DateTimeOffset(2099, 3, 1, 9, 0, 0, TimeSpan.Zero);
         await Plant(store, new Event
         {
             Id = "ge13-group", AuthorId = owner, GroupId = group.Id,
@@ -449,8 +449,8 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         });
 
         var window = await svc.ListInRangeAsync(
-            new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 3, 2, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2099, 3, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2099, 3, 2, 0, 0, 0, TimeSpan.Zero),
             null, owner);
         Assert.DoesNotContain(window, e => e.Id == "ge13-group");
     }
@@ -657,8 +657,8 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         Title = id,
         Body = "body " + id,
         Audience = new Audience(),
-        Start = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero),
-        End = new DateTimeOffset(2026, 3, 1, 13, 0, 0, TimeSpan.Zero),
+        Start = new DateTimeOffset(2099, 3, 1, 9, 0, 0, TimeSpan.Zero),
+        End = new DateTimeOffset(2099, 3, 1, 13, 0, 0, TimeSpan.Zero),
         IsDraft = false,
         Created = DateTimeOffset.UtcNow
     };

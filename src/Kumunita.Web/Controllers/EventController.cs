@@ -974,8 +974,11 @@ public sealed class EventController : Controller
                 Grants = "[]",
                 CommunityVisible = true,
             },
-            Start = start,
-            End = start.AddHours(1),
+            // The model is a wall-clock DateTime in the actor's effective zone
+            // (ADR 0019) — `start` is already the author's local wall-clock
+            // instant, so `.DateTime` is the correct wall-clock seeding.
+            Start = start.DateTime,
+            End = start.DateTime.AddHours(1),
             ReminderEnabled = true,
             SaveAsDraft = true, // ADR 0037 — a new event is a draft until published.
             Languages = await SeedLanguagePickerAsync(),
@@ -1045,6 +1048,15 @@ public sealed class EventController : Controller
             return View("Create", model);
         }
 
+        // ADR 0019 — the form's Start/End are wall-clock (no offset) in the
+        // actor's effective zone (resident override → platform default → UTC
+        // floor). Convert to a UTC instant using the zone's DST-aware offset
+        // at that wall-clock moment (the `ToOffset` idiom the `CreateGet`
+        // seeding uses in reverse).
+        var authorZone = await timezone.GetAsync();
+        var startUtc = new DateTimeOffset(model.Start, authorZone.GetUtcOffset(model.Start)).UtcDateTime;
+        var endUtc = new DateTimeOffset(model.End, authorZone.GetUtcOffset(model.End)).UtcDateTime;
+
         var request = new CreateEventRequest
         {
             // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
@@ -1053,8 +1065,8 @@ public sealed class EventController : Controller
             Title = model.Title!,
             Body = model.Body!,
             ComponentId = model.ComponentId,
-            Start = model.Start,
-            End = model.End,
+            Start = new DateTimeOffset(startUtc, TimeSpan.Zero),
+            End = new DateTimeOffset(endUtc, TimeSpan.Zero),
             Location = model.Location,
             Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,
@@ -1131,14 +1143,20 @@ public sealed class EventController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0019 — the model is a wall-clock DateTime in the *editor's*
+        // effective zone (resident override → platform default → UTC floor).
+        // The stored `ev.Start` / `ev.End` are UTC instants; `ToOffset(zone)`
+        // re-expresses them in that zone (DST-aware) so the form shows the
+        // author the local wall-clock they (or a prior editor) chose.
+        var editorZone = await timezone.GetAsync();
         var model = new EventEditorModel
         {
             Id = ev.Id,
             Title = ev.Title,
             Body = ev.Body,
             ComponentId = ev.ComponentId,
-            Start = ev.Start,
-            End = ev.End,
+            Start = TimeZoneInfo.ConvertTime(ev.Start, editorZone).DateTime,
+            End = TimeZoneInfo.ConvertTime(ev.End, editorZone).DateTime,
             Location = ev.Location,
             Color = ev.Color,
             Capacity = ev.Capacity,
@@ -1208,6 +1226,14 @@ public sealed class EventController : Controller
             return View("Edit", model);
         }
 
+        // ADR 0019 — the form's Start/End are wall-clock (no offset) in the
+        // editor's effective zone. Convert to a UTC instant using the
+        // zone's DST-aware offset at that wall-clock moment (the same
+        // `ToOffset` idiom the `EditGet` seeding uses in reverse).
+        var editorZone = await timezone.GetAsync();
+        var startUtc = new DateTimeOffset(model.Start, editorZone.GetUtcOffset(model.Start)).UtcDateTime;
+        var endUtc = new DateTimeOffset(model.End, editorZone.GetUtcOffset(model.End)).UtcDateTime;
+
         var request = new UpdateEventRequest
         {
             // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
@@ -1216,8 +1242,8 @@ public sealed class EventController : Controller
             Title = model.Title!,
             Body = model.Body!,
             ComponentId = model.ComponentId,
-            Start = model.Start,
-            End = model.End,
+            Start = new DateTimeOffset(startUtc, TimeSpan.Zero),
+            End = new DateTimeOffset(endUtc, TimeSpan.Zero),
             Location = model.Location,
             Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,

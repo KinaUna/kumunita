@@ -27,10 +27,13 @@ public interface IEventService
     // --- Read lanes (U03) -------------------------------------------------------
 
     /// <summary>
-    /// The feed (upcoming events) — the <c>componentId</c> is a *filter, never a
-    /// gate* (C-M3·2); the survivors are <c>CanSeeAsync(Read)</c>-filtered (C6 / C3),
-    /// ordered by <c>Start</c> ascending, paged. Drafts and deleted events are
-    /// excluded for non-authors.
+    /// The feed (upcoming events) — the candidate set is the non-draft,
+    /// non-deleted, non-group-channel events whose <c>Start</c> is at or after
+    /// now (the <c>Start &gt;= nowUtc</c> time window — an event is "upcoming"
+    /// until it starts; the <see cref="ListPastAsync"/> lane is its exact
+    /// mirror on <c>Start &lt; nowUtc</c>); the <c>componentId</c> is a *filter,
+    /// never a gate* (C-M3·2); the survivors are <c>CanSeeAsync(Read)</c>-filtered
+    /// (C6 / C3), ordered by <c>Start</c> ascending, paged.
     /// <para>
     /// <see cref="EventPage.HasMore"/> (ADR 0090 D1 / D3) is the sole paging
     /// signal: <c>true</c> iff the page's candidate set filled the page

@@ -593,8 +593,8 @@ public class EventControllerTests
         {
             Title = "Cleanup day",
             Body = "Bring gloves. Meet at the common shed.",
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 13, 0, 0),
             Location = "Common shed",
             SaveAsDraft = true, // ADR 0037 — the composer posts "save as draft".
             ReminderEnabled = true,
@@ -642,8 +642,8 @@ public class EventControllerTests
         {
             Title = "Cleanup day",
             Body = "   ", // malformed — empty body.
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
         };
         var controller = Build(events, subjectId: "subj-resident-001");
@@ -680,8 +680,8 @@ public class EventControllerTests
             Body = "   ", // blank — the quick-create modal posts no body.
             QuickCreate = true, // the marker (the modal's hidden field).
             SaveAsDraft = true, // the modal saves as draft (ADR 0037 floor).
-            Start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 10, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 1, 9, 0, 0),
+            End = new DateTime(2026, 10, 1, 10, 0, 0),
             Audience = new AudienceEditorModel
             {
                 Mode = "Any",
@@ -780,8 +780,8 @@ public class EventControllerTests
             Id = id,
             Title = "New title",
             Body = "New body",
-            Start = new DateTimeOffset(2026, 10, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 2, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 2, 9, 0, 0),
+            End = new DateTime(2026, 10, 2, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
         };
         var controller = Build(events, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin-001");
@@ -817,8 +817,8 @@ public class EventControllerTests
         var result = await controller.EditPost(id, new EventEditorModel
         {
             Title = "t", Body = "b",
-            Start = new DateTimeOffset(2026, 10, 2, 9, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 2, 13, 0, 0, TimeSpan.Zero),
+            Start = new DateTime(2026, 10, 2, 9, 0, 0),
+            End = new DateTime(2026, 10, 2, 13, 0, 0),
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
         });
 
