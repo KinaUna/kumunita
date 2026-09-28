@@ -25,6 +25,8 @@ public static class WhatsNew
             "Messaging — 1:1 resident messaging: a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; an admin can enable or disable the feature instance-wide.",
             "PWA and responsive design — the site installs and behaves as an app on the device.",
             "Portability — import and export of the community's data for a self-hosted move.",
+            "iCal — export your visible events to a calendar app: an \"Add to calendar\" link on each event, plus a subscribable \"Calendar feed (iCal)\" your calendar can keep up to date.",
+            "Navigation layout — choose how the site's top navigation looks: a compact top row with a \"More\" menu (the default), or an icon rail beside a slim top bar; picked in the account menu, per browser.",
             "The \"What's new\" section on the About page and the version toast — you are reading this.",
         }),
         new("0.9.0", "2026-09-18", new List<string>
