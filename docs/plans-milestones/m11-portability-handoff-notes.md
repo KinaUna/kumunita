@@ -1271,6 +1271,7 @@ session.Store(locale);
 foreach (var l in config.Languages) {
     var row = await session.LoadAsync<LanguageCatalog>(l.Id, ct)
         ?? new LanguageCatalog { Id = l.Id };
+
     row.NativeName = l.NativeName;
     row.Enabled    = l.Enabled;
     row.SortOrder  = l.SortOrder;
@@ -1439,3 +1440,23 @@ Per the register's U07 entry reads (plus U06's actual seams):
   `docs/STATUS.md` + `docs/ARCHITECTURE.md` (the value-chain table — the four
   parity surfaces the flip touches) + `tests/Kumunita.Web.Tests/MilestonesTests.cs`
   (the single-in-progress pin the re-pin moves M11 → M12).
+
+---
+
+## U07 — the close
+
+**U07 is the close of M11** (the ADR 0108 milestone). It does **not** change any shipped code in `Kumunita.Core` or `Kumunita.Web` — the only shipped surface it touches is the milestone status (the `Milestones.cs` + `README.md` + `STATUS.md` + `ARCHITECTURE.md` four-surface flip) and the test surface it pins. It ships **only**:
+
+1. **The three frozen Core D9 tests** (`tests/Kumunita.Core.Tests/PortabilityRoundTripTests.cs`) — `PortabilityRoundTrip_ExportThenImportPreservesContentGraphAndMediaAndRoles` (D9a), `PortabilityNoSecret_ArchiveContainsNoCredentialMaterial` (D9b), and `PortabilityFailClosed_RejectedArchiveWritesZeroRows` (D9c) — verbatim the frozen names from `docs/design/m11-portability-design.md` §D9, each running the **real** `PortabilityService.ExportAsync` + `PortabilityService.ImportAsync` end-to-end against the real Postgres-backed seams (the shared `PostgresFixture` + the same `IDocumentStore` + `UserManager<User>` / `RoleManager<IdentityRole>` + `LocalVolumeMediaStore` the GU / GA / ML lanes established in this assembly). A test whose exact name is not in the design doc's pinned list is a drift pause, not a silent add.
+    - **D9a** — a representative instance (one of each of the participating content doc types + one media object + the two principals with the role standing + the config block) → `ExportAsync` → a *fresh* instance → `ImportAsync` → the content graph + the media bytes + the role assignments are all present on the fresh instance, byte-identical and referentially intact (one row per planted id, the media SHA round-trips, the `UserManager.GetRolesAsync` reflects the planted standing).
+    - **D9b** — the `PortabilityPrincipal` POCO field shape (the C-M11·2 **type boundary**: exactly `subjectId` / `username` / `email` / `normalizedEmail` / `displayName` / `verified` / `blocked` / `roles` — no `PasswordHash` / `SecurityStamp` / `AccessToken` / `RefreshToken` / `RecoveryCode` field exists on the type) + a byte-scan witness over the export (the C-M11·2 **wire boundary**: the seeded password hash + the updated security stamp are not in the exported bytes).
+    - **D9c** — three legs of the closed failure set, each of which is rejected *before any write* (C-M11·4): a wrong `format` manifest (`format.unsupported`, the short-circuit leg), a corrupted media byte (`media.mismatch:{id}`), and a dangling reference (`ref.dangling:{Type}.{field}`). After each rejection the fresh instance has **zero** content rows, **zero** principals, and **zero** audit rows (the `AssertZeroRowsAsync` helper — the C-M11·4 fail-closed pin at the wire).
+2. **The Web-surface pins** (`tests/Kumunita.Web.Tests/AdminPortabilityControllerTests.cs`) — the GlobalAdmin gate via `GetCustomAttribute<AuthorizeAttribute>()` on `typeof(AdminPortabilityController)` (the C-M11·7 pin), the `Export()` → `portability.ExportAsync(Admin)` delegation (one call, the ADR 0034 attachment-lane shape: `FileContentResult` + `application/octet-stream` + `attachment`), the `Import(formFile)` clean / failure / null / zero-byte legs (the `PortabilityImportResult` closed failure set + the `TempData["info"]` / `TempData["error"]` render + the `DidNotReceive` guard on the null / zero-byte defensive pin), and the kw-l parity pins (the six `portability.*` keys present with non-empty values in `KnownTranslationKeys.EnValues` / `DeValues` / `FrValues` / `DaValues`).
+3. **The milestone flip** — `Milestones.cs` (`M11 → StatusDone`, `M12 → StatusNext`), `README.md` (the `## Status` paragraph's "M11 in progress" → "M12 in progress" + the M1–M10 → M1–M11 done set + the Roadmap M11 entry **In progress** → **Done** (ADR 0108) and M12 → **In progress**), `STATUS.md` (the `next is M11` → `M11 is done` + `next is M12`), `ARCHITECTURE.md` (conservative — the value-chain table's M11 row has no status column; the deferred-lanes notes are pre-existing stale references left as-is), and `MilestonesTests.cs` (the `Shipped_Milestones_Are_Marked_Done` list extended to M11 + the `M11_Is_The_Single_InProgress_Milestone_And_M12_Through_M14_Are_Planned` pin renamed to `M12_Is_The_Single_InProgress_Milestone_And_M13_Through_M14_Are_Planned`, the single-in-progress milestone now M12 with M13 / M14 planned).
+4. **The plan file moves** — `portability-u00.md` / `portability-u01.md` / `portability-u02.md` moved from `docs/plans-milestones/in-progress/` to `docs/plans-milestones/done/`, completing the set alongside `portability-u03.md` … `portability-u06.md`.
+
+---
+
+## Summary — M11 is closed
+
+M11 (Portability — import/export) is the **single in-progress milestone → done** flip at the close of U07: `Milestones.cs` / `README.md` / `STATUS.md` / `ARCHITECTURE.md` all agree that **M1–M11 + all named lanes are done** and **M12 (iCal) is now the single in-progress milestone**, with M13 (logging & analytics) and M14 (Events+Projects integration) still planned. The three pinned Core D9 tests (the round-trip, the no-secret, the fail-closed) + the Web-surface pins + the kw-l parity pins are green, and the `MilestonesTests` re-pin to M12 is in step. The milestone is closed; the platform can now be exercised as a self-hosted community **that moves** — exported as a `*.kumunita` archive, restored onto a fresh instance byte-identically (content + media + roles), with the no-secret identity boundary enforced at the wire and the fail-closed closed-failure-set enforced before any write.

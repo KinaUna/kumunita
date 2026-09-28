@@ -138,7 +138,7 @@ public static class PortabilityValidate
         // for check (c) to resolve against (a dangling ref on a malformed
         // type is subsumed by the check (b) failure — the archive is
         // already rejected).
-        var rowsByType = new Dictionary<string, List<object>>(StringComparer.Ordinal);
+        var rowsByType = new Dictionary<string, System.Collections.IEnumerable>(StringComparer.Ordinal);
         var typeSetById = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
 
         foreach (var entry in PortabilityDocTypes.Entries)
@@ -149,11 +149,11 @@ public static class PortabilityValidate
                 continue;
             }
 
-            List<object>? rows;
+            System.Collections.IEnumerable? rows;
             try
             {
                 var listType = typeof(List<>).MakeGenericType(PortabilityExportDocuments.NameToType[entry.Type]);
-                rows = (List<object>)(JsonSerializer.Deserialize(json, listType, JsonOpts)
+                rows = (System.Collections.IEnumerable)(JsonSerializer.Deserialize(json, listType, JsonOpts)
                     ?? throw new JsonException("null array"));
             }
             catch (JsonException)
