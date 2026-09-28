@@ -27,8 +27,6 @@ namespace Kumunita.Core.Tests;
 
 using static Marten.QueryableExtensions;
 
-using static Marten.QueryableExtensions;
-
 /// <summary>
 /// M11 U07 — the <b>close</b> of the milestone: the three pinned Core tests
 /// from <c>docs/design/m11-portability-design.md</c> §D9 (the exact frozen
@@ -245,7 +243,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         if (!principalA.Succeeded)
             throw new InvalidOperationException("principal A create failed: " +
                 string.Join(", ", principalA.Errors.Select(e => e.Description)));
-        var userA = await userManager.FindByIdAsync("pt-admin-001")!;
+        var userA = (await userManager.FindByIdAsync("pt-admin-001"))!;
         await userManager.AddToRoleAsync(userA, Roles.GlobalAdmin);
         await userManager.AddToRoleAsync(userA, Roles.Moderator);
 
@@ -261,7 +259,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
         if (!principalB.Succeeded)
             throw new InvalidOperationException("principal B create failed: " +
                 string.Join(", ", principalB.Errors.Select(e => e.Description)));
-        var userB = await userManager.FindByIdAsync("pt-resident-001")!;
+        var userB = (await userManager.FindByIdAsync("pt-resident-001"))!;
         await userManager.AddToRoleAsync(userB, Roles.Member);
 
         // The config block — the §config field set (the U02 ConfigExport
@@ -784,7 +782,6 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             await BootFullInstanceAsync(ct);
 
         const string knownPassword = "Zk9!s3cret-wire-b0undary-M11-U07-2026";
-        const string knownSecurityStamp = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6-e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2";
         const string knownPrincipalId = "pt-nosecret-witness-001";
         const string knownEmail = "pt-nosecret@maplewood.example";
 
@@ -1001,7 +998,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
 
         var corruptedStream = new MemoryStream();
         await KumunitaArchive.WriteAsync(
-            corruptedStream, data.Manifest, data.Docs, data.Media,
+            corruptedStream, data.Manifest!, data.Docs, data.Media,
             data.Principals, data.Config, ct);
         corruptedStream.Position = 0;
 
@@ -1039,7 +1036,7 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
 
         var corruptedStream = new MemoryStream();
         await KumunitaArchive.WriteAsync(
-            corruptedStream, data.Manifest, data.Docs, data.Media,
+            corruptedStream, data.Manifest!, data.Docs, data.Media,
             data.Principals, data.Config, ct);
         corruptedStream.Position = 0;
 

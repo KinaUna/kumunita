@@ -18,13 +18,12 @@ namespace Kumunita.Web.Controllers;
 /// — the <c>messaging.toggle</c> one-audit-row shape the controller adds
 /// none).
 /// <para>
-/// <b>U04 ships the export half</b> (the <c>Export</c> action + the
-/// service's <c>ExportAsync</c> audit row). The import half — the
+/// Both halves are shipped: the export half (the <c>Export</c> action + the
+/// service's <c>ExportAsync</c> audit row, U04) and the import half — the
 /// <c>POST /admin/portability/import</c> action, the
 /// <see cref="IPortabilityService.ImportAsync"/> delegation, and the
-/// <c>portability.import</c> audit row — completes the surface (U06); the
-/// index view's import upload form targets that route so the surface is
-/// whole.
+/// <c>portability.import</c> audit row (U06). The index view's import
+/// upload form targets that route, so the surface is whole.
 /// </para>
 /// <para>
 /// **Zero new authorization surface (C-M11·7):** no <c>AccessAction</c> /
@@ -49,8 +48,7 @@ public sealed class AdminPortabilityController(
     /// design doc §surface: the index read is un-audited). The import
     /// upload form (rendered in the view) targets
     /// <c>POST /admin/portability/import</c> — the
-    /// <see cref="Import(IFormFile)"/> action (this unit completes the
-    /// import half, the register's U06 scope).
+    /// <see cref="Import(IFormFile)"/> action (the surface's import half).
     /// </summary>
     [HttpGet]
     public IActionResult Index() => View();

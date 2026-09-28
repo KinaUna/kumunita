@@ -138,9 +138,10 @@ operator-plane pin). **FACES locked:** F1–F5.
   `Conversation`, `Message`. Order 9 PG: `Page`, `PageTranslation`. The full
   reference map + the excluded-docs table are in the design doc §inventory.
 - **The manifest format (C-M11·1)** — `format`
-  (`kumunita/portability/1`), `produced_by`, `produced_at`,
-  `source_version?`, `community_name`, `principals`, `content_docs`,
-  `media_objects`, `config`. See design doc §manifest.
+  (`kumunita/portability/1`), `generated_at`, `community_name`,
+  `doc_counts`, `media_manifest` (the archive's `principals` / content
+  docs / `media` / `config` are separate top-level members, not manifest
+  fields). See design doc §manifest.
 - **The no-secret principals shape (C-M11·2)** — `subjectId` / `username` /
   `email` / `normalizedEmail` / `displayName` / `roles` / lockout+state
   flags; **excluded** credential fields (password hash, security stamp,
