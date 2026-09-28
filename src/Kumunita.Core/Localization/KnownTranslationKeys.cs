@@ -80,6 +80,15 @@ public static class KnownTranslationKeys
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "More",
+            ["nav_variant.label"] = "Navigation style",
+            ["nav_variant.row"]   = "Top row",
+            ["nav_variant.rail"]  = "Icon rail",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
             ["events.created"]    = "Created",
@@ -1262,6 +1271,8 @@ public static class KnownTranslationKeys
                 "Every release is dated and listed here — read what landed in " +
                 "each minor version of the platform you are using.",
             ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Show more versions",
+            ["whatsnew.show_more_remaining"] = "Show the {n} earlier versions",
             ["whatsnew.toast_label"]    = "Kumunita {v} is now in use.",
             ["whatsnew.toast_see"]      = "See what's new",
 
@@ -1673,6 +1684,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Mehr",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Obere Reihe",
+            ["nav_variant.rail"]  = "Icon-Leiste",
 
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
@@ -2795,6 +2815,8 @@ public static class KnownTranslationKeys
                 "Jede Veröffentlichung ist hier mit Datum gelistet — lies nach, " +
                 "was in jeder Minor-Version der Plattform, die du nutzt, eingezogen ist.",
             ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Weitere Versionen anzeigen",
+            ["whatsnew.show_more_remaining"] = "Die {n} älteren Versionen anzeigen",
             ["whatsnew.toast_label"]    = "Kumunita {v} ist jetzt im Einsatz.",
             ["whatsnew.toast_see"]      = "Was ist neu?",
 
@@ -3179,6 +3201,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Plus",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Barre supérieure",
+            ["nav_variant.rail"]  = "Barre d’icônes",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
@@ -4301,6 +4332,8 @@ public static class KnownTranslationKeys
                 "Chaque publication est datée et listée ici — lis ce qui est " +
                 "arrivé dans chaque version mineure de la plateforme que tu utilises.",
             ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Afficher plus de versions",
+            ["whatsnew.show_more_remaining"] = "Afficher les {n} versions précédentes",
             ["whatsnew.toast_label"]    = "Kumunita {v} est désormais en service.",
             ["whatsnew.toast_see"]      = "Voir les nouveautés",
 
@@ -4686,6 +4719,15 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
+
+            // ADR 0111 — the nav-variant surface: the compact top-row variant
+            // folds the less-frequent sections into one "More" menu, and the
+            // resident picks a variant from the account menu (nav_variant.*
+            // are the picker labels, the active one marked with a ✓).
+            ["nav.more"]          = "Mere",
+            ["nav_variant.label"] = "Navigation",
+            ["nav_variant.row"]   = "Øverste række",
+            ["nav_variant.rail"]  = "Ikonrail",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",
@@ -5799,6 +5841,8 @@ public static class KnownTranslationKeys
             ["whatsnew.lead"] =
                 "Hver udgivelse er datoeret og listet her — læs, hvad der er landet i hver minor-version af platformen, du bruger.",
             ["whatsnew.version"]        = "Version",
+            ["whatsnew.show_more"]      = "Vis flere versioner",
+            ["whatsnew.show_more_remaining"] = "Vis de {n} tidligere versioner",
             ["whatsnew.toast_label"]    = "Kumunita {v} er nu i brug.",
             ["whatsnew.toast_see"]      = "Se nyhederne",
 

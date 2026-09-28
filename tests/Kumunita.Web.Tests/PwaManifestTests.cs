@@ -298,13 +298,16 @@ public class PwaManifestTests
     }
 
     /// <summary>
-    /// U06 / D6 — the <c>site.css</c> media-block boundary is pinned to
-    /// the U00–U05 baseline: exactly <b>four</b> <c>@media (max-width:
-    /// 767.98px)</c> blocks + <b>one</b> <c>@media (prefers-reduced-motion:
-    /// reduce)</c> block, for a total of <b>five</b> <c>@media</c>
-    /// occurrences. No M10 unit (U01–U05) introduced a new media boundary;
-    /// this pin holds that. A count change without a recorded drift-guard
-    /// entry is a breach (the design doc §drift-guard frozen pin #7).
+    /// U06 / D6 — the <c>site.css</c> media-block boundary is pinned:
+    /// exactly <b>four</b> <c>@media (max-width: 767.98px)</c> blocks +
+    /// <b>one</b> <c>@media (max-width: 575.98px)</c> block (the ADR 0111
+    /// collapsed-mobile-navbar block — Bootstrap's navbar-expand-sm
+    /// breakpoint, narrower than the app's 767.98px block) + <b>one</b>
+    /// <c>@media (prefers-reduced-motion: reduce)</c> block, for a total of
+    /// <b>six</b> <c>@media</c> occurrences. The 575.98px block is a recorded
+    /// drift-guard entry (ADR 0111), so it is expected here. Any OTHER count
+    /// change without a recorded entry is a breach (the design doc §drift-guard
+    /// frozen pin #7).
     /// </summary>
     [Fact(DisplayName = "M10 U06: site.css media-block boundary pinned (D6)")]
     public void Site_Css_Media_Block_Boundary_Pinned()
@@ -313,24 +316,30 @@ public class PwaManifestTests
         Assert.True(File.Exists(cssPath), $"site.css not found at {cssPath}.");
         var css = File.ReadAllText(cssPath);
 
-        // The four width blocks (the U00–U05 baseline — the U00 drift
-        // note (a) corrected the register's "six" to four; this pin
-        // holds four).
+        // The four 767.98px width blocks (the U00–U05 baseline — the U00 drift
+        // note (a) corrected the register's "six" to four; this pin holds four).
         var widthBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*767\.98px\)");
         Assert.True(widthBlocks.Count == 4,
             $"Expected exactly 4 '@media (max-width: 767.98px)' blocks (the U00–U05 baseline); found {widthBlocks.Count}.");
+
+        // The one collapsed-mobile navbar block (ADR 0111 — the 575.98px
+        // breakpoint where navbar-expand-sm collapses; a recorded drift entry).
+        var collapsedBlocks = Regex.Matches(css, @"@media\s*\(max-width:\s*575\.98px\)");
+        Assert.True(collapsedBlocks.Count == 1,
+            $"Expected exactly 1 '@media (max-width: 575.98px)' block (the ADR 0111 collapsed navbar); found {collapsedBlocks.Count}.");
 
         // The one reduced-motion block.
         var motionBlocks = Regex.Matches(css, @"@media\s*\(prefers-reduced-motion:\s*reduce\)");
         Assert.True(motionBlocks.Count == 1,
             $"Expected exactly 1 '@media (prefers-reduced-motion: reduce)' block; found {motionBlocks.Count}.");
 
-        // The total @media count is five (four + one) — the "no new
-        // boundary" witness (the design doc §drift-guard frozen pin #7:
-        // "a count change without a recorded entry is a breach").
+        // The total @media count is six (four + one collapsed + one motion) —
+        // the "no new boundary without a record" witness (the design doc
+        // §drift-guard frozen pin #7: "a count change without a recorded entry
+        // is a breach").
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 5,
-            $"Expected exactly 5 '@media' occurrences total (4 width + 1 reduced-motion); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 6,
+            $"Expected exactly 6 '@media' occurrences total (4 width + 1 collapsed + 1 reduced-motion); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

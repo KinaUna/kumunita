@@ -19,13 +19,12 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
-        new("1.0.0", "2026-09-28", new List<string>
+        new("0.10.0", "2026-09-28", new List<string>
         {
             "Search — one /search surface (nav search box, anonymous + signed-in) over the four resident content surfaces: community + group posts, community + group events, pages, announcements.",
             "Messaging — 1:1 resident messaging: a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; an admin can enable or disable the feature instance-wide.",
             "PWA and responsive design — the site installs and behaves as an app on the device.",
             "Portability — import and export of the community's data for a self-hosted move.",
-            "iCal — event calendars available as a standard iCal feed.",
             "The \"What's new\" section on the About page and the version toast — you are reading this.",
         }),
         new("0.9.0", "2026-09-18", new List<string>
