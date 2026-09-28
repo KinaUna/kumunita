@@ -368,3 +368,89 @@ path is the faithful choice). One `xUnit2018` analyzer note on
 **Open items for U05:** U04 registers the two `kw-l` keys × 4 langs + the 3
 view links + the parity pin; U05 flips the docs (M12→Done, M13→Next) +
 `MilestonesTests` re-pin + records the gate run in §gate.
+
+## U04 — Surface: the two `kw-l` affordances × en/de/fr/da + the phone-width re-check
+
+**Status:** complete. Build green (`dotnet build Kumunita.slnx -c Debug` —
+Build succeeded, 0 errors); `Kumunita.Web.Tests` **575/575** green (the
+`KwLRegistryConsistencyTests` view scan now accepts the two new keys — it
+scans every `kw-l key="…"` literal in the views against the registry, so it
+is the Web-side witness that the three views' keys resolve);
+`Kumunita.Core.Tests` **976/976** green (the
+`KnownTranslationKeys_ParityTests` family — en/de/fr/da key-for-key parity
++ no-empty-values — discovers the two new keys in all four dictionaries and
+passes; no other Core test regressed). `docker container prune -f` after the
+Core run (0B reclaimed — the containers were already stopped by the run).
+
+**The three view links (as rendered, verbatim — cross-checked against the
+`## U02` / `## U03` entries' exact routes):**
+
+- `src/Kumunita.Web/Views/Event/Detail.cshtml` — the detail page's metadata
+  row (the `text-muted mb-3` line above the body card) now carries the one
+  "Add to calendar" link: `<a class="btn btn-outline-secondary btn-sm"
+  href="@($"/events/{Model.Event.Id}.ics")"><kw-l key="events.ics.download">
+  Add to calendar</kw-l></a>` — lane 1's exact route (`/events/{id}.ics`,
+  U02), no extra gate (the page only renders for a visible event, the
+  C-M12·6 "quiet" pin). The row's `text-muted` wrapper gained
+  `d-inline-flex gap-2 align-items-center flex-wrap` so the link sits on the
+  metadata's line and wraps below at 360 px; the row's own visual shape is
+  unchanged.
+- `src/Kumunita.Web/Views/Event/Index.cshtml` — the `/events` feed header
+  (`head-row`) action side: the `New event` button is wrapped in a
+  `d-flex gap-2 align-items-center flex-wrap` group that now also carries
+  the one "Calendar feed (iCal)" link: `<a class="btn btn-outline-secondary"
+  href="/events.ics"><kw-l key="events.ics.feed">Calendar feed (iCal)
+  </kw-l></a>` — lane 2's exact route (`/events.ics`, U03), placed beside
+  the `New event` secondary affordance per the design doc §affordances
+  item 2.
+- `src/Kumunita.Web/Views/Event/Calendar.cshtml` — the calendar page's
+  `head-row` control group: the same feed link, one line, added after the
+  `New event` quick-create button: `<a class="btn btn-outline-secondary
+  btn-sm" href="/events.ics"><kw-l key="events.ics.feed">Calendar feed
+  (iCal)</kw-l></a>`. **In scope** — the design doc §affordances item 2
+  names this page explicitly, so the link was kept (not dropped).
+
+No new JS anywhere — all three are plain `<a>` links (the tsc-only
+discipline holds; no browser harness needed).
+
+**The two keys × four languages (the exact strings from the design doc
+§kw-l, verbatim — registered in `src/Kumunita.Core/Localization/
+KnownTranslationKeys.cs`, in the `events.*` block of each language section,
+after the `events.past_empty` rows):**
+
+| Key | `en` | `de` | `fr` | `da` |
+|---|---|---|---|---|
+| `events.ics.download` | Add to calendar | Zum Kalender hinzufügen | Ajouter à l'agenda | Tilføj til kalender |
+| `events.ics.feed` | Calendar feed (iCal) | Kalender-Feed (iCal) | Flux de calendrier (iCal) | Kalenderfeed (iCal) |
+
+**The parity pins:** `KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_
+Is_Registered` (Web, static view scan — discovers the two keys in the three
+touched views and asserts they are registered; passing) and the
+`KnownTranslationKeys_ParityTests` family (Core — en AllKeys-vs-EnValues,
+plus the de/fr/da key-for-key parity + no-empty-value tests, each of which
+now covers the two new keys in all four dictionaries; all passing).
+
+**The M10 phone-width re-check (360 px):** no CSS change. The three links
+join existing rows that already wrap at mobile widths: the Detail row is
+now `d-inline-flex … flex-wrap` (the link wraps below the metadata text);
+the Index `head-row` is `flex-wrap: wrap` (the `airy-head .head-row` rule,
+site.css line 1622) so the new action group wraps below the title/lede;
+the Calendar `head-row` is the same `.airy-head .head-row` rule + its own
+`d-flex gap-2 align-items-center` control group sits in a flex-wrap parent.
+Bootstrap's default `.btn` is ~38 px tall with comfortable padding — the
+links respect the touch-target floor without a 44 px override (the M10
+Floor A list is closed and names no new element; these are standard `.btn`
+links, not a sub-44 custom control). No `site.css` edit made.
+
+**Deviation:** none. No drift pause — the design doc §affordances / §kw-l
+matched the views and the registry shape (the `events.past_empty` block
+pattern copied for each of the four language sections).
+
+**Files touched (the 5 deliverables only):**
+`src/Kumunita.Web/Views/Event/Detail.cshtml` ·
+`src/Kumunita.Web/Views/Event/Index.cshtml` ·
+`src/Kumunita.Web/Views/Event/Calendar.cshtml` ·
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs` · this handoff note.
+
+**Open items for U05:** flip the docs (M12→Done, M13→Next) +
+`MilestonesTests` re-pin + record the gate run in §gate.

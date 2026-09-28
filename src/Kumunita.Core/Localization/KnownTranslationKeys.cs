@@ -1380,6 +1380,11 @@ public static class KnownTranslationKeys
             ["events.past"] = "Past",
             ["events.past_empty"] = "No past events yet.",
 
+            // ── events.ics (the M12 iCal affordances — the detail page's
+            //    "Add to calendar" link + the feed/calendar feed link, ADR 0112) ──
+            ["events.ics.download"] = "Add to calendar",
+            ["events.ics.feed"] = "Calendar feed (iCal)",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2924,6 +2929,10 @@ public static class KnownTranslationKeys
             ["events.past"] = "Vergangen",
             ["events.past_empty"] = "Noch keine vergangenen Veranstaltungen.",
 
+            // ── events.ics (die M12-iCal-Oberflächen — Detailseite + Feed/Kalenderansicht, ADR 0112) ──
+            ["events.ics.download"] = "Zum Kalender hinzufügen",
+            ["events.ics.feed"] = "Kalender-Feed (iCal)",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -4441,6 +4450,10 @@ public static class KnownTranslationKeys
             ["events.past"] = "Passés",
             ["events.past_empty"] = "Aucun événement passé pour l'instant.",
 
+            // ── events.ics (les surfaces iCal M12 — page de détail + feed/calendrier, ADR 0112) ──
+            ["events.ics.download"] = "Ajouter à l'agenda",
+            ["events.ics.feed"] = "Flux de calendrier (iCal)",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -5949,6 +5962,10 @@ public static class KnownTranslationKeys
             ["events.upcoming"] = "Kommende",
             ["events.past"] = "Forløbne",
             ["events.past_empty"] = "Ingen forløbne arrangementer endnu.",
+
+            // ── events.ics (M12's iCal-overflader — detaljesiden + feed/kalender, ADR 0112) ──
+            ["events.ics.download"] = "Tilføj til kalender",
+            ["events.ics.feed"] = "Kalenderfeed (iCal)",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

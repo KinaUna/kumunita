@@ -166,6 +166,14 @@
                          module) re-points them when a resident clicks an
                          empty calendar slot instead. -->
                     <button type="button" class="btn btn-primary btn-sm events-new-event-btn" data-bs-toggle="modal" data-bs-target="#new-event-modal"><kw-l key="events.new_event">New event</kw-l></button>
+                    @* M12 (ADR 0112, U04) — the "Calendar feed (iCal)"
+                       affordance: a plain link to the lane-2 subscription
+                       (GET /events.ics, U03). Quiet, beside the New event
+                       action (the calendar header idiom — design doc
+                       §affordances item 2 names this page); flex-wrap (the
+                       head-row's own rule) lets it wrap below at 360 px
+                       without a CSS change (M10 re-check). *@
+                    <a class="btn btn-outline-secondary btn-sm" href="/events.ics"><kw-l key="events.ics.feed">Calendar feed (iCal)</kw-l></a>
                 </div>
             </div>
         </header>
