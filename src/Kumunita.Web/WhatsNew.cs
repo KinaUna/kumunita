@@ -27,6 +27,7 @@ public static class WhatsNew
             "Portability — import and export of the community's data for a self-hosted move.",
             "iCal — export your visible events to a calendar app: an \"Add to calendar\" link on each event, plus a subscribable \"Calendar feed (iCal)\" your calendar can keep up to date.",
             "Navigation layout — choose how the site's top navigation looks: a compact top row with a \"More\" menu (the default), or an icon rail beside a slim top bar; picked in the account menu, per browser.",
+            "Navigation layout (top row) — in a narrow window the Community and Groups links now tuck into the \"More\" menu so the top row never needs a horizontal scrollbar; they pop back out when there is room.",
             "The \"What's new\" section on the About page and the version toast — you are reading this.",
         }),
         new("0.9.0", "2026-09-18", new List<string>

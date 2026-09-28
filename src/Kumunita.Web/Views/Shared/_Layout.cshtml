@@ -84,15 +84,22 @@
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
-                                <li class="nav-item">
+                                @* ADR 0113 — data-nav-fold: when the variant-B row doesn't
+                                   fit between the sm and md breakpoints, the nav-more-fold.ts
+                                   module moves these two <li>s into the More menu below
+                                   (data-nav-more) and back when there is room again. The hooks
+                                   are inert without that module, and absent in variant C and
+                                   for signed-out users, so the fold is self-scoped. *@
+                                <li class="nav-item" data-nav-fold>
                                     <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" data-nav-fold>
                                     <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
                                 </li>
                                 @* ADR 0111 — the More menu: the five less-frequent
-                                   resident-only sections folded into one dropdown. *@
-                                <li class="nav-item dropdown">
+                                   resident-only sections folded into one dropdown.
+                                   ADR 0113 — data-nav-more marks this as the fold target. *@
+                                <li class="nav-item dropdown" data-nav-more>
                                     <a class="nav-link text-dark dropdown-toggle" href="#" role="button"
                                        data-bs-toggle="dropdown" aria-expanded="false">
                                         <kw-l key="nav.more">More</kw-l>
@@ -340,6 +347,12 @@
          label source as one quiet fixed button on beforeinstallprompt;
          a clean no-op where the browser never fires it (iOS). -->
     <script type="module" src="~/js/lib/pwa-install.js"></script>
+    <!-- Nav-row overflow fold (client/lib/nav-more-fold.ts, tsc-built — ADR 0113):
+         in the variant-B "top row" nav, folds Community + Groups into the More
+         menu when the row doesn't fit, and back when there is room. Self-guards
+         (no-op) in variant C, signed-out, and where the data-nav-* hooks are
+         absent, so loading it globally is safe. -->
+    <script type="module" src="~/js/lib/nav-more-fold.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
