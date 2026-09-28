@@ -6,7 +6,7 @@ entry: files written/touched, decisions locked or refined (with the
 design-doc / ADR section it maps to), anything that drifted from the plan's
 text, and the next unit's entry reads.
 
-The register is `docs/plans-milestones/plan-m11-portability.md`. Each unit
+The register is `docs/plans-milestones/done/plan-m11-portability.md`. Each unit
 ships its own self-contained plan in `in-progress/portability-uNN.md`; when
 a unit is done its plan file moves to `done/`. The **next unit's** agent
 reads its own unit plan + this file's most recent `## U#` section + its
@@ -23,14 +23,14 @@ entry reads — it does not re-derive the register.
   not a milestone-status change (M11 is already `StatusNext` — the flip
   happens at **U07 close**, when M11 → `StatusDone` and M12 → `StatusNext`).
 - **Files touched (this kickoff: the plan tier only):**
-  - `docs/plans-milestones/plan-m11-portability.md` — the unit register
+  - `docs/plans-milestones/done/plan-m11-portability.md` — the unit register
     (U00–U07), [PROPOSED] D1–D10 + C-M11·1–8 + F1–F5, per-unit Goal /
     Entry reads / Deliverables / Exit, + the Deferred lanes.
   - `docs/plans-milestones/in-progress/portability-u00.md` …
     `portability-u06.md` — the six self-contained unit plans (U00–U06;
     U07's close is defined in the register's `## U07` section directly —
     the close unit reads it there, no separate in-progress file).
-  - `docs/plans-milestones/m11-portability-handoff-notes.md` — this file.
+  - `docs/plans-milestones/done/m11-portability-handoff-notes.md` — this file.
 - **Open veto window:** D1–D10 in the register are the [PROPOSED] set the
   user can still change cheaply **before U00 runs**. After U00 they are
   locked by `docs/design/m11-portability-design.md` + ADR 0108.
