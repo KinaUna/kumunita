@@ -409,6 +409,133 @@ public class EventControllerTests
         await events.Received(1).ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>());
     }
 
+    // ── ADR 0109 (EV-PAST) — the /events "Past" option read lane ─────────────
+
+    /// <summary>
+    /// ADR 0109 — the Past lane: <c>GET /events?past=true</c> routes to
+    /// <see cref="IEventService.ListPastAsync"/> (the additive seam) with the
+    /// same component-id / page / actor shape the upcoming lane uses, and sets
+    /// <see cref="EventIndexViewModel.Past"/> on the model so the view renders
+    /// the Past toggle active. The upcoming seam (<see cref
+    /// "IEventService.ListUpcomingAsync"/>) is **not** called (the lane is
+    /// purely additive — the default path is untouched).
+    /// </summary>
+    [Fact]
+    public async Task Index_Past_RoutesToListPastAsync_AndSetsPastFlag()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-past", authorId: "subj-author-001") }, false));
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+
+        var result = (await controller.Index(componentId: null, page: 1, past: true)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
+        Assert.True(model.Past);
+        Assert.Single(model.Events);
+        Assert.Equal("ev-past", model.Events[0].Id);
+        Assert.Equal("Ada", model.Events[0].AuthorDisplayName);
+        await events.Received(1).ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+        // The upcoming lane is not called on the Past path.
+        await events.DidNotReceive()
+            .ListUpcomingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0109 (D7) — the Past lane's pager carries the <c>past=true</c>
+    /// selector as a FilterParams pair (alongside the component filter), so
+    /// the shared <c>_Pager</c>'s prev/next links stay on the Past view. A
+    /// regression (a dropped past pair) would silently drop the Past
+    /// selection on page navigation.
+    /// </summary>
+    [Fact]
+    public async Task Index_Past_CarriesPastSelectorInPagerFilterParams()
+    {
+        var events = Substitute.For<IEventService>();
+        // A full page (30 candidates, HasMore true) so the pager renders.
+        var fullPage = Enumerable.Range(0, 30)
+            .Select(i => SampleEvent($"ev-p{i}", authorId: "subj-author-001", componentId: "component-A"))
+            .ToList();
+        events.ListPastAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>())
+            .Returns(new EventPage(fullPage, true));
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
+
+        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+
+        var result = (await controller.Index(componentId: "component-A", page: 2, past: true)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
+        Assert.True(model.Past);
+        Assert.NotNull(model.Pager);
+        var pager = model.Pager!;
+        Assert.Equal("component-A", pager.FilterParams["componentId"]);
+        Assert.Equal("true", pager.FilterParams["past"]);
+        await events.Received(1).ListPastAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0109 — the default (non-Past) path still routes to
+    /// <see cref="IEventService.ListUpcomingAsync"/> (the additive lane does not
+    /// disturb the default): <see cref="EventIndexViewModel.Past"/> is false and
+    /// the upcoming seam is the one called.
+    /// </summary>
+    [Fact]
+    public async Task Index_Default_StillRoutesToListUpcomingAsync()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-up", authorId: "subj-author-001") }, false));
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+
+        var result = (await controller.Index(componentId: null, page: 1)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
+        Assert.False(model.Past);
+        Assert.Single(model.Events);
+        await events.Received(1).ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+        await events.DidNotReceive()
+            .ListPastAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0109 — the 403 split on the Past lane: the service's
+    /// <see cref="IEventService.ListPastAsync"/> denies (a Core-layer re-check
+    /// of the actor's standing). The Web layer maps that to a clean
+    /// <see cref="ForbidResult"/> (403, never a 500) and renders nothing — the
+    /// same 404-vs-403 split convention the upcoming feed and the write lanes
+    /// use.
+    /// </summary>
+    [Fact]
+    public async Task Index_Past_When_ListPastDenies_Returns_403()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<EventPage>(new UnauthorizedAccessException($"Actor may not read events.")));
+
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        var result = await controller.Index(componentId: null, page: 1, past: true);
+
+        Assert.IsType<ForbidResult>(result);
+        await events.Received(1).ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+    }
+
     // ── Composer (GET/POST /events/new) ────────────────────────────────────────
 
     /// <summary>

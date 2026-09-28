@@ -2365,6 +2365,227 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // ADR 0109 (EV-PAST) — the /events "Past" option read lane.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── ADR 0109·1 — M4_PastFeed_ShowsPast_ExcludesUpcoming ─────────────────
+    // The past lane's candidate set is the feed filter plus Start < nowUtc:
+    // a past public event appears, a future (upcoming) public event does not
+    // (and vice-versa on the upcoming lane — the split is the pin).
+
+    [Fact]
+    public async Task M4_PastFeed_ShowsPast_ExcludesUpcoming()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a0109-f1-author";
+        const string resident = "u-a0109-f1-resident";
+
+        var pastStart = DateTimeOffset.UtcNow.AddDays(-5);
+        await Plant(store, new Event
+        {
+            Id = "p1-past", AuthorId = author, Title = "Old fair", Body = "b",
+            Start = pastStart, End = pastStart.AddHours(3),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var futureStart = DateTimeOffset.UtcNow.AddDays(5);
+        await Plant(store, new Event
+        {
+            Id = "p1-future", AuthorId = author, Title = "Next fair", Body = "b",
+            Start = futureStart, End = futureStart.AddHours(3),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var past = (await svc.ListPastAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p1-past", past);
+        Assert.DoesNotContain("p1-future", past);
+
+        // ADR 0109 decision: ListUpcomingAsync is **untouched** — it carries no
+        // time-window predicate (the ~30 pinned feed tests rely on that), so it
+        // lists *both* the future and the past event. The past lane is the
+        // additive, windowed read beside it (the ADR 0063 EV-CAL precedent).
+        var upcoming = (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p1-future", upcoming);
+        Assert.Contains("p1-past", upcoming);
+    }
+
+    // ── ADR 0109·2 — M4_PastFeed_OrderedStartDescending ─────────────────────
+    // The past lane is ordered by Start descending — the most recent past
+    // event first (the "history" reading order, the inverse of the feed's
+    // upcoming-ascending order).
+
+    [Fact]
+    public async Task M4_PastFeed_OrderedStartDescending()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a0109-f2-author";
+        const string resident = "u-a0109-f2-resident";
+
+        var t = DateTimeOffset.UtcNow.AddDays(-10);
+        // Plant in an order deliberately different from the expected sort
+        // order (Start descending, most-recent-past first): the most recent
+        // past (t) is planted first, then the middle (t-1d), then the oldest
+        // (t-2d).
+        await Plant(store, new Event { Id = "recent", AuthorId = author, Title = "recent", Body = "r", Start = t, End = t, IsDraft = false, IsDeleted = false, Audience = null });
+        await Plant(store, new Event { Id = "oldest", AuthorId = author, Title = "oldest", Body = "o", Start = t.AddDays(-2), End = t.AddDays(-2), IsDraft = false, IsDeleted = false, Audience = null });
+        await Plant(store, new Event { Id = "middle", AuthorId = author, Title = "middle", Body = "m", Start = t.AddDays(-1), End = t.AddDays(-1), IsDraft = false, IsDeleted = false, Audience = null });
+
+        var feed = (await svc.ListPastAsync(null, resident, 1)).Items;
+        Assert.Equal(3, feed.Count);
+        // Start descending: recent (t) → middle (t-1d) → oldest (t-2d).
+        Assert.Equal(new[] { "recent", "middle", "oldest" }, feed.Select(e => e.Id).ToArray());
+    }
+
+    // ── ADR 0109·3 — M4_PastFeed_AudienceGateAndAudit ───────────────────────
+    // The past lane carries the same single CanSeeAsync(Read) gate + one
+    // aggregate AccessAudit row (TargetKind "event") as the feed: a
+    // grantee sees an audience-restricted past event, a stranger is denied,
+    // and exactly one audit row lands for the page.
+
+    [Fact]
+    public async Task M4_PastFeed_AudienceGateAndAudit()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a0109-f3-author";
+        const string grantee = "u-a0109-f3-grantee";
+        const string stranger = "u-a0109-f3-stranger";
+
+        var pastStart = DateTimeOffset.UtcNow.AddDays(-3);
+        await Plant(store, new Event
+        {
+            Id = "p3-ev", AuthorId = author, Title = "Members only retro", Body = "b",
+            Start = pastStart, End = pastStart.AddHours(2),
+            IsDraft = false, IsDeleted = false,
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        // The grantee sees the past event (branch 6 MatchGroups).
+        var granteePast = (await svc.ListPastAsync(null, grantee, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p3-ev", granteePast);
+
+        // The stranger is denied (branch 7 Deny) and the deny lands an audit row.
+        var strangerPast = (await svc.ListPastAsync(null, stranger, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.DoesNotContain("p3-ev", strangerPast);
+    }
+
+    // ── ADR 0109·4 — M4_PastFeed_DraftAndDeletedExcluded ────────────────────
+    // The past lane's candidate set is the feed's candidate set plus the time
+    // predicate: a past draft and a past soft-deleted event are both excluded
+    // (unconditionally — not just for non-authors), mirroring the feed's
+    // !IsDraft / !IsDeleted filters.
+
+    [Fact]
+    public async Task M4_PastFeed_DraftAndDeletedExcluded()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a0109-f4-author";
+        const string resident = "u-a0109-f4-resident";
+
+        var past = DateTimeOffset.UtcNow.AddDays(-2);
+        await Plant(store, new Event
+        {
+            Id = "p4-live", AuthorId = author, Title = "Live", Body = "b",
+            Start = past, End = past.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "p4-draft", AuthorId = author, Title = "Draft", Body = "b",
+            Start = past, End = past.AddHours(2),
+            IsDraft = true, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "p4-deleted", AuthorId = author, Title = "Deleted", Body = "b",
+            Start = past, End = past.AddHours(2),
+            IsDraft = false, IsDeleted = true, Audience = null,
+        });
+
+        var ids = (await svc.ListPastAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p4-live", ids);
+        Assert.DoesNotContain("p4-draft", ids);
+        Assert.DoesNotContain("p4-deleted", ids);
+    }
+
+    // ── ADR 0109·5 — M4_PastFeed_ZeroCandidates_NoDecision ──────────────────
+    // With zero candidates the past lane returns an empty page with
+    // HasMore:false *before* any decision — no AccessAudit row lands (the
+    // C-M7·5 posture, the feed's 0-candidate early return).
+
+    [Fact]
+    public async Task M4_PastFeed_ZeroCandidates_NoDecision()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string resident = "u-a0109-f5-resident";
+
+        // Only a future event exists — zero past candidates.
+        var future = DateTimeOffset.UtcNow.AddDays(4);
+        await Plant(store, new Event
+        {
+            Id = "p5-future", AuthorId = "u-a0109-f5-author", Title = "Upcoming", Body = "b",
+            Start = future, End = future.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var page = await svc.ListPastAsync(null, resident, 1);
+        Assert.Empty(page.Items);
+        Assert.False(page.HasMore);
+
+        // No audit row from the empty read (the no-decision early return).
+        Assert.Empty(await EventAuditRows(store));
+    }
+
+    // ── ADR 0109·6 — M4_PastFeed_ComponentFilter ────────────────────────────
+    // The componentId is a filter, never a gate (C-M3·2): a past event on
+    // component A is returned under the A filter and not under the unfiltered
+    // + B filter (a B-only page excludes it).
+
+    [Fact]
+    public async Task M4_PastFeed_ComponentFilter()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-a0109-f6-author";
+        const string member = "u-a0109-f6-member";
+        const string compA = "c-a0109-f6-a";
+        const string compB = "c-a0109-f6-b";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compB, Name = "Garden", Enabled = true });
+        await userInfo.SetCommunityMembershipAsync(compA, member, actorId: "u-a0109-f6-admin");
+        await userInfo.SetCommunityMembershipAsync(compB, member, actorId: "u-a0109-f6-admin");
+
+        var past = DateTimeOffset.UtcNow.AddDays(-1);
+        await Plant(store, new Event
+        {
+            Id = "p6-a", AuthorId = author, Title = "A retro", Body = "b",
+            ComponentId = compA, Start = past, End = past.AddHours(2),
+            IsDraft = false, IsDeleted = false,
+            Audience = new Audience { Community = true },
+        });
+        await Plant(store, new Event
+        {
+            Id = "p6-b", AuthorId = author, Title = "B retro", Body = "b",
+            ComponentId = compB, Start = past, End = past.AddHours(2),
+            IsDraft = false, IsDeleted = false,
+            Audience = new Audience { Community = true },
+        });
+
+        var aFeed = (await svc.ListPastAsync(compA, member, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p6-a", aFeed);
+        Assert.DoesNotContain("p6-b", aFeed);
+
+        var bFeed = (await svc.ListPastAsync(compB, member, 1)).Items.Select(e => e.Id).ToArray();
+        Assert.Contains("p6-b", bFeed);
+        Assert.DoesNotContain("p6-a", bFeed);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // Test plumbing (mirrors PostServiceTests).
     // ════════════════════════════════════════════════════════════════════════
 

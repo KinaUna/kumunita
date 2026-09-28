@@ -251,7 +251,7 @@ public sealed class EventController : Controller
     /// </para>
     /// </summary>
     [HttpGet("/events")]
-    public async Task<IActionResult> Index(string? componentId, int page = 1)
+    public async Task<IActionResult> Index(string? componentId, int page = 1, bool past = false)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
@@ -259,7 +259,13 @@ public sealed class EventController : Controller
         bool hasMore;
         try
         {
-            var pageResult = await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            // ADR 0109 (EV-PAST) — the "Past" option is an additive read lane on
+            // the same seam: past = true routes to ListPastAsync (Start < now,
+            // most-recent-first); the default (false) keeps ListUpcomingAsync
+            // verbatim (the ADR 0097 additive-surface precedent).
+            var pageResult = past
+                ? await this.events.ListPastAsync(componentId, actorId, page, HttpContext.RequestAborted)
+                : await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             events = pageResult.Items;
             hasMore = pageResult.HasMore;
         }
@@ -350,6 +356,16 @@ public sealed class EventController : Controller
         var rows = events.Select(e => ProjectRow(e, authorName, componentById)).ToList();
         var myRows = myEvents.Select(e => ProjectRow(e, authorName, componentById)).ToList();
 
+        // ADR 0109 (D7) — the pager's prev/next links carry the *current* filter
+        // values so they don't drop the selection. The community filter is a
+        // FilterParams pair (ADR 0090 D7); when the Past lane is active the
+        // past=true selector is carried too, so prev/next stay on the Past view.
+        var pagerFilters = new Dictionary<string, string>();
+        if (componentId is not null)
+            pagerFilters["componentId"] = componentId;
+        if (past)
+            pagerFilters["past"] = "true";
+
         var vm = new EventIndexViewModel(
             Events: rows,
             Components: allComponents
@@ -361,11 +377,12 @@ public sealed class EventController : Controller
             MyEvents: myRows,
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
             // single page so the _Pager partial renders nothing. The community
-            // filter is carried across prev/next (D7) as a FilterParams pair.
+            // filter + the Past selector are carried across prev/next (D7).
             Pager: (hasMore || page > 1)
                 ? PagedViewModel.ForRoute("/events", page, 30, hasMore,
-                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
-                : null);
+                    pagerFilters.Count > 0 ? pagerFilters : null)
+                : null,
+            Past: past);
 
         return View(vm);
     }
