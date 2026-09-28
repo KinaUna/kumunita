@@ -1310,6 +1310,18 @@ body.kmb-page-expanded .page-expand-close {
   flex-wrap: wrap;
 }
 
+/* Calendar header (Event/Calendar, ADR 0104) — the full-page + full-screen
+   toggles share the lede's line, floated right; below the wrap threshold
+   they stack after the lede, before the Day/Week/Month + New event
+   controls (the DOM order keeps that on every viewport). */
+.airy-head .lede-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
 /* A: the announcements ledger — one bordered container, generous rows. */
 .airy-ann-list {
   background: #fff;

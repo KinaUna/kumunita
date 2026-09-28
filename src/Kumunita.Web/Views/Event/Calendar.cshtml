@@ -110,7 +110,41 @@
             <div class="head-row">
                 <div>
                     <h1><kw-l key="events.calendar.title">Calendar</kw-l></h1>
-                    <p class="lede">@Model.Label</p>
+                    @* The full-page + full-screen toggles: sit on the
+                       lede's line, floated right (the .lede-row rule in
+                       site.css); on narrower screens they wrap below the
+                       lede — after the lede and before the Day/Week/Month
+                       + New event controls (DOM order keeps that on
+                       every viewport). *@
+                    <div class="lede-row">
+                        <p class="lede">@Model.Label</p>
+                        <div class="d-flex gap-2 align-items-center">
+                            <!-- The full-page expand toggle (client/lib/
+                                 expand-page.js, shared with the Kanban
+                                 board's): keeps the page in the normal
+                                 viewport but hides the navbar / footer and
+                                 stretches the calendar to fill 100% of the
+                                 page body (the body.kmb-page-expanded rules
+                                 in site.css). The ✕ close sits just above
+                                 the grid; Escape also collapses. -->
+                            <button type="button" class="btn btn-sm btn-outline-secondary page-expand-toggle" aria-pressed="false">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                                <span><kw-l key="common.full_page">Full page</kw-l></span>
+                            </button>
+                            <!-- The browser full-screen toggle (client/lib/
+                                 calendar-fullscreen.ts, the board's ⛶
+                                 sibling): #events-calendar becomes the
+                                 Fullscreen API element — the browser hides
+                                 the rest of the page, the :fullscreen rules
+                                 in site.css give it the full-bleed look, and
+                                 the ✕ close inside the grid exits (native
+                                 Esc always works). -->
+                            <button type="button" class="btn btn-sm btn-outline-secondary calendar-fullscreen-toggle" aria-pressed="false">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                                <span><kw-l key="common.fullscreen">Full screen</kw-l></span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="d-flex gap-2 align-items-center">
                     <!-- D5 — the Day/Week/Month toggle: three plain GET links
@@ -132,28 +166,6 @@
                          module) re-points them when a resident clicks an
                          empty calendar slot instead. -->
                     <button type="button" class="btn btn-primary btn-sm events-new-event-btn" data-bs-toggle="modal" data-bs-target="#new-event-modal"><kw-l key="events.new_event">New event</kw-l></button>
-                    <!-- The full-page expand toggle (client/lib/expand-page.js,
-                         shared with the Kanban board's): keeps the page in
-                         the normal viewport but hides the navbar / footer
-                         and stretches the calendar to fill 100% of the page
-                         body (the body.kmb-page-expanded rules in site.css).
-                         The ✕ close sits just above the grid; Escape also
-                         collapses. -->
-                    <button type="button" class="btn btn-sm btn-outline-secondary page-expand-toggle" aria-pressed="false">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-                        <span><kw-l key="common.full_page">Full page</kw-l></span>
-                    </button>
-                    <!-- The browser full-screen toggle (client/lib/
-                         calendar-fullscreen.ts, the board's ⛶ sibling):
-                         #events-calendar becomes the Fullscreen API element
-                         — the browser hides the rest of the page, the
-                         :fullscreen rules in site.css give it the full-bleed
-                         look, and the ✕ close inside the grid exits (native
-                         Esc always works). -->
-                    <button type="button" class="btn btn-sm btn-outline-secondary calendar-fullscreen-toggle" aria-pressed="false">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-                        <span><kw-l key="common.fullscreen">Full screen</kw-l></span>
-                    </button>
                 </div>
             </div>
         </header>
