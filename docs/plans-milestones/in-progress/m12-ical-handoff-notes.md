@@ -270,3 +270,101 @@ In_Challenge` tests with the `CalendarFeed` assertions (keep the single
 shared test name per the design doc pin list); add the two
 `CalendarFeed_*` pins; the composition pin (`IcsFeed_
 ContainsExactlyTheVisibleUpcomingSet`) is U03's (Core, `PostgresFixture`).
+
+## U03 — Web: the `GET /events.ics` feed lane (lane 2) + its Web pins + the Core composition pin
+
+**Status:** complete. `CalendarFeed` action on the existing `EventController`;
+build green (`dotnet build Kumunita.slnx -c Debug` — Build succeeded, 0
+errors, 0 warnings); `Kumunita.Web.Tests` **575/575** green (the 4 feed pins
++ 2 shared-pin extensions + the route-map line discovered + passing; no other
+Web test regressed); `Kumunita.Core.Tests` **976/976** green (the composition
+pin discovered + passing via `PostgresFixture`; no other Core test regressed).
+
+**Action + route (as registered, verbatim):** `CalendarFeed` on
+`EventController`, `[HttpGet("/events.ics")]` — the design doc §routes pin,
+verbatim. It composes the frozen `IEventService.ListUpcomingAsync(null,
+actorId, 0, ct)` (C-M12·1 — exactly the feed's visible upcoming set: the
+candidate filter + the `CanSeeAsync(Read)` gate all inside it) and renders
+through the pure `IcsWriter.Build(items, DateTimeOffset.UtcNow, categories)`
+over the already-authorized rows. **Always `200`** (an empty visible set is a
+valid empty `VCALENDAR` — C-M12·4, which falls out of U01's emitter). **No
+routing surprise:** U02's handoff analysis held — the literal
+`"/events.ics"` route ranks above the parameterized `"/events/{id}"` (detail)
+route, and it does **not** collide with `"/events/{id}.ics"` (different
+segment structure: `GET /events.ics` has no `{id}` segment to bind). Inherited
+as-is, no workaround.
+
+**Serve shape (locked, §routes — the same ADR 0034 / 0108 idiom as the
+lane-1 sibling, set on `Response.Headers` before the return):**
+`Content-Type: text/calendar; charset=utf-8` (the `File(bytes, …)` second
+arg) · `Content-Disposition: attachment; filename="kumunita-events.ics"`
+(lane-2 filename, **not** `kumunita-event-{id}.ics`) · `Cache-Control:
+no-store` · `X-Content-Type-Options: nosniff`. Return: `File(
+Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8")`.
+
+**CATEGORIES (the Web layer's job — drift-guard entry 2):** the same
+§field-map idiom as the lane-1 sibling, looped over `page.Items`. The
+optional `ITagService? tags` is already on the constructor (U02's D6 shape) —
+when present + any event has `TagIds`: `tags.ListForActorAsync(actorId)` →
+`TagId → DisplayedName` map, dangling ids dropped (`Where(readableById.
+ContainsKey)`), `OrderBy(DisplayedName, Ordinal)`, per-event names handed to
+`IcsWriter.Build`; no names resolve ⇒ no `CATEGORIES`. A `null` `tags`
+(test-construction site) ⇒ no `CATEGORIES` on any `VEVENT`.
+
+**The composition pin (Core, `PostgresFixture`, new
+`tests/Kumunita.Core.Tests/IcsFeedTests.cs`):**
+`IcsFeed_ContainsExactlyTheVisibleUpcomingSet` — plants the pinned set (all
+future-dated, authored by distinct authors so the author-owner branch is not
+the admitting one): a **visible community** event (`Audience = null`
+public, published, non-group-channel) + an **audience-restricted** event
+(`Audience = User("someone-else")` — passes the candidate filter, excluded by
+`CanSeeAsync(Read)`) + a **draft** + a **deleted** + a **group-channel**
+event (`GroupId` non-empty — filtered by the candidate filter). Calls
+`ListUpcomingAsync(null, actorId, 0, ct)` (the `CalendarFeed` action's exact
+call shape), then `IcsWriter.Build(page.Items, nowUtc, null)` — `categories`
+is `null` here because the pin's events carry no `TagIds` (CATEGORIES
+resolution is the Web layer's per drift-guard entry 2, so the Core pin
+exercises the emitter's "no CATEGORIES" path and asserts on the `VEVENT` set,
+which is the load-bearing claim). Asserts `Assert.Single(page.Items)`,
+exactly **one** `BEGIN:VEVENT`, the visible event's UID
+(`kw-eve-feed-visible@kumunita`) present, and the other four UIDs absent.
+
+**The four Web pins (all passing, exact design-doc names):**
+
+- `CalendarFeed_Route_Exists_Is_Authorize_And_Returns_Text_Calendar` — route
+  string `/events.ics` + class `[Authorize]` + (with `ListUpcomingAsync`
+  stubbed to one `SampleEvent`) a `200` `FileResult` with `ContentType ==
+  "text/calendar; charset=utf-8"`.
+- `CalendarFeed_Content_Disposition_Filename_Is_Kumunita_Events_Ics` — the
+  serve-shape pin: `Content-Disposition == "attachment;
+  filename=\"kumunita-events.ics\""`.
+- `Ics_Routes_Set_Cache_Control_No_Store` — **extended** (single shared name,
+  per the design-doc pin list) with the lane-2 block: stub `ListUpcomingAsync`
+  → one `SampleEvent`, call `CalendarFeed()`, assert `Cache-Control: no-store`
+  + `X-Content-Type-Options: nosniff` (lane-1 block unchanged).
+- `Ics_Routes_Anonymous_Return_Sign_In_Challenge` — **extended** with the
+  lane-2 block: `CalendarFeed` carries **no** `[AllowAnonymous]` opt-out, so
+  the framework's standard sign-in challenge applies (F3). Lane-1 block
+  unchanged.
+
+The route-map pin `RouteMap_MatchesDocumentedSurface` was extended with
+`Assert.Equal("/events.ics", Route("CalendarFeed"))` (U02's comment anticipated
+the line; an extension of an existing test, not a new pinned test).
+
+**Deviation:** none. No drift pause — the design doc §routes/§Seams, the
+frozen `ListUpcomingAsync` seam, and the lane-1 serve idiom all matched the
+pins. The only judgment call was the Core pin passing `null` for
+`categoriesByEventId` (drift-guard entry 2 keeps CATEGORIES in the Web layer;
+the pin asserts the `VEVENT`-set composition, so the emitter's no-CATEGORIES
+path is the faithful choice). One `xUnit2018` analyzer note on
+`Assert.IsType<FileResult>` (abstract base) was resolved to
+`Assert.IsAssignableFrom<FileResult>` before the green run.
+
+**Files touched (the 4 deliverables only):**
+`src/Kumunita.Web/Controllers/EventController.cs` ·
+`tests/Kumunita.Core.Tests/IcsFeedTests.cs` ·
+`tests/Kumunita.Web.Tests/EventControllerTests.cs` · this handoff note.
+
+**Open items for U05:** U04 registers the two `kw-l` keys × 4 langs + the 3
+view links + the parity pin; U05 flips the docs (M12→Done, M13→Next) +
+`MilestonesTests` re-pin + records the gate run in §gate.

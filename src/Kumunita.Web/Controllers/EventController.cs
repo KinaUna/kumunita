@@ -872,6 +872,74 @@ public sealed class EventController : Controller
         return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
     }
 
+    /// <summary>
+    /// <c>GET /events.ics</c> — the M12 subscription feed (the D3
+    /// lane-2 contract, <c>docs/design/m12-ical-design.md</c> §routes,
+    /// locked): the frozen <see cref="IEventService.ListUpcomingAsync"/>
+    /// (<c>componentId = null</c>, page 0 — C-M12·1: **exactly** the feed's
+    /// visible upcoming set, the candidate filter + the
+    /// <c>CanSeeAsync(Read)</c> gate all inside it) renders through the
+    /// pure <see cref="IcsWriter"/> over the already-authorized rows.
+    /// <para>
+    /// **Always <c>200</c>** (the feed is a valid <c>VCALENDAR</c> — an
+    /// empty visible set is a valid empty calendar, C-M12·4; the seam
+    /// filters rather than throws for an individual denial, so there is
+    /// no 404/403 on this lane). **Anonymous ⇒ the standard sign-in
+    /// challenge** (the class-level <c>[Authorize]</c> default — F3).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, §routes — the same ADR 0034 / 0108 idiom as
+    /// the lane-1 sibling):** <c>Content-Type: text/calendar;
+    /// charset=utf-8</c> + <c>Content-Disposition: attachment;
+    /// filename="kumunita-events.ics"</c> + <c>Cache-Control: no-store</c>
+    /// + <c>X-Content-Type-Options: nosniff</c>.
+    /// </para>
+    /// </summary>
+    [HttpGet("/events.ics")]
+    public async Task<IActionResult> CalendarFeed()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        // C-M12·1 — the feed seam, called exactly as the in-app feed calls it:
+        // componentId null (no filter), page 0 (the service clamps to 1).
+        var page = await this.events.ListUpcomingAsync(null, actorId, 0, HttpContext.RequestAborted);
+        var items = page.Items;
+
+        // §field-map — resolve CATEGORIES for the caller before the pure
+        // emitter (a read, not a decision — C-TG·8; a dangling TagId is
+        // dropped, the C-TG·1 "renders as nothing" pin; stable Ordinal
+        // order). A null <see cref="ITagService"/> (a test-construction
+        // site) ⇒ no CATEGORIES on any VEVENT (the PostsController no-op
+        // idiom, the lane-1 sibling's shape).
+        Dictionary<string, IReadOnlyList<string>>? categories = null;
+        if (tags is not null && items.Any(e => e.TagIds.Count > 0))
+        {
+            var readable = await tags.ListForActorAsync(actorId);
+            var readableById = readable.ToDictionary(t => t.Tag.Id, StringComparer.Ordinal);
+            categories = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            foreach (var e in items)
+            {
+                var names = e.TagIds
+                    .Where(readableById.ContainsKey)
+                    .Select(tid => readableById[tid].DisplayedName)
+                    .OrderBy(n => n, StringComparer.Ordinal)
+                    .ToList();
+                if (names.Count > 0)
+                    categories[e.Id] = names;
+            }
+        }
+
+        var icsText = IcsWriter.Build(items, DateTimeOffset.UtcNow, categories);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom,
+        // the lane-2 filename.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-events.ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
+    }
+
     // ── Write lanes ────────────────────────────────────────────────────────────
 
     /// <summary>

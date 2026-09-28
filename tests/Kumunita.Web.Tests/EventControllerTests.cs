@@ -84,9 +84,10 @@ public class EventControllerTests
 
         Assert.Equal("/events", Route("Index"));
         Assert.Equal("/events/{id}", Route("Detail"));
-        // M12 (ADR 0112) — the per-event iCal file lane (lane 1; U03 adds
-        // the /events.ics feed sibling).
+        // M12 (ADR 0112) — the per-event iCal file lane (lane 1) + the
+        // /events.ics subscription feed (lane 2, U03).
         Assert.Equal("/events/{id}.ics", Route("EventIcs"));
+        Assert.Equal("/events.ics", Route("CalendarFeed"));
         Assert.Equal("/events/new", Route("CreateGet"));
         Assert.Equal("/events/new", Route("CreatePost"));
         Assert.Equal("/events/{id}/edit", Route("EditGet"));
@@ -1915,13 +1916,13 @@ public class EventControllerTests
     /// <c>Cache-Control: no-store</c> (the content is per-caller +
     /// re-authorized every fetch — never cached by a proxy or the PWA service
     /// worker, C-M12·6) + <c>X-Content-Type-Options: nosniff</c> (the
-    /// <c>ServeFile</c> idiom). This pin covers **lane 1**
-    /// (<c>/{id}.ics</c>); **U03 extends it to the <c>/events.ics</c> feed
-    /// lane** (<c>CalendarFeed</c>) once that route lands.
+    /// <c>ServeFile</c> idiom). Lane 1 (<c>/{id}.ics</c>) and lane 2
+    /// (<c>/events.ics</c>, <c>CalendarFeed</c>) are both covered here.
     /// </summary>
     [Fact]
     public async Task Ics_Routes_Set_Cache_Control_No_Store()
     {
+        // Lane 1 — the per-event file.
         const string id = "ev-ics-cache";
         var events = Substitute.For<IEventService>();
         events.GetAsync(id, Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -1933,6 +1934,20 @@ public class EventControllerTests
         var headers = controller.HttpContext.Response.Headers;
         Assert.Equal("no-store", headers["Cache-Control"]);
         Assert.Equal("nosniff", headers["X-Content-Type-Options"]);
+
+        // Lane 2 — the /events.ics feed (U03). The seam returns one visible
+        // event; the pin is the serve-shape headers, not the VEVENT set (the
+        // Core composition pin owns that).
+        var feedEvents = Substitute.For<IEventService>();
+        feedEvents.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-cache", authorId: "subj-author-001") }, false));
+        var feedController = Build(feedEvents, subjectId: "subj-resident-001");
+
+        await feedController.CalendarFeed();
+
+        var feedHeaders = feedController.HttpContext.Response.Headers;
+        Assert.Equal("no-store", feedHeaders["Cache-Control"]);
+        Assert.Equal("nosniff", feedHeaders["X-Content-Type-Options"]);
     }
 
     /// <summary>
@@ -1976,9 +1991,9 @@ public class EventControllerTests
     /// gets the **standard sign-in challenge** — the unit-level shape is that
     /// the action sits under the class-level <c>[Authorize]</c> and carries
     /// no <c>[AllowAnonymous]</c> opt-out (the challenge is then MVC's
-    /// default for the route — the "no anonymous iCal surface" posture). This
-    /// pin covers **lane 1** (<c>EventIcs</c>); **U03 extends it to
-    /// <c>CalendarFeed</c>** once that route lands.
+    /// default for the route — the "no anonymous iCal surface" posture). Both
+    /// lanes are covered: lane 1 (<c>EventIcs</c>) and lane 2
+    /// (<c>CalendarFeed</c>).
     /// </summary>
     [Fact]
     public void Ics_Routes_Anonymous_Return_Sign_In_Challenge()
@@ -1991,6 +2006,61 @@ public class EventControllerTests
         // challenge (the [Authorize] default — F3).
         var action = typeof(EventController).GetMethod(nameof(EventController.EventIcs))!;
         Assert.Null(action.GetCustomAttribute<AllowAnonymousAttribute>());
+
+        // … and the lane-2 feed action does not opt out either (U03).
+        var feed = typeof(EventController).GetMethod(nameof(EventController.CalendarFeed))!;
+        Assert.Null(feed.GetCustomAttribute<AllowAnonymousAttribute>());
+    }
+
+    /// <summary>
+    /// M12 lane 2 (U03, the D3 route pin): the <c>/events.ics</c> feed action
+    /// exists, sits under the class-level <c>[Authorize]</c>, and — when the
+    /// frozen feed seam returns a page — returns a <see cref="FileResult"/>
+    /// carrying <c>text/calendar; charset=utf-8</c> (the serve shape, the
+    /// design doc §routes). The VEVENT-set composition is the Core
+    /// composition pin's job; this pin is the route + auth + Content-Type.
+    /// </summary>
+    [Fact]
+    public async Task CalendarFeed_Route_Exists_Is_Authorize_And_Returns_Text_Calendar()
+    {
+        // The route + auth shape.
+        var method = typeof(EventController).GetMethod(nameof(EventController.CalendarFeed))!;
+        var route = method.GetCustomAttribute<HttpGetAttribute>()!.Template;
+        Assert.Equal("/events.ics", route);
+        Assert.NotNull(typeof(EventController).GetCustomAttribute<AuthorizeAttribute>());
+
+        // The serve Content-Type (the File(...) second arg).
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-route", authorId: "subj-author-001") }, false));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        var result = await controller.CalendarFeed();
+
+        var file = Assert.IsAssignableFrom<FileResult>(result);
+        Assert.Equal("text/calendar; charset=utf-8", file.ContentType);
+    }
+
+    /// <summary>
+    /// M12 lane 2 (U03, the D3 serve-shape pin): the feed response carries
+    /// <c>Content-Disposition: attachment; filename="kumunita-events.ics"</c>
+    /// — the ADR 0034 / 0108 serve idiom with the lane-2 filename
+    /// (<c>kumunita-events.ics</c>, not the per-event
+    /// <c>kumunita-event-{id}.ics</c>).
+    /// </summary>
+    [Fact]
+    public async Task CalendarFeed_Content_Disposition_Filename_Is_Kumunita_Events_Ics()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new EventPage(new List<Event> { SampleEvent("feed-filename", authorId: "subj-author-001") }, false));
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        await controller.CalendarFeed();
+
+        Assert.Equal(
+            "attachment; filename=\"kumunita-events.ics\"",
+            controller.HttpContext.Response.Headers["Content-Disposition"]);
     }
 
     // ── Harness ────────────────────────────────────────────────────────────────
