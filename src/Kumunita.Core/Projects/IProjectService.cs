@@ -67,6 +67,32 @@ public interface IProjectService
 Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
+    /// The **reverse read seam** of the M14 interlock (ADR 0115 D2) — the
+    /// to-dos **linked to this event**: the <see cref="ListTodosAsync"/> shape
+    /// filtered to one event (the <see cref="ListBoardsForTodoAsync"/>
+    /// "list X for a Y" reverse-read precedent). The candidate set is
+    /// <c>!IsDeleted</c> with <see cref="TodoItem.EventId"/> equal to
+    /// <paramref name="eventId"/> — **a filter, never a gate** (C-M14·1: the
+    /// <c>EventId</c> narrows the candidate set; it never changes the audience
+    /// decision — a to-do is visible iff it passes its **own**
+    /// <c>CanSeeAsync(Read)</c>). The survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6 / C3) over the **existing**
+    /// <see cref="TodoItemToAuditableResource"/> (C-M14·4 — no new adapter, no
+    /// new <c>AccessAction</c> / <c>AccessVia</c> / <c>Decide()</c> branch);
+    /// ordered by <c>Created</c> descending; paged with
+    /// <c>HasMore = candidates.Count == PageSize</c> (ADR 0090 D1/D3).
+    /// **One aggregate** <c>AccessAudit</c> row (<c>TargetKind = "todo"</c>,
+    /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape; a 0-
+    /// candidate page reports <c>HasMore: false</c> and emits **no** decision
+    /// row (C-M7·5). The seam returns **only to-dos the actor may read** — an
+    /// event with zero readable linked to-dos returns an **empty page**, never
+    /// a 404/403 (the event's own detail page decides its own visibility — this
+    /// lane is called only from a page that already passed the event's
+    /// <c>Read</c> decision).
+    /// </summary>
+    Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
+
+    /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
     /// <c>ParentId == todoItemId</c>, ordered by <c>Created</c> ascending). One
     /// <c>CanAsync(Read)</c> over the to-do; <see cref="KeyNotFoundException"/>

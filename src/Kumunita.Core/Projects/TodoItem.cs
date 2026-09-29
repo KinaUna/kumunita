@@ -29,6 +29,7 @@ public sealed class TodoItem
 
     public string? ComponentId { get; set; }                   // a feed filter, never a gate (C-M3·2 — the Post.ComponentId shape)
     public string? ProjectId { get; set; }                     // a feed filter, never a gate (C-M3·2) — the Project association (ADR 0086 D4)
+    public string? EventId { get; set; }                       // a feed filter / association, NEVER a gate (C-M14·1) — the Event association (ADR 0115, the ProjectId shape, ADR 0086 D4)
     public string AuthorId { get; set; } = string.Empty;       // the standing owner (C-M5·6)
     public string? AssigneeId { get; set; }                    // a SubjectId — display + standing, NEVER a gate (C-M5·3 / C-M5·6)
     public string? Status { get; set; }                         // nullable string state label; `null` = no status — NOT an enum (C-M5·4)

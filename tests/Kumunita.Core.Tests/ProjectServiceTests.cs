@@ -3273,6 +3273,156 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(cleared.DueAt);
     }
 
+    // ── M14 U01 — ListTodosForEventAsync (ADR 0115 D2, the 4 pinned tests) ──
+
+    /// <summary>
+    /// **U01 pin 1** (ADR 0115 §pinned tests): the **empty-candidate early
+    /// return** — an event id with no linked to-dos (and linked to-dos for a
+    /// *different* event do not count) returns an empty page,
+    /// <c>HasMore: false</c>, and — because it runs **before** any decision
+    /// (C-M7·5) — emits **no** <see cref="AccessAudit"/> decision row.
+    /// </summary>
+    [Fact]
+    public async Task ListTodosForEventAsync_ReturnsEmptyPage_WhenNoTodosLinkedToTheEvent()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-m14-u01-p1-author";
+
+        // A to-do linked to a *different* event + one unlinked: neither is a
+        // candidate for "m14-eve-p1" (the `EventId ==` filter, C-M14·1).
+        await Plant(store, new TodoItem
+        {
+            Id = "p1-todo-other", AuthorId = author, Title = "Linked to a different event",
+            EventId = "m14-eve-p1-other",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "p1-todo-unlinked", AuthorId = author, Title = "Unlinked to-do",
+            EventId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var page = await svc.ListTodosForEventAsync("m14-eve-p1", author, page: 1);
+
+        Assert.Empty(page.Items);
+        Assert.False(page.HasMore);
+
+        // C-M7·5 — the 0-candidate early return runs before any decision: no
+        // `TargetKind = "todo"` audit rows exist at all for this fresh db.
+        Assert.Empty(await TodoAuditRows(store, "m14-eve-p1-other"));
+        Assert.Empty(await TodoAuditRows(store, "p1-todo-unlinked"));
+    }
+
+    /// <summary>
+    /// **U01 pin 2** (ADR 0115 §pinned tests): the <c>CanSeeAsync(Read)</c>
+    /// filter **drops the denied to-do** (C-M14·1/4) — of two to-dos linked to
+    /// the same event, the public one is returned and the audience-restricted
+    /// one (the actor is neither its author nor in its audience) is excluded,
+    /// not just hidden in the view; the event link grants it nothing (the
+    /// <c>EventId</c> is never a gate).
+    /// </summary>
+    [Fact]
+    public async Task ListTodosForEventAsync_DropsTodosTheActorCannotRead()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-m14-u01-p2-author";
+        const string grantee = "u-m14-u01-p2-grantee";
+        const string actor = "u-m14-u01-p2-actor";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "p2-todo-public", AuthorId = author, Title = "Public linked to-do",
+            EventId = "m14-eve-p2",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null, // public — the actor may read it
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "p2-todo-restricted", AuthorId = author, Title = "Audience-restricted linked to-do",
+            EventId = "m14-eve-p2",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee), // the actor is neither author nor grantee
+        });
+
+        var page = await svc.ListTodosForEventAsync("m14-eve-p2", actor, page: 1);
+
+        Assert.Contains("p2-todo-public", page.Items.Select(t => t.Id));
+        Assert.DoesNotContain("p2-todo-restricted", page.Items.Select(t => t.Id));
+    }
+
+    /// <summary>
+    /// **U01 pin 3** (ADR 0115 §pinned tests): the <c>EventId ==</c>
+    /// candidate filter (C-M14·1) — a to-do linked to a *different* event is
+    /// **excluded** from this event's page: of two public to-dos, one linked to
+    /// <c>m14-eve-p3</c> and one to <c>m14-eve-p3b</c>, reading
+    /// <c>m14-eve-p3</c> returns only the former.
+    /// </summary>
+    [Fact]
+    public async Task ListTodosForEventAsync_ExcludesTodosLinkedToADifferentEvent()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-m14-u01-p3-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "p3-todo-a", AuthorId = author, Title = "Linked to event A",
+            EventId = "m14-eve-p3",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "p3-todo-b", AuthorId = author, Title = "Linked to event B",
+            EventId = "m14-eve-p3b",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var page = await svc.ListTodosForEventAsync("m14-eve-p3", author, page: 1);
+
+        Assert.Contains("p3-todo-a", page.Items.Select(t => t.Id));
+        Assert.DoesNotContain("p3-todo-b", page.Items.Select(t => t.Id));
+        Assert.False(page.HasMore);
+    }
+
+    /// <summary>
+    /// **U01 pin 4** (ADR 0115 §pinned tests): the <c>HasMore</c>
+    /// page-boundary pin (C-M7·4 / ADR 0090 D1) — with **31** to-dos linked to
+    /// the event, page 1 takes the 30 most recent (the page is *full*:
+    /// <c>candidates.Count == PageSize</c>) and the seam reports
+    /// <c>HasMore: true</c> as its sole paging signal.
+    /// </summary>
+    [Fact]
+    public async Task ListTodosForEventAsync_HasMoreIsTrue_WhenThePageFills()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-m14-u01-p4-author";
+        const string eventId = "m14-eve-p4";
+
+        for (var i = 0; i < 31; i++)
+        {
+            await Plant(store, new TodoItem
+            {
+                Id = $"p4-todo-{i}", AuthorId = author, Title = $"Linked to-do {i}",
+                EventId = eventId,
+                Created = new DateTimeOffset(2026, 1, 1, 9, 0, i, TimeSpan.Zero),
+                Audience = null,
+            });
+        }
+
+        var page = await svc.ListTodosForEventAsync(eventId, author, page: 1);
+
+        Assert.Equal(30, page.Items.Count);
+        Assert.True(page.HasMore);
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch

@@ -142,3 +142,82 @@ U06:0-new / U07:3). The only naming divergence (the register's `todoId`
 vs the sibling's `todoItemId`) is resolved by **drift entry 3** in favor
 of the live signature. The D6 RRULE→M18 supersession and the ADR-0112
 `VTODO`-deferral supersession are recorded in ADR 0115 Consequences.
+
+## U01 — `EventId` field + `(EventId)` index + `ListTodosForEventAsync`
+
+**Status:** done, build green, **993 / 993 Core tests pass** (0 errors,
+0 skipped — includes the 4 U01 pins below, discovered + executed).
+Implemented **only U01**: the data seam of the M14 interlock, additive
+only (C-M14·7); no `IEventService` reference anywhere in `Projects`
+(U01 stays in `Kumunita.Core.Projects`); the frozen `IEventService`
+surface and every existing `IProjectService` lane untouched; **no**
+`RRULE` / recurrence (C-M14·6 / D6); **no** new `AccessAction` /
+`AccessVia` / `Decide()` branch / adapter (C-M14·4 — reuses the frozen
+`CanSeeAsync(Read)` pass over the existing
+`TodoItemToAuditableResource`).
+
+**(a) The `EventId?` field + doc-comment** —
+`src/Kumunita.Core/Projects/TodoItem.cs`, one additive line directly
+beside `ProjectId` (exactly the design doc §D1 locked text, comment
+included):
+
+```csharp
+public string? EventId { get; set; }   // a feed filter / association, NEVER a gate (C-M14·1) — the Event association (ADR 0115, the ProjectId shape, ADR 0086 D4)
+```
+
+Not added to `CreateTodoRequest` / `UpdateTodoRequest` (D3 — the
+`ProjectId` precedent: association is a dedicated lane, not the main
+form).
+
+**(b) The `(EventId)` index** — `src/Kumunita.Core/M5DocTypes.cs`, on
+the `TodoItem` block, **unnamed form** (the file's own note: Marten
+`ComputedIndex` exposes no `Name`, so single-field indexes use the
+auto-derived name — same as the `ProjectId` / `BlockedByTodoId`
+precedents beside it), written exactly as the design doc §D1 locked
+comment:
+
+```csharp
+.Index(t => t.EventId)
+```
+
+**(c) `ListTodosForEventAsync` signature + candidate-filter line** —
+`src/Kumunita.Core/Projects/IProjectService.cs` (declaration, after
+`ListTodosAsync`, with the full §D2 doc-comment), and
+`src/Kumunita.Core/Projects/ProjectService.cs` (implementation, after
+`ListTodosAsync`):
+
+```csharp
+Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default);
+```
+
+Candidate-filter line, verbatim from the implementation:
+`q.Where(t => !t.IsDeleted && t.EventId == eventId)` — **a filter, never
+a gate** (C-M14·1); survivors `CanSeeAsync(Read)`-filtered over the
+existing `TodoItemToAuditableResource` (one shared pass, C6); `Created`
+descending; `HasMore = candidates.Count == PageSize` (ADR 0090 D1/D3);
+0-candidate early return before any decision (no `AccessAudit` row,
+C-M7·5); 1 aggregate `AccessAudit` row `TargetKind = "todo"` on a
+non-empty page (C-M3·3, the `ListTodosAsync` shape, copied verbatim);
+returns an empty page, never a 404/403.
+
+**(d) The 4 pin names + pass/red** (all in
+`tests/Kumunita.Core.Tests/ProjectServiceTests.cs`, the existing
+`PostgresFixture` / `BootStoreAsync` / `Services` / `Plant` shape —
+nothing new introduced to the harness):
+
+1. `ListTodosForEventAsync_ReturnsEmptyPage_WhenNoTodosLinkedToTheEvent`
+   — green
+2. `ListTodosForEventAsync_DropsTodosTheActorCannotRead` — green
+3. `ListTodosForEventAsync_ExcludesTodosLinkedToADifferentEvent` — green
+4. `ListTodosForEventAsync_HasMoreIsTrue_WhenThePageFills` — green
+
+(4 / 4 green; whole suite: `Kumunita.Core.Tests  Total: 993, Errors: 0,
+Failed: 0, Skipped: 0`.)
+
+**(e) Compile warnings** — none; `dotnet build Kumunita.slnx -c Debug`
+succeeded clean (all 4 projects). **Drift vs. the register:** none
+recorded — U01's seam, field, index, and pin names all match the design
+doc verbatim; drift entry 3 (the `todoItemId` parameter name, a U02
+concern) is honored — untouched, and the sibling `SetTodoProjectAsync`
+shape is intact. **Docker cleanup note:** none needed — the run
+completed normally (no orphaned containers observed).

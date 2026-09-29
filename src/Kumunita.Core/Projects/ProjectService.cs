@@ -155,6 +155,63 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// The **reverse read seam** of the M14 interlock (ADR 0115 D2) — the
+    /// <see cref="ListTodosAsync"/> shape filtered to one event (the
+    /// <see cref="ListBoardsForTodoAsync"/> "list X for a Y" reverse-read
+    /// precedent): candidates are the non-deleted to-dos with
+    /// <see cref="TodoItem.EventId"/> == <paramref name="eventId"/> —
+    /// **a filter, never a gate** (C-M14·1 — the <c>EventId</c> narrows the
+    /// candidate set, it never changes the audience decision); the survivors
+    /// are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass;
+    /// C3, the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "todo"</c>) over the **existing**
+    /// <see cref="TodoItemToAuditableResource"/> (C-M14·4 — no new adapter);
+    /// ordered by <see cref="TodoItem.Created"/> descending; paged with
+    /// <c>HasMore = candidates.Count == PageSize</c> (ADR 0090 D1/D3). A 0-
+    /// candidate page reports <c>HasMore: false</c> and runs **before** any
+    /// decision (no audit row — C-M7·5). The lane returns **only** to-dos the
+    /// actor may read — never a 404/403 (the event's own detail page decides
+    /// its own visibility — the lane is called only from a page that already
+    /// passed the event's <c>Read</c> decision).
+    /// </summary>
+    public async Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        // The M14 event link: a feed filter, never a gate (C-M14·1) — the
+        // to-do's own Audience decision stays the access boundary (C-M5·3),
+        // exactly the `projectId` filter discipline above.
+        var candidates = await session.Query<TodoItem>()
+            .Where(t => !t.IsDeleted && t.EventId == eventId)
+            .OrderByDescending(t => t.Created)
+            .Skip((page - 1) * PageSize).Take(PageSize)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
+        if (candidates.Count == 0)
+            return new TodoPage(Array.Empty<TodoItem>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "todo"), from that single call (the ListTodosAsync
+        // shape). Standalone form (no IDocumentSession overload): this is a
+        // plain read with no in-flight caller transaction (the M2 ListAsync
+        // precedent).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(t => new TodoItemToAuditableResource(t)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return new TodoPage(candidates.Where(t => visibleIds.Contains(t.Id)).ToList(), hasMore);
+    }
+
+    /// <summary>
     /// One to-do + its visible subtasks (design doc §2.3) — a single
     /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
     /// decision over the <see cref="TodoItemToAuditableResource"/> (U03) (C6,

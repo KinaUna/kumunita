@@ -64,6 +64,11 @@ public static class M5DocTypes
                // the `ProjectId` feed-filter lookup (the PL `projectId`
                // filter — a feed filter, never a gate, ADR 0086 D4 / C-PL·3)
                .Index(t => t.ProjectId)
+               // the `EventId` feed-filter lookup (the M14 interlock — a feed filter,
+               // never a gate, ADR 0115 D1 / C-M14·1 — the ADR 0086 `ProjectId` / ADR
+               // 0087 `BlockedByTodoId` precedent; unnamed: the auto-derived name stays
+               // under Postgres' 64-char NAMEDATALEN cap, the file's own note)
+               .Index(t => t.EventId)
                // the TBD "waiting on" lookup (ADR 0087 D1 — additive on
                // M5DocTypes, zero migration for existing rows; the ADR 0004
                // §B.1 delta-detect shape; unnamed: the auto-derived name stays
