@@ -165,6 +165,14 @@ var marten = builder.Services.AddMarten(opts =>
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
     M9DocTypes.Configure(opts);
+
+    // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
+    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
+    // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
+    // the conventional string Id, so no non-default convention or
+    // business-key index is pinned). Without this call the UsageEvent doc
+    // is invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent).
+    UsageDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

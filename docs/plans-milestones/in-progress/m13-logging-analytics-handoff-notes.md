@@ -301,3 +301,205 @@ unchanged, only the concrete type names moved):**
 `app-YYYYMMDD.log` under the configured directory, a file older than
 `RetentionDays` is deleted at boot, and the `docker logs` console sink is
 unchanged (F5).
+
+---
+
+## U02 — Usage context (2026-09-29)
+
+**Role.** D1 + D2 rendered as code — the `Kumunita.Core.Usage` bounded
+context (`UsageEvent` POCO + the `UsageDocTypes` registration surface +
+the pure `UsageCapturePolicy.Decide` + the pure `SurfaceKey.Map`
+closed-list mapper), the `Program.cs` `UsageDocTypes.Configure(opts);`
+wiring, and the 6 D1/D2 pins. BCL-only, zero new NuGet dependency.
+Touched only the U02 deliverables (the `Usage/` folder, the two test
+files, `Program.cs`). Did **not** touch the `Kumunita.Core.Logging`
+sink (U01, done), the capture middleware, the `IUsageAnalyticsService`
+aggregation seam, the admin surface, or the retention tick (U03–U05).
+
+**Deliverables landed (U02's scope):**
+
+- `src/Kumunita.Core/Usage/UsageEvent.cs`
+- `src/Kumunita.Core/Usage/UsageDocTypes.cs`
+- `src/Kumunita.Core/Usage/UsageCapturePolicy.cs` (the
+  `UsageCaptureInput` / `UsageCaptureDecision` POCOs + the
+  `UsageCapturePolicy.Decide` static, one file — the design doc
+  §capture shape)
+- `src/Kumunita.Core/Usage/SurfaceKey.cs`
+- `tests/Kumunita.Core.Tests/UsageCapturePolicyTests.cs` (4 pins)
+- `tests/Kumunita.Core.Tests/SurfaceKeyTests.cs` (2 pins)
+- `src/Kumunita.Web/Program.cs` (one `UsageDocTypes.Configure(opts);`
+  line)
+
+**(a) The `UsageEvent` fields as written:**
+
+- `Id` — `string`, `string.Empty` default (the M3 "string Id"
+  convention — the conventional document identity; no non-default
+  convention or business-key index pinned)
+- `At` — `DateTimeOffset` (the capture instant, UTC — the middleware's
+  request instant, set by the U03 capture, not the policy)
+- `ActorId` — `string`, `string.Empty` default (the
+  `ClaimTypes.Subject` value, `string.Empty` when anonymous — C-M13·2)
+- `RouteTemplate` — `string`, `string.Empty` default (the **route
+  template**, e.g. `GET /posts/{id}`, never a concrete path — C-M13·4)
+
+**No** status code, **no** email, **no** request body, **no**
+user-agent, **no** IP (C-M13·2 — the status code would leak the access
+decision, which the `AccessAudit` lane already owns). Pinned by the
+`UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip` reflection pin.
+
+**(b) The `UsageCapturePolicy` surface:**
+
+- `UsageCaptureInput` (pure input POCO, `init`-only):
+  `HasEndpoint` (`bool`), `IsStaticFile` (`bool`), `RouteTemplate`
+  (`string?`), `ActorId` (`string`, `string.Empty` default) — the small
+  projection the U03 middleware builds from the `HttpContext` (so the
+  policy is testable without an `HttpContext`, D1).
+- `UsageCaptureDecision` (pure output POCO, `init`-only):
+  `Record` (`bool`), `RouteTemplate` (`string`, `string.Empty`
+  default), `ActorId` (`string`, `string.Empty` default).
+- `UsageCapturePolicy.Decide(UsageCaptureInput) → UsageCaptureDecision`
+  — pure static, `ArgumentNullException.ThrowIfNull(input)`. The two
+  skip rules (C-M13·4): `!HasEndpoint` ⇒ `Record = false` (a true 404,
+  a malformed path); `IsStaticFile` ⇒ `Record = false` (a static file is
+  noise, not a usage surface). Otherwise `Record = true` with
+  `RouteTemplate = input.RouteTemplate ?? string.Empty` + `ActorId =
+  input.ActorId` (the `ActorId`-empty-for-anonymous rule, C-M13·2).
+  Mirrors the `EventReminderService` "Wolverine-free static class" house
+  shape (the Web middleware is the thin host adapter).
+
+**(c) The `SurfaceKey` closed list:** **26** top-level segments (each
+mapping to itself — `posts` / `events` / `groups` / `admin` /
+`messages` / `todos` / `boards` / `projects` / `search` / `about` /
+`terms` / `help` / `privacy` / `conduct` / `language` / `settings` /
+`account` / `my` / `pages` / `community` / `attachments` /
+`content-image` / `notifications` / `calendar` / `whats-new` /
+`health`) + the **`"other"`** fallback (one bucket, never a crash — an
+unknown segment, a bare `/`, or a `null` input). `SurfaceKey.Map(string?
+routeTemplate) → string` — pure static BCL-only string-map, strips the
+`METHOD ` prefix, takes the first non-empty path segment, lower-cases,
+and looks it up. **Byte-for-byte the design doc §surface-key sketch**
+(the private field is named `Pinned` rather than `Map` to avoid a
+CS0102 field/method name collision with the `Map` method — the D2 map
+contents are unchanged). U04's `UsageAnalyticsService` `GroupBy` call
+copies this same map (the D3 §aggregation `SurfaceRanking`
+`.GroupBy(e => SurfaceKey.Map(e.RouteTemplate))` call).
+
+**(d) The wiring line numbers:**
+
+- `src/Kumunita.Web/Program.cs` **line 175** — the
+  `UsageDocTypes.Configure(opts);` call, immediately after the
+  `M9DocTypes.Configure(opts);` call (the last existing `*DocTypes`
+  line, the house per-milestone "comment + one-line `Configure(opts)`"
+  pattern). Inside the `builder.Services.AddMarten(opts => { … })`
+  lambda (the single `*DocTypes.Configure(opts)` registration surface in
+  this repo — the dev-only `ApplyAllDatabaseChangesOnStartup` loop and
+  the `SchemaBootstrap` versioned boot both pick the surface up
+  automatically through the host-registered `StoreOptions`).
+- `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — **no line added**
+  (see the drift note below).
+
+**(e) The 6 pin test names + pass/red:**
+
+- `Policy_Skips_No_Endpoint` — **pass**
+- `Policy_Skips_StaticFile_Endpoint` — **pass**
+- `Policy_Records_Template_Not_Concrete_Path` — **pass**
+- `Policy_Anonymous_Record_Has_Empty_ActorId` — **pass**
+- `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` — **pass**
+- `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip` — **pass**
+
+Run via `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.UsageCapturePolicyTests"`
+→ `Total: 4, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`, and
+`dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+-class "Kumunita.Core.Tests.SurfaceKeyTests"` → `Total: 2, Errors: 0,
+Failed: 0, Skipped: 0, Not Run: 0`. (The repo's `dotnet test` discovery
+path is broken — see AGENTS.md; the in-process xunit.v3 runner is the
+reliable path.)
+
+**(f) Compile warnings:** **0** warnings, 0 errors on
+`dotnet build Kumunita.slnx -c Debug`.
+
+**Drift found (the design sketch named a `SchemaBootstrap.cs` line that
+has no `StoreOptions` surface; the source is the authority):**
+
+1. **The `*DocTypes.Configure(opts)` block lives only in `Program.cs`.**
+   The design doc §capture + the U02 plan both name "one line in
+   `SchemaBootstrap.cs`" for the `UsageDocTypes.Configure(opts);` wiring,
+   and §Context item 7 names "`SchemaBootstrap.cs` — the one-line
+   `UsageDocTypes.Configure(opts);` additions U02 makes." **Verified
+   against the live tree:** `SchemaBootstrap.cs` (and the whole
+   `Bootstrap/` folder) has **no** `AddMarten` / `StoreOptions` /
+   `.Configure(` / `Schema.For` surface — it resolves the already-
+   configured `IDocumentStore` from DI (`sp.GetRequiredService
+   <IDocumentStore>()`, line 36) and calls
+   `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`
+   (line 55). The single `*DocTypes.Configure(opts)` registration
+   surface in this repo is the `builder.Services.AddMarten(opts => { … })`
+   lambda in `Program.cs` (lines 90–176), where every one of the
+   `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` /
+   `TagDocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
+   `M9DocTypes` calls lives. The `SchemaBootstrap` versioned boot picks
+   the new surface up automatically through the host-registered
+   `StoreOptions` (the M4/M5/M6/M9 precedent comments all say exactly
+   this: "the SchemaBootstrap versioned boot both pick the surface up
+   automatically"). So the wiring is in `Program.cs` line 175 — the
+   `SchemaBootstrap.cs` "one line" in the design sketch is the same
+   source-vs-sketch drift U01 flagged (`LoggingBuilder` → `ILoggingBuilder`)
+   — the D1 intent (register `UsageEvent` on a parallel `*DocTypes`
+   surface) is unchanged, only the concrete file the line lands in
+   differs. Recorded here so U07's docs flip (the ADR / design-doc
+   reference to the wiring) names the line that actually ships
+   (`Program.cs:175`), not the sketch's.
+2. **The test project's implicit usings are reduced** — `System.Linq`
+   is **not** in `Kumunita.Core.Tests`'s implicit usings (the `LoggingTests`
+   U01 file explicitly adds `using System.IO;`, and `SideEffectHarnessTests`
+   / `UserInfoServiceTests` explicitly add `using System.Linq;`).
+   U02's `SurfaceKeyTests` adds `using System.Linq;` explicitly (for
+   `.Select` / `.ToHashSet`).
+3. **xunit.v3's `Assert.Equal(expected, actual, stringMessage)` does
+   not resolve to the 3-arg string-message overload** — it binds to the
+   `IEnumerable<char>` overload (the 3rd arg becomes an
+   `IEqualityComparer<char>`), a CS1503. U02's
+   `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` uses a 2-arg
+   `Assert.True(expected == actual, message)` per-iteration instead —
+   the assertion is the same (each of the 26 pinned segments maps to
+   its key, plus the `other` fallback), the message is preserved.
+4. **`PropertyInfo` has no `IsStatic` property** (that's `MethodInfo` /
+   `FieldInfo`) — the design's reflection pin sketch's
+   `.Where(p => !p.IsStatic)` does not compile. `GetProperties
+   (BindingFlags.Public | BindingFlags.Instance)` already excludes
+   statics, so U02's `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip`
+   drops the `.Where` filter and asserts the `HashSet` of the four
+   property names equals `{ Id, At, ActorId, RouteTemplate }` (count 4)
+   + the seven forbidden-name `Assert.DoesNotContain` checks
+   (`Email` / `Body` / `UserAgent` / `Ua` / `Ip` / `Status` /
+   `StatusCode`). The C-M13·2 boundary is pinned the same.
+5. **A test-fixture bug (caught by the first run, not by the design):**
+   U02's first `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` fixture
+   used `GET /search?q=test` — the `?q=test` query string makes the
+   first segment `search?q=test`, not `search`, so the verbatim
+   `SurfaceKey.Map` (the authority) correctly returned `other`. The
+   fixture was wrong (a real route template from `RoutePattern.RawText`
+   never carries a query string), not the code. U02's fixture now uses
+   `GET /search` (a clean template), and the pin passes against the
+   unmodified verbatim `SurfaceKey.Map`.
+
+**Gap left for U03.** The `Kumunita.Web.Middleware.UsageCaptureMiddleware`
+(the D1 §middleware thin host adapter — the `RequestDelegate`
+middleware that projects the `HttpContext` into the
+`UsageCaptureInput`, calls `UsageCapturePolicy.Decide`, and on a
+`Record` decision writes one `UsageEvent` via
+`IDocumentStore.LightweightSession()` in its own `try/catch` —
+C-M13·5 "a capture never fails the request"), its `Program.cs` pipeline
+position (after `UseAuthentication()` line 546 + after
+`PrivilegedStampMiddleware` line 555 + before `UseAuthorization()`
+line 557 — i.e. **between `Program.cs` lines 555 and 557 in the live
+tree after U01's `AddFileSink` wiring shifted everything — re-verify
+against the live tree before inserting**), and the 3 D1 middleware pins
+(`UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request`,
+`UsageCaptureMiddleware_Skips_True_404`,
+`UsageCaptureMiddleware_Skips_When_Store_Throws`). The `Usage` context
+surface is complete — the `UsageEvent` doc is registered on the
+`UsageDocTypes` parallel surface (the `M3DocTypes` precedent), the
+capture policy is pure and pinned, and the `SurfaceKey` closed list is
+pinned verbatim (the U04 aggregation's `GroupBy` copies this same map).
