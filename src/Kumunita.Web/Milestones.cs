@@ -57,6 +57,7 @@ public static class Milestones
         new("M16", "Inventory — check-out / check-in shared, community-owned, or private items (equipment, sports-team clothes, books, …); track where items are and, optionally, who uses them how much", StatusDone),
         new("M17", "Bookmarks — save posts, events, todos, etc. for quick personal access", StatusNext),
         new("M18", "Recurring events — repeating events over the M4 events surface", StatusPlanned),
+        new("M19", "Guest accounts — limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, etc.; admins set what a guest may access and when", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch

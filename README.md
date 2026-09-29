@@ -22,7 +22,7 @@ events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
 (`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
 design (`M10`), and portability (import/export) (`M11`), on one
 server-rendered stack over a single Postgres. M18 is planned —
-recurring events (see the "Roadmap" below).
+recurring events — and M19 — guest accounts (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
 milestone-by-milestone breakdown is in the Roadmap below.
@@ -248,6 +248,7 @@ stays trivial and the authorization rules can grow freely.
 - **M16** — Inventory: check-out / check-in shared, community-owned, or private resources (equipment, clothes for sports teams, books, etc.), track where items are, and optionally how much they are used by whom. **Done.** (ADR 0117)
 - **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **In progress.**
 - **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112).
+- **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long.
 
 ## Deferred (future, by design)
 

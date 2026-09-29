@@ -347,6 +347,11 @@
          reveals the hidden earlier releases in batches of 10 on click.
          Self-guards: no-op if the list has ≤3 entries (no button). -->
     <script type="module" src="~/js/lib/whatsnew-more.js"></script>
+    <!-- Home roadmap "show more" (both directions; see Home/Index.cshtml):
+         reveals the hidden earlier + upcoming milestones in batches of 10
+         on click. Self-guards: no-op on pages without #roadmap-list, and
+         per-side no-op where a direction has no button (≤3 items). -->
+    <script type="module" src="~/js/lib/roadmap-more.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class

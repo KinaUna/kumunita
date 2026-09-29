@@ -527,6 +527,8 @@ body.kmb-page-expanded .page-expand-close {
 /* --- Navbar ------------------------------------------------------------------ */
 .navbar {
   box-shadow: none;
+  /* Halve the bar's vertical padding (Bootstrap's default 0.5rem -> 0.25rem). */
+  --bs-navbar-padding-y: 0.25rem;
 }
 .navbar-brand {
   font-family: var(--bs-heading-font-family);
@@ -817,7 +819,7 @@ body.kmb-nav-rail-mode {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0.75rem 0;
+  padding: 0.375rem 0;
   gap: 0.25rem;
   z-index: 1030;
 }
@@ -2510,6 +2512,17 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   box-shadow: 0 1px 2px rgba(19, 32, 26, 0.05);
   transition: box-shadow 120ms ease;
   cursor: grab; /* the drag-drop channel (ADR 0069) — the card is a grab point */
+  /* The card must never grow past its lane: a long unbroken token in the
+     title / blocker chip / meta line / rendered body previously set the
+     card's min-content width, which stretched the lane and turned the
+     board's overflow-x into a horizontal scroll bar. Break the long
+     tokens, and let the card's flex row (avatar + text cell + ⋮) shrink
+     below its content width so the text cell wraps instead. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kanban-card > .d-flex > .flex-grow-1 {
+  min-width: 0;
 }
 .kanban-card:hover {
   box-shadow: 0 1px 6px rgba(19, 32, 26, 0.08);

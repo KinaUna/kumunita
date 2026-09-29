@@ -529,6 +529,8 @@ public static class KnownTranslationKeys
 
             // ── home roadmap (the plan, after the intro) ────────────────────
             ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
+            ["home.roadmap.show_more_earlier"] = "Show the {n} earlier milestones",
+            ["home.roadmap.show_more_upcoming"]  = "Show the {n} upcoming milestones",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Sign in",
@@ -2208,6 +2210,8 @@ public static class KnownTranslationKeys
 
             // ── home Roadmap (der Plan, nach der Intro) ────────────────────
             ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
+            ["home.roadmap.show_more_earlier"] = "Die {n} früheren Meilensteine anzeigen",
+            ["home.roadmap.show_more_upcoming"]  = "Die {n} kommenden Meilensteine anzeigen",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Anmelden",
@@ -3797,6 +3801,8 @@ public static class KnownTranslationKeys
 
             // ── home feuille de route (le plan, après l'intro) ─────────────
             ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
+            ["home.roadmap.show_more_earlier"] = "Afficher les {n} jalons précédents",
+            ["home.roadmap.show_more_upcoming"]  = "Afficher les {n} prochains jalons",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Se connecter",
@@ -5388,6 +5394,8 @@ public static class KnownTranslationKeys
 
             // ── home milepæler (planen, efter introen) ─────────────────────
             ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",
+            ["home.roadmap.show_more_earlier"] = "Vis de {n} tidligere milepæle",
+            ["home.roadmap.show_more_upcoming"]  = "Vis de {n} kommende milepæle",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Log ind",
