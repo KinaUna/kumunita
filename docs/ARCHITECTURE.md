@@ -104,7 +104,9 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md; PL ✓ (ADR 0086) — ProjectGoal + Project docs (additive on M5DocTypes, zero migration) + ProjectGoalToAuditableResource (TargetKind "goal") + ProjectToAuditableResource (TargetKind "project") + the IProjectService goal / project / association / delete lanes (standing creator ∪ GlobalAdmin, the ADR 0070 matrix) + the additive ProjectId? feed-filter field on TodoItem + KanbanBoard (never a gate); see design/pl-goals-projects-design.md
     │   │   ├── Notifications/      # M6 ✓ (ADR 0076) — Notification + NotificationPreference docs (the M6DocTypes surface) + NotificationService (the EmitAsync writer + the inbox / preference lanes, reusing the M1 durable-email trio, no IAuthorizationService — a personal read, not an AccessAction decision); see design/m6-notifications-design.md
     │   │   ├── Search/             # M8 ✓ (ADR 0091) — no docs, no DocTypes surface (zero schema change, ADR 0004 §B untouched) + ISearchService (SearchAsync `all` read + SearchSurfaceAsync paged single-surface read, the ADR 0090 D1/D3 HasMore shape) + SearchService (store-composing; composes only the frozen IDocumentStore / IAuthorizationService / IUserInfoService; per-surface candidate predicates copied from the canonical reads, the case-insensitive substring match over Title + Body, the truncated context window); one aggregate audit row per (query, surface, scope) decision — TargetKind "search:<surface>" (search:posts / search:events / search:pages / search:announcements), TargetId null, zero-candidate visits emit no row; see design/m8-search-design.md
-    │   │   └── Messaging/          # M9 ✓ (ADR 0105) — Conversation + Message docs (the M9DocTypes surface; a unique (ParticipantA, ParticipantB) pair index + a (ConversationId, Created) thread index) + IMessagingService / MessagingService (the toggle seams IsMessagingEnabledAsync / SetMessagingEnabledAsync over the LocaleSettings.MessagingEnabled false-floor + open / send / list / thread / mark-read); participant-by-id access — no Audience, no IAuthorizationService call, zero new AccessAction / AccessVia / IAuditableResource adapter (a non-participant, GlobalAdmin included, gets a non-leaky 404); one in-transaction AccessAudit row per write (Action/TargetKind "message" on open + send, Via Owner; "messaging.toggle" on the admin flip, Via Admin), reads + mark-read emit no row; the D6 nudge reuses the M6 lane (EmitAsync, kind message.new, idempotency key notification:message.new:{messageId}); plain-text ≤ 2000 chars, immutable in M9 (rich content / edit / delete are the follow-on lanes' entry); see design/m9-messaging-design.md
+    │   │   ├── Messaging/          # M9 ✓ (ADR 0105) — Conversation + Message docs (the M9DocTypes surface; a unique (ParticipantA, ParticipantB) pair index + a (ConversationId, Created) thread index) + IMessagingService / MessagingService (the toggle seams IsMessagingEnabledAsync / SetMessagingEnabledAsync over the LocaleSettings.MessagingEnabled false-floor + open / send / list / thread / mark-read); participant-by-id access — no Audience, no IAuthorizationService call, zero new AccessAction / AccessVia / IAuditableResource adapter (a non-participant, GlobalAdmin included, gets a non-leaky 404); one in-transaction AccessAudit row per write (Action/TargetKind "message" on open + send, Via Owner; "messaging.toggle" on the admin flip, Via Admin), reads + mark-read emit no row; the D6 nudge reuses the M6 lane (EmitAsync, kind message.new, idempotency key notification:message.new:{messageId}); plain-text ≤ 2000 chars, immutable in M9 (rich content / edit / delete are the follow-on lanes' entry); see design/m9-messaging-design.md
+    │   │   ├── Usage/              # M13 ✓ (ADR 0114) — UsageEvent doc (the UsageDocTypes surface) + the pure UsageCapturePolicy.Decide (skip no-endpoint / static-file) + the pure SurfaceKey closed-list mapper (26 top-level segments + "other") + IUsageAnalyticsService / UsageAnalyticsService (the 7/30/90-day window aggregation — Total / AuthenticatedTotal / AnonymousTotal / DistinctActors / SurfaceRanking; touches only UsageEvent, zero new authorization surface) + UsagePurgeService (the 365-day platform-constant batched delete) + UsagePurgeTick (the 1-day self-rescheduling TimeoutMessage); see design/m13-logging-analytics-design.md
+    │   │   └── Logging/            # M13 ✓ (ADR 0114) — the BCL-only file sink: FileSinkOptions POCO + LogLine (JSON-lines writer, BCL-only escaping) + RollingFileSink (BuildFileName daily rotation + Retain boot deletion) + FileLoggerProvider / FileLogger (an ILoggerProvider over a per-category TextWriter) + the AddFileSink extension (registered on builder.Logging, additive to the console sink; the sink never logs request bodies / cookies / secrets — C-M13·1/2)
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── Milestones.cs       # home-page roadmap (kept in sync with README's "Roadmap" — AGENTS.md)
@@ -153,7 +155,21 @@ included — gets a non-leaky 404) — and the write audit rows
 `TargetKind = "message"` (open / send, `Via = Owner`) and
 `TargetKind = "messaging.toggle"` (the admin flip, `Via = Admin`); reads and
 mark-read emit no row; the new-message nudge rides the M6 `Notification` lane
-(kind `message.new`). M7 (ADR 0090) shipped the shared pagination idiom
+(kind `message.new`). `Usage/` + `Logging/` (M13) are now live —
+ADR 0114 ships the BCL-only file sink (the `Logging/` surface —
+`FileLoggerProvider` / `FileLogger` / the `LogLine` JSON-lines writer / the
+`RollingFileSink` daily rotation + boot retention, additive to the console
+sink, registered on `builder.Logging`; the sink never logs request bodies,
+cookies, or secrets) and the `Usage/` bounded context — the `UsageEvent` doc
+(the `UsageDocTypes` surface) + the pure `UsageCapturePolicy` (skip no-endpoint
+/ static-file) + the pure `SurfaceKey` closed-list mapper + the
+`IUsageAnalyticsService` seam (7/30/90-day windows over `Total` /
+`AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+`SurfaceRanking`) — with the thin Web `UsageCaptureMiddleware` (a capture
+failure never fails the request) and the `/admin/analytics` GlobalAdmin surface
+(the surface-rank table + the CSV export with one `AccessAudit` row);
+**zero new authorization surface** (C-M13·6), **zero per-account rendered data**
+(C-M13·3), **zero third-party telemetry** (C-M13·1). M7 (ADR 0090) shipped the shared pagination idiom
 — the `PagedViewModel` record + the `_Pager` partial (`Views/Shared/_Pager.cshtml`) +
 the `HasMore` signal on every paged Core seam. A new list surface that needs paging adds
 the `HasMore` signal to its seam (the D1/D3 shape) and drops in the `_Pager` partial (the
@@ -170,7 +186,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, and translated UI
   strings (ADR 0005); consumed by the presentation layer, never by feature
   authorization. (Static pages live in the `Pages` context now, ADR 0039.)
-- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091), Messaging (M9 ✓ — ADR 0105).
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076), Search (M8 ✓ — ADR 0091), Messaging (M9 ✓ — ADR 0105), Usage (M13 ✓ — ADR 0114), Logging (M13 ✓ — ADR 0114, the BCL-only file sink).
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:

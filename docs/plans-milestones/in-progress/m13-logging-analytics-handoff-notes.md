@@ -888,3 +888,124 @@ other `## U<m>` drift items are resolved in-code.
 → `done/` + the handoff `## Summary` (the C-M13·7 flip is not yet done —
 M13 is still the single in-progress, which is why `MilestonesTests` is
 still green in the gate run above).
+
+---
+
+## Summary (M13 — 2026-09-29)
+
+**Role.** The milestone close (U07, record-only against code): the docs
+parity flip (C-M13·7), the `MilestonesTests` re-pin, the unit-plan archive,
+and this `## Summary`. **This is the last handoff entry the M13 note
+receives; it is written for the M14 agent** (integration of Events and
+Projects — see the `docs/plans-milestones/in-progress/` register for that
+milestone when it lands).
+
+**Docs flip (C-M13·7, this unit, one unit):**
+
+- `src/Kumunita.Web/Milestones.cs` — M13 `StatusNext` → `StatusDone`, M14
+  `StatusPlanned` → `StatusNext` (the two one-line flips).
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs` — `M13` added to
+  `Shipped_Milestones_Are_Marked_Done`; the single-in-progress test renamed
+  `M13_Is_The_Single_InProgress_Milestone_And_M14_Is_Planned` →
+  `M14_Is_The_Single_InProgress_Milestone` (the `Assert.Equal("M14", next[0].Id)`
+  pin; the trailing `StatusPlanned` foreach drops, since M14 is now the sole
+  in-progress and there is no M15). The exact-order pin
+  `Roadmap_Covers_M0_Through_M14_Plus_Named_Lanes_In_Order` (M0…M14) is
+  **unchanged**.
+- `README.md` — Status section ("M14 in progress", "M1–M13 … are done") +
+  Roadmap (M13 → **Done** with the scope sentence, M14 → **In progress**).
+- `docs/STATUS.md` — "M13 is done" line + "next is M14" (citing ADR 0114).
+- `docs/ARCHITECTURE.md` — the value-chain table is status-free (the M12
+  close precedent — no-op on that row); the M13 ship is reflected in the
+  shape-of-code sections instead: the solution tree gains the two new Core
+  contexts (`Usage/` + `Logging/`), the §2 "now live" paragraph gains the
+  M13 sentence, and the §3 feature-modules line gains `Usage` + `Logging`
+  (the M9-close precedent for a milestone that adds new contexts — M12
+  added none, which is why its ARCHITECTURE close was a no-op).
+
+**Unit-plan archive.** `m13-u00.md` … `m13-u07.md` moved to
+`docs/plans-milestones/done/` (eight files; the handoff note + the register
+stay in place, the M12/M11 house shape). `in-progress/` now holds only this
+note (until M14's register lands).
+
+**Shipped (the seven units U00–U06), against the design doc + ADR 0114:**
+
+| Unit | Goal (one-liner) | Pins landed | Drift / deviation |
+|---|---|---|---|
+| **U00** | Lock the design — `m13-logging-analytics-design.md` + ADR 0114 + the ADR README index row | — (the sign-off gate; D1–D8 + C-M13·1–7 + F1–F5 locked as proposed, no veto) | ADR 0114 confirmed free (the index ran 0001–0113) |
+| **U01** | D6 — the BCL-only file sink (`Kumunita.Core.Logging`) + `Program.cs` wiring + `appsettings.json` | 3 sink pins (`RollingFileSink_LogLine_Is_ValidJsonLines` / `_FileNaming_Is_Daily` / `_Retention_Deletes_Older_Files`) — all PASS | `LoggingBuilder` is `internal` in .NET 10 (use `ILoggingBuilder`); `ILogger.BeginScope` is the 1-arg form; the wiring is `builder.Logging.AddFileSink(...)` (not `builder.Services.Logging`); `SetLastWriteTimeUtc` takes `DateTime` — the D6 intent unchanged, only the concrete .NET 10 type names moved |
+| **U02** | D1 + D2 — the `Kumunita.Core.Usage` context (`UsageEvent` + `UsageDocTypes` + the pure `UsageCapturePolicy` + the pure `SurfaceKey`) | 6 policy/surface pins (`Policy_Skips_No_Endpoint` / `_StaticFile_Endpoint` / `_Records_Template_Not_Concrete_Path`, `Policy_Anonymous_Record_Has_Empty_ActorId`, `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set`, `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip`) — all PASS | the `*DocTypes.Configure(opts)` surface lives **only** in `Program.cs` (line 175) — `SchemaBootstrap.cs` has no `StoreOptions` surface (the design sketch's "one line in SchemaBootstrap" is source-vs-sketch drift, the D1 intent unchanged); a few xunit.v3 / BCL API reconciliations in the test pins (the `PropertyInfo.IsStatic` / 3-arg `Assert.Equal` overloads) |
+| **U03** | D1 — the thin `UsageCaptureMiddleware` host adapter + `Program.cs` pipeline position | 3 middleware pins (`UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request` / `_Skips_True_404` / `_Skips_When_Store_Throws`) — all PASS | **DRIFT GUARD (closed by U05):** .NET 10 has no `RoutePattern.RawText` (use `IRouteDiagnosticsMetadata.Route`) and no `StaticFileEndpointMetadata` (use `StaticAssetDescriptor`) — the D1 intent (skip no-endpoint + static-file, capture the template) is preserved and pinned; only the two type names follow the real .NET 10 API |
+| **U04** | D3 — the `IUsageAnalyticsService` + impl (the 7/30/90-day window aggregation) | 4 aggregation pins (`Aggregation_Window_Excludes_Older_Rows` / `_SurfaceRanking_Descending_Then_Alphabetical` / `_AuthenticatedVsAnonymous_Counts` / `_DistinctActors_Counts_Unique_NonEmpty`) — all PASS (PostgresFixture, postgres:18) | the design's `Distinct()` Linq clause runs **Linq-to-objects** over the window's row set (the `SurfaceKey.Map` call inside the `GroupBy` is a C# function the provider cannot translate, so the group-by runs client-side; the only clause sent to Postgres is the `Where(e => e.At >= cutoff)` column compare) — the contract's recorded-fallback clause, the pins assert the result not the SQL |
+| **U05** | D4 + D5 — the `AdminAnalyticsController` + `Analytics.cshtml` + `_AdminNav` tab + the `admin.analytics_*` kw-l block + the retention tick (`UsagePurgeService` / `UsagePurgeHandler` / `UsagePurgeTick`) | 3 admin-surface pins (`AdminAnalytics_Route_Exists_And_GlobalAdmin_Only` / `AdminAnalytics_Csv_Shape` / `KnownTranslationKeys_Parity_Extended_With_Analytics_Keys`) — all PASS | none — the U03 DRIFT GUARD follow-up is **closed** by this unit (the design doc's §capture + §middleware doc-comments updated to the real .NET 10 API); the ten `admin.analytics_*` keys × en/de/fr/da (40 entries) pass the existing `KnownTranslationKeys_ParityTests` key-set parity with no extra work |
+| **U06** | The M13 acceptance gate — **recorded, not run** (no new test code; the 19 pins + `MilestonesTests` are subsets of the green suites) | (a) closed loop PASS (via U04's two ranking pins); (b) handoff PASS (via U04's `DistinctActors == 2` pin); (c) part-vs-whole PASS — **Web 585/585 + Core 989/989**, both Errors: 0 / Failed: 0 (in-process xunit.v3 runner) | none — the U03 DRIFT GUARD item (the only cross-unit drift) was already closed by U05 |
+
+**Full-suite state at the close (this unit, post-flip):** `Kumunita.Web.Tests`
+**585/585** + `Kumunita.Core.Tests` **989/989** — both Errors: 0 / Failed: 0;
+`MilestonesTests` green with the re-pinned
+`M14_Is_The_Single_InProgress_Milestone` + the unchanged
+`Roadmap_Covers_M0_Through_M14_Plus_Named_Lanes_In_Order` (M0…M14) +
+`Shipped_Milestones_Are_Marked_Done` (now including M13). The four parity
+surfaces (`Milestones.cs` / `README.md` / `docs/STATUS.md` /
+`docs/ARCHITECTURE.md`) agree that **M13 is done and M14 is next**.
+
+**The 19 pinned tests (D7) — all green, in the tree:** U01's 3 sink pins +
+U02's 6 policy/surface pins + U03's 3 middleware pins + U04's 4 aggregation
+pins + U05's 3 admin-surface pins = **19/19**.
+
+**Invariants as landed (C-M13·1–7):** the feedback is **local** (C-M13·1 — no
+third-party telemetry, the sink writes to a local file, the admin page is a
+local Razor view); the row is **minimal** (C-M13·2 — `UsageEvent` carries
+exactly `Id` / `At` / `ActorId` / `RouteTemplate`); the surface renders **no
+per-account data** (C-M13·3 — `/admin/analytics` renders aggregates over the
+window, never a row per `ActorId`); the **template** is the unit (C-M13·4 —
+`RouteTemplate` is a route template, never a concrete path, and no-endpoint /
+static-file requests are not recorded); a **capture never fails the request**
+(C-M13·5 — the `LightweightSession` write is in a `try/catch` that logs and
+re-throws nothing); **zero new authorization surface** (C-M13·6 — no new
+`AccessAction` / `AccessVia` / `Decide()` branch / `IAuditableResource`; the
+one `AccessAudit` row is on the export, `TargetKind == "analytics"` /
+`Action == "analytics.export"`); **docs parity holds at the flip** (C-M13·7 —
+done in this unit, the four surfaces agree).
+
+**Deferred lanes (ADR 0114 Consequences — each a named follow-on lane, own
+ADR):**
+
+- **Charts** (a `client/lib` TS module over the existing table) — the admin
+  page is a table + a count for M13. **Own lane**, own ADR.
+- **Per-account activity views** (a rendering of the `ActorId` column) — the
+  C-M13·3 boundary says no, and **stays no**, unless ADR 0114 is **revisited**
+  (a deliberate privacy decision). **Own lane**, own ADR.
+- **Per-request detail views** (the raw `UsageEvent` table rendered as a page)
+  — the raw table is the operator's **psql** surface, not a rendered one.
+  **Own lane**, own ADR.
+- **Custom retention per surface** (a per-`SurfaceKey` retention knob) — the
+  single 365-day window is enough for M13. **Own lane**, own ADR.
+- **Per-instance retention config** (a config knob for the 365-day constant)
+  — the D5 "platform constant" inversion is deliberate. **Own lane**, own ADR.
+- **Log-streaming to a remote sink** — **forbidden by C-M13·1**
+  (SECURITY.md §5: "No third-party analytics, no telemetry") — not a lane, a
+  **boundary**.
+- **Per-resident usage views** — there is **no** resident-facing analytics
+  surface in this milestone or any named follow-on (the C-M13·3 boundary
+  holds for the resident surface as it does for the admin surface).
+- **The new-signups metric** (a `NewSignups` field on `UsageAnalyticsResult`)
+  — the `User : IdentityUser` table has **no** created-at column (its only
+  delta is `ExternalId`); a "new residents" count needs a new column or a
+  different source. **Own lane**, own ADR.
+- **The `tsvector` full-text search upgrade** — M8's own deferred lane (ADR
+  0091 D4); M13's aggregation is a `COUNT(*)` over a window, not a text query.
+  **Own lane** (M8's, already named).
+
+**Handed to the M14 agent (integration of Events and Projects — the
+`coordination` value-chain step, the two coordination surfaces interlock).
+Open items carried forward:** none blocking — the one cross-unit drift (U03's
+DRIFT GUARD, `RoutePattern.RawText` / `StaticFileEndpointMetadata` → the real
+.NET 10 `IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor`) is
+**closed** in the design doc by U05; the U04 Linq-to-objects fallback for the
+`GroupBy` / `Distinct()` aggregation is recorded as a contract-allowance
+(deviation, not drift); the U01 .NET 10 logging-API reconciliations
+(`ILoggingBuilder`, the 1-arg `BeginScope`, `builder.Logging` wiring) are the
+shipped shape. The M14 agent starts from the M13 green baseline (Web 585/585 +
+Core 989/989) with **M14 as the single in-progress milestone** and **no M15** —
+the exact-order pin M0…M14 is the roadmap's tail.

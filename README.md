@@ -13,8 +13,8 @@ not a code concern.
 
 ## Status
 
-**M13 in progress** (logging and analytics);
-M1–M12 and all named lanes
+**M14 in progress** (integration of Events and Projects);
+M1–M13 and all named lanes
 are done — identity, groups & delegation, directory & profiles, posts +
 moderation, multilingual (`ML`/`ML-UI`), rich content (`RC`), guardian
 controls (`GU`), pages (`PG`), events + calendar (`M4`/`GE`/`EV-DWM`),
@@ -241,8 +241,8 @@ stays trivial and the authorization rules can grow freely.
 - **M10** — PWA and responsive design. **Done.** (ADR 0107)
 - **M11** — Portability (import/export). **Done.** (ADR 0108)
 - **M12** — iCal: a **resident-facing calendar world seam** — a per-event file (`GET /events/{id}.ics`, one `VEVENT`) + a subscription feed (`GET /events.ics`, the caller's visible upcoming set), both `[Authorize]` (no subscription token — authorization rides the cookie, re-run on every fetch), served `text/calendar; charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control: no-store`; the hand-written BCL-only `IcsWriter` (a pure function over already-authorized `Event` rows, the RFC 5545 pinned subset — CRLF, 75-octet fold, full escaping, stable `UID`s, `PRODID: -//Kumunita//community calendar//EN`) — **zero Core schema change**, **zero new dependency**, zero new authorization surface; two `kw-l` affordances (the detail page's "Add to calendar" + the feed/calendar "Calendar feed (iCal)") × en/de/fr/da. **Done.** (ADR 0112)
-- **M13** — Logging and analytics. **In progress.**
-- **M14** — Integration of Events and Projects.
+- **M13** — Logging and analytics: the BCL-only file log sink (the `Kumunita.Core.Logging` surface — `FileLoggerProvider` / `FileLogger` / `LogLine` JSON-lines writer / `RollingFileSink` daily rotation + boot retention), the `UsageEvent` capture lane (one `UsageEvent` doc per recognized request in the new `Kumunita.Core.Usage` context; the pure `UsageCapturePolicy` + `SurfaceKey` closed-list mapper; the thin `UsageCaptureMiddleware` — a capture failure never fails the request), the `IUsageAnalyticsService` aggregation seam (7/30/90-day windows over `Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` / `SurfaceRanking`), the `/admin/analytics` GlobalAdmin surface (the surface-rank table + the CSV export with one `AccessAudit` row), and the 365-day retention tick (`UsagePurgeService` + `UsagePurgeHandler` + `UsagePurgeTick`); **zero new authorization surface**, **zero per-account rendered data**, **zero third-party telemetry** (the C-M13·1/3/6 invariants). **Done.** (ADR 0114)
+- **M14** — Integration of Events and Projects. **In progress.**
 
 ## Deferred (future, by design)
 
