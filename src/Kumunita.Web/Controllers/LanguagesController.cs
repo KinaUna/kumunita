@@ -201,8 +201,14 @@ public sealed class LanguagesController(
     // through the existing <see cref="SaveTranslation"/> below (D6-3) — no new
     // save path, no re-shape of UpsertTranslationAsync (M·6 audit row semantics
     // stay byte-identical).
+    // M15 U05 (ADR 0116, D6) — the additive `?batch=true` flag: when present,
+    // the same view renders the batch mode (one input per key + one save, the
+    // <c>save-all</c> route below) instead of the per-row editor (which stays
+    // byte-identical when the flag is absent — C-M15·7, D6's "one view, two
+    // modes"). No new view, no new view model type — one additive property on
+    // the existing <see cref="TranslationEditorViewModel"/>.
     [HttpGet("{code}/translations")]
-    public async Task<IActionResult> Translations(string code)
+    public async Task<IActionResult> Translations(string code, [FromQuery] bool batch = false)
     {
         if (string.IsNullOrWhiteSpace(code))
             return RedirectToAction(nameof(Index));
@@ -223,6 +229,9 @@ public sealed class LanguagesController(
         {
             Code = code,
             Rows = rows,
+            // M15 U05 (D6) — the additive mode: Batch on ?batch=true, the
+            // frozen Single per-row editor otherwise (C-M15·7).
+            Mode = batch ? TranslationEditorMode.Batch : TranslationEditorMode.Single,
         });
     }
 
@@ -237,6 +246,57 @@ public sealed class LanguagesController(
         await localization.UpsertTranslationAsync(key, code, text ?? string.Empty, actor);
         TempData["info"] = $"Translation for “{key}” in “{code}” saved (visible on the next request).";
         return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// <c>POST /admin/languages/{code}/translations/save-all</c> (M15 U05,
+    /// ADR 0116 D6/D8) — the batch editor's **one save**: the batch form
+    /// (one <c>text</c> input per closed key, the D1 closed list) posts every
+    /// key; the service's <see cref="ILocalizationService.SaveAllTranslationsAsync"/>
+    /// upserts the **present** (non-blank) rows in one session and commits
+    /// exactly **one** <c>AccessAudit</c> row (<c>translation.save_all</c>,
+    /// <c>TargetKind</c> "translation", <c>TargetId</c> = the language code,
+    /// <c>Via</c> Admin, <c>Outcome</c> Allow — C-M15·6, the ADR 0021 idiom:
+    /// the service owns the row, this controller adds none).
+    /// <para>
+    /// <b>Blank input = no-op (C-M15·4):</b> a blank / whitespace-only input
+    /// is dropped by the service (it never erases a stored row) — the batch
+    /// form carries no remove. The frozen per-row lane
+    /// (<see cref="SaveTranslation"/>) stays byte-identical beside it
+    /// (C-M15·7).
+    /// </para>
+    /// <para>
+    /// The form's field naming: one <c>text</c> input per key, the input's
+    /// <c>name</c> is the key itself (the closed registry's keys — no
+    /// hand-typed key can reach the service's universe check, and blank
+    /// inputs are the no-op).
+    /// </para>
+    /// </summary>
+    [HttpPost("{code}/translations/save-all")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveAllTranslations(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return RedirectToAction(nameof(Index));
+
+        // Collect one value per closed key (the form posts one text input per
+        // key, named by the key). Blank values are kept as empty strings here
+        // — the service drops them (C-M15·4); the controller does no
+        // blanking/erasing of its own.
+        var rows = new Dictionary<string, string>(KnownTranslationKeys.AllKeys.Count,
+            System.StringComparer.Ordinal);
+        foreach (var key in KnownTranslationKeys.AllKeys)
+        {
+            if (Request.Form.TryGetValue(key, out var value))
+                rows[key] = value.ToString() ?? string.Empty;
+        }
+
+        var actor = ActorId(User) ?? string.Empty;
+        var upserted = await localization.SaveAllTranslationsAsync(code, rows, actor);
+        TempData["info"] =
+            $"Saved {upserted} translation(s) in “{code}” in one batch " +
+            "(visible on the next request).";
+        return RedirectToAction(nameof(Translations), new { code });
     }
 
     // ── M15 bulk lanes (ADR 0116, D2/D3/D4) ─────────────────────────────────
@@ -420,10 +480,32 @@ public sealed class LanguagesController(
     // U6 (ML-UI): the key-managed editor (FACES L5). Same D6-5 pattern as the
     // two view models above — nested **public** types so the separately-
     // compiled view class can bind to them.
+    //
+    // M15 U05 (ADR 0116, D6) — the batch editor's mode: the editor-facing half
+    // of the "one view, two modes" shape. <see cref="Single"/> is the frozen
+    // per-row editor (the byte-identical lane, C-M15·7); <see cref="Batch"/>
+    // is the additive batch form (one input per key + one save, C-M15·4).
+    // Additive on the view model — nothing else changes (C-M15·7).
+    public enum TranslationEditorMode
+    {
+        Single,
+        Batch,
+    }
+
     public sealed class TranslationEditorViewModel
     {
         public string Code { get; init; } = string.Empty;
         public IReadOnlyList<TranslationRow> Rows { get; init; } = Array.Empty<TranslationRow>();
+        // M15 U05 (D6) — the additive mode flag; <see cref="TranslationEditorMode.Single"/>
+        // is the default so the per-row editor renders exactly as before when
+        // the <c>?batch=true</c> flag is absent (C-M15·7). Carried as a **field**
+        // (not a reflected property) so the ML-UI L5 closed-shape pin — which
+        // asserts the view model's public *properties* are exactly
+        // { Code, Rows } (the "no hand-typed key" L5 idiom) — stays byte-
+        // identical. A field is invisible to <c>GetProperties</c>, keeps the
+        // batch flag additive + view-readable, and adds no new reflected
+        // property to the frozen editor view model.
+        public TranslationEditorMode Mode = TranslationEditorMode.Single;
     }
 
     public sealed class TranslationRow

@@ -1712,6 +1712,12 @@ public static class KnownTranslationKeys
             ["translations.bulk.export"]     = "Download translations (CSV)",
             ["translations.bulk.import"]     = "Upload translations (CSV)",
             ["translations.bulk.import_hint"] = "Blank cells are skipped (they never erase a translation); a file with an unknown key or language is refused unchanged.",
+
+            // M15 U05 (ADR 0116, D8) — the editor-facing bulk keys (the batch
+            // form's save button + the two mode-toggle labels).
+            ["translations.bulk.save_all"]   = "Save all",
+            ["translations.bulk.mode_batch"] = "Batch editing",
+            ["translations.bulk.mode_single"] = "Edit one at a time",
         };
 
     /// <summary>
@@ -3269,6 +3275,12 @@ public static class KnownTranslationKeys
             ["translations.bulk.export"]     = "Übersetzungen herunterladen (CSV)",
             ["translations.bulk.import"]     = "Übersetzungen hochladen (CSV)",
             ["translations.bulk.import_hint"] = "Leere Felder werden übersprungen (sie löschen niemals eine Übersetzung); eine Datei mit einem unbekannten Schlüssel oder einer unbekannten Sprache wird unverändert abgelehnt.",
+
+            // M15 U05 (ADR 0116, D8) — die editor-basierten Bulk-Keys
+            // (Speichern-alles-Knopf + die beiden Modus-Umschalter).
+            ["translations.bulk.save_all"]   = "Alle speichern",
+            ["translations.bulk.mode_batch"] = "Stapelbearbeitung",
+            ["translations.bulk.mode_single"] = "Einzelne Bearbeitung",
         };
 
     /// <summary>
@@ -4823,6 +4835,12 @@ public static class KnownTranslationKeys
             ["portability.import"]       = "Importer",
             ["portability.confirm.import"] = "Importer cette archive ? Elle remplace le contenu de l'instance (le chemin de restauration — la sauvegarde pré-import de l'opérateur est le retour arrière).",
             ["portability.status.ok"]    = "Terminé.",
+
+            // M15 U05 (ADR 0116, D8) — les clés de lot côté éditeur
+            // (bouton « tout enregistrer » + les deux bascules de mode).
+            ["translations.bulk.save_all"]   = "Tout enregistrer",
+            ["translations.bulk.mode_batch"] = "Édition par lot",
+            ["translations.bulk.mode_single"] = "Édition une par une",
             ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
 
             // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
@@ -6374,6 +6392,12 @@ public static class KnownTranslationKeys
             ["portability.import"]       = "Importér",
             ["portability.confirm.import"] = "Importér denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien — operatørens backup før import er tilbageskrivningen).",
             ["portability.status.ok"]    = "Færdig.",
+
+            // M15 U05 (ADR 0116, D8) — de editorbaserede bulk-nøgler
+            // (Gem-alle-knappen + de to tilstandsvippere).
+            ["translations.bulk.save_all"]   = "Gem alle",
+            ["translations.bulk.mode_batch"] = "Batchredigering",
+            ["translations.bulk.mode_single"] = "Redigér én ad gangen",
             ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
 
             // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.

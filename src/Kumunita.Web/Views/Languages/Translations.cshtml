@@ -1,6 +1,13 @@
 @model Kumunita.Web.Controllers.LanguagesController.TranslationEditorViewModel
 @{
     ViewData["Title"] = $"UI strings — {Model.Code}";
+
+    // M15 U05 (ADR 0116, D6) — the quiet mode toggle (two kw-l links, plain
+    // <a>, no JS): each link points at the *other* mode of this same view —
+    // one view, two modes (D6). The per-row editor below is the frozen
+    // Single lane (byte-identical, C-M15·7); the batch form above it renders
+    // only when the ?batch=true flag is set.
+    var isBatch = Model.Mode == Kumunita.Web.Controllers.LanguagesController.TranslationEditorMode.Batch;
 }
 
 <p>
@@ -8,12 +15,79 @@
 </p>
 
 <h1>UI strings for @Model.Code</h1>
+
+@* ── M15 U05 (ADR 0116, D6) — the quiet top toggle: two kw-l links (plain
+   <a>, no JS) switching between the two modes of this same view. The
+   current mode's link is styled as the active state (Bootstrap .active);
+   the other mode is the link. The per-row editor below is the frozen lane
+   (byte-identical, C-M15·7) — the toggle is additive markup above it. *@
+<div class="d-inline-flex btn-group mb-3" role="group" aria-label="Editor mode">
+    <a href="/admin/languages/@Model.Code/translations"
+       class="btn btn-sm @(isBatch ? "btn-outline-secondary" : "btn-secondary active")">
+        <kw-l key="translations.bulk.mode_single">Edit one at a time</kw-l>
+    </a>
+    <a href="/admin/languages/@Model.Code/translations?batch=true"
+       class="btn btn-sm @(isBatch ? "btn-secondary active" : "btn-outline-secondary")">
+        <kw-l key="translations.bulk.mode_batch">Batch editing</kw-l>
+    </a>
+</div>
+
 <p class="text-muted">
     The closed list of canonical platform keys. Each row shows the key, its
     <code>en</code> reference text, and the current value in
     <strong>@Model.Code</strong>. Save a row to upsert its translation —
     visible on the next request.
 </p>
+
+@* ── M15 U05 (ADR 0116, D6) — the batch form (one view, two modes): the
+   same closed key list (the Model.Rows loop, D1), one text input per key,
+   one "Save all" button posting the save-all route → the U03
+   SaveAllTranslationsAsync seam + the one translation.save_all audit row
+   (C-M15·6). A blank input is a no-op (C-M15·4 — the service drops blank
+   values; the form never erases a row). The kw-l labels are the U05
+   translations.bulk.save_all key; the maxlength / aria-label idiom matches
+   the per-row inputs below. Renders only in Batch mode — the per-row
+   editor below stays byte-identical when the flag is absent (C-M15·7). *@
+@if (isBatch)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post" action="/admin/languages/@Model.Code/translations/save-all">
+                @Html.AntiForgeryToken()
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>English reference</th>
+                                <th>Value in @Model.Code</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.Rows)
+                            {
+                                <tr>
+                                    <td class="text-nowrap"><code>@row.Key</code></td>
+                                    <td>@row.EnReference</td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               name="@row.Key" value="@row.CurrentValue" maxlength="512"
+                                               aria-label="Value for @row.Key in @Model.Code" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">
+                        <kw-l key="translations.bulk.save_all">Save all</kw-l>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
 
 @* ── M15 U04 (ADR 0116, D2/D4) — the bulk upload affordance ─────────────────
    Additive (C-M15·7: the per-row editor below stays byte-identical). The

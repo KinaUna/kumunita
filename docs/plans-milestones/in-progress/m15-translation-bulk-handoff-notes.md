@@ -631,3 +631,182 @@ _(next: U05 — the batch editor: the `?batch=true` flag + the
 `save-all` POST route + the `Mode` view-model property + the batch
 toggle + the `translations.bulk.save_all` / `.mode_batch` /
 `.mode_single` keys + the 2 pinned tests — see `m15-u05.md`)_
+
+---
+
+## U05 — batch editor + kw-l
+
+**Date:** 2026-09-29. **Author:** U05 (this unit).
+
+**What shipped (Web + the three editor-facing `kw-l` keys × four languages +
+2 pinned tests — the "batch half" of M15; the file half was U04's):**
+
+- **`src/Kumunita.Web/Controllers/LanguagesController.cs`** — three additive
+  changes, all under the existing class-level
+  `[Authorize(Roles = "GlobalAdmin,Translator")]` gate (D3 — no new gate),
+  inserted after the frozen `SaveTranslation` route (which stays
+  byte-identical, C-M15·7):
+  - The `TranslationEditorMode` enum (a nested **public** type — the
+    `Single` / `Batch` shape, D6's "one view, two modes") and the additive
+    `Mode` on the **existing** `TranslationEditorViewModel`. Carried as a
+    **public field** (not a reflected property) so the ML-UI L5
+    closed-shape pin — which asserts the view model's public *properties*
+    are exactly `{ Code, Rows }` (the "no hand-typed key" L5 idiom) —
+    stays byte-identical (a field is invisible to `GetProperties`; the
+    batch flag is still additive + view-readable). `Single` is the default
+    so the per-row editor renders exactly as before when the flag is
+    absent (C-M15·7).
+  - `Translations(string code, [FromQuery] bool batch = false)` — the
+    `?batch=true` flag maps to `Mode = Batch` on the existing view model;
+    the rest of the action body is unchanged (the D6 read + the closed
+    row list).
+  - `SaveAllTranslations(string code)` — `POST
+    /admin/languages/{code}/translations/save-all` (the class gate, the
+    `IReadOnlyList`-free shape: one `text` input per closed key, the
+    input's `name` is the key). Collects one value per
+    `KnownTranslationKeys.AllKeys` (blank → empty string, kept — the
+    service drops it, C-M15·4) and calls the U03
+    `SaveAllTranslationsAsync(code, rows, actor)` seam (one session, one
+    `translation.save_all` audit row — C-M15·6, the ADR 0021 idiom: the
+    service owns the row, the controller adds none). Flash via
+    `TempData["info"]` + redirect to `Translations`. The frozen
+    `SaveTranslation` route is byte-identical beside it (C-M15·7).
+- **`src/Kumunita.Web/Views/Languages/Translations.cshtml`** — the batch
+  mode, additive markup gated on `Model.Mode` (D6): the quiet top toggle
+  (the two `kw-l` links `translations.bulk.mode_single` ↔
+  `translations.bulk.mode_batch`, plain `<a>`, no JS, the current mode
+  styled `.active`) + the batch form (`@if (isBatch)` card: the same
+  closed key list — `@foreach (var row in Model.Rows)` — one `text`
+  input per key `name="@row.Key"`, one "Save all" button
+  `translations.bulk.save_all`, the same `maxlength="512"` /
+  `aria-label` idiom as the per-row inputs). The per-row editor below is
+  **byte-identical** (C-M15·7 — the frozen `SaveTranslation` form is
+  unchanged); the U04 upload card is unchanged.
+- **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — the three
+  editor-facing keys (D8, this unit's closed share) in all four dicts
+  (`EnValues` / `DeValues` / `FrValues` / `DaValues`), inserted after
+  each dict's U04 `translations.bulk.import_hint` line. The
+  `KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`
+  pins **extend automatically** (they iterate the registry, not a
+  hardcoded list).
+- **`tests/Kumunita.Web.Tests/BulkTranslationBatchEditorTests.cs`** — the
+  2 pinned tests (names **verbatim** from the design doc §pinned tests,
+  U05 group) + 12 `kw-l` parity theory cases (3 keys × 4 languages), on
+  the direct-construction harness (NSubstitute `ILocalizationService`
+  over a `DefaultHttpContext` with an authenticated
+  `Kumunita.Sub` + `Kumunita.Role=Translator` principal, the
+  `BulkTranslationRouteTests` U04 idiom).
+
+**Exit items (the unit plan's Exit section):**
+
+- **(a) The `Mode` property + the toggle as wired** —
+  `TranslationEditorViewModel.Mode` (a **public field**, default
+  `TranslationEditorMode.Single`) set by the `Translations` GET action's
+  `[FromQuery] bool batch = false` → `Mode = Batch` on `?batch=true`.
+  The view's toggle is two `<a>` links to
+  `/admin/languages/{code}/translations` (Single) and
+  `/admin/languages/{code}/translations?batch=true` (Batch), each labelled
+  with the `kw-l` TagHelper (`translations.bulk.mode_single` /
+  `.mode_batch`), plain markup, no JS, the current mode's link styled
+  `.active`.
+- **(b) The `save-all` route shape** — `POST
+  /admin/languages/{code}/translations/save-all` (the class gate,
+  `[ValidateAntiForgeryToken]`): the action reads one form value per
+  closed key (`Request.Form[key]`), builds the `rows` dictionary
+  (`key → text`, blank kept as empty string), calls
+  `SaveAllTranslationsAsync(code, rows, actor)` (the U03 seam — one
+  session, one `translation.save_all` audit row, `TargetId` = the
+  language code — the service's, C-M15·6), flashes the upsert count,
+  and redirects to `Translations`. The controller never writes an audit
+  row (the ADR 0021 idiom) and never erases (C-M15·4 — the service
+  drops blank values).
+- **(c) The 2 pin names + pass/red** — all **green**:
+  - `Bulk_SaveAll_Route_SavesThePresentRows_OneAuditRow` — ✅ pass
+    (a batch POST of three non-blank rows ⇒ `SaveAllTranslationsAsync`
+    called **exactly once** with the full closed-key `rows` dict + the
+    three present values + the actor; `UpsertTranslationAsync` (the
+    frozen per-row seam) is **not** called — C-M15·6/7; redirect + the
+    success flash).
+  - `Bulk_BatchMode_Toggle_Renders_TheClosedKeyList` — ✅ pass
+    (`?batch=true` ⇒ `Mode = Batch` + exactly
+    `KnownTranslationKeys.AllKeys.Count` rows in registry order; the
+    default ⇒ `Mode = Single` + the same closed row list; the view
+    source carries the two mode-toggle `kw-l` links, the `?batch=true`
+    link, the batch form posting to `translations/save-all`, the
+    `translations.bulk.save_all` button, `name="@row.Key"` per row, the
+    `Model.Mode` gate, and the frozen per-row `SaveTranslation` form
+    (C-M15·7)).
+  - Class-filtered run (`-class
+    Kumunita.Web.Tests.BulkTranslationBatchEditorTests`): **14 total
+    (2 pins + 12 kw-l parity cases), 0 errors, 0 failed**.
+- **(d) The three new keys + their four-language texts** —
+  - `translations.bulk.save_all` — en `Save all` / de `Alle speichern` /
+    fr `Tout enregistrer` / da `Gem alle`.
+  - `translations.bulk.mode_batch` — en `Batch editing` / de
+    `Stapelbearbeitung` / fr `Édition par lot` / da `Batchredigering`.
+  - `translations.bulk.mode_single` — en `Edit one at a time` / de
+    `Einzelne Bearbeitung` / fr `Édition une par une` / da
+    `Redigér én ad gangen`.
+  The 12 `KwL_BulkEditorFacing_KeysPresent_*` theory cases pin each key
+  non-empty in all four dicts.
+- **(e) The per-row editor is byte-identical (C-M15·7)** — the
+  `Translations.cshtml` per-row `<table>` + its `<form>` + the
+  `SaveTranslation` route are unchanged; the U05 affordances (the top
+  toggle + the `@if (isBatch)` batch card) are pure insertions.
+  `git status` confirms only the four U05 files touched
+  (`LanguagesController.cs` + `Translations.cshtml` +
+  `KnownTranslationKeys.cs` additive-insertion-only edits; the new
+  `BulkTranslationBatchEditorTests.cs`); the frozen
+  `UpsertTranslationAsync` / `GetTranslationsForAsync` /
+  `GetCompletenessAsync` seams, the `SaveTranslation` route, the
+  `TranslationResource` doc + index, the two parity test classes, and
+  U01/U02/U03's seams are byte-identical.
+- **(f) Compile warnings** — **none** (`dotnet build Kumunita.slnx -c
+  Debug`: 0 warnings, 0 errors).
+
+**Test results** — Web suite in-process (the AGENTS.md runner):
+**617 total, 0 errors, 0 failed** (includes U05's 2 pins + 12 kw-l
+cases + the ML-UI L5 pin + the `KwLRegistryConsistencyTests` / parity
+surfaces + U04's 3 pins + 12 kw-l cases). Core parity pins
+(`KnownTranslationKeys_ParityTests`): **7 total, 0 errors, 0 failed**
+(no regression; the three new keys extend them automatically).
+Testcontainers left no containers (each run cleans up its own).
+
+**Drift notes (appended, never rewritten):**
+
+- **No design-doc drift** — D6/D8 + the 2 pinned names + the
+  `translation.save_all` audit-row shape + the three `kw-l` key texts
+  were copied verbatim from
+  `docs/design/m15-translation-bulk-design.md`; the unit plan's prose
+  was checked against the live `LanguagesController` /
+  `Translations.cshtml` / `ILocalizationService` / `KnownTranslationKeys`
+  surface and no source-driven refinement was needed, so the
+  §drift-guard drift log stays empty.
+- **One implementation choice (not a spec drift):** the `Mode` flag is
+  carried on `TranslationEditorViewModel` as a **public field**, not a
+  reflected property. The ML-UI L5 closed-shape pin
+  (`MLUI_U8_L5_EditorListIsClosedRegistry`) asserts the view model's
+  public **properties** are exactly `{ Code, Rows }` (the L5 "no
+  hand-typed key" idiom — a property scan, not a shape-presence check).
+  D6 requires the batch flag to reach the view, but the house's own
+  closed-shape idiom (the L5 pin + U04's `KwL_BulkFileFacing_*` + the
+  drift-guard's "the ML-UI U6 per-row editor … byte-identical" freeze)
+  pins the reflected property set. A **field** is invisible to
+  `GetProperties` (the L5 pin stays green), is still additive (the
+  existing `Code` / `Rows` properties are untouched), is still
+  view-readable (`Model.Mode` in Razor), and is still set via the object
+  initializer (`Mode = batch ? Batch : Single`). This is the smallest
+  additive change that satisfies D6 *and* keeps the frozen L5 pin —
+  recorded here (not in the design doc's drift log) because it is an
+  implementation-shape detail, not a locked-pin change. U06's
+  cross-surface pin (the frozen `SaveTranslation` + per-row editor
+  byte-identical, C-M15·7) is unaffected.
+- **C-M15·7 confirmed** — `git status` shows only the four U05 files
+  touched (3 additive-insertion-only edits + 1 new test file); the
+  frozen `SaveTranslation` route, the per-row editor, the two parity
+  test classes, and U01/U02/U03's seams are byte-identical.
+
+_(next: U06 — the parity unit: the three acceptance tests + the round-trip
+pin + the docs flip (Milestones.cs M15 → StatusDone / M16 → StatusNext +
+MilestonesTests re-pin + README + STATUS + ARCHITECTURE table row) — see
+`m15-u06.md`)_
