@@ -310,6 +310,50 @@ public interface ILocalizationService
         string actorId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// <b>M15 bulk-export audit seam (ADR 0116, D4; U04)</b> — commits
+    /// **exactly one** <c>AccessAudit</c> row for a translation-bundle
+    /// export: action <c>translation.export</c>,
+    /// <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the catalog's language codes joined (","),
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c>, the acting account recorded on
+    /// <c>ActorId</c> + <c>EffectivePrincipalId</c> — the M13
+    /// analytics-CSV precedent (ADR 0114: an admin-surface CSV carries
+    /// exactly one <c>AccessAudit</c> row) applied to the
+    /// <see cref="TranslationBulkExporter"/> bundle.
+    /// <para>
+    /// A **read with an audit** (D4): the matrix read
+    /// (<see cref="GetBulkTranslationMatrixAsync"/>) is un-audited
+    /// (C-M15·7); the export *action* is the audited one — the bundle
+    /// leaving the platform is the operator's act, not a plain read.
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency. No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate). The frozen one-row seams
+    /// (<see cref="UpsertTranslationAsync"/>,
+    /// <see cref="GetTranslationsForAsync"/>,
+    /// <see cref="GetCompletenessAsync"/>) stay byte-identical
+    /// (C-M15·7).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCodes">
+    /// The catalog's codes in <c>SortOrder</c> (enabled **and** disabled —
+    /// the whole set, D1/D2), recorded on the one <c>AccessAudit</c>
+    /// row's <c>TargetId</c>.
+    /// </param>
+    /// <param name="actorId">
+    /// The acting account (GlobalAdmin or Translator — the ADR 0021
+    /// split), recorded on the one <c>AccessAudit</c> row.
+    /// </param>
+    /// <param name="ct">The cancellation token.</param>
+    Task RecordTranslationExportAsync(
+        IReadOnlyList<string> languageCodes,
+        string actorId,
+        CancellationToken ct = default);
+
     // ── Completeness — read ─────────────────────────────────────────
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys are
     /// present vs. missing for a language.</summary>

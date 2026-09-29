@@ -908,4 +908,46 @@ public sealed class LocalizationService : ILocalizationService
 
         return count;
     }
+
+    // ── M15 bulk-export audit (ADR 0116, D4; U04) — the read-with-an-audit
+    //    row (the M13 analytics-CSV precedent, ADR 0114) ──
+
+    /// <inheritdoc />
+    public async Task RecordTranslationExportAsync(
+        IReadOnlyList<string> languageCodes,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        // M15 bulk-export audit (ADR 0116, D4; U04): a **read with an
+        // audit** — the bundle read itself (GetBulkTranslationMatrixAsync)
+        // emits zero rows (C-M15·7); the export *action* is the audited
+        // one, exactly one row, the M13 analytics-CSV precedent (ADR 0114):
+        // action translation.export, TargetKind "translation", TargetId =
+        // the codes joined, Via = Admin, Outcome = Allow, committed in one
+        // session (C3). The controller adds no audit row of its own (the
+        // ADR 0021 idiom — the service owns the row). Same one-session +
+        // one-audit-row idiom as UpsertManyTranslationsAsync (U02) /
+        // SaveAllTranslationsAsync (U03), but no domain rows are upserted —
+        // the export is a read; the audit row is the sole write.
+        var now = DateTimeOffset.UtcNow;
+        var targetId = string.Join(",",
+            languageCodes ?? Array.Empty<string>());
+
+        await using var session = _store.OpenSession(new SessionOptions());
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "translation.export",
+            TargetKind = "translation",
+            TargetId = targetId,
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
 }

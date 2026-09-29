@@ -15,6 +15,36 @@
     visible on the next request.
 </p>
 
+@* ── M15 U04 (ADR 0116, D2/D4) — the bulk upload affordance ─────────────────
+   Additive (C-M15·7: the per-row editor below stays byte-identical). The
+   form posts to the `import` route (the IFormFile → TranslationBulkImporter
+   → UpsertManyTranslationsAsync compose). A success is flashed via the
+   _FlashToast partial (the TempData["info"] the route writes); a refusal is
+   a 422 + TempData["error"] naming the first offending row (C-M15·3) — the
+   same _FlashToast surface (the house convention, the Portability.cshtml
+   precedent). The kw-l labels are the U04 `translations.bulk.import` +
+   `translations.bulk.import_hint` keys; the en fallback is the registry
+   floor (M·1). *@
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="fw-semibold mb-2"><kw-l key="translations.bulk.import">Upload translations (CSV)</kw-l></div>
+        <small class="text-muted d-block mb-3">
+            <kw-l key="translations.bulk.import_hint">Blank cells are skipped (they never erase a translation); a file with an unknown key or language is refused unchanged.</kw-l>
+        </small>
+        <form method="post" action="/admin/languages/@Model.Code/translations/import" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-8">
+                    <input type="file" name="bundle" class="form-control" accept=".csv,text/csv" />
+                </div>
+                <div class="col-sm-4">
+                    <button type="submit" class="btn btn-primary"><kw-l key="translations.bulk.import">Upload translations (CSV)</kw-l></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="table-responsive">
     <table class="table table-sm align-middle">
         <thead>

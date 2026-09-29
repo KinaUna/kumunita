@@ -239,6 +239,168 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
+    // ── M15 bulk lanes (ADR 0116, D2/D3/D4) ─────────────────────────────────
+    // The two new routes ride the existing class-level gate
+    // [Authorize(Roles = "GlobalAdmin,Translator")] (D3 — no new gate).
+    // The controller never writes an audit row itself (the ADR 0021 idiom):
+    // the service emits the one row per bulk action (C-M15·6). The Web layer
+    // never parses or serializes the bundle (the Core owns the format —
+    // C-M15·8, the IcsWriter / IcsWriter posture).
+
+    /// <summary>
+    /// <c>GET /admin/languages/{code}/translations/bundle.csv</c> (M15 U04) —
+    /// the download: <see cref="ILocalizationService.GetBulkTranslationMatrixAsync"/>
+    /// (a read, no audit row — C-M15·7) + the pure
+    /// <see cref="TranslationBulkExporter.Build"/> (the bundle format is the
+    /// Core's, the controller composes but never serializes) over the
+    /// catalog's codes in SortOrder (D1/D2). Served with the ADR 0034 /
+    /// ADR 0112 serve idiom (the <see cref="EventController.EventIcs"/>
+    /// precedent, the M12 shape):
+    /// <c>Content-Type: text/csv; charset=utf-8</c> +
+    /// <c>Content-Disposition: attachment;
+    /// filename="kumunita-translations-{code}.csv"</c> +
+    /// <c>Cache-Control: no-store</c> + <c>X-Content-Type-Options: nosniff</c>.
+    /// Commits **exactly one** <c>AccessAudit</c> row
+    /// (<c>translation.export</c>, <c>TargetKind "translation"</c>,
+    /// <c>TargetId</c> = the joined catalog codes, <c>Via Admin</c>,
+    /// <c>Outcome Allow</c>, the acting account) via
+    /// <see cref="ILocalizationService.RecordTranslationExportAsync"/>
+    /// — the M13 analytics-CSV precedent (ADR 0114), D4. The controller
+    /// adds no audit row of its own (the ADR 0021 idiom — the service owns
+    /// the row).
+    /// </summary>
+    [HttpGet("{code}/translations/bundle.csv")]
+    public async Task<IActionResult> BulkExport(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return RedirectToAction(nameof(Index));
+
+        var actor = ActorId(User) ?? string.Empty;
+
+        // The matrix read (C-M15·7 — no audit row on the read itself).
+        var matrix = await localization.GetBulkTranslationMatrixAsync();
+        // The column order: the catalog's codes in SortOrder, enabled +
+        // disabled (D1/D2 — the bundle carries the whole set). `en` maps
+        // onto the dedicated third column (the exporter's D2 rule).
+        var catalog = await localization.ListLanguagesAsync();
+        var columnOrder = catalog
+            .OrderBy(c => c.SortOrder)
+            .Select(c => c.Id)
+            .Distinct()
+            .ToList();
+
+        // The pure emitter (C-M15·8 — BCL-only, no session, no store, no
+        // CSV package). The Web composes, never serializes.
+        var bundle = TranslationBulkExporter.Build(matrix, columnOrder);
+
+        // The one translation.export audit row (D4 — the M13
+        // analytics-CSV precedent, ADR 0114). The service owns the row
+        // (the ADR 0021 idiom — the controller adds none).
+        await localization.RecordTranslationExportAsync(columnOrder, actor);
+
+        // The serve idiom (ADR 0034 / ADR 0112, the EventController.EventIcs
+        // precedent): nosniff + no-store on the response, the
+        // Content-Disposition filename names the language so a resident
+        // downloading two languages keeps both; the Content-Type as the
+        // File(...) second arg.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-translations-" + code + ".csv\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(bundle),
+            "text/csv; charset=utf-8");
+    }
+
+    /// <summary>
+    /// <c>POST /admin/languages/{code}/translations/import</c> (M15 U04) —
+    /// the upload: <c>IFormFile</c> → <see cref="TranslationBulkImporter.Parse"/>
+    /// (the pure parser — the Web never parses the bundle itself, C-M15·8) →
+    /// on a parse success, <see cref="ILocalizationService.UpsertManyTranslationsAsync"/>
+    /// (one session, one <c>translation.import</c> audit row per upserted
+    /// language — D4, C-M15·6) for each present language in the bundle.
+    /// <para>
+    /// <b>Fail-closed (C-M15·3, the M11 D4 posture):</b> a refusal from the
+    /// parser (wrong marker, unknown key, unknown language, empty body,
+    /// malformed cell) is surfaced as <c>StatusCode(422)</c> +
+    /// <c>TempData["error"]</c> naming the **first offending row** + the
+    /// reason; the service is **not called** (zero writes, no audit row —
+    /// the M11 D4 "no audit for the blocked attempt" pin). A
+    /// <c>null</c> / zero-byte <c>IFormFile</c> is the same 422 shape (the
+    /// "empty bundle" refusal, the U02 <see cref="TranslationBulkImporter"/>
+    /// doc-comment).
+    /// </para>
+    /// </summary>
+    [HttpPost("{code}/translations/import")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BulkImport(string code, IFormFile bundle)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return RedirectToAction(nameof(Index));
+
+        if (bundle is null || bundle.Length == 0)
+        {
+            TempData["error"] = "Import refused — the uploaded file is empty (the bundle must carry the marker row + a header + a non-empty body).";
+            return StatusCode(422);
+        }
+
+        // The pure parser (C-M15·8 — BCL-only, no session, no store, no
+        // CSV package). The Web composes, never parses (the format is the
+        // Core's — the U02 <see cref="TranslationBulkImporter"/> doc).
+        string bundleText;
+        await using var stream = bundle.OpenReadStream();
+        using var reader = new System.IO.StreamReader(stream,
+            System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        bundleText = await reader.ReadToEndAsync();
+
+        // The catalog's codes (enabled + disabled — the whole set, D1/D2)
+        // are the validator's universe (an unknown column ⇒ refused,
+        // C-M15·3).
+        var catalog = await localization.ListLanguagesAsync();
+        var catalogCodes = catalog
+            .Select(c => c.Id)
+            .ToHashSet(System.StringComparer.Ordinal);
+
+        var result = TranslationBulkImporter.Parse(bundleText, catalogCodes);
+
+        if (result is TranslationBulkImportRefused refusal)
+        {
+            // Fail-closed (C-M15·3): zero writes, no audit row (the M11
+            // D4 "no audit for the blocked attempt" pin) — the service is
+            // never called. The first offending row is named (the 422
+            // shape, the <c>TranslationBulkImportRefused</c> pin).
+            TempData["error"] =
+                "Import refused — " + refusal.Reason +
+                (refusal.OffendingRow.Length > 0
+                    ? "  First offending row: " + refusal.OffendingRow
+                    : string.Empty);
+            return StatusCode(422);
+        }
+
+        var import = (TranslationBulkImport)result;
+        var actor = ActorId(User) ?? string.Empty;
+
+        // Apply (D5 — the validate-then-apply half, the M11 D4 posture).
+        // One UpsertManyTranslationsAsync call per present language in the
+        // bundle (the importer's RowsByLanguage is the present set — a code
+        // with no non-blank cell is absent, C-M15·4). Each call commits
+        // exactly one translation.import audit row (D4, C-M15·6) — the
+        // batch lane's "one row per action" shape is preserved per language
+        // (a bundle covering N languages lands N audit rows, one per
+        // language's upsert — the M13 analytics-CSV precedent per language).
+        var totalUpserted = 0;
+        foreach (var (lang, rows) in import.RowsByLanguage)
+        {
+            totalUpserted += await localization.UpsertManyTranslationsAsync(
+                lang, rows, actor);
+        }
+
+        TempData["info"] =
+            $"Import completed — {totalUpserted} row(s) upserted " +
+            $"across {import.RowsByLanguage.Count} language(s) " +
+            "(visible on the next request).";
+        return RedirectToAction(nameof(Translations), new { code });
+    }
+
     // ── View models (the shell + editor shapes) ─────────────────────────────────────
     // Nested **public** types so U6's Razor views can bind to them as
     // `@model LanguagesController.LanguageRowViewModel` (a private nested type is

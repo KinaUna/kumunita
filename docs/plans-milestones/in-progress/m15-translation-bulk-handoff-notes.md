@@ -415,3 +415,219 @@ Kumunita.Core.Tests.TranslationBulkSaveAllTests`): 2 total, 0
 failed. Full assembly: **1011 total, 0 errors, 0 failed** (no
 regression). Testcontainers left no containers (each run cleans up
 its own).
+
+---
+
+## U04 — export/import routes + views + kw-l
+
+**Date:** 2026-09-29. **Author:** U04 (this unit).
+
+**What shipped (Web + one additive Core seam + 3 pinned tests + the
+three file-facing `kw-l` keys × four languages — the "file half" of
+M15; the batch editor is U05's):**
+
+- **`src/Kumunita.Web/Controllers/LanguagesController.cs`** — the two
+  new routes, both under the **existing** class-level
+  `[Authorize(Roles = "GlobalAdmin,Translator")]` gate (D3 — no new
+  gate), inserted after the frozen `SaveTranslation` route (which stays
+  byte-identical, C-M15·7). The controller **never writes an audit row**
+  (the ADR 0021 idiom — the service owns the row) and **never parses or
+  serializes the bundle** (the Core owns the format, C-M15·8):
+  - `BulkExport(string code)` — `GET
+    /admin/languages/{code}/translations/bundle.csv`:
+    `GetBulkTranslationMatrixAsync()` (a read, no audit) + the pure
+    `TranslationBulkExporter.Build(matrix, columnOrder)` over the
+    catalog's codes in `SortOrder` (the `en` column is dedicated, the
+    exporter maps a catalog `en` onto it). Commits **exactly one**
+    `translation.export` audit row via
+    `RecordTranslationExportAsync(columnOrder, actor)` (the M13
+    analytics-CSV precedent, ADR 0114 — D4). Serves the body as
+    `text/csv; charset=utf-8` with the ADR 0034 / ADR 0112 serve idiom
+    (the `EventController.EventIcs` precedent):
+    `X-Content-Type-Options: nosniff`,
+    `Content-Disposition: attachment;
+    filename="kumunita-translations-{code}.csv"`,
+    `Cache-Control: no-store`.
+  - `BulkImport(string code, IFormFile bundle)` — `POST
+    /admin/languages/{code}/translations/import`: reads the
+    `IFormFile` to a `string` (a null / zero-byte file is the 422 shape
+    before the parser), `ListLanguagesAsync()` → the catalog's codes as
+    the validator's `catalogCodes`, then the pure
+    `TranslationBulkImporter.Parse(text, catalogCodes)`. On
+    **refusal** (`TranslationBulkImportRefused`): `StatusCode(422)` +
+    `TempData["error"]` naming the **first offending row** + the reason;
+    the service is **not called** (zero writes, no audit row — C-M15·3).
+    On **success** (`TranslationBulkImport`): loops `ok.RowsByLanguage`
+    and calls `UpsertManyTranslationsAsync(lang, rows, actor)` **once per
+    present language** (each call commits exactly one
+    `translation.import` audit row — D4/C-M15·6), then
+    `TempData["info"]` + redirect to `Translations`.
+- **`src/Kumunita.Core/Localization/ILocalizationService.cs`** — the
+  additive seam
+  `Task RecordTranslationExportAsync(IReadOnlyList<string> languageCodes,
+  string actorId, CancellationToken ct = default)` + doc-comment (a
+  **read with an audit** — D4; the M13 analytics-CSV precedent, ADR
+  0114; exactly one `translation.export` row, `Via = Admin`,
+  `TargetId` = the joined codes; no new `AccessAction` / `AccessVia` /
+  `Decide()` branch / role — C-M15·5). Inserted between U02's
+  `SaveAllTranslationsAsync` and the `GetCompletenessAsync` tail — the
+  frozen seams above are byte-identical (C-M15·7, a pure insertion).
+- **`src/Kumunita.Core/Localization/LocalizationService.cs`** — the
+  implementation (pure insertion at the end of the class, after U03's
+  `SaveAllTranslationsAsync`): the same one-session idiom as U02/U03,
+  but **no domain rows** — the sole write is the one
+  `AccessAudit` row: `Action = "translation.export"`,
+  `TargetKind = "translation"`, `TargetId = string.Join(",",
+  languageCodes)`, `Via = AccessVia.Admin`,
+  `Outcome = AccessOutcome.Allow`, `ActorId` / `EffectivePrincipalId` =
+  the acting account, committed with `SaveChangesAsync(ct)`.
+- **`src/Kumunita.Web/Views/Languages/Index.cshtml`** — the per-language
+  "Download (CSV)" affordance: a plain `<a>` (no JS) to
+  `/admin/languages/@row.Code/translations/bundle.csv` with the
+  `translations.bulk.export` `kw-l` label, added to the per-row action
+  `<div class="btn-group">` next to the **byte-identical** "UI strings"
+  link (the frozen surface, C-M15·7 — the "UI strings" link itself is
+  unchanged). Open to both roles (the class gate, D3).
+- **`src/Kumunita.Web/Views/Languages/Translations.cshtml`** — the
+  upload affordance block (a card between the intro `<p>` and the
+  per-row table): a `<form method="post"
+  action="/admin/languages/@Model.Code/translations/import"
+  enctype="multipart/form-data">` with `@Html.AntiForgeryToken()`, an
+  `<input type="file" name="bundle" accept=".csv,text/csv">`, the
+  `translations.bulk.import` submit label, and the
+  `translations.bulk.import_hint` hint (the blank-no-op +
+  refused-file rule, C-M15·4/3). A success flashes via
+  `TempData["info"]`, a refusal via `TempData["error"]` (the
+  `_FlashToast` surface — the house convention, the
+  `Portability.cshtml` precedent). The per-row editor below it is
+  **byte-identical** (C-M15·7); the batch-mode toggle is **U05's**.
+- **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — the
+  three file-facing keys (D8, this unit's closed share) in all four
+  dicts (`EnValues` / `DeValues` / `FrValues` / `DaValues`), inserted
+  after each dict's `portability.status.failure` line (the M11
+  portability block). The three editor-facing keys (`save_all` /
+  `mode_batch` / `mode_single`) are **U05's** — each unit's key set is
+  closed. The `KnownTranslationKeys_ParityTests` /
+  `KwLRegistryConsistencyTests` pins **extend automatically** (they
+  iterate the registry, not a hardcoded list).
+- **`tests/Kumunita.Web.Tests/BulkTranslationRouteTests.cs`** — the 3
+  pinned tests (names **verbatim** from the design doc §pinned tests,
+  U04 group) + 12 `kw-l` parity theory cases (3 keys × 4 languages), on
+  the direct-construction harness (NSubstitute `ILocalizationService`
+  over a `DefaultHttpContext` with an authenticated
+  `Kumunita.Sub` + `Kumunita.Role=Translator` principal; a byte-backed
+  `TestFormFile` carrier + a no-op `ITempDataProvider`, the
+  `AdminPortabilityControllerTests` / `MLUI_FacesTests` idiom).
+
+**Exit items (the unit plan's Exit section):**
+
+- **(a) The two route shapes + the 422 refusal as wired** —
+  `BulkExport` (GET `bundle.csv`) → matrix read + `Build` + one
+  `translation.export` audit seam call + the serve idiom →
+  `File(bytes, "text/csv; charset=utf-8")`. `BulkImport` (POST
+  `import`) → `IFormFile` read → `Parse` → refusal ⇒ `StatusCode(422)` +
+  `TempData["error"]` (first offending row named), service **not**
+  called; success ⇒ `UpsertManyTranslationsAsync` per present language +
+  `TempData["info"]` + `RedirectToAction(Translations)`.
+- **(b) The serve headers as set** — `X-Content-Type-Options: nosniff`,
+  `Content-Disposition: attachment;
+  filename="kumunita-translations-{code}.csv"`,
+  `Cache-Control: no-store`, `Content-Type: text/csv; charset=utf-8`
+  (the ADR 0034 / ADR 0112 serve idiom, the `EventController.EventIcs`
+  precedent).
+- **(c) The `RecordTranslationExportAsync` seam signature** —
+  `Task RecordTranslationExportAsync(IReadOnlyList<string> languageCodes,
+  string actorId, CancellationToken ct = default)` on
+  `ILocalizationService`; the implementation commits exactly one
+  `AccessAudit` row (`translation.export` / `translation` / the joined
+  codes / `Admin` / `Allow` / the actor) in one session, no domain rows.
+- **(d) The 3 pin names + pass/red** — all **green**:
+  - `Bulk_Export_Route_ServesCsv_WithAttachmentHeaders` — ✅ pass
+    (asserts `FileContentResult`, `ContentType == "text/csv;
+    charset=utf-8"`, `X-Content-Type-Options == "nosniff"`,
+    `Cache-Control == "no-store"`, `Content-Disposition` contains
+    `attachment`, the body starts with
+    `# kumunita-translation-bundle/1`, and
+    `RecordTranslationExportAsync` is called exactly once).
+  - `Bulk_Import_Route_RefusalIs422_And_NoAuditRow` — ✅ pass
+    (a wrong-marker bundle ⇒ `StatusCodeResult` 422, `TempData["error"]`
+    names the marker + the offending row, and
+    `UpsertManyTranslationsAsync` is **not** called — C-M15·3).
+  - `Bulk_Import_Route_Upsert_Saves_ThePresentRows` — ✅ pass
+    (a well-formed two-row / one-language bundle ⇒ `RedirectToActionResult`
+    + `UpsertManyTranslationsAsync("de", {two rows}, actor)` called
+    exactly once with the exact two rows).
+  - Class-filtered run (`-class
+    Kumunita.Web.Tests.BulkTranslationRouteTests`): **15 total (3 pins +
+    12 kw-l parity cases), 0 errors, 0 failed**.
+- **(e) The three new keys + their four-language texts** —
+  - `translations.bulk.export` — en `Download translations (CSV)` /
+    de `Übersetzungen herunterladen (CSV)` / fr
+    `Télécharger les traductions (CSV)` / da
+    `Download translationer (CSV)`.
+  - `translations.bulk.import` — en `Upload translations (CSV)` /
+    de `Übersetzungen hochladen (CSV)` / fr
+    `Téléverser les traductions (CSV)` / da
+    `Upload translationer (CSV)`.
+  - `translations.bulk.import_hint` — en
+    `Blank cells are skipped (they never erase a translation); a file
+    with an unknown key or language is refused unchanged.` / de
+    `Leere Felder werden übersprungen (sie löschen niemals eine
+    Übersetzung); eine Datei mit einem unbekannten Schlüssel oder einer
+    unbekannten Sprache wird unverändert abgelehnt.` / fr
+    `Les cellules vides sont ignorées (elles n'effacent jamais une
+    traduction) ; un fichier contenant une clé inconnue ou une langue
+    inconnue est refusé sans modification.` / da
+    `Tomme felter springes over (de sletter aldrig en oversættelse); en
+    fil med en ukendt nøgle eller et ukendt sprog afvises uændret.`
+  The 12 `KwL_BulkFileFacing_KeysPresent_*` theory cases pin each
+  key non-empty in all four dicts.
+- **(f) The per-row editor is byte-identical (C-M15·7)** — the
+  `Translations.cshtml` per-row `<table>` + its `<form>` + the
+  `SaveTranslation` route are unchanged; the U04 affordances (the
+  `Index.cshtml` "Download (CSV)" link + the `Translations.cshtml`
+  upload card) are pure insertions. The "UI strings" link in
+  `Index.cshtml` is unchanged.
+- **(g) Compile warnings** — none (`dotnet build Kumunita.slnx -c
+  Debug`: 0 warnings, 0 errors).
+
+**Test results** — Web suite in-process (the AGENTS.md runner):
+**603 total, 0 errors, 0 failed** (includes U04's 3 pins + 12 kw-l
+cases + the `KwLRegistryConsistencyTests` / parity surfaces). Core
+suite: **1011 total, 0 errors, 0 failed** (no regression; U01/U02/U03
+pins green). Testcontainers left no containers (each run cleans up its
+own).
+
+**Drift notes (appended, never rewritten):**
+
+- **No design-doc drift** — D2/D3/D4/D8 + the §bundle table + the 3
+  pinned names + the `translation.export` audit-row shape + the three
+  `kw-l` key texts were copied verbatim from
+  `docs/design/m15-translation-bulk-design.md`; the unit plan's prose
+  was checked against the live `LanguagesController` /
+  `ILocalizationService` / `Index.cshtml` / `Translations.cshtml`
+  surface and no
+  source-driven refinement was needed, so the §drift-guard drift log
+  stays empty.
+- **Per-language import loop (a wiring note, not a spec drift):** the
+  `UpsertManyTranslationsAsync` seam is **per-language** (one
+  `translation.import` audit row per call). The import bundle is the
+  whole matrix (multiple languages via `RowsByLanguage`), so the route
+  **loops over `ok.RowsByLanguage`** and calls the seam once per present
+  language. A bundle covering N languages lands N audit rows (one per
+  language's upsert) — the "one row per bulk action" shape (D4/C-M15·6)
+  is preserved per language. The pinned upsert test uses a single
+  language (`de`), so it asserts exactly one seam call + one audit row,
+  matching the design doc's "the two stored rows updated + the one
+  `translation.import` audit row" pin for that single-language bundle.
+- **C-M15·7 confirmed** — the two edited Core files' changes are pure
+  insertions (the interface seam between U03's seam and the
+  completeness tail; the implementation appended at the end of the
+  class); the Web routes are pure insertions after the frozen
+  `SaveTranslation` route; the views' per-row editor + the "UI strings"
+  link are byte-identical. U01/U02/U03's seams are untouched.
+
+_(next: U05 — the batch editor: the `?batch=true` flag + the
+`save-all` POST route + the `Mode` view-model property + the batch
+toggle + the `translations.bulk.save_all` / `.mode_batch` /
+`.mode_single` keys + the 2 pinned tests — see `m15-u05.md`)_

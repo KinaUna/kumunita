@@ -1707,6 +1707,11 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback).",
             ["portability.status.ok"]    = "Done.",
             ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
+
+            // M15 U04 (ADR 0116, D8) — the file-facing bulk keys.
+            ["translations.bulk.export"]     = "Download translations (CSV)",
+            ["translations.bulk.import"]     = "Upload translations (CSV)",
+            ["translations.bulk.import_hint"] = "Blank cells are skipped (they never erase a translation); a file with an unknown key or language is refused unchanged.",
         };
 
     /// <summary>
@@ -3259,6 +3264,11 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Dieses Archiv importieren? Es ersetzt den Inhalt der Instanz (der Wiederherstellungspfad — das Vorkopie-Backup des Operators ist der Rollback).",
             ["portability.status.ok"]    = "Fertig.",
             ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
+
+            // M15 U04 (ADR 0116, D8) — die datei-basierten Bulk-Keys.
+            ["translations.bulk.export"]     = "Übersetzungen herunterladen (CSV)",
+            ["translations.bulk.import"]     = "Übersetzungen hochladen (CSV)",
+            ["translations.bulk.import_hint"] = "Leere Felder werden übersprungen (sie löschen niemals eine Übersetzung); eine Datei mit einem unbekannten Schlüssel oder einer unbekannten Sprache wird unverändert abgelehnt.",
         };
 
     /// <summary>
@@ -4814,6 +4824,11 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Importer cette archive ? Elle remplace le contenu de l'instance (le chemin de restauration — la sauvegarde pré-import de l'opérateur est le retour arrière).",
             ["portability.status.ok"]    = "Terminé.",
             ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
+
+            // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
+            ["translations.bulk.export"]     = "Télécharger les traductions (CSV)",
+            ["translations.bulk.import"]     = "Téléverser les traductions (CSV)",
+            ["translations.bulk.import_hint"] = "Les cellules vides sont ignorées (elles n'effacent jamais une traduction) ; un fichier contenant une clé inconnue ou une langue inconnue est refusé sans modification.",
         };
 
     /// <summary>
@@ -6360,6 +6375,11 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Importér denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien — operatørens backup før import er tilbageskrivningen).",
             ["portability.status.ok"]    = "Færdig.",
             ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
+
+            // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.
+            ["translations.bulk.export"]     = "Download translationer (CSV)",
+            ["translations.bulk.import"]     = "Upload translationer (CSV)",
+            ["translations.bulk.import_hint"] = "Tomme felter springes over (de sletter aldrig en oversættelse); en fil med en ukendt nøgle eller et ukendt sprog afvises uændret.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
