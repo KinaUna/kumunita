@@ -10,3 +10,11 @@
 - **ADR 0118** created (Status: Accepted, 2026-09-29; amends 0004 §B.1 + 0006 + 0105 + 0117 (M16 D5 posture) + 0101 (inverted)) and its **index row appended after 0117** in `docs/adr/README.md`.
 - Design doc `docs/design/m17-bookmarks-design.md` carries the named trade (dangling-row UX vs. leak surface — exactly one static string) and the **empty drift log** (frozen pins, `§drift-guard`).
 - **No veto** recorded before the lock; the lock set is [LOCKED] as of this unit.
+
+## U01 — Bookmark doc + M17DocTypes + boot wiring
+
+- **`Bookmark` field set** (`src/Kumunita.Core/Bookmarks/Bookmark.cs`): `Id` / `OwnerId` / `TargetKind` (string, closed set {`post`,`event`,`todo`,`announcement`,`page`}) / `TargetId` / `Created` — confirmed **no** `Audience`, **no** `IsDeleted`, **no** `Modified`, **no** `ComponentId` (D1/D2/D4); class doc-comment says "a pointer, not content".
+- **Two indexes** (`src/Kumunita.Core/M17DocTypes.cs`): **unique** `bm_uidx_owner_target` on `(OwnerId, TargetKind, TargetId)` (the F1 idempotency witness — the M9 `convo_uidx_pair` named-`UniqueIndex` idiom) + non-unique `(OwnerId, Created)` list-ordering index (unnamed, the M5/M16 feed-index shape).
+- **Boot wiring**: `M17DocTypes.Configure(opts);` added at `src/Kumunita.Web/Program.cs` **line 191**, immediately after `M16DocTypes.Configure(opts);` — `SchemaBootstrap.cs` was **not touched** (it calls no `*DocTypes.Configure`; it applies the host-registered store's configured surface — mirrored the M16 precedent exactly).
+- **Pinned test**: `M17DocTypes_RegistersBookmarkWithUniqueOwnerTargetIndex` in `tests/Kumunita.Core.Tests/M17DocTypesDdlTests.cs` (doc-registration shape pin — outside the §2.5 seam list, the M16/U01 `M16DocTypesDdlTests` precedent; live Postgres catalog, verifies the table + the UNIQUE index referencing all three keys).
+- **Compile warnings**: none on the new POCO (build clean — `dotnet build Kumunita.slnx -c Debug` green); `dotnet exec` of `Kumunita.Core.Tests.dll` green (Total 1021, Failed 0).
