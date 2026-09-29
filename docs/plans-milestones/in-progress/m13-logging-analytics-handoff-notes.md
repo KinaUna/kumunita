@@ -503,3 +503,109 @@ surface is complete — the `UsageEvent` doc is registered on the
 `UsageDocTypes` parallel surface (the `M3DocTypes` precedent), the
 capture policy is pure and pinned, and the `SurfaceKey` closed list is
 pinned verbatim (the U04 aggregation's `GroupBy` copies this same map).
+
+## U03 — UsageCaptureMiddleware (2026-09-29)
+
+D1's thin host adapter shipped. Touched only U03's deliverables
+(`Middleware/UsageCaptureMiddleware.cs`, one `Program.cs` line + one
+`using`, `UsageCaptureMiddlewareTests.cs`). Did **not** touch U01's file
+sink, U04's aggregation seam, U05's admin surface / retention tick, or the
+U02 `Usage` context (reused `UsageCapturePolicy.Decide` + `UsageEvent`
+verbatim, no duplication). Reused U02's `UsageCapturePolicy.Decide` and
+`UsageEvent` — the skip rules and POCO are not re-implemented.
+
+**(a) Middleware + `InvokeAsync` signature.**
+`src/Kumunita.Web/Middleware/UsageCaptureMiddleware.cs` —
+`public sealed class UsageCaptureMiddleware`, ctor
+`(RequestDelegate next, IDocumentStore store, ILogger<UsageCaptureMiddleware> logger)`,
+and `public async Task InvokeAsync(HttpContext httpContext)`. The
+`HttpContext`→`UsageCaptureInput` projection is a private static
+`ToInput(HttpContext)` (the `HasEndpoint` / `IsStaticFile` /
+`RouteTemplate` / `ActorId` fields), then `UsageCapturePolicy.Decide(input)`.
+On `Record`: one `UsageEvent` via `IDocumentStore.LightweightSession()`
+(`session.Store(...)` + `await session.SaveChangesAsync(httpContext.RequestAborted)`).
+
+**(b) `Program.cs` wiring line.** `app.UseMiddleware<UsageCaptureMiddleware>();`
+at **line 565** (the `using Kumunita.Web.Middleware;` added at line 8).
+Position: **after** `app.UseAuthentication()` (line 547), after
+`app.UseMiddleware<BlockedAccountMiddleware>()` (549), after
+`app.UseMiddleware<PrivilegedStampMiddleware>()` (556), and **before**
+`app.UseAuthorization()` (567) — exactly the design doc §middleware intent
+(so `HttpContext.User` is populated and an authorized request is captured;
+a denied one, which never reaches the endpoint, is not — C-M13·4). U01's
+`AddFileSink` wiring shifted the pipeline from the design doc's 534/536
+lines; re-verified against the live tree before inserting.
+
+**(c) `ClaimTypes.Subject` claim shape.**
+`ActorId = httpContext.User?.Identity?.IsAuthenticated == true ?
+httpContext.User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value ?? string.Empty : string.Empty`
+— the house claim (the `AdminController.AdminSubjectId` shape), **not** the
+literal `"sub"`. `ClaimTypes.Subject == "Kumunita.Sub"`
+(`src/Kumunita.Core/Identity/ThinPrincipal.cs`). Empty for anonymous
+(C-M13·2).
+
+**(d) `try/catch` C-M13·5 pin.** The `LightweightSession` write is wrapped
+in `try { ... } catch (Exception ex) { _logger.LogError(ex,
+"UsageEvent capture failed (RouteTemplate: {RouteTemplate}); the request
+continues.", decision.RouteTemplate); }` — **logs and re-throws nothing**;
+the response always continues. Pinned by
+`UsageCaptureMiddleware_Skips_When_Store_Throws` (the
+`SaveChangesAsync` throws; response still 200; `ILogger.Log` received with
+the exception).
+
+**(e) The 3 Web pins — all PASS.** Run via the in-process xunit.v3 runner
+(`dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.UsageCaptureMiddlewareTests"` —
+not `dotnet test`, per AGENTS.md): **Total: 3, Errors: 0, Failed: 0,
+Skipped: 0**.
+- `UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request` — **PASS** (a `GET /` stores exactly one `UsageEvent`, `RouteTemplate == "GET /"`, `ActorId == ""`, `At` set; the happy path never logs a failure).
+- `UsageCaptureMiddleware_Skips_True_404` — **PASS** (no endpoint → `GetEndpoint()` null → `HasEndpoint` false → the store is never opened, zero rows).
+- `UsageCaptureMiddleware_Skips_When_Store_Throws` — **PASS** (`SaveChangesAsync` throws → response still 200, `ILogger.Log` received with the exception).
+
+**(f) Compile warnings.** 0 (clean non-incremental build of `Kumunita.slnx`).
+The three CS4014/CS8620 warnings that briefly appeared on the first build of
+the test file (un-awaited `SaveChangesAsync` in a `Received` check + the
+`ILogger` formatter nullability `Func<object, Exception, string>` vs
+`Exception?`) were fixed in-line; the final build is 0 warnings / 0 errors.
+
+**DRIFT GUARD — .NET 10 API deviation from the locked design doc
+(recorded here so U04/U05 + the drift guard see it, per AGENTS.md
+"check the actual APIs in the current dependency versions — do not copy a
+common Marten or … pattern from memory").** The design doc §middleware names
+two .NET types that **do not exist in .NET 10 (10.0.12)** — verified by
+probing the live shared framework + ilspycmd decompilation, not memory:
+
+1. **Route template.** The doc says
+   `endpoint.RoutePattern.RawText` (and `UsageCapturePolicy.cs`'s doc-comment
+   repeats it). In .NET 10, `Endpoint` (in
+   `Microsoft.AspNetCore.Http.Abstractions`) has **no `RoutePattern`
+   property** — only `DisplayName` / `Metadata` / `RequestDelegate`; and
+   `RoutePattern` has moved to `Microsoft.AspNetCore.Routing.Patterns.RoutePattern`
+   (and `RoutePattern.Parse` → `RoutePatternFactory.Parse`). The **route
+   template is read from `IRouteDiagnosticsMetadata.Route`**
+   (`Microsoft.AspNetCore.Http.Metadata`) via
+   `endpoint.Metadata.OfType<IRouteDiagnosticsMetadata>().FirstOrDefault()?.Route`.
+   Verified: a `/posts/{id}` route surfaces `Route == "/posts/{id}"` (the
+   template, not a concrete path — C-M13·4 holds). **The middleware uses
+   `IRouteDiagnosticsMetadata.Route`, not `RoutePattern.RawText`.**
+
+2. **Static-file skip.** The doc says
+   `endpoint.Metadata.GetMetadata<StaticFileEndpointMetadata>()`.
+   `StaticFileEndpointMetadata` **does not exist** in .NET 10. The project
+   uses the .NET 10 `MapStaticAssets()`/`WithStaticAssets()` pipeline, whose
+   endpoint carries a **`StaticAssetDescriptor`**
+   (`Microsoft.AspNetCore.StaticAssets`) in its metadata (confirmed by
+   decompiling `StaticAssetEndpointFactory.Create` — it does
+   `routeEndpointBuilder.Metadata.Add(resource)` where `resource` is a
+   `StaticAssetDescriptor`). `StaticAssetDescriptor` is `public sealed` but
+   does **not** implement `IEndpointMetadata`, so it is detected via
+   `endpoint.Metadata.OfType<StaticAssetDescriptor>().Any()`, **not**
+   `GetMetadata<>()`. **The middleware uses `OfType<StaticAssetDescriptor>()`.**
+
+The D1 *intent* (skip no-endpoint + static-file noise, capture the route
+**template**) is fully preserved and pinned by the 3 Web tests; only the two
+type names follow the real .NET 10 API. **Recommendation for the drift
+guard / U04:** if the design doc's `UsageCaptureInput` doc-comment (or any
+downstream unit) references `RoutePattern.RawText` /
+`StaticFileEndpointMetadata`, update them to `IRouteDiagnosticsMetadata.Route`
+/ `StaticAssetDescriptor` so the primary tier matches the shipped code. The
+3 pinned test names are unchanged (U06's gate can reference them verbatim).

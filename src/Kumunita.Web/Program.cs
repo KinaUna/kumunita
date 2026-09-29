@@ -5,6 +5,7 @@ using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Web;
+using Kumunita.Web.Middleware;
 using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -553,6 +554,15 @@ app.UseMiddleware<BlockedAccountMiddleware>();
 // enforcement (a blocked user is signed out unconditionally) and before
 // authorization (so the gate sees a current claim set).
 app.UseMiddleware<PrivilegedStampMiddleware>();
+
+// M13 — usage capture (D1, ADR 0114): record one UsageEvent per recognized
+// request (route template + ActorId, nothing else — C-M13·2). Registered
+// after UseAuthentication() + PrivilegedStampMiddleware (so HttpContext.User is
+// populated and the current claim set is live) and before UseAuthorization()
+// (so a denied request, which never reaches the endpoint, is not captured —
+// the C-M13·4 boundary, no noise). A capture failure never fails the request
+// (C-M13·5 — the middleware's own try/catch logs and swallows).
+app.UseMiddleware<UsageCaptureMiddleware>();
 
 app.UseAuthorization();
 
