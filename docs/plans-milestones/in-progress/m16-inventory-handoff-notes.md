@@ -757,3 +757,84 @@ docs-parity flip (the four surfaces — `Milestones.cs` M16→done / M17→next,
 shipped list + M18 planned, the README Roadmap/Status, `docs/STATUS.md`,
 and the `docs/ARCHITECTURE.md` value-chain M16 row) — **all in U06's one
 unit** (C-M16·7). **U06 is the close — it has its own plan.**
+
+---
+
+## U06 — close (three gate tests + D7 docs-parity flip)
+
+**Role:** the close. U00–U05 are done and committed; this unit ships the
+M16 milestone. There is no U07.
+
+**(a) The three acceptance gate tests** (the U00 §gate — locked names, a
+rename / re-scope would be a drift event) added to
+`tests/Kumunita.Web.Tests/M16AcceptanceGateTests.cs`, all run over the
+**full stack** (the real `InventoryController` routes + the real
+`InventoryService` over Testcontainers Postgres — not a service-level or
+NSubstitute double):
+
+- `M16_Acceptance_ClosedLoop_CheckOutCheckInHistory` — the creator creates
+  a **shared** item (controller `CreatePost` → redirect), a second resident
+  checks it out (`CheckOutPost`), checks it in (`CheckInPost`); the usage
+  history shows **exactly one** closed `InventoryCheckout` (both
+  `CheckedOutAt` + `CheckedInAt` set), the item's `CurrentHolderId` is
+  cleared, and the `AccessAudit` trail carries create / check-out /
+  check-in **Allow** rows (C-M16·3 / F1 / F3 / D4).
+- `M16_Acceptance_HandoffAuthorizationBoundary_PrivateAndShared` — a
+  **private** item (owner-restricted audience) is hidden from the list
+  (aggregate `HiddenCount ≥ 1`, not in the visible set), its detail is a
+  **404, not a 403** (C-M3·4 non-leaky), and a stranger's check-out is a
+  **403** (`ForbidResult`) with the single **Deny** `inventory.checkout`
+  audit row committing; a **shared** item is visible in the list and a
+  member's check-out is a **Redirect** + **Allow** row (D5 standing probe —
+  *see* ≠ *act*).
+- `M16_Acceptance_PartVsWholeAuditCompleteness` — the check-out /
+  check-in transition's audit row commits **atomically** with the state
+  change (one `SaveChangesAsync`, the F1 witness), the list's aggregate
+  row survives a concurrent create, and the **whole** audit trail is
+  present (C-M16·2 / C3 / C-M16·3).
+
+The tests boot the full store trio (`UserInfoService` → `AuthorizationService`
+→ `InventoryService`) on `M1DocTypes` + `M16DocTypes` over a fresh
+`PostgresFixture` database, and drive the **real** `InventoryController`
+with a real `ClaimsPrincipal` (`Kumunita.Sub` / `Kumunita.Role`) +
+`DefaultHttpContext` — the same path the browser takes.
+
+**(b) The D7 docs-parity flip** (C-M16·7 — the four surfaces flip
+**together in this one unit**, no half-flip; M17/M18 are **not** reordered
+and the shipped M1–M15 text is **not** edited):
+
+- `src/Kumunita.Web/Milestones.cs` — M16 `StatusNext` → `StatusDone`;
+  M17 `StatusPlanned` → `StatusNext` (M18 stays `StatusPlanned`).
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs` — `Shipped_Milestones_Are_Marked_Done`
+  now includes `"M16"`; the single-in-progress pin renamed
+  `M16_Is_The_Single_InProgress_Milestone` →
+  `M17_Is_The_Single_InProgress_Milestone` (re-pinned to `"M17"`, the
+  planned set drops M17 to leave `M18`). The order pin
+  (`… "M15", "M16", "M17", "M18"`) is untouched — no reorder.
+- `README.md` — Status block now reads **M17 in progress** … **M1–M16**
+  done … **M18 is planned**; Roadmap M16 row → **Done.** (ADR 0117), M17
+  row → **In progress.**, M18 stays planned.
+- `docs/STATUS.md` — the milestone line flipped: **M16 is done** (ADR 0117)
+  … **next is M17** … M18.
+- `docs/ARCHITECTURE.md` — the value-chain table gains the
+  **M16 inventory** row (`coordination` — the neighborhood's shared /
+  community-owned / private things become trackable: check-out / check-in,
+  where they are, and who has used them).
+
+**(c) Guardrails honored:** docs + tests only — no new lane, no new code
+surface beyond the gate tests. No new bounded context, no new `AccessVia`
+value, no `INotificationService` (D8), no new `kw-l` keys, no new ADR
+(ADR 0117 was landed by an earlier unit). The frozen `IAuthorizationService`
+/ `AccessAction` / `AccessVia` / `Decide()` / `IUserInfoService` seams are
+untouched (C-M16·4).
+
+**(d) The exit gate** (green): `dotnet build Kumunita.slnx -c Debug`
+(0 errors) + both test assemblies in-process:
+`dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+— **1020 tests, 0 errors, 0 failed, 0 skipped**; and `dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` —
+**638 tests, 0 errors, 0 failed, 0 skipped** (635 at U05 + the 3 new U06
+gate tests; `MilestonesTests` re-pins to M17 and passes).
+
+**(e) M16 milestone is shipped; handoff notes complete.** U06 is the close
+— this is the last unit of M16. `m16-u06.md` moves to `done/`.
