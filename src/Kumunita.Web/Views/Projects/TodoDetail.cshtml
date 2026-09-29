@@ -487,6 +487,19 @@
                     </div>
                 }
 
+                @* ADR 0115 D4 (M14 interlock, U06) — the **VTODO** "Add to
+                   calendar" affordance (the ADR 0112 events.ics.download shape
+                   carried to the to-do surface): a plain link to the lane-1
+                   per-item file (GET /projects/todos/{id}.ics, U06). Quiet,
+                   beside the event-link chip / picker block — the detail page
+                   only renders for a to-do the caller already passed the
+                   Read decision on, so the file lane's own 404-not-403 split
+                   (C-M14·2) is the guard. No new JS (the ADR 0031 tsc-only
+                   discipline — a plain <a>). *@
+                <a class="btn btn-outline-secondary btn-sm d-inline-block mb-3" href="@($"/projects/todos/{Model.Todo.Id}.ics")">
+                    <kw-l key="projects.todos.ics.download">Add to calendar</kw-l>
+                </a>
+
                 @* ADR 0115 D3 (M14 interlock) — the **event picker** (the
                    <c>set-event</c> lane's affordance, the U04
                    <c>POST /projects/todos/{id}/set-event</c> form). A

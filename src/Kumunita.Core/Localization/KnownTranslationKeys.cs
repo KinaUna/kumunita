@@ -1415,6 +1415,14 @@ public static class KnownTranslationKeys
             ["todo.set_event.label"] = "Link to event",
             ["todo.set_event.pick"] = "Choose an event",
 
+            // ── M14 (ADR 0115 D4) — the two U06 VTODO affordances (the to-do
+            //    detail's "Add to calendar" link + the to-do index's feed
+            //    link, the ADR 0112 events.ics.* shape carried to the to-do
+            //    surface; plain <a> links, no new JS — the closed-key
+            //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["projects.todos.ics.download"] = "Add to calendar",
+            ["projects.todos.ics.feed"] = "Calendar feed (iCal)",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2988,6 +2996,14 @@ public static class KnownTranslationKeys
             ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
             ["todo.set_event.pick"] = "Veranstaltung wählen",
 
+            // ── M14 (ADR 0115 D4) — die zwei U06 VTODO-Oberflächen
+            //    (To-do-Details: „Zum Kalender hinzufügen" + To-do-Index:
+            //    Feed-Link; die ADR-0112 events.ics.-Form auf der To-do-Seite,
+            //    schlichte <a>-Links, kein neues JS — das geschlossene
+            //    Schlüssel-Register + KnownTranslationKeys_ParityTests erzwingen × 4) ──
+            ["projects.todos.ics.download"] = "Zum Kalender hinzufügen",
+            ["projects.todos.ics.feed"] = "Kalender-Feed (iCal)",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -4535,6 +4551,14 @@ public static class KnownTranslationKeys
             ["todo.set_event.label"] = "Lier à un événement",
             ["todo.set_event.pick"] = "Choisir un événement",
 
+            // ── M14 (ADR 0115 D4) — les deux surfaces VTODO U06 (détail de la
+            //    to-do : lien « Ajouter à l'agenda » + index des to-dos : lien
+            //    de flux ; la forme events.ics. d'ADR 0112 portée à la surface
+            //    to-do ; liens <a> simples, pas de nouveau JS — le registre
+            //    de clés fermé + KnownTranslationKeys_ParityTests appliquent × 4) ──
+            ["projects.todos.ics.download"] = "Ajouter à l'agenda",
+            ["projects.todos.ics.feed"] = "Flux de calendrier (iCal)",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -6072,6 +6096,14 @@ public static class KnownTranslationKeys
             //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──
             ["todo.set_event.label"] = "Knyt til arrangement",
             ["todo.set_event.pick"] = "Vælg et arrangement",
+
+            // ── M14 (ADR 0115 D4) — de to U06 VTODO-overflader (to-do-detail:
+            //    "Tilføj til kalender"-link + to-do-index: feed-link; ADR 0112's
+            //    events.ics.-form på to-do-overfladen; simple <a>-links, intet
+            //    nyt JS — det lukkede nøgle-register +
+            //    KnownTranslationKeys_ParityTests håndhæver × 4) ──
+            ["projects.todos.ics.download"] = "Tilføj til kalender",
+            ["projects.todos.ics.feed"] = "Kalenderfeed (iCal)",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

@@ -1442,6 +1442,150 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// <c>GET /projects/todos/{id}.ics</c> — the M14 per-to-do calendar file
+    /// (ADR 0115 D4 / design doc §routes lane-1, locked): the frozen
+    /// <see cref="IProjectService.GetTodoAsync"/> (one <c>CanAsync(Read)</c>
+    /// decision — C-M14·4, no new authorization surface) renders one
+    /// <c>VTODO</c> through the pure U05 <see cref="TodoIcsWriter"/> over the
+    /// already-authorized row. The decision never leaks into the file
+    /// (C-M14·5) — the ICS text is display fields only on the closed pinned
+    /// subset (§vtodo — the emitter is U05's and already closed; the routes
+    /// add no <c>RRULE</c> / recurrence, C-M14·6 / D6).
+    /// <para>
+    /// **404-not-403 (C-M14·2, the non-leaky pin):** *both*
+    /// <see cref="KeyNotFoundException"/> (absent) *and*
+    /// <see cref="UnauthorizedAccessException"/> (denied) map to
+    /// <see cref="NotFoundResult"/> — a to-do a caller cannot see neither
+    /// downloads nor 403s into existence (the M12 <see
+    /// cref="EventController.EventIcs"/> lane-1 split, verbatim).
+    /// </para>
+    /// <para>
+    /// **Undated to-do ⇒ the degenerate form** (drift entry 4): an undated
+    /// to-do still yields a valid <c>VTODO</c> with only <c>UID</c> /
+    /// <c>DTSTAMP</c> / <c>SUMMARY</c> (+ <c>DESCRIPTION</c>) — the
+    /// RFC-legal form; the feed lane's skip rule (undated ⇒ omitted) applies
+    /// to the *feed* only (lane 2 below).
+    /// </para>
+    /// <para>
+    /// **Anonymous ⇒ the standard sign-in challenge** (the class-level
+    /// <c>[Authorize]</c> default — F3; there is no anonymous iCal surface,
+    /// the ADR 0112 D2 pin).
+    /// </para>
+    /// <para>
+    /// **Route-resolution pin (the M12 known gotcha, carried):** ASP.NET
+    /// Core ranks the **literal** <c>"/projects/todos.ics"</c> route above
+    /// the parameterized <c>"/projects/todos/{id}"</c>, so
+    /// <c>GET /projects/todos.ics</c> resolves to the feed lane (below),
+    /// never to a detail with <c>id = "todos.ics"</c> (the
+    /// <c>EventController</c> <c>/events.ics</c> / <c>/events/{id}</c>
+    /// resolution, the ADR 0112 §routes precedent).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, ADR 0034 / 0108 idiom — the M12 <see
+    /// cref="EventController.EventIcs"/> action verbatim):**
+    /// <c>Content-Type: text/calendar; charset=utf-8</c> (the
+    /// <see cref="FileResult"/> second arg) +
+    /// <c>Content-Disposition: attachment;
+    /// filename="kumunita-todo-{id}.ics"</c> +
+    /// <c>Cache-Control: no-store</c> (per-caller, re-authorized content —
+    /// never cached by a proxy or the PWA service worker) +
+    /// <c>X-Content-Type-Options: nosniff</c>, the three headers set on
+    /// <see cref="HttpResponse.Headers"/> before the return.
+    /// </para>
+    /// </summary>
+    [HttpGet("/projects/todos/{id}.ics")]
+    public async Task<IActionResult> TodoIcs(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        TodoItem todo;
+        try
+        {
+            todo = (await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted)).Todo;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(); // absent — the non-leaky split (C3)
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(); // denied — the file lane does not 403 into existence (C-M14·2)
+        }
+
+        // The pure emitter (U05) over the already-authorized row — the feed's
+        // skip rule is feed-only (lane 2); an undated to-do yields the
+        // degenerate VTODO here (drift entry 4).
+        var icsText = TodoIcsWriter.BuildTodos([todo], DateTimeOffset.UtcNow);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom,
+        // the M12 EventIcs action verbatim:
+        // Content-Disposition + nosniff + no-store on the response, the
+        // Content-Type as the File(...) second arg.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-todo-" + id + ".ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
+    }
+
+    /// <summary>
+    /// <c>GET /projects/todos.ics</c> — the M14 to-do subscription feed
+    /// (ADR 0115 D4 / design doc §routes lane-2, locked): the frozen
+    /// <see cref="IProjectService.ListTodosAsync"/> caller's **visible**
+    /// to-do set (the candidate filter + the <c>CanSeeAsync(Read)</c> gate
+    /// all inside the seam — C-M14·7, the frozen seam is consumed, not
+    /// extended) renders through the pure U05 <see cref="TodoIcsWriter"/>
+    /// over the already-authorized rows.
+    /// <para>
+    /// **Filter to dated to-dos in the Web layer** (<c>DueAt != null ||
+    /// StartAt != null</c> — a *display* filter, never a gate / new seam,
+    /// C-M14·4 / C-M14·7); an empty visible/dated set ⇒ a valid empty
+    /// <c>VCALENDAR</c> (C-M14·5/6). **Always <c>200</c>** — the seam
+    /// filters rather than throws for an individual denial, so there is no
+    /// 404/403 on this lane (the M12 <see cref="EventController.CalendarFeed"/>
+    /// shape, verbatim).
+    /// </para>
+    /// <para>
+    /// **Anonymous ⇒ the standard sign-in challenge** (the class-level
+    /// <c>[Authorize]</c> default — F3). **No subscription token** — the
+    /// feed rides the cookie, re-authorized every fetch (the M6 link-lane
+    /// posture, ADR 0085 / 0095; the ADR 0112 D2 shape).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, §routes — the same ADR 0034 / 0108 idiom as
+    /// the lane-1 sibling):** <c>Content-Type: text/calendar;
+    /// charset=utf-8</c> + <c>Content-Disposition: attachment;
+    /// filename="kumunita-todos.ics"</c> + <c>Cache-Control: no-store</c>
+    /// + <c>X-Content-Type-Options: nosniff</c>.
+    /// </para>
+    /// </summary>
+    [HttpGet("/projects/todos.ics")]
+    public async Task<IActionResult> TodosIcsFeed()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        // C-M14·7 — the feed seam, called exactly as the in-app feed calls it
+        // (the M12 CalendarFeed shape): no filters (all null / default),
+        // page 0 (the service clamps to 1).
+        var page = await projects.ListTodosAsync(null, null, actorId, 0, ct: HttpContext.RequestAborted);
+
+        // The "dated to-dos" filter — a **Web-layer display** filter (a
+        // to-do with neither DueAt nor StartAt is skipped, the §vtodo feed
+        // skip rule), never a gate / new seam (C-M14·4 / C-M14·7).
+        var dated = page.Items.Where(t => t.DueAt is not null || t.StartAt is not null).ToList();
+
+        var icsText = TodoIcsWriter.BuildTodos(dated, DateTimeOffset.UtcNow);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom,
+        // the M12 CalendarFeed action verbatim.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-todos.ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
+    }
+
+    /// <summary>
     /// <c>POST /projects/todos/{id}/claim</c> — the **claim** write lane (ADR
     /// 0073 — the self-assign): the actor takes an **unassigned** to-do onto
     /// themselves iff they are a member of one of the to-do's audience

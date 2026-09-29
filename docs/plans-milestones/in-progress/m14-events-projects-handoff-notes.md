@@ -705,3 +705,150 @@ runner at exit); `docker container ls` after the run shows only the
 `testcontainers-ryuk-*` (the M14 test run's reaper, already orphaned-
 cleanup eligible) — **no** orphaned `postgres:18` test containers, so no
 `docker container prune` was needed.
+
+## U06 — the two `VTODO` routes + the two `kw-l` affordances
+
+**Status:** done, build green (0 warnings, all 4 projects), **585 / 585 Web
+tests pass** (0 errors, 0 skipped — includes the
+`KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests` pins the
+two new keys satisfy) + **1000 / 1000 Core tests pass** (0 errors, 0
+skipped, ~127 s — the kw-l registry's Core-side parity pins over the two new
+keys). Implemented **only U06**: the M14 `VTODO` Web surface (D4 rendered in
+the UI), additive only (C-M14·7); the **frozen** `IProjectService` read
+seams (`ListTodosAsync` / `GetTodoAsync`) and the **U05** `TodoIcsWriter`
+emitter are **consumed, not re-added/renamed**; **no new authorization
+surface** (C-M14·4 — the routes ride the class-level `[Authorize]` + the
+frozen seams' own `Read` decisions; the dated filter is a display filter,
+never a gate); **no `RRULE` / recurrence anywhere** (C-M14·6 / D6 — the
+emitter is U05's and already closed, the routes add none); **no**
+`ORGANIZER` / `CREATED-BY` / `ATTENDEE` / `X-…` / identity material reaches
+the file (C-M14·5 — the routes pass the frozen seams' already-authorized
+output straight into `TodoIcsWriter`); **no new JS** (two plain `<a>`
+links — the ADR 0031 tsc-only discipline holds); **no subscription token**
+(rides the cookie, re-authorized every fetch — the M6 link-lane posture,
+ADR 0085/0095).
+
+**(a) The two routes + their serve shapes.**
+`src/Kumunita.Web/Controllers/ProjectsController.cs`, placed immediately
+after the U04 `TodoSetEvent` action (the `POST
+/projects/todos/{id}/set-event` lane):
+
+- **Lane 1 — `TodoIcs(string id)`** under
+  `[HttpGet("/projects/todos/{id}.ics")]` — the **404-not-403 split**
+  (C-M14·2, the M12 `EventController.EventIcs` idiom verbatim):
+  `projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted)` inside
+  a try; **both** `KeyNotFoundException` (absent) and
+  `UnauthorizedAccessException` (denied) map to `NotFound()` — a to-do a
+  caller cannot see neither downloads nor 403s into existence. One `VTODO`
+  via `TodoIcsWriter.BuildTodos([todo], DateTimeOffset.UtcNow)` — the
+  to-do's own single `VTODO` on the pinned subset (§vtodo); an **undated**
+  to-do still yields the degenerate `VTODO` (only `UID` / `DTSTAMP` /
+  `SUMMARY` (+`DESCRIPTION`) — **drift entry 4**: the feed's skip rule does
+  **not** apply on the per-item lane). Serve shape (locked):
+  `Content-Type: text/calendar; charset=utf-8` (the `File(...)` second arg)
+  + `Content-Disposition: attachment; filename="kumunita-todo-{id}.ics"` +
+  `Cache-Control: no-store` + `X-Content-Type-Options: nosniff` — the three
+  headers set on `HttpResponse.Headers` before the return, the
+  `EventIcs` action's exact idiom (ADR 0034 / 0108).
+- **Lane 2 — `TodosIcsFeed()`** under
+  `[HttpGet("/projects/todos.ics")]` — **always `200`** (the M12
+  `CalendarFeed` idiom verbatim):
+  `projects.ListTodosAsync(null, null, actorId, 0, ct:
+  HttpContext.RequestAborted)` (the caller's **visible** to-do set — the
+  candidate filter + the `CanSeeAsync(Read)` gate all inside the frozen
+  seam, C-M14·7) → **the "dated to-dos" Web-layer filter line**:
+  `page.Items.Where(t => t.DueAt is not null || t.StartAt is not null)
+  .ToList()` (a *display* filter, never a gate / new seam — C-M14·4 /
+  C-M14·7) → `TodoIcsWriter.BuildTodos(dated, DateTimeOffset.UtcNow)` (an
+  empty visible/dated set ⇒ the valid **empty** `VCALENDAR` — the
+  RFC-legal no-crash path, C-M14·5/6) → the serve shape
+  (`filename="kumunita-todos.ics"`, the same three other headers).
+  **Anonymous ⇒ the standard sign-in challenge** (the class-level
+  `[Authorize]` default — F3; no anonymous iCal surface, the ADR 0112 D2
+  pin).
+
+**(b) The route-resolution outcome (the M12 gotcha pin).** Verified
+against the live tree + ASP.NET Core's route ranking: the controller has
+**no** plain `GET /projects/todos/{id}.ics`-competing parameterized GET —
+the nearest GET siblings are `/projects/todos/{id}` (TodoDetail),
+`/projects/todos/{id}/edit`, and the two new literal/parameter `.ics`
+routes. ASP.NET Core ranks a route by (1) segment count, then (2) **literal
+segments cost 0, parameter tokens cost 1** — the literal `/projects/
+todos.ics` scores lower cost than `/projects/todos/{id}` **and** than
+`/projects/todos/{id}.ics` (one token vs. zero literals in the last
+segment), so **`GET /projects/todos.ics` resolves to the feed action
+(`TodosIcsFeed`), not to `TodoDetail` with `id = "todos.ics"`** — exactly
+the ADR 0112 §routes precedent the `EventController`
+`/events.ics` / `/events/{id}` pair already demonstrates in this tree. The
+two `.ics` routes themselves are mutually unambiguous (one literal, one
+token, different shapes). **Recorded as the exact resolution: literal
+wins; the feed owns `/projects/todos.ics`.**
+
+**(c) The two U06 `kw-l` keys × en/de/fr/da** (the design-doc §kw-l locked
+en values; added in the M14 U03/U04 block in
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`, which holds all
+four language dictionaries — the closed-key registry **is** the parity
+surface; there are no separate `*.json` files, the U03/U04 note stands):
+
+| Key | en | de | fr | da |
+|---|---|---|---|---|
+| `projects.todos.ics.download` | Add to calendar | Zum Kalender hinzufügen | Ajouter à l'agenda | Tilføj til kalender |
+| `projects.todos.ics.feed` | Calendar feed (iCal) | Kalender-Feed (iCal) | Flux de calendrier (iCal) | Kalenderfeed (iCal) |
+
+The de / fr / da values are the **locked** house translations of the M12
+sibling keys (`events.ics.download` / `events.ics.feed` — the §kw-l pin
+says "the ADR 0112 `events.ics.*` shape carried to the to-do surface"),
+reused verbatim since the English strings are identical.
+**Wiring (plain `<a>`, no new JS — the ADR 0031 discipline):**
+- `projects.todos.ics.download` — `Views/Projects/TodoDetail.cshtml`, a
+  `btn btn-outline-secondary btn-sm` anchor to
+  `/projects/todos/{Model.Todo.Id}.ics`, placed directly **below** the U03
+  event-link chip + U04 picker block (the "join the chip/picker block"
+  rule). Gated on nothing — the detail page only renders for a to-do the
+  caller already passed the `Read` decision on, so the file lane's own
+  404-not-403 split (C-M14·2) is the guard.
+- `projects.todos.ics.feed` — `Views/Projects/TodosIndex.cshtml`, the
+  index header's `head-row` gains the `Event/Index.cshtml` M12
+  `events.ics.feed` idiom verbatim: the "New to-do" button is now wrapped
+  in a `d-flex gap-2 align-items-center flex-wrap` row (the Event Index
+  head-row idiom — flex-wrap lets it wrap below at 360 px, M10 re-check)
+  with the feed anchor first.
+
+**(d) Drift vs. the register** — two cosmetic notes (no decision change):
+1. The register's U06 entry-reads named the views as
+   `Views/Projects/Todo/Detail.cshtml` + `Views/Projects/Todo/Index.cshtml`
+   — the **actual** live paths are `Views/Projects/TodoDetail.cshtml` +
+   `Views/Projects/TodosIndex.cshtml` (the same cosmetic path mismatch
+   U03 / U04 recorded; the views were edited at their real location).
+2. The register's U06 prose for lane 2 shows the call as
+   `ListTodosAsync(null, null, actorId, 0, ct)` — the **actual** frozen
+   seam signature (unchanged by U01–U05) is
+   `ListTodosAsync(string? componentId, string? assigneeId, string actorId,
+   int page, bool unassignedOnly = false, string? projectId = null, bool
+   blockedOnly = false, CancellationToken ct = default)`, so the action
+   passes the two default `bool`/`string?` params through by name
+   (`unassignedOnly` omitted at its `false` default, `projectId` /
+   `blockedOnly` omitted at their defaults) — the in-app feed's own call
+   shape, exactly "the caller's visible set" (C-M14·7). Both match the
+   design doc §routes verbatim.
+
+**(e) Build + test.** `dotnet build Kumunita.slnx -c Debug` succeeded
+clean (all 4 projects, 0 warnings). `Kumunita.Web.Tests  Total: 585,
+Errors: 0, Failed: 0, Skipped: 0` (the `KnownTranslationKeys_ParityTests`
++ `KwLRegistryConsistencyTests` pins the two new keys satisfy, plus the
+frozen `ProjectsControllerTests` / `EventControllerTests` seam pins, all
+survive the two new actions + the two view edits — **no existing
+test-construction site required a change**: the two new actions use only
+the existing `IProjectService` seam + the U05 pure emitter, and the
+`ProjectsController` constructor is **untouched** — neither new action
+needs a new dependency). `Kumunita.Core.Tests  Total: 1000, Errors: 0,
+Failed: 0, Skipped: 0, Time: 127.2s` (the kw-l registry's Core-side parity
+pins over the two new keys + all 996 prior pins survive the additive
+registry rows). **Docker cleanup note:** the Web run's 5 Testcontainers
+were reaped by the xunit.v3 runner at exit ("Delete Docker container …"
+observed for all 5); the Core run's containers were likewise reaped
+("Delete Docker container …" observed through to the summary line);
+`docker container ls` after both runs shows only the **app's** long-lived
+containers (`kumunita_app` / `kumunita_db` / `kumunita_mailpit` — the
+dev-compose stack) — **no** orphaned `postgres:18` test containers, so no
+`docker container prune` was needed.

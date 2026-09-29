@@ -50,7 +50,17 @@
                         <kw-l key="projects.todo.lede">The neighborhood's shared to-dos — assign work to a neighbor, break it into subtasks, and put it on a board.</kw-l>
                     </p>
                 </div>
-                <a class="btn btn-outline-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
+                @* ADR 0115 D4 (M14 interlock, U06) — the **VTODO** feed
+                   affordance (the ADR 0112 events.ics.feed shape carried to
+                   the to-do surface): a plain link to the lane-2 subscription
+                   (GET /projects/todos.ics, U06). Quiet, beside the New to-do
+                   action (the Event Index head-row idiom); flex-wrap lets it
+                   wrap below at 360 px (M10 re-check). No new JS (the ADR 0031
+                   tsc-only discipline — a plain <a>). *@
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <a class="btn btn-outline-secondary" href="/projects/todos.ics"><kw-l key="projects.todos.ics.feed">Calendar feed (iCal)</kw-l></a>
+                    <a class="btn btn-outline-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
+                </div>
             </div>
         </header>
 
