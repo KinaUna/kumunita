@@ -609,3 +609,86 @@ downstream unit) references `RoutePattern.RawText` /
 `StaticFileEndpointMetadata`, update them to `IRouteDiagnosticsMetadata.Route`
 / `StaticAssetDescriptor` so the primary tier matches the shipped code. The
 3 pinned test names are unchanged (U06's gate can reference them verbatim).
+
+---
+
+## U04 — IUsageAnalyticsService (2026-09-29)
+
+**Role.** D3 aggregation seam in `Kumunita.Core.Usage` + the 4 pinned D3
+Core tests (PostgresFixture, the one unit in U01–U04 that boots
+postgres:18). Touched **only** the Deliverable files.
+
+**Deliverables landed:**
+
+- `src/Kumunita.Core/Usage/IUsageAnalyticsService.cs` — the two method
+  signatures, verbatim from design doc §aggregation:
+  `Task<UsageAnalyticsResult> GetWindowAsync(int windowDays)` and
+  `Task<IReadOnlyList<UsageCsvRow>> GetCsvRowsAsync(int windowDays)`;
+  `windowDays` pinned to 7/30/90, an unknown value throws
+  `ArgumentOutOfRangeException` (not a 0-row query).
+- `src/Kumunita.Core/Usage/UsageAnalyticsResult.cs` — the six fields,
+  verbatim: `WindowDays` / `Total` / `AuthenticatedTotal` /
+  `AnonymousTotal` / `DistinctActors` / `SurfaceRanking`
+  (`IReadOnlyList<SurfaceRow>`); **`NewSignups` is absent** (the D3
+  deferral, `User : IdentityUser` has no created-at column). `SurfaceRow
+  { Surface, Total }` + `UsageCsvRow { Date, Surface, Total }` in the
+  same file.
+- `src/Kumunita.Core/Usage/UsageAnalyticsService.cs` — the impl, ctor
+  `(IDocumentStore store)`, touches **only** `UsageEvent` (the
+  `AspNetUsers` table is never read; zero new authorization surface,
+  C-M13·6).
+  - **SurfaceKey.Map GroupBy shape:** the window's rows are pulled
+    server-side in one query
+    (`Query<UsageEvent>().Where(e => e.At >= cutoff).ToListAsync()`,
+    `cutoff = DateTimeOffset.UtcNow.AddDays(-windowDays)` at the seam
+    call), then `GroupBy(e => SurfaceKey.Map(e.RouteTemplate))`
+    client-side → `SurfaceRow { Surface = g.Key, Total = g.Count() }`.
+  - **Ordering pin:** `.OrderByDescending(r => r.Total).ThenBy(r =>
+    r.Surface)` (CSV: `.OrderBy(r => r.Date).ThenBy(r => r.Surface)`,
+    Date = the `At`'s UTC date).
+  - **DistinctActors Linq shape (parser deviation recorded, per the §
+    aggregation contract's allowance):** the design doc's `Select(e =>
+    e.ActorId).Distinct().Count()` is evaluated **Linq-to-objects** over
+    the window's row set — `Where(e => !string.IsNullOrEmpty(e.ActorId))
+    .Select(e => e.ActorId).ToHashSet().Count()`. Same result, different
+    shape: the only clause sent to Postgres is the plain
+    `Where(e => e.At >= cutoff)` column compare (the `SurfaceKey.Map`
+    call inside a LINQ `GroupBy` is a C# function and cannot be
+    translated by the provider, so the whole group-by runs client-side).
+    The pins assert the result (2), not the SQL — the contract's
+    recorded-fallback clause.
+- `src/Kumunita.Core/DependencyInjection.cs` — one line, the house
+  `AddTransient`-with-store shape, placed after
+  `IAuthorizationService`:
+  `services.AddTransient<Usage.IUsageAnalyticsService>(sp => new
+  Usage.UsageAnalyticsService(sp.GetRequiredService<Marten.IDocumentStore>()));`
+- `tests/Kumunita.Core.Tests/UsageAnalyticsServiceTests.cs` — the 4 D3
+  pins, PostgresFixture harness (same `BootStoreAsync` shape as
+  `EventReminderServiceTests`, plus `UsageDocTypes.Configure(opts)` so
+  the `UsageEvent` table exists), rows planted via a write session.
+
+**4 D3 pin names + result (2026-09-29, in-process xunit.v3 runner,
+`-class "Kumunita.Core.Tests.UsageAnalyticsServiceTests"`):**
+
+| Pin | Result |
+|---|---|
+| `Aggregation_Window_Excludes_Older_Rows` | PASS |
+| `Aggregation_SurfaceRanking_Descending_Then_Alphabetical` | PASS |
+| `Aggregation_AuthenticatedVsAnonymous_Counts` | PASS |
+| `Aggregation_DistinctActors_Counts_Unique_NonEmpty` | PASS |
+
+Runner summary: `Total: 4, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0,
+Time: 9.250s` (postgres:18 Testcontainers; containers cleaned up with
+`docker container prune` after the run).
+
+**Compile warnings:** none — `dotnet build Kumunita.slnx -c Debug` →
+`Build succeeded. 0 Warning(s) 0 Error(s)`.
+
+**Open for U05+ (no drift pauses):** the U03 DRIFT GUARD's
+`RoutePattern.RawText` / `StaticFileEndpointMetadata` →
+`IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor` doc-comment
+follow-up is still open (it names U04 as the next consumer; U04 never
+references those two type names, so it stays open for whoever next
+touches the affected doc-comments). U05's `AdminAnalyticsController`
+consumes `IUsageAnalyticsService` verbatim (both methods) — no shape
+changes landed in U04 beyond the recorded Linq-to-objects fallback.

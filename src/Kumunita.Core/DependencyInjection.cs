@@ -44,6 +44,16 @@ public static class ServiceCollectionExtensions
     {
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
+
+        // M13 (ADR 0114, plan U04): the D3 aggregation seam — the Usage
+        // context's operator-plane read service (it touches only
+        // UsageEvent; the AspNetUsers table is never read — the
+        // "NewSignups dropped" deferral). Zero new authorization surface
+        // (C-M13·6). The same "AddTransient with the store injected"
+        // shape as IPageService / IEventService below.
+        services.AddTransient<Usage.IUsageAnalyticsService>(sp => new Usage.UsageAnalyticsService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
         // seam (the account.signup / account.verified admin-lane emitters) is
         // resolved automatically by the container from the registered
