@@ -592,3 +592,116 @@ change, since `IEventService` is an optional ctor param and the new action /
 helper are additive). **Docker cleanup note:** none needed — the Web run
 completed normally (Testcontainers cleaned up its own containers:
 "Delete Docker container …" observed for all 5).
+
+## U05 — `TodoIcsWriter` (VTODO emitter)
+
+**Status:** done, build green (0 warnings, all 4 projects), **1000 / 1000
+Core tests pass** (0 errors, 0 skipped, 115 s — includes the 4 U05 pins
+below, discovered + executed). Implemented **only U05**: the M14 `VTODO`
+emitter (D4 rendered as code), additive only (C-M14·7); the **frozen**
+`IcsWriter` and the `IProjectService` read seams are **consumed, not
+re-added/renamed**; **no new authorization surface** (C-M14·4 — the emitter
+is pure: no store, no `IDocumentSession`, no `IAuthorizationService`, no
+clock, no reflection, no library — BCL-only, C-M14·5); **no `RRULE` /
+`RECURRENCE-ID` / recurrence of any kind** (C-M14·6 / D6); **no**
+`ORGANIZER` / `CREATED-BY` / `ATTENDEE` / `X-…` / identity fields emitted
+(C-M14·5, the ADR 0028 posture); **no** `kw-l` keys and **no** routes
+(both U06's surface — the two `projects.todos.ics.*` affordances and the
+two `.ics` actions are untouched).
+
+**(a) The `BuildTodos` signature + the `VTODO` property set as emitted.**
+New static class `src/Kumunita.Core/Events/TodoIcsWriter.cs` (the
+`IcsWriter` shape — one `using Kumunita.Core.Projects;` for the
+`TodoItem` POCO; no constructor, no dependencies), the **only public
+surface** (the §seams contract 5 locked text, verbatim):
+
+```csharp
+public static string BuildTodos(IReadOnlyList<TodoItem> todos, DateTimeOffset nowUtc)
+```
+
+`nowUtc` = the caller's fetch instant — the `DTSTAMP` refresh marker; the
+emitter **never reads a clock** (deterministic + testable). The return is
+the **entire** ICS file: the `VCALENDAR` envelope **verbatim from
+`IcsWriter`** (`BEGIN:VCALENDAR` / `VERSION:2.0` /
+`PRODID:-//Kumunita//community calendar//EN` / `CALSCALE:GREGORIAN` /
+`METHOD:PUBLISH` / … / `END:VCALENDAR`) + **one `VTODO` per dated to-do**
+in list order. **Feed skip rule** (§vtodo): the candidate set is
+`t.DueAt is not null || t.StartAt is not null`; a to-do with **neither**
+is skipped (no `VTODO` block — the drift entry 4 degenerate form is the
+U06 lane-1 concern, not the feed). The emitted property set, in the locked
+§vtodo order, per dated to-do:
+
+```
+BEGIN:VTODO
+UID:kw-todo-{todo.Id}@kumunita              (stable — the kw-eve-… convention with the todo tag)
+DTSTAMP:{nowUtc as yyyyMMddTHHmmss}Z        (the caller-passed refresh marker, not Modified)
+DUE:{todo.DueAt as yyyyMMddTHHmmss}Z        (only when DueAt is set)
+DTSTART:{todo.StartAt as yyyyMMddTHHmmss}Z  (only when StartAt is set)
+SUMMARY:{todo.Title escaped}
+DESCRIPTION:{todo.Body escaped, folded}     (only when Body is non-empty — the Markdown source)
+STATUS:CANCELLED                            (only when todo.IsDeleted == true — the RFC update path, emitter capability)
+END:VTODO
+```
+
+CRLF on every line (incl. the final `END:VCALENDAR`), 75-octet fold at a
+multi-byte-safe boundary with a single leading space on continuations, and
+escape (`\` → `\\` first, `;` → `\;`, `,` → `\,`, CR/LF → `\n`) — the
+`IcsWriter` `FormatUtc` / `Escape` / `Fold` private-helper discipline
+copied verbatim (same private methods, re-implemented in this class so the
+frozen `IcsWriter` is byte-untouched, C-M14·7). A valid **empty**
+`VCALENDAR` (envelope only, zero `VTODO`) when no dated to-dos — the
+RFC-legal no-crash path (C-M14·5/6).
+
+**(b) The never-emitted list — confirmed absent.** Pin 1 asserts by
+**property name** (the part before the first `:` of each physical line,
+after unfolding continuations) that none of `ORGANIZER` / `CREATED-BY` /
+`ATTENDEE` / `RRULE` / `RECURRENCE-ID` / `AUDIENCE` / `STATUS` (the
+non-deleted case) / `SEQUENCE` / `PRIORITY` / `CLASS` / `CREATED` /
+`LAST-MODIFIED` / `REQUEST-ID` appears, and **no property name starts with
+`X-`** — i.e. no author/assignee identity, no recurrence, no audience /
+grant / membership internals, and no vendor property (C-M14·5 / C-M14·6).
+The emitter reads **only** `Id` / `Title` / `Body` / `StartAt` / `DueAt`
+/ `IsDeleted` off the POCO; `AuthorId` / `AssigneeId` / `Audience` /
+`ComponentId` / `ProjectId` / `EventId` / `ParentId` / `BlockedByTodoId`
+/ `Status` / `LanguageCode` / `TagIds` / `ImageIds` / `AttachmentIds` /
+`Created` are never touched.
+
+**(c) The 4 pin names + pass/red** (all in
+`tests/Kumunita.Core.Tests/TodoIcsWriterTests.cs` — the pure-emitter
+shape, **no Testcontainers**; the `IcsWriterTests` file is the model —
+shared `FindLine` / `CountOccurrences` helpers, a fixed
+`NowUtc = 2026-09-28T12:00Z`, a `MakeTodo(id, title, body, startAt,
+dueAt, isDeleted)` factory):
+
+1. `BuildTodos_EmitsThePinnedVTodoSubset_ForADatedTodo` — green
+   (envelope verbatim + the 6-line pinned property set in locked order +
+   the never-emitted property-name sweep)
+2. `BuildTodos_EmitsDueOnly_DtstartOnly_SkipsUndated` — green (DUE-only
+   block has no `DTSTART:`, DTSTART-only block has no `DUE:`, the undated
+   to-do produces **zero** `VTODO` blocks — 2 blocks for 3 inputs)
+3. `BuildTodos_FoldsAndEscapesALongTitleAndBody` — green (all four escape
+   rules in SUMMARY; a 120-octet `DESCRIPTION` folds to ≥ 2 physical
+   lines, every physical line ≤ 75 octets, continuation begins with
+   exactly one space, unfolding reconstructs the logical line)
+4. `BuildTodos_ReturnsAValidEmptyCalendar_WhenNoDatedTodos` — green
+   (empty set **and** an all-undated set both yield exactly the 5-line
+   envelope + `END:VCALENDAR`, zero `VTODO` — C-M14·5/6)
+
+(4 / 4 green; whole suite: `Kumunita.Core.Tests  Total: 1000, Errors: 0,
+Failed: 0, Skipped: 0, Not Run: 0, Time: 115.359s` — the prior 996 pins
+survive the additive emitter; the 4 new pins are the delta.)
+
+**(d) Compile warnings** — none; `dotnet build Kumunita.slnx -c Debug`
+succeeded clean (all 4 projects). **Drift vs. the register:** none — the
+`BuildTodos` signature, the closed `VTODO` property set + order, the
+conditional `DUE`/`DTSTART`/`DESCRIPTION`/`STATUS` shape, the `kw-todo-{Id}@kumunita`
+UID, the skip rule, the envelope, the PRODID, the never-emitted list, the
+format pin, and the 4 pin names all match the design doc §vtodo / §seams
+contract 5 / §pinned tests verbatim. **Docker cleanup note:** the Core run
+completed normally (its own Testcontainers were reaped by the xunit.v3
+runner at exit); `docker container ls` after the run shows only the
+**app's** long-lived containers (`kumunita_app` / `kumunita_db` /
+`kumunita_mailpit` — the dev-compose stack) and one transient
+`testcontainers-ryuk-*` (the M14 test run's reaper, already orphaned-
+cleanup eligible) — **no** orphaned `postgres:18` test containers, so no
+`docker container prune` was needed.
