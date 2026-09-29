@@ -207,6 +207,61 @@ public interface ILocalizationService
     /// TargetId = key (M·6; M9 FACES). Takes effect on the next request (M·4).</summary>
     Task UpsertTranslationAsync(string key, string languageCode, string text, string actorId);
 
+    /// <summary>
+    /// <b>M15 bulk-write seam (ADR 0116, D4/D5; U02)</b> — upserts the
+    /// present non-blank rows of one catalog language **through the same
+    /// row store the frozen <see cref="UpsertTranslationAsync"/> uses**
+    /// (C-M15·7 — the same <see cref="TranslationResource"/> upsert, one
+    /// write session), and commits **exactly one** <c>AccessAudit</c> row
+    /// — action <c>translation.import</c>, <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the count of upserted rows (as a string),
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in that same session (C3; C-M15·6: one
+    /// audit row per bulk action, never N rows for N upserts).
+    /// <para>
+    /// A **blank value never reaches here** (the pure
+    /// <see cref="TranslationBulkImporter"/> drops blank cells before
+    /// return — C-M15·4: a blank is a no-op, never an erase; this seam
+    /// still guards — a blank entry in <paramref name="rows"/> is skipped,
+    /// not written). The <c>source</c> column is the importer's concern
+    /// (it ignores it) and never appears in <paramref name="rows"/>. A
+    /// <b>refused</b> bundle is never applied (the caller sees <see cref
+    /// "TranslationBulkImportRefused"/>) — it writes zero rows and emits
+    /// no audit row (C-M15·3, the M11 D4 pin).
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency; the frozen one-row seam
+    /// <see cref="UpsertTranslationAsync"/> stays byte-identical beside it
+    /// (C-M15·7). No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCode">
+    /// The catalog code this call writes (the header's <c>en</c> column
+    /// maps to <c>"en"</c>; a <c>&lt;codeN&gt;</c> column maps to
+    /// <c>codeN</c>).
+    /// </param>
+    /// <param name="rows">
+    /// The present non-blank upsert rows — <c>key → text</c>. Every key is
+    /// a <see cref="KnownTranslationKeys.AllKeys"/> key (the importer
+    /// refused otherwise) and every text is non-blank (the importer
+    /// dropped blanks — C-M15·4).
+    /// </param>
+    /// <param name="actorId">The acting account (GlobalAdmin or Translator
+    /// — the ADR 0021 split), recorded on the one <c>AccessAudit</c> row.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>
+    /// The count of rows upserted (the <c>AccessAudit</c> row's
+    /// <c>TargetId</c> as a string).
+    /// </returns>
+    Task<int> UpsertManyTranslationsAsync(
+        string languageCode,
+        IReadOnlyDictionary<string, string> rows,
+        string actorId,
+        CancellationToken ct = default);
+
     // ── Completeness — read ─────────────────────────────────────────
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys are
     /// present vs. missing for a language.</summary>

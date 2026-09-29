@@ -201,6 +201,154 @@ _(next: U01 — the `Kumunita.Core/Localization/` bulk pair:
   require. Recorded here (not in the design doc's drift log) because it
   is a test-harness detail, not a locked-pin change.
 
-_(next: U02 — the `TranslationBulkImporter` pure + `UpsertManyTranslatio
-nsAsync` + the five fail-closed / blank-no-op / audit-shape pins — see
-`m15-u02.md`)_
+---
+
+## U02 — importer + UpsertMany
+
+**Date:** 2026-09-29. **Author:** U02 (this unit).
+
+**What shipped (Core only — additive, the drift-guard list untouched):**
+
+- `src/Kumunita.Core/Localization/TranslationBulkImporter.cs` — the pure
+  **parser** (the `IcsWriter` posture: no store, no session, no audit, no
+  HTTP, no CSV package — plain BCL string code, C-M15·8):
+  - `public static TranslationBulkImportResult Parse(string bundleText,
+    IReadOnlySet<string> catalogCodes)` — validation is **complete before
+    any row is returned** (C-M15·3), in the D5 locked order:
+    (1) exact marker on line 1 (pinned against
+    `TranslationBulkExporter.BundleMarker` — the round-trip pair,
+    C-M15·2); (2) a header row whose first three cells are exactly
+    `key,source,en`; (3) every language column ∈ the catalog's codes
+    (an extra column = unknown language ⇒ refused); (4) a non-empty
+    body (≥ 1 body row); (5) every body key ∈
+    `KnownTranslationKeys.AllKeys` (an unknown key ⇒ refused). The
+    `source` column is **ignored** (never written back — D2 §bundle);
+    a **blank cell is dropped** from the upsert set (C-M15·4 — never a
+    deletion); cell count per row must equal the header's (a mismatch ⇒
+    refused). RFC 4180 cell splitting (the inverse of the exporter's
+    `Quote`): a quoted cell is read until the unescaped closing quote,
+    embedded `""` → `"`; unquoted cells read to the next comma.
+  - The sealed result pair: `TranslationBulkImport` (Ok —
+    `IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
+    RowsByLanguage`, blank cells dropped, the `source` column absent by
+    construction) and `TranslationBulkImportRefused` (the 422 shape —
+    `OffendingRow` = the first offending row's text + `Reason` = the
+    human-readable diagnostic, the M11 D4 / C-M15·3 pin). Both sealed;
+    the common base `TranslationBulkImportResult` is abstract with a
+    protected constructor.
+- `src/Kumunita.Core/Localization/ILocalizationService.cs` — the additive
+  seam `Task<int> UpsertManyTranslationsAsync(string languageCode,
+  IReadOnlyDictionary<string, string> rows, string actorId,
+  CancellationToken ct = default)` + doc-comment (exactly **one**
+  `AccessAudit` row `translation.import`, `Via = Admin`, `TargetId` =
+  the count, C3/C-M15·6; a blank value never reaches here — C-M15·4;
+  the frozen one-row store is the write path — C-M15·7; no new
+  `AccessAction` / `AccessVia` / `Decide()` branch / role — C-M15·5).
+  The frozen `UpsertTranslationAsync` declaration + doc-comment stay
+  byte-identical beside it (C-M15·7 — diff-verified: the interface
+  change is a pure insertion after that line).
+- `src/Kumunita.Core/Localization/LocalizationService.cs` — the
+  implementation (one write session: the per-row `TranslationResource`
+  upserts — the **same** pair idiom `UpsertTranslationAsync` uses, the
+  unique index enforcing one row per (Key, LanguageCode) — + the one
+  `translation.import` audit row committed in that session, C3). Blank
+  values are skipped (C-M15·4); returns the count of rows written (the
+  audit row's `TargetId`). The frozen `UpsertTranslationAsync` body is
+  byte-identical (diff-verified: the class change is a pure insertion
+  after that method's closing brace).
+- `tests/Kumunita.Core.Tests/TranslationBulkImporterTests.cs` — the 5
+  pinned tests, names verbatim from the design doc's §pinned tests (U02
+  group), over the same `PostgresFixture` template
+  `LocalizationServiceTests` / `TranslationBulkExporterTests` use.
+
+**Exit items (the unit plan's Exit section):**
+
+- **(a) The `TranslationBulkImporter` signature + the refusal shape** —
+  `public static TranslationBulkImportResult Parse(string bundleText,
+  IReadOnlySet<string> catalogCodes)`; Ok =
+  `TranslationBulkImport.RowsByLanguage` (`code → (key → text)`, blanks
+  dropped), refused = `TranslationBulkImportRefused { OffendingRow,
+  Reason }` (the first offending row named — the 422 shape, C-M15·3).
+- **(b) The validation order as implemented** — (1) exact marker on
+  line 1 (`TranslationBulkExporter.BundleMarker`, ordinal); (2) header
+  present with first three cells `key,source,en`; (3) every language
+  column ∈ `catalogCodes`; (4) non-empty body; (5) per row: cell count
+  == header count, key non-empty and ∈ `KnownTranslationKeys.AllKeys`.
+  The `source` column (cell 2 of the body row) is never read into the
+  result; blank cells are dropped per C-M15·4.
+- **(c) The `UpsertManyTranslationsAsync` signature + the audit row as
+  written** — `Task<int> UpsertManyTranslationsAsync(string languageCode,
+  IReadOnlyDictionary<string, string> rows, string actorId,
+  CancellationToken ct = default)`; one session, per-row
+  `TranslationResource` upsert (the frozen seam's store shape), exactly
+  one `AccessAudit` row: `Action = "translation.import"`,
+  `TargetKind = "translation"`, `TargetId = <count>`,
+  `Via = AccessVia.Admin`, `Outcome = AccessOutcome.Allow`,
+  `ActorId`/`EffectivePrincipalId` = the actor — committed with the
+  writes (C3); returns the count.
+- **(d) The 5 pin names + pass/red** — all **green**:
+  - `Bulk_Import_UpsertsPresentRows_Only` — ✅ pass (round-trip:
+    U01's export feeds U02's import; the present rows upsert, the blank
+    cell's key is absent from the store, re-export is identical —
+    C-M15·2).
+  - `Bulk_Import_BlankCellIsANoOp` — ✅ pass (a blank cell leaves the
+    stored row byte-identical; zero audit rows — C-M15·4).
+  - `Bulk_Import_UnknownKeyRefused_ZeroWrites_NoAudit` — ✅ pass
+    (the refusal names the unknown key + the row; zero audit rows; the
+    stored row untouched — C-M15·3).
+  - `Bulk_Import_WrongMarkerRefused_ZeroWrites_NoAudit` — ✅ pass
+    (a `# kumunita-translation-bundle/2` first line is refused, marker
+    named; zero audit rows; the stored row untouched — C-M15·3, the
+    M11 D4 posture).
+  - `Bulk_Import_AuditRowShape_TranslationImport` — ✅ pass (exactly one
+    row: `translation.import` / `translation` / `"2"` / `Admin` /
+    `Allow` / the actor — C-M15·6).
+  Full Core suite: `Total: 1009, Errors: 0, Failed: 0, Skipped: 0,
+  Not Run: 0` (the xunit.v3 in-process runner, per AGENTS.md) and the
+  Web suite `Total: 588, Errors: 0, Failed: 0` — both green, the
+  `KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`
+  pins and U01's 4 pins included (no regressions).
+- **(e) The round-trip note** — `Bulk_Import_UpsertsPresentRows_Only`
+  drives the pair end-to-end: `GetBulkTranslationMatrixAsync` →
+  `TranslationBulkExporter.Build` → `TranslationBulkImporter.Parse` →
+  `UpsertManyTranslationsAsync` → re-export; the stored matrix is
+  identical (same keys, same languages, same non-blank texts; the
+  blank cell's key still has no row — never a synthetic row, never a
+  deletion). U01's exporter feeds U02's importer unchanged — the
+  C-M15·2 pair, with the marker pinned against
+  `TranslationBulkExporter.BundleMarker` (no re-derived marker text).
+- **(f) Any compile warnings** — **none** (`0 Warning(s), 0 Error(s)`
+  on `dotnet build Kumunita.slnx -c Debug`).
+
+**Drift notes (appended, never rewritten):**
+
+- **No design-doc drift** — D4/D5 + the §bundle table + the 5 pinned
+  names + the `translation.import` audit-row shape were copied verbatim
+  from `docs/design/m15-translation-bulk-design.md`; the unit plan's
+  prose was checked against the live `ILocalizationService` /
+  `LocalizationService` / `AccessAudit` surface and no source-driven
+  refinement was needed, so the §drift-guard drift log stays empty.
+- **Two test-side refinements (not spec drifts):** (1) the test catalog
+  is the **full** seeded catalog (`en` + the bundled `de`/`fr`/`da`
+  baselines + `pl` added by the test), so `Parse` is driven with the
+  full catalog's codes as `catalogCodes` — a narrower hand-built column
+  set is still *accepted* (the rule is "every column ∈ catalog", not
+  "columns == catalog"), and that is exactly how the Web route will
+  call it (`ListLanguagesAsync` codes → the importer). (2)
+  `Bulk_Import_BlankCellIsANoOp` and the two refusal pins scope their
+  `Assert.Empty` to the **translation** surface (`TargetKind ==
+  "translation"`), because the test's own seeding (`AddLanguage`)
+  writes the *already-audited* `language.add` rows — a different,
+  out-of-scope seam — mirroring U01's `Bulk_Export_Pure_NoAuditRow`
+  scoping. The pins still assert what C-M15·3/4 require on the
+  translation surface.
+- **C-M15·7 confirmed** — `git status` shows only the four U02 files
+  touched (2 new, 2 additive-insertion-only edits); the
+  `UpsertTranslationAsync` / `GetTranslationsForAsync` /
+  `GetCompletenessAsync` seams, the `SaveTranslation` route, the
+  per-row editor, the two parity test classes, and the
+  `TranslationResource` doc + index are byte-identical (the two edited
+  files' diffs are pure insertions after the frozen members).
+
+_(next: U03 — `SaveAllTranslationsAsync` (the batch-editor seam) + its
+2 pinned tests — see `m15-u03.md`)_

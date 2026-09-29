@@ -745,4 +745,84 @@ public sealed class LocalizationService : ILocalizationService
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    // ── M15 bulk write (ADR 0116, D4/D5; U02) — one session, one audit row ──
+
+    /// <inheritdoc />
+    public async Task<int> UpsertManyTranslationsAsync(
+        string languageCode,
+        IReadOnlyDictionary<string, string> rows,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        // M15 bulk-write seam (ADR 0116, D4/D5; U02): the present non-blank
+        // rows upsert **through the same row store the frozen
+        // UpsertTranslationAsync uses** (C-M15·7 — the same
+        // TranslationResource upsert, one write session), committing
+        // **exactly one** AccessAudit row — translation.import,
+        // TargetKind "translation", TargetId = the count, Via = Admin,
+        // Outcome = Allow — in that same session (C3; C-M15·6). Blank
+        // values are skipped, never written (C-M15·4 — the importer
+        // already drops them; this seam guards as well).
+        if (rows is null || rows.Count == 0)
+            return 0;
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = _store.OpenSession(new SessionOptions());
+
+        var count = 0;
+        foreach (var (key, text) in rows)
+        {
+            // Blank = no-op (C-M15·4): never erase, never write an empty row.
+            if (string.IsNullOrEmpty(text))
+                continue;
+
+            // The frozen one-row upsert's store shape (C-M15·7 — the same
+            // TranslationResource pair idiom; the unique index enforces one
+            // row per (Key, LanguageCode)).
+            var existing = await session
+                .Query<TranslationResource>()
+                .Where(t => t.Key == key && t.LanguageCode == languageCode)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new TranslationResource
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Key = key,
+                    LanguageCode = languageCode,
+                    Text = text
+                });
+            }
+            else
+            {
+                existing.Text = text;
+                session.Store(existing);
+            }
+
+            count++;
+        }
+
+        // Exactly ONE audit row for the whole batch (C-M15·6 — never N rows
+        // for N upserts), committed in the same session as the writes (C3).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "translation.import",
+            TargetKind = "translation",
+            TargetId = count.ToString(),
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return count;
+    }
 }
