@@ -4,6 +4,7 @@ using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kumunita.Web.Controllers;
@@ -31,15 +32,28 @@ namespace Kumunita.Web.Controllers;
 /// <item><c>GET/POST /inventory/new</c> — the composer + create (the
 /// actor **is** the creator — <c>AuthorId</c> = the actor, D5; a refused
 /// write is a form error / 403, never a 500).</item>
+/// <item><c>GET /inventory/{id}/edit</c> + <c>POST /inventory/{id}</c> —
+/// the composer + edit write lane (**creator ∪ GlobalAdmin** — D5,
+/// server-side; a missing id is 404, a denied actor 403).</item>
+/// <item><c>POST /inventory/{id}/delete</c> — the delete write lane
+/// (**creator ∪ GlobalAdmin** — D5; the ADR 0024 soft-delete flag — the
+/// item's append-only history survives the flag).</item>
+/// <item><c>POST /inventory/{id}/checkout</c> — the check-out write lane
+/// (D4 / F1 atomic transition; **standing:** any member who can see it
+/// over a <c>community</c> / <c>shared</c> item, owner ∪ GlobalAdmin over a
+/// <c>private</c> one — D5; the F1 loser's <see cref="InvalidOperationException"/>
+/// is a <b>409 Conflict</b>, never 403/404).</item>
+/// <item><c>POST /inventory/{id}/checkin</c> — the check-in write lane
+/// (D4; **standing:** current holder ∪ creator ∪ GlobalAdmin — D5; a
+/// missing id or no open checkout is 404, a denied actor 403).</item>
 /// </list>
 /// <para>
 /// **D5 / C-M16·5:** the <see cref="AuthorizeAttribute"/> is a
 /// convenience pre-gate only — never the source of truth (the
-/// server-side standing probe, U03, is the gate). **U04 (this unit) ships
-/// list / detail / create only** — the edit / delete / check-out /
-/// check-in action buttons + the nav entry land in U05. **D6 /
-/// C-M16·6:** M16 is a standing core surface (no off-by-default toggle) —
-/// the views are always available to the community.
+/// server-side standing probe, U03, is the gate; the controller never
+/// re-derives access). **D6 / C-M16·6:** M16 is a standing core surface
+/// (no off-by-default toggle) — the views are always available to the
+/// community.
 /// </para>
 /// </summary>
 [Authorize]
@@ -263,6 +277,204 @@ public sealed class InventoryController : Controller
         }
 
         return Redirect($"/inventory/{item.Id}");
+    }
+
+    /// <summary>
+    /// <c>GET /inventory/{id}/edit</c> — the edit composer (the locked M16
+    /// edit field set: the same four create fields — <c>Name</c> /
+    /// <c>OwnerKind</c> / <c>Description</c> / <c>ComponentId</c> — pre-seeded
+    /// from the live item). **D5 / C-M16·5:** the <see
+    /// cref="AuthorizeAttribute"/> is a convenience pre-gate only — the
+    /// server-side standing probe (creator ∪ GlobalAdmin, U03) is the
+    /// source of truth; this composer is the <c>Edit</c> link's target
+    /// (the detail view's read-side hint gates the link's *display*, not
+    /// access).
+    /// </summary>
+    [HttpGet("/inventory/{id}/edit")]
+    public async Task<IActionResult> EditGet(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        InventoryItem item;
+        try
+        {
+            item = await inventory.GetItemAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            // C-M3·4 non-leaky shape — a denied item is a 404, never a 403.
+            return NotFound();
+        }
+
+        var model = new InventoryEditorModel
+        {
+            Name = item.Name,
+            OwnerKind = item.OwnerKind,
+            Description = item.Description,
+            ComponentId = item.ComponentId,
+            Components = await SeedComponentsAsync(),
+        };
+        // The form posts to /inventory/{id} (the M5 BoardEdit ViewData idiom
+        // — the id is not a form field).
+        ViewData["itemId"] = id;
+        return View("Edit", model);
+    }
+
+    /// <summary>
+    /// <c>POST /inventory/{id}</c> — the edit write lane (**creator ∪
+    /// GlobalAdmin** — D5, enforced **server-side** by the seam; the Web
+    /// <see cref="AuthorizeAttribute"/> is a convenience pre-gate only, F4).
+    /// Validates the shape (<see cref="InventoryEditorModel.IsValid"/>),
+    /// writes through <see cref="IInventoryService.EditItemAsync"/> (the
+    /// seam opens its own write session + the one <c>AccessAudit</c> row —
+    /// C3), redirects to the item's <c>/inventory/{id}</c> (the "redirect
+    /// after write" precedent). A missing id is 404, a denied actor 403
+    /// (the C3 split).
+    /// </summary>
+    [HttpPost("/inventory/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditPost(string id, [FromForm] InventoryEditorModel model)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        if (!model.IsValid)
+        {
+            if (string.IsNullOrWhiteSpace(model.Name))
+                ModelState.AddModelError(nameof(model.Name), "A name is required.");
+            if (model.OwnerKind is not ("shared" or "community" or "private"))
+                ModelState.AddModelError(nameof(model.OwnerKind), "The type must be shared, community, or private.");
+            model.Components = await SeedComponentsAsync();
+            return View("Edit", model);
+        }
+
+        var request = new EditItemRequest
+        {
+            Name = model.Name!,
+            OwnerKind = model.OwnerKind,
+            Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            ComponentId = string.IsNullOrWhiteSpace(model.ComponentId) ? null : model.ComponentId,
+        };
+
+        try
+        {
+            await inventory.EditItemAsync(id, actorId, KumunitaPrincipal.RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Item updated.";
+        return Redirect($"/inventory/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /inventory/{id}/delete</c> — the delete write lane
+    /// (**creator ∪ GlobalAdmin** — D5; the ADR 0024 **soft-delete** flag —
+    /// the item's append-only <c>InventoryCheckout</c> history **survives**
+    /// the flag). Enforced **server-side** by the seam (the Web
+    /// <see cref="AuthorizeAttribute"/> is a convenience pre-gate only, F4);
+    /// a missing id is 404, a denied actor 403 (the C3 split).
+    /// </summary>
+    [HttpPost("/inventory/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeletePost(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await inventory.DeleteItemAsync(id, actorId, KumunitaPrincipal.RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Item deleted.";
+        return Redirect("/inventory");
+    }
+
+    /// <summary>
+    /// <c>POST /inventory/{id}/checkout</c> — the check-out write lane (D4 /
+    /// F1 — the **atomic** transition). **Standing (D5):** any member who
+    /// can see it over a <c>community</c> / <c>shared</c> item; owner ∪
+    /// GlobalAdmin over a <c>private</c> one — enforced **server-side** by
+    /// the seam (the Web <see cref="AuthorizeAttribute"/> is a convenience
+    /// pre-gate only, F4). The optional <paramref name="note"/> is stored on
+    /// the <c>InventoryCheckout</c> record (per-checkout — the U03
+    /// follow-on: the note is on the checkout, not the item). A missing id
+    /// is 404, a denied actor 403, and the F1 loser's
+    /// <see cref="InvalidOperationException"/> ("already checked out") is a
+    /// **409 Conflict** (never 403/404 — the loser's commit rolled back
+    /// atomically at the unique partial index).
+    /// </summary>
+    [HttpPost("/inventory/{id}/checkout")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CheckOutPost(string id, [FromForm] string? note = null)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await inventory.CheckOutAsync(id, actorId, KumunitaPrincipal.RoleSet(User),
+                string.IsNullOrWhiteSpace(note) ? null : note, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // F1 / D4 — the loser of the concurrent double-check-out (the
+            // unique partial index's arbiter). 409, never 403/404.
+            return new ObjectResult("Already checked out.") { StatusCode = StatusCodes.Status409Conflict };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Item checked out.";
+        return Redirect($"/inventory/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /inventory/{id}/checkin</c> — the check-in write lane (D4 —
+    /// clears <see cref="InventoryItem.CurrentHolderId"/> + closes the open
+    /// <c>InventoryCheckout</c> record). **Standing (D5):** current holder ∪
+    /// creator ∪ GlobalAdmin — enforced **server-side** by the seam (the Web
+    /// <see cref="AuthorizeAttribute"/> is a convenience pre-gate only, F4).
+    /// A missing id **or no open checkout to close** is 404 (the U03
+    /// follow-on: a check-in with no open record is a 404, not a 403); a
+    /// denied actor 403.
+    /// </summary>
+    [HttpPost("/inventory/{id}/checkin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CheckInPost(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await inventory.CheckInAsync(id, actorId, KumunitaPrincipal.RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Item checked in.";
+        return Redirect($"/inventory/{id}");
     }
 
     /// <summary>

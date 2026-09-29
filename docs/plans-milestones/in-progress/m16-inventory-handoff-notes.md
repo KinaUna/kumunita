@@ -599,3 +599,161 @@ Web surface + the nav entry):
    action links should be conditionally rendered (e.g. hide "Edit" when
    `!CreatorIsActor` and the actor is not GlobalAdmin — the read-side
    hint) but the **server-side** standing probe is the authority.
+
+## U05 — Web surface part 2 (edit/delete + check-out/check-in + nav)
+
+**(a) The controller extension** (`src/Kumunita.Web/Controllers/InventoryController.cs`)
+— five new actions appended **after** U04's `CreatePost` (the M4
+full-interface-first pin honored — U04's `List` / `Detail` / `CreateGet` /
+`CreatePost` are untouched, no rename). Every action is a **thin** HTTP
+layer (ADR 0006-D: routes + authz + shape) that routes **only** to the
+frozen `IInventoryService` seam — the controller **never re-derives
+access** (D5 / C-M16·5 / F4 — the `[Authorize]` convenience pre-gate is the
+class-level one, not per-action; the standing probe is the seam's). A
+`using Microsoft.AspNetCore.Http;` was added (for `StatusCodes.Status409Conflict`).
+
+- **`EditGet(id)`** → GET `/inventory/{id}/edit` — loads the item via
+  `GetItemAsync` (the C-M3·4 non-leaky 404 gate), seeds an
+  `InventoryEditorModel` from the live item, sets `ViewData["itemId"]` (the
+  M5 `BoardEdit` idiom — the id is not a form field), renders `Edit`.
+- **`EditPost(id, [FromForm] InventoryEditorModel)`** → POST
+  `/inventory/{id}` — validates `IsValid`, posts an `EditItemRequest`
+  (four locked fields: `Name` / `OwnerKind` / `Description` /
+  `ComponentId` — blank → `null`), calls `EditItemAsync(id, actorId,
+  KumunitaPrincipal.RoleSet(User), request)`. `KeyNotFoundException` →
+  **404**, `UnauthorizedAccessException` → **403** (the C3 split); success
+  → `TempData["info"]` + `Redirect("/inventory/{id}")`.
+- **`DeletePost(id)`** → POST `/inventory/{id}/delete` — calls
+  `DeleteItemAsync` (the ADR 0024 soft-delete flag; the append-only
+  history survives); `KeyNotFoundException` → 404,
+  `UnauthorizedAccessException` → 403; success → `Redirect("/inventory")`
+  (the feed — the item is no longer listed).
+- **`CheckOutPost(id, [FromForm] string? note = null)`** → POST
+  `/inventory/{id}/checkout` — calls `CheckOutAsync(id, actorId, roles,
+  blank→null note)`. **The F1 loser's `InvalidOperationException`
+  ("already checked out") → a `409 Conflict` `ObjectResult`** (the U03
+  follow-on #2 — never 403/404; the loser's commit rolled back atomically
+  at the unique partial index). `KeyNotFoundException` → 404,
+  `UnauthorizedAccessException` → 403; success → `Redirect("/inventory/{id}")`.
+- **`CheckInPost(id)`** → POST `/inventory/{id}/checkin` — calls
+  `CheckInAsync(id, actorId, roles)`. `KeyNotFoundException` (absent item
+  **or no open checkout to close** — the U03 follow-on #3) → **404** (not a
+  403); `UnauthorizedAccessException` → 403; success →
+  `Redirect("/inventory/{id}")`.
+
+**(b) The edit view** (`src/Kumunita.Web/Views/Inventory/Edit.cshtml`) —
+the M5 `BoardEdit` / U04 `Create.cshtml` shape: a `<form method="post"
+action="@($"/inventory/{itemId}")">` with `Name` (text) / `OwnerKind`
+(`<select>` of the three D3 labels) / `Description` (textarea) /
+`ComponentId` (`<select>` of `Model.Components`, rendered only when non-
+empty) + `@Html.AntiForgeryToken()`. Reuses U04's registered `inv.create.*`
+field-label keys + `inv.edit.title` / `inv.edit.submit` (the §kw-l list —
+**no new keys**; the parity + `KwLRegistryConsistencyTests` pins are
+untouched). `ViewData["itemId"]` is read in the view (`?? throw`).
+
+**(c) The detail view extension** (`src/Kumunita.Web/Views/Inventory/Detail.cshtml`)
+— an **action bar** inserted between the item `<dl>` card and the F3
+usage-history section. The top block now computes
+`var canManage = Model.CreatorIsActor || KumunitaPrincipal.IsGlobalAdmin(User)`
+(a *display* hint — D5 / C-M16·5 — the server-side standing probe is the
+source of truth). The "currently with" display was **already** in U04's
+`<dl>` (the `inv.detail.currentHolder` row, conditional on
+`CurrentHolderId` non-null) — U05 does not re-add it. The bar renders:
+
+- a **check-out** form (only when `Model.CanCheckOut`) — the optional
+  `Note` input (per-checkout, the U03 follow-on #4) + a `POST
+  /inventory/{id}/checkout` submit (`inv.detail.checkOut`);
+- a **check-in** form (only when `CurrentHolderId` is non-null) — a `POST
+  /inventory/{id}/checkin` submit (`inv.detail.checkIn`);
+- the **Edit** link (`/inventory/{id}/edit`, `inv.detail.edit`) + the
+  **Delete** button (`POST /inventory/{id}/delete`, `inv.detail.delete`,
+  `data-confirm`) — both only when `canManage`.
+
+All four action keys are U04's registered `inv.detail.*` keys (the §kw-l
+list — **no new keys**; the view only uses them, never re-registers).
+
+**(d) The nav entry** (`src/Kumunita.Web/Views/Shared/_Layout.cshtml`) —
+the M5 `nav.projects` shape in **both** variants:
+
+- **Variant B** (top row) — a `<li>` in the "More ▾" dropdown, after the
+  Projects item: `<a href="/inventory"><kw-l key="inv.nav">Inventory</kw-l></a>`.
+- **Variant C** (icon rail) — a `<a class="kmb-rail-btn" href="/inventory">`
+  with a box/box-lid SVG + the `visually-hidden` + `kmb-rail-tip` `inv.nav`
+  spans, after the Projects rail button.
+
+The `inv.nav` key is U04's registered key (the §kw-l list — **no new
+key**). A standing core surface (D6, no admin toggle) — the entry is
+**not** wrapped in the `@if (User.Identity?.IsAuthenticated == true)`
+resident-only guard that the adjacent Community/Groups/Events/Projects
+entries carry; it is a flat entry (like Home + Announcements), matching D6's
+"always available to the community."
+
+**(e) The pinned Web tests** (`tests/Kumunita.Web.Tests/InventoryControllerTests.cs`,
+5 new `[Fact]` tests — all pass; a `RepoRoot` helper was added to the
+class, mirroring the `NavMoreFoldTests` / `PwaManifestTests` structural-pin
+idiom):
+
+- **U05·4a** `CheckOut_Valid_Sets_CurrentHolder_And_Appends_Record` — a
+  valid check-out → `RedirectResult` to `/inventory/{id}`; the seam's
+  `CheckOutAsync` is called with the actor as the borrower + the `note`
+  (asserted via `Received(1)`); a denied actor (seam's
+  `UnauthorizedAccessException`) → clean `ForbidResult` (403); a missing
+  id (seam's `KeyNotFoundException`) → clean `NotFoundResult` (404) — the
+  C3 split.
+- **U05·4b** `CheckOut_AlreadyCheckedOut_Is_409_Not_403_404` — the F1
+  loser's `InvalidOperationException` → an `ObjectResult` with
+  `StatusCode == 409` (never 403/404 — the U03 follow-on #2), body
+  contains "already checked out" (case-insensitive).
+- **U05·5** `CheckIn_Valid_Clears_CurrentHolder_And_Closes_Record` — a
+  valid check-in → `RedirectResult` to `/inventory/{id}`; the seam's
+  `CheckInAsync` is called with the actor; no open record / absent (seam's
+  `KeyNotFoundException`) → clean `NotFoundResult` (404 — the U03
+  follow-on #3, NOT a 403); a denied actor (seam's
+  `UnauthorizedAccessException`) → clean `ForbidResult` (403).
+- **U05·6** `Edit_And_Delete_Valid_Route_To_Seam_And_Redirect` — edit:
+  valid form → `RedirectResult` to `/inventory/{id}`, the seam's
+  `EditItemAsync` is called with the actor + the four locked fields
+  (asserted via the `Arg.Do`-style capture — `capturedEdit`'s
+  `Name`/`OwnerKind`/`Description`/`ComponentId`); delete: →
+  `RedirectResult` to `/inventory` (the feed), the seam's
+  `DeleteItemAsync` is called with the actor. Both lanes: a denied actor →
+  `ForbidResult` (403), a missing id → `NotFoundResult` (404) — the C3
+  split on each.
+- **U05·7** `Nav_Entry_Present_In_Both_Layout_Variants_And_Registry` —
+  the `KnownTranslationKeys` `inv.nav` key is present in **all four**
+  languages (the §kw-l parity pin — U04's registration; U05 consumes,
+  never re-registers), and `_Layout.cshtml` carries `href="/inventory"` +
+  `key="inv.nav"` in **both** nav variants (B dropdown + C rail — ≥ 2
+  `inv.nav` occurrences), alongside the mirrored M5 `nav.projects` entry
+  (the structural-pin idiom — a pure file read, no TestServer).
+
+**(f) Drift observed** — none. The five actions are pure append-only to
+U04's controller (no rename/re-scope of `List` / `Detail` / `CreateGet` /
+`CreatePost`). No files outside the U05 deliverables were modified: the
+frozen `IAuthorizationService` / `AccessAction` / `AccessVia` / `Decide()`
+/ `IUserInfoService` are untouched (C-M16·4 honored — the controller routes
+every write through the seam's standing probe, never re-derives). No new
+`inv.*` kw-l keys (all five action labels + the nav label are U04's
+registered keys — the parity + `KwLRegistryConsistencyTests` pins extend
+automatically and pass). No new bounded context, no new `AccessVia` value,
+no `INotificationService` (D8). The `NavMoreFoldTests` structural pins are
+unaffected (the new `inv.nav` dropdown item adds no `data-nav-fold` /
+`data-nav-more` hooks — the pin counts remain 2 + 1).
+
+**(g) The exit gate** (green): `dotnet build Kumunita.slnx -c Debug`
+(0 errors) + `dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` —
+**635 tests, 0 errors, 0 failed, 0 skipped** (630 at U04 + the 5 new U05
+tests; `KwLRegistryConsistencyTests` + the Core 4-language parity tests
+auto-pin the keys and pass; `NavMoreFoldTests` unaffected).
+
+**(h) Follow-on for U06 (the close):** none — U05's surface is complete
+(the four write-lane actions + the edit view + the action bar + the nav
+entry + the 5 pinned tests). U06 is the close: the three acceptance gate
+tests (the U00 §gate — closed-loop / handoff-authorization-boundary /
+part-vs-whole-audit-completeness, the locked names in U00(b)) + the D7
+docs-parity flip (the four surfaces — `Milestones.cs` M16→done / M17→next,
+`MilestonesTests.cs` re-pin to `M17_Is_The_Single_InProgress_Milestone` +
+shipped list + M18 planned, the README Roadmap/Status, `docs/STATUS.md`,
+and the `docs/ARCHITECTURE.md` value-chain M16 row) — **all in U06's one
+unit** (C-M16·7). **U06 is the close — it has its own plan.**

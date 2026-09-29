@@ -2,6 +2,14 @@
 @using Kumunita.Web.Security
 @{
     ViewData["Title"] = Model.Item.Name;
+    // D5 / C-M16·5 — the action buttons below are *read-side display hints*
+    // only (the server-side standing probe, U03, is the source of truth; the
+    // [Authorize] pre-gate is a convenience, F4). edit / delete standing =
+    // creator ∪ GlobalAdmin (the CreatorIsActor hint + the principal's
+    // GlobalAdmin role); check-out standing = Model.CanCheckOut (not held &&
+    // the broad/owner standing); check-in standing = the item is currently
+    // held (current holder ∪ creator ∪ GlobalAdmin).
+    var canManage = Model.CreatorIsActor || KumunitaPrincipal.IsGlobalAdmin(User);
 }
 
 <div class="row justify-content-center">
@@ -39,6 +47,40 @@
                     <dd class="col-sm-9">@Model.Item.Created</dd>
                 </dl>
             </div>
+        </div>
+
+        @* U05 — the action bar (D5 / C-M16·5: these are *display* hints;
+           the server-side standing probe is the source of truth, F4).
+           check-out = optional note (per-checkout, the U03 follow-on) +
+           POST /checkout; check-in = POST /checkin; edit / delete =
+           the creator ∪ GlobalAdmin hint. *@
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+            @if (Model.CanCheckOut)
+            {
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/checkout")" class="d-flex flex-wrap align-items-center gap-2" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input class="form-control form-control-sm" type="text" name="note" maxlength="200"
+                           placeholder="Note (optional)" aria-label="Check-out note" />
+                    <button type="submit" class="btn btn-primary btn-sm"><kw-l key="inv.detail.checkOut">Check out</kw-l></button>
+                </form>
+            }
+            else if (Model.Item.CurrentHolderId is not null)
+            {
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/checkin")" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success btn-sm"><kw-l key="inv.detail.checkIn">Check in</kw-l></button>
+                </form>
+            }
+
+            @if (canManage)
+            {
+                <a class="btn btn-outline-secondary btn-sm" href="@($"/inventory/{Model.Item.Id}/edit")"><kw-l key="inv.detail.edit">Edit</kw-l></a>
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/delete")"
+                      data-confirm="@("Delete this item? This cannot be undone.")" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-danger btn-sm"><kw-l key="inv.detail.delete">Delete</kw-l></button>
+                </form>
+            }
         </div>
 
         @* F3 — the usage history (the append-only checkout record set, the
