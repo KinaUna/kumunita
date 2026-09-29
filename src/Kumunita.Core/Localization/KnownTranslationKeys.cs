@@ -1401,6 +1401,13 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Add to calendar",
             ["events.ics.feed"] = "Calendar feed (iCal)",
 
+            // ── M14 (ADR 0115 D2) — the Events ↔ Projects interlock's two U03
+            //    display-link labels (the to-do detail's event chip + the event
+            //    detail's linked to-dos section; the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["todo.event_link"] = "Linked event",
+            ["events.linked_todos"] = "Linked to-dos",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2965,6 +2972,10 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Zum Kalender hinzufügen",
             ["events.ics.feed"] = "Kalender-Feed (iCal)",
 
+            // ── M14 (ADR 0115 D2) — die beiden U03-Verknüpfungsetiketten Events ↔ To-dos ──
+            ["todo.event_link"] = "Verknüpfte Veranstaltung",
+            ["events.linked_todos"] = "Verknüpfte To-dos",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -4502,6 +4513,10 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Ajouter à l'agenda",
             ["events.ics.feed"] = "Flux de calendrier (iCal)",
 
+            // ── M14 (ADR 0115 D2) — les deux libellés de lien U03 événements ↔ to-dos ──
+            ["todo.event_link"] = "Événement lié",
+            ["events.linked_todos"] = "To-dos liés",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -6030,6 +6045,10 @@ public static class KnownTranslationKeys
             // ── events.ics (M12's iCal-overflader — detaljesiden + feed/kalender, ADR 0112) ──
             ["events.ics.download"] = "Tilføj til kalender",
             ["events.ics.feed"] = "Kalenderfeed (iCal)",
+
+            // ── M14 (ADR 0115 D2) — de to U03-lænkemærkater arrangementer ↔ to-dos ──
+            ["todo.event_link"] = "Knyttet arrangement",
+            ["events.linked_todos"] = "Knyttede to-dos",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

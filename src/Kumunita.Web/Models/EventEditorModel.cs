@@ -546,7 +546,12 @@ public sealed record EventDetailViewModel(
     IReadOnlyList<Kumunita.Core.Events.EventTranslation>? EventTranslations = null,
     IReadOnlyList<LanguageOption>? Languages = null,
     bool CanTranslate = false,
-    string OriginalLanguageCode = "")
+    string OriginalLanguageCode = "",
+    // ADR 0115 D2 (M14 interlock) — the **linked to-dos** on the event detail
+    // (the reverse read seam's page, mapped to rows; `null` = no linked
+    // readable to-dos, the view renders nothing; the `events.linked_todos`
+    // kw-l key labels the section).
+    IReadOnlyList<LinkedTodoRow>? LinkedTodos = null)
 {
     /// <summary>The event's translations, coalesced to a non-null empty list (a
     /// never-blank shape for the view).</summary>
@@ -569,3 +574,20 @@ public sealed record EventDetailViewModel(
 public sealed record EventRsvpEntry(
     Kumunita.Core.Events.EventRsvp Rsvp,
     string DisplayName);
+
+/// <summary>
+/// ADR 0115 D2 (M14 interlock) — one **linked to-do** row on the event
+/// detail (the §seams contract 4 locked shape — drift-guard entry 5: the
+/// <see cref="TodoRow"/> is too heavy for a chip; the
+/// <c>BlockerChip</c>-sized row). <see cref="Status"/> / <see cref="DueAt"/>
+/// are the to-do's verbatim fields; <see cref="LinkPath"/> is
+/// <c>/projects/todos/{TodoId}</c>. The page's <c>Read</c> decision already
+/// ran on every row — the seam's <c>CanSeeAsync(Read)</c> pass is the gate
+/// (C-M14·1 / C-M14·4), so the row is a display convenience, never a gate.
+/// </summary>
+public sealed record LinkedTodoRow(
+    string TodoId,
+    string Title,
+    string? Status,
+    DateTimeOffset? DueAt,
+    string LinkPath);

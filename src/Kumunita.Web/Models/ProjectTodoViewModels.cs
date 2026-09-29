@@ -170,7 +170,15 @@ public sealed record TodoDetailViewModel(
     // the to-do's single Read decision already ran, a comment inherits it — no
     // per-comment decision). Ordered by Created ascending. `null`/empty = no
     // comments yet (the view renders the empty-state label + composer).
-    IReadOnlyList<CommentRow>? Comments = null);
+    IReadOnlyList<CommentRow>? Comments = null,
+    // ADR 0115 D2 (M14 interlock) — the **event link** on the to-do detail
+    // (the D2 dangling-safe rule: all three fields are `null` when the to-do
+    // has no `EventId`, or the target event is soft-deleted / unreadable by
+    // the actor — the chip is then omitted entirely, never a 404/403 for the
+    // to-do itself; the `todo.event_link` kw-l key labels it).
+    string? EventId = null,
+    string? EventTitle = null,
+    string? EventLinkPath = null);
 
 /// <summary>
 /// One <see cref="Kumunita.Core.Projects.TodoComment"/> as a **detail row**

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -69,6 +70,16 @@ public sealed class ProjectsController : Controller
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
 
+    // ADR 0115 D2 (M14 interlock) — the to-do detail's **event link**
+    // (the ADR 0086 D9 `ProjectLink` resolve, carried to the event
+    // association) resolves the to-do's `EventId` through the **frozen**
+    // <see cref="IEventService"/> read seam — optional (default null) so the
+    // existing test-construction sites that build this controller without an
+    // event service keep compiling (the <see cref="EventController"/>
+    // optional-ctor-param idiom — DI always supplies the live
+    // <c>IEventService</c> in the app); absent, the chip simply omits.
+    private readonly IEventService? events;
+
     // ADR 0088 / ADR 0051 — the shared per-request translation provider used
     // to resolve the viewer's current language for the feed's default-visible
     // variant swap (the <see cref="EventController"/> /
@@ -86,7 +97,8 @@ public sealed class ProjectsController : Controller
         ILocalizationService localization,
         IDocumentStore store,
         ITranslationProvider? translationProvider = null,
-        EffectiveTimezoneResolver? timezone = null)
+        EffectiveTimezoneResolver? timezone = null,
+        IEventService? events = null)
     {
         this.projects = projects;
         this.userInfo = userInfo;
@@ -94,6 +106,7 @@ public sealed class ProjectsController : Controller
         this.store = store;
         this.translationProvider = translationProvider;
         this._timezone = timezone;
+        this.events = events;
     }
 
     // ADR 0019 — the actor's effective time zone (resident override →
@@ -768,6 +781,42 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0115 D2 (M14 interlock) — the **event link** (the same
+        // dangling-safe rule as the project link above): resolve the to-do's
+        // `EventId` through the **frozen** <see cref="IEventService.GetAsync"/>
+        // — its 404-vs-403 split is the seam's, and here a soft-deleted
+        // (404) or an unreadable (403) target leaves all three chip fields
+        // `null`, and the chip is omitted entirely — **not** a 404/403 for the
+        // to-do itself, and the target's title / id are not leaked (C-M14·2;
+        // C-M14·4 — the chip reuses the frozen Read decision, no new surface).
+        string? eventId = null;
+        string? eventTitle = null;
+        string? eventLinkPath = null;
+        if (result.Todo.EventId is { Length: > 0 } && events is not null)
+        {
+            try
+            {
+                var ev = await events.GetAsync(result.Todo.EventId, actorId, HttpContext.RequestAborted);
+                if (!ev.IsDeleted)
+                {
+                    eventId = ev.Id;
+                    eventTitle = ev.Title;
+                    eventLinkPath = "/events/" + ev.Id;
+                }
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted event — the association dangles; the chip is
+                // hidden (C-M14·2), the to-do itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // An event the actor may not read — a hidden chip, not a 403
+                // for the to-do (C-M14·2 — the to-do's own Audience is the
+                // access boundary).
+            }
+        }
+
         // ADR 0088 — the to-do's user-added translations (the ADR 0027
         // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
         // shape). A "a read, not a decision" surface; the parent to-do's single
@@ -814,7 +863,10 @@ public sealed class ProjectsController : Controller
             CanTranslate: canTranslateTodo,
             OriginalLanguageCode: result.Todo.LanguageCode,
             Blocker: result.Blocker,
-            Comments: commentRows);
+            Comments: commentRows,
+            EventId: eventId,
+            EventTitle: eventTitle,
+            EventLinkPath: eventLinkPath);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).

@@ -325,3 +325,144 @@ drift entry 2 (no `IEventService` constructor parameter) both hold —
 verified against the live `SetTodoProjectAsync` sibling. **Docker cleanup
 note:** none needed — both runs completed normally (no orphaned
 containers observed).
+
+## U03 — both-direction display links (to-do → event chip + event → linked to-dos)
+
+**Status:** D2 rendered in the UI — **both directions, access-scoped +
+dangling-safe** (C-M14·2), **no new authorization surface** (C-M14·4),
+**additive-only** (C-M14·7). Both the to-do → event chip and the event →
+linked to-dos section resolve through the frozen / U01 seams, so the
+linkage degrades gracefully and never leaks (an unreadable / absent /
+soft-deleted target is omitted entirely — never a 404/403 for the source
+surface, and its title / id are not leaked).
+
+**(a) Additive view-model fields (as written).**
+
+`src/Kumunita.Web/Models/ProjectTodoViewModels.cs` —
+`TodoDetailViewModel` gains three trailing `null`-defaulted fields (the
+ADR 0086 D9 `ProjectId?` / `ProjectTitle?` shape, the `ProjectLink`
+idiom), appended after `Comments`:
+
+```
+string? EventId = null,
+string? EventTitle = null,
+string? EventLinkPath = null,
+```
+
+`src/Kumunita.Web/Models/EventEditorModel.cs` — `EventDetailViewModel`
+gains one trailing `null`-defaulted field, appended after
+`OriginalLanguageCode`:
+
+```
+IReadOnlyList<LinkedTodoRow>? LinkedTodos = null
+```
+
+and the **locked** `LinkedTodoRow` (drift-guard entry 5 — the `TodoRow`
+is too heavy for a chip; the `BlockerChip`-sized row) is added as a new
+sealed record beside `EventRsvpEntry`:
+
+```
+public sealed record LinkedTodoRow(
+    string TodoId,
+    string Title,
+    string? Status,
+    DateTimeOffset? DueAt,
+    string LinkPath);
+```
+
+**(b) The two dangling-safe resolve calls + their catch.**
+
+**To-do → event chip** — `ProjectsController` `GET
+/projects/todos/{id}` (the `TodoDetail` action): resolves
+`result.Todo.EventId` through the **frozen** `IEventService.GetAsync`
+(the seam's 404-vs-403 split, C-M14·7 — the frozen surface untouched).
+Guarded on `result.Todo.EventId is { Length: > 0 } && events is not null`
+(the optional-ctor idiom — absent service = chip simply omits). On
+success with `!ev.IsDeleted`: sets `eventId = ev.Id`, `eventTitle =
+ev.Title`, `eventLinkPath = "/events/" + ev.Id`. **Catch (dangling-safe,
+C-M14·2):** `KeyNotFoundException` (soft-deleted) and
+`UnauthorizedAccessException` (unreadable) both **leave all three chip
+fields `null`** — the chip is omitted entirely, never a 404/403 for the
+to-do, and the target's title / id are not leaked. A non-null `IsDeleted`
+also leaves them null (the `BlockerChip.Generic` / ADR 0086 D9
+idiom carried to the event link). The three fields flow into
+`TodoDetailViewModel` (`EventId` / `EventTitle` / `EventLinkPath`).
+
+`ProjectsController` gains an **optional** `IEventService? events`
+constructor parameter (default null — the `EventController`
+optional-ctor-param idiom, so the existing 5-arg test-construction sites
+keep compiling; DI always supplies the live `IEventService`). One
+`using Kumunita.Core.Events;` added. **No new authorization surface** —
+the chip reuses the frozen `GetAsync` `Read` decision (C-M14·4).
+
+**Event → linked to-dos** — `EventController` `GET /events/{id}` (the
+`Detail` action): calls **U01's** `IProjectService
+.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted)`
+(page 0 — the detail surface, not a paged list; `HasMore` ignored — the
+section is display-only, the `BlockerChip` / `ProjectLink` "one section,
+not a feed" precedent). The seam's `CanSeeAsync(Read)` pass is the gate
+(C-M14·1 / C-M14·4 — **no new authorization surface**, composition stays
+in the Web layer, no `Core.Events` → `Core.Projects` dependency). Maps
+each `TodoItem` to a `LinkedTodoRow` (`TodoId` = `t.Id`, `Title` =
+`t.Title`, `Status` = `t.Status`, `DueAt` = `t.DueAt`, `LinkPath` =
+`"/projects/todos/" + t.Id`). **Dangling-safe (C-M14·2):** `Items.Count
+> 0` ⇒ `linkedTodos` = mapped rows; an empty page ⇒ `linkedTodos` stays
+**`null`** and the view renders **nothing** (no empty-state section for
+an absent linkage — the design-doc rule, not an invented empty-state).
+
+`EventController` gains an **optional** `IProjectService? projects`
+constructor parameter (default null — the `ProjectsController` idiom,
+so the existing 5/6-arg test-construction sites keep compiling; DI
+always supplies the live `IProjectService`). One `using
+Kumunita.Core.Projects;` added. The `LinkedTodos` field flows into
+`EventDetailViewModel`.
+
+**(c) `kw-l` keys × en/de/fr/da** (the two U03 keys — the design-doc
+§kw-l locked set; added beside the existing `events.ics.*` M12 block in
+`KnownTranslationKeys.cs`, which holds all four language dictionaries —
+there are no separate `en.json` / `de.json` / `fr.json` / `da.json`
+files in this repo, the closed-key registry **is** the parity surface the
+`KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests` pins
+enforce):
+
+| Key | en | de | fr | da |
+|---|---|---|---|---|
+| `todo.event_link` | Linked event | Verknüpfte Veranstaltung | Événement lié | Knyttet arrangement |
+| `events.linked_todos` | Linked to-dos | Verknüpfte To-dos | To-dos liés | Knyttede to-dos |
+
+The `todo.event_link` key labels the to-do detail chip (`Views/Projects/
+TodoDetail.cshtml`, rendered **only** when
+`Model.EventId is not null && Model.EventTitle is not null`, the
+`ProjectLink` chip directly below it — absent linkage renders nothing).
+The `events.linked_todos` key labels the event detail section
+(`Views/Event/Detail.cshtml`, rendered **only** when
+`Model.LinkedTodos is { Count: > 0 }`, one row per to-do — title link +
+optional status badge + optional due date via the existing
+`projects.todo.due` `kw-l` key + the `<kw-dt>` TagHelper). The two
+picker/feed keys (`todo.set_event.label` / `todo.set_event.pick` /
+`projects.todos.ics.*`) are **not** in U03 — they are U04 / U06.
+
+**(d) Drift vs. the register** — none. The two resolve shapes (frozen
+`GetAsync` for the chip, U01's `ListTodosForEventAsync` for the section),
+the `LinkedTodoRow` shape (drift-guard entry 5), the `null`-defaulted
+additive view-model fields, the "absent ⇒ omit, never 404/403, no
+leak" rule (C-M14·2), and the "empty ⇒ `null`, no empty-state" rule all
+match the design doc §D2 / §seams contract 4 verbatim. The register's
+U03 entry-reads named the views as `Views/Projects/Todo/Detail.cshtml` +
+`Views/Events/Detail.cshtml` — the **actual** live paths are
+`Views/Projects/TodoDetail.cshtml` + `Views/Event/Detail.cshtml` (a
+cosmetic path mismatch only; the views were edited at their real
+location). Both new controller dependencies are **optional constructor
+parameters** (the house `ITagService?` / `ITranslationProvider?` idiom),
+so the frozen `IEventService` / `IProjectService` surfaces are untouched
+(C-M14·7) and no existing test-construction site required a change.
+
+**(e) Build + test.** `dotnet build Kumunita.slnx -c Debug` succeeded
+clean (all 4 projects). `Kumunita.Web.Tests  Total: 585, Errors: 0,
+Failed: 0, Skipped: 0` (the `KnownTranslationKeys_ParityTests` +
+`KwLRegistryConsistencyTests` pins the two new keys satisfy, plus the
+frozen `EventControllerTests` / `ProjectsController` detail pins, survive
+the additive view-model fields + optional ctor params).
+`Kumunita.Core.Tests  Total: 996, Errors: 0, Failed: 0, Skipped: 0` (the
+kw-l registry's Core-side parity pins). **Docker cleanup note:** none
+needed — both runs completed normally (no orphaned containers observed).

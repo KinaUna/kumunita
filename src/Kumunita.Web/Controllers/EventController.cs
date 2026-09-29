@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Projects;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
@@ -78,6 +79,19 @@ public sealed class EventController : Controller
     // <c>ITagService</c> in the app.
     private readonly ITagService? tags;
 
+    // ADR 0115 D2 (M14 interlock) — the event detail's **linked to-dos**
+    // section (the reverse read seam's page, mapped to rows) resolves through
+    // the <see cref="IProjectService"/><see
+    // cref="IProjectService.ListTodosForEventAsync"/> seam (U01) — the seam's
+    // <c>CanSeeAsync(Read)</c> pass is the gate (C-M14·4 — no new
+    // authorization surface; the composition stays in this controller, never
+    // a <c>Core.Events</c> → <c>Core.Projects</c> dependency). **Optional**
+    // (default null) so the existing test-construction sites that build this
+    // controller without a project service keep compiling (the
+    // <see cref="ProjectsController"/> idiom); absent, the section simply
+    // omits.
+    private readonly IProjectService? projects;
+
     public EventController(
         IEventService events,
         IUserInfoService userInfo,
@@ -85,7 +99,8 @@ public sealed class EventController : Controller
         IDocumentStore store,
         EffectiveTimezoneResolver timezone,
         ITranslationProvider? translationProvider = null,
-        ITagService? tags = null)
+        ITagService? tags = null,
+        IProjectService? projects = null)
     {
         this.events = events;
         this.userInfo = userInfo;
@@ -94,6 +109,7 @@ public sealed class EventController : Controller
         this.timezone = timezone;
         this.translationProvider = translationProvider;
         this.tags = tags;
+        this.projects = projects;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -766,6 +782,33 @@ public sealed class EventController : Controller
             .ToList();
         var canTranslate = EventService.CanAddTranslation(ev.AuthorId, actorId, roles);
 
+        // ADR 0115 D2 (M14 interlock) — the **linked to-dos** section (the
+        // reverse read seam's page, mapped to <see cref="LinkedTodoRow"/>
+        // rows): the seam is the gate (its <c>CanSeeAsync(Read)</c> pass
+        // already ran on every row — C-M14·1 / C-M14·4, no new surface). Page
+        // 0 — the detail surface, not a paged list; the <c>HasMore</c>
+        // signal is ignored (the section is display-only, the
+        // <c>BlockerChip</c> / <c>ProjectLink</c> "one section, not a feed"
+        // precedent). An empty <c>Items</c> ⇒ <c>LinkedTodos</c> stays
+        // <c>null</c> and the view renders nothing (no empty-state section
+        // for an absent linkage — C-M14·2).
+        IReadOnlyList<LinkedTodoRow>? linkedTodos = null;
+        if (projects is not null)
+        {
+            var linkedPage = await projects.ListTodosForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            if (linkedPage.Items.Count > 0)
+            {
+                linkedTodos = linkedPage.Items
+                    .Select(t => new LinkedTodoRow(
+                        TodoId: t.Id,
+                        Title: t.Title,
+                        Status: t.Status,
+                        DueAt: t.DueAt,
+                        LinkPath: "/projects/todos/" + t.Id))
+                    .ToList();
+            }
+        }
+
         var vm = new EventDetailViewModel(
             Event: ev,
             AuthorDisplayName: authorName,
@@ -778,7 +821,8 @@ public sealed class EventController : Controller
             EventTranslations: eventTranslations,
             Languages: languages,
             CanTranslate: canTranslate,
-            OriginalLanguageCode: ev.LanguageCode);
+            OriginalLanguageCode: ev.LanguageCode,
+            LinkedTodos: linkedTodos);
 
         return View(vm);
     }

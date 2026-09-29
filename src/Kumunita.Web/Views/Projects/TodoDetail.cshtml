@@ -470,6 +470,23 @@
                     </div>
                 }
 
+                @* ADR 0115 D2 (M14 interlock) — the **event link** chip
+                   (the `ProjectLink` chip above, carried to the event
+                   association): rendered only when the controller resolved a
+                   readable, non-deleted event (C-M14·2 — a dangling /
+                   unreadable association yields null fields and the whole
+                   line is hidden: the chip is a display surface, never a
+                   404/403 for the to-do, and the target's title / id are not
+                   leaked). Absent linkage renders nothing (no empty-state
+                   line). *@
+                @if (Model.EventId is not null && Model.EventTitle is not null)
+                {
+                    <div class="text-muted small mb-3">
+                        <kw-l key="todo.event_link">Linked event</kw-l>:
+                        <a href="@Model.EventLinkPath">@Model.EventTitle</a>
+                    </div>
+                }
+
                 @* F9 — the parent link (a subtask is a full to-do shown under
                    its parent; the service's read surface, the view renders it). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))
