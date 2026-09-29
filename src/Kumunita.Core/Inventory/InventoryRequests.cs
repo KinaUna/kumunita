@@ -53,3 +53,24 @@ public sealed record CreateItemRequest
     public string? Description { get; init; }              // optional Markdown (the ADR 0025 shape, the one MarkdownRenderer)
     public string? ComponentId { get; init; }              // a feed filter, never a gate (C-M3·2 — the Post.ComponentId shape)
 }
+
+/// <summary>
+/// The edit-an-item request (the <see cref="IInventoryService"/> U03
+/// <c>EditItemAsync</c> shape — a **full update** of the same four fields the
+/// create lane writes, the M5 <c>UpdateBoardRequest</c> shape):
+/// <see cref="Name"/> (required, non-empty), <see cref="OwnerKind"/> (the D3
+/// string label), <see cref="Description"/> (a blank value clears it to
+/// <c>null</c>), <see cref="ComponentId"/> (a blank value clears it to
+/// <c>null</c> — a feed filter, never a gate — C-M3·2). The
+/// <see cref="InventoryItem.Audience"/> / <see cref="InventoryItem.AuthorId"/>
+/// / <see cref="InventoryItem.CurrentHolderId"/> fields are **not** editable
+/// here — the audience is a creation-time choice (D2/D3), the author is the
+/// creator (D5), and the holder is the F1 transition's state (D4).
+/// </summary>
+public sealed record EditItemRequest
+{
+    public required string Name { get; init; }             // non-empty — the card label + adapter `Name`
+    public string OwnerKind { get; init; } = "community";  // string label: shared / community / private (D3 — a filter + standing breadth, NEVER a read gate)
+    public string? Description { get; init; }              // optional Markdown (the ADR 0025 shape); a blank value clears it to null
+    public string? ComponentId { get; init; }              // a feed filter, never a gate (C-M3·2); a blank value clears it to null
+}

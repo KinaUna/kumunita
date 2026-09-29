@@ -91,8 +91,91 @@ public interface IInventoryService
 
     // --- Write lanes (U03) ---------------------------------------------------
     //
-    // CreateItemAsync / EditItemAsync / DeleteItemAsync / CheckOutAsync /
-    // CheckInAsync — the D5 standing probes + the F1 atomic transition land
-    // here in U03 (each takes the caller's IDocumentSession — C3). A rename
-    // or re-scope of these signatures after U03 ships is a drift event.
+    // Each takes <c>actorId</c> + <c>actorRoles</c> (the thin-principal role
+    // set — the D5 standing probe's input, the M5 <c>ClaimTodoAsync</c> /
+    // <c>EventService.CheckEditStanding</c> shape) and composes the frozen
+    // <c>IAuthorizationService</c> "can see it" + the <c>actorRoles</c>
+    // GlobalAdmin probe **server-side** (the Web <c>[Authorize]</c> is a
+    // convenience pre-gate only, F4). A rename or re-scope of these
+    // signatures after U03 ships is a drift event (M4 full-interface-first
+    // pin — U02 shipped the reads; U03 appends the writes).
+
+    /// <summary>
+    /// **Create** an item (D5 — the actor **is** the creator:
+    /// <see cref="InventoryItem.AuthorId"/> = the actor; the item is **live
+    /// on creation**, <c>public by default</c> — its
+    /// <see cref="InventoryItem.Audience"/> is <c>null</c> = public, D2/D3).
+    /// One <see cref="Authorization.AccessAudit"/> row
+    /// (<c>TargetKind = "inventory"</c>, <c>TargetId</c> = the new item id,
+    /// <see cref="Authorization.AccessVia.Owner"/>, <c>Outcome = Allow</c>)
+    /// commits atomically with the write (C-M16·2 / C3).
+    /// </summary>
+    /// <exception cref="ArgumentException">A name is required.</exception>
+    /// <exception cref="UnauthorizedAccessException">No acting actor
+    /// (the Web <c>[Authorize]</c> pre-gate's source of truth).</exception>
+    Task<InventoryItem> CreateItemAsync(string actorId, IReadOnlySet<string> actorRoles, CreateItemRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Edit** an item (D5 standing: **creator ∪ GlobalAdmin**). A
+    /// non-creator, non-GlobalAdmin is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) and a **Deny**
+    /// <see cref="Authorization.AccessAudit"/> row commits (C-M16·2 — Allow
+    /// **and** Deny); a successful edit stamps
+    /// <see cref="InventoryItem.Modified"/> and writes one
+    /// <c>inventory.update</c> row (<see cref="Authorization.AccessVia.Owner"/>
+    /// for the creator branch, <see cref="Authorization.AccessVia.Admin"/>
+    /// for the GlobalAdmin override).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The item is absent or soft-deleted.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no standing (a Deny row commits).</exception>
+    Task<InventoryItem> EditItemAsync(string itemId, string actorId, IReadOnlySet<string> actorRoles, EditItemRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Delete** an item (D5 standing: **creator ∪ GlobalAdmin**; the
+    /// ADR 0024 **soft-delete** flag — <see cref="InventoryItem.IsDeleted"/>
+    /// flips, the item's append-only
+    /// <see cref="InventoryCheckout"/> history **survives** the flag). A
+    /// non-creator, non-GlobalAdmin is refused (403, a Deny row commits); a
+    /// successful delete writes one <c>inventory.delete</c> row.
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The item is absent or soft-deleted.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no standing (a Deny row commits).</exception>
+    Task DeleteItemAsync(string itemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Check out** an item (D4 / F1 — the **atomic** state transition):
+    /// the <see cref="InventoryItem.CurrentHolderId"/> flips to the actor
+    /// **and** a new <see cref="InventoryCheckout"/> record (open —
+    /// <see cref="InventoryCheckout.CheckedInAt"/> null) is appended, both
+    /// committing in **one** <c>SaveChangesAsync</c>. **Standing (D5):** any
+    /// member who can see it over a <c>community</c> / <c>shared</c> item
+    /// (the M5 <c>ClaimTodoAsync</c> broad-standing precedent — the
+    /// frozen <c>IAuthorizationService</c> "can see it" pass); the **owner ∪
+    /// GlobalAdmin** over a <c>private</c> item. The <see
+    /// cref="M16DocTypes"/> unique partial index on
+    /// <c>(ItemId) where CheckedInAt IS NULL</c> is the **F1 idempotency
+    /// witness** — a concurrent double-check-out's second commit fails at
+    /// the DB layer (the loser sees "already checked out"), making the DB
+    /// the arbiter of at-most-one-open-checkout (C-M16·3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The item is absent or soft-deleted.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no standing (a Deny row commits).</exception>
+    /// <exception cref="InvalidOperationException">The item is already checked
+    /// out (the F1 witness — a concurrent double-check-out's loser, or a
+    /// second check-out while one is open).</exception>
+    Task<InventoryCheckout> CheckOutAsync(string itemId, string actorId, IReadOnlySet<string> actorRoles, string? note = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Check in** an item (D4): the <see
+    /// cref="InventoryItem.CurrentHolderId"/> clears and the **open**
+    /// <see cref="InventoryCheckout"/> record **closes**
+    /// (<see cref="InventoryCheckout.CheckedInAt"/> set) — the record is
+    /// append-only (never mutated or deleted beyond this close flip,
+    /// C-M16·3). **Standing (D5):** the **current holder ∪ creator ∪
+    /// GlobalAdmin**. One <c>inventory.checkin</c> audit row commits
+    /// atomically with the close.
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The item is absent or soft-deleted, or has no open checkout to close.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no standing (a Deny row commits).</exception>
+    Task<InventoryCheckout> CheckInAsync(string itemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 }
