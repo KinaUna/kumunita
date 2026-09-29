@@ -262,6 +262,54 @@ public interface ILocalizationService
         string actorId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// <b>M15 batch-editor write seam (ADR 0116, D4/D6; U03)</b> — the
+    /// batch editor's one save: upserts the present non-blank rows of one
+    /// catalog language **through the same row store the frozen
+    /// <see cref="UpsertTranslationAsync"/> uses** (C-M15·7 — the same
+    /// <see cref="TranslationResource"/> upsert, one write session), and
+    /// commits **exactly one** <c>AccessAudit</c> row — action
+    /// <c>translation.save_all</c>, <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the **language code**,
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in that same session (C3; C-M15·6: one
+    /// audit row per bulk action, never N rows for N upserts).
+    /// <para>
+    /// A **blank value is dropped, never erased** (C-M15·4 — the same
+    /// no-op rule as the import; a blank entry in
+    /// <paramref name="rows"/> is skipped, not written, and never deletes
+    /// a stored row). The per-row lane
+    /// <see cref="UpsertTranslationAsync"/> stays byte-identical beside it
+    /// (C-M15·7 — the batch editor is the same write, a different action
+    /// string + <c>TargetId</c>).
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency. No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCode">
+    /// The catalog code this call writes — also the one
+    /// <c>AccessAudit</c> row's <c>TargetId</c>.
+    /// </param>
+    /// <param name="rows">
+    /// The form's rows — <c>key → text</c>. Blank values are dropped
+    /// (C-M15·4); the stored set is otherwise upserted present-only.
+    /// </param>
+    /// <param name="actorId">The acting account (GlobalAdmin or Translator
+    /// — the ADR 0021 split), recorded on the one <c>AccessAudit</c> row.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>
+    /// The count of rows upserted.
+    /// </returns>
+    Task<int> SaveAllTranslationsAsync(
+        string languageCode,
+        IReadOnlyDictionary<string, string> rows,
+        string actorId,
+        CancellationToken ct = default);
+
     // ── Completeness — read ─────────────────────────────────────────
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys are
     /// present vs. missing for a language.</summary>

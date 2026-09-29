@@ -350,5 +350,68 @@ _(next: U01 — the `Kumunita.Core/Localization/` bulk pair:
   `TranslationResource` doc + index are byte-identical (the two edited
   files' diffs are pure insertions after the frozen members).
 
-_(next: U03 — `SaveAllTranslationsAsync` (the batch-editor seam) + its
-2 pinned tests — see `m15-u03.md`)_
+---
+
+## U03 — SaveAll seam
+
+**Date:** 2026-09-29. **Author:** U03 (this unit).
+
+**What shipped (Core — one additive seam + 2 pinned tests):**
+
+- **`src/Kumunita.Core/Localization/ILocalizationService.cs`** — the
+  additive
+  `Task<int> SaveAllTranslationsAsync(string languageCode,
+  IReadOnlyDictionary<string, string> rows, string actorId,
+  CancellationToken ct = default)` signature + doc-comment (inserted
+  between `UpsertManyTranslationsAsync` (U02) and the
+  `GetCompletenessAsync` tail — the frozen seams above are
+  byte-identical, C-M15·7).
+- **`src/Kumunita.Core/Localization/LocalizationService.cs`** — the
+  implementation (pure insertion at the end of the class, after U02's
+  `UpsertManyTranslationsAsync`): the same one-session + one-audit-row
+  idiom as U02; blank values are **dropped, not erased** (the guard is
+  `string.IsNullOrWhiteSpace` — U02 uses `IsNullOrEmpty`, this seam
+  treats whitespace-only input as blank too, the stricter reading of
+  "blank" in C-M15·4); the frozen `UpsertTranslationAsync` is
+  byte-identical beside it (C-M15·7).
+- **`tests/Kumunita.Core.Tests/TranslationBulkSaveAllTests.cs`** — the
+  2 pinned tests (new file, mirroring U02's
+  `TranslationBulkImporterTests` fixture shape).
+
+**(a) The signature** — `SaveAllTranslationsAsync(string languageCode,
+IReadOnlyDictionary<string, string> rows, string actorId,
+CancellationToken ct = default) → int`; exactly one
+`AccessAudit` row; blank values dropped (C-M15·4); additive on
+`ILocalizationService` (C-M15·8).
+
+**(b) The audit row as written** — `Action =
+"translation.save_all"`, `TargetKind = "translation"`, `TargetId` =
+the **language code** (e.g. `"pl"` — not the count, unlike
+`translation.import`), `Via = AccessVia.Admin`, `Outcome = Allow`,
+`ActorId` / `EffectivePrincipalId` = the acting account, committed in
+the same session as the writes (C3; C-M15·6).
+
+**(c) The 2 pin names + pass/red** —
+- `Bulk_SaveAll_UpsertsPresentRows_Only` — **pass** (present non-blank
+  rows upsert; a blank input's stored row survives byte-identical —
+  C-M15·4; the blank entry is not counted in the return value).
+- `Bulk_SaveAll_AuditRowShape_TranslationSaveAll` — **pass** (exactly
+  one row, the shape above, `TargetId = "pl"`).
+
+**(d) C-M15·7 confirmed** — the two edited files' changes are pure
+insertions (the interface seam between U02's seam and the
+completeness tail; the implementation appended at the end of the
+class); `UpsertTranslationAsync`, `GetTranslationsForAsync`,
+`GetCompletenessAsync`, `TranslationResource` + its index, the
+`SaveTranslation` route, the per-row editor, and both parity test
+classes are byte-identical. U02's `UpsertManyTranslationsAsync` is
+untouched.
+
+**(e) Compile warnings** — none (`dotnet build Kumunita.slnx -c
+Debug`: 0 warnings, 0 errors).
+
+**Test results** — class-filtered run (`-class
+Kumunita.Core.Tests.TranslationBulkSaveAllTests`): 2 total, 0
+failed. Full assembly: **1011 total, 0 errors, 0 failed** (no
+regression). Testcontainers left no containers (each run cleans up
+its own).
