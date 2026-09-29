@@ -494,8 +494,14 @@ namespace Kumunita.Core.Usage;
 /// <c>HttpContext</c>, D1). <see cref="HasEndpoint"/> is
 /// <c>httpContext.GetEndpoint() != null</c>; <see cref="IsStaticFile"/>
 /// is the endpoint's metadata containing a
-/// <c>StaticFileEndpointMetadata</c>; <see cref="RouteTemplate"/> is the
-/// endpoint's <c>RoutePattern.RawText</c> prefixed with the HTTP method
+/// <c>StaticAssetDescriptor</c> (the .NET 10 <c>MapStaticAssets()</c>
+/// pipeline's endpoint metadata — the U03 DRIFT GUARD closed the
+/// <c>StaticFileEndpointMetadata</c> name, which does not exist in .NET 10);
+/// <see cref="RouteTemplate"/> is the
+/// endpoint's <c>IRouteDiagnosticsMetadata.Route</c> (the .NET 10 surface the
+/// shipped middleware reads — the U03 DRIFT GUARD closed the
+/// <c>RoutePattern.RawText</c> name, which does not exist on .NET 10's
+/// <c>Endpoint</c>) prefixed with the HTTP method
 /// (the <c>GET /posts/{id}</c> shape); <see cref="ActorId"/> is the
 /// <c>ClaimTypes.Subject</c> value, <c>string.Empty</c> when anonymous.
 /// </summary>
@@ -682,10 +688,14 @@ public static class SurfaceKey
 `ILogger<UsageCaptureMiddleware>`):
 
 - `HasEndpoint` = `httpContext.GetEndpoint() != null`;
-- `IsStaticFile` = the endpoint's `Metadata.GetMetadata<
-  Microsoft.AspNetCore.StaticFiles.StaticFileEndpointMetadata>() != null`;
-- `RouteTemplate` = the endpoint's `RoutePattern.RawText` prefixed with
-  the HTTP method + a space (the `GET /posts/{id}` shape; the `RawText`
+- `IsStaticFile` = the endpoint's metadata carrying a `StaticAssetDescriptor`
+  (the .NET 10 `MapStaticAssets()` pipeline — `endpoint.Metadata
+  .OfType<StaticAssetDescriptor>().Any()`; the U03 DRIFT GUARD closed the
+  `StaticFileEndpointMetadata` name, which does not exist in .NET 10);
+- `RouteTemplate` = the endpoint's `IRouteDiagnosticsMetadata.Route` (the .NET 10
+  surface — `endpoint.Metadata.OfType<IRouteDiagnosticsMetadata>()
+  .FirstOrDefault()?.Route`) prefixed with
+  the HTTP method + a space (the `GET /posts/{id}` shape; the route metadata
   is the *template*, never the concrete path — C-M13·4);
 - `ActorId` =
   `httpContext.User?.Identity?.IsAuthenticated == true ?

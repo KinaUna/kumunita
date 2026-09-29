@@ -692,3 +692,174 @@ references those two type names, so it stays open for whoever next
 touches the affected doc-comments). U05's `AdminAnalyticsController`
 consumes `IUsageAnalyticsService` verbatim (both methods) — no shape
 changes landed in U04 beyond the recorded Linq-to-objects fallback.
+
+---
+
+## U05 — AdminAnalyticsController + retention tick (2026-09-29)
+
+**Role.** D4 admin surface + D5 retention tick in code, rendered from
+the design doc §admin-surface / §retention / §kw-l contracts
+(verbatim). Touched **only** U05's deliverables (the controller, the
+view model, the view, the admin-nav tab, the `Usage` context's
+`UsagePurgeService` / `UsagePurgeTick`, the Web `UsagePurgeHandler`,
+the ten `admin.analytics_*` kw-l keys × en/de/fr/da, the 3 D4/D7 Web
+pins). Did **not** touch U01's file sink, U02's `Usage` context files
+(reused `UsageEvent` / `SurfaceRow` verbatim, no duplication), U03's
+middleware, U04's aggregation seam (consumed
+`IUsageAnalyticsService` verbatim), or U07's docs flip.
+
+**Deliverables landed (U05's scope, 9 + 1 doc edit):**
+
+- `src/Kumunita.Core/Usage/UsagePurgeService.cs` — the
+  `AuditPurgeService` shape verbatim, a Wolverine-free static class;
+  `PurgeAsync(IDocumentStore store, DateTimeOffset now, CancellationToken
+  ct)` — batched id-collection + delete in **one** session (no per-row
+  `SaveChangesAsync`), **no** tier, **no** summary row (the D5
+  "no tier, no summary" inversion); the **365-day platform constant**
+  is `UsagePurgeService.RetentionDays = 365` (a `const int`, not a
+  config knob — the D5 inversion of the `AuditPurgeService`
+  per-instance principle).
+- `src/Kumunita.Core/Usage/UsagePurgeTick.cs` — the
+  `AuditPurgeTick` shape verbatim: `public sealed record
+  UsagePurgeTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1))`.
+- `src/Kumunita.Web/SideEffects/UsagePurgeHandler.cs` — the
+  `AuditPurgeHandler` shape verbatim: `public static async
+  Task<IEnumerable<object>> Handle(UsagePurgeTick tick, IDocumentStore
+  store)` — calls `UsagePurgeService.PurgeAsync(store,
+  DateTimeOffset.UtcNow)`, then re-yields `new UsagePurgeTick()`
+  (the 1-day schedule is baked into the `TimeoutMessage` type, so every
+  re-publish carries the same cadence — the ADR 0025/0054 house shape).
+- `src/Kumunita.Web/Controllers/AdminAnalyticsController.cs` — the
+  `[Route("admin/analytics")]` + `[Authorize(Roles = Roles.GlobalAdmin)]`
+  controller, ctor `(IDocumentStore store, IUsageAnalyticsService
+  analytics)` (the ADR 0062 section-split precedent — a
+  section-specific controller, not a new action on `AdminController`).
+- `src/Kumunita.Web/Models/AnalyticsViewModel.cs` — the POCO, six
+  fields verbatim from §admin-surface: `WindowDays` / `Total` /
+  `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+  `SurfaceRanking` (`IReadOnlyList<SurfaceRow>`).
+- `src/Kumunita.Web/Views/Admin/Analytics.cshtml` — the
+  `Admin/Audit.cshtml` table shape: the summary row (the
+  `WindowDays` / `Total` / `AuthenticatedTotal` / `AnonymousTotal` /
+  `DistinctActors`), the `SurfaceRanking` table loop (the loop is over
+  `SurfaceRow`, **not** over accounts — C-M13·3: no `@r.ActorId`
+  loop), the window selector `<select name="window">` (7/30/90),
+  the `/admin/analytics/export?window={window}` link, the
+  `admin.analytics_*` kw-l labels × en/de/fr/da (the ten keys from §kw-l,
+  verbatim).
+- `src/Kumunita.Web/Views/Admin/_AdminNav.cshtml` — the "Analytics"
+  tab: one line in the `tabs` array + one arm in the `action switch`,
+  joining the existing `Audit`/`BreakGlass` arms.
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the ten
+  `admin.analytics_*` keys × en/de/fr/da (the exact keys + strings from
+  design doc §kw-l, verbatim; 10 keys × 4 languages = 40 entries).
+- `tests/Kumunita.Web.Tests/AdminAnalyticsControllerTests.cs` — the 3
+  D4/D7 Web pins (NSubstitute, no Postgres).
+- `docs/design/m13-logging-analytics-design.md` §capture + §middleware
+  — the U03 DRIFT GUARD follow-up, **closed** by this unit (the
+  `RoutePattern.RawText` / `StaticFileEndpointMetadata` doc-comments
+  updated to the real .NET 10 API — `IRouteDiagnosticsMetadata.Route`
+  / `StaticAssetDescriptor`; see the drift note below).
+
+**(a) The two routes (verbatim).**
+
+- `GET /admin/analytics?window=7|30|90` (default 30) →
+  `AnalyticsViewModel` → `Views/Admin/Analytics.cshtml` (the
+  `Index` action — a read, no audit row; the D4 surface contract).
+- `GET /admin/analytics/export?window=7|30|90` (default 30) → the CSV
+  (the `Export` action — the `Content-Type: text/csv; charset=utf-8`
+  + `Content-Disposition: attachment; filename="kumunita-usage-{window}d
+  .csv"` + `Cache-Control: no-store` serve shape, the ADR 0034/0112
+  serve idiom, the `AdminPortabilityController` Export precedent) +
+  **exactly one `AccessAudit` row** committed via
+  `IDocumentStore.LightweightSession()`.
+
+**(b) The `AnalyticsViewModel` fields (the six).** `WindowDays` /
+`Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+`SurfaceRanking` (the `UsageAnalyticsResult` projection — verbatim from
+§admin-surface).
+
+**(c) The one `AccessAudit` row shape.** `TargetKind == "analytics"`
++ `Action == "analytics.export"` + `Via = AccessVia.Admin` +
+`Outcome = AccessOutcome.Allow` + `ActorId` = the current user's
+`ClaimTypes.Subject` value (the `AdminSubjectId(User)` helper shape,
+the ADR 0108 "portability.export" precedent verbatim). Committed via
+`IDocumentStore.LightweightSession()` (the D4 contract — the
+controller's own commit, not a service seam).
+
+**(d) The `UsagePurgeService` / `UsagePurgeHandler` / `UsagePurgeTick`
+shapes.**
+
+- `UsagePurgeService.RetentionDays = 365` (the D5 platform constant).
+- `UsagePurgeService.PurgeAsync(IDocumentStore, DateTimeOffset,
+  CancellationToken)` — batched id-collection + delete in one session,
+  no tier, no summary row.
+- `UsagePurgeTick` — `public sealed record UsagePurgeTick() :
+  Wolverine.TimeoutMessage(TimeSpan.FromDays(1))` (the 1-day schedule
+  baked in).
+- `UsagePurgeHandler.Handle(UsagePurgeTick, IDocumentStore)` — calls
+  `UsagePurgeService.PurgeAsync(store, DateTimeOffset.UtcNow)`, then
+  re-yields `new UsagePurgeTick()` (self-rescheduling).
+
+**(e) The `admin.analytics_*` keys (ten, verbatim from §kw-l).**
+`admin.analytics_title` / `admin.analytics_lede` /
+`admin.analytics_window` / `admin.analytics_total` /
+`admin.analytics_authenticated` / `admin.analytics_anonymous` /
+`admin.analytics_distinct` / `admin.analytics_surface` /
+`admin.analytics_count` / `admin.analytics_export` — each present ×
+en/de/fr/da with non-empty values (40 entries total; the
+`KnownTranslationKeys_ParityTests` family already enforces the
+key-set parity across the four dictionaries, the new
+`KnownTranslationKeys_Parity_Extended_With_Analytics_Keys` pin asserts
+the ten keys exist + are non-empty in each of the four dictionaries).
+
+**(f) The 3 D4/D7 Web pins — all PASS.** Run via the in-process
+xunit.v3 runner (`dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+-class "Kumunita.Web.Tests.AdminAnalyticsControllerTests"` — not
+`dotnet test`, per AGENTS.md): **Total: 3, Errors: 0, Failed: 0,
+Skipped: 0, Not Run: 0**.
+
+| Pin | Result |
+|---|---|
+| `AdminAnalytics_Route_Exists_And_GlobalAdmin_Only` | PASS |
+| `AdminAnalytics_Csv_Shape` | PASS |
+| `KnownTranslationKeys_Parity_Extended_With_Analytics_Keys` | PASS |
+
+**Full-suite confirmation (2026-09-29):** `Kumunita.Web.Tests`
+`Total: 585, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`;
+`Kumunita.Core.Tests` `Total: 989, Errors: 0, Failed: 0, Skipped: 0,
+Not Run: 0` (the kw-l additions + the new `UsagePurgeService` /
+`UsagePurgeTick` + the `UsagePurgeHandler` all compile + the
+`KnownTranslationKeys_ParityTests` family still green — the ten new
+`admin.analytics_*` keys pass the existing en/de/fr/da key-set parity
+pins with no extra work).
+
+**(g) Compile warnings.** 0 — `dotnet build Kumunita.slnx -c Debug
+--no-incremental` → `Build succeeded. 0 Warning(s) 0 Error(s)`.
+
+**Drift follow-up closed (the U03 DRIFT GUARD item, open since U03).**
+The design doc's `UsageCaptureInput` doc-comment (§capture) and the
+§middleware projection-rules list both named `RoutePattern.RawText` +
+`StaticFileEndpointMetadata` — types that do not exist in .NET 10
+(U03's DRIFT GUARD recorded the real .NET 10 API:
+`IRouteDiagnosticsMetadata.Route` + `StaticAssetDescriptor`). U05
+updated both doc-comment sites to the real .NET 10 API (the
+`StaticFileEndpointMetadata` → `StaticAssetDescriptor` rename + the
+`RoutePattern.RawText` → `IRouteDiagnosticsMetadata.Route` rename,
+with a one-line note in each site that the U03 DRIFT GUARD closed the
+old name). This is a **doc-only edit** — no code, no test impact; the
+shipped `UsageCaptureMiddleware` already used the real .NET 10 API
+(U03's pin), and the 3 D1 middleware pins still pass unchanged.
+The U04 "open for U05+" item in the handoff notes above is now closed
+by this unit.
+
+**Open for U06 (no drift pauses):** the U06 gate's part-vs-whole
+invokes the full 19-pin list (U01's 3 sink pins + U02's 6 policy/
+surface pins + U03's 3 middleware pins + U04's 4 aggregation pins +
+U05's 3 admin-surface pins) — all 19 are in the tree and green (the
+full-suite runs above confirm this). The (a) closed-loop + (b) handoff
+acceptance tests are not yet authored — U06's scope per the register.
+The (c) part-vs-whole gate is the full pinned list +
+`MilestonesTests` green (the U07 docs flip is not yet done — M13 is
+still `StatusNext` / M14 is still `StatusPlanned`).

@@ -1050,6 +1050,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Outcome",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Usage analytics",
+            ["admin.analytics_lede"] =
+                "A local summary of how the platform is used — a request count, " +
+                "the signed-in / anonymous split, the number of distinct accounts, " +
+                "and the per-surface ranking, over a fixed window. No per-account " +
+                "detail is shown; the raw rows are the operator's psql surface.",
+            ["admin.analytics_window"] = "Window",
+            ["admin.analytics_total"] = "Total requests",
+            ["admin.analytics_authenticated"] = "Signed-in",
+            ["admin.analytics_anonymous"] = "Anonymous",
+            ["admin.analytics_distinct"] = "Distinct accounts",
+            ["admin.analytics_surface"] = "Surface",
+            ["admin.analytics_count"] = "Count",
+            ["admin.analytics_export"] = "Export CSV",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Granted at (UTC)",
@@ -2620,6 +2636,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Über",
             ["admin.audit_th_outcome"] = "Ergebnis",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Verwendungsanalytik",
+            ["admin.analytics_lede"] =
+                "Eine lokale Zusammenfassung der Plattfornutzung — Anfragen, " +
+                "angemeldet / anonym, eindeutige Konten und Oberflächen-Ranking " +
+                "über ein festes Zeitfenster. Keine Kontodetails; die rohen " +
+                "Zeilen sind das psql-Surface des Betreibers.",
+            ["admin.analytics_window"] = "Fenster",
+            ["admin.analytics_total"] = "Gesamtanfragen",
+            ["admin.analytics_authenticated"] = "Angemeldet",
+            ["admin.analytics_anonymous"] = "Anonym",
+            ["admin.analytics_distinct"] = "Eindeutige Konten",
+            ["admin.analytics_surface"] = "Oberfläche",
+            ["admin.analytics_count"] = "Anzahl",
+            ["admin.analytics_export"] = "CSV exportieren",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Gewährt am (UTC)",
@@ -4139,6 +4171,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Résultat",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Analyse d'usage",
+            ["admin.analytics_lede"] =
+                "Un résumé local de l'usage de la plateforme — nombre de requêtes, " +
+                "connecté / anonyme, comptes distincts et classement par surface, " +
+                "sur une fenêtre fixe. Aucun détail par compte ; les lignes " +
+                "brutes sont la surface psql de l'opérateur.",
+            ["admin.analytics_window"] = "Fenêtre",
+            ["admin.analytics_total"] = "Requêtes totales",
+            ["admin.analytics_authenticated"] = "Connectés",
+            ["admin.analytics_anonymous"] = "Anonymes",
+            ["admin.analytics_distinct"] = "Comptes distincts",
+            ["admin.analytics_surface"] = "Surface",
+            ["admin.analytics_count"] = "Nombre",
+            ["admin.analytics_export"] = "Exporter CSV",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Accordé à (UTC)",
@@ -5655,6 +5703,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_aggregate"] = "Aggregate",
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Resultat",
+
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Brugsanalyse",
+            ["admin.analytics_lede"] =
+                "Et lokalt overblik over platformens brug — anmodninger, " +
+                "tilmeldt / anonym, distinkte konti og overfladeranking over " +
+                "et fast vindue. Ingen konto-detaljer; de rå rækker er " +
+                "operatørets psql-overflade.",
+            ["admin.analytics_window"] = "Vindue",
+            ["admin.analytics_total"] = "Samtlige anmodninger",
+            ["admin.analytics_authenticated"] = "Tilmeldte",
+            ["admin.analytics_anonymous"] = "Anonyme",
+            ["admin.analytics_distinct"] = "Distinkte konti",
+            ["admin.analytics_surface"] = "Overflade",
+            ["admin.analytics_count"] = "Antal",
+            ["admin.analytics_export"] = "Eksportér CSV",
 
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",

@@ -13,6 +13,7 @@
         ("Communities", "/admin/communities"),
         ("Platform",    "/admin/platform"),
         ("Security",    "/admin/security"),
+        ("Analytics",   "/admin/analytics"),
     };
     var activeLabel = inSecurity ? "Security" : action switch
     {
@@ -20,6 +21,7 @@
         "Communities" => "Communities",
         "Platform"    => "Platform",
         "Security"    => "Security",
+        "Analytics"   => "Analytics",
         _             => "Overview",
     };
 }
