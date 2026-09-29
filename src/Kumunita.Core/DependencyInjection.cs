@@ -283,6 +283,25 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<IUserInfoService>()));
 
+        // M17 (ADR 0118, plan U02): the bookmarks-side service seam (bounded
+        // context Kumunita.Core.Bookmarks — a personal-by-id record, D2).
+        // The same "AddTransient with the store injected" shape as
+        // IAnnouncementService / IPageService above. U02 ships the read lane
+        // (ListAsync) + the write lanes (ToggleAsync / RemoveAsync); the D3
+        // write-lane visibility check reuses the owning surfaces' existing
+        // read seams (the *same call the detail page uses*). Composes **only**
+        // frozen seams (C-M17·1): the frozen IAuthorizationService (the D3
+        // check only) + the owning surfaces' read seams (the D5 resolution).
+        // **No** INotificationService (D7 — the nudge lane is §deferred).
+        services.AddTransient<Bookmarks.IBookmarkService>(sp => new Bookmarks.BookmarkService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Announcements.IAnnouncementService>(),
+            sp.GetRequiredService<Pages.IPageService>(),
+            sp.GetRequiredService<Events.IEventService>(),
+            sp.GetRequiredService<Projects.IProjectService>()));
+
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"
         // arrow: the Notification + NotificationPreference documents, the
