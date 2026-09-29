@@ -866,7 +866,19 @@ public sealed class ProjectsController : Controller
             Comments: commentRows,
             EventId: eventId,
             EventTitle: eventTitle,
-            EventLinkPath: eventLinkPath);
+            EventLinkPath: eventLinkPath,
+            // ADR 0115 D3 (M14 interlock) — the **event picker** (the
+            // <c>set-event</c> lane's affordance; the <see
+            // cref="SeedEventPickerAsync"/> seed over the frozen
+            // <c>IEventService.ListMineAsync</c>, capped at 25). An empty
+            // <see cref="TodoEventPicker.Options"/> list hides the picker
+            // card in the view (the ADR 0086 D9 hide rule; the picker is a
+            // display surface, never a gate, C-M14·4). <see
+            // cref="TodoEventPicker.CurrentEventId"/> is the to-do's stored
+            // <c>EventId</c> (the <c>&lt;select&gt;</c> prefill).
+            EventPicker: new TodoEventPicker(
+                Options: await SeedEventPickerAsync(),
+                CurrentEventId: result.Todo.EventId));
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1378,6 +1390,54 @@ public sealed class ProjectsController : Controller
         TempData["info"] = string.IsNullOrWhiteSpace(projectId)
             ? "Project cleared."
             : "Project set.";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/set-event</c> — the **event
+    /// association** write lane (ADR 0115 D3 / C-M14·3 — the M14 interlock).
+    /// A **standalone** form POST (its own small form on the to-do detail —
+    /// **not** the main M5 update form, whose frozen <see
+    /// cref="Kumunita.Core.Projects.UpdateTodoRequest"/> is untouched —
+    /// C-M14·7: <c>EventId</c> is not on <c>CreateTodoRequest</c> /
+    /// <c>UpdateTodoRequest</c>). Sets the to-do's <see
+    /// cref="Kumunita.Core.Projects.TodoItem.EventId"/> through the U02
+    /// <see cref="IProjectService.SetTodoEventAsync"/> seam (the
+    /// <c>set-project</c> lane shape, verbatim); a blank / <c>null</c>
+    /// choice posts <c>null</c> = **clear** the association. **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the to-do — the service's server-side
+    /// standing re-check + event guard (C-M14·3; the ADR 0006-D split) is
+    /// the enforcement; the controller does no standing math (C-M14·4 — no
+    /// new authorization surface). A missing to-do is 404, a denied actor
+    /// 403, a missing / unreadable event 404 (the seam's decision as truth,
+    /// C-M14·3).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/set-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TodoSetEvent(string id, [FromForm] string? eventId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetTodoEventAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(eventId) ? null : eventId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(eventId)
+            ? "Event link cleared."
+            : "Event linked.";
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -3780,6 +3840,55 @@ public sealed class ProjectsController : Controller
         // surface as an empty one — the picker card hides (C-PL·3).
         return (list ?? [])
             .Select(p => (Id: p.Id, Name: string.IsNullOrWhiteSpace(p.Title) ? p.Id : p.Title))
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Seeds the **event picker** options (ADR 0115 D3 — the M14 interlock's
+    /// <c>set-event</c> affordance) — the actor's own events (authored ∪
+    /// RSVPed — the **frozen** <see cref="IEventService.ListMineAsync"/>
+    /// read seam, the ADR 0065 posture), **capped at 25** for the
+    /// <c>&lt;select&gt;</c> (a **display** cap, never a gate — C-M14·4; the
+    /// picker is a display surface, the service's
+    /// <c>SetTodoEventAsync</c> standing re-check + event guard on write is
+    /// the enforcement, C-M14·3). A **display** surface, never a gate — the
+    /// picker shows the actor's own events (a read convenience, not a
+    /// decision); the service's write-time decision is the authority. An
+    /// empty result (no events, or a denied read) hides the picker card in
+    /// the view — a picker with no options is a noise surface, not a
+    /// control (the ADR 0086 D9 hide rule).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Name)>> SeedEventPickerAsync()
+    {
+        // Absent event service (a test-construction site without DI) — the
+        // picker has no options and hides (the C-M14·4 display-surface rule;
+        // no exception is raised over an optional dependency).
+        if (events is null)
+            return [];
+        var actorId = SubjectId(User) ?? string.Empty;
+        IReadOnlyList<Event> list;
+        try
+        {
+            list = await events.ListMineAsync(actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        // A null result (a seam that returns no list) is the same display
+        // surface as an empty one — the picker card hides (C-M14·4). The
+        // 25-cap is a display cap, not a gate (the ADR 0065 posture — the
+        // per-actor set is small at one-neighborhood scale; the cap is a
+        // backstop against a pathologically large <c>&lt;select&gt;</c>).
+        return (list ?? [])
+            .Take(25)
+            .Select(e => (Id: e.Id, Name: string.IsNullOrWhiteSpace(e.Title) ? e.Id : e.Title))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

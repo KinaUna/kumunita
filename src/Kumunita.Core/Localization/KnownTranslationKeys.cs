@@ -1408,6 +1408,13 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Linked event",
             ["events.linked_todos"] = "Linked to-dos",
 
+            // ── M14 (ADR 0115 D3) — the U04 set-event picker labels (the
+            //    to-do detail's "Link to event" form label + the
+            //    <select>'s placeholder / clear option; the closed-key
+            //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["todo.set_event.label"] = "Link to event",
+            ["todo.set_event.pick"] = "Choose an event",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2976,6 +2983,11 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Verknüpfte Veranstaltung",
             ["events.linked_todos"] = "Verknüpfte To-dos",
 
+            // ── M14 (ADR 0115 D3) — die U04 set-event-Picker-Beschriftungen
+            //    (To-do-Details: Formularbeschriftung + Platzhalter/Clear-Option) ──
+            ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
+            ["todo.set_event.pick"] = "Veranstaltung wählen",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -4517,6 +4529,12 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Événement lié",
             ["events.linked_todos"] = "To-dos liés",
 
+            // ── M14 (ADR 0115 D3) — les deux libellés du sélecteur U04 set-event
+            //    (détail de la to-do : libellé du formulaire + option
+            //    placeholder / effacement) ──
+            ["todo.set_event.label"] = "Lier à un événement",
+            ["todo.set_event.pick"] = "Choisir un événement",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -6049,6 +6067,11 @@ public static class KnownTranslationKeys
             // ── M14 (ADR 0115 D2) — de to U03-lænkemærkater arrangementer ↔ to-dos ──
             ["todo.event_link"] = "Knyttet arrangement",
             ["events.linked_todos"] = "Knyttede to-dos",
+
+            // ── M14 (ADR 0115 D3) — de to U04 set-event-vælgermærkater
+            //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──
+            ["todo.set_event.label"] = "Knyt til arrangement",
+            ["todo.set_event.pick"] = "Vælg et arrangement",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

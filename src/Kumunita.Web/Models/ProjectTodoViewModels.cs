@@ -178,7 +178,37 @@ public sealed record TodoDetailViewModel(
     // to-do itself; the `todo.event_link` kw-l key labels it).
     string? EventId = null,
     string? EventTitle = null,
-    string? EventLinkPath = null);
+    string? EventLinkPath = null,
+    // ADR 0115 D3 (M14 interlock) — the **event picker** on the to-do detail
+    // (the <c>set-event</c> lane's affordance; the U04
+    // <c>POST /projects/todos/{id}/set-event</c> form). <see
+    // cref="TodoEventPicker"/> carries the actor's visible events + the
+    // to-do's current selection. `null` = the actor has no visible events —
+    // the picker card hides (the ADR 0086 D9 <c>Projects.Count &gt; 0</c>
+    // hide rule; the picker is a display surface, never a gate, C-M14·4).
+    TodoEventPicker? EventPicker = null);
+
+/// <summary>
+/// The **event picker** affordance on the to-do detail (ADR 0115 D3, the M14
+/// interlock — the <c>set-event</c> lane's UI). Carries the actor's visible
+/// events (<see cref="Options"/>) + the to-do's current selection
+/// (<see cref="CurrentEventId"/>).
+/// <para>
+/// **<see cref="Options"/>** is the actor's visible events — the **frozen**
+/// <see cref="Kumunita.Core.Events.IEventService.ListMineAsync"/> (the
+/// actor's own events, authored ∪ RSVPed — the ADR 0065 posture), **capped
+/// at 25** for the <c>&lt;select&gt;</c> (a display cap, never a gate —
+/// C-M14·4). **<see cref="CurrentEventId"/>** is the to-do's stored
+/// <see cref="Kumunita.Core.Projects.TodoItem.EventId"/> (the <c>&lt;
+/// select&gt;</c> prefill — the association the lane is editing). An empty
+/// <see cref="Options"/> list hides the picker card in the view (a picker
+/// with no options is a noise surface, not a control — the ADR 0086 D9
+/// hide rule).
+/// </para>
+/// </summary>
+public sealed record TodoEventPicker(
+    IReadOnlyList<(string Id, string Name)> Options,
+    string? CurrentEventId = null);
 
 /// <summary>
 /// One <see cref="Kumunita.Core.Projects.TodoComment"/> as a **detail row**

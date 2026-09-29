@@ -466,3 +466,129 @@ the additive view-model fields + optional ctor params).
 `Kumunita.Core.Tests  Total: 996, Errors: 0, Failed: 0, Skipped: 0` (the
 kw-l registry's Core-side parity pins). **Docker cleanup note:** none
 needed — both runs completed normally (no orphaned containers observed).
+
+## U04 — `set-event` Web lane + event picker + `kw-l`
+
+**Status:** done, build green (0 warnings, all 4 projects), **585 / 585 Web
+tests pass** (0 errors, 0 skipped — includes the `KnownTranslationKeys_ParityTests`
++ `KwLRegistryConsistencyTests` pins the two new keys satisfy, plus the frozen
+`ProjectsController` / `EventController` detail pins, which survive the additive
+view-model field + optional ctor param). Implemented **only U04**: the M14
+`set-event` Web lane (D3 rendered in the UI), additive only (C-M14·7); the
+**frozen** `IEventService` surface and the **U02** `SetTodoEventAsync` seam are
+consumed, not re-added/renamed; `EventId` is **not** on
+`CreateTodoRequest` / `UpdateTodoRequest` (the association is a dedicated lane,
+not the main form — D3); **no** new `AccessAction` / `AccessVia` / `Decide()`
+branch (C-M14·4 — the lane reuses the U02 standing + the frozen `Read`
+decision); **no** `RRULE` / recurrence (C-M14·6 / D6); **no** new JS (one
+native `<form>` / `<select>` — the ADR 0031 tsc-only discipline holds).
+
+**(a) The `set-event` action signature + route** —
+`src/Kumunita.Web/Controllers/ProjectsController.cs`, placed immediately after
+`TodoSetProject` (the `set-project` lane it copies verbatim):
+
+```csharp
+[HttpPost("/projects/todos/{id}/set-event")]
+[ValidateAntiForgeryToken]
+public async Task<IActionResult> TodoSetEvent(string id, [FromForm] string? eventId)
+```
+
+The body mirrors `TodoSetProject` exactly: one `eventId` form field bound
+nullable (`string.IsNullOrWhiteSpace(eventId) ? null : eventId` — blank / `null`
+posts as the **clear** affordance, the `set-project` lane's `null`-clears
+shape); calls the **U02** `SetTodoEventAsync` seam (whose standing
+`creator ∪ assignee ∪ GlobalAdmin` + 404/403 decision is **truth** —
+C-M14·3; the Web `[Authorize]` is a convenience pre-gate only — the controller
+does no standing math, C-M14·4); catches `KeyNotFoundException` → 404 and
+`UnauthorizedAccessException` → `ForbidResult` (the seam's decision as
+truth); sets `TempData["info"]` to "Event link cleared." / "Event linked.";
+redirects back to `/projects/todos/{id}` on success. **No new authorization
+surface** — the action reuses the U02 standing + the frozen `Read` decision.
+
+**(b) The picker read seam + cap** — `SeedEventPickerAsync()` (a new private
+helper beside `SeedProjectPickerAsync`), seeds the picker from the **frozen**
+`IEventService.ListMineAsync(actorId, ct)` (the actor's own events — authored
+∪ RSVPed — the ADR 0065 posture), **capped at 25** for the `<select>` (a
+**display** cap, not a gate — C-M14·4; `.Take(25)`), sorted by name
+ordinal-ignoring-case (the `SeedProjectPickerAsync` shape). A `null`
+`events` service (test construction without DI) or an empty / denied read
+returns `[]` (the picker card hides — the ADR 0086 D9 hide rule). The picker
+is a **display surface, never a gate** (C-M14·4 — the service's write-time
+standing re-check + event guard is the enforcement, C-M14·3).
+
+**(c) The `TodoEventPicker` view-model + the `EventPicker` field** — U03 did
+not provide a picker model, so U04 adds one (the design doc is the authority —
+D3 names `TodoEventPicker`, "the visible-event list + the current `EventId`"):
+
+`src/Kumunita.Web/Models/ProjectTodoViewModels.cs`:
+
+```csharp
+public sealed record TodoEventPicker(
+    IReadOnlyList<(string Id, string Name)> Options,
+    string? CurrentEventId = null);
+```
+
++ `TodoDetailViewModel` gains one trailing `null`-defaulted additive field,
+appended after `EventLinkPath`:
+
+```
+TodoEventPicker? EventPicker = null
+```
+
+`ProjectsController` `GET /projects/todos/{id}` (the `TodoDetail` action)
+populates it: `EventPicker: new TodoEventPicker(Options: await
+SeedEventPickerAsync(), CurrentEventId: result.Todo.EventId)`. The field is
+additive (`null`-defaulted) — the frozen view-model pins survive.
+
+**(d) The picker `<form>` / `<select>` (the view wiring)** —
+`src/Kumunita.Web/Views/Projects/TodoDetail.cshtml`, rendered **only** when
+`Model.EventPicker is { Options.Count: > 0 }` (the ADR 0086 D9 hide rule — an
+empty picker is a noise surface, not a control), placed directly below the
+U03 event-link chip block (the same location the picker joins). A native
+`<form method="post" action="/projects/todos/{id}/set-event">` +
+`@Html.AntiForgeryToken()` + a `<select name="eventId">` whose **first option
+is the "clear" affordance** (`<option value="">` labeled `todo.set_event.pick`)
++ one `<option>` per visible event (selected when `id ==
+Model.EventPicker.CurrentEventId`) + one submit button. **No new JS** — a
+single native form / select (the ADR 0031 tsc-only discipline).
+
+**(e) The two U04 `kw-l` keys × en/de/fr/da** (the design-doc §kw-l locked set;
+added beside the existing U03 M14 block in
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`, which holds all four
+language dictionaries — the closed-key registry **is** the parity surface the
+`KnownTranslationKeys_ParityTests` + `KwLRegistryConsistencyTests` pins
+enforce; there are no separate `*.json` files):
+
+| Key | en | de | fr | da |
+|---|---|---|---|---|
+| `todo.set_event.label` | Link to event | Mit Veranstaltung verknüpfen | Lier à un événement | Knyt til arrangement |
+| `todo.set_event.pick` | Choose an event | Veranstaltung wählen | Choisir un événement | Vælg et arrangement |
+
+The `todo.set_event.label` key labels the picker form + submit button; the
+`todo.set_event.pick` key labels the `<select>`'s placeholder / clear option.
+The two U06 keys (`projects.todos.ics.*`) are **not** in U04.
+
+**(f) Drift vs. the register** — one cosmetic note (not a decision change):
+the register's U04 entry-reads named the view `Views/Projects/Todo/Detail.cshtml`
++ the view-model as "if U03 did not already add it" — the **actual** live view
+path is `Views/Projects/TodoDetail.cshtml` (a cosmetic path mismatch only, the
+same note U03 recorded), and U03 added the chip fields but **not** a picker
+model, so U04 added the `TodoEventPicker` record (the design-doc D3 name) as a
+new additive view-model — exactly the design-doc's "add a small `TodoEventPicker`
+view-model … only if U03 did not already provide it" branch. All other shapes
+(the action signature + route, the `ListMineAsync` seam + the 25-cap, the
+`null`-clears rule, the redirect-back target, the `kw-l` keys, the no-new-JS
+rule, and the no-new-authorization-surface rule) match the design doc §D3 /
+§seams contract 3 verbatim.
+
+**(g) Build + test.** `dotnet build Kumunita.slnx -c Debug` succeeded clean
+(all 4 projects). `Kumunita.Web.Tests  Total: 585, Errors: 0, Failed: 0,
+Skipped: 0` (the `KnownTranslationKeys_ParityTests` +
+`KwLRegistryConsistencyTests` pins the two new keys satisfy, plus the frozen
+`ProjectsController` detail pins, survive the additive `TodoEventPicker`
+view-model + `EventPicker` field + the new `TodoSetEvent` action + the new
+`SeedEventPickerAsync` helper — no existing test-construction site required a
+change, since `IEventService` is an optional ctor param and the new action /
+helper are additive). **Docker cleanup note:** none needed — the Web run
+completed normally (Testcontainers cleaned up its own containers:
+"Delete Docker container …" observed for all 5).
