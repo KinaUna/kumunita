@@ -1,9 +1,8 @@
 # Plan: M15 — Translation bulk (import/export, review & extend as a batch)
 
-> **In progress** (M15 is the single in-progress milestone — `Milestones.cs`
-> already says `StatusNext`; this register is its unit plan). Unit register
-> (secondary tier). Living handoff note:
-> `docs/plans-milestones/in-progress/m15-translation-bulk-handoff-notes.md`
+> **Done** (closed U06, 2026-09-29). Unit register (secondary tier). Living
+> handoff note:
+> `docs/plans-milestones/done/m15-translation-bulk-handoff-notes.md`
 > (scratch tier — one `## U#` section per unit, appended, never rewritten).
 > The authoritative design (primary tier) —
 > `docs/design/m15-translation-bulk-design.md`
@@ -12,7 +11,7 @@
 > **confirm it is free against `docs/adr/README.md` before writing**).
 >
 > **Unit plans (this convention):** each unit ships its own self-contained
-> plan file in `docs/plans-milestones/in-progress/` (`m15-u00.md` …
+> plan file in `docs/plans-milestones/done/` (`m15-u00.md` …
 > `m15-u06.md`). When a unit is done, its plan file moves to
 > `docs/plans-milestones/done/`. A unit agent reads **its own plan file +
 > its entry reads** — it does not need to re-derive this register, which is
