@@ -757,6 +757,245 @@ after the U04 `TodoSetEvent` action (the `POST
   HttpContext.RequestAborted)` (the caller's **visible** to-do set — the
   candidate filter + the `CanSeeAsync(Read)` gate all inside the frozen
   seam, C-M14·7) → **the "dated to-dos" Web-layer filter line**:
+
+## U07 — acceptance + docs parity (the close)
+
+**Status:** done, build green (0 warnings, all 4 projects). **No production
+code changed** (a close unit — C-M14·7; the close ships tests + docs +
+the plans archive move only). Delivered **all three verbatim acceptance
+tests** in `tests/Kumunita.Web.Tests/M14InterlockTests.cs` (the D7
+feedback loop — the names are the pins), the **Web-side cross-surface
+read-shape pins** that Core's own pins do not cover (see (b)), and the
+**D8 docs-parity flip** across `Milestones.cs` / `MilestonesTests.cs` /
+`README.md` / `docs/STATUS.md` / `docs/ARCHITECTURE.md`.
+
+**(a) The three acceptance tests — all green.** All three are
+`[Fact]` on `M14InterlockTests` (the `PostgresFixture` class-fixture
+harness — one shared `postgres:18` container; `BuildRealStoreAsync` boots
+a real Marten `DocumentStore` over `M1DocTypes` / `M3DocTypes` /
+`M4DocTypes` / `M5DocTypes`, since the to-do-detail chip resolves the
+event over a **real store session** in `ProjectsController.TodoDetail`);
+NSubstitute stands in for the frozen service seams
+(`IProjectService` / `IEventService` / `IUserInfoService` /
+`ILocalizationService`). Run: `dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+-class Kumunita.Web.Tests.M14InterlockTests` → **3 / 3 green, 0 errors**
+(~11 s).
+
+1. **`Interlock_ClosedLoop_TodoAndEventSeeEachOther`** — **green.** The
+   closed loop, three legs: **(A)** the write leg — `TodoSetEvent(todoId,
+   eventId)` returns `Redirect("/projects/todos/{todoId}")` and
+   `projects.Received(1).SetTodoEventAsync(todoId, actorId, roles,
+   eventId, ct)` (the D3 lane, the `POST /projects/todos/{id}/set-event`
+   action → the `IProjectService.SetTodoEventAsync` seam); **(B)** the
+   to-do → event chip (real store) — `projects.GetTodoAsync` returns a
+   `TodoDetailResult` whose `Todo.EventId` is set,
+   `events.GetAsync(eventId, …)` resolves the `Event` (the frozen M4 seam),
+   the `ViewResult.Model` is a `TodoDetailViewModel` with
+   `EventId == eventId` + `EventTitle` (the event title) +
+   `EventLinkPath == "/events/{eventId}"` + `EventPicker.CurrentEventId ==
+   eventId` (the D2 chip shape, drift-guard); **(C)** the event → to-do
+   leg — `EventController.Detail(eventId)` over
+   `detailProjects.ListTodosForEventAsync(eventId, actorId, 0, ct)`
+   (U01's reverse seam) returning a non-empty `TodoPage` yields an
+   `EventDetailViewModel` whose `LinkedTodos` is a single
+   `LinkedTodoRow` with `TodoId == todoId` + `Title` +
+   `LinkPath == "/projects/todos/{todoId}"` +
+   `detailProjects.Received(1).ListTodosForEventAsync(…)`. The two
+   directions compose over the frozen seams with **no new authorization
+   surface** (C-M14·4).
+
+2. **`Interlock_Handoff_WriteAndReadComposeWithoutNewAuthorizationSurface`**
+   — **green.** The write→read handoff **without a new authorization
+   surface**: **(1)** the load-bearing C-M14·4 pin — `typeof(AccessAction)`
+   exposes **exactly** the frozen two static `AccessAction` fields
+   `Read` + `Moderate` (sorted names `["Moderate", "Read"]`;
+   `AccessAction.Read.Id == "read"`, `AccessAction.Moderate.Id ==
+   "moderate"`); M14 adds none. (A first draft also asserted the
+   `AccessVia` type was absent — **removed**: `AccessVia` is a
+   **pre-existing** M3/M5 audit `enum` in `Kumunita.Core.Authorization.Decision`,
+   not an M14 surface, so asserting its absence was an over-reach.)
+   **(2)** the write leg set + clear — `SetTodoEventAsync(todoId, …,
+   eventId, …)` returns the `TodoItem`, then a follow-up `TodoSetEvent(todoId,
+   null)` → `Redirect` (the `null`-clears branch, D3) — the write lane is
+   a single seam, not a decision; **(3)** the read leg — the chip
+   (`vm.EventId == eventId`) **rides the `Read` decision, not a new
+   one** (the `GetAsync` resolve; C-M14·4). No new `AccessAction` /
+   `AccessVia` / `Decide()` branch is required anywhere.
+
+3. **`Interlock_PartVsWhole_UnreadableEventOmitsTheChip`** — **green.**
+   The dangling-safe read (C-M14·2, the `ProjectLink` / `BlockerChip`
+   idiom — omit, never 404/403, no title/id leak). Four cases, each over a
+   real-store `TodoDetail` whose `Todo.EventId` is set (or null in case 4),
+   asserting the page still 200s (`ViewResult`) and the chip fields
+   `EventId` / `EventTitle` / `EventLinkPath` are all `null` (no leak):
+   **case 1 — denied** (`events.GetAsync` throws
+   `UnauthorizedAccessException` — the chip omits, no 403 into existence);
+   **case 2 — absent** (`KeyNotFoundException` — no 404); **case 3 —
+   soft-deleted** (`ev.IsDeleted == true` — the chip omits the
+   soft-deleted event); **case 4 — no association** (`Todo.EventId == null`
+   — the chip block is skipped, `events.DidNotReceiveWithAnyArgs().
+   GetAsync(…)`). (A first draft also asserted
+   `vm.EventPicker.CurrentEventId` was null — **removed**: the picker's
+   `CurrentEventId` is the actor's **own stored association** prefill, not a
+   chip leak; the three chip fields are the C-M14·2 pin.)
+
+**(b) Pins added (U07) vs. already covered.** U07 added the **Web-side
+cross-surface read-shape pins** that the Core-side pins do not reach —
+the `M14InterlockTests` class is new; the three tests pin the
+**controller composition** over the frozen seams: the
+`TodoDetailViewModel` chip shape (`EventId` / `EventTitle` /
+`EventLinkPath` — drift-guard), the `EventDetailViewModel.LinkedTodos`
+row shape (`LinkedTodoRow` — drift-guard), the `SetTodoEventAsync`
+write-leg + redirect mapping (the D3 lane), the dangling-safe omission
+across the 4 cases (denied / absent / soft-deleted / unlinked), and the
+C-M14·4 `AccessAction` closed-set pin. **Already covered and NOT
+duplicated** (in `Kumunita.Core.Tests`): U01's 4 `ListTodosForEventAsync`
+seam pins (the reverse read — the `(EventId)` index + the `CanSeeAsync(Read)`
+gate + the `TodoPage` shape), U02's 3 `SetTodoEventAsync` write-lane pins
+(`ProjectServiceTests` — standing creator ∪ assignee ∪ GlobalAdmin, the
+non-visible-target 404, the `null`-clears + the one `todo.set_event` audit
+row), and U05's 4 `TodoIcsWriter` emitter pins (`TodoIcsWriterTests` — the
+closed `VTODO` subset, the DUE/DTSTART conditional, the fold/escape, the
+valid-empty calendar). U07 does **not** re-pin any of the Core-side
+shapes; it pins the Web composition over them.
+
+**(c) The D8 docs-parity flip (as made).** Five surfaces, kept together:
+
+1. **`src/Kumunita.Web/Milestones.cs`** — M14 → `StatusDone`
+   (`new("M14", "Integration of Events and Projects", StatusDone)`); M15 →
+   `StatusNext` (the single in-progress milestone flips forward; M16/M17/M18
+   stay `StatusPlanned`).
+2. **`tests/Kumunita.Web.Tests/MilestonesTests.cs`** — the
+   single-in-progress test re-pinned to **M15** (renamed
+   `M15_Is_The_Single_InProgress_Milestone`; `Assert.Equal("M15",
+   next[0].Id)`; the planned-remainder loop now `new[] { "M16", "M17",
+   "M18" }`; the shipped list gains `"M14"`). The exact-order pin
+   `Roadmap_Covers_M0_Through_M14_Plus_Named_Lanes_In_Order` (list ends
+   `"M12","M13","M14","M15","M16","M17","M18"`) is unchanged — it already
+   carried M14. `No_Milestone_Has_Blank_Title` unchanged.
+3. **`README.md`** — the Status line flips "M14 in progress" → "M15 in
+   progress (translation bulk…); M1–M14 and all named lanes are done"; the
+   Roadmap M14 row → the full scope sentence + `**Done.** (ADR 0115)`, and
+   the M15 row → `**In progress.**`.
+4. **`docs/STATUS.md`** — the M13/M14 close line on the live milestone
+   (the long line 40) flips "…next is M14 — integration of Events and
+   Projects…" → "…M14 is done — integration of Events and Projects (the
+   `TodoItem.EventId?` association — a feed filter, never a gate — C-M14·1;
+   the `ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync`
+   set-event write lane; the both-direction display links — dangling-safe —
+   C-M14·2; the `TodoIcsWriter` VTODO surface + the two `.ics` routes, no
+   `RRULE` — C-M14·6; zero new authorization surface — C-M14·4; ADR 0115);
+   next is M15 — translation bulk…; After that, three planned milestones:
+   M16 — inventory…".
+5. **`docs/ARCHITECTURE.md`** — the value-chain table's M14 row
+   (`| **M14** integration of Events and Projects | **coordination** — the
+   two coordination surfaces interlock |`) is **status-free** (the M13 / M14
+   rows carry no done-marker — the M13-close precedent), so the reflection
+   goes into the shape-of-code sections following the `PL ✓ (ADR 0086)` /
+   `RC ✓ (ADR 0025)` precedent: the **`Projects/`** tree row gains
+   `M14 ✓ (ADR 0115)` — the `EventId?` association (a feed filter, never a
+   gate — C-M14·1) + the `ListTodosForEventAsync` reverse seam + the
+   `SetTodoEventAsync` set-event lane (C-M5·6; non-visible target 404;
+   `null` clears; one `todo.set_event` audit row) + the `TodoIcsWriter`
+   `VTODO` emitter + the two `.ics` routes, **zero new authorization
+   surface** (C-M14·4), no `RRULE` (C-M14·6); the **`Events/`** tree row
+   gains `M14 ✓ (ADR 0115)` — the event-detail "linked to-dos" section
+   (the frozen `GetAsync` chip resolve + U01's `ListTodosForEventAsync`,
+   access-scoped + dangling-safe — C-M14·2) + the `LinkedTodoRow` shape +
+   the `events.linked_todos` `kw-l` key; no `RRULE` (C-M14·6). Both rows
+   cite `docs/design/m14-events-projects-design.md`. The §2 "now live"
+   paragraph + the §3 feature-modules line already enumerate the
+   feature-module contexts by ADR; M14 adds **no new bounded context or
+   DocTypes surface** (it interlocks the existing `Events/` + `Projects/`),
+   so those lines are unchanged — the interlock is reflected where the two
+   owning contexts live (the tree rows).
+
+**(d) Plans archive move.** The eight `m14-u00.md` … `m14-u07.md` unit
+plans move from `docs/plans-milestones/in-progress/` →
+`docs/plans-milestones/done/` (the M13 close shape — the handoff note + the
+register `plan-m14-events-projects.md` stay in place).
+
+**(e) Full-suite state at the close.** `dotnet build Kumunita.slnx -c
+Debug` — clean (0 warnings, 4 projects). `dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` — the
+Web suite rises from the U06 baseline of 585 (the three new
+`M14InterlockTests` are the delta: 585 → **588**) + the
+`MilestonesTests` re-pin (M14→M15 in-progress) all green. `dotnet exec
+tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` —
+**1000 / 1000** (unchanged — M14 is Web-composition + the two
+Core-side pins already landed in U01/U02/U05; no Core test added or
+removed at the close). **Docker cleanup note:** the Core run's
+Testcontainers self-reaped at exit; if the Core run is interrupted
+(`dotnet exec` killed mid-run), `docker container prune` clears any
+orphaned `postgres:18` test containers before the next run.
+
+## Summary
+
+**Role:** U07 is the M14 **close** unit — the feedback loop (D7) and the
+docs-parity flip (D8) in one unit, after U00 (design + ADR 0115) → U01
+(field + index + reverse read seam) → U02 (the `set-event` write lane) →
+U03 (both-direction display links) → U04 (the picker) → U05 (the
+`TodoIcsWriter` `VTODO` emitter) → U06 (the two `.ics` routes + the
+`kw-l` affordances). U07 ships **only** tests + docs + the plans archive
+move (C-M14·7 — no production code changes in a close unit); if an
+acceptance test had exposed a real defect, the unit would stop and report,
+not silently fix.
+
+**Docs flip (C-M14·7):** M14 → `StatusDone`, M15 → `StatusNext`, across
+`Milestones.cs` / `MilestonesTests.cs` (re-pinned to M15 as the single
+in-progress; the exact-order M0…M18 pin unchanged) / `README.md` (Status +
+Roadmap) / `docs/STATUS.md` (the live-milestone line) /
+`docs/ARCHITECTURE.md` (the `Events/` + `Projects/` tree rows gain
+`M14 ✓ (ADR 0115)`; the value-chain table is status-free; no new bounded
+context or DocTypes surface, so the §2 "now live" + §3 feature-modules
+lines are unchanged).
+
+**Shipped (the seven units U00–U06):**
+
+| Unit | Shipped |
+|---|---|
+| U00 | the design doc (primary authority) + ADR 0115 (the decision record) + the three acceptance test names + the D7/D8 close shape locked |
+| U01 | the additive `TodoItem.EventId?` (a feed filter, never a gate — C-M14·1) + the `(EventId)` index on `M5DocTypes` (ADR 0004 §B.1, zero migration) + the `IProjectService.ListTodosForEventAsync` reverse read seam (the `ListTodosAsync` shape, the `ListBoardsForTodoAsync` precedent, one `CanSeeAsync(Read)` over the existing adapter, one `AccessAudit` row) + 4 pins |
+| U02 | the `IProjectService.SetTodoEventAsync(todoItemId, actorId, actorRoles, eventId, ct)` set-event write lane (standing creator ∪ assignee ∪ GlobalAdmin — C-M5·6; a non-visible `eventId` refused 404; `null` clears; one atomic `todo.set_event` audit row) + 3 pins |
+| U03 | both-direction display links (the to-do → event chip over the frozen `GetAsync` + the event → to-do "linked to-dos" section over U01's seam) + the `TodoDetailViewModel.EventId/EventTitle/EventLinkPath` + the `EventDetailViewModel.LinkedTodos` (`LinkedTodoRow` shape) + the `todo.event_link` / `events.linked_todos` `kw-l` keys × en/de/fr/da — dangling-safe (C-M14·2) |
+| U04 | the event picker (seeded by the frozen `IEventService.ListMineAsync`, ADR 0065) + the `TodoSetEvent` `POST /projects/todos/{id}/set-event` action (CSRF) + the `todo.set_event.label` / `todo.set_event.pick` `kw-l` keys |
+| U05 | the BCL-only pure `TodoIcsWriter.BuildTodos` `VTODO` emitter (the ADR 0112 `IcsWriter` discipline; a closed `VTODO` subset; `UID kw-todo-{Id}@kumunita`; no `ORGANIZER` / `CREATED-BY` / `ATTENDEE` / `RRULE` / `X-…` — the ADR 0028 posture, C-M14·5; a valid-empty calendar) + 4 pins |
+| U06 | the two `[Authorize]` routes — `GET /projects/todos/{id}.ics` (the 404-not-403 split; a degenerate `VTODO` for an undated to-do) + `GET /projects/todos.ics` (the caller's visible dated set, always 200) — `text/calendar; charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control: no-store` + `nosniff`; no subscription token (rides the cookie) + the `projects.todos.ics.download` / `projects.todos.ics.feed` `kw-l` keys |
+| U07 | this close — the three acceptance tests + the docs flip (D8) + the plans archive move |
+
+**Full-suite state at the close (post-flip):** `Kumunita.Web.Tests` —
+588 / 588 (585 U06 baseline + 3 `M14InterlockTests`); `Kumunita.Core.Tests`
+— 1000 / 1000 (unchanged). `dotnet build Kumunita.slnx -c Debug` — clean.
+
+**The pinned tests — all green, in the tree:**
+- `Kumunita.Core.Tests.ListTodosForEventTests` (U01, 4 pins) — the reverse read seam (the `(EventId)` index, the `CanSeeAsync(Read)` gate, the `TodoPage` shape)
+- `Kumunita.Core.Tests.ProjectServiceTests` — the `SetTodoEventAsync` set-event lane (U02, 3 pins)
+- `Kumunita.Core.Tests.TodoIcsWriterTests` (U05, 4 pins) — the `VTODO` emitter
+- `Kumunita.Web.Tests.M14InterlockTests` (U07, 3 acceptance tests) — the closed loop, the write/read handoff without a new authorization surface, the dangling-safe chip omission
+
+**Invariants as landed (C-M14·1–7):**
+- **C-M14·1** — `EventId?` is a feed filter / association, **never a gate**
+  (the `ProjectId` shape; a to-do's visibility is unchanged by its event
+  linkage).
+- **C-M14·2** — both display directions are **access-scoped + dangling-safe**
+  (omit, never 404/403, no title/id leak) — pinned by
+  `Interlock_PartVsWhole_UnreadableEventOmitsTheChip` (4 cases).
+- **C-M14·3** — the set-event lane reuses the frozen `Read` decision over
+  the event (the `SetTodoProjectAsync` target-visibility rule).
+- **C-M14·4** — **no new authorization surface** (the `AccessAction`
+  closed-set pin — `Read` + `Moderate`; no new `AccessVia` / `Decide()`
+  branch) — pinned by `Interlock_Handoff_WriteAndReadComposeWithoutNewAuthorizationSurface`.
+- **C-M14·5** — the `VTODO` emitter carries no identity / audience / grant
+  material (the never-emitted property-name sweep).
+- **C-M14·6** — **no `RRULE` / recurrence anywhere in M14** (M18's home).
+- **C-M14·7** — docs parity in one unit (this close) + no production code
+  changed in a close unit.
+
+**The milestone is complete.** M14 — integration of Events and Projects —
+is **done** (ADR 0115); M15 — translation bulk (import/export, review &
+extend the platform's translations as a batch) — is **next**; M16
+(inventory) / M17 (bookmarks) / M18 (recurring events) are planned.
   `page.Items.Where(t => t.DueAt is not null || t.StartAt is not null)
   .ToList()` (a *display* filter, never a gate / new seam — C-M14·4 /
   C-M14·7) → `TodoIcsWriter.BuildTodos(dated, DateTimeOffset.UtcNow)` (an
