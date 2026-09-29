@@ -863,3 +863,28 @@ acceptance tests are not yet authored — U06's scope per the register.
 The (c) part-vs-whole gate is the full pinned list +
 `MilestonesTests` green (the U07 docs flip is not yet done — M13 is
 still `StatusNext` / M14 is still `StatusPlanned`).
+
+---
+
+## U06 — gate recorded (2026-09-29)
+
+**Role.** Record-only acceptance gate (no new test code, no build, no
+U00–U05 file touched; the only change is the design-doc §gate append).
+The runtime was present (all 19 pins in the tree + green), so the gate
+was **run in full**, not deferred.
+
+- **(a) Closed loop — PASS** (via U04's `Aggregation_Window_Excludes_Older_Rows` + `Aggregation_SurfaceRanking_Descending_Then_Alphabetical`).
+- **(b) Handoff — PASS** (via U04's `Aggregation_DistinctActors_Counts_Unique_NonEmpty` → `DistinctActors == 2`).
+- **(c) Part-vs-whole — PASS**: `Kumunita.Web.Tests` **585/585** + `Kumunita.Core.Tests` **989/989** (both Errors: 0, Failed: 0, in-process xunit.v3 runner, 2026-09-29); the 19-pin list + `MilestonesTests` are subsets of the green suites.
+
+**Still-open drift: none.** The one cross-unit item — U03's DRIFT GUARD
+(`RoutePattern.RawText` / `StaticFileEndpointMetadata` → the real .NET 10
+`IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor`) — was **closed
+by U05** against the design doc's §capture + §middleware doc-comments. All
+other `## U<m>` drift items are resolved in-code.
+
+**Gap left for U07.** The docs parity flip (M13 → `StatusDone`, M14 →
+`StatusNext`) + the `MilestonesTests` re-pin to M14 + the unit-plan files
+→ `done/` + the handoff `## Summary` (the C-M13·7 flip is not yet done —
+M13 is still the single in-progress, which is why `MilestonesTests` is
+still green in the gate run above).

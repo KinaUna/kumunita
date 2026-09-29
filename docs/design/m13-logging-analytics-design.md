@@ -1614,6 +1614,72 @@ number is U01's pin, recorded in the handoff note.
   `StatusNext`, the exact order M0…M14 unchanged). *(Part-vs-whole:
   every part green implies the whole green.)*
 
+### Run result (M13 acceptance gate — 2026-09-29)
+
+**Executed by U06 (record-only; no new test code, no build).** The
+runtime (Testcontainers `postgres:18` + the minimal `WebApplication`
+host) **was present** — all 19 pinned tests were in the tree and green
+at run time, so the gate was **run in full**, not authored-and-deferred
+(mirroring M2's U13 fallback, which did not apply).
+
+- **(a) Closed loop — PASS.** Satisfied verbatim by U04's two
+  aggregation pins (no new test authored):
+  `Aggregation_Window_Excludes_Older_Rows` (a row at `now − 1d` is
+  inside the 90-day window ⇒ `Total == 1` ⇒ `Total ≥ 1`) +
+  `Aggregation_SurfaceRanking_Descending_Then_Alphabetical` (the
+  `SurfaceRanking` carries the row's surface key). The capture → admin
+  loop is closed.
+- **(b) Handoff — PASS.** Satisfied verbatim by U04's
+  `Aggregation_DistinctActors_Counts_Unique_NonEmpty` pin (two distinct
+  non-empty `ActorId`s + one empty ⇒ `DistinctActors == 2`). The
+  operator sees *two accounts*, not *which accounts* (C-M13·3 holds).
+- **(c) Part-vs-whole — PASS.** Both test assemblies ran in full on
+  2026-09-29 (in-process xunit.v3 runner per AGENTS.md, after a clean
+  `dotnet build Kumunita.slnx -c Debug`):
+
+  | Assembly | Total | Errors | Failed | Skipped | Not Run |
+  |---|---|---|---|---|---|
+  | `Kumunita.Web.Tests` | 585 | 0 | 0 | 0 | 0 |
+  | `Kumunita.Core.Tests` | 989 | 0 | 0 | 0 | 0 |
+
+  The **19-pin list** (U01's 3 sink + U02's 6 policy/surface + U03's
+  3 middleware + U04's 4 aggregation + U05's 3 admin-surface) is a
+  strict subset of these green suites, and `MilestonesTests` (inside
+  `Kumunita.Web.Tests`) is green (M13 still the single
+  in-progress — the U07 flip has not run yet, so the exact-order pin
+  M0…M14 + the single-in-progress pin are unchanged and passing).
+
+**Per-unit drift status (one line per `## U<m>` handoff section):**
+
+- **U00** — no drift pauses; ADR 0114 confirmed free + `Program.cs`
+  middleware position source-confirmed. **Resolved.**
+- **U01** — 4 source-driven confirmations (the `LoggingBuilder` →
+  `ILoggingBuilder`, `ILogger.BeginScope` 1-arg, `builder.Logging`
+  wiring, `SetLastWriteTimeUtc(DateTime`) all shipped in the code as
+  the authority. **Resolved.**
+- **U02** — 5 items (the `SchemaBootstrap.cs` wiring line is
+  `Program.cs:175`; the test-fixture + reflection-pin sketch
+  reconciliations) all shipped in the code as the authority.
+  **Resolved.**
+- **U03** — the DRIFT GUARD (`RoutePattern.RawText` /
+  `StaticFileEndpointMetadata` → the real .NET 10
+  `IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor`) was
+  **closed by U05** (both §capture + §middleware doc-comment sites in
+  this doc updated to the real .NET 10 API; the shipped middleware
+  already used it). **Resolved by U05.**
+- **U04** — the `DistinctActors` Linq-to-objects fallback (the design
+  doc's `Select().Distinct().Count()` recorded as the documented
+  fallback; the pins assert the result, not the SQL). **Resolved**
+  (recorded, intent unchanged).
+- **U05** — closed the U03 DRIFT GUARD item (see above); the ten
+  `admin.analytics_*` kw-l keys + the `UsagePurgeService` /
+  `UsagePurgeTick` / `UsagePurgeHandler` shapes shipped verbatim.
+  **Resolved.**
+
+**Still-open drift: none.** All `## U<m>` drift items in the handoff
+note are resolved (the sole cross-unit item — U03's DRIFT GUARD — was
+closed by U05 against this doc's doc-comments).
+
 ## Invariants (C-M13·1–7 — locked)
 
 - **C-M13·1 · The feedback is local.** M13 transmits **no** usage signal
