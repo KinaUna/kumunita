@@ -255,3 +255,105 @@ compile gate is unambiguous.)*
 the atomic double-check-out behavior (U03) should rely on it at the DB
 layer (catch the unique-constraint violation → "already checked out")
 rather than an app-level check — that is the whole point of the witness.
+
+## U02 — read lanes + service seam + DI
+
+**(a) The read-lane contract**
+(`src/Kumunita.Core/Inventory/IInventoryService.cs` — the seam,
+`src/Kumunita.Core/Inventory/InventoryService.cs` — the read lanes):
+
+- **`ListItemsAsync(ownerKind, componentId, actorId, page)`** →
+  `ItemPage`. Candidates = `!IsDeleted`, filtered by the optional
+  `ownerKind` (**filter, never a gate** — C-M3·2 / C-M16·5) and the
+  optional `componentId` (a feed filter, never a gate — the
+  `Post.ComponentId` shape); ordered by `Created` descending; paged
+  (`PageSize = 30`, `HasMore = candidates.Count == PageSize`, 0-candidate
+  early return with no audit row). The survivors go through the frozen
+  `IAuthorizationService.CanSeeAsync(Read)` over the U01
+  `InventoryItemToAuditableResource` — the **single aggregate**
+  `AccessAudit` row (`TargetKind = "inventory"`, `TargetId = null`,
+  `VisibleCount`/`HiddenCount`, `Action = "read"`) is the C-M3·3 feed
+  shape (C-M16·2 — one row, Allow **and** Deny).
+- **`GetItemAsync(itemId, actorId)`** → `InventoryItem`. **The 404-vs-403
+  split (C-M3·4 non-leaky shape, locked in the design doc §Human cost):**
+  `KeyNotFoundException` (404) on an absent or soft-deleted id, **and
+  also on a Deny** — a non-visible item is a 404, never a 403 ("its
+  existence is not even disclosed"). The item's single
+  `CanAsync(Read)` decision is the one single-target `AccessAudit` row
+  (`TargetKind = "inventory"`, `TargetId` = the item id).
+- **`GetHistoryAsync(itemId, actorId)`** →
+  `IReadOnlyList<InventoryCheckout>`. Same entry gate as
+  `GetItemAsync` (the history is a part of the detail page; a denied
+  item is a 404, not an empty list that would leak existence); the
+  append-only record set **is** the history (C-M16·3), ordered by
+  `CheckedOutAt` **descending** (F3).
+- **Write lanes are U03, not here** — `CreateItemAsync` /
+  `EditItemAsync` / `DeleteItemAsync` / `CheckOutAsync` /
+  `CheckInAsync` are documented as comments on the seam (the
+  full-interface-first pin in reverse: U02 ships the reads, U03 appends
+  the writes).
+
+**(b) The composition** (D8 / C-M16·6): the constructor is
+`InventoryService(IDocumentStore store, IAuthorizationService
+authorization, IUserInfoService userInfo)` — **no**
+`INotificationService`, **no** Wolverine handler, **no** off-by-default
+toggle. The `_userInfo` field is held for U03's write lanes (the
+GlobalAdmin probe anchor); the read lanes consume only `_store` +
+`_authorization`.
+
+**(c) The DI registration** (`DependencyInjection.cs`, after the M5
+`IProjectService` block): `AddTransient<Inventory.IInventoryService>(sp
+=> new Inventory.InventoryService(store, authorization, userInfo))` —
+the same three-constructor shape as the M5 trio.
+
+**(d) Drift / findings (note for U03+):**
+
+1. **The 404-not-403 deviation from M5** (the one deliberate M16
+   choice): M5's `GetBoardAsync` / `GetTodoAsync` throw
+   `UnauthorizedAccessException` (403) on a Deny. M16's design doc
+   (locked, §Human cost + §Seams) and the U06 gate test **both** pin
+   that a non-visible inventory item's detail is a **404, never a 403**
+   (the C-M3·4 non-leaky shape). `GetItemAsync` and
+   `GetHistoryAsync` therefore throw `KeyNotFoundException` on a Deny
+   — the denial is still audited (the single-target `AccessAudit` row
+   with `Outcome = Deny` is committed), it just does not distinguish
+   "not found" from "you may not see this". **Do not "fix" this to
+   match M5's 403 shape** — that would be a drift event against the
+   locked design doc.
+2. **The `IInventoryService` doc-comments** use
+   `<exception cref="KeyNotFoundException">` (not
+   `UnauthorizedAccessException`) on both detail + history lanes —
+   kept in step with (d)·1.
+3. **The `ItemPage` record** (`InventoryRequests.cs`) is the
+   `record ItemPage(IReadOnlyList<InventoryItem> Items, bool HasMore)`
+   shape (the `TodoPage` / `PostFeed` convention — record, not an
+   out param, CS1988). `CreateItemRequest` (4 fields: `Name`,
+   `OwnerKind`, `Description`, `ComponentId`) is present for U03's
+   `CreateItemAsync` — **not** consumed by U02's read lanes.
+
+**(e) The pins** (`tests/Kumunita.Core.Tests/InventoryServiceTests.cs`,
+3 tests — all pass):
+
+- **U02·a** `U02_ListWritesSingleAggregateAuditRow` — a public item + an
+  audience-restricted item; the actor (not the grantee) reads the list;
+  the restricted item is excluded from `Items`; the single aggregate
+  `AccessAudit` row (`TargetKind = "inventory"`, `TargetId = null`,
+  `VisibleCount = 1`, `HiddenCount = 1`, `Action = "read"`,
+  `Outcome = Allow`) is present, and the per-item Deny row carries the
+  restricted item's id.
+- **U02·b** `U02_DetailDeniedItemIs404Not403` — an audience-restricted
+  item (grants `grantee` only); a `stranger` reads the detail;
+  `Assert.ThrowsAsync<KeyNotFoundException>` (NOT
+  `UnauthorizedAccessException`); the single-target Deny
+  `AccessAudit` row (`TargetId` = the item id, `Outcome = Deny`) is
+  committed. **This is the C-M3·4 non-leaky pin (d)·1 above.**
+- **U02·c** `U02_HistoryOrderedByCheckedOutAtDescending` — three
+  `InventoryCheckout` records with distinct `CheckedOutAt` (oldest
+  closed, middle closed, newest open); `GetHistoryAsync` returns them
+  ordered by `CheckedOutAt` **descending** (newest first, F3).
+
+**(f) The exit gate** (green): `dotnet build Kumunita.slnx -c Debug`
++ `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+— **1016 tests, 0 errors, 0 failed, 0 skipped** (includes the 3 new
+`InventoryServiceTests`; `Kumunita.Web.Tests` not re-run here — the
+U02 surface is Core-only).

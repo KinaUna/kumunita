@@ -261,6 +261,28 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Localization.ITranslationProvider>(),
             sp.GetRequiredService<Localization.ILocalizationService>()));
 
+        // M16 (ADR 0117, plan U02): the Inventory bounded context's service
+        // seam (bounded context Kumunita.Core.Inventory — the "track where
+        // items are, and optionally how much they are used by whom" surface:
+        // the InventoryItem + InventoryCheckout documents, the M16DocTypes
+        // surface, the InventoryItemToAuditableResource adapter). Same
+        // "AddTransient with the store injected" shape as IProjectService
+        // above; U02 lands the read lanes (ListItemsAsync / GetItemAsync /
+        // GetHistoryAsync), U03 lands the write lanes + the D5 standing
+        // probes + the F1 atomic transition (the seam is the frozen surface
+        // — the design doc §Seams pin). Composes **only** the frozen seams
+        // (D8 / C-M16·6): IDocumentStore + IUserInfoService (the GlobalAdmin
+        // standing probe the U03 write lanes compose) + IAuthorizationService
+        // (the frozen read/write decision path, via the U01 adapter — no new
+        // AccessAction / AccessVia / Decide() branch, C-M16·4). **No**
+        // INotificationService (D8 — the nudge lane is §deferred, its own
+        // ADR) and **no** off-by-default toggle (D6 — M16 is a standing core
+        // surface, like M5 Projects).
+        services.AddTransient<Inventory.IInventoryService>(sp => new Inventory.InventoryService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
+
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"
         // arrow: the Notification + NotificationPreference documents, the
