@@ -19,6 +19,11 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.11.0", "2026-09-29", new List<string>
+        {
+            "Events & projects, linked — a to-do can now be for one event: the event page shows its linked to-dos, and each to-do shows its linked event with a picker to set it.",
+            "To-dos on your calendar — dated to-dos can be added to a calendar app: an \"Add to calendar\" link on each to-do, plus a subscribable to-do calendar feed your calendar can keep up to date.",
+        }),
         new("0.10.0", "2026-09-28", new List<string>
         {
             "Search — one /search surface (nav search box, anonymous + signed-in) over the four resident content surfaces: community + group posts, community + group events, pages, announcements.",

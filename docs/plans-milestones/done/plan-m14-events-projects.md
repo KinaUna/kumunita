@@ -1,9 +1,7 @@
 # Plan: M14 — Integration of Events and Projects
 
-> **In progress** (M14 is the single in-progress milestone — `Milestones.cs`
-> already says `StatusNext`; this register is its unit plan). Unit register
-> (secondary tier). Living handoff note:
-> `docs/plans-milestones/in-progress/m14-events-projects-handoff-notes.md`
+> **Done** (closed U07, 2026-09-29). Unit register (secondary tier). Living
+> handoff note: `docs/plans-milestones/done/m14-events-projects-handoff-notes.md`
 > (scratch tier — one `## U#` section per unit, appended, never rewritten).
 > The authoritative design (primary tier) — `docs/design/m14-events-projects-design.md`
 > — is authored by **U00** and locked before any code unit runs; the decision
