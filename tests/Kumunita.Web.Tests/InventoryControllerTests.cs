@@ -1,0 +1,431 @@
+using System.Security.Claims;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
+using Kumunita.Core.UserInfo;
+using Kumunita.Web.Controllers;
+using Kumunita.Web.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using NSubstitute;
+using Xunit;
+
+namespace Kumunita.Web.Tests;
+
+/// <summary>
+/// The <see cref="InventoryController"/> Web-boundary seam tests (M16 U04 —
+/// Web surface part 1: list / detail / create, ADR 0117). Mirrors the
+/// <see cref="ProjectsControllerTests"/> / <see cref="TagControllerTests"/>
+/// harness shape: the **frozen** <see cref="IInventoryService"/> seam is
+/// substituted with NSubstitute (the controller never re-derives access —
+/// D2 / C-M16·1: the seam does the <c>CanSeeAsync(Read)</c> /
+/// <c>CanAsync(Read)</c>; the 404-not-403 non-leaky split and the form-error
+/// / redirect mapping are **this** layer's pins). <see
+/// cref="IUserInfoService"/> is a plain substitute for the display-name /
+/// component-picker reads (a *read* lookup — never an access decision).
+/// <para>
+/// The three M16-U04 pinned tests (the design doc §Feedback loops, U04
+/// shape):
+/// </para>
+/// <list type="number">
+/// <item><b>List_Renders_With_OwnerKind_Filter_And_Paged_Markup</b> — the
+/// <c>GET /inventory</c> list page: the feed rows are exactly the seam's
+/// <c>ListItemsAsync</c> survivors (the seam's
+/// <c>CanSeeAsync(Read)</c> gate is the sole reader — C6 / C-M16·2), the
+/// holder display names are *read* lookups (falling back to the raw id),
+/// the <c>ownerKind</c> + <c>componentId</c> filters are passed to the seam
+/// verbatim (a filter, never a gate — C-M3·2 / C-M16·5), and the
+/// <see cref="PagedViewModel"/> is built from the seam's
+/// <c>HasMore</c> signal (the ADR 0090 D1 / D5 / D7 shape — the F2
+/// one-page no-render pin).</item>
+/// <item><b>Detail_404_Not_403_For_NonVisible_Item</b> — the
+/// <c>GET /inventory/{id}</c> detail: the seam's
+/// <see cref="IInventoryService.GetItemAsync"/> <c>KeyNotFoundException</c>
+/// (the C-M3·4 non-leaky shape — a non-visible item is a 404, never a 403)
+/// maps to a clean <see cref="NotFoundResult"/>; the
+/// <see cref="IInventoryService.GetHistoryAsync"/> F3 read is the entry
+/// gate's continuation (one history read after the item read succeeded);
+/// the <see cref="IInventoryService.CreateItemAsync"/> <see
+/// cref="UnauthorizedAccessException"/> maps to a form error (403 → the
+/// form re-renders), never a 500.</item>
+/// <item><b>Create_Flow_Valid_Item_Appears_In_List</b> — the
+/// <c>POST /inventory</c> create: a valid form posts a
+/// <see cref="CreateItemRequest"/> with the four locked fields (the design
+/// doc §Seams pin — <c>Name</c> / <c>OwnerKind</c> / <c>Description</c> /
+/// <c>ComponentId</c>; a field added is a drift event), the seam's
+/// <c>CreateItemAsync</c> is called with the actor as the
+/// <c>AuthorId</c> (D5 — the actor **is** the creator), the result
+/// redirects to <c>/inventory/{id}</c> (the "redirect after write"
+/// precedent), and the item's <c>Name</c> is the row the list page renders
+/// (the closed-loop shape the U06 gate test extends).</item>
+/// </list>
+/// <para>
+/// **No database, no Testcontainers** — a pure NSubstitute seam test (the
+/// seam's read / write decisions are the seam's; this layer pins the
+/// controller's mapping, not the seam's gate).
+/// </para>
+/// </summary>
+public sealed class InventoryControllerTests
+{
+    // ── 1 — List_Renders_With_OwnerKind_Filter_And_Paged_Markup ─────────
+
+    /// <summary>
+    /// <c>GET /inventory</c>: the list page renders with the <c>OwnerKind</c>
+    /// filter (the <c>ownerKind</c> + <c>componentId</c> queries passed to
+    /// the seam verbatim — a filter, never a gate, C-M3·2 / C-M16·5) and the
+    /// paged markup (the <see cref="PagedViewModel"/> built from the seam's
+    /// <c>HasMore</c> signal — the ADR 0090 D1 / D5 / D7 shape; the F2
+    /// one-page no-render pin: <c>null</c> on a single page so the
+    /// <c>_Pager</c> partial renders nothing). The holder display names are
+    /// *read* lookups (falling back to the raw id). A denied read (the
+    /// seam's <see cref="UnauthorizedAccessException"/>) maps to a clean
+    /// <see cref="ForbidResult"/> (the C3 403), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task List_Renders_With_OwnerKind_Filter_And_Paged_Markup()
+    {
+        const string actor = "subj-inventory-actor";
+        const string sharedItem = "inv-item-shared";
+        const string communityItem = "inv-item-community";
+
+        var inventory = Substitute.For<IInventoryService>();
+        var shared = new InventoryItem
+        {
+            Id = sharedItem,
+            Name = "Power drill",
+            OwnerKind = "shared",
+            CurrentHolderId = "subj-holder-a",
+            Created = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+        var community = new InventoryItem
+        {
+            Id = communityItem,
+            Name = "Ladder",
+            OwnerKind = "community",
+            Created = new DateTimeOffset(2026, 9, 2, 10, 0, 0, TimeSpan.Zero),
+        };
+        inventory.ListItemsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ItemPage([shared, community], true));
+
+        var controller = Build(inventory, subjectId: actor);
+        var result = await controller.List(ownerKind: null, componentId: null, page: 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<InventoryListViewModel>(view.ViewData.Model);
+        Assert.Equal(2, vm.Items.Count);
+        Assert.Equal(sharedItem, vm.Items[0].Id);
+        Assert.Equal("Power drill", vm.Items[0].Name);
+        Assert.Equal("shared", vm.Items[0].OwnerKind);
+        Assert.Equal("subj-holder-a", vm.Items[0].CurrentHolderId);
+        Assert.Equal("subj-holder-a", vm.Items[0].CurrentHolderName); // no profile → raw id
+        Assert.Equal(communityItem, vm.Items[1].Id);
+        Assert.Equal("community", vm.Items[1].OwnerKind);
+        Assert.Null(vm.Items[1].CurrentHolderName);
+
+        // The seam's HasMore: true → the pager is built (the F2 no-render
+        // pin is the inverse: HasMore false on a page-1 → Pager null).
+        Assert.NotNull(vm.Pager);
+        Assert.True(vm.Pager!.HasNext);
+        Assert.Equal(1, vm.Pager.CurrentPage);
+        Assert.Equal("/inventory", vm.Pager.BaseUrl);
+
+        // The filters are passed to the seam verbatim (the C-M3·2 /
+        // C-M16·5 pin: a filter, never a gate — the audience decision is
+        // the seam's, this is only a candidate-set narrowing).
+        await inventory.Received(1).ListItemsAsync(
+            null, null, actor, 1, Arg.Any<CancellationToken>());
+
+        // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
+        var deniedInventory = Substitute.For<IInventoryService>();
+        deniedInventory.ListItemsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<ItemPage>(
+                new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedInventory, subjectId: actor);
+        Assert.IsType<ForbidResult>(
+            await deniedController.List(null, null, page: 1));
+
+        // The F2 one-page no-render pin: HasMore false on page 1 → the
+        // Pager is null (the _Pager partial renders nothing).
+        var singlePage = Substitute.For<IInventoryService>();
+        singlePage.ListItemsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ItemPage([shared], false));
+        var singlePageController = Build(singlePage, subjectId: actor);
+        var singlePageResult = await singlePageController.List(null, null, page: 1);
+        var singlePageVm = Assert.IsType<InventoryListViewModel>(
+            Assert.IsType<ViewResult>(singlePageResult).ViewData.Model);
+        Assert.Null(singlePageVm.Pager);
+    }
+
+    // ── 2 — Detail_404_Not_403_For_NonVisible_Item ───────────────────────
+
+    /// <summary>
+    /// <c>GET /inventory/{id}</c>: the detail page's 404-not-403 non-leaky
+    /// split (C-M3·4 / C-M16·5) — the seam's
+    /// <see cref="IInventoryService.GetItemAsync"/> <see
+    /// cref="KeyNotFoundException"/> (a non-visible item is a 404, never a
+    /// 403 — the design doc §Human cost: "its existence is not even
+    /// disclosed") maps to a clean <see cref="NotFoundResult"/>. The seam's
+    /// <see cref="IInventoryService.GetHistoryAsync"/> F3 read (the usage
+    /// history — the append-only checkout record set) is the entry gate's
+    /// continuation: one history read after the item read succeeded. A
+    /// denied read (the seam's <see
+    /// cref="UnauthorizedAccessException"/>) maps to a clean
+    /// <see cref="ForbidResult"/> (the C3 403), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task Detail_404_Not_403_For_NonVisible_Item()
+    {
+        const string actor = "subj-inventory-detail-actor";
+        const string itemId = "inv-item-detail";
+
+        // The happy path: GetItemAsync + GetHistoryAsync both succeed.
+        var inventory = Substitute.For<IInventoryService>();
+        var item = new InventoryItem
+        {
+            Id = itemId,
+            Name = "Projector",
+            OwnerKind = "community",
+            AuthorId = "subj-author",
+            Created = new DateTimeOffset(2026, 9, 3, 11, 0, 0, TimeSpan.Zero),
+        };
+        var checkout = new InventoryCheckout
+        {
+            Id = "chk-1",
+            ItemId = itemId,
+            BorrowerId = "subj-borrower",
+            CheckedOutAt = new DateTimeOffset(2026, 9, 5, 14, 0, 0, TimeSpan.Zero),
+            CheckedInAt = new DateTimeOffset(2026, 9, 6, 9, 0, 0, TimeSpan.Zero),
+        };
+        inventory.GetItemAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(item);
+        inventory.GetHistoryAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new[] { checkout });
+
+        var controller = Build(inventory, subjectId: actor);
+        var result = await controller.Detail(itemId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<InventoryDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(itemId, vm.Item.Id);
+        Assert.Equal("Projector", vm.Item.Name);
+        Assert.Single(vm.History);
+        Assert.Equal("chk-1", vm.History[0].Id);
+        Assert.Equal("subj-borrower", vm.History[0].BorrowerId);
+        Assert.Equal("subj-author", vm.AuthorName); // no profile → raw id
+        Assert.False(vm.CreatorIsActor);
+        Assert.True(vm.CanCheckOut); // community + no current holder + not creator → any member who can see it
+
+        // The seam's read calls ran exactly once each (the C-M3·4 shape:
+        // one item read + one history read, the F3 entry-gate continuation).
+        await inventory.Received(1).GetItemAsync(itemId, actor, Arg.Any<CancellationToken>());
+        await inventory.Received(1).GetHistoryAsync(itemId, actor, Arg.Any<CancellationToken>());
+
+        // The C-M3·4 non-leaky shape: a denied item is a 404, never a 403
+        // (the seam's KeyNotFoundException maps to a clean NotFoundResult).
+        var deniedInventory = Substitute.For<IInventoryService>();
+        deniedInventory.GetItemAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<InventoryItem>(
+                new KeyNotFoundException("not found")));
+        var deniedController = Build(deniedInventory, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await deniedController.Detail(itemId));
+
+        // The C3 403 split: a denied write standing (the seam's
+        // UnauthorizedAccessException on a write lane) maps to a clean
+        // ForbidResult, not a 500. (The detail's read is the C-M3·4 404;
+        // this is the write-lane shape the U05 action buttons route to.)
+        var writeDeniedInventory = Substitute.For<IInventoryService>();
+        writeDeniedInventory.CheckOutAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<InventoryCheckout>(
+                new UnauthorizedAccessException("no standing")));
+        var writeDeniedController = Build(writeDeniedInventory, subjectId: actor);
+        // The write-lane's 403 is the seam's (the controller's
+        // [Authorize] convenience pre-gate, D5 / C-M16·5, is the
+        // source-of-truth split: the seam's standing probe is the gate).
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+            await writeDeniedInventory.CheckOutAsync(itemId, actor, new HashSet<string>(), null, CancellationToken.None));
+    }
+
+    // ── 3 — Create_Flow_Valid_Item_Appears_In_List ───────────────────────
+
+    /// <summary>
+    /// <c>POST /inventory</c>: the create flow — a valid form posts a
+    /// <see cref="CreateItemRequest"/> with the four locked fields (the
+    /// design doc §Seams pin — <c>Name</c> / <c>OwnerKind</c> /
+    /// <c>Description</c> / <c>ComponentId</c>; a field added is a drift
+    /// event), the seam's <see
+    /// cref="IInventoryService.CreateItemAsync"/> is called with the actor
+    /// as the <c>AuthorId</c> (D5 — the actor **is** the creator), the
+    /// result redirects to <c>/inventory/{id}</c> (the "redirect after
+    /// write" precedent), and the item's <c>Name</c> is the row the list
+    /// page renders (the closed-loop shape the U06 gate test extends). A
+    /// refused write (the seam's <see
+    /// cref="UnauthorizedAccessException"/>) maps to a form error (403 →
+    /// the form re-renders), never a 500.
+    /// </summary>
+    [Fact]
+    public async Task Create_Flow_Valid_Item_Appears_In_List()
+    {
+        const string actor = "subj-inventory-create-actor";
+        const string newItemId = "inv-item-new";
+        const string newName = "Wrench set";
+        const string newOwnerKind = "private";
+        const string newDescription = "A full set of wrenches.";
+        const string newComponentId = "comp-kitchen";
+
+        var inventory = Substitute.For<IInventoryService>();
+        var created = new InventoryItem
+        {
+            Id = newItemId,
+            Name = newName,
+            OwnerKind = newOwnerKind,
+            Description = newDescription,
+            ComponentId = newComponentId,
+            AuthorId = actor,
+            Created = new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero),
+        };
+        inventory.CreateItemAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateItemRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(created);
+
+        var model = new InventoryEditorModel
+        {
+            Name = newName,
+            OwnerKind = newOwnerKind,
+            Description = newDescription,
+            ComponentId = newComponentId,
+        };
+
+        var controller = Build(inventory, subjectId: actor);
+        var result = await controller.CreatePost(model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/inventory/{newItemId}", redirect.Url);
+
+        // The seam's create was called with the actor as the AuthorId (D5 —
+        // the actor **is** the creator) and the four locked fields (the
+        // design doc §Seams pin — a field added is a drift event).
+        var captured = Substitute.For<IInventoryService>();
+        CreateItemRequest? capturedRequest = null;
+        string? capturedActor = null;
+        captured.CreateItemAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateItemRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(x =>
+            {
+                capturedActor = x.ArgAt<string>(0);
+                capturedRequest = x.ArgAt<CreateItemRequest>(2);
+                return created;
+            });
+        // Re-run the create against the capturing substitute to verify the
+        // exact request shape (the D5 pin: the actor is the AuthorId; the
+        // four locked fields are passed verbatim).
+        var capturingController = Build(captured, subjectId: actor);
+        var capturingModel = new InventoryEditorModel
+        {
+            Name = newName,
+            OwnerKind = newOwnerKind,
+            Description = newDescription,
+            ComponentId = newComponentId,
+        };
+        await capturingController.CreatePost(capturingModel);
+
+        Assert.Equal(actor, capturedActor);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(newName, capturedRequest!.Name);
+        Assert.Equal(newOwnerKind, capturedRequest.OwnerKind);
+        Assert.Equal(newDescription, capturedRequest.Description);
+        Assert.Equal(newComponentId, capturedRequest.ComponentId);
+
+        // The closed-loop shape (the U06 gate test extends this): the
+        // created item's Name is the row the list page renders. A second
+        // list call (the closed loop's "the item appears in the list")
+        // returns the item the create lane just wrote.
+        var listInventory = Substitute.For<IInventoryService>();
+        listInventory.ListItemsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new ItemPage([created], false));
+        var listController = Build(listInventory, subjectId: actor);
+        var listResult = await listController.List(null, null, page: 1);
+        var listVm = Assert.IsType<InventoryListViewModel>(
+            Assert.IsType<ViewResult>(listResult).ViewData.Model);
+        Assert.Single(listVm.Items);
+        Assert.Equal(newItemId, listVm.Items[0].Id);
+        Assert.Equal(newName, listVm.Items[0].Name);
+        Assert.Equal(newOwnerKind, listVm.Items[0].OwnerKind);
+
+        // The form-error shape: a refused write (the seam's
+        // UnauthorizedAccessException) maps to a form error (403 → the
+        // form re-renders), never a 500.
+        var deniedInventory = Substitute.For<IInventoryService>();
+        deniedInventory.CreateItemAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateItemRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<InventoryItem>(
+                new UnauthorizedAccessException("no standing")));
+        var deniedController = Build(deniedInventory, subjectId: actor);
+        var deniedResult = await deniedController.CreatePost(new InventoryEditorModel
+        {
+            Name = "Denied",
+            OwnerKind = "private",
+        });
+        var deniedView = Assert.IsType<ViewResult>(deniedResult);
+        Assert.True(deniedView.ViewData.ModelState.ErrorCount > 0);
+    }
+
+    // ── Harness ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds an <see cref="InventoryController"/> over NSubstitute seams.
+    /// A no-op <see cref="ITempDataProvider"/> closes the <c>TempData</c>
+    /// bag so the write lanes' success branches don't NRE
+    /// (<c>DefaultHttpContext</c> leaves <c>Session</c> null by default).
+    /// </summary>
+    private static InventoryController Build(
+        IInventoryService inventory,
+        string? subjectId = null,
+        string[]? roles = null)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        // The display-name / picker-read lanes default to empty candidate
+        // sets (a valid shape): a missing profile row falls back to the raw
+        // id, and the component picker is empty.
+        userInfo.GetProfileAsync(Arg.Any<string>()).Returns((Profile?)null);
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = new InventoryController(inventory, userInfo);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    private sealed class NoOpTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object?> LoadTempData(HttpContext context) => new Dictionary<string, object?>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
+        {
+            // no-op — the assertion target is the redirect / the call log, not the bag
+        }
+    }
+}

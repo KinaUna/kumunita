@@ -1718,6 +1718,34 @@ public static class KnownTranslationKeys
             ["translations.bulk.save_all"]   = "Save all",
             ["translations.bulk.mode_batch"] = "Batch editing",
             ["translations.bulk.mode_single"] = "Edit one at a time",
+
+            // M16 (ADR 0117, D1) — the inventory surface (check-out / check-in
+            // + the usage-history section + the nav entry). The closed
+            // key set is the design doc §kw-l (the list / detail / create
+            // labels U04 consumes; the edit / delete / check-out / check-in
+            // action labels U05 consumes; the nav entry U05 consumes).
+            ["inv.nav"]                     = "Inventory",
+            ["inv.list.title"]              = "Inventory",
+            ["inv.list.empty"]              = "No items yet.",
+            ["inv.list.ownerKind.shared"]   = "Shared",
+            ["inv.list.ownerKind.community"] = "Community",
+            ["inv.list.ownerKind.private"]  = "Private",
+            ["inv.list.filter"]             = "Filter by type",
+            ["inv.create.title"]            = "New item",
+            ["inv.create.name"]             = "Name",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Description",
+            ["inv.create.component"]        = "Section",
+            ["inv.create.submit"]           = "Create item",
+            ["inv.detail.title"]            = "Item",
+            ["inv.detail.currentHolder"]    = "Currently with",
+            ["inv.detail.history"]          = "Usage history",
+            ["inv.detail.edit"]             = "Edit",
+            ["inv.detail.delete"]           = "Delete",
+            ["inv.detail.checkOut"]         = "Check out",
+            ["inv.detail.checkIn"]          = "Check in",
+            ["inv.edit.title"]              = "Edit item",
+            ["inv.edit.submit"]             = "Save changes",
         };
 
     /// <summary>
@@ -3281,6 +3309,32 @@ public static class KnownTranslationKeys
             ["translations.bulk.save_all"]   = "Alle speichern",
             ["translations.bulk.mode_batch"] = "Stapelbearbeitung",
             ["translations.bulk.mode_single"] = "Einzelne Bearbeitung",
+
+            // M16 (ADR 0117, D1) — die Inventar-Oberfläche (Ausleihe / Rückgabe
+            // + die Verlaufs-Sektion + der Nav-Eintrag). Die geschlossene
+            // Schlüsselmenge ist der Design-Doc-§kw-l.
+            ["inv.nav"]                     = "Inventar",
+            ["inv.list.title"]              = "Inventar",
+            ["inv.list.empty"]              = "Noch keine Gegenstände.",
+            ["inv.list.ownerKind.shared"]   = "Gemeinsam",
+            ["inv.list.ownerKind.community"] = "Gemeinde",
+            ["inv.list.ownerKind.private"]  = "Privat",
+            ["inv.list.filter"]             = "Nach Typ filtern",
+            ["inv.create.title"]            = "Neuer Gegenstand",
+            ["inv.create.name"]             = "Name",
+            ["inv.create.ownerKind"]        = "Typ",
+            ["inv.create.description"]      = "Beschreibung",
+            ["inv.create.component"]        = "Bereich",
+            ["inv.create.submit"]           = "Gegenstand anlegen",
+            ["inv.detail.title"]            = "Gegenstand",
+            ["inv.detail.currentHolder"]    = "Derzeit bei",
+            ["inv.detail.history"]          = "Verwendungshistorie",
+            ["inv.detail.edit"]             = "Bearbeiten",
+            ["inv.detail.delete"]           = "Löschen",
+            ["inv.detail.checkOut"]         = "Ausleihen",
+            ["inv.detail.checkIn"]          = "Zurückgeben",
+            ["inv.edit.title"]              = "Gegenstand bearbeiten",
+            ["inv.edit.submit"]             = "Änderungen speichern",
         };
 
     /// <summary>
@@ -4847,6 +4901,32 @@ public static class KnownTranslationKeys
             ["translations.bulk.export"]     = "Télécharger les traductions (CSV)",
             ["translations.bulk.import"]     = "Téléverser les traductions (CSV)",
             ["translations.bulk.import_hint"] = "Les cellules vides sont ignorées (elles n'effacent jamais une traduction) ; un fichier contenant une clé inconnue ou une langue inconnue est refusé sans modification.",
+
+            // M16 (ADR 0117, D1) — la surface inventaire (prêt / retour + la
+            // section historique + l'entrée de navigation). L'ensemble fermé
+            // des clés est le §kw-l du document de conception.
+            ["inv.nav"]                     = "Inventaire",
+            ["inv.list.title"]              = "Inventaire",
+            ["inv.list.empty"]              = "Aucun article pour l'instant.",
+            ["inv.list.ownerKind.shared"]   = "Partagé",
+            ["inv.list.ownerKind.community"] = "Communauté",
+            ["inv.list.ownerKind.private"]  = "Privé",
+            ["inv.list.filter"]             = "Filtrer par type",
+            ["inv.create.title"]            = "Nouvel article",
+            ["inv.create.name"]             = "Nom",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Description",
+            ["inv.create.component"]        = "Section",
+            ["inv.create.submit"]           = "Créer l'article",
+            ["inv.detail.title"]            = "Article",
+            ["inv.detail.currentHolder"]    = "Actuellement chez",
+            ["inv.detail.history"]          = "Historique d'utilisation",
+            ["inv.detail.edit"]             = "Modifier",
+            ["inv.detail.delete"]           = "Supprimer",
+            ["inv.detail.checkOut"]         = "Emprunter",
+            ["inv.detail.checkIn"]          = "Restituer",
+            ["inv.edit.title"]              = "Modifier l'article",
+            ["inv.edit.submit"]             = "Enregistrer les modifications",
         };
 
     /// <summary>
@@ -6404,6 +6484,32 @@ public static class KnownTranslationKeys
             ["translations.bulk.export"]     = "Download translationer (CSV)",
             ["translations.bulk.import"]     = "Upload translationer (CSV)",
             ["translations.bulk.import_hint"] = "Tomme felter springes over (de sletter aldrig en oversættelse); en fil med en ukendt nøgle eller et ukendt sprog afvises uændret.",
+
+            // M16 (ADR 0117, D1) — lageroverfladen (udlån / returnering +
+            // historik-sektionen + nav-indekset). Det lukkedes nøglesæt er
+            // design-dokumentets §kw-l.
+            ["inv.nav"]                     = "Lager",
+            ["inv.list.title"]              = "Lager",
+            ["inv.list.empty"]              = "Ingen emner endnu.",
+            ["inv.list.ownerKind.shared"]   = "Fælles",
+            ["inv.list.ownerKind.community"] = "Fællesskab",
+            ["inv.list.ownerKind.private"]  = "Privat",
+            ["inv.list.filter"]             = "Filtrer efter type",
+            ["inv.create.title"]            = "Nyt emne",
+            ["inv.create.name"]             = "Navn",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Beskrivelse",
+            ["inv.create.component"]        = "Sektion",
+            ["inv.create.submit"]           = "Opret emne",
+            ["inv.detail.title"]            = "Emne",
+            ["inv.detail.currentHolder"]    = "Hos lige nu",
+            ["inv.detail.history"]          = "Brughistorik",
+            ["inv.detail.edit"]             = "Redigér",
+            ["inv.detail.delete"]           = "Slet",
+            ["inv.detail.checkOut"]         = "Udlån",
+            ["inv.detail.checkIn"]          = "Returnér",
+            ["inv.edit.title"]              = "Redigér emne",
+            ["inv.edit.submit"]             = "Gem ændringer",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

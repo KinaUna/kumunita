@@ -1,0 +1,80 @@
+@model Kumunita.Web.Models.InventoryDetailViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = Model.Item.Name;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="inv.detail.title">Item</kw-l> — @Model.Item.Name</h1>
+                </div>
+            </div>
+        </header>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3"><kw-l key="inv.create.ownerKind">Type</kw-l></dt>
+                    <dd class="col-sm-9">@Model.Item.OwnerKind</dd>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Item.Description))
+                    {
+                        <dt class="col-sm-3"><kw-l key="inv.create.description">Description</kw-l></dt>
+                        <dd class="col-sm-9 markdown">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Item.Description))</dd>
+                    }
+
+                    <dt class="col-sm-3"><kw-l key="inv.create.name">Name</kw-l> — creator</dt>
+                    <dd class="col-sm-9">@Model.AuthorName</dd>
+
+                    @if (Model.Item.CurrentHolderId is not null)
+                    {
+                        <dt class="col-sm-3"><kw-l key="inv.detail.currentHolder">Currently with</kw-l></dt>
+                        <dd class="col-sm-9">@Model.CurrentHolderName</dd>
+                    }
+
+                    <dt class="col-sm-3"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dt>
+                    <dd class="col-sm-9">@Model.Item.Created</dd>
+                </dl>
+            </div>
+        </div>
+
+        @* F3 — the usage history (the append-only checkout record set, the
+           "optionally how much … by whom" surface; C-M16·3). *@
+        <section class="mb-4">
+            <h2><kw-l key="inv.detail.history">Usage history</kw-l></h2>
+            @if (Model.History.Count == 0)
+            {
+                <div class="p-3 text-muted"><kw-l key="inv.list.empty">No items yet.</kw-l></div>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var checkout in Model.History)
+                    {
+                        <li class="list-group-item">
+                            <span class="fw-semibold">@checkout.BorrowerId</span>
+                            <span class="text-muted small ms-2">
+                                · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>
+                                @if (checkout.CheckedInAt is not null)
+                                {
+                                    <span> · <kw-l key="inv.detail.checkIn">Check in</kw-l> <kw-dt dt="@checkout.CheckedInAt" format="g"></kw-dt></span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark ms-2">open</span>
+                                }
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(checkout.Note))
+                            {
+                                <div class="text-muted small mt-1">@checkout.Note</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+</div>

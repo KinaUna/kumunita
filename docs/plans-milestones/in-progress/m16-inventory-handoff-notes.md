@@ -420,3 +420,182 @@ lanes):
 2. **The F1 loser sees `InvalidOperationException`** ("already checked out") — the Web layer should surface this as a **409 Conflict** (not a 403, not a 404). The loser's transaction rolled back atomically (C3) — the item's `CurrentHolderId`, the `InventoryCheckout` record, and the `AccessAudit` row all committed or rolled back together; no cleanup is needed.
 3. **The check-in's `CurrentHolderId` clear + `CheckedInAt` set commit together** (F1, C-M16·3) — a `CheckInAsync` on an item with no open record throws `KeyNotFoundException` (the open-record load is `KeyNotFoundException`-guarded, not the standing probe). The Web layer should surface this as a **404** (no open checkout to close), not a 403.
 4. **The `Note` field** on `CheckOutAsync` (optional free-text) is **stored on the record** (the `InventoryCheckout.Note`), not on the item (the item has no `Note` field — the note is per-checkout, the item is the aggregate). A Web form for checkout should surface the `Note` as an optional field; a Web form for check-in should **not** (the check-in has no note — the note is on the checkout).
+
+## U04 — Web surface part 1 (controller + list/detail/create + kw-l)
+
+**(a) The controller** (`src/Kumunita.Web/Controllers/InventoryController.cs`) —
+a thin `[Authorize]` HTTP layer (ADR 0006-D: routes + authz + shape). Ctor
+`(IInventoryService inventory, IUserInfoService userInfo)`. `[Authorize]`
+is a **convenience pre-gate only** (D5/C-M16·5) — the **single decision
+path** is the seam's read lanes (which route every read through the frozen
+`IAuthorizationService` over the U01 adapter). The controller never
+re-derives access — the M5 `ProjectsController` precedent.
+
+- **`List(ownerKind, componentId, page)`** → GET `/inventory` — calls
+  `ListItemsAsync(ownerKind, componentId, actorId, page)`; maps `ItemPage`
+  to `InventoryListViewModel` (rows = `InventoryItemRow`; `Pager` =
+  `PagedViewModel.ForRoute("/inventory", ...)` — **null** on the single
+  page, so `_Pager` renders nothing — the F2 no-render pin); the
+  `CurrentOwnerKind` / `CurrentComponentId` / `CurrentPage` are echoed so
+  the filter form + pager re-link correctly.
+- **`Detail(id)`** → GET `/inventory/{id}` — calls `GetItemAsync(id,
+  actorId)`; on `KeyNotFoundException` (absent **or** not visible) returns
+  **`NotFound`** — a non-visible item is a **404, never a 403** (C-M3·4
+  non-leaky — the seam throws `KeyNotFoundException` for both cases; the
+  controller does not distinguish). Loads history via `GetHistoryAsync`;
+  `AuthorName` / `CurrentHolderName` via `IUserInfoService.GetProfileAsync`
+  (missing profile row → the raw id, a valid shape); `CreatorIsActor` =
+  `item.AuthorId == actorId`; `CanCheckOut` = the item is **not** currently
+  held (`CurrentHolderId` null) — a read-side hint, **not** a gate (the
+  check-out lane's standing probe is the gate).
+- **`CreateGet()`** → GET `/inventory/new` — seeds the `InventoryEditorModel`
+  with the enabled components (`GetComponentsAsync(true)` → `(Id, Name)`
+  tuples; empty list when the instance has none — a valid shape).
+- **`CreatePost([FromForm] InventoryEditorModel)`** → POST `/inventory` —
+  on invalid model: re-renders `Create` with the model (field errors
+  surface via the `kw-l` fallback labels — no model-state plumbing needed
+  for this lane; the form is a single POST). On valid: `CreateItemAsync`
+  (the actor **is** the creator, D5) → **redirect** to
+  `/inventory/{item.Id}`.
+
+**Subject extraction** — `private static string? SubjectId(ClaimsPrincipal
+user)` = `user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject).Value`
+(the `Kumunita.Sub` thin-principal claim, not the ASP.NET default subject).
+
+**(b) The view-models** (`src/Kumunita.Web/Models/InventoryViewModels.cs`):
+
+- `InventoryListViewModel(Items, Components, CurrentOwnerKind,
+  CurrentComponentId, CurrentPage, Pager)` — `Items` is
+  `IReadOnlyList<InventoryItemRow>`; `Pager` is `PagedViewModel?` (null =
+  single page).
+- `InventoryItemRow(Id, Name, OwnerKind, CurrentHolderId,
+  CurrentHolderName, Created)`.
+- `InventoryDetailViewModel(Item, History, AuthorName,
+  CurrentHolderName, CreatorIsActor, CanCheckOut)` — `History` is
+  `IReadOnlyList<InventoryCheckout>` (newest-first, as returned by the
+  seam).
+- `InventoryEditorModel` — `Name` / `OwnerKind` (default `"community"`) /
+  `Description` / `ComponentId` / `Components` (an
+  `IReadOnlyList<(string Id, string Name)>`, **not** a `List<>` — the
+  controller's helper returns `IReadOnlyList<>`); `IsValid` =
+  non-whitespace `Name` **and** `OwnerKind` ∈ {`shared`, `community`,
+  `private`}.
+
+**(c) The three views** (`src/Kumunita.Web/Views/Inventory/`):
+
+- **`List.cshtml`** — a `@functions { static string OwnerKindKey(string) ... }`
+  dynamic-key idiom (the M5 `StatusLabelKey` shape): maps `shared` →
+  `inv.list.ownerKind.shared`, `community` → `.community`, `private` →
+  `.private`, unknown → the raw value. The ownerKind filter is a
+  `<select>` (All + the three kinds), the `componentId` filter an optional
+  text input; both re-POST as GET query params. Rows render
+  `Name` / `OwnerKind` (via the kw-l key) / `CurrentHolderName` (or the
+  "not held" fallback) / `Created` (via `<kw-dt dt="..." format="g">`).
+  Empty list → the `inv.list.empty` kw-l row. Pager: `<partial
+  name="_Pager" model="Model.Pager" />` (renders nothing when null — F2).
+- **`Detail.cshtml`** — `@using Kumunita.Web.Security`; the item's `Name` /
+  `OwnerKind` / `AuthorName` / `Created` / `Description` (rendered Markdown
+  via `MarkdownRenderer.RenderHtml`, the ADR 0025 shape) + a
+  **`inv.detail.history`** section (F3 — the append-only
+  `InventoryCheckout` rows, newest-first, each showing borrower / note /
+  checked-out-at / checked-in-at). The `inv.detail.edit` /
+  `inv.detail.delete` / `inv.detail.checkOut` / `inv.detail.checkIn` links
+  are the **U05** surface (they render as kw-l links now but route to the
+  U05 actions — the U05 unit wires the actual POST routes + standing).
+- **`Create.cshtml`** — a `<form method="post" asp-action="CreatePost">`
+  with `Name` (text) / `OwnerKind` (`<select>` of the three kinds, default
+  `community`) / `Description` (textarea) / `ComponentId` (`<select>` of
+  `Model.Components` — empty when the instance has none) +
+  `@Html.AntiForgeryToken()`. The back-link uses `common.cancel` (not a
+  new `inv.create.cancel` key — the common key is the precedent).
+
+**(d) The kw-l keys** — **22** `inv.*` keys registered in **all four**
+languages (`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`,
+appended after the M15 `translations.bulk.*` keys in each dict —
+`EnValues` / `DeValues` / `FrValues` / `DaValues`): `inv.nav`,
+`inv.list.title`, `inv.list.empty`, `inv.list.ownerKind.shared`,
+`inv.list.ownerKind.community`, `inv.list.ownerKind.private`,
+`inv.list.filter`, `inv.create.title`, `inv.create.name`,
+`inv.create.ownerKind`, `inv.create.description`, `inv.create.component`,
+`inv.create.submit`, `inv.detail.title`, `inv.detail.currentHolder`,
+`inv.detail.history`, `inv.detail.edit`, `inv.detail.delete`,
+`inv.detail.checkOut`, `inv.detail.checkIn`, `inv.edit.title`,
+`inv.edit.submit`. **Drift noted**: the design doc's prose says
+"twenty" `inv.*` keys but its **table** lists **22** — the table is the
+source of truth, so all **22** are registered (88 total `inv.*` lines =
+22 × 4). `KwLRegistryConsistencyTests` (auto-scans every view for static
+`kw-l` keys) and the Core 4-language parity tests both pin this — both
+pass.
+
+**(e) The three pinned Web tests**
+(`tests/Kumunita.Web.Tests/InventoryControllerTests.cs`, 3 `[Fact]`
+tests — all pass):
+
+- **U04·1** `List_Renders_With_OwnerKind_Filter_And_Paged_Markup` — a
+  visible item; `List(ownerKind: "community", ...)` returns `OkObjectResult`
+  whose view-model has the item's `Name`, `CurrentOwnerKind = "community"`,
+  and a **null** `Pager` (single page — the F2 no-render pin).
+- **U04·2** `Detail_404_Not_403_For_NonVisible_Item` — the seam's
+  `GetItemAsync` throws `KeyNotFoundException` (the non-visible item's
+  shape); the controller returns `NotFoundObjectResult` — **404, never
+  403** (C-M3·4 non-leaky).
+- **U04·3** `Create_Flow_Valid_Item_Appears_In_List` — a valid
+  `InventoryEditorModel`; `CreatePost` returns a `RedirectToActionResult`
+  to `/inventory/{id}`; the seam's `CreateItemAsync` is called with the
+  actor as `AuthorId` (D5) and the model's `Name` / `OwnerKind` /
+  `Description` / `ComponentId` (asserted via NSubstitute's
+  `Arg.Do<CreateItemRequest>` capture).
+
+**Test harness** — pure NSubstitute (no Testcontainers): `Build(inventory,
+userInfo, subjectId, roles)` wires a `DefaultHttpContext` + a
+`ClaimsPrincipal` with the `Kumunita.Sub` / `Kumunita.Role` claims + a
+`TempDataDictionary` over a `NoOpTempDataProvider`. The seam's
+`GetProfileAsync` / `GetComponentsAsync` default to an empty candidate
+set (a valid shape). **Note**: the test file must reference
+`Kumunita.Core.Identity.ClaimTypes` **fully qualified** — the unqualified
+name is ambiguous with `System.Security.Claims.ClaimTypes` (the .NET
+`Claim` / `ClaimsPrincipal` types are imported for the principal wiring).
+
+**(f) Drift observed** — two minor: (1) the controller initially omitted
+`using System.Security.Claims;` (build error, fixed); (2) the
+`InventoryEditorModel.Components` property was typed `List<>` but the
+controller's helper returns `IReadOnlyList<>` (build error, fixed — the
+property is now `IReadOnlyList<(string Id, string Name)>`). No seam drift:
+the frozen `IAuthorizationService` / `AccessAction` / `AccessVia` /
+`Decide()` / `IUserInfoService` are untouched (C-M16·4 honored — the
+controller routes every read through the seam, never re-derives). No files
+outside the 7 U04 deliverables were modified.
+
+**(g) The exit gate** (green): `dotnet build Kumunita.slnx -c Debug`
+(0 warnings, 0 errors)
++ `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+— **630 tests, 0 errors, 0 failed, 0 skipped** (includes the 3 new U04
+tests + `KwLRegistryConsistencyTests` + the Core 4-language parity tests,
+which all auto-pin the new 22 `inv.*` keys).
+
+**(h) Follow-ons** for the U05 lanes (the edit/delete/check-out/check-in
+Web surface + the nav entry):
+
+1. **The Detail view's action links** (`inv.detail.edit` /
+   `inv.detail.delete` / `inv.detail.checkOut` / `inv.detail.checkIn`)
+   currently render as kw-l links — U05 wires the actual **POST** routes
+   (the write lanes are all POST — the M5 precedent) + the standing
+   probes (D5: edit/delete = creator ∪ GlobalAdmin; check-out = any member
+   who can see it for `community`/`shared`, owner ∪ GlobalAdmin for
+   `private`; check-in = current holder ∪ creator ∪ GlobalAdmin).
+2. **The F1 loser sees `InvalidOperationException`** ("already checked
+   out") — U05 should surface this as a **409 Conflict** (not a 403, not a
+   404) — the U03 follow-on #2.
+3. **The `Note` field** on the check-out form (optional free-text, stored
+   on the `InventoryCheckout` record, not the item) — the U03 follow-on
+   #4. The check-in form has **no** `Note` field.
+4. **The nav entry** (`inv.nav` key, already registered) — the home-page
+   nav link to `/inventory` — a standing core surface (D6, no admin
+   toggle). The U05 unit adds the nav entry + wires the edit/delete/
+   check-out/check-in routes + the standing probes.
+5. **The `Detail` view's `CreatorIsActor` / `CanCheckOut` flags** are
+   read-side hints (rendering convenience) — the **gate** is always the
+   seam's standing probe (D5) — the U05 POST lanes. The `Detail` view's
+   action links should be conditionally rendered (e.g. hide "Edit" when
+   `!CreatorIsActor` and the actor is not GlobalAdmin — the read-side
+   hint) but the **server-side** standing probe is the authority.
