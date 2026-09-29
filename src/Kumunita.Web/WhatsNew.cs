@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.13.0", "2026-09-29", new List<string>
+        {
+            "Inventory — check out and check in shared, community-owned, or private items (equipment, sports-team clothes, books, …): the item's page shows who has it now, and its usage history keeps a running record of every check-out — how much it's used and by whom.",
+        }),
         new("0.12.0", "2026-09-29", new List<string>
         {
             "Translation bulk — check, update, and extend the platform's translations as a batch rather than one at a time: download the whole closed set as one CSV bundle, upload the edited bundle back (blank cells are skipped — they never erase a translation; a file with an unknown key or language is refused unchanged), and review or extend a new language with one save in the batch editor.",
