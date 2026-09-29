@@ -557,6 +557,25 @@ body.kmb-page-expanded .page-expand-close {
   align-items: center;
 }
 
+/* ADR 0113 — the overflow fold state. When the variant-B row doesn't fit,
+   nav-more-fold.ts moves the Community + Groups <li>s into the More dropdown
+   and adds .kmb-nav-folded to the nav. The moved anchors carry Bootstrap's
+   .dropdown-item classes (so they render as normal menu items); this single
+   state-scoped rule re-asserts the navbar link voice (size + color) so the
+   folded items read as the same links, now inside the More menu. It is a
+   top-level (non-conditional) rule, deliberately NOT a media-query block,
+   so site.css keeps its pinned media-block inventory (the M10 drift-guard
+   pin), and it is inert unless the class is present, so variant C and
+   signed-out layouts are untouched. */
+.kmb-nav-folded .navbar-nav .dropdown-item {
+  font-size: 0.9375rem;
+  color: var(--kmb-ink-soft);
+}
+.kmb-nav-folded .navbar-nav .dropdown-item:hover,
+.kmb-nav-folded .navbar-nav .dropdown-item:focus {
+  color: #1c4532;
+}
+
 /* Tabs that hang from the navbar — the section tab strips (the ADR 0062
    nav-tabs idiom: _AdminNav / _EventsTabs / _SettingsTabs / _ProjectsTabs
    + Groups/Detail). The bar is pulled up so its top edge sits flush with
@@ -809,8 +828,8 @@ body.kmb-nav-rail-mode {
   margin-bottom: 0.75rem;
 }
 .kmb-rail-brand img {
-  width: 34px;
-  height: 34px;
+  width: 52px;
+  height: 52px;
 }
 .kmb-rail-btn {
   width: 46px;

@@ -433,16 +433,18 @@ test.describe('M10 PWA — §2 SW registered in Chromium (F1 / C-M10·3)', () =>
 test.describe('M10 PWA — §3 offline-shell revisit of / (F2 / C-M10·1/2)', () => {
 
   test('Offline_Shell_Revisit_Of_Root_Renders', async ({ context, page }) => {
-    // 1) While online: visit `/` + `/about` so the SW's stale-while-
-    //    revalidate path caches both (the design doc §SW's no-precache
-    //    rule — the cache fills on the first intercepted response).
+    // 1) While online: visit `/` + `/about` so the SW caches both. (M11
+    //    refinement: the two HTML pages are now network-first — a fresh
+    //    render wins and the cache stores it — so the cache fills on the
+    //    first intercepted response, the same as the design doc §SW's
+    //    no-precache rule.)
     await page.goto('/');
     await page.goto('/about');
 
-    // 2) Cut the network + revisit `/`. The SW's fetch handler
-    //    intercepts the `/` request (an allowlisted path — gate 3),
-    //    serves the cached copy, and (failing the background refresh
-    //    on the offline network) falls back to the cached response.
+    // 2) Cut the network + revisit `/`. The SW's fetch handler intercepts
+    //    the `/` request (an allowlisted path — gate 3), the network-first
+    //    fetch fails on the offline network, and it falls back to the
+    //    cached copy.
     await context.setOffline(true);
     const resp = await page.goto('/', { waitUntil: 'load' });
     // The page loads from cache — the `load` event fires + the

@@ -19,11 +19,16 @@
  *
  *   event.respondWith(fetch(event.request));
  *
- * Caching (locked): stale-while-revalidate on `kumunita-shell-v1`;
- * **no precache** (the cache fills on the first intercepted response);
- * on `activate` every cache name other than the current one is deleted.
- * This worker never calls `self.skipWaiting()` or `clients.claim()` —
- * a normal reload picks up a new worker (honesty, D1).
+ * Caching (locked, refined for the M11 nav-layout-lag fix): the two HTML
+ * pages (`/`, `/about`) are **network-first** — a fresh server render (which
+ * re-reads the `kumunita.nav` / `kumunita.lang` preference cookies) wins, and
+ * the cached copy is only the offline fallback — so a preference switch
+ * renders immediately on navigation. The static assets keep
+ * **stale-while-revalidate** on `kumunita-shell-v1` (unchanged). **No
+ * precache** (the cache fills on the first intercepted response); on
+ * `activate` every cache name other than the current one is deleted. This
+ * worker never calls `self.skipWaiting()` or `clients.claim()` — a normal
+ * reload picks up a new worker (honesty, D1).
  */
 
 'use strict';
@@ -78,6 +83,19 @@ self.addEventListener('fetch', (event) => {
     // The exact fall-through line (design doc §SW — the C-M10·2 pin):
     // pass-through, never a cache-lookup-then-fallback.
     event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // M11 nav-layout-lag fix: the two HTML pages (the allowlist's only non-
+  // asset paths) are **network-first** — a fresh server render, which
+  // re-reads the `kumunita.nav` / `kumunita.lang` preference cookies, wins
+  // and the cached copy is only the offline fallback. This is what makes the
+  // nav-layout / language switch render immediately on navigation instead of
+  // showing the stale cached page until the next visit. `mode === 'navigate'`
+  // is the top-level page-load/navigation check, so any non-navigational
+  // fetch of `/` or `/about` still falls to network-only (below).
+  if (event.request.mode === 'navigate') {
+    event.respondWith(networkFirst(event.request));
     return;
   }
 
@@ -160,6 +178,43 @@ function staleWhileRevalidate(request) {
           return fresh;
         });
       })
+    );
+}
+
+/*
+ * Network-first for the two HTML shell pages (the M11 nav-layout-lag fix).
+ *
+ *  - online: `fetch(request)`; on a **2xx same-origin** response store a
+ *    clone and serve the fresh render — this is what makes the `kumunita.nav`
+ *    / `kumunita.lang` switch show up immediately (the server resolves both
+ *    preferences per request, so a fresh render always reflects them).
+ *  - offline (the fetch rejects): fall back to the cached copy when one
+ *    exists, else the browser's own error (never a fabricated stale page).
+ *
+ * Deliberately **not** stale-while-revalidate: that strategy serves the
+ * cached page immediately and refreshes in the background, so a
+ * preference switch — which the server resolves per request from a cookie —
+ * stays invisible until the next visit (the reported nav-layout bug).
+ */
+function networkFirst(request) {
+  return fetch(request)
+    .then((fresh) => {
+      if (fresh && fresh.ok && isSameOriginResponse(fresh)) {
+        caches
+          .open(CACHE_NAME)
+          .then((cache) => cache.put(request, fresh.clone()))
+          .catch(() => {});
+      }
+      return fresh;
+    })
+    .catch(() =>
+      caches
+        .open(CACHE_NAME)
+        .then((cache) => cache.match(request))
+        .then((cached) => {
+          if (cached) return cached;
+          throw new TypeError('offline and no cached copy');
+        })
     );
 }
 

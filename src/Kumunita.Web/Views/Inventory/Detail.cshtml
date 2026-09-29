@@ -1,0 +1,122 @@
+@model Kumunita.Web.Models.InventoryDetailViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = Model.Item.Name;
+    // D5 / C-M16·5 — the action buttons below are *read-side display hints*
+    // only (the server-side standing probe, U03, is the source of truth; the
+    // [Authorize] pre-gate is a convenience, F4). edit / delete standing =
+    // creator ∪ GlobalAdmin (the CreatorIsActor hint + the principal's
+    // GlobalAdmin role); check-out standing = Model.CanCheckOut (not held &&
+    // the broad/owner standing); check-in standing = the item is currently
+    // held (current holder ∪ creator ∪ GlobalAdmin).
+    var canManage = Model.CreatorIsActor || KumunitaPrincipal.IsGlobalAdmin(User);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="inv.detail.title">Item</kw-l> — @Model.Item.Name</h1>
+                </div>
+            </div>
+        </header>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3"><kw-l key="inv.create.ownerKind">Type</kw-l></dt>
+                    <dd class="col-sm-9">@Model.Item.OwnerKind</dd>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.Item.Description))
+                    {
+                        <dt class="col-sm-3"><kw-l key="inv.create.description">Description</kw-l></dt>
+                        <dd class="col-sm-9 markdown">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Item.Description))</dd>
+                    }
+
+                    <dt class="col-sm-3"><kw-l key="inv.create.name">Name</kw-l> — creator</dt>
+                    <dd class="col-sm-9">@Model.AuthorName</dd>
+
+                    @if (Model.Item.CurrentHolderId is not null)
+                    {
+                        <dt class="col-sm-3"><kw-l key="inv.detail.currentHolder">Currently with</kw-l></dt>
+                        <dd class="col-sm-9">@Model.CurrentHolderName</dd>
+                    }
+
+                    <dt class="col-sm-3"><kw-dt dt="@Model.Item.Created" format="g"></kw-dt></dt>
+                    <dd class="col-sm-9">@Model.Item.Created</dd>
+                </dl>
+            </div>
+        </div>
+
+        @* U05 — the action bar (D5 / C-M16·5: these are *display* hints;
+           the server-side standing probe is the source of truth, F4).
+           check-out = optional note (per-checkout, the U03 follow-on) +
+           POST /checkout; check-in = POST /checkin; edit / delete =
+           the creator ∪ GlobalAdmin hint. *@
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+            @if (Model.CanCheckOut)
+            {
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/checkout")" class="d-flex flex-wrap align-items-center gap-2" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <input class="form-control form-control-sm" type="text" name="note" maxlength="200"
+                           placeholder="Note (optional)" aria-label="Check-out note" />
+                    <button type="submit" class="btn btn-primary btn-sm"><kw-l key="inv.detail.checkOut">Check out</kw-l></button>
+                </form>
+            }
+            else if (Model.Item.CurrentHolderId is not null)
+            {
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/checkin")" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success btn-sm"><kw-l key="inv.detail.checkIn">Check in</kw-l></button>
+                </form>
+            }
+
+            @if (canManage)
+            {
+                <a class="btn btn-outline-secondary btn-sm" href="@($"/inventory/{Model.Item.Id}/edit")"><kw-l key="inv.detail.edit">Edit</kw-l></a>
+                <form method="post" action="@($"/inventory/{Model.Item.Id}/delete")"
+                      data-confirm="@("Delete this item? This cannot be undone.")" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-danger btn-sm"><kw-l key="inv.detail.delete">Delete</kw-l></button>
+                </form>
+            }
+        </div>
+
+        @* F3 — the usage history (the append-only checkout record set, the
+           "optionally how much … by whom" surface; C-M16·3). *@
+        <section class="mb-4">
+            <h2><kw-l key="inv.detail.history">Usage history</kw-l></h2>
+            @if (Model.History.Count == 0)
+            {
+                <div class="p-3 text-muted"><kw-l key="inv.list.empty">No items yet.</kw-l></div>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var checkout in Model.History)
+                    {
+                        <li class="list-group-item">
+                            <span class="fw-semibold">@checkout.BorrowerId</span>
+                            <span class="text-muted small ms-2">
+                                · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>
+                                @if (checkout.CheckedInAt is not null)
+                                {
+                                    <span> · <kw-l key="inv.detail.checkIn">Check in</kw-l> <kw-dt dt="@checkout.CheckedInAt" format="g"></kw-dt></span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark ms-2">open</span>
+                                }
+                            </span>
+                            @if (!string.IsNullOrWhiteSpace(checkout.Note))
+                            {
+                                <div class="text-muted small mt-1">@checkout.Note</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+</div>

@@ -67,6 +67,32 @@ public interface IProjectService
 Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
+    /// The **reverse read seam** of the M14 interlock (ADR 0115 D2) — the
+    /// to-dos **linked to this event**: the <see cref="ListTodosAsync"/> shape
+    /// filtered to one event (the <see cref="ListBoardsForTodoAsync"/>
+    /// "list X for a Y" reverse-read precedent). The candidate set is
+    /// <c>!IsDeleted</c> with <see cref="TodoItem.EventId"/> equal to
+    /// <paramref name="eventId"/> — **a filter, never a gate** (C-M14·1: the
+    /// <c>EventId</c> narrows the candidate set; it never changes the audience
+    /// decision — a to-do is visible iff it passes its **own**
+    /// <c>CanSeeAsync(Read)</c>). The survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6 / C3) over the **existing**
+    /// <see cref="TodoItemToAuditableResource"/> (C-M14·4 — no new adapter, no
+    /// new <c>AccessAction</c> / <c>AccessVia</c> / <c>Decide()</c> branch);
+    /// ordered by <c>Created</c> descending; paged with
+    /// <c>HasMore = candidates.Count == PageSize</c> (ADR 0090 D1/D3).
+    /// **One aggregate** <c>AccessAudit</c> row (<c>TargetKind = "todo"</c>,
+    /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape; a 0-
+    /// candidate page reports <c>HasMore: false</c> and emits **no** decision
+    /// row (C-M7·5). The seam returns **only to-dos the actor may read** — an
+    /// event with zero readable linked to-dos returns an **empty page**, never
+    /// a 404/403 (the event's own detail page decides its own visibility — this
+    /// lane is called only from a page that already passed the event's
+    /// <c>Read</c> decision).
+    /// </summary>
+    Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
+
+    /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
     /// <c>ParentId == todoItemId</c>, ordered by <c>Created</c> ascending). One
     /// <c>CanAsync(Read)</c> over the to-do; <see cref="KeyNotFoundException"/>
@@ -628,6 +654,26 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// caller's session (C3).
     /// </summary>
     Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The **M14 interlock** (ADR 0115 D3): sets <c>TodoItem.EventId</c> to
+    /// <paramref name="eventId"/> (<c>null</c> = **clear the link** — the
+    /// <see cref="SetTodoProjectAsync"/> null-clears rule). **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the **to-do** (the C-M5·6 standing
+    /// matrix, re-checked **server-side** — C-M14·3; the Web <c>[Authorize]</c>
+    /// is a convenience pre-gate only, never the source of truth). The to-do
+    /// must exist and be <c>!IsDeleted</c> (<see cref="KeyNotFoundException"/>
+    /// — 404). A non-null <c>eventId</c> that is **non-existent, soft-deleted,
+    /// or not readable by the actor is refused** (<see
+    /// cref="KeyNotFoundException"/> — 404, the non-leaky split, C-M14·3; the
+    /// standing decision is the frozen <see cref="IAuthorizationService"/>
+    /// <c>CanAsync(Read)</c> path over the event — **you can only link to an
+    /// event you can see**; C-M14·4 — no new authorization surface).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped; one <c>AccessAudit</c> row (<c>todo.set_event</c>,
+    /// <c>TargetKind = "todo"</c>) commits **atomically** with the write (C3).
+    /// </summary>
+    Task<TodoItem> SetTodoEventAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default);
 
     /// <summary>
     /// Sets <c>KanbanBoard.ProjectId</c> to <paramref name="projectId"/>

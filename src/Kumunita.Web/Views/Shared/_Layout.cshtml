@@ -68,7 +68,7 @@
             <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3 kmb-nav-row">
                 <div class="container-fluid">
                     <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                        <img src="~/images/logo/kumunita_k_logo_42x42.png" alt="Kumunita" />
+                        <img src="~/images/logo/kumunita_k_logo_52x52.png" alt="Kumunita" />
                     </a>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                             aria-expanded="false" aria-label="Toggle navigation">
@@ -84,15 +84,22 @@
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
-                                <li class="nav-item">
+                                @* ADR 0113 — data-nav-fold: when the variant-B row doesn't
+                                   fit between the sm and md breakpoints, the nav-more-fold.ts
+                                   module moves these two <li>s into the More menu below
+                                   (data-nav-more) and back when there is room again. The hooks
+                                   are inert without that module, and absent in variant C and
+                                   for signed-out users, so the fold is self-scoped. *@
+                                <li class="nav-item" data-nav-fold>
                                     <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
                                 </li>
-                                <li class="nav-item">
+                                <li class="nav-item" data-nav-fold>
                                     <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
                                 </li>
                                 @* ADR 0111 — the More menu: the five less-frequent
-                                   resident-only sections folded into one dropdown. *@
-                                <li class="nav-item dropdown">
+                                   resident-only sections folded into one dropdown.
+                                   ADR 0113 — data-nav-more marks this as the fold target. *@
+                                <li class="nav-item dropdown" data-nav-more>
                                     <a class="nav-link text-dark dropdown-toggle" href="#" role="button"
                                        data-bs-toggle="dropdown" aria-expanded="false">
                                         <kw-l key="nav.more">More</kw-l>
@@ -100,6 +107,10 @@
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item text-dark" href="/events"><kw-l key="nav.events">Events</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/projects/todos"><kw-l key="nav.projects">Projects</kw-l></a></li>
+                                        @* M16 (ADR 0117) — the Inventory surface (D6: a
+                                           standing core surface, no admin toggle; the M5
+                                           projects nav-entry shape). *@
+                                        <li><a class="dropdown-item text-dark" href="/inventory"><kw-l key="inv.nav">Inventory</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/tags"><kw-l key="nav.tags">Tags</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a></li>
@@ -134,7 +145,7 @@
                duplication). *@
             <nav class="kmb-rail" aria-label="Primary">
                     <a class="kmb-rail-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                        <img src="~/images/logo/kumunita_k_logo_42x42.png" alt="Kumunita" />
+                        <img src="~/images/logo/kumunita_k_logo_52x52.png" alt="Kumunita" />
                     </a>
                     <a class="kmb-rail-btn" asp-area="" asp-controller="Home" asp-action="Index">
                         <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>
@@ -167,6 +178,14 @@
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
                             <span class="visually-hidden"><kw-l key="nav.projects">Projects</kw-l></span>
                             <span class="kmb-rail-tip"><kw-l key="nav.projects">Projects</kw-l></span>
+                        </a>
+                        @* M16 (ADR 0117) — the Inventory surface rail icon
+                           (the M5 projects nav-entry shape; D6 standing core
+                           surface). *@
+                        <a class="kmb-rail-btn" href="/inventory">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>
+                            <span class="visually-hidden"><kw-l key="inv.nav">Inventory</kw-l></span>
+                            <span class="kmb-rail-tip"><kw-l key="inv.nav">Inventory</kw-l></span>
                         </a>
                         <a class="kmb-rail-btn" href="/pages">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
@@ -340,6 +359,12 @@
          label source as one quiet fixed button on beforeinstallprompt;
          a clean no-op where the browser never fires it (iOS). -->
     <script type="module" src="~/js/lib/pwa-install.js"></script>
+    <!-- Nav-row overflow fold (client/lib/nav-more-fold.ts, tsc-built — ADR 0113):
+         in the variant-B "top row" nav, folds Community + Groups into the More
+         menu when the row doesn't fit, and back when there is room. Self-guards
+         (no-op) in variant C, signed-out, and where the data-nav-* hooks are
+         absent, so loading it globally is safe. -->
+    <script type="module" src="~/js/lib/nav-more-fold.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

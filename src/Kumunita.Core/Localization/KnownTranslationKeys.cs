@@ -1050,6 +1050,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Outcome",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Usage analytics",
+            ["admin.analytics_lede"] =
+                "A local summary of how the platform is used — a request count, " +
+                "the signed-in / anonymous split, the number of distinct accounts, " +
+                "and the per-surface ranking, over a fixed window. No per-account " +
+                "detail is shown; the raw rows are the operator's psql surface.",
+            ["admin.analytics_window"] = "Window",
+            ["admin.analytics_total"] = "Total requests",
+            ["admin.analytics_authenticated"] = "Signed-in",
+            ["admin.analytics_anonymous"] = "Anonymous",
+            ["admin.analytics_distinct"] = "Distinct accounts",
+            ["admin.analytics_surface"] = "Surface",
+            ["admin.analytics_count"] = "Count",
+            ["admin.analytics_export"] = "Export CSV",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Granted at (UTC)",
@@ -1385,6 +1401,28 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Add to calendar",
             ["events.ics.feed"] = "Calendar feed (iCal)",
 
+            // ── M14 (ADR 0115 D2) — the Events ↔ Projects interlock's two U03
+            //    display-link labels (the to-do detail's event chip + the event
+            //    detail's linked to-dos section; the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["todo.event_link"] = "Linked event",
+            ["events.linked_todos"] = "Linked to-dos",
+
+            // ── M14 (ADR 0115 D3) — the U04 set-event picker labels (the
+            //    to-do detail's "Link to event" form label + the
+            //    <select>'s placeholder / clear option; the closed-key
+            //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["todo.set_event.label"] = "Link to event",
+            ["todo.set_event.pick"] = "Choose an event",
+
+            // ── M14 (ADR 0115 D4) — the two U06 VTODO affordances (the to-do
+            //    detail's "Add to calendar" link + the to-do index's feed
+            //    link, the ADR 0112 events.ics.* shape carried to the to-do
+            //    surface; plain <a> links, no new JS — the closed-key
+            //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["projects.todos.ics.download"] = "Add to calendar",
+            ["projects.todos.ics.feed"] = "Calendar feed (iCal)",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -1669,6 +1707,45 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback).",
             ["portability.status.ok"]    = "Done.",
             ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
+
+            // M15 U04 (ADR 0116, D8) — the file-facing bulk keys.
+            ["translations.bulk.export"]     = "Download translations (CSV)",
+            ["translations.bulk.import"]     = "Upload translations (CSV)",
+            ["translations.bulk.import_hint"] = "Blank cells are skipped (they never erase a translation); a file with an unknown key or language is refused unchanged.",
+
+            // M15 U05 (ADR 0116, D8) — the editor-facing bulk keys (the batch
+            // form's save button + the two mode-toggle labels).
+            ["translations.bulk.save_all"]   = "Save all",
+            ["translations.bulk.mode_batch"] = "Batch editing",
+            ["translations.bulk.mode_single"] = "Edit one at a time",
+
+            // M16 (ADR 0117, D1) — the inventory surface (check-out / check-in
+            // + the usage-history section + the nav entry). The closed
+            // key set is the design doc §kw-l (the list / detail / create
+            // labels U04 consumes; the edit / delete / check-out / check-in
+            // action labels U05 consumes; the nav entry U05 consumes).
+            ["inv.nav"]                     = "Inventory",
+            ["inv.list.title"]              = "Inventory",
+            ["inv.list.empty"]              = "No items yet.",
+            ["inv.list.ownerKind.shared"]   = "Shared",
+            ["inv.list.ownerKind.community"] = "Community",
+            ["inv.list.ownerKind.private"]  = "Private",
+            ["inv.list.filter"]             = "Filter by type",
+            ["inv.create.title"]            = "New item",
+            ["inv.create.name"]             = "Name",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Description",
+            ["inv.create.component"]        = "Section",
+            ["inv.create.submit"]           = "Create item",
+            ["inv.detail.title"]            = "Item",
+            ["inv.detail.currentHolder"]    = "Currently with",
+            ["inv.detail.history"]          = "Usage history",
+            ["inv.detail.edit"]             = "Edit",
+            ["inv.detail.delete"]           = "Delete",
+            ["inv.detail.checkOut"]         = "Check out",
+            ["inv.detail.checkIn"]          = "Check in",
+            ["inv.edit.title"]              = "Edit item",
+            ["inv.edit.submit"]             = "Save changes",
         };
 
     /// <summary>
@@ -2620,6 +2697,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Über",
             ["admin.audit_th_outcome"] = "Ergebnis",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Verwendungsanalytik",
+            ["admin.analytics_lede"] =
+                "Eine lokale Zusammenfassung der Plattfornutzung — Anfragen, " +
+                "angemeldet / anonym, eindeutige Konten und Oberflächen-Ranking " +
+                "über ein festes Zeitfenster. Keine Kontodetails; die rohen " +
+                "Zeilen sind das psql-Surface des Betreibers.",
+            ["admin.analytics_window"] = "Fenster",
+            ["admin.analytics_total"] = "Gesamtanfragen",
+            ["admin.analytics_authenticated"] = "Angemeldet",
+            ["admin.analytics_anonymous"] = "Anonym",
+            ["admin.analytics_distinct"] = "Eindeutige Konten",
+            ["admin.analytics_surface"] = "Oberfläche",
+            ["admin.analytics_count"] = "Anzahl",
+            ["admin.analytics_export"] = "CSV exportieren",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Gewährt am (UTC)",
@@ -2933,6 +3026,23 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Zum Kalender hinzufügen",
             ["events.ics.feed"] = "Kalender-Feed (iCal)",
 
+            // ── M14 (ADR 0115 D2) — die beiden U03-Verknüpfungsetiketten Events ↔ To-dos ──
+            ["todo.event_link"] = "Verknüpfte Veranstaltung",
+            ["events.linked_todos"] = "Verknüpfte To-dos",
+
+            // ── M14 (ADR 0115 D3) — die U04 set-event-Picker-Beschriftungen
+            //    (To-do-Details: Formularbeschriftung + Platzhalter/Clear-Option) ──
+            ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
+            ["todo.set_event.pick"] = "Veranstaltung wählen",
+
+            // ── M14 (ADR 0115 D4) — die zwei U06 VTODO-Oberflächen
+            //    (To-do-Details: „Zum Kalender hinzufügen" + To-do-Index:
+            //    Feed-Link; die ADR-0112 events.ics.-Form auf der To-do-Seite,
+            //    schlichte <a>-Links, kein neues JS — das geschlossene
+            //    Schlüssel-Register + KnownTranslationKeys_ParityTests erzwingen × 4) ──
+            ["projects.todos.ics.download"] = "Zum Kalender hinzufügen",
+            ["projects.todos.ics.feed"] = "Kalender-Feed (iCal)",
+
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Zurück",
@@ -3188,6 +3298,43 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Dieses Archiv importieren? Es ersetzt den Inhalt der Instanz (der Wiederherstellungspfad — das Vorkopie-Backup des Operators ist der Rollback).",
             ["portability.status.ok"]    = "Fertig.",
             ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
+
+            // M15 U04 (ADR 0116, D8) — die datei-basierten Bulk-Keys.
+            ["translations.bulk.export"]     = "Übersetzungen herunterladen (CSV)",
+            ["translations.bulk.import"]     = "Übersetzungen hochladen (CSV)",
+            ["translations.bulk.import_hint"] = "Leere Felder werden übersprungen (sie löschen niemals eine Übersetzung); eine Datei mit einem unbekannten Schlüssel oder einer unbekannten Sprache wird unverändert abgelehnt.",
+
+            // M15 U05 (ADR 0116, D8) — die editor-basierten Bulk-Keys
+            // (Speichern-alles-Knopf + die beiden Modus-Umschalter).
+            ["translations.bulk.save_all"]   = "Alle speichern",
+            ["translations.bulk.mode_batch"] = "Stapelbearbeitung",
+            ["translations.bulk.mode_single"] = "Einzelne Bearbeitung",
+
+            // M16 (ADR 0117, D1) — die Inventar-Oberfläche (Ausleihe / Rückgabe
+            // + die Verlaufs-Sektion + der Nav-Eintrag). Die geschlossene
+            // Schlüsselmenge ist der Design-Doc-§kw-l.
+            ["inv.nav"]                     = "Inventar",
+            ["inv.list.title"]              = "Inventar",
+            ["inv.list.empty"]              = "Noch keine Gegenstände.",
+            ["inv.list.ownerKind.shared"]   = "Gemeinsam",
+            ["inv.list.ownerKind.community"] = "Gemeinde",
+            ["inv.list.ownerKind.private"]  = "Privat",
+            ["inv.list.filter"]             = "Nach Typ filtern",
+            ["inv.create.title"]            = "Neuer Gegenstand",
+            ["inv.create.name"]             = "Name",
+            ["inv.create.ownerKind"]        = "Typ",
+            ["inv.create.description"]      = "Beschreibung",
+            ["inv.create.component"]        = "Bereich",
+            ["inv.create.submit"]           = "Gegenstand anlegen",
+            ["inv.detail.title"]            = "Gegenstand",
+            ["inv.detail.currentHolder"]    = "Derzeit bei",
+            ["inv.detail.history"]          = "Verwendungshistorie",
+            ["inv.detail.edit"]             = "Bearbeiten",
+            ["inv.detail.delete"]           = "Löschen",
+            ["inv.detail.checkOut"]         = "Ausleihen",
+            ["inv.detail.checkIn"]          = "Zurückgeben",
+            ["inv.edit.title"]              = "Gegenstand bearbeiten",
+            ["inv.edit.submit"]             = "Änderungen speichern",
         };
 
     /// <summary>
@@ -4139,6 +4286,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Résultat",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Analyse d'usage",
+            ["admin.analytics_lede"] =
+                "Un résumé local de l'usage de la plateforme — nombre de requêtes, " +
+                "connecté / anonyme, comptes distincts et classement par surface, " +
+                "sur une fenêtre fixe. Aucun détail par compte ; les lignes " +
+                "brutes sont la surface psql de l'opérateur.",
+            ["admin.analytics_window"] = "Fenêtre",
+            ["admin.analytics_total"] = "Requêtes totales",
+            ["admin.analytics_authenticated"] = "Connectés",
+            ["admin.analytics_anonymous"] = "Anonymes",
+            ["admin.analytics_distinct"] = "Comptes distincts",
+            ["admin.analytics_surface"] = "Surface",
+            ["admin.analytics_count"] = "Nombre",
+            ["admin.analytics_export"] = "Exporter CSV",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Accordé à (UTC)",
@@ -4454,6 +4617,24 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Ajouter à l'agenda",
             ["events.ics.feed"] = "Flux de calendrier (iCal)",
 
+            // ── M14 (ADR 0115 D2) — les deux libellés de lien U03 événements ↔ to-dos ──
+            ["todo.event_link"] = "Événement lié",
+            ["events.linked_todos"] = "To-dos liés",
+
+            // ── M14 (ADR 0115 D3) — les deux libellés du sélecteur U04 set-event
+            //    (détail de la to-do : libellé du formulaire + option
+            //    placeholder / effacement) ──
+            ["todo.set_event.label"] = "Lier à un événement",
+            ["todo.set_event.pick"] = "Choisir un événement",
+
+            // ── M14 (ADR 0115 D4) — les deux surfaces VTODO U06 (détail de la
+            //    to-do : lien « Ajouter à l'agenda » + index des to-dos : lien
+            //    de flux ; la forme events.ics. d'ADR 0112 portée à la surface
+            //    to-do ; liens <a> simples, pas de nouveau JS — le registre
+            //    de clés fermé + KnownTranslationKeys_ParityTests appliquent × 4) ──
+            ["projects.todos.ics.download"] = "Ajouter à l'agenda",
+            ["projects.todos.ics.feed"] = "Flux de calendrier (iCal)",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -4708,7 +4889,44 @@ public static class KnownTranslationKeys
             ["portability.import"]       = "Importer",
             ["portability.confirm.import"] = "Importer cette archive ? Elle remplace le contenu de l'instance (le chemin de restauration — la sauvegarde pré-import de l'opérateur est le retour arrière).",
             ["portability.status.ok"]    = "Terminé.",
+
+            // M15 U05 (ADR 0116, D8) — les clés de lot côté éditeur
+            // (bouton « tout enregistrer » + les deux bascules de mode).
+            ["translations.bulk.save_all"]   = "Tout enregistrer",
+            ["translations.bulk.mode_batch"] = "Édition par lot",
+            ["translations.bulk.mode_single"] = "Édition une par une",
             ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
+
+            // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
+            ["translations.bulk.export"]     = "Télécharger les traductions (CSV)",
+            ["translations.bulk.import"]     = "Téléverser les traductions (CSV)",
+            ["translations.bulk.import_hint"] = "Les cellules vides sont ignorées (elles n'effacent jamais une traduction) ; un fichier contenant une clé inconnue ou une langue inconnue est refusé sans modification.",
+
+            // M16 (ADR 0117, D1) — la surface inventaire (prêt / retour + la
+            // section historique + l'entrée de navigation). L'ensemble fermé
+            // des clés est le §kw-l du document de conception.
+            ["inv.nav"]                     = "Inventaire",
+            ["inv.list.title"]              = "Inventaire",
+            ["inv.list.empty"]              = "Aucun article pour l'instant.",
+            ["inv.list.ownerKind.shared"]   = "Partagé",
+            ["inv.list.ownerKind.community"] = "Communauté",
+            ["inv.list.ownerKind.private"]  = "Privé",
+            ["inv.list.filter"]             = "Filtrer par type",
+            ["inv.create.title"]            = "Nouvel article",
+            ["inv.create.name"]             = "Nom",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Description",
+            ["inv.create.component"]        = "Section",
+            ["inv.create.submit"]           = "Créer l'article",
+            ["inv.detail.title"]            = "Article",
+            ["inv.detail.currentHolder"]    = "Actuellement chez",
+            ["inv.detail.history"]          = "Historique d'utilisation",
+            ["inv.detail.edit"]             = "Modifier",
+            ["inv.detail.delete"]           = "Supprimer",
+            ["inv.detail.checkOut"]         = "Emprunter",
+            ["inv.detail.checkIn"]          = "Restituer",
+            ["inv.edit.title"]              = "Modifier l'article",
+            ["inv.edit.submit"]             = "Enregistrer les modifications",
         };
 
     /// <summary>
@@ -5656,6 +5874,22 @@ public static class KnownTranslationKeys
             ["admin.audit_th_via"] = "Via",
             ["admin.audit_th_outcome"] = "Resultat",
 
+            // ── admin (Analytics page — M13, ADR 0114 D4) ─────────────────
+            ["admin.analytics_title"] = "Brugsanalyse",
+            ["admin.analytics_lede"] =
+                "Et lokalt overblik over platformens brug — anmodninger, " +
+                "tilmeldt / anonym, distinkte konti og overfladeranking over " +
+                "et fast vindue. Ingen konto-detaljer; de rå rækker er " +
+                "operatørets psql-overflade.",
+            ["admin.analytics_window"] = "Vindue",
+            ["admin.analytics_total"] = "Samtlige anmodninger",
+            ["admin.analytics_authenticated"] = "Tilmeldte",
+            ["admin.analytics_anonymous"] = "Anonyme",
+            ["admin.analytics_distinct"] = "Distinkte konti",
+            ["admin.analytics_surface"] = "Overflade",
+            ["admin.analytics_count"] = "Antal",
+            ["admin.analytics_export"] = "Eksportér CSV",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Givet (UTC)",
@@ -5967,6 +6201,23 @@ public static class KnownTranslationKeys
             ["events.ics.download"] = "Tilføj til kalender",
             ["events.ics.feed"] = "Kalenderfeed (iCal)",
 
+            // ── M14 (ADR 0115 D2) — de to U03-lænkemærkater arrangementer ↔ to-dos ──
+            ["todo.event_link"] = "Knyttet arrangement",
+            ["events.linked_todos"] = "Knyttede to-dos",
+
+            // ── M14 (ADR 0115 D3) — de to U04 set-event-vælgermærkater
+            //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──
+            ["todo.set_event.label"] = "Knyt til arrangement",
+            ["todo.set_event.pick"] = "Vælg et arrangement",
+
+            // ── M14 (ADR 0115 D4) — de to U06 VTODO-overflader (to-do-detail:
+            //    "Tilføj til kalender"-link + to-do-index: feed-link; ADR 0112's
+            //    events.ics.-form på to-do-overfladen; simple <a>-links, intet
+            //    nyt JS — det lukkede nøgle-register +
+            //    KnownTranslationKeys_ParityTests håndhæver × 4) ──
+            ["projects.todos.ics.download"] = "Tilføj til kalender",
+            ["projects.todos.ics.feed"] = "Kalenderfeed (iCal)",
+
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
             ["events.calendar.prev"] = "Forrige",
@@ -6221,7 +6472,44 @@ public static class KnownTranslationKeys
             ["portability.import"]       = "Importér",
             ["portability.confirm.import"] = "Importér denne arkiv? Den erstanser indholdet i instansen (gendannelsesstien — operatørens backup før import er tilbageskrivningen).",
             ["portability.status.ok"]    = "Færdig.",
+
+            // M15 U05 (ADR 0116, D8) — de editorbaserede bulk-nøgler
+            // (Gem-alle-knappen + de to tilstandsvippere).
+            ["translations.bulk.save_all"]   = "Gem alle",
+            ["translations.bulk.mode_batch"] = "Batchredigering",
+            ["translations.bulk.mode_single"] = "Redigér én ad gangen",
             ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
+
+            // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.
+            ["translations.bulk.export"]     = "Download translationer (CSV)",
+            ["translations.bulk.import"]     = "Upload translationer (CSV)",
+            ["translations.bulk.import_hint"] = "Tomme felter springes over (de sletter aldrig en oversættelse); en fil med en ukendt nøgle eller et ukendt sprog afvises uændret.",
+
+            // M16 (ADR 0117, D1) — lageroverfladen (udlån / returnering +
+            // historik-sektionen + nav-indekset). Det lukkedes nøglesæt er
+            // design-dokumentets §kw-l.
+            ["inv.nav"]                     = "Lager",
+            ["inv.list.title"]              = "Lager",
+            ["inv.list.empty"]              = "Ingen emner endnu.",
+            ["inv.list.ownerKind.shared"]   = "Fælles",
+            ["inv.list.ownerKind.community"] = "Fællesskab",
+            ["inv.list.ownerKind.private"]  = "Privat",
+            ["inv.list.filter"]             = "Filtrer efter type",
+            ["inv.create.title"]            = "Nyt emne",
+            ["inv.create.name"]             = "Navn",
+            ["inv.create.ownerKind"]        = "Type",
+            ["inv.create.description"]      = "Beskrivelse",
+            ["inv.create.component"]        = "Sektion",
+            ["inv.create.submit"]           = "Opret emne",
+            ["inv.detail.title"]            = "Emne",
+            ["inv.detail.currentHolder"]    = "Hos lige nu",
+            ["inv.detail.history"]          = "Brughistorik",
+            ["inv.detail.edit"]             = "Redigér",
+            ["inv.detail.delete"]           = "Slet",
+            ["inv.detail.checkOut"]         = "Udlån",
+            ["inv.detail.checkIn"]          = "Returnér",
+            ["inv.edit.title"]              = "Redigér emne",
+            ["inv.edit.submit"]             = "Gem ændringer",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

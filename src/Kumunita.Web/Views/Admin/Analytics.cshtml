@@ -1,0 +1,75 @@
+@model Kumunita.Web.Models.AnalyticsViewModel
+@{
+    ViewData["Title"] = "Admin — Analytics";
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): the "Analytics"
+   tab is the strip's sixth entry (the ADR 0114 D4 surface). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+<h1><kw-l key="admin.analytics_title">Usage analytics</kw-l></h1>
+<p class="text-muted">
+    <kw-l key="admin.analytics_lede">A local summary of how the platform is used — a request count, the signed-in / anonymous split, the number of distinct accounts, and the per-surface ranking, over a fixed window. No per-account detail is shown; the raw rows are the operator's psql surface.</kw-l>
+</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <label class="visually-hidden" for="window"><kw-l key="admin.analytics_window">Window</kw-l></label>
+        <select id="window" name="window" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="7"  selected="@(Model.WindowDays == 7  ? "selected" : null)">7</option>
+            <option value="30" selected="@(Model.WindowDays == 30 ? "selected" : null)">30</option>
+            <option value="90" selected="@(Model.WindowDays == 90 ? "selected" : null)">90</option>
+        </select>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th><kw-l key="admin.analytics_window">Window</kw-l></th>
+                <th class="text-end"><kw-l key="admin.analytics_total">Total requests</kw-l></th>
+                <th class="text-end"><kw-l key="admin.analytics_authenticated">Signed-in</kw-l></th>
+                <th class="text-end"><kw-l key="admin.analytics_anonymous">Anonymous</kw-l></th>
+                <th class="text-end"><kw-l key="admin.analytics_distinct">Distinct accounts</kw-l></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>@Model.WindowDays d</td>
+                <td class="text-end">@Model.Total</td>
+                <td class="text-end">@Model.AuthenticatedTotal</td>
+                <td class="text-end">@Model.AnonymousTotal</td>
+                <td class="text-end">@Model.DistinctActors</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<h2 class="mt-4"><kw-l key="admin.analytics_surface">Surface</kw-l></h2>
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th><kw-l key="admin.analytics_surface">Surface</kw-l></th>
+                <th class="text-end"><kw-l key="admin.analytics_count">Count</kw-l></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.SurfaceRanking)
+            {
+                <tr>
+                    <td>@r.Surface</td>
+                    <td class="text-end">@r.Total</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="mt-3">
+    <a class="btn btn-outline-primary btn-sm"
+       href="/admin/analytics/export?window=@Model.WindowDays">
+        <kw-l key="admin.analytics_export">Export CSV</kw-l>
+    </a>
+</p>

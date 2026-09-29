@@ -1,0 +1,1011 @@
+# M13 — Logging and usage analytics — handoff notes
+
+> **The unit series' shared note file.** Each unit (U00–U07) appends its
+> section here as it completes, recording: the exact shapes it shipped
+> (or copied from the design doc verbatim), the pin names it implemented,
+> the `Program.cs` line numbers it touched (if any), the drift it found
+> (if any), and the gap it leaves for the next unit. The design doc
+> (`docs/design/m13-logging-analytics-design.md`) is the authority; this
+> file is the **delta log** — what each unit actually did, against that
+> authority.
+
+---
+
+## U00 — Lock the design (2026-09-28)
+
+**Role.** Sign-off gate for the whole M13 milestone. Authored the design
+doc + ADR 0114 + the one ADR README index row + this handoff-notes
+seed. Touched **only** the Deliverable files (no code, no tests, no
+`Program.cs`).
+
+**Deliverables landed (U00's scope):**
+
+- `docs/design/m13-logging-analytics-design.md` — **authored**, all 27
+  sections present (§capture, §surface-key, §middleware, §aggregation,
+  §admin-surface, §kw-l, §retention, §sink, §pinned tests, §gate,
+  invariants, FACES, §deferred lanes, §drift-guard, plus the design-doc
+  template sections: Context / Goals-Non-goals / Human cost / Parts
+  affected / Seams & contracts / Feedback loops / Emergent impact /
+  Local-optimization check / FACES check / Rollout & rollback / Risks /
+  Integration step served / World seams).
+- `docs/adr/0114-logging-and-usage-analytics.md` — **authored** (Status:
+  Accepted, Date: 2026-09-28, Context / Decision D1–D8 / Consequences /
+  Alternatives-considered-and-rejected).
+- `docs/adr/README.md` — **one index row** added after the 0113 row
+  (line 119): the 0114 row, `Accepted` status.
+- This file — **seeded** with the U00 section.
+
+**Decisions locked (no vetoes; D1–D8 locked as proposed):**
+
+- **D1 · Capture shape.** `UsageEvent { Id, At, ActorId, RouteTemplate }`
+  + the pure `UsageCapturePolicy.Decide(UsageCaptureInput) →
+  UsageCaptureDecision` in `Kumunita.Core.Usage` + one Web middleware
+  (`UsageCaptureMiddleware`). **No** status code, no email, no body, no
+  UA, no IP. Skip when no endpoint (true 404) or static file. The
+  `ActorId` is the `Kumunita.Core.Identity.ClaimTypes.Subject` claim
+  value, empty when anonymous. The `UsageCaptureInput` /
+  `UsageCaptureDecision` POCO shapes are locked verbatim in §capture.
+- **D2 · Surface-key normalization.** The pure `SurfaceKey.Map(string
+  routeTemplate) → string` in Core — the top-level segment → surface-key
+  map (a **closed list** of 26 top-level segments + the `"other"`
+  fallback), locked verbatim in §surface-key. U02's `SurfaceKey` class
+  + U04's `UsageAnalyticsService` `GroupBy` call copy this map exactly.
+- **D3 · Aggregation seam.** `IUsageAnalyticsService` in Core:
+  `GetWindowAsync(int windowDays)` → `UsageAnalyticsResult { WindowDays,
+  Total, AuthenticatedTotal, AnonymousTotal, DistinctActors,
+  SurfaceRanking }` + `GetCsvRowsAsync(int windowDays)` →
+  `IReadOnlyList<UsageCsvRow>`. `windowDays` pin: 7/30/90; unknown →
+  `ArgumentOutOfRangeException`. `SurfaceRanking` sorted by `Total`
+  descending, ties `Surface` ascending. **`NewSignups` is dropped** —
+  `User : IdentityUser` has no created-at column (only `ExternalId`);
+  named deferral, own ADR. The POCO shapes are locked verbatim in
+  §aggregation.
+- **D4 · The admin surface.** `AdminAnalyticsController`
+  (`[Authorize(Roles = Roles.GlobalAdmin)]`) + `Views/Admin/Analytics.cshtml`
+  + `_AdminNav.cshtml` "Analytics" tab. Ctor: `(IDocumentStore store,
+  IUsageAnalyticsService analytics)`. `GET /admin/analytics?window=30`
+  (default) → `AnalyticsViewModel`. `GET /admin/analytics/export?window=30`
+  → CSV (`text/csv; charset=utf-8` + `Content-Disposition: attachment;
+  filename="kumunita-usage-{window}d.csv"` + `Cache-Control: no-store`) +
+  **one `AccessAudit` row** (`TargetKind == "analytics"`, `Action ==
+  "analytics.export"`, `ActorId` = the `ClaimTypes.Subject` value, `Via =
+  AccessVia.Admin`, `Outcome = AccessOutcome.Allow`). The
+  `AnalyticsViewModel` six fields + the ten `admin.analytics_*` `kw-l`
+  keys × en/de/fr/da are locked verbatim in §admin-surface + §kw-l.
+- **D5 · Retention tick.** `UsagePurgeService` (Core, static,
+  `PurgeAsync(store, now, ct)` — the `AuditPurgeService` shape) +
+  `UsagePurgeHandler` (Web, `AuditPurgeHandler` shape verbatim) +
+  `UsagePurgeTick` (one `TimeoutMessage(TimeSpan.FromDays(1))` record).
+  Retention constant: **365 days** (`UsagePurgeService.RetentionDays =
+  365`), a **platform constant**, not a config knob. Locked verbatim in
+  §retention.
+- **D6 · File log sink.** **BCL-only** `FileLoggerProvider` / `FileLogger`
+  / `LogLine` (JSON-lines writer) / `RollingFileSink` (`BuildFileName` +
+  `Retain`) + `AddFileSink(LoggingBuilder, dir, retentionDays)` extension
+  in `Kumunita.Core.Logging`. `FileSinkOptions` POCO (the
+  `CommunityOptions` bind shape). The `LogLine.Write` escaping rules are
+  locked verbatim in §sink: `\` → `\\`, `"` → `\"`, newline → `\n`, tab
+  → `\t`; the `timestamp` field in ISO-8601 `"o"` format; the `level`
+  field as the `LogLevel` enum name in **lowercase**; the `category`
+  field verbatim (escaped); the `message` field escaped; the `exception`
+  field as `exception?.ToString()` escaped, **omitted when null**.
+- **D7 · 19 pinned tests.** The exact 19 test names are locked verbatim
+  in §pinned tests. U01–U05 implement them verbatim (3 sink + 4 policy +
+  2 surface-key + 3 middleware + 4 aggregation + 3 admin-surface).
+- **D8 · The U07 docs flip.** M13 → `StatusDone`, M14 → `StatusNext`, in
+  one unit (U07), `MilestonesTests` re-pinned to M14 (the C-M11·8
+  precedent verbatim — the exact-order pin M0…M14 unchanged).
+
+**Invariants locked (C-M13·1–7):**
+
+- **C-M13·1 · The feedback is local.** M13 transmits **no** usage signal
+  to any third party (SECURITY.md §5: "No third-party analytics, no
+  telemetry"). Pinned by the D6 sink-shape pin + the D4 surface pin.
+- **C-M13·2 · The row is minimal.** A `UsageEvent` row carries
+  **exactly** `Id` / `At` / `ActorId` / `RouteTemplate` — no email, no
+  profile field, no request body, no user-agent, no IP, no status code.
+  Pinned by the `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip`
+  reflection pin.
+- **C-M13·3 · The surface renders no per-account data.**
+  `/admin/analytics` renders **aggregates over the window** — never a
+  row per `ActorId`, never an email, never a "resident X did Y" view.
+  Pinned by the D4 surface pin + the (b) handoff acceptance test.
+- **C-M13·4 · The template is the unit.** A recorded row's
+  `RouteTemplate` is a **route template** (`GET /posts/{id}`), never a
+  concrete path; a request with **no** recognized endpoint (a true 404,
+  a static file, a malformed path) is **not recorded**. Pinned by the
+  `Policy_Skips_No_Endpoint` / `Policy_Skips_StaticFile_Endpoint` /
+  `Policy_Records_Template_Not_Concrete_Path` pins.
+- **C-M13·5 · A capture never fails the request.** The middleware's
+  `IDocumentStore.LightweightSession()` write is in a `try/catch` that
+  **logs the exception and re-throws nothing**. Pinned by the
+  `UsageCaptureMiddleware_Skips_When_Store_Throws` Web pin.
+- **C-M13·6 · Zero new authorization surface.** M13 adds **no**
+  `AccessAction` / `AccessVia` / `Decide()` branch /
+  `IAuditableResource`. The `IAuthorizationService` frozen surface is
+  unchanged.
+- **C-M13·7 · Docs parity holds at the flip.** M13 → `StatusDone`, M14 →
+  `StatusNext`, in one unit (U07), `MilestonesTests` re-pinned to M14.
+
+**FACES locked (F1–F5):**
+
+- **F1 · The operator sees the week.** A GlobalAdmin opens
+  `/admin/analytics?window=7` and sees the `Total` request count, the
+  authenticated/anonymous split, the `DistinctActors` count, and the
+  per-surface ranking for the last 7 days.
+- **F2 · The operator exports the 90 days.** A GlobalAdmin opens
+  `/admin/analytics/export?window=90` and downloads a
+  `kumunita-usage-90d.csv`; the `AccessAudit` table gains one
+  `analytics.export` row.
+- **F3 · The stranger sees nothing.** A resident without `GlobalAdmin`
+  gets the sign-in challenge on `/admin/analytics`.
+- **F4 · The capture is honest.** A `GET /posts/{id}` by a signed-in
+  resident stores exactly one `UsageEvent` row; a `GET /no/such/route`
+  stores **zero** rows.
+- **F5 · The sink is boring.** The host's logs land in `app-YYYYMMDD.log`
+  under the configured directory; a file older than the `RetentionDays`
+  value is deleted at the next boot; the `docker logs` console sink is
+  unchanged.
+
+**ADR number confirmed free.** The `docs/adr/` folder contains `0001`
+through `0113` (113 ADR files + `README.md`), and `docs/adr/README.md`'s
+index ends at the `0113` row (line 119). `0114` is the next free number —
+verified at U00 against the live tree.
+
+**Drift found (source-driven confirmations; no register-vs-source
+contradiction was found, so the register's D-item text is the locked
+text):**
+
+1. **The ADR number 0114 is confirmed free** (see above).
+2. **The `Program.cs` middleware position is confirmed against the live
+   tree.** `Program.cs` line 516 `app.UseRouting()`, line 525
+   `app.UseAuthentication()`, line 534
+   `app.UseMiddleware<PrivilegedStampMiddleware>()`, line 536
+   `app.UseAuthorization()` — the D1 / §middleware "after
+   `PrivilegedStampMiddleware`, before `UseAuthorization()`" position is
+   the gap between lines 534 and 536 (U03's pin). The
+   `ClaimTypes.Subject` claim shape is confirmed against
+   `AdminController.AdminSubjectId` (line 107 —
+   `user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value`).
+   The `AccessAudit` POCO shape is confirmed against
+   `src/Kumunita.Core/Authorization/AccessAudit.cs` (the `TargetKind` /
+   `Action` / `ActorId` / `Via` / `Outcome` fields the D4 export row
+   writes).
+
+**Gap left for U01.** The design doc's §sink code sketches are the
+authority; U01 implements the `Kumunita.Core.Logging` surface
+(`FileSinkOptions` / `LogLine` / `RollingFileSink` / `FileLoggerProvider`
+/ `FileLogger` / `AddFileSink`) + the `Program.cs` wiring (the
+`AddFileSink` call next to the `AddLogging()` line, the
+`Logging__File__Directory` / `Logging__File__RetentionDays` config read,
+the `appsettings.json` `Logging:File` section) + the 3 D6 sink pins.
+
+---
+
+## U01 — RollingFileSink + AddFileSink (2026-09-28)
+
+**Role.** D6 rendered as code — the `Kumunita.Core.Logging` surface
+(BCL-only, zero new NuGet dependency), the `Program.cs` wiring, the
+`appsettings.json` `Logging:File` section, and the 3 D6 sink pins.
+Touched only the U01 deliverables (the `Logging/` folder, `Program.cs`,
+`appsettings.json`, `LoggingTests.cs`). Did **not** touch the `Usage`
+context, the middleware, the admin surface, or the retention tick
+(U02–U05).
+
+**Deliverables landed (U01's scope, 8):**
+
+- `src/Kumunita.Core/Logging/FileSinkOptions.cs`
+- `src/Kumunita.Core/Logging/LogLine.cs`
+- `src/Kumunita.Core/Logging/RollingFileSink.cs`
+- `src/Kumunita.Core/Logging/FileLoggerProvider.cs`
+- `src/Kumunita.Core/Logging/FileLogger.cs`
+- `src/Kumunita.Core/Logging/AddFileSink.cs`
+- `tests/Kumunita.Core.Tests/LoggingTests.cs` (the 3 D6 sink pins)
+- `src/Kumunita.Web/Program.cs` (one `AddFileSink` call) +
+  `src/Kumunita.Web/appsettings.json` (one `Logging:File` section)
+
+**(a) The `FileSinkOptions` fields as written:**
+
+- `SectionName` — `const string = "Logging__File"`
+- `Directory` — `string`, default `"logs"`
+- `RetentionDays` — `int`, default `14`
+
+(the `CommunityOptions` / `MediaOptions` bind shape — a `SectionName`
+constant + two POCO properties, bound in `Program.cs` by the
+`GetSection(FileSinkOptions.SectionName).Get<FileSinkOptions>()` read.)
+
+**(b) The three D6 pin test names + pass/red:**
+
+- `RollingFileSink_LogLine_Is_ValidJsonLines` — **pass**
+- `RollingFileSink_FileNaming_Is_Daily` — **pass**
+- `RollingFileSink_Retention_Deletes_Older_Files` — **pass**
+
+Run via `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.LoggingTests"` →
+`Total: 3, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`. (The repo's
+`dotnet test` discovery path is broken — see AGENTS.md; the in-process
+xunit.v3 runner is the reliable path.)
+
+**(c) The `Program.cs` wiring:** line **53** (the
+`builder.Logging.AddFileSink(...)` call; the config read is line **52**,
+the `var fileSinkOptions = ...Get<FileSinkOptions>()` read, both between
+`builder.Services.AddLogging()` at line 41 and the
+`AddSingleton<ILogger>` bootstrap bridge at line 56). The sink is
+**additive** — the console sink above stays; the file sink is a second
+`ILoggerProvider` on the same `ILoggerFactory`.
+
+**(d) The `appsettings.json` `Logging:File` section as written:**
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "Microsoft.AspNetCore": "Warning"
+  },
+  "File": {
+    "Directory": "logs",
+    "RetentionDays": 14
+  }
+},
+```
+
+**(e) Compile warnings:** **0** warnings, 0 errors on
+`dotnet build Kumunita.slnx -c Debug`.
+
+**Drift found (the design sketch's `LoggingBuilder` was an older-version
+API; U01 reconciled to the .NET 10 public surface — the D6 intent is
+unchanged, only the concrete type names moved):**
+
+1. **`LoggingBuilder` is `internal` in .NET 10** — the public surface is
+   `ILoggingBuilder`. The design doc's §sink sketch names
+   `LoggingBuilder AddFileSink(this LoggingBuilder b, ...)`; U01's
+   `AddFileSink.cs` uses `ILoggingBuilder` (the `ILoggerProvider` /
+   `AddProvider` / `Retain` shape is byte-for-byte the D6 sketch). This is
+   the "memory is an older major version" trap AGENTS.md flags — the
+   concrete `LoggingBuilder` type became internal across the
+   `Microsoft.Extensions.Logging` line; only the `ILoggingBuilder`
+   interface is public.
+2. **`ILogger.BeginScope` is the 1-arg form in .NET 10** — the design
+   sketch's `BeginScope<TState>(TState state, Func<TState, string> factory)`
+   no longer matches the `ILogger` interface (the 2-arg factory overload
+   was dropped from the public interface). U01's `FileLogger` implements
+   `IDisposable BeginScope<TState>(TState state) where TState : notnull`
+   returning a no-op `NullScope.Instance` (the file sink carries no
+   structured scope state; the `Log` formatter already receives the
+   `TState`). The design sketch's `IDisposable?` return was also
+   tightened to non-nullable to avoid a CS8603 nullability warning —
+   the `NullScope` singleton keeps the contract honest.
+3. **The wiring is `builder.Logging.AddFileSink(...)`, not
+   `builder.Services.Logging.AddFileSink(...)`.** The design doc's §sink
+   sketch names `builder.Services.Logging.AddFileSink(dir, days)`; the
+   `WebApplicationBuilder`'s `Logging` property (an `ILoggingBuilder`) is
+   the canonical, host-blessed surface (no need to reach into
+   `services` for the builder). `builder.Services.Log` /
+   `builder.Services.Logging` do not resolve on this .NET 10 surface
+   (CS1061 — the extension property is not exposed on
+   `IServiceCollection` in this closure), so `builder.Logging` is the
+   correct idiom. Recorded here so U07's docs flip (the ADR / design-doc
+   reference to the `Program.cs` wiring) names the line that actually
+   ships (line 53), not the sketch's.
+4. **The test's `SetLastWriteTimeUtc` takes a `DateTime`, not a
+   `DateTimeOffset`.** The design sketch's retention pin plants files with
+   "distinct mtimes"; the BCL `File.SetLastWriteTimeUtc` signature is
+   `(string, DateTime)`. U01's test converts the `DateTimeOffset`
+   `now`-offsets via `.UtcDateTime` when planting the mtimes — the
+   `Retain` contract (the `File.GetLastWriteTimeUtc(f) < cutoff`
+   comparison over `DateTimeOffset`) is unchanged.
+
+**Gap left for U02.** The `Kumunita.Core.Usage` context
+(`UsageEvent` POCO + the pure `UsageCapturePolicy.Decide`), the
+`SurfaceKey.Map` closed-list normalization, and the D1/D2 pins. The
+`sink` lane is complete — the host's logs land in
+`app-YYYYMMDD.log` under the configured directory, a file older than
+`RetentionDays` is deleted at boot, and the `docker logs` console sink is
+unchanged (F5).
+
+---
+
+## U02 — Usage context (2026-09-29)
+
+**Role.** D1 + D2 rendered as code — the `Kumunita.Core.Usage` bounded
+context (`UsageEvent` POCO + the `UsageDocTypes` registration surface +
+the pure `UsageCapturePolicy.Decide` + the pure `SurfaceKey.Map`
+closed-list mapper), the `Program.cs` `UsageDocTypes.Configure(opts);`
+wiring, and the 6 D1/D2 pins. BCL-only, zero new NuGet dependency.
+Touched only the U02 deliverables (the `Usage/` folder, the two test
+files, `Program.cs`). Did **not** touch the `Kumunita.Core.Logging`
+sink (U01, done), the capture middleware, the `IUsageAnalyticsService`
+aggregation seam, the admin surface, or the retention tick (U03–U05).
+
+**Deliverables landed (U02's scope):**
+
+- `src/Kumunita.Core/Usage/UsageEvent.cs`
+- `src/Kumunita.Core/Usage/UsageDocTypes.cs`
+- `src/Kumunita.Core/Usage/UsageCapturePolicy.cs` (the
+  `UsageCaptureInput` / `UsageCaptureDecision` POCOs + the
+  `UsageCapturePolicy.Decide` static, one file — the design doc
+  §capture shape)
+- `src/Kumunita.Core/Usage/SurfaceKey.cs`
+- `tests/Kumunita.Core.Tests/UsageCapturePolicyTests.cs` (4 pins)
+- `tests/Kumunita.Core.Tests/SurfaceKeyTests.cs` (2 pins)
+- `src/Kumunita.Web/Program.cs` (one `UsageDocTypes.Configure(opts);`
+  line)
+
+**(a) The `UsageEvent` fields as written:**
+
+- `Id` — `string`, `string.Empty` default (the M3 "string Id"
+  convention — the conventional document identity; no non-default
+  convention or business-key index pinned)
+- `At` — `DateTimeOffset` (the capture instant, UTC — the middleware's
+  request instant, set by the U03 capture, not the policy)
+- `ActorId` — `string`, `string.Empty` default (the
+  `ClaimTypes.Subject` value, `string.Empty` when anonymous — C-M13·2)
+- `RouteTemplate` — `string`, `string.Empty` default (the **route
+  template**, e.g. `GET /posts/{id}`, never a concrete path — C-M13·4)
+
+**No** status code, **no** email, **no** request body, **no**
+user-agent, **no** IP (C-M13·2 — the status code would leak the access
+decision, which the `AccessAudit` lane already owns). Pinned by the
+`UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip` reflection pin.
+
+**(b) The `UsageCapturePolicy` surface:**
+
+- `UsageCaptureInput` (pure input POCO, `init`-only):
+  `HasEndpoint` (`bool`), `IsStaticFile` (`bool`), `RouteTemplate`
+  (`string?`), `ActorId` (`string`, `string.Empty` default) — the small
+  projection the U03 middleware builds from the `HttpContext` (so the
+  policy is testable without an `HttpContext`, D1).
+- `UsageCaptureDecision` (pure output POCO, `init`-only):
+  `Record` (`bool`), `RouteTemplate` (`string`, `string.Empty`
+  default), `ActorId` (`string`, `string.Empty` default).
+- `UsageCapturePolicy.Decide(UsageCaptureInput) → UsageCaptureDecision`
+  — pure static, `ArgumentNullException.ThrowIfNull(input)`. The two
+  skip rules (C-M13·4): `!HasEndpoint` ⇒ `Record = false` (a true 404,
+  a malformed path); `IsStaticFile` ⇒ `Record = false` (a static file is
+  noise, not a usage surface). Otherwise `Record = true` with
+  `RouteTemplate = input.RouteTemplate ?? string.Empty` + `ActorId =
+  input.ActorId` (the `ActorId`-empty-for-anonymous rule, C-M13·2).
+  Mirrors the `EventReminderService` "Wolverine-free static class" house
+  shape (the Web middleware is the thin host adapter).
+
+**(c) The `SurfaceKey` closed list:** **26** top-level segments (each
+mapping to itself — `posts` / `events` / `groups` / `admin` /
+`messages` / `todos` / `boards` / `projects` / `search` / `about` /
+`terms` / `help` / `privacy` / `conduct` / `language` / `settings` /
+`account` / `my` / `pages` / `community` / `attachments` /
+`content-image` / `notifications` / `calendar` / `whats-new` /
+`health`) + the **`"other"`** fallback (one bucket, never a crash — an
+unknown segment, a bare `/`, or a `null` input). `SurfaceKey.Map(string?
+routeTemplate) → string` — pure static BCL-only string-map, strips the
+`METHOD ` prefix, takes the first non-empty path segment, lower-cases,
+and looks it up. **Byte-for-byte the design doc §surface-key sketch**
+(the private field is named `Pinned` rather than `Map` to avoid a
+CS0102 field/method name collision with the `Map` method — the D2 map
+contents are unchanged). U04's `UsageAnalyticsService` `GroupBy` call
+copies this same map (the D3 §aggregation `SurfaceRanking`
+`.GroupBy(e => SurfaceKey.Map(e.RouteTemplate))` call).
+
+**(d) The wiring line numbers:**
+
+- `src/Kumunita.Web/Program.cs` **line 175** — the
+  `UsageDocTypes.Configure(opts);` call, immediately after the
+  `M9DocTypes.Configure(opts);` call (the last existing `*DocTypes`
+  line, the house per-milestone "comment + one-line `Configure(opts)`"
+  pattern). Inside the `builder.Services.AddMarten(opts => { … })`
+  lambda (the single `*DocTypes.Configure(opts)` registration surface in
+  this repo — the dev-only `ApplyAllDatabaseChangesOnStartup` loop and
+  the `SchemaBootstrap` versioned boot both pick the surface up
+  automatically through the host-registered `StoreOptions`).
+- `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — **no line added**
+  (see the drift note below).
+
+**(e) The 6 pin test names + pass/red:**
+
+- `Policy_Skips_No_Endpoint` — **pass**
+- `Policy_Skips_StaticFile_Endpoint` — **pass**
+- `Policy_Records_Template_Not_Concrete_Path` — **pass**
+- `Policy_Anonymous_Record_Has_Empty_ActorId` — **pass**
+- `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` — **pass**
+- `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip` — **pass**
+
+Run via `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.UsageCapturePolicyTests"`
+→ `Total: 4, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`, and
+`dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+-class "Kumunita.Core.Tests.SurfaceKeyTests"` → `Total: 2, Errors: 0,
+Failed: 0, Skipped: 0, Not Run: 0`. (The repo's `dotnet test` discovery
+path is broken — see AGENTS.md; the in-process xunit.v3 runner is the
+reliable path.)
+
+**(f) Compile warnings:** **0** warnings, 0 errors on
+`dotnet build Kumunita.slnx -c Debug`.
+
+**Drift found (the design sketch named a `SchemaBootstrap.cs` line that
+has no `StoreOptions` surface; the source is the authority):**
+
+1. **The `*DocTypes.Configure(opts)` block lives only in `Program.cs`.**
+   The design doc §capture + the U02 plan both name "one line in
+   `SchemaBootstrap.cs`" for the `UsageDocTypes.Configure(opts);` wiring,
+   and §Context item 7 names "`SchemaBootstrap.cs` — the one-line
+   `UsageDocTypes.Configure(opts);` additions U02 makes." **Verified
+   against the live tree:** `SchemaBootstrap.cs` (and the whole
+   `Bootstrap/` folder) has **no** `AddMarten` / `StoreOptions` /
+   `.Configure(` / `Schema.For` surface — it resolves the already-
+   configured `IDocumentStore` from DI (`sp.GetRequiredService
+   <IDocumentStore>()`, line 36) and calls
+   `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`
+   (line 55). The single `*DocTypes.Configure(opts)` registration
+   surface in this repo is the `builder.Services.AddMarten(opts => { … })`
+   lambda in `Program.cs` (lines 90–176), where every one of the
+   `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` /
+   `TagDocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
+   `M9DocTypes` calls lives. The `SchemaBootstrap` versioned boot picks
+   the new surface up automatically through the host-registered
+   `StoreOptions` (the M4/M5/M6/M9 precedent comments all say exactly
+   this: "the SchemaBootstrap versioned boot both pick the surface up
+   automatically"). So the wiring is in `Program.cs` line 175 — the
+   `SchemaBootstrap.cs` "one line" in the design sketch is the same
+   source-vs-sketch drift U01 flagged (`LoggingBuilder` → `ILoggingBuilder`)
+   — the D1 intent (register `UsageEvent` on a parallel `*DocTypes`
+   surface) is unchanged, only the concrete file the line lands in
+   differs. Recorded here so U07's docs flip (the ADR / design-doc
+   reference to the wiring) names the line that actually ships
+   (`Program.cs:175`), not the sketch's.
+2. **The test project's implicit usings are reduced** — `System.Linq`
+   is **not** in `Kumunita.Core.Tests`'s implicit usings (the `LoggingTests`
+   U01 file explicitly adds `using System.IO;`, and `SideEffectHarnessTests`
+   / `UserInfoServiceTests` explicitly add `using System.Linq;`).
+   U02's `SurfaceKeyTests` adds `using System.Linq;` explicitly (for
+   `.Select` / `.ToHashSet`).
+3. **xunit.v3's `Assert.Equal(expected, actual, stringMessage)` does
+   not resolve to the 3-arg string-message overload** — it binds to the
+   `IEnumerable<char>` overload (the 3rd arg becomes an
+   `IEqualityComparer<char>`), a CS1503. U02's
+   `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` uses a 2-arg
+   `Assert.True(expected == actual, message)` per-iteration instead —
+   the assertion is the same (each of the 26 pinned segments maps to
+   its key, plus the `other` fallback), the message is preserved.
+4. **`PropertyInfo` has no `IsStatic` property** (that's `MethodInfo` /
+   `FieldInfo`) — the design's reflection pin sketch's
+   `.Where(p => !p.IsStatic)` does not compile. `GetProperties
+   (BindingFlags.Public | BindingFlags.Instance)` already excludes
+   statics, so U02's `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip`
+   drops the `.Where` filter and asserts the `HashSet` of the four
+   property names equals `{ Id, At, ActorId, RouteTemplate }` (count 4)
+   + the seven forbidden-name `Assert.DoesNotContain` checks
+   (`Email` / `Body` / `UserAgent` / `Ua` / `Ip` / `Status` /
+   `StatusCode`). The C-M13·2 boundary is pinned the same.
+5. **A test-fixture bug (caught by the first run, not by the design):**
+   U02's first `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set` fixture
+   used `GET /search?q=test` — the `?q=test` query string makes the
+   first segment `search?q=test`, not `search`, so the verbatim
+   `SurfaceKey.Map` (the authority) correctly returned `other`. The
+   fixture was wrong (a real route template from `RoutePattern.RawText`
+   never carries a query string), not the code. U02's fixture now uses
+   `GET /search` (a clean template), and the pin passes against the
+   unmodified verbatim `SurfaceKey.Map`.
+
+**Gap left for U03.** The `Kumunita.Web.Middleware.UsageCaptureMiddleware`
+(the D1 §middleware thin host adapter — the `RequestDelegate`
+middleware that projects the `HttpContext` into the
+`UsageCaptureInput`, calls `UsageCapturePolicy.Decide`, and on a
+`Record` decision writes one `UsageEvent` via
+`IDocumentStore.LightweightSession()` in its own `try/catch` —
+C-M13·5 "a capture never fails the request"), its `Program.cs` pipeline
+position (after `UseAuthentication()` line 546 + after
+`PrivilegedStampMiddleware` line 555 + before `UseAuthorization()`
+line 557 — i.e. **between `Program.cs` lines 555 and 557 in the live
+tree after U01's `AddFileSink` wiring shifted everything — re-verify
+against the live tree before inserting**), and the 3 D1 middleware pins
+(`UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request`,
+`UsageCaptureMiddleware_Skips_True_404`,
+`UsageCaptureMiddleware_Skips_When_Store_Throws`). The `Usage` context
+surface is complete — the `UsageEvent` doc is registered on the
+`UsageDocTypes` parallel surface (the `M3DocTypes` precedent), the
+capture policy is pure and pinned, and the `SurfaceKey` closed list is
+pinned verbatim (the U04 aggregation's `GroupBy` copies this same map).
+
+## U03 — UsageCaptureMiddleware (2026-09-29)
+
+D1's thin host adapter shipped. Touched only U03's deliverables
+(`Middleware/UsageCaptureMiddleware.cs`, one `Program.cs` line + one
+`using`, `UsageCaptureMiddlewareTests.cs`). Did **not** touch U01's file
+sink, U04's aggregation seam, U05's admin surface / retention tick, or the
+U02 `Usage` context (reused `UsageCapturePolicy.Decide` + `UsageEvent`
+verbatim, no duplication). Reused U02's `UsageCapturePolicy.Decide` and
+`UsageEvent` — the skip rules and POCO are not re-implemented.
+
+**(a) Middleware + `InvokeAsync` signature.**
+`src/Kumunita.Web/Middleware/UsageCaptureMiddleware.cs` —
+`public sealed class UsageCaptureMiddleware`, ctor
+`(RequestDelegate next, IDocumentStore store, ILogger<UsageCaptureMiddleware> logger)`,
+and `public async Task InvokeAsync(HttpContext httpContext)`. The
+`HttpContext`→`UsageCaptureInput` projection is a private static
+`ToInput(HttpContext)` (the `HasEndpoint` / `IsStaticFile` /
+`RouteTemplate` / `ActorId` fields), then `UsageCapturePolicy.Decide(input)`.
+On `Record`: one `UsageEvent` via `IDocumentStore.LightweightSession()`
+(`session.Store(...)` + `await session.SaveChangesAsync(httpContext.RequestAborted)`).
+
+**(b) `Program.cs` wiring line.** `app.UseMiddleware<UsageCaptureMiddleware>();`
+at **line 565** (the `using Kumunita.Web.Middleware;` added at line 8).
+Position: **after** `app.UseAuthentication()` (line 547), after
+`app.UseMiddleware<BlockedAccountMiddleware>()` (549), after
+`app.UseMiddleware<PrivilegedStampMiddleware>()` (556), and **before**
+`app.UseAuthorization()` (567) — exactly the design doc §middleware intent
+(so `HttpContext.User` is populated and an authorized request is captured;
+a denied one, which never reaches the endpoint, is not — C-M13·4). U01's
+`AddFileSink` wiring shifted the pipeline from the design doc's 534/536
+lines; re-verified against the live tree before inserting.
+
+**(c) `ClaimTypes.Subject` claim shape.**
+`ActorId = httpContext.User?.Identity?.IsAuthenticated == true ?
+httpContext.User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value ?? string.Empty : string.Empty`
+— the house claim (the `AdminController.AdminSubjectId` shape), **not** the
+literal `"sub"`. `ClaimTypes.Subject == "Kumunita.Sub"`
+(`src/Kumunita.Core/Identity/ThinPrincipal.cs`). Empty for anonymous
+(C-M13·2).
+
+**(d) `try/catch` C-M13·5 pin.** The `LightweightSession` write is wrapped
+in `try { ... } catch (Exception ex) { _logger.LogError(ex,
+"UsageEvent capture failed (RouteTemplate: {RouteTemplate}); the request
+continues.", decision.RouteTemplate); }` — **logs and re-throws nothing**;
+the response always continues. Pinned by
+`UsageCaptureMiddleware_Skips_When_Store_Throws` (the
+`SaveChangesAsync` throws; response still 200; `ILogger.Log` received with
+the exception).
+
+**(e) The 3 Web pins — all PASS.** Run via the in-process xunit.v3 runner
+(`dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.UsageCaptureMiddlewareTests"` —
+not `dotnet test`, per AGENTS.md): **Total: 3, Errors: 0, Failed: 0,
+Skipped: 0**.
+- `UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request` — **PASS** (a `GET /` stores exactly one `UsageEvent`, `RouteTemplate == "GET /"`, `ActorId == ""`, `At` set; the happy path never logs a failure).
+- `UsageCaptureMiddleware_Skips_True_404` — **PASS** (no endpoint → `GetEndpoint()` null → `HasEndpoint` false → the store is never opened, zero rows).
+- `UsageCaptureMiddleware_Skips_When_Store_Throws` — **PASS** (`SaveChangesAsync` throws → response still 200, `ILogger.Log` received with the exception).
+
+**(f) Compile warnings.** 0 (clean non-incremental build of `Kumunita.slnx`).
+The three CS4014/CS8620 warnings that briefly appeared on the first build of
+the test file (un-awaited `SaveChangesAsync` in a `Received` check + the
+`ILogger` formatter nullability `Func<object, Exception, string>` vs
+`Exception?`) were fixed in-line; the final build is 0 warnings / 0 errors.
+
+**DRIFT GUARD — .NET 10 API deviation from the locked design doc
+(recorded here so U04/U05 + the drift guard see it, per AGENTS.md
+"check the actual APIs in the current dependency versions — do not copy a
+common Marten or … pattern from memory").** The design doc §middleware names
+two .NET types that **do not exist in .NET 10 (10.0.12)** — verified by
+probing the live shared framework + ilspycmd decompilation, not memory:
+
+1. **Route template.** The doc says
+   `endpoint.RoutePattern.RawText` (and `UsageCapturePolicy.cs`'s doc-comment
+   repeats it). In .NET 10, `Endpoint` (in
+   `Microsoft.AspNetCore.Http.Abstractions`) has **no `RoutePattern`
+   property** — only `DisplayName` / `Metadata` / `RequestDelegate`; and
+   `RoutePattern` has moved to `Microsoft.AspNetCore.Routing.Patterns.RoutePattern`
+   (and `RoutePattern.Parse` → `RoutePatternFactory.Parse`). The **route
+   template is read from `IRouteDiagnosticsMetadata.Route`**
+   (`Microsoft.AspNetCore.Http.Metadata`) via
+   `endpoint.Metadata.OfType<IRouteDiagnosticsMetadata>().FirstOrDefault()?.Route`.
+   Verified: a `/posts/{id}` route surfaces `Route == "/posts/{id}"` (the
+   template, not a concrete path — C-M13·4 holds). **The middleware uses
+   `IRouteDiagnosticsMetadata.Route`, not `RoutePattern.RawText`.**
+
+2. **Static-file skip.** The doc says
+   `endpoint.Metadata.GetMetadata<StaticFileEndpointMetadata>()`.
+   `StaticFileEndpointMetadata` **does not exist** in .NET 10. The project
+   uses the .NET 10 `MapStaticAssets()`/`WithStaticAssets()` pipeline, whose
+   endpoint carries a **`StaticAssetDescriptor`**
+   (`Microsoft.AspNetCore.StaticAssets`) in its metadata (confirmed by
+   decompiling `StaticAssetEndpointFactory.Create` — it does
+   `routeEndpointBuilder.Metadata.Add(resource)` where `resource` is a
+   `StaticAssetDescriptor`). `StaticAssetDescriptor` is `public sealed` but
+   does **not** implement `IEndpointMetadata`, so it is detected via
+   `endpoint.Metadata.OfType<StaticAssetDescriptor>().Any()`, **not**
+   `GetMetadata<>()`. **The middleware uses `OfType<StaticAssetDescriptor>()`.**
+
+The D1 *intent* (skip no-endpoint + static-file noise, capture the route
+**template**) is fully preserved and pinned by the 3 Web tests; only the two
+type names follow the real .NET 10 API. **Recommendation for the drift
+guard / U04:** if the design doc's `UsageCaptureInput` doc-comment (or any
+downstream unit) references `RoutePattern.RawText` /
+`StaticFileEndpointMetadata`, update them to `IRouteDiagnosticsMetadata.Route`
+/ `StaticAssetDescriptor` so the primary tier matches the shipped code. The
+3 pinned test names are unchanged (U06's gate can reference them verbatim).
+
+---
+
+## U04 — IUsageAnalyticsService (2026-09-29)
+
+**Role.** D3 aggregation seam in `Kumunita.Core.Usage` + the 4 pinned D3
+Core tests (PostgresFixture, the one unit in U01–U04 that boots
+postgres:18). Touched **only** the Deliverable files.
+
+**Deliverables landed:**
+
+- `src/Kumunita.Core/Usage/IUsageAnalyticsService.cs` — the two method
+  signatures, verbatim from design doc §aggregation:
+  `Task<UsageAnalyticsResult> GetWindowAsync(int windowDays)` and
+  `Task<IReadOnlyList<UsageCsvRow>> GetCsvRowsAsync(int windowDays)`;
+  `windowDays` pinned to 7/30/90, an unknown value throws
+  `ArgumentOutOfRangeException` (not a 0-row query).
+- `src/Kumunita.Core/Usage/UsageAnalyticsResult.cs` — the six fields,
+  verbatim: `WindowDays` / `Total` / `AuthenticatedTotal` /
+  `AnonymousTotal` / `DistinctActors` / `SurfaceRanking`
+  (`IReadOnlyList<SurfaceRow>`); **`NewSignups` is absent** (the D3
+  deferral, `User : IdentityUser` has no created-at column). `SurfaceRow
+  { Surface, Total }` + `UsageCsvRow { Date, Surface, Total }` in the
+  same file.
+- `src/Kumunita.Core/Usage/UsageAnalyticsService.cs` — the impl, ctor
+  `(IDocumentStore store)`, touches **only** `UsageEvent` (the
+  `AspNetUsers` table is never read; zero new authorization surface,
+  C-M13·6).
+  - **SurfaceKey.Map GroupBy shape:** the window's rows are pulled
+    server-side in one query
+    (`Query<UsageEvent>().Where(e => e.At >= cutoff).ToListAsync()`,
+    `cutoff = DateTimeOffset.UtcNow.AddDays(-windowDays)` at the seam
+    call), then `GroupBy(e => SurfaceKey.Map(e.RouteTemplate))`
+    client-side → `SurfaceRow { Surface = g.Key, Total = g.Count() }`.
+  - **Ordering pin:** `.OrderByDescending(r => r.Total).ThenBy(r =>
+    r.Surface)` (CSV: `.OrderBy(r => r.Date).ThenBy(r => r.Surface)`,
+    Date = the `At`'s UTC date).
+  - **DistinctActors Linq shape (parser deviation recorded, per the §
+    aggregation contract's allowance):** the design doc's `Select(e =>
+    e.ActorId).Distinct().Count()` is evaluated **Linq-to-objects** over
+    the window's row set — `Where(e => !string.IsNullOrEmpty(e.ActorId))
+    .Select(e => e.ActorId).ToHashSet().Count()`. Same result, different
+    shape: the only clause sent to Postgres is the plain
+    `Where(e => e.At >= cutoff)` column compare (the `SurfaceKey.Map`
+    call inside a LINQ `GroupBy` is a C# function and cannot be
+    translated by the provider, so the whole group-by runs client-side).
+    The pins assert the result (2), not the SQL — the contract's
+    recorded-fallback clause.
+- `src/Kumunita.Core/DependencyInjection.cs` — one line, the house
+  `AddTransient`-with-store shape, placed after
+  `IAuthorizationService`:
+  `services.AddTransient<Usage.IUsageAnalyticsService>(sp => new
+  Usage.UsageAnalyticsService(sp.GetRequiredService<Marten.IDocumentStore>()));`
+- `tests/Kumunita.Core.Tests/UsageAnalyticsServiceTests.cs` — the 4 D3
+  pins, PostgresFixture harness (same `BootStoreAsync` shape as
+  `EventReminderServiceTests`, plus `UsageDocTypes.Configure(opts)` so
+  the `UsageEvent` table exists), rows planted via a write session.
+
+**4 D3 pin names + result (2026-09-29, in-process xunit.v3 runner,
+`-class "Kumunita.Core.Tests.UsageAnalyticsServiceTests"`):**
+
+| Pin | Result |
+|---|---|
+| `Aggregation_Window_Excludes_Older_Rows` | PASS |
+| `Aggregation_SurfaceRanking_Descending_Then_Alphabetical` | PASS |
+| `Aggregation_AuthenticatedVsAnonymous_Counts` | PASS |
+| `Aggregation_DistinctActors_Counts_Unique_NonEmpty` | PASS |
+
+Runner summary: `Total: 4, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0,
+Time: 9.250s` (postgres:18 Testcontainers; containers cleaned up with
+`docker container prune` after the run).
+
+**Compile warnings:** none — `dotnet build Kumunita.slnx -c Debug` →
+`Build succeeded. 0 Warning(s) 0 Error(s)`.
+
+**Open for U05+ (no drift pauses):** the U03 DRIFT GUARD's
+`RoutePattern.RawText` / `StaticFileEndpointMetadata` →
+`IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor` doc-comment
+follow-up is still open (it names U04 as the next consumer; U04 never
+references those two type names, so it stays open for whoever next
+touches the affected doc-comments). U05's `AdminAnalyticsController`
+consumes `IUsageAnalyticsService` verbatim (both methods) — no shape
+changes landed in U04 beyond the recorded Linq-to-objects fallback.
+
+---
+
+## U05 — AdminAnalyticsController + retention tick (2026-09-29)
+
+**Role.** D4 admin surface + D5 retention tick in code, rendered from
+the design doc §admin-surface / §retention / §kw-l contracts
+(verbatim). Touched **only** U05's deliverables (the controller, the
+view model, the view, the admin-nav tab, the `Usage` context's
+`UsagePurgeService` / `UsagePurgeTick`, the Web `UsagePurgeHandler`,
+the ten `admin.analytics_*` kw-l keys × en/de/fr/da, the 3 D4/D7 Web
+pins). Did **not** touch U01's file sink, U02's `Usage` context files
+(reused `UsageEvent` / `SurfaceRow` verbatim, no duplication), U03's
+middleware, U04's aggregation seam (consumed
+`IUsageAnalyticsService` verbatim), or U07's docs flip.
+
+**Deliverables landed (U05's scope, 9 + 1 doc edit):**
+
+- `src/Kumunita.Core/Usage/UsagePurgeService.cs` — the
+  `AuditPurgeService` shape verbatim, a Wolverine-free static class;
+  `PurgeAsync(IDocumentStore store, DateTimeOffset now, CancellationToken
+  ct)` — batched id-collection + delete in **one** session (no per-row
+  `SaveChangesAsync`), **no** tier, **no** summary row (the D5
+  "no tier, no summary" inversion); the **365-day platform constant**
+  is `UsagePurgeService.RetentionDays = 365` (a `const int`, not a
+  config knob — the D5 inversion of the `AuditPurgeService`
+  per-instance principle).
+- `src/Kumunita.Core/Usage/UsagePurgeTick.cs` — the
+  `AuditPurgeTick` shape verbatim: `public sealed record
+  UsagePurgeTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1))`.
+- `src/Kumunita.Web/SideEffects/UsagePurgeHandler.cs` — the
+  `AuditPurgeHandler` shape verbatim: `public static async
+  Task<IEnumerable<object>> Handle(UsagePurgeTick tick, IDocumentStore
+  store)` — calls `UsagePurgeService.PurgeAsync(store,
+  DateTimeOffset.UtcNow)`, then re-yields `new UsagePurgeTick()`
+  (the 1-day schedule is baked into the `TimeoutMessage` type, so every
+  re-publish carries the same cadence — the ADR 0025/0054 house shape).
+- `src/Kumunita.Web/Controllers/AdminAnalyticsController.cs` — the
+  `[Route("admin/analytics")]` + `[Authorize(Roles = Roles.GlobalAdmin)]`
+  controller, ctor `(IDocumentStore store, IUsageAnalyticsService
+  analytics)` (the ADR 0062 section-split precedent — a
+  section-specific controller, not a new action on `AdminController`).
+- `src/Kumunita.Web/Models/AnalyticsViewModel.cs` — the POCO, six
+  fields verbatim from §admin-surface: `WindowDays` / `Total` /
+  `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+  `SurfaceRanking` (`IReadOnlyList<SurfaceRow>`).
+- `src/Kumunita.Web/Views/Admin/Analytics.cshtml` — the
+  `Admin/Audit.cshtml` table shape: the summary row (the
+  `WindowDays` / `Total` / `AuthenticatedTotal` / `AnonymousTotal` /
+  `DistinctActors`), the `SurfaceRanking` table loop (the loop is over
+  `SurfaceRow`, **not** over accounts — C-M13·3: no `@r.ActorId`
+  loop), the window selector `<select name="window">` (7/30/90),
+  the `/admin/analytics/export?window={window}` link, the
+  `admin.analytics_*` kw-l labels × en/de/fr/da (the ten keys from §kw-l,
+  verbatim).
+- `src/Kumunita.Web/Views/Admin/_AdminNav.cshtml` — the "Analytics"
+  tab: one line in the `tabs` array + one arm in the `action switch`,
+  joining the existing `Audit`/`BreakGlass` arms.
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the ten
+  `admin.analytics_*` keys × en/de/fr/da (the exact keys + strings from
+  design doc §kw-l, verbatim; 10 keys × 4 languages = 40 entries).
+- `tests/Kumunita.Web.Tests/AdminAnalyticsControllerTests.cs` — the 3
+  D4/D7 Web pins (NSubstitute, no Postgres).
+- `docs/design/m13-logging-analytics-design.md` §capture + §middleware
+  — the U03 DRIFT GUARD follow-up, **closed** by this unit (the
+  `RoutePattern.RawText` / `StaticFileEndpointMetadata` doc-comments
+  updated to the real .NET 10 API — `IRouteDiagnosticsMetadata.Route`
+  / `StaticAssetDescriptor`; see the drift note below).
+
+**(a) The two routes (verbatim).**
+
+- `GET /admin/analytics?window=7|30|90` (default 30) →
+  `AnalyticsViewModel` → `Views/Admin/Analytics.cshtml` (the
+  `Index` action — a read, no audit row; the D4 surface contract).
+- `GET /admin/analytics/export?window=7|30|90` (default 30) → the CSV
+  (the `Export` action — the `Content-Type: text/csv; charset=utf-8`
+  + `Content-Disposition: attachment; filename="kumunita-usage-{window}d
+  .csv"` + `Cache-Control: no-store` serve shape, the ADR 0034/0112
+  serve idiom, the `AdminPortabilityController` Export precedent) +
+  **exactly one `AccessAudit` row** committed via
+  `IDocumentStore.LightweightSession()`.
+
+**(b) The `AnalyticsViewModel` fields (the six).** `WindowDays` /
+`Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+`SurfaceRanking` (the `UsageAnalyticsResult` projection — verbatim from
+§admin-surface).
+
+**(c) The one `AccessAudit` row shape.** `TargetKind == "analytics"`
++ `Action == "analytics.export"` + `Via = AccessVia.Admin` +
+`Outcome = AccessOutcome.Allow` + `ActorId` = the current user's
+`ClaimTypes.Subject` value (the `AdminSubjectId(User)` helper shape,
+the ADR 0108 "portability.export" precedent verbatim). Committed via
+`IDocumentStore.LightweightSession()` (the D4 contract — the
+controller's own commit, not a service seam).
+
+**(d) The `UsagePurgeService` / `UsagePurgeHandler` / `UsagePurgeTick`
+shapes.**
+
+- `UsagePurgeService.RetentionDays = 365` (the D5 platform constant).
+- `UsagePurgeService.PurgeAsync(IDocumentStore, DateTimeOffset,
+  CancellationToken)` — batched id-collection + delete in one session,
+  no tier, no summary row.
+- `UsagePurgeTick` — `public sealed record UsagePurgeTick() :
+  Wolverine.TimeoutMessage(TimeSpan.FromDays(1))` (the 1-day schedule
+  baked in).
+- `UsagePurgeHandler.Handle(UsagePurgeTick, IDocumentStore)` — calls
+  `UsagePurgeService.PurgeAsync(store, DateTimeOffset.UtcNow)`, then
+  re-yields `new UsagePurgeTick()` (self-rescheduling).
+
+**(e) The `admin.analytics_*` keys (ten, verbatim from §kw-l).**
+`admin.analytics_title` / `admin.analytics_lede` /
+`admin.analytics_window` / `admin.analytics_total` /
+`admin.analytics_authenticated` / `admin.analytics_anonymous` /
+`admin.analytics_distinct` / `admin.analytics_surface` /
+`admin.analytics_count` / `admin.analytics_export` — each present ×
+en/de/fr/da with non-empty values (40 entries total; the
+`KnownTranslationKeys_ParityTests` family already enforces the
+key-set parity across the four dictionaries, the new
+`KnownTranslationKeys_Parity_Extended_With_Analytics_Keys` pin asserts
+the ten keys exist + are non-empty in each of the four dictionaries).
+
+**(f) The 3 D4/D7 Web pins — all PASS.** Run via the in-process
+xunit.v3 runner (`dotnet exec
+tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+-class "Kumunita.Web.Tests.AdminAnalyticsControllerTests"` — not
+`dotnet test`, per AGENTS.md): **Total: 3, Errors: 0, Failed: 0,
+Skipped: 0, Not Run: 0**.
+
+| Pin | Result |
+|---|---|
+| `AdminAnalytics_Route_Exists_And_GlobalAdmin_Only` | PASS |
+| `AdminAnalytics_Csv_Shape` | PASS |
+| `KnownTranslationKeys_Parity_Extended_With_Analytics_Keys` | PASS |
+
+**Full-suite confirmation (2026-09-29):** `Kumunita.Web.Tests`
+`Total: 585, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`;
+`Kumunita.Core.Tests` `Total: 989, Errors: 0, Failed: 0, Skipped: 0,
+Not Run: 0` (the kw-l additions + the new `UsagePurgeService` /
+`UsagePurgeTick` + the `UsagePurgeHandler` all compile + the
+`KnownTranslationKeys_ParityTests` family still green — the ten new
+`admin.analytics_*` keys pass the existing en/de/fr/da key-set parity
+pins with no extra work).
+
+**(g) Compile warnings.** 0 — `dotnet build Kumunita.slnx -c Debug
+--no-incremental` → `Build succeeded. 0 Warning(s) 0 Error(s)`.
+
+**Drift follow-up closed (the U03 DRIFT GUARD item, open since U03).**
+The design doc's `UsageCaptureInput` doc-comment (§capture) and the
+§middleware projection-rules list both named `RoutePattern.RawText` +
+`StaticFileEndpointMetadata` — types that do not exist in .NET 10
+(U03's DRIFT GUARD recorded the real .NET 10 API:
+`IRouteDiagnosticsMetadata.Route` + `StaticAssetDescriptor`). U05
+updated both doc-comment sites to the real .NET 10 API (the
+`StaticFileEndpointMetadata` → `StaticAssetDescriptor` rename + the
+`RoutePattern.RawText` → `IRouteDiagnosticsMetadata.Route` rename,
+with a one-line note in each site that the U03 DRIFT GUARD closed the
+old name). This is a **doc-only edit** — no code, no test impact; the
+shipped `UsageCaptureMiddleware` already used the real .NET 10 API
+(U03's pin), and the 3 D1 middleware pins still pass unchanged.
+The U04 "open for U05+" item in the handoff notes above is now closed
+by this unit.
+
+**Open for U06 (no drift pauses):** the U06 gate's part-vs-whole
+invokes the full 19-pin list (U01's 3 sink pins + U02's 6 policy/
+surface pins + U03's 3 middleware pins + U04's 4 aggregation pins +
+U05's 3 admin-surface pins) — all 19 are in the tree and green (the
+full-suite runs above confirm this). The (a) closed-loop + (b) handoff
+acceptance tests are not yet authored — U06's scope per the register.
+The (c) part-vs-whole gate is the full pinned list +
+`MilestonesTests` green (the U07 docs flip is not yet done — M13 is
+still `StatusNext` / M14 is still `StatusPlanned`).
+
+---
+
+## U06 — gate recorded (2026-09-29)
+
+**Role.** Record-only acceptance gate (no new test code, no build, no
+U00–U05 file touched; the only change is the design-doc §gate append).
+The runtime was present (all 19 pins in the tree + green), so the gate
+was **run in full**, not deferred.
+
+- **(a) Closed loop — PASS** (via U04's `Aggregation_Window_Excludes_Older_Rows` + `Aggregation_SurfaceRanking_Descending_Then_Alphabetical`).
+- **(b) Handoff — PASS** (via U04's `Aggregation_DistinctActors_Counts_Unique_NonEmpty` → `DistinctActors == 2`).
+- **(c) Part-vs-whole — PASS**: `Kumunita.Web.Tests` **585/585** + `Kumunita.Core.Tests` **989/989** (both Errors: 0, Failed: 0, in-process xunit.v3 runner, 2026-09-29); the 19-pin list + `MilestonesTests` are subsets of the green suites.
+
+**Still-open drift: none.** The one cross-unit item — U03's DRIFT GUARD
+(`RoutePattern.RawText` / `StaticFileEndpointMetadata` → the real .NET 10
+`IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor`) — was **closed
+by U05** against the design doc's §capture + §middleware doc-comments. All
+other `## U<m>` drift items are resolved in-code.
+
+**Gap left for U07.** The docs parity flip (M13 → `StatusDone`, M14 →
+`StatusNext`) + the `MilestonesTests` re-pin to M14 + the unit-plan files
+→ `done/` + the handoff `## Summary` (the C-M13·7 flip is not yet done —
+M13 is still the single in-progress, which is why `MilestonesTests` is
+still green in the gate run above).
+
+---
+
+## Summary (M13 — 2026-09-29)
+
+**Role.** The milestone close (U07, record-only against code): the docs
+parity flip (C-M13·7), the `MilestonesTests` re-pin, the unit-plan archive,
+and this `## Summary`. **This is the last handoff entry the M13 note
+receives; it is written for the M14 agent** (integration of Events and
+Projects — see the `docs/plans-milestones/in-progress/` register for that
+milestone when it lands).
+
+**Docs flip (C-M13·7, this unit, one unit):**
+
+- `src/Kumunita.Web/Milestones.cs` — M13 `StatusNext` → `StatusDone`, M14
+  `StatusPlanned` → `StatusNext` (the two one-line flips).
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs` — `M13` added to
+  `Shipped_Milestones_Are_Marked_Done`; the single-in-progress test renamed
+  `M13_Is_The_Single_InProgress_Milestone_And_M14_Is_Planned` →
+  `M14_Is_The_Single_InProgress_Milestone` (the `Assert.Equal("M14", next[0].Id)`
+  pin; the trailing `StatusPlanned` foreach drops, since M14 is now the sole
+  in-progress and there is no M15). The exact-order pin
+  `Roadmap_Covers_M0_Through_M14_Plus_Named_Lanes_In_Order` (M0…M14) is
+  **unchanged**.
+- `README.md` — Status section ("M14 in progress", "M1–M13 … are done") +
+  Roadmap (M13 → **Done** with the scope sentence, M14 → **In progress**).
+- `docs/STATUS.md` — "M13 is done" line + "next is M14" (citing ADR 0114).
+- `docs/ARCHITECTURE.md` — the value-chain table is status-free (the M12
+  close precedent — no-op on that row); the M13 ship is reflected in the
+  shape-of-code sections instead: the solution tree gains the two new Core
+  contexts (`Usage/` + `Logging/`), the §2 "now live" paragraph gains the
+  M13 sentence, and the §3 feature-modules line gains `Usage` + `Logging`
+  (the M9-close precedent for a milestone that adds new contexts — M12
+  added none, which is why its ARCHITECTURE close was a no-op).
+
+**Unit-plan archive.** `m13-u00.md` … `m13-u07.md` moved to
+`docs/plans-milestones/done/` (eight files; the handoff note + the register
+stay in place, the M12/M11 house shape). `in-progress/` now holds only this
+note (until M14's register lands).
+
+**Shipped (the seven units U00–U06), against the design doc + ADR 0114:**
+
+| Unit | Goal (one-liner) | Pins landed | Drift / deviation |
+|---|---|---|---|
+| **U00** | Lock the design — `m13-logging-analytics-design.md` + ADR 0114 + the ADR README index row | — (the sign-off gate; D1–D8 + C-M13·1–7 + F1–F5 locked as proposed, no veto) | ADR 0114 confirmed free (the index ran 0001–0113) |
+| **U01** | D6 — the BCL-only file sink (`Kumunita.Core.Logging`) + `Program.cs` wiring + `appsettings.json` | 3 sink pins (`RollingFileSink_LogLine_Is_ValidJsonLines` / `_FileNaming_Is_Daily` / `_Retention_Deletes_Older_Files`) — all PASS | `LoggingBuilder` is `internal` in .NET 10 (use `ILoggingBuilder`); `ILogger.BeginScope` is the 1-arg form; the wiring is `builder.Logging.AddFileSink(...)` (not `builder.Services.Logging`); `SetLastWriteTimeUtc` takes `DateTime` — the D6 intent unchanged, only the concrete .NET 10 type names moved |
+| **U02** | D1 + D2 — the `Kumunita.Core.Usage` context (`UsageEvent` + `UsageDocTypes` + the pure `UsageCapturePolicy` + the pure `SurfaceKey`) | 6 policy/surface pins (`Policy_Skips_No_Endpoint` / `_StaticFile_Endpoint` / `_Records_Template_Not_Concrete_Path`, `Policy_Anonymous_Record_Has_Empty_ActorId`, `SurfaceKey_Maps_RouteTemplates_To_The_Pinned_Set`, `UsageEvent_Row_Has_No_Email_No_Body_No_Ua_No_Ip`) — all PASS | the `*DocTypes.Configure(opts)` surface lives **only** in `Program.cs` (line 175) — `SchemaBootstrap.cs` has no `StoreOptions` surface (the design sketch's "one line in SchemaBootstrap" is source-vs-sketch drift, the D1 intent unchanged); a few xunit.v3 / BCL API reconciliations in the test pins (the `PropertyInfo.IsStatic` / 3-arg `Assert.Equal` overloads) |
+| **U03** | D1 — the thin `UsageCaptureMiddleware` host adapter + `Program.cs` pipeline position | 3 middleware pins (`UsageCaptureMiddleware_Records_One_Usegevent_Per_Recognized_Request` / `_Skips_True_404` / `_Skips_When_Store_Throws`) — all PASS | **DRIFT GUARD (closed by U05):** .NET 10 has no `RoutePattern.RawText` (use `IRouteDiagnosticsMetadata.Route`) and no `StaticFileEndpointMetadata` (use `StaticAssetDescriptor`) — the D1 intent (skip no-endpoint + static-file, capture the template) is preserved and pinned; only the two type names follow the real .NET 10 API |
+| **U04** | D3 — the `IUsageAnalyticsService` + impl (the 7/30/90-day window aggregation) | 4 aggregation pins (`Aggregation_Window_Excludes_Older_Rows` / `_SurfaceRanking_Descending_Then_Alphabetical` / `_AuthenticatedVsAnonymous_Counts` / `_DistinctActors_Counts_Unique_NonEmpty`) — all PASS (PostgresFixture, postgres:18) | the design's `Distinct()` Linq clause runs **Linq-to-objects** over the window's row set (the `SurfaceKey.Map` call inside the `GroupBy` is a C# function the provider cannot translate, so the group-by runs client-side; the only clause sent to Postgres is the `Where(e => e.At >= cutoff)` column compare) — the contract's recorded-fallback clause, the pins assert the result not the SQL |
+| **U05** | D4 + D5 — the `AdminAnalyticsController` + `Analytics.cshtml` + `_AdminNav` tab + the `admin.analytics_*` kw-l block + the retention tick (`UsagePurgeService` / `UsagePurgeHandler` / `UsagePurgeTick`) | 3 admin-surface pins (`AdminAnalytics_Route_Exists_And_GlobalAdmin_Only` / `AdminAnalytics_Csv_Shape` / `KnownTranslationKeys_Parity_Extended_With_Analytics_Keys`) — all PASS | none — the U03 DRIFT GUARD follow-up is **closed** by this unit (the design doc's §capture + §middleware doc-comments updated to the real .NET 10 API); the ten `admin.analytics_*` keys × en/de/fr/da (40 entries) pass the existing `KnownTranslationKeys_ParityTests` key-set parity with no extra work |
+| **U06** | The M13 acceptance gate — **recorded, not run** (no new test code; the 19 pins + `MilestonesTests` are subsets of the green suites) | (a) closed loop PASS (via U04's two ranking pins); (b) handoff PASS (via U04's `DistinctActors == 2` pin); (c) part-vs-whole PASS — **Web 585/585 + Core 989/989**, both Errors: 0 / Failed: 0 (in-process xunit.v3 runner) | none — the U03 DRIFT GUARD item (the only cross-unit drift) was already closed by U05 |
+
+**Full-suite state at the close (this unit, post-flip):** `Kumunita.Web.Tests`
+**585/585** + `Kumunita.Core.Tests` **989/989** — both Errors: 0 / Failed: 0;
+`MilestonesTests` green with the re-pinned
+`M14_Is_The_Single_InProgress_Milestone` + the unchanged
+`Roadmap_Covers_M0_Through_M14_Plus_Named_Lanes_In_Order` (M0…M14) +
+`Shipped_Milestones_Are_Marked_Done` (now including M13). The four parity
+surfaces (`Milestones.cs` / `README.md` / `docs/STATUS.md` /
+`docs/ARCHITECTURE.md`) agree that **M13 is done and M14 is next**.
+
+**The 19 pinned tests (D7) — all green, in the tree:** U01's 3 sink pins +
+U02's 6 policy/surface pins + U03's 3 middleware pins + U04's 4 aggregation
+pins + U05's 3 admin-surface pins = **19/19**.
+
+**Invariants as landed (C-M13·1–7):** the feedback is **local** (C-M13·1 — no
+third-party telemetry, the sink writes to a local file, the admin page is a
+local Razor view); the row is **minimal** (C-M13·2 — `UsageEvent` carries
+exactly `Id` / `At` / `ActorId` / `RouteTemplate`); the surface renders **no
+per-account data** (C-M13·3 — `/admin/analytics` renders aggregates over the
+window, never a row per `ActorId`); the **template** is the unit (C-M13·4 —
+`RouteTemplate` is a route template, never a concrete path, and no-endpoint /
+static-file requests are not recorded); a **capture never fails the request**
+(C-M13·5 — the `LightweightSession` write is in a `try/catch` that logs and
+re-throws nothing); **zero new authorization surface** (C-M13·6 — no new
+`AccessAction` / `AccessVia` / `Decide()` branch / `IAuditableResource`; the
+one `AccessAudit` row is on the export, `TargetKind == "analytics"` /
+`Action == "analytics.export"`); **docs parity holds at the flip** (C-M13·7 —
+done in this unit, the four surfaces agree).
+
+**Deferred lanes (ADR 0114 Consequences — each a named follow-on lane, own
+ADR):**
+
+- **Charts** (a `client/lib` TS module over the existing table) — the admin
+  page is a table + a count for M13. **Own lane**, own ADR.
+- **Per-account activity views** (a rendering of the `ActorId` column) — the
+  C-M13·3 boundary says no, and **stays no**, unless ADR 0114 is **revisited**
+  (a deliberate privacy decision). **Own lane**, own ADR.
+- **Per-request detail views** (the raw `UsageEvent` table rendered as a page)
+  — the raw table is the operator's **psql** surface, not a rendered one.
+  **Own lane**, own ADR.
+- **Custom retention per surface** (a per-`SurfaceKey` retention knob) — the
+  single 365-day window is enough for M13. **Own lane**, own ADR.
+- **Per-instance retention config** (a config knob for the 365-day constant)
+  — the D5 "platform constant" inversion is deliberate. **Own lane**, own ADR.
+- **Log-streaming to a remote sink** — **forbidden by C-M13·1**
+  (SECURITY.md §5: "No third-party analytics, no telemetry") — not a lane, a
+  **boundary**.
+- **Per-resident usage views** — there is **no** resident-facing analytics
+  surface in this milestone or any named follow-on (the C-M13·3 boundary
+  holds for the resident surface as it does for the admin surface).
+- **The new-signups metric** (a `NewSignups` field on `UsageAnalyticsResult`)
+  — the `User : IdentityUser` table has **no** created-at column (its only
+  delta is `ExternalId`); a "new residents" count needs a new column or a
+  different source. **Own lane**, own ADR.
+- **The `tsvector` full-text search upgrade** — M8's own deferred lane (ADR
+  0091 D4); M13's aggregation is a `COUNT(*)` over a window, not a text query.
+  **Own lane** (M8's, already named).
+
+**Handed to the M14 agent (integration of Events and Projects — the
+`coordination` value-chain step, the two coordination surfaces interlock).
+Open items carried forward:** none blocking — the one cross-unit drift (U03's
+DRIFT GUARD, `RoutePattern.RawText` / `StaticFileEndpointMetadata` → the real
+.NET 10 `IRouteDiagnosticsMetadata.Route` / `StaticAssetDescriptor`) is
+**closed** in the design doc by U05; the U04 Linq-to-objects fallback for the
+`GroupBy` / `Distinct()` aggregation is recorded as a contract-allowance
+(deviation, not drift); the U01 .NET 10 logging-API reconciliations
+(`ILoggingBuilder`, the 1-arg `BeginScope`, `builder.Logging` wiring) are the
+shipped shape. The M14 agent starts from the M13 green baseline (Web 585/585 +
+Core 989/989) with **M14 as the single in-progress milestone** and **no M15** —
+the exact-order pin M0…M14 is the roadmap's tail.

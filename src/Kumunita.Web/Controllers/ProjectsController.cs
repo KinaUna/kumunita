@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -69,6 +70,16 @@ public sealed class ProjectsController : Controller
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
 
+    // ADR 0115 D2 (M14 interlock) — the to-do detail's **event link**
+    // (the ADR 0086 D9 `ProjectLink` resolve, carried to the event
+    // association) resolves the to-do's `EventId` through the **frozen**
+    // <see cref="IEventService"/> read seam — optional (default null) so the
+    // existing test-construction sites that build this controller without an
+    // event service keep compiling (the <see cref="EventController"/>
+    // optional-ctor-param idiom — DI always supplies the live
+    // <c>IEventService</c> in the app); absent, the chip simply omits.
+    private readonly IEventService? events;
+
     // ADR 0088 / ADR 0051 — the shared per-request translation provider used
     // to resolve the viewer's current language for the feed's default-visible
     // variant swap (the <see cref="EventController"/> /
@@ -86,7 +97,8 @@ public sealed class ProjectsController : Controller
         ILocalizationService localization,
         IDocumentStore store,
         ITranslationProvider? translationProvider = null,
-        EffectiveTimezoneResolver? timezone = null)
+        EffectiveTimezoneResolver? timezone = null,
+        IEventService? events = null)
     {
         this.projects = projects;
         this.userInfo = userInfo;
@@ -94,6 +106,7 @@ public sealed class ProjectsController : Controller
         this.store = store;
         this.translationProvider = translationProvider;
         this._timezone = timezone;
+        this.events = events;
     }
 
     // ADR 0019 — the actor's effective time zone (resident override →
@@ -768,6 +781,42 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0115 D2 (M14 interlock) — the **event link** (the same
+        // dangling-safe rule as the project link above): resolve the to-do's
+        // `EventId` through the **frozen** <see cref="IEventService.GetAsync"/>
+        // — its 404-vs-403 split is the seam's, and here a soft-deleted
+        // (404) or an unreadable (403) target leaves all three chip fields
+        // `null`, and the chip is omitted entirely — **not** a 404/403 for the
+        // to-do itself, and the target's title / id are not leaked (C-M14·2;
+        // C-M14·4 — the chip reuses the frozen Read decision, no new surface).
+        string? eventId = null;
+        string? eventTitle = null;
+        string? eventLinkPath = null;
+        if (result.Todo.EventId is { Length: > 0 } && events is not null)
+        {
+            try
+            {
+                var ev = await events.GetAsync(result.Todo.EventId, actorId, HttpContext.RequestAborted);
+                if (!ev.IsDeleted)
+                {
+                    eventId = ev.Id;
+                    eventTitle = ev.Title;
+                    eventLinkPath = "/events/" + ev.Id;
+                }
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted event — the association dangles; the chip is
+                // hidden (C-M14·2), the to-do itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // An event the actor may not read — a hidden chip, not a 403
+                // for the to-do (C-M14·2 — the to-do's own Audience is the
+                // access boundary).
+            }
+        }
+
         // ADR 0088 — the to-do's user-added translations (the ADR 0027
         // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
         // shape). A "a read, not a decision" surface; the parent to-do's single
@@ -814,7 +863,22 @@ public sealed class ProjectsController : Controller
             CanTranslate: canTranslateTodo,
             OriginalLanguageCode: result.Todo.LanguageCode,
             Blocker: result.Blocker,
-            Comments: commentRows);
+            Comments: commentRows,
+            EventId: eventId,
+            EventTitle: eventTitle,
+            EventLinkPath: eventLinkPath,
+            // ADR 0115 D3 (M14 interlock) — the **event picker** (the
+            // <c>set-event</c> lane's affordance; the <see
+            // cref="SeedEventPickerAsync"/> seed over the frozen
+            // <c>IEventService.ListMineAsync</c>, capped at 25). An empty
+            // <see cref="TodoEventPicker.Options"/> list hides the picker
+            // card in the view (the ADR 0086 D9 hide rule; the picker is a
+            // display surface, never a gate, C-M14·4). <see
+            // cref="TodoEventPicker.CurrentEventId"/> is the to-do's stored
+            // <c>EventId</c> (the <c>&lt;select&gt;</c> prefill).
+            EventPicker: new TodoEventPicker(
+                Options: await SeedEventPickerAsync(),
+                CurrentEventId: result.Todo.EventId));
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1327,6 +1391,198 @@ public sealed class ProjectsController : Controller
             ? "Project cleared."
             : "Project set.";
         return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/set-event</c> — the **event
+    /// association** write lane (ADR 0115 D3 / C-M14·3 — the M14 interlock).
+    /// A **standalone** form POST (its own small form on the to-do detail —
+    /// **not** the main M5 update form, whose frozen <see
+    /// cref="Kumunita.Core.Projects.UpdateTodoRequest"/> is untouched —
+    /// C-M14·7: <c>EventId</c> is not on <c>CreateTodoRequest</c> /
+    /// <c>UpdateTodoRequest</c>). Sets the to-do's <see
+    /// cref="Kumunita.Core.Projects.TodoItem.EventId"/> through the U02
+    /// <see cref="IProjectService.SetTodoEventAsync"/> seam (the
+    /// <c>set-project</c> lane shape, verbatim); a blank / <c>null</c>
+    /// choice posts <c>null</c> = **clear** the association. **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the to-do — the service's server-side
+    /// standing re-check + event guard (C-M14·3; the ADR 0006-D split) is
+    /// the enforcement; the controller does no standing math (C-M14·4 — no
+    /// new authorization surface). A missing to-do is 404, a denied actor
+    /// 403, a missing / unreadable event 404 (the seam's decision as truth,
+    /// C-M14·3).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/set-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TodoSetEvent(string id, [FromForm] string? eventId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetTodoEventAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(eventId) ? null : eventId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(eventId)
+            ? "Event link cleared."
+            : "Event linked.";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>GET /projects/todos/{id}.ics</c> — the M14 per-to-do calendar file
+    /// (ADR 0115 D4 / design doc §routes lane-1, locked): the frozen
+    /// <see cref="IProjectService.GetTodoAsync"/> (one <c>CanAsync(Read)</c>
+    /// decision — C-M14·4, no new authorization surface) renders one
+    /// <c>VTODO</c> through the pure U05 <see cref="TodoIcsWriter"/> over the
+    /// already-authorized row. The decision never leaks into the file
+    /// (C-M14·5) — the ICS text is display fields only on the closed pinned
+    /// subset (§vtodo — the emitter is U05's and already closed; the routes
+    /// add no <c>RRULE</c> / recurrence, C-M14·6 / D6).
+    /// <para>
+    /// **404-not-403 (C-M14·2, the non-leaky pin):** *both*
+    /// <see cref="KeyNotFoundException"/> (absent) *and*
+    /// <see cref="UnauthorizedAccessException"/> (denied) map to
+    /// <see cref="NotFoundResult"/> — a to-do a caller cannot see neither
+    /// downloads nor 403s into existence (the M12 <see
+    /// cref="EventController.EventIcs"/> lane-1 split, verbatim).
+    /// </para>
+    /// <para>
+    /// **Undated to-do ⇒ the degenerate form** (drift entry 4): an undated
+    /// to-do still yields a valid <c>VTODO</c> with only <c>UID</c> /
+    /// <c>DTSTAMP</c> / <c>SUMMARY</c> (+ <c>DESCRIPTION</c>) — the
+    /// RFC-legal form; the feed lane's skip rule (undated ⇒ omitted) applies
+    /// to the *feed* only (lane 2 below).
+    /// </para>
+    /// <para>
+    /// **Anonymous ⇒ the standard sign-in challenge** (the class-level
+    /// <c>[Authorize]</c> default — F3; there is no anonymous iCal surface,
+    /// the ADR 0112 D2 pin).
+    /// </para>
+    /// <para>
+    /// **Route-resolution pin (the M12 known gotcha, carried):** ASP.NET
+    /// Core ranks the **literal** <c>"/projects/todos.ics"</c> route above
+    /// the parameterized <c>"/projects/todos/{id}"</c>, so
+    /// <c>GET /projects/todos.ics</c> resolves to the feed lane (below),
+    /// never to a detail with <c>id = "todos.ics"</c> (the
+    /// <c>EventController</c> <c>/events.ics</c> / <c>/events/{id}</c>
+    /// resolution, the ADR 0112 §routes precedent).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, ADR 0034 / 0108 idiom — the M12 <see
+    /// cref="EventController.EventIcs"/> action verbatim):**
+    /// <c>Content-Type: text/calendar; charset=utf-8</c> (the
+    /// <see cref="FileResult"/> second arg) +
+    /// <c>Content-Disposition: attachment;
+    /// filename="kumunita-todo-{id}.ics"</c> +
+    /// <c>Cache-Control: no-store</c> (per-caller, re-authorized content —
+    /// never cached by a proxy or the PWA service worker) +
+    /// <c>X-Content-Type-Options: nosniff</c>, the three headers set on
+    /// <see cref="HttpResponse.Headers"/> before the return.
+    /// </para>
+    /// </summary>
+    [HttpGet("/projects/todos/{id}.ics")]
+    public async Task<IActionResult> TodoIcs(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        TodoItem todo;
+        try
+        {
+            todo = (await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted)).Todo;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(); // absent — the non-leaky split (C3)
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound(); // denied — the file lane does not 403 into existence (C-M14·2)
+        }
+
+        // The pure emitter (U05) over the already-authorized row — the feed's
+        // skip rule is feed-only (lane 2); an undated to-do yields the
+        // degenerate VTODO here (drift entry 4).
+        var icsText = TodoIcsWriter.BuildTodos([todo], DateTimeOffset.UtcNow);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom,
+        // the M12 EventIcs action verbatim:
+        // Content-Disposition + nosniff + no-store on the response, the
+        // Content-Type as the File(...) second arg.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-todo-" + id + ".ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
+    }
+
+    /// <summary>
+    /// <c>GET /projects/todos.ics</c> — the M14 to-do subscription feed
+    /// (ADR 0115 D4 / design doc §routes lane-2, locked): the frozen
+    /// <see cref="IProjectService.ListTodosAsync"/> caller's **visible**
+    /// to-do set (the candidate filter + the <c>CanSeeAsync(Read)</c> gate
+    /// all inside the seam — C-M14·7, the frozen seam is consumed, not
+    /// extended) renders through the pure U05 <see cref="TodoIcsWriter"/>
+    /// over the already-authorized rows.
+    /// <para>
+    /// **Filter to dated to-dos in the Web layer** (<c>DueAt != null ||
+    /// StartAt != null</c> — a *display* filter, never a gate / new seam,
+    /// C-M14·4 / C-M14·7); an empty visible/dated set ⇒ a valid empty
+    /// <c>VCALENDAR</c> (C-M14·5/6). **Always <c>200</c>** — the seam
+    /// filters rather than throws for an individual denial, so there is no
+    /// 404/403 on this lane (the M12 <see cref="EventController.CalendarFeed"/>
+    /// shape, verbatim).
+    /// </para>
+    /// <para>
+    /// **Anonymous ⇒ the standard sign-in challenge** (the class-level
+    /// <c>[Authorize]</c> default — F3). **No subscription token** — the
+    /// feed rides the cookie, re-authorized every fetch (the M6 link-lane
+    /// posture, ADR 0085 / 0095; the ADR 0112 D2 shape).
+    /// </para>
+    /// <para>
+    /// **Serve shape (locked, §routes — the same ADR 0034 / 0108 idiom as
+    /// the lane-1 sibling):** <c>Content-Type: text/calendar;
+    /// charset=utf-8</c> + <c>Content-Disposition: attachment;
+    /// filename="kumunita-todos.ics"</c> + <c>Cache-Control: no-store</c>
+    /// + <c>X-Content-Type-Options: nosniff</c>.
+    /// </para>
+    /// </summary>
+    [HttpGet("/projects/todos.ics")]
+    public async Task<IActionResult> TodosIcsFeed()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        // C-M14·7 — the feed seam, called exactly as the in-app feed calls it
+        // (the M12 CalendarFeed shape): no filters (all null / default),
+        // page 0 (the service clamps to 1).
+        var page = await projects.ListTodosAsync(null, null, actorId, 0, ct: HttpContext.RequestAborted);
+
+        // The "dated to-dos" filter — a **Web-layer display** filter (a
+        // to-do with neither DueAt nor StartAt is skipped, the §vtodo feed
+        // skip rule), never a gate / new seam (C-M14·4 / C-M14·7).
+        var dated = page.Items.Where(t => t.DueAt is not null || t.StartAt is not null).ToList();
+
+        var icsText = TodoIcsWriter.BuildTodos(dated, DateTimeOffset.UtcNow);
+
+        // The serve shape (locked, §routes) — the ADR 0034 / 0108 idiom,
+        // the M12 CalendarFeed action verbatim.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Disposition"] =
+            "attachment; filename=\"kumunita-todos.ics\"";
+        Response.Headers["Cache-Control"] = "no-store";
+        return File(System.Text.Encoding.UTF8.GetBytes(icsText), "text/calendar; charset=utf-8");
     }
 
     /// <summary>
@@ -3728,6 +3984,55 @@ public sealed class ProjectsController : Controller
         // surface as an empty one — the picker card hides (C-PL·3).
         return (list ?? [])
             .Select(p => (Id: p.Id, Name: string.IsNullOrWhiteSpace(p.Title) ? p.Id : p.Title))
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Seeds the **event picker** options (ADR 0115 D3 — the M14 interlock's
+    /// <c>set-event</c> affordance) — the actor's own events (authored ∪
+    /// RSVPed — the **frozen** <see cref="IEventService.ListMineAsync"/>
+    /// read seam, the ADR 0065 posture), **capped at 25** for the
+    /// <c>&lt;select&gt;</c> (a **display** cap, never a gate — C-M14·4; the
+    /// picker is a display surface, the service's
+    /// <c>SetTodoEventAsync</c> standing re-check + event guard on write is
+    /// the enforcement, C-M14·3). A **display** surface, never a gate — the
+    /// picker shows the actor's own events (a read convenience, not a
+    /// decision); the service's write-time decision is the authority. An
+    /// empty result (no events, or a denied read) hides the picker card in
+    /// the view — a picker with no options is a noise surface, not a
+    /// control (the ADR 0086 D9 hide rule).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Name)>> SeedEventPickerAsync()
+    {
+        // Absent event service (a test-construction site without DI) — the
+        // picker has no options and hides (the C-M14·4 display-surface rule;
+        // no exception is raised over an optional dependency).
+        if (events is null)
+            return [];
+        var actorId = SubjectId(User) ?? string.Empty;
+        IReadOnlyList<Event> list;
+        try
+        {
+            list = await events.ListMineAsync(actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        // A null result (a seam that returns no list) is the same display
+        // surface as an empty one — the picker card hides (C-M14·4). The
+        // 25-cap is a display cap, not a gate (the ADR 0065 posture — the
+        // per-actor set is small at one-neighborhood scale; the cap is a
+        // backstop against a pathologically large <c>&lt;select&gt;</c>).
+        return (list ?? [])
+            .Take(25)
+            .Select(e => (Id: e.Id, Name: string.IsNullOrWhiteSpace(e.Title) ? e.Id : e.Title))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

@@ -180,9 +180,179 @@ public interface ILocalizationService
     /// </summary>
     Task<IReadOnlyDictionary<string, string>> GetTranslationsForAsync(string languageCode);
 
+    /// <summary>
+    /// <b>M15 bulk-read seam (ADR 0116, D1; U01)</b> — the closed-set matrix
+    /// the translation-bundle exporter (<see cref="TranslationBulkExporter"/>)
+    /// projects onto the §bundle CSV: one <see cref="TranslationBulkRow"/> per
+    /// <see cref="KnownTranslationKeys.AllKeys"/> key in declaration order;
+    /// each row's <see cref="TranslationBulkRow.Stored"/> carries **every**
+    /// catalog code (enabled **and** disabled, the catalog's set) — a code
+    /// with no stored <see cref="TranslationResource"/> row is present with a
+    /// <c>null</c> value (an **empty cell**, never a synthetic row — the M·12
+    /// floor).
+    /// <para>
+    /// <b>A read: **no audit row**</b> (C-M15·7 — matching
+    /// <see cref="GetTranslationsForAsync"/>; the matrix read emits **zero**
+    /// <c>AccessAudit</c> rows, the §bundle "a read" pin). Composes the frozen
+    /// seams only — one <see cref="GetTranslationsForAsync"/> round-trip per
+    /// catalog code (the <c>key → text</c> map), plus the catalog's codes in
+    /// <c>SortOrder</c>; it creates no second store (C-M15·1) and touches no
+    /// schema (C-M15·8).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<TranslationBulkRow>> GetBulkTranslationMatrixAsync(
+        CancellationToken ct = default);
+
     /// <summary>Upserts one UI string — audited <c>translation.save</c>,
     /// TargetId = key (M·6; M9 FACES). Takes effect on the next request (M·4).</summary>
     Task UpsertTranslationAsync(string key, string languageCode, string text, string actorId);
+
+    /// <summary>
+    /// <b>M15 bulk-write seam (ADR 0116, D4/D5; U02)</b> — upserts the
+    /// present non-blank rows of one catalog language **through the same
+    /// row store the frozen <see cref="UpsertTranslationAsync"/> uses**
+    /// (C-M15·7 — the same <see cref="TranslationResource"/> upsert, one
+    /// write session), and commits **exactly one** <c>AccessAudit</c> row
+    /// — action <c>translation.import</c>, <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the count of upserted rows (as a string),
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in that same session (C3; C-M15·6: one
+    /// audit row per bulk action, never N rows for N upserts).
+    /// <para>
+    /// A **blank value never reaches here** (the pure
+    /// <see cref="TranslationBulkImporter"/> drops blank cells before
+    /// return — C-M15·4: a blank is a no-op, never an erase; this seam
+    /// still guards — a blank entry in <paramref name="rows"/> is skipped,
+    /// not written). The <c>source</c> column is the importer's concern
+    /// (it ignores it) and never appears in <paramref name="rows"/>. A
+    /// <b>refused</b> bundle is never applied (the caller sees <see cref
+    /// "TranslationBulkImportRefused"/>) — it writes zero rows and emits
+    /// no audit row (C-M15·3, the M11 D4 pin).
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency; the frozen one-row seam
+    /// <see cref="UpsertTranslationAsync"/> stays byte-identical beside it
+    /// (C-M15·7). No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCode">
+    /// The catalog code this call writes (the header's <c>en</c> column
+    /// maps to <c>"en"</c>; a <c>&lt;codeN&gt;</c> column maps to
+    /// <c>codeN</c>).
+    /// </param>
+    /// <param name="rows">
+    /// The present non-blank upsert rows — <c>key → text</c>. Every key is
+    /// a <see cref="KnownTranslationKeys.AllKeys"/> key (the importer
+    /// refused otherwise) and every text is non-blank (the importer
+    /// dropped blanks — C-M15·4).
+    /// </param>
+    /// <param name="actorId">The acting account (GlobalAdmin or Translator
+    /// — the ADR 0021 split), recorded on the one <c>AccessAudit</c> row.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>
+    /// The count of rows upserted (the <c>AccessAudit</c> row's
+    /// <c>TargetId</c> as a string).
+    /// </returns>
+    Task<int> UpsertManyTranslationsAsync(
+        string languageCode,
+        IReadOnlyDictionary<string, string> rows,
+        string actorId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// <b>M15 batch-editor write seam (ADR 0116, D4/D6; U03)</b> — the
+    /// batch editor's one save: upserts the present non-blank rows of one
+    /// catalog language **through the same row store the frozen
+    /// <see cref="UpsertTranslationAsync"/> uses** (C-M15·7 — the same
+    /// <see cref="TranslationResource"/> upsert, one write session), and
+    /// commits **exactly one** <c>AccessAudit</c> row — action
+    /// <c>translation.save_all</c>, <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the **language code**,
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in that same session (C3; C-M15·6: one
+    /// audit row per bulk action, never N rows for N upserts).
+    /// <para>
+    /// A **blank value is dropped, never erased** (C-M15·4 — the same
+    /// no-op rule as the import; a blank entry in
+    /// <paramref name="rows"/> is skipped, not written, and never deletes
+    /// a stored row). The per-row lane
+    /// <see cref="UpsertTranslationAsync"/> stays byte-identical beside it
+    /// (C-M15·7 — the batch editor is the same write, a different action
+    /// string + <c>TargetId</c>).
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency. No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCode">
+    /// The catalog code this call writes — also the one
+    /// <c>AccessAudit</c> row's <c>TargetId</c>.
+    /// </param>
+    /// <param name="rows">
+    /// The form's rows — <c>key → text</c>. Blank values are dropped
+    /// (C-M15·4); the stored set is otherwise upserted present-only.
+    /// </param>
+    /// <param name="actorId">The acting account (GlobalAdmin or Translator
+    /// — the ADR 0021 split), recorded on the one <c>AccessAudit</c> row.</param>
+    /// <param name="ct">The cancellation token.</param>
+    /// <returns>
+    /// The count of rows upserted.
+    /// </returns>
+    Task<int> SaveAllTranslationsAsync(
+        string languageCode,
+        IReadOnlyDictionary<string, string> rows,
+        string actorId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// <b>M15 bulk-export audit seam (ADR 0116, D4; U04)</b> — commits
+    /// **exactly one** <c>AccessAudit</c> row for a translation-bundle
+    /// export: action <c>translation.export</c>,
+    /// <c>TargetKind</c> "translation",
+    /// <c>TargetId</c> = the catalog's language codes joined (","),
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c>, the acting account recorded on
+    /// <c>ActorId</c> + <c>EffectivePrincipalId</c> — the M13
+    /// analytics-CSV precedent (ADR 0114: an admin-surface CSV carries
+    /// exactly one <c>AccessAudit</c> row) applied to the
+    /// <see cref="TranslationBulkExporter"/> bundle.
+    /// <para>
+    /// A **read with an audit** (D4): the matrix read
+    /// (<see cref="GetBulkTranslationMatrixAsync"/>) is un-audited
+    /// (C-M15·7); the export *action* is the audited one — the bundle
+    /// leaving the platform is the operator's act, not a plain read.
+    /// </para>
+    /// <para>
+    /// <b>Additive (C-M15·8):</b> no new document, no new index, no new
+    /// dependency. No new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch / role (C-M15·5 — the Web route rides the
+    /// existing ADR 0021 class gate). The frozen one-row seams
+    /// (<see cref="UpsertTranslationAsync"/>,
+    /// <see cref="GetTranslationsForAsync"/>,
+    /// <see cref="GetCompletenessAsync"/>) stay byte-identical
+    /// (C-M15·7).
+    /// </para>
+    /// </summary>
+    /// <param name="languageCodes">
+    /// The catalog's codes in <c>SortOrder</c> (enabled **and** disabled —
+    /// the whole set, D1/D2), recorded on the one <c>AccessAudit</c>
+    /// row's <c>TargetId</c>.
+    /// </param>
+    /// <param name="actorId">
+    /// The acting account (GlobalAdmin or Translator — the ADR 0021
+    /// split), recorded on the one <c>AccessAudit</c> row.
+    /// </param>
+    /// <param name="ct">The cancellation token.</param>
+    Task RecordTranslationExportAsync(
+        IReadOnlyList<string> languageCodes,
+        string actorId,
+        CancellationToken ct = default);
 
     // ── Completeness — read ─────────────────────────────────────────
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys are

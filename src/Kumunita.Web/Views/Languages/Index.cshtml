@@ -138,6 +138,16 @@
                             <a href="/admin/languages/@row.Code/translations"
                                class="btn btn-outline-info">UI strings</a>
 
+                            @* M15 U04 (ADR 0116, D2/D4) — the per-language download: a plain
+                               <a>, no JS, to the bundle.csv route. Open to both roles (the
+                               class gate, D3). The kw-l label is the U04 `translations.bulk.export`
+                               key; the en fallback is the registry floor (M·1). *@
+                            <a href="/admin/languages/@row.Code/translations/bundle.csv"
+                               class="btn btn-outline-secondary"
+                               title="Download this language's UI strings as the §bundle CSV">
+                                <kw-l key="translations.bulk.export">Download translations (CSV)</kw-l>
+                            </a>
+
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/admin/languages/@row.Code" class="d-inline"

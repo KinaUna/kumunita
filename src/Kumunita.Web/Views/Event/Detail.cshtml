@@ -414,5 +414,43 @@
                 }
             </div>
         </div>
+
+        @* ADR 0115 D2 (M14 interlock) — the **linked to-dos** section (the
+           reverse read seam's page, U01). Rendered **only** when non-empty:
+           `LinkedTodos` is `null` when the event has no linked readable
+           to-dos, so an absent linkage renders nothing — no empty-state
+           section (C-M14·2 — the dangling-safe rule carried to the section;
+           C-M14·4 — the seam's CanSeeAsync(Read) pass is the gate, every row
+           here is already-authorized). One row per to-do: title link +
+           optional status label + optional due date. *@
+        @if (Model.LinkedTodos is { Count: > 0 })
+        {
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3"><kw-l key="events.linked_todos">Linked to-dos</kw-l></h2>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var t in Model.LinkedTodos)
+                        {
+                            <li class="d-flex justify-content-between py-1 align-items-center gap-2 flex-wrap">
+                                <span>
+                                    <a href="@t.LinkPath">@t.Title</a>
+                                    @if (!string.IsNullOrWhiteSpace(t.Status))
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@t.Status</span>
+                                    }
+                                </span>
+                                @if (t.DueAt is not null)
+                                {
+                                    <span class="text-muted small">
+                                        <kw-l key="projects.todo.due">Due</kw-l>
+                                        <kw-dt dt="@t.DueAt.Value" format="g"></kw-dt>
+                                    </span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
     </div>
 </div>

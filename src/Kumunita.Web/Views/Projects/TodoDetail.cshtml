@@ -470,6 +470,80 @@
                     </div>
                 }
 
+                @* ADR 0115 D2 (M14 interlock) — the **event link** chip
+                   (the `ProjectLink` chip above, carried to the event
+                   association): rendered only when the controller resolved a
+                   readable, non-deleted event (C-M14·2 — a dangling /
+                   unreadable association yields null fields and the whole
+                   line is hidden: the chip is a display surface, never a
+                   404/403 for the to-do, and the target's title / id are not
+                   leaked). Absent linkage renders nothing (no empty-state
+                   line). *@
+                @if (Model.EventId is not null && Model.EventTitle is not null)
+                {
+                    <div class="text-muted small mb-3">
+                        <kw-l key="todo.event_link">Linked event</kw-l>:
+                        <a href="@Model.EventLinkPath">@Model.EventTitle</a>
+                    </div>
+                }
+
+                @* ADR 0115 D4 (M14 interlock, U06) — the **VTODO** "Add to
+                   calendar" affordance (the ADR 0112 events.ics.download shape
+                   carried to the to-do surface): a plain link to the lane-1
+                   per-item file (GET /projects/todos/{id}.ics, U06). Quiet,
+                   beside the event-link chip / picker block — the detail page
+                   only renders for a to-do the caller already passed the
+                   Read decision on, so the file lane's own 404-not-403 split
+                   (C-M14·2) is the guard. No new JS (the ADR 0031 tsc-only
+                   discipline — a plain <a>). *@
+                <a class="btn btn-outline-secondary btn-sm d-inline-block mb-3" href="@($"/projects/todos/{Model.Todo.Id}.ics")">
+                    <kw-l key="projects.todos.ics.download">Add to calendar</kw-l>
+                </a>
+
+                @* ADR 0115 D3 (M14 interlock) — the **event picker** (the
+                   <c>set-event</c> lane's affordance, the U04
+                   <c>POST /projects/todos/{id}/set-event</c> form). A
+                   standalone POST (its own small form — **not** the main M5
+                   update form, whose frozen <c>UpdateTodoRequest</c> is
+                   untouched — C-M14·7). The picker is a **display surface,
+                   never a gate** (C-M14·4): the service's
+                   <c>SetTodoEventAsync</c> standing re-check + event guard
+                   on write is the enforcement (C-M14·3). The card is hidden
+                   when the actor has no visible events (the ADR 0086 D9
+                   hide rule — a picker with no options is a noise surface,
+                   not a control). The clear option (blank value) is always
+                   first — a blank / <c>null</c> choice posts <c>null</c> =
+                   **clear** the association. No new JS — one native
+                   <c>&lt;form&gt;</c> / <c>&lt;select&gt;</c> (the ADR 0031
+                   tsc-only discipline). *@
+                @if (Model.EventPicker is { Options.Count: > 0 })
+                {
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <label class="form-label fw-semibold" for="set-event-select">
+                                <kw-l key="todo.set_event.label">Link to event</kw-l>
+                            </label>
+                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/set-event")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <select class="form-select" id="set-event-select" name="eventId">
+                                    <option value="">
+                                        <kw-l key="todo.set_event.pick">Choose an event</kw-l>
+                                    </option>
+                                    @foreach (var (id, name) in Model.EventPicker.Options)
+                                    {
+                                        <option value="@id" selected="@(id == Model.EventPicker.CurrentEventId ? "selected" : null)">@name</option>
+                                    }
+                                </select>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        <kw-l key="todo.set_event.label">Link to event</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                }
+
                 @* F9 — the parent link (a subtask is a full to-do shown under
                    its parent; the service's read surface, the view renders it). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))

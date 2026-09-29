@@ -13,15 +13,16 @@ not a code concern.
 
 ## Status
 
-**M13 in progress** (logging and analytics);
-M1–M12 and all named lanes
-are done — identity, groups & delegation, directory & profiles, posts +
-moderation, multilingual (`ML`/`ML-UI`), rich content (`RC`), guardian
-controls (`GU`), pages (`PG`), events + calendar (`M4`/`GE`/`EV-DWM`),
-projects (`M5`), notifications (`M6`), pagination (`M7`), search (`M8`),
-messaging (`M9`), PWA + responsive design (`M10`), and portability
-(import/export) (`M11`), on one
-server-rendered stack over a single Postgres.
+**M17 in progress** (bookmarks — save posts, events, todos, and other
+platform content for quick personal access); M1–M16
+and all named lanes are done — identity,
+groups & delegation, directory & profiles, posts + moderation, multilingual
+(`ML`/`ML-UI`), rich content (`RC`), guardian controls (`GU`), pages (`PG`),
+events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
+(`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
+design (`M10`), and portability (import/export) (`M11`), on one
+server-rendered stack over a single Postgres. M18 is planned —
+recurring events (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
 milestone-by-milestone breakdown is in the Roadmap below.
@@ -241,8 +242,12 @@ stays trivial and the authorization rules can grow freely.
 - **M10** — PWA and responsive design. **Done.** (ADR 0107)
 - **M11** — Portability (import/export). **Done.** (ADR 0108)
 - **M12** — iCal: a **resident-facing calendar world seam** — a per-event file (`GET /events/{id}.ics`, one `VEVENT`) + a subscription feed (`GET /events.ics`, the caller's visible upcoming set), both `[Authorize]` (no subscription token — authorization rides the cookie, re-run on every fetch), served `text/calendar; charset=utf-8` + `Content-Disposition: attachment` + `Cache-Control: no-store`; the hand-written BCL-only `IcsWriter` (a pure function over already-authorized `Event` rows, the RFC 5545 pinned subset — CRLF, 75-octet fold, full escaping, stable `UID`s, `PRODID: -//Kumunita//community calendar//EN`) — **zero Core schema change**, **zero new dependency**, zero new authorization surface; two `kw-l` affordances (the detail page's "Add to calendar" + the feed/calendar "Calendar feed (iCal)") × en/de/fr/da. **Done.** (ADR 0112)
-- **M13** — Logging and analytics. **In progress.**
-- **M14** — Integration of Events and Projects.
+- **M13** — Logging and analytics: the BCL-only file log sink (the `Kumunita.Core.Logging` surface — `FileLoggerProvider` / `FileLogger` / `LogLine` JSON-lines writer / `RollingFileSink` daily rotation + boot retention), the `UsageEvent` capture lane (one `UsageEvent` doc per recognized request in the new `Kumunita.Core.Usage` context; the pure `UsageCapturePolicy` + `SurfaceKey` closed-list mapper; the thin `UsageCaptureMiddleware` — a capture failure never fails the request), the `IUsageAnalyticsService` aggregation seam (7/30/90-day windows over `Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` / `SurfaceRanking`), the `/admin/analytics` GlobalAdmin surface (the surface-rank table + the CSV export with one `AccessAudit` row), and the 365-day retention tick (`UsagePurgeService` + `UsagePurgeHandler` + `UsagePurgeTick`); **zero new authorization surface**, **zero per-account rendered data**, **zero third-party telemetry** (the C-M13·1/3/6 invariants). **Done.** (ADR 0114)
+- **M14** — Integration of Events and Projects: the `TodoItem.EventId?` association (a feed filter / association, **never a gate** — C-M14·1), the `ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane (creator ∪ assignee ∪ GlobalAdmin, one `todo.set_event` audit row, a missing / unreadable event refused 404 — the frozen seam as truth), the both-direction display links (the to-do detail's event chip + the event detail's "linked to-dos" section, both access-scoped + dangling-safe — an unreadable / absent / soft-deleted event omits the chip, never a 404/403, no title / id leak — C-M14·2), and the VTODO iCal surface (the `TodoIcsWriter` pure emitter over the closed RFC-5545 subset + the two `GET /projects/todos.ics` / `GET /projects/todos/{id}.ics` routes — no `RRULE` / recurrence, C-M14·6); **zero new authorization surface** (C-M14·4 — the frozen `AccessAction` set is unchanged, `EventId` rides the read seams, never a decision). **Done.** (ADR 0115)
+- **M15** — Translation bulk: import/export, review, and extend the platform's translations as a batch — instead of working through them one translation at a time — so they can easily be checked, updated, and extended with new languages. **Done.** (ADR 0116)
+- **M16** — Inventory: check-out / check-in shared, community-owned, or private resources (equipment, clothes for sports teams, books, etc.), track where items are, and optionally how much they are used by whom. **Done.** (ADR 0117)
+- **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **In progress.**
+- **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112).
 
 ## Deferred (future, by design)
 

@@ -1,0 +1,96 @@
+@model Kumunita.Web.Models.InventoryListViewModel
+@functions {
+    // The ownerKind badge's label key (the dynamic-key idiom — the same
+    // <c>StatusLabelKey</c> the M5 to-do feed's status badge uses: the
+    // KwLRegistryConsistencyTests scan skips keys containing '@', so a
+    // helper-mapped dynamic key is the house pattern for a closed-code-set
+    // label. The three D3 labels are the closed set).
+    static string OwnerKindKey(string ownerKind) => ownerKind switch
+    {
+        "shared"    => "inv.list.ownerKind.shared",
+        "community" => "inv.list.ownerKind.community",
+        "private"   => "inv.list.ownerKind.private",
+        _           => "inv.list.filter",
+    };
+}
+@{
+    ViewData["Title"] = "Inventory";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="inv.list.title">Inventory</kw-l></h1>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <a class="btn btn-outline-primary" href="/inventory/new"><kw-l key="inv.create.title">New item</kw-l></a>
+                </div>
+            </div>
+        </header>
+
+        <form method="get" action="/inventory" class="mb-4">
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                    <label class="form-label" for="ownerkind-filter" style="font-weight:600;">
+                        <kw-l key="inv.list.filter">Filter by type</kw-l>
+                    </label>
+                    <select class="form-select" id="ownerkind-filter" name="ownerKind">
+                        <option value="" selected="@(Model.CurrentOwnerKind is null ? "selected" : null)">—</option>
+                        <option value="shared" selected="@(Model.CurrentOwnerKind == "shared" ? "selected" : null)"><kw-l key="inv.list.ownerKind.shared">Shared</kw-l></option>
+                        <option value="community" selected="@(Model.CurrentOwnerKind == "community" ? "selected" : null)"><kw-l key="inv.list.ownerKind.community">Community</kw-l></option>
+                        <option value="private" selected="@(Model.CurrentOwnerKind == "private" ? "selected" : null)"><kw-l key="inv.list.ownerKind.private">Private</kw-l></option>
+                    </select>
+                </div>
+                @if (Model.Components.Count > 0)
+                {
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="inv.create.component">Section</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value="" selected="@(Model.CurrentComponentId is null ? "selected" : null)">—</option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+            </div>
+        </form>
+
+        <div class="airy-ann-list">
+            @if (Model.Items.Count == 0)
+            {
+                <div class="p-4 text-muted"><kw-l key="inv.list.empty">No items yet.</kw-l></div>
+            }
+            @foreach (var row in Model.Items)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@($"/inventory/{row.Id}")">@row.Name</a>
+                        </h3>
+                        <div class="text-muted small">
+                            <span class="badge bg-light text-dark border me-2">
+                                <kw-l key="@OwnerKindKey(row.OwnerKind)">@row.OwnerKind</kw-l>
+                            </span>
+                            @if (row.CurrentHolderName is not null)
+                            {
+                                <span><kw-l key="inv.detail.currentHolder">Currently with</kw-l> @row.CurrentHolderName · </span>
+                            }
+                            <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* M7 (ADR 0090 D5) — the shared pager (F2 one-page no-render pin). *@
+        @if (Model.Pager is not null)
+        {
+            <partial name="_Pager" model="Model.Pager" />
+        }
+    </div>
+</div>

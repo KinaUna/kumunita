@@ -51,8 +51,12 @@ public static class Milestones
         new("M10", "PWA and responsive design", StatusDone),
         new("M11", "Portability (import/export)", StatusDone),
         new("M12", "iCal", StatusDone),
-        new("M13", "Logging and analytics", StatusNext),
-        new("M14", "Integration of Events and Projects", StatusPlanned),
+        new("M13", "Logging and analytics", StatusDone),
+        new("M14", "Integration of Events and Projects", StatusDone),
+        new("M15", "Translation bulk — import/export, review & extend the platform's translations as a batch rather than one at a time", StatusDone),
+        new("M16", "Inventory — check-out / check-in shared, community-owned, or private items (equipment, sports-team clothes, books, …); track where items are and, optionally, who uses them how much", StatusDone),
+        new("M17", "Bookmarks — save posts, events, todos, etc. for quick personal access", StatusNext),
+        new("M18", "Recurring events — repeating events over the M4 events surface", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch

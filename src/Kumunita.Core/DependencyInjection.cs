@@ -44,6 +44,16 @@ public static class ServiceCollectionExtensions
     {
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
+
+        // M13 (ADR 0114, plan U04): the D3 aggregation seam — the Usage
+        // context's operator-plane read service (it touches only
+        // UsageEvent; the AspNetUsers table is never read — the
+        // "NewSignups dropped" deferral). Zero new authorization surface
+        // (C-M13·6). The same "AddTransient with the store injected"
+        // shape as IPageService / IEventService below.
+        services.AddTransient<Usage.IUsageAnalyticsService>(sp => new Usage.UsageAnalyticsService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
         // seam (the account.signup / account.verified admin-lane emitters) is
         // resolved automatically by the container from the registered
@@ -250,6 +260,28 @@ public static class ServiceCollectionExtensions
             // EventReminderService resolution order).
             sp.GetRequiredService<Localization.ITranslationProvider>(),
             sp.GetRequiredService<Localization.ILocalizationService>()));
+
+        // M16 (ADR 0117, plan U02): the Inventory bounded context's service
+        // seam (bounded context Kumunita.Core.Inventory — the "track where
+        // items are, and optionally how much they are used by whom" surface:
+        // the InventoryItem + InventoryCheckout documents, the M16DocTypes
+        // surface, the InventoryItemToAuditableResource adapter). Same
+        // "AddTransient with the store injected" shape as IProjectService
+        // above; U02 lands the read lanes (ListItemsAsync / GetItemAsync /
+        // GetHistoryAsync), U03 lands the write lanes + the D5 standing
+        // probes + the F1 atomic transition (the seam is the frozen surface
+        // — the design doc §Seams pin). Composes **only** the frozen seams
+        // (D8 / C-M16·6): IDocumentStore + IUserInfoService (the GlobalAdmin
+        // standing probe the U03 write lanes compose) + IAuthorizationService
+        // (the frozen read/write decision path, via the U01 adapter — no new
+        // AccessAction / AccessVia / Decide() branch, C-M16·4). **No**
+        // INotificationService (D8 — the nudge lane is §deferred, its own
+        // ADR) and **no** off-by-default toggle (D6 — M16 is a standing core
+        // surface, like M5 Projects).
+        services.AddTransient<Inventory.IInventoryService>(sp => new Inventory.InventoryService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

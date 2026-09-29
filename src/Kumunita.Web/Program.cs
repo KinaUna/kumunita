@@ -1,9 +1,12 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Bootstrap;
+using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Usage;
 using Kumunita.Web;
+using Kumunita.Web.Middleware;
 using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -15,6 +18,7 @@ using Marten;
 using Marten.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net.Mail;
 using Wolverine;
@@ -39,6 +43,17 @@ builder.Services.AddControllersWithViews();
 // call AddLogging for us), so even LoggerFactory was missing from DI. AddLogging
 // registers LoggerFactory, ILoggerFactory, and the open-generic ILogger<T>.
 builder.Services.AddLogging();
+
+// M13 file log sink (ADR 0114 D6): the dated app-*.log files under a
+// configurable directory, BCL-only (no logging package). ADDITIVE — the
+// console sink above (docker logs) stays; this is a second ILoggerProvider
+// on the same ILoggerFactory. The call runs one RollingFileSink.Retain boot
+// pass (delete files older than RetentionDays by mtime), then registers the
+// provider. The config read follows the CommunityOptions / MediaOptions
+// bind shape (Logging__File__Directory /
+// Logging__File__RetentionDays, defaulted by the FileSinkOptions POCO).
+var fileSinkOptions = builder.Configuration.GetSection(FileSinkOptions.SectionName).Get<FileSinkOptions>() ?? new FileSinkOptions();
+builder.Logging.AddFileSink(fileSinkOptions.Directory, fileSinkOptions.RetentionDays);
 
 // SchemaBootstrap and FirstBootSeeder are static classes and resolve the non-generic
 // ILogger: they can't be ILogger<T> type arguments (CS0718 — static types), and the
@@ -152,6 +167,26 @@ var marten = builder.Services.AddMarten(opts =>
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
     M9DocTypes.Configure(opts);
+
+    // M16 (ADR 0117 D1, plan U01): the Inventory bounded context's documents
+    // (InventoryItem + InventoryCheckout, ADR 0004 §B.1 — the (ComponentId,
+    // Created) + (OwnerKind, Created) feed/filter indexes on InventoryItem
+    // (a filter, never a gate — C-M3·2 / C-M16·5) and the (ItemId, CheckedOutAt)
+    // thread-ordering index on InventoryCheckout, plus the unique partial
+    // index on (ItemId) where CheckedInAt IS NULL — the F1 idempotency witness,
+    // the M9 convo_uidx_pair shape). Without this call the docs are invisible
+    // to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M16DocTypes.Configure(opts);
+
+    // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
+    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
+    // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
+    // the conventional string Id, so no non-default convention or
+    // business-key index is pinned). Without this call the UsageEvent doc
+    // is invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent).
+    UsageDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -533,6 +568,15 @@ app.UseMiddleware<BlockedAccountMiddleware>();
 // authorization (so the gate sees a current claim set).
 app.UseMiddleware<PrivilegedStampMiddleware>();
 
+// M13 — usage capture (D1, ADR 0114): record one UsageEvent per recognized
+// request (route template + ActorId, nothing else — C-M13·2). Registered
+// after UseAuthentication() + PrivilegedStampMiddleware (so HttpContext.User is
+// populated and the current claim set is live) and before UseAuthorization()
+// (so a denied request, which never reaches the endpoint, is not captured —
+// the C-M13·4 boundary, no noise). A capture failure never fails the request
+// (C-M13·5 — the middleware's own try/catch logs and swallows).
+app.UseMiddleware<UsageCaptureMiddleware>();
+
 app.UseAuthorization();
 
 app.MapStaticAssets();
@@ -630,13 +674,14 @@ else if (sampleDataOpts.Enabled && !firstBoot)
 }
 
 // Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
-// SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a
-// 1-day delay, so publishing one fresh tick each schedules the first run for
-// tomorrow; each handler self-reschedules (returns a new tick) after each run so
-// the cadence continues. Idempotent: the purge is a no-op when no rows are
-// expired, and the reminder service is a no-op when nothing is in the window
-// (the existing-OutboxEmail-key check is the no-double-send guard), so a
-// double-schedule across two consecutive boots is harmless.
+// SideEffects/EventReminderHandler + SideEffects/UsagePurgeHandler) on boot.
+// The TimeoutMessage types bake in a 1-day delay, so publishing one fresh tick
+// each schedules the first run for tomorrow; each handler self-reschedules
+// (returns a new tick) after each run so the cadence continues. Idempotent: the
+// purges are a no-op when no rows are expired, and the reminder service is a
+// no-op when nothing is in the window (the existing-OutboxEmail-key check is
+// the no-double-send guard), so a double-schedule across two consecutive boots
+// is harmless.
 //
 // This must run AFTER StartAsync: Wolverine's IMessageBus asserts that the
 // underlying IHost has started (WolverineRuntime.AssertHasStarted), so any publish
@@ -647,6 +692,12 @@ await using var startupScope = app.Services.CreateAsyncScope();
 var bus = startupScope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
 await bus.PublishAsync(new AuditPurgeTick());
 await bus.PublishAsync(new EventReminderTick());
+// M13 (ADR 0114 D5) — the UsageEvent 365-day retention tick (the
+// UsagePurgeHandler self-reschedules after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and the
+// UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
+// would silently stop honoring the 365-day constant).
+await bus.PublishAsync(new UsagePurgeTick());
 
 try
 {
