@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -3421,6 +3422,199 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         Assert.Equal(30, page.Items.Count);
         Assert.True(page.HasMore);
+    }
+
+    // ── M14 U02 — SetTodoEventAsync (ADR 0115 D3, the 3 pinned tests) ──────
+
+    /// <summary>
+    /// **U02 pin 1** (ADR 0115 §pinned tests): the **standing matrix**
+    /// (C-M14·3 / C-M5·6) — creator, assignee, and GlobalAdmin each **allowed**;
+    /// an outsider (not the creator, not the assignee, no elevated role)
+    /// **refused** with <see cref="UnauthorizedAccessException"/> (403) and
+    /// **nothing written** (the standing is re-checked **server-side** — the
+    /// Web <c>[Authorize]</c> is a pre-gate only).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoEventAsync_AllowsCreatorAssigneeAndGlobalAdmin_RefusesOutsider()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-m14-u02-p1-creator";
+        const string assignee = "u-m14-u02-p1-assignee";
+        const string otherAuthor = "u-m14-u02-p1-other-author";
+        const string outsider = "u-m14-u02-p1-outsider";
+        const string eventId = "m14-u02-p1-event";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        // A public event any standing actor may read (the guard is satisfied;
+        // this pin isolates the to-do's standing, not the event guard).
+        await Plant(store, new Event
+        {
+            Id = eventId, Title = "A public event", AuthorId = creator,
+            Start = at, End = at.AddHours(2), IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        // to-do A — creator standing: the creator is its AuthorId.
+        await Plant(store, new TodoItem
+        {
+            Id = "u02p1-todo-creator", AuthorId = creator, Title = "Creator to-do",
+            Created = at, Audience = null,
+        });
+        // to-do B — assignee standing: the actor is its AssigneeId (the creator
+        // is a third party, isolating the assignee branch).
+        await Plant(store, new TodoItem
+        {
+            Id = "u02p1-todo-assignee", AuthorId = otherAuthor, AssigneeId = assignee,
+            Title = "Assignee to-do", Created = at, Audience = null,
+        });
+        // to-do C — GlobalAdmin standing only: neither creator nor assignee, so
+        // the GlobalAdmin branch is the only thing that grants it.
+        await Plant(store, new TodoItem
+        {
+            Id = "u02p1-todo-admin", AuthorId = otherAuthor, AssigneeId = assignee,
+            Title = "Admin to-do", Created = at, Audience = null,
+        });
+
+        // Creator (Owner branch) → allowed; EventId written.
+        var byCreator = await svc.SetTodoEventAsync(
+            "u02p1-todo-creator", creator, MemberRoles, eventId);
+        Assert.Equal(eventId, byCreator.EventId);
+
+        // Assignee (the ADR 0067 collaborator branch) → allowed.
+        var byAssignee = await svc.SetTodoEventAsync(
+            "u02p1-todo-assignee", assignee, MemberRoles, eventId);
+        Assert.Equal(eventId, byAssignee.EventId);
+
+        // GlobalAdmin (the ADR 0017 override branch) → allowed.
+        var byAdmin = await svc.SetTodoEventAsync(
+            "u02p1-todo-admin", "u-m14-u02-p1-admin", GlobalAdminRoles, eventId);
+        Assert.Equal(eventId, byAdmin.EventId);
+
+        // Outsider (a member, neither creator nor assignee) → refused (403),
+        // nothing written on the to-do.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoEventAsync("u02p1-todo-creator", outsider, MemberRoles, eventId));
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p1-todo-creator"))!;
+            // The allowed creator write above is still the stored value — the
+            // refused outsider write left it untouched.
+            Assert.Equal(eventId, reloaded.EventId);
+        }
+    }
+
+    /// <summary>
+    /// **U02 pin 2** (ADR 0115 §pinned tests): the **event guard** + the
+    /// **null-clears** rule (C-M14·3). A non-null <paramref name="eventId"/>
+    /// pointing at an event the actor **cannot read** (audience-restricted;
+    /// the actor is the to-do's creator, so standing is satisfied) is
+    /// **refused** (the C3 non-leaky split — the sibling
+    /// <see cref="ProjectService.SetTodoProjectAsync"/> shape, drift entry 1:
+    /// the frozen <c>CanAsync(Read)</c> decision over the
+    /// <see cref="EventToAuditableResource"/>) with **nothing written**; a
+    /// <c>null</c> <paramref name="eventId"/> **clears** the link and stamps
+    /// <see cref="TodoItem.Modified"/>.
+    /// </summary>
+    [Fact]
+    public async Task SetTodoEventAsync_RefusesInvisibleEventId_NullClearsTheLink()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-m14-u02-p2-creator";
+        const string eventId = "m14-u02-p2-event";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        // A readable public event (the happy path) + a **restricted** event
+        // the creator is not granted (the guard's refused side).
+        await Plant(store, new Event
+        {
+            Id = eventId, Title = "A readable event", AuthorId = creator,
+            Start = at, End = at.AddHours(2), IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "m14-u02-p2-restricted", Title = "A restricted event",
+            AuthorId = "u-m14-u02-p2-event-author",
+            Start = at, End = at.AddHours(2), IsDraft = false, IsDeleted = false,
+            Audience = Audience(GrantKind.User, "u-m14-u02-p2-grantee"),
+        });
+
+        await Plant(store, new TodoItem
+        {
+            Id = "u02p2-todo", AuthorId = creator, Title = "A to-do", Created = at,
+            Audience = null,
+        });
+
+        // The creator (standing satisfied) may link to the readable event.
+        var ok = await svc.SetTodoEventAsync(
+            "u02p2-todo", creator, MemberRoles, eventId);
+        Assert.Equal(eventId, ok.EventId);
+
+        // ...but is refused (the C3 split, the sibling's 403-for-unreadable)
+        // when pointing at the restricted event — nothing written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, "m14-u02-p2-restricted"));
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo"))!;
+            Assert.Equal(eventId, reloaded.EventId); // still the readable one
+        }
+
+        // A null eventId clears the link (the sibling's null-unassociate rule)
+        // and stamps Modified.
+        var cleared = await svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, null);
+        Assert.Null(cleared.EventId);
+        Assert.NotNull(cleared.Modified);
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo"))!;
+            Assert.Null(reloaded.EventId);
+        }
+    }
+
+    /// <summary>
+    /// **U02 pin 3** (ADR 0115 §pinned tests): the write commits **atomically
+    /// with exactly one** <see cref="AccessAudit"/> row
+    /// (<c>todo.set_event</c>, <c>TargetKind = "todo"</c>) — the C3 audit pin.
+    /// The row's <c>Via</c> is <see cref="AccessVia.Owner"/> for the creator
+    /// (the <see cref="ProjectService"/> <c>TodoAuditViaFor</c> shape).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoEventAsync_CommitsOneAccessAuditRowWithTheWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-m14-u02-p3-creator";
+        const string eventId = "m14-u02-p3-event";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        await Plant(store, new Event
+        {
+            Id = eventId, Title = "A public event", AuthorId = creator,
+            Start = at, End = at.AddHours(2), IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "u02p3-todo", AuthorId = creator, Title = "A to-do", Created = at,
+            Audience = null,
+        });
+
+        await svc.SetTodoEventAsync("u02p3-todo", creator, MemberRoles, eventId);
+
+        // The write landed ...
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p3-todo"))!;
+            Assert.Equal(eventId, reloaded.EventId);
+        }
+
+        // ... and exactly one audit row for the to-do, with the locked action
+        // string + target kind, the creator's <see cref="AccessVia.Owner"/>.
+        var audits = await TodoAuditRows(store, "u02p3-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_event");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("u02p3-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
     }
 
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────

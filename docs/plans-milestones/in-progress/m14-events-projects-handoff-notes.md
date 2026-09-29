@@ -221,3 +221,107 @@ doc verbatim; drift entry 3 (the `todoItemId` parameter name, a U02
 concern) is honored — untouched, and the sibling `SetTodoProjectAsync`
 shape is intact. **Docker cleanup note:** none needed — the run
 completed normally (no orphaned containers observed).
+
+## U02 — `set-event` write lane (`SetTodoEventAsync`)
+
+**Status:** done, build green (0 warnings), **996 / 996 Core tests pass**
+(0 errors, 0 skipped — includes the 3 U02 pins below, discovered +
+executed) and **585 / 585 Web tests pass**. Implemented **only U02**: the
+M14 `set-event` write lane, additive only (C-M14·7); the frozen
+`IEventService` surface and every existing `IProjectService` lane
+untouched; **no** new `AccessAction` / `AccessVia` / `Decide()` branch /
+adapter (C-M14·4 — reuses the frozen `CanAsync(Read)` path over the
+**existing** `EventToAuditableResource` adapter, M4 U02); **no**
+`RRULE` / recurrence (C-M14·6 / D6); **no** Events → Projects
+dependency (the `Projects` context references the `Events` context's
+`Event` + `EventToAuditableResource` — the same direction as
+`SetTodoProjectAsync` referencing `Project`; no reference is added to the
+`Events` → `Projects` direction, D2's pin holds).
+
+**Drift entries 1 + 2 honored (verified against the live sibling).**
+The house's association-lane precedent — `SetTodoProjectAsync` — resolves
+its **target**'s visibility through the **frozen**
+`IAuthorizationService.CanAsync(Read)` path over the target's
+`IAuditableResource` (a `ProjectToAuditableResource`), **not** by calling
+a sibling service's `GetAsync`. So the preferred reading (drift entry 1)
+holds, and **`ProjectService`'s constructor gains no `IEventService`
+parameter** (drift entry 2 confirmed — the `Services(...)` test trio and
+the existing positional constructor signature are unchanged). The
+`set-event` event-guard mirrors the `set-project` project-guard
+**verbatim**, swapping `Project` / `ProjectToAuditableResource` for
+`Event` / `EventToAuditableResource` and `"todo.set_project"` for
+`"todo.set_event"`.
+
+**(a) The seam** — `src/Kumunita.Core/Projects/IProjectService.cs`, the
+locked §D3 signature verbatim (drift entry 3 — `todoItemId`, matching the
+sibling `SetTodoProjectAsync(string todoItemId, …)`), placed immediately
+after `SetTodoProjectAsync`:
+
+```csharp
+Task<TodoItem> SetTodoEventAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default);
+```
+
++ the full §D3 doc-comment (creator ∪ assignee ∪ GlobalAdmin re-checked
+server-side C-M14·3; to-do `!IsDeleted` 404; a non-null `eventId` that is
+non-existent / soft-deleted / unreadable refused 404 the non-leaky split;
+`null` clears; `AuthorId` / `Created` untouched, `Modified` stamped; one
+`AccessAudit` row `todo.set_event` / `TargetKind = "todo"` committed
+atomically, C3; C-M14·4 no new surface).
+
+**(b) The implementation** — `src/Kumunita.Core/Projects/ProjectService.cs`,
+immediately after `SetTodoProjectAsync`, the **exact** `SetTodoProjectAsync`
+shape:
+
+- Standing: `CheckTodoStanding(actorId, actorRoles, todo)` (creator ∪
+  assignee ∪ GlobalAdmin, C-M5·6) against the **stored** to-do.
+- Existence: `LoadAsync<TodoItem>` → null / `IsDeleted` → `KeyNotFoundException`
+  (404), **before** the standing check (same order as the sibling).
+- **Event guard (drift entry 1):** `if (eventId is not null)` →
+  `session.LoadAsync<Event>(eventId)` → null or `IsDeleted` →
+  `KeyNotFoundException` (404, the non-leaky split — the
+  `SetTodoProjectAsync` project-guard shape); then
+  `_authorization.CanAsync(actorId, AccessAction.Read, new
+  EventToAuditableResource(@event))` → `!Allowed` → `UnauthorizedAccessException`
+  (the C3 split, the "a read is not a decision" posture, ADR 0054).
+  `null` `eventId` = clear the link — the guard is skipped.
+- Write: `todo.EventId = eventId;` (`null` = clear), `todo.Modified =
+  DateTimeOffset.UtcNow;`, `session.Store(todo);`.
+- Audit: `StoreAuditRow(session, actorId, "todo.set_event", todo.Id,
+  TargetKindTodo, TodoAuditViaFor(actorId, todo));` then
+  `SaveChangesAsync` — **one** row committed atomically (C3), the
+  `todo.set_project` shape with the `todo.set_event` action string.
+
+`ProjectService.cs` gains one `using Kumunita.Core.Events;` (the `Event`
++ `EventToAuditableResource` types) — **no constructor change**.
+
+**(c) The 3 pin names + pass/red** (all in
+`tests/Kumunita.Core.Tests/ProjectServiceTests.cs`, the existing
+`PostgresFixture` / `BootStoreAsync` / `Services` / `Plant` shape — no
+new harness; `using Kumunita.Core.Events;` added to the test file):
+
+1. `SetTodoEventAsync_AllowsCreatorAssigneeAndGlobalAdmin_RefusesOutsider`
+   — green (creator/assignee/GlobalAdmin each write `EventId`; the
+   outsider is refused 403 and leaves the stored row untouched —
+   C-M14·3 / C-M5·6)
+2. `SetTodoEventAsync_RefusesInvisibleEventId_NullClearsTheLink` — green
+   (the readable event writes; an audience-restricted event is refused
+   for the standing creator — nothing written; `null` clears `EventId`
+   and stamps `Modified` — C-M14·3, drift entry 1)
+3. `SetTodoEventAsync_CommitsOneAccessAuditRowWithTheWrite` — green (one
+   `todo.set_event` row, `TargetKind = "todo"`, `Via Owner` for the
+   creator — C3)
+
+(3 / 3 green; whole suite: `Kumunita.Core.Tests  Total: 996, Errors: 0,
+Failed: 0, Skipped: 0`; `Kumunita.Web.Tests  Total: 585, Errors: 0,
+Failed: 0, Skipped: 0` — the frozen Web pins survive the additive seam.)
+
+**(d) Compile warnings** — none; `dotnet build Kumunita.slnx -c Debug`
+succeeded clean (all 4 projects). **Drift vs. the register:** none
+recorded — the seam signature (`todoItemId`), the standing rule, the
+event-visibility rule, the `todo.set_event` audit action, and the 3 pin
+names all match the design doc verbatim; drift entry 1 (the `CanAsync(Read)`
+over `EventToAuditableResource`, **not** `IEventService.GetAsync`) and
+drift entry 2 (no `IEventService` constructor parameter) both hold —
+verified against the live `SetTodoProjectAsync` sibling. **Docker cleanup
+note:** none needed — both runs completed normally (no orphaned
+containers observed).

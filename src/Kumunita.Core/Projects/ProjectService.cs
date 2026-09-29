@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
@@ -2462,6 +2463,71 @@ public sealed class ProjectService : IProjectService
 
         session.Store(todo);
         StoreAuditRow(session, actorId, "todo.set_project", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return todo;
+    }
+
+    /// <summary>
+    /// **M14 interlock (ADR 0115 D3)**: sets <see cref="TodoItem.EventId"/>
+    /// to <paramref name="eventId"/> (<c>null</c> = clear the link — the
+    /// <see cref="SetTodoProjectAsync"/> null-clears rule). Standing
+    /// (server-side, C3): **creator ∪ assignee ∪ GlobalAdmin** over the
+    /// **to-do** (C-M5·6, the <see cref="CheckTodoStanding"/> shape).
+    /// **Event guard** (drift entry 1): a non-null <paramref name="eventId"/>
+    /// must point at an event that exists (404 otherwise), is not
+    /// soft-deleted (404), and that the actor may Read (403) — the frozen
+    /// <see cref="IAuthorizationService"/> <c>CanAsync(Read)</c> path over
+    /// the <see cref="EventToAuditableResource"/> (C-M14·3/4; a *read* is not
+    /// a decision — ADR 0054); checked **before** the to-do write (the
+    /// <see cref="SetTodoProjectAsync"/> target-visibility shape).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped. One <see cref="AccessAudit"/> row (<c>todo.set_event</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task<TodoItem> SetTodoEventAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a to-do with an event.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6).
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // The event guard (ADR 0115 D3, drift entry 1): a non-null eventId
+        // must point at an event that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — the frozen
+        // IAuthorizationService.CanAsync(Read) path over the
+        // EventToAuditableResource (C-M14·3/4 — "a read is not a decision",
+        // ADR 0054); `null` = clear the link — no guard.
+        if (eventId is not null)
+        {
+            var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+            if (@event is null)
+                throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+            if (@event.IsDeleted)
+                throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+            var eventDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new EventToAuditableResource(@event))
+                .ConfigureAwait(false);
+            if (!eventDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read event '{eventId}'.");
+        }
+
+        todo.EventId = eventId;                          // `null` = clear the link.
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        StoreAuditRow(session, actorId, "todo.set_event", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }

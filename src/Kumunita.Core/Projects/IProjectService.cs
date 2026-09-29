@@ -656,6 +656,26 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
 
     /// <summary>
+    /// The **M14 interlock** (ADR 0115 D3): sets <c>TodoItem.EventId</c> to
+    /// <paramref name="eventId"/> (<c>null</c> = **clear the link** — the
+    /// <see cref="SetTodoProjectAsync"/> null-clears rule). **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the **to-do** (the C-M5·6 standing
+    /// matrix, re-checked **server-side** — C-M14·3; the Web <c>[Authorize]</c>
+    /// is a convenience pre-gate only, never the source of truth). The to-do
+    /// must exist and be <c>!IsDeleted</c> (<see cref="KeyNotFoundException"/>
+    /// — 404). A non-null <c>eventId</c> that is **non-existent, soft-deleted,
+    /// or not readable by the actor is refused** (<see
+    /// cref="KeyNotFoundException"/> — 404, the non-leaky split, C-M14·3; the
+    /// standing decision is the frozen <see cref="IAuthorizationService"/>
+    /// <c>CanAsync(Read)</c> path over the event — **you can only link to an
+    /// event you can see**; C-M14·4 — no new authorization surface).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped; one <c>AccessAudit</c> row (<c>todo.set_event</c>,
+    /// <c>TargetKind = "todo"</c>) commits **atomically** with the write (C3).
+    /// </summary>
+    Task<TodoItem> SetTodoEventAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default);
+
+    /// <summary>
     /// Sets <c>KanbanBoard.ProjectId</c> to <paramref name="projectId"/>
     /// (<c>null</c> = unassociate). **Creator ∪ GlobalAdmin** over the
     /// **board** (the ADR 0070 precedent, re-checked server-side). A non-null
