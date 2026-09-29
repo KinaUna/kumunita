@@ -104,3 +104,103 @@ _(next: U01 — the `Kumunita.Core/Localization/` bulk pair:
 `TranslationBulkRow` + the pure `TranslationBulkExporter` + the additive
 `GetBulkTranslationMatrixAsync` seam + the four Core pins — see
 `m15-u01.md`)_
+
+---
+
+## U01 — exporter + bulk-read seam
+
+**Date:** 2026-09-29. **Author:** U01 (this unit).
+
+**What shipped (Core only — additive, the drift-guard list untouched):**
+
+- `src/Kumunita.Core/Localization/TranslationBulkRow.cs` — the matrix
+  POCO (a projection, **not** a Marten document — no `mt` table,
+  C-M15·8): `Key` + `SourceText` (never null — the M·12 floor) +
+  `Stored: IReadOnlyDictionary<string, string?>` (the catalog's codes →
+  the stored text; a missing row is present with a `null` value — the
+  empty cell, never a synthetic row — D1).
+- `src/Kumunita.Core/Localization/TranslationBulkExporter.cs` — the pure
+  emitter (the `IcsWriter` posture: no store, no session, no audit, no
+  HTTP, no CSV package — BCL-only `StringBuilder`):
+  - `public const string BundleMarker = "# kumunita-translation-bundle/1"`
+    (the §bundle format authority, exposed as a constant so U02's importer
+    can pin against it without re-deriving the marker text).
+  - `public static string Build(IReadOnlyList<TranslationBulkRow> matrix,
+    IReadOnlyList<string> columnOrder)` → the entire bundle: marker row,
+    the `key,source,en,<codes…>` header (the `en` column is dedicated and
+    third — a catalog `en` maps onto it, never duplicated), body rows in
+    matrix order, RFC-4180 quoting (a comma / quote / CR-LF ⇒ quoted,
+    embedded quotes doubled; plain + empty cells unquoted), CRLF on every
+    line including the last.
+- `src/Kumunita.Core/Localization/ILocalizationService.cs` — the additive
+  seam `Task<IReadOnlyList<TranslationBulkRow>>
+  GetBulkTranslationMatrixAsync(CancellationToken ct = default)` +
+  doc-comment: **a read — no audit row** (C-M15·7), one
+  `GetTranslationsForAsync` round-trip per catalog code, the catalog's
+  codes in `SortOrder` as the column set (disabled included — D1/D2).
+- `src/Kumunita.Core/Localization/LocalizationService.cs` — the
+  implementation: `ListLanguagesAsync()` → codes in `SortOrder` → one
+  frozen `GetTranslationsForAsync` per code → one `TranslationBulkRow` per
+  `KnownTranslationKeys.AllKeys` (declaration order), `SourceText` =
+  `EnValues[key]`, a missing row → a `null` cell. Composes the frozen
+  seams only; creates no second store (C-M15·1); touches no schema
+  (C-M15·8).
+- `tests/Kumunita.Core.Tests/TranslationBulkExporterTests.cs` — the 4
+  pinned tests, names verbatim from the design doc's §pinned tests (U01
+  group), over the same `PostgresFixture` template
+  `LocalizationServiceTests` uses.
+
+**Exit items (the unit plan's Exit section):**
+
+- **(a) The `TranslationBulkExporter` signature** —
+  `public static string Build(IReadOnlyList<TranslationBulkRow> matrix,
+  IReadOnlyList<string> columnOrder)` (+ `public const string
+  BundleMarker`). One public method, the locked D9 surface; the §bundle
+  shape is the entire output.
+- **(b) The matrix POCO shape** — `TranslationBulkRow { string Key; string
+  SourceText; IReadOnlyDictionary<string,string?> Stored; }` — a
+  projection, not a document; `Stored`'s `null` values are the missing
+  cells (the M·12 floor; never an absent entry).
+- **(c) The seam signature + the "no audit row" doc-comment** —
+  `Task<IReadOnlyList<TranslationBulkRow>>
+  GetBulkTranslationMatrixAsync(CancellationToken ct = default)` on
+  `ILocalizationService`; the doc-comment states **"A read: no audit
+  row"** (C-M15·7) and that the column set is the catalog's codes in
+  `SortOrder`, disabled included (D1/D2).
+- **(d) The 4 pin names + pass/red** — all **green**:
+  - `Bulk_Export_RoundTrips_TheClosedSetMatrix` — ✅ pass
+  - `Bulk_Export_MissingRowIsEmptyCell_NeverNull` — ✅ pass
+  - `Bulk_Export_ColumnsFollowCatalogSortOrder` — ✅ pass
+  - `Bulk_Export_Pure_NoAuditRow` — ✅ pass
+  Full Core suite: `Total: 1004, Errors: 0, Failed: 0, Skipped: 0,
+  Not Run: 0` (the xunit.v3 in-process runner, per AGENTS.md).
+- **(e) The bundle spec as implemented** — marker line 1 verbatim
+  `# kumunita-translation-bundle/1`; column header line 2
+  `key,source,en,<SortOrder codes…>` (e.g. `key,source,en,pl`); body rows
+  in `AllKeys` declaration order. Quoted-cell example (RFC 4180): a stored
+  text `Hello, neighbor — see the "board" for details` renders as
+  `"Hello, neighbor — see the \"board\" for details"`. CRLF on every
+  line including the last; UTF-8 text, no BOM (the caller's encoding
+  choice — `Build` returns text).
+- **(f) Any compile warnings** — **none** (`0 Warning(s), 0 Error(s)`
+  on `dotnet build Kumunita.slnx -c Debug`).
+
+**Drift notes (appended, never rewritten):**
+
+- **No design-doc drift** — D1/D2 + the §bundle table + the 4 pinned
+  names were copied verbatim from
+  `docs/design/m15-translation-bulk-design.md`; no source-driven
+  refinement was needed, so the §drift-guard drift log stays empty.
+- **One test-side refinement (not a spec drift):**
+  `Bulk_Export_Pure_NoAuditRow` scopes its `Assert.Empty` to the
+  **translation** surface (`TargetKind == "translation"`), because the
+  test's own seeding (`AddLanguage`) uses the *already-audited*
+  `language.add` seam — a different, out-of-scope audit row. The pin
+  still asserts the **bulk read emits zero `AccessAudit` rows** on the
+  translation surface, which is what C-M15·7 / the §bundle "a read" pin
+  require. Recorded here (not in the design doc's drift log) because it
+  is a test-harness detail, not a locked-pin change.
+
+_(next: U02 — the `TranslationBulkImporter` pure + `UpsertManyTranslatio
+nsAsync` + the five fail-closed / blank-no-op / audit-shape pins — see
+`m15-u02.md`)_

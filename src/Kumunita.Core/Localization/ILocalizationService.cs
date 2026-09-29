@@ -180,6 +180,29 @@ public interface ILocalizationService
     /// </summary>
     Task<IReadOnlyDictionary<string, string>> GetTranslationsForAsync(string languageCode);
 
+    /// <summary>
+    /// <b>M15 bulk-read seam (ADR 0116, D1; U01)</b> — the closed-set matrix
+    /// the translation-bundle exporter (<see cref="TranslationBulkExporter"/>)
+    /// projects onto the §bundle CSV: one <see cref="TranslationBulkRow"/> per
+    /// <see cref="KnownTranslationKeys.AllKeys"/> key in declaration order;
+    /// each row's <see cref="TranslationBulkRow.Stored"/> carries **every**
+    /// catalog code (enabled **and** disabled, the catalog's set) — a code
+    /// with no stored <see cref="TranslationResource"/> row is present with a
+    /// <c>null</c> value (an **empty cell**, never a synthetic row — the M·12
+    /// floor).
+    /// <para>
+    /// <b>A read: **no audit row**</b> (C-M15·7 — matching
+    /// <see cref="GetTranslationsForAsync"/>; the matrix read emits **zero**
+    /// <c>AccessAudit</c> rows, the §bundle "a read" pin). Composes the frozen
+    /// seams only — one <see cref="GetTranslationsForAsync"/> round-trip per
+    /// catalog code (the <c>key → text</c> map), plus the catalog's codes in
+    /// <c>SortOrder</c>; it creates no second store (C-M15·1) and touches no
+    /// schema (C-M15·8).
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<TranslationBulkRow>> GetBulkTranslationMatrixAsync(
+        CancellationToken ct = default);
+
     /// <summary>Upserts one UI string — audited <c>translation.save</c>,
     /// TargetId = key (M·6; M9 FACES). Takes effect on the next request (M·4).</summary>
     Task UpsertTranslationAsync(string key, string languageCode, string text, string actorId);

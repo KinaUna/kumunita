@@ -130,6 +130,50 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<TranslationBulkRow>> GetBulkTranslationMatrixAsync(
+        CancellationToken ct = default)
+    {
+        // M15 bulk-read seam (ADR 0116, D1; U01): the closed-set matrix the
+        // TranslationBulkExporter projects onto the §bundle CSV. A read —
+        // **no audit row** (C-M15·7), composed over the frozen seams only:
+        // the catalog's codes (SortOrder, enabled + disabled) and one
+        // GetTranslationsForAsync round-trip per code. A missing row → a
+        // missing cell (a null value in Stored), never null in Key/SourceText
+        // and never a synthetic row (the M·12 floor, C-M15·1).
+        var catalog = await ListLanguagesAsync().ConfigureAwait(false);
+        var codes = catalog
+            .OrderBy(c => c.SortOrder)
+            .Select(c => c.Id)
+            .Distinct()
+            .ToList();
+
+        // One round-trip per catalog code, over the frozen batch read.
+        var textByCode = new Dictionary<string, IReadOnlyDictionary<string, string>>(codes.Count, StringComparer.Ordinal);
+        foreach (var code in codes)
+            textByCode[code] = await GetTranslationsForAsync(code).ConfigureAwait(false);
+
+        var rows = new List<TranslationBulkRow>(KnownTranslationKeys.AllKeys.Count);
+        foreach (var key in KnownTranslationKeys.AllKeys)
+        {
+            var stored = new Dictionary<string, string?>(codes.Count, StringComparer.Ordinal);
+            foreach (var code in codes)
+            {
+                textByCode[code].TryGetValue(key, out var text);
+                stored[code] = text; // a missing row → a null cell (D1; the M·12 floor)
+            }
+
+            rows.Add(new TranslationBulkRow
+            {
+                Key = key,
+                SourceText = KnownTranslationKeys.EnValues[key],
+                Stored = stored,
+            });
+        }
+
+        return rows;
+    }
+
+    /// <inheritdoc />
     public async Task<LanguageCompleteness> GetCompletenessAsync(string languageCode)
     {
         // M·9: the "known" universe of keys / slugs is the instance's seeded `en`
