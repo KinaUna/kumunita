@@ -136,3 +136,122 @@ the invariants (C-M16·1–7), the FACES (F1–F5) + the named trade, the
 this is done** — U00 is now done, so the U01–U06 unit series may
 proceed in order (each reading **only its own unit plan + its entry
 reads**).
+
+## U01 — context docs + M16DocTypes + adapter
+
+**(a) The field set** (the locked list from the design doc §2 — a unit
+that adds, drops, or re-types a field is a drift event):
+
+- `InventoryItem` (`Kumunita.Core.Inventory`, POCO, conventional
+  `string Id`): `Id` · `Name` (non-empty — the card label + adapter
+  `Name`) · `OwnerKind` (string: `shared`/`community`/`private`,
+  default `community` — the M5 `KanbanStatuses` shape, D3 — a grouping +
+  write-standing-breadth label, **never** a read gate) · `Description`
+  (optional Markdown) · `ComponentId` (feed filter, never a gate —
+  C-M3·2) · `AuthorId` (the standing owner — D5) · `Audience`
+  (the exact `Post` `Audience`, `null` = public — D2/D3) ·
+  `CurrentHolderId` (nullable — who it's with; `null` = in the pool —
+  D4) · `IsDeleted` (the ADR 0024 soft-delete flag) · `LanguageCode`
+  (the ADR 0018 authored-in tag) · `Created` · `Modified` (nullable).
+- `InventoryCheckout` (POCO, `string Id`, **append-only** — no
+  `Modified`, C-M16·3): `Id` · `ItemId` · `BorrowerId` (a SubjectId —
+  display + standing, **never** a gate) · `CheckedOutAt` ·
+  `CheckedInAt` (nullable — **open when null**; set = closed) ·
+  `Note` (optional).
+
+**(b) The index set** (`M16DocTypes`, `src/Kumunita.Core/M16DocTypes.cs`):
+
+- `InventoryItem` — `(ComponentId, Created)` feed-ordering +
+  `(OwnerKind, Created)` filter (unnamed — the M5 `ComputedIndex`
+  auto-derives the names).
+- `InventoryCheckout` — `(ItemId, CheckedOutAt)` thread-ordering
+  (unnamed) + the **F1 idempotency witness**: a **unique partial
+  index** on `(ItemId)` where `CheckedInAt IS NULL`, named
+  `inv_uidx_item_open` (the M9 `convo_uidx_pair` shape — at most one
+  open checkout per item; a concurrent double-check-out's second commit
+  fails at the DB layer, C-M16·3 / F1).
+- Registered in `Program.cs` — `M16DocTypes.Configure(opts);` added
+  **after** `M9DocTypes.Configure(opts)` (before the M13 block).
+
+**(c) The adapter's `TargetKind`:** `"inventory"` — the **exact**
+string (C3, the `AccessAudit.TargetKind` discriminator). The adapter
+(`InventoryItemToAuditableResource`) is the **exact** M5
+`ProjectToAuditableResource` 6-member projection
+(`Id`=`Item.Id` · `Name`=`Item.Name` · `OwnerId`=`Item.AuthorId` ·
+`Audience`=`Item.Audience` projected verbatim · `ComponentId`
+=`Item.ComponentId` · `TargetKind`=`"inventory"`); `sealed`;
+`OwnerKind` is **never** consulted (D3 / C-M16·1 / C-M16·5).
+
+**(d) Drift / findings (note for U02+):**
+
+1. **The partial-index mechanism** (the one non-obvious bit): Marten
+   9.31.2 has no first-class partial-index API; the working mechanism is
+   `opts.Schema.For<T>().Index(expr, idx => { idx.IsUnique = true;
+   idx.Name = "..."; idx.Predicate = "data ->> 'CheckedInAt' IS NULL";
+   })`. **Correction to the in-repo note** in `M5DocTypes.cs` (and
+   `M4DocTypes`): that note claims `ComputedIndex` "exposes no `Name`
+   property (only Casing / TenancyScope)." That is **stale / wrong** —
+   against the installed stack, `ComputedIndex` (a
+   `Weasel.Postgresql.Tables.IndexDefinition`) exposes **`Name`,
+   `IsUnique`, and `Predicate`** (all `public set`), and the compiler
+   accepts all three (verified by a clean build). The `Predicate` is
+   what Weasel renders as the `WHERE (...)` clause of a partial index.
+   So a **named unique partial index is expressible** — the M5 note's
+   "a computed index therefore cannot be named in this stack" is also
+   incorrect. (The M5/M4 feed indexes simply chose the unnamed form;
+   nothing *forced* them to.)
+2. **The JSONB key casing in the predicate:** the predicate must use the
+   **PascalCase** key (`'CheckedInAt'`, matching ADR 0004's
+   `data->'IsDraft'` / `data->'Id'` shape and the repo's default
+   serializer) — **not** camelCase. A nullable `DateTimeOffset` is JSON
+   `null` on an open record, so `IS NULL` is the correct open-test.
+3. **The doc-table naming convention** (for U02+ DDL tests): Marten's
+   default document tables in this stack are the **`mt_doc_` prefix +
+   lowercase class name** — `mt.mt_doc_inventoryitem` and
+   `mt.mt_doc_inventorycheckout` — which is distinct from (a) the
+   hand-rolled Weasel `mt."AdminOverride"` table (quoted PascalCase) and
+   (b) the PascalCase JSONB *keys* inside the `data` column. A DDL
+   test that hardcodes `InventoryItem` / `AdminOverride`-style names
+   will miss the document tables; resolve by the actual
+   `mt_doc_*` name.
+4. **Document DDL is applied lazily on first save**, not by a bare
+   `ApplyAllConfiguredChangesToDatabaseAsync` (that path only applies
+   the storage features + Weasel migrations). The sibling doc-shape
+   tests (`ProjectDocShapeTests`, `MessagingServiceTests`) therefore
+   **round-trip-store their docs first**; the new `M16DocTypesDdlTests`
+   follows the same shape (store + load both docs, then inspect the
+   live catalog). A DDL-only test that skips the store round-trip will
+   not see the doc tables.
+5. **Postgres catalog quirk:** the two-arg `to_regclass('schema',
+   'table')` **does not exist** (`function to_regclass(unknown, text)
+   does not exist`, error 42883). Use the `pg_class` / `pg_namespace`
+   join (the repo's own `AdminOverrideDdlTests` shape) or the one-arg
+   `to_regclass('mt.mt_doc_inventorycheckout')` form.
+
+**(e) The pin** (`tests/Kumunita.Core.Tests/M16DocTypesDdlTests.cs`,
+2 tests — both pass): `Apply_Registers_BothDocs_And_OpenCheckout_UniquePartialIndex`
+(both tables exist with the `id` + `data` Marten core, and the
+`mt_doc_inventorycheckout` table carries a **unique** index with a
+**non-null partial predicate** referencing `CheckedInAt` … `IS NULL`)
++ `Adapter_Presents_Frozen6MemberSurface_With_InventoryTargetKind` (the
+6-member projection + `TargetKind == "inventory"`, and `OwnerKind` is
+not a member of `IAuditableResource`).
+
+**Exit gate:** `dotnet build Kumunita.slnx -c Debug` green **+**
+`Kumunita.Core.Tests` green — **Total: 1013, Errors: 0, Failed: 0**.
+*(Note: on this machine the canonical
+`tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+build copy was blocked by a stale shared-read handle on
+`src\Kumunita.Core\bin\...\Kumunita.Core.dll` (a leaked handle from a
+prior terminal session; `dotnet build-server shutdown` did not clear it
+and no live process mapped the DLL). The exit gate was therefore run
+identically by building to an alternate output dir
+(`-o .tmp\m16build`) and executing that same test assembly — same
+sources, same 1013 tests. The `ComputedIndex.IsUnique/Name/Predicate`
+usage compiled cleanly on the **first** build attempt, so the C#
+compile gate is unambiguous.)*
+
+**Follow-on for U02+:** the F1 witness index is now in the live schema;
+the atomic double-check-out behavior (U03) should rely on it at the DB
+layer (catch the unique-constraint violation → "already checked out")
+rather than an app-level check — that is the whole point of the witness.

@@ -168,6 +168,18 @@ var marten = builder.Services.AddMarten(opts =>
     // boot both pick the surface up automatically.
     M9DocTypes.Configure(opts);
 
+    // M16 (ADR 0117 D1, plan U01): the Inventory bounded context's documents
+    // (InventoryItem + InventoryCheckout, ADR 0004 §B.1 — the (ComponentId,
+    // Created) + (OwnerKind, Created) feed/filter indexes on InventoryItem
+    // (a filter, never a gate — C-M3·2 / C-M16·5) and the (ItemId, CheckedOutAt)
+    // thread-ordering index on InventoryCheckout, plus the unique partial
+    // index on (ItemId) where CheckedInAt IS NULL — the F1 idempotency witness,
+    // the M9 convo_uidx_pair shape). Without this call the docs are invisible
+    // to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M16DocTypes.Configure(opts);
+
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
     // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
