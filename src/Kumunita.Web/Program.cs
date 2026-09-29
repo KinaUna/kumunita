@@ -4,6 +4,7 @@ using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Logging;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
+using Kumunita.Core.Usage;
 using Kumunita.Web;
 using Kumunita.Web.Middleware;
 using Kumunita.Web.Security;
@@ -661,13 +662,14 @@ else if (sampleDataOpts.Enabled && !firstBoot)
 }
 
 // Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
-// SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a
-// 1-day delay, so publishing one fresh tick each schedules the first run for
-// tomorrow; each handler self-reschedules (returns a new tick) after each run so
-// the cadence continues. Idempotent: the purge is a no-op when no rows are
-// expired, and the reminder service is a no-op when nothing is in the window
-// (the existing-OutboxEmail-key check is the no-double-send guard), so a
-// double-schedule across two consecutive boots is harmless.
+// SideEffects/EventReminderHandler + SideEffects/UsagePurgeHandler) on boot.
+// The TimeoutMessage types bake in a 1-day delay, so publishing one fresh tick
+// each schedules the first run for tomorrow; each handler self-reschedules
+// (returns a new tick) after each run so the cadence continues. Idempotent: the
+// purges are a no-op when no rows are expired, and the reminder service is a
+// no-op when nothing is in the window (the existing-OutboxEmail-key check is
+// the no-double-send guard), so a double-schedule across two consecutive boots
+// is harmless.
 //
 // This must run AFTER StartAsync: Wolverine's IMessageBus asserts that the
 // underlying IHost has started (WolverineRuntime.AssertHasStarted), so any publish
@@ -678,6 +680,12 @@ await using var startupScope = app.Services.CreateAsyncScope();
 var bus = startupScope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
 await bus.PublishAsync(new AuditPurgeTick());
 await bus.PublishAsync(new EventReminderTick());
+// M13 (ADR 0114 D5) — the UsageEvent 365-day retention tick (the
+// UsagePurgeHandler self-reschedules after each run; this seed is the
+// first-boot scheduling. Without this line the handler never fires and the
+// UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
+// would silently stop honoring the 365-day constant).
+await bus.PublishAsync(new UsagePurgeTick());
 
 try
 {
