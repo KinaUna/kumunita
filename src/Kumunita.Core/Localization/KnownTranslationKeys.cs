@@ -1748,6 +1748,24 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Check in",
             ["inv.edit.title"]              = "Edit item",
             ["inv.edit.submit"]             = "Save changes",
+
+            // M17 (ADR 0118) — Bookmarks: the personal-pin surface (D6: a
+            // standing core surface, no admin toggle). The closed key set is
+            // the design doc §kw-l (12 keys: the nav entry U03 consumes, the
+            // list / degraded / kind labels U03 consumes, the unbookmark
+            // action U03 consumes, and the toggle button U04 consumes).
+            ["bm.nav"]                      = "Bookmarks",
+            ["bm.list.title"]               = "Your bookmarks",
+            ["bm.list.empty"]               = "No bookmarks yet.",
+            ["bm.list.degraded"]            = "No longer available",
+            ["bm.list.kind.post"]           = "Posts",
+            ["bm.list.kind.event"]          = "Events",
+            ["bm.list.kind.todo"]           = "To-dos",
+            ["bm.list.kind.announcement"]   = "Announcements",
+            ["bm.list.kind.page"]           = "Pages",
+            ["bm.list.unbookmark"]          = "Remove",
+            ["bm.button.bookmark"]          = "Bookmark",
+            ["bm.button.bookmarked"]        = "Bookmarked",
         };
 
     /// <summary>
@@ -3339,6 +3357,24 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Zurückgeben",
             ["inv.edit.title"]              = "Gegenstand bearbeiten",
             ["inv.edit.submit"]             = "Änderungen speichern",
+
+            // M17 (ADR 0118) — Lesezeichen: die persönliche Merk-Oberfläche
+            // (D6: dauerhafte Kerno­berfläche, kein Admin-Toggle). Die
+            // geschlossene Schlüsselmenge ist der Design-Doc-§kw-l (12
+            // Schlüssel: Nav-Eintrag, Listen-/Degradier-/Typ-Labels,
+            // Unmark-Aktion + Umschaltknopf).
+            ["bm.nav"]                      = "Lesezeichen",
+            ["bm.list.title"]               = "Deine Lesezeichen",
+            ["bm.list.empty"]               = "Noch keine Lesezeichen.",
+            ["bm.list.degraded"]            = "Nicht mehr verfügbar",
+            ["bm.list.kind.post"]           = "Beiträge",
+            ["bm.list.kind.event"]          = "Veranstaltungen",
+            ["bm.list.kind.todo"]           = "Aufgaben",
+            ["bm.list.kind.announcement"]   = "Ankündigungen",
+            ["bm.list.kind.page"]           = "Seiten",
+            ["bm.list.unbookmark"]          = "Entfernen",
+            ["bm.button.bookmark"]          = "Merken",
+            ["bm.button.bookmarked"]        = "Gemerkt",
         };
 
     /// <summary>
@@ -4933,6 +4969,24 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Restituer",
             ["inv.edit.title"]              = "Modifier l'article",
             ["inv.edit.submit"]             = "Enregistrer les modifications",
+
+            // M17 (ADR 0118) — Signets : la surface de repères personnels
+            // (D6 : surface cœur permanente, pas de bascule admin). L'ensemble
+            // fermé des clés est le §kw-l du document de conception (12 clés :
+            // entrée de navigation, libellés de liste / dégradé / type,
+            // action de retrait + bouton bascule).
+            ["bm.nav"]                      = "Signets",
+            ["bm.list.title"]               = "Tes signets",
+            ["bm.list.empty"]               = "Aucun signet pour l'instant.",
+            ["bm.list.degraded"]            = "Non plus disponible",
+            ["bm.list.kind.post"]           = "Publications",
+            ["bm.list.kind.event"]          = "Événements",
+            ["bm.list.kind.todo"]           = "À faire",
+            ["bm.list.kind.announcement"]   = "Annonces",
+            ["bm.list.kind.page"]           = "Pages",
+            ["bm.list.unbookmark"]          = "Retirer",
+            ["bm.button.bookmark"]          = "Signeter",
+            ["bm.button.bookmarked"]        = "Signeté",
         };
 
     /// <summary>
@@ -6518,6 +6572,24 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Returnér",
             ["inv.edit.title"]              = "Redigér emne",
             ["inv.edit.submit"]             = "Gem ændringer",
+
+            // M17 (ADR 0118) — Bogmærker: den personlige mærke-overflade
+            // (D6: stående kerne­overflade, ingen admin-toggle). Det lukkede
+            // nøglesæt er design-dokumentets §kw-l (12 nøgler: nav-indeks,
+            // liste-/degraderings-/type-etiketter, fjern-handling +
+            // tilstandsknap).
+            ["bm.nav"]                      = "Bogmærker",
+            ["bm.list.title"]               = "Dine bogmærker",
+            ["bm.list.empty"]               = "Ingen bogmærker endnu.",
+            ["bm.list.degraded"]            = "Ikke længere tilgængelig",
+            ["bm.list.kind.post"]           = "Indlæg",
+            ["bm.list.kind.event"]          = "Begivenheder",
+            ["bm.list.kind.todo"]           = "Opgaver",
+            ["bm.list.kind.announcement"]   = "Bekendtgørelser",
+            ["bm.list.kind.page"]           = "Sider",
+            ["bm.list.unbookmark"]          = "Fjern",
+            ["bm.button.bookmark"]          = "Bogmærk",
+            ["bm.button.bookmarked"]        = "Bogmærket",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
