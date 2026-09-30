@@ -1833,6 +1833,27 @@ public static class KnownTranslationKeys
             ["events.created"]    = "Erstellt",
             ["events.edited"]     = "bearbeitet",
 
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Wiederholt sich nicht",
+            ["events.recurrence.daily"]      = "Täglich",
+            ["events.recurrence.weekly"]     = "Wöchentlich",
+            ["events.recurrence.monthly"]    = "Monatlich",
+            ["events.recurrence.yearly"]     = "Jährlich",
+            ["events.recurrence.interval"]   = "Alle",
+            ["events.recurrence.ends_after"] = "Endet nach",
+            ["events.recurrence.ends_on"]    = "Endet am",
+            ["events.recurrence.count"]      = "Terminen",
+            ["events.recurrence.until"]      = "bis",
+            ["events.series.repeats"]        = "Wiederholt sich",
+            ["events.series.skip"]           = "Diesen Termin überspringen",
+            ["events.series.restore"]        = "Diesen Termin wiederherstellen",
+            ["events.series.part_of"]        = "Teil einer Serie",
+
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projekte",
             ["projects.todo.title"]          = "Aufgaben",
@@ -3495,6 +3516,27 @@ public static class KnownTranslationKeys
             ["events.created"]    = "Créé le",
             ["events.edited"]     = "modifié le",
 
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Ne se répète pas",
+            ["events.recurrence.daily"]      = "Quotidien",
+            ["events.recurrence.weekly"]     = "Hebdomadaire",
+            ["events.recurrence.monthly"]    = "Mensuel",
+            ["events.recurrence.yearly"]     = "Annuel",
+            ["events.recurrence.interval"]   = "Tous les",
+            ["events.recurrence.ends_after"] = "Se termine après",
+            ["events.recurrence.ends_on"]    = "Se termine le",
+            ["events.recurrence.count"]      = "événements",
+            ["events.recurrence.until"]      = "jusqu'au",
+            ["events.series.repeats"]        = "Se répète",
+            ["events.series.skip"]           = "Passer cet événement",
+            ["events.series.restore"]        = "Restaurer cet événement",
+            ["events.series.part_of"]        = "Fait partie d'une série",
+
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projets",
             ["projects.todo.title"]          = "Tâches",
@@ -5110,6 +5152,27 @@ public static class KnownTranslationKeys
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["events.created"]    = "Oprettet",
             ["events.edited"]     = "redigeret",
+
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Gentages ikke",
+            ["events.recurrence.daily"]      = "Dagligt",
+            ["events.recurrence.weekly"]     = "Ugentligt",
+            ["events.recurrence.monthly"]    = "Månedligt",
+            ["events.recurrence.yearly"]     = "Årligt",
+            ["events.recurrence.interval"]   = "Hver",
+            ["events.recurrence.ends_after"] = "Slutter efter",
+            ["events.recurrence.ends_on"]    = "Slutter den",
+            ["events.recurrence.count"]      = "arrangementer",
+            ["events.recurrence.until"]      = "til",
+            ["events.series.repeats"]        = "Gentages",
+            ["events.series.skip"]           = "Spring dette arrangement over",
+            ["events.series.restore"]        = "Gendan dette arrangement",
+            ["events.series.part_of"]        = "En del af en serie",
 
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projekter",
