@@ -72,3 +72,12 @@
 - **Did NOT land:** no new `kw-l` namespace (the 14 keys sit under the existing `events.*`), no `RRULE` / `iCal` / `EXRULE` / `RFC 5545` term in any user-visible string, the `kw-l` TagHelper / seed path / en-floor seeder are **unchanged** (the M·9 / ADR 0005 / 0015 shape is preserved).
 - **GATE green:** `dotnet build Kumunita.slnx -c Debug` green (0 errors); `dotnet exec …Kumunita.Core.Tests.dll` **Total: 1046, Failed: 0** (both new closure tests pass; U01–U04's four gates + U05/U06's Web gates still green).
 - **No open questions.** U08 (close) can now start — all M18 units (U00–U07) are landed and green.
+
+
+## U08 — Close the milestone (M18 → StatusDone, M19 → StatusNext)
+
+- **What landed:** M18 closed — Milestones.cs flipped (M18 StatusDone, M19 StatusNext), MilestonesTests.cs re-pinned to M19_Is_The_Single_InProgress_Milestone (+ M18 added to the shipped-done list), README Status + Roadmap flipped, docs/STATUS.md chain updated, docs/ARCHITECTURE.md M4 events note gained the M18 line; the register + 7 unit plans + handoff-notes moved to flat done/.
+- **What a later (M19) agent can rely on:** the five-file parity set is consistent; the M18 plan artifacts are complete and under done/ for reference; the ADR 0119 index row is present (verified in U08 step 6).
+- **What did NOT land:** no new milestone was started (M19 is StatusNext only — no plan artifacts for it exist yet; that is a future planning task, not an M18 unit).
+- **GATE green:** dotnet build Kumunita.slnx -c Debug green (0 errors); dotnet exec …Kumunita.Web.Tests.dll **Total: 657, Failed: 0**; dotnet exec …Kumunita.Core.Tests.dll **Total: 1046, Failed: 0**.
+- **No open risks / follow-ups for M18.** (M19 — guest accounts — is the next planning task; it will author its own register + units + ADR.)
