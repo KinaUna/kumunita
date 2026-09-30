@@ -38,6 +38,17 @@ public static class M6DocTypes
         opts.Schema.For<NotificationPreference>()
                .Identity(p => p.RecipientId);
 
+        // ── ADR 0121 (M20) — the per-resident quiet schedule ────────────
+        // One row per recipient; the RecipientId IS the document identity
+        // (the NotificationPreference shape — the M1DocTypes Profile
+        // .Identity precedent). A bare Schema.For<NotificationQuietSchedule>()
+        // would fail Marten's identity resolution; pin it (the same
+        // InvalidDocumentException the NotificationPreference pin guards
+        // against). Delta-detection applies the new table idempotently at
+        // boot (ADR 0004 §B.1 — zero migration for this additive surface).
+        opts.Schema.For<NotificationQuietSchedule>()
+               .Identity(s => s.RecipientId);
+
         // ── ADR 0084 — per-target notification subscriptions ─────────────
         // One row per (recipient, kind, target) triple; the surrogate Id is
         // the Marten identity (the GroupMembership / ComponentMembership

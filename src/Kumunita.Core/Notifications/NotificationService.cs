@@ -483,6 +483,65 @@ public sealed class NotificationService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // --- M20 (ADR 0121) — the per-resident quiet schedule (D2) ─────────
+    // The <see cref="SetProfileTimezoneAsync"/> single-write-lane shape:
+    // owner scope, **no** AccessAudit row (the ADR 0019 personal-preference
+    // lane, C-M20·7). The Web boundary (U06) owns the owner check (the
+    // signed-in subject must equal recipientId); these seams do **not**
+    // re-check User.
+
+    /// <summary>
+    /// M20 (ADR 0121, D2) — the quiet-schedule READ (owner-scope, no audit row
+    /// — the <c>SetProfileTimezoneAsync</c> personal-preference shape, ADR
+    /// 0019). Returns the recipient's schedule, or <c>null</c> = "never quiet"
+    /// (the floor, C-M20·3). The Web boundary owns the owner check (the
+    /// signed-in subject must equal <paramref name="recipientId"/>); this seam
+    /// does not re-check <c>User</c>.
+    /// </summary>
+    public async Task<NotificationQuietSchedule?> GetQuietScheduleAsync(
+        string recipientId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+
+        await using var session = _store.QuerySession();
+        return await session.LoadAsync<NotificationQuietSchedule>(recipientId, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// M20 (ADR 0121, D2) — the quiet-schedule WRITE (owner-scope, **no** audit
+    /// row — a personal preference, C-M20·7 / ADR 0019). Store-or-update the
+    /// recipient's schedule; a <c>null</c> <paramref name="schedule"/> clears
+    /// it (the recipient's schedule is deleted = "never quiet", the floor). The
+    /// Web boundary owns the owner check; this seam does not re-check
+    /// <c>User</c> and appends **no** <c>AccessAudit</c> row (the
+    /// <c>SetProfileTimezoneAsync</c> shape — C-M20·7). Stamps <c>Updated</c>
+    /// on a real write.
+    /// </summary>
+    public async Task SetQuietScheduleAsync(
+        string recipientId, NotificationQuietSchedule? schedule, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        if (schedule is null)
+        {
+            // Clear = never quiet (the floor): delete the recipient's row, if
+            // any. A delete is the record of "the resident cleared their
+            // schedule" — the read seam returns null (C-M20·3). (The synchronous
+            // <c>session.Delete&lt;T&gt;(id)</c> lane — the
+            // <c>AuditPurgeService</c> / <c>LocalizationService</c> precedent —
+            // the <c>SaveChangesAsync</c> below commits it.)
+            session.Delete<NotificationQuietSchedule>(recipientId);
+        }
+        else
+        {
+            schedule.RecipientId = recipientId;    // pin the identity (the Web layer owns the owner check, C-M20·7)
+            schedule.Updated = DateTimeOffset.UtcNow;
+            session.Store(schedule);
+        }
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // --- ADR 0084 — per-target subscription lanes (the §6.1
     //     NotificationSubscription shape; the same personal-read / no-audit
     //     convention as the NotificationPreference lanes, D3 / F11) ──────

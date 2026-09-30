@@ -78,3 +78,64 @@
   seams (`GetQuietScheduleAsync` / `SetQuietScheduleAsync`). Reads the design
   doc's §4 (the doc shape) + §6 (the evaluator) + the ADR 0121; exits on
   `Kumunita.Core.Tests`.
+
+## U02 — the `NotificationQuietSchedule` doc + pure evaluator + owner-scope seams (Core)
+
+- **Delivered (Core-only, 4 files):**
+  1. `src/Kumunita.Core/Notifications/NotificationQuietSchedule.cs` — the doc
+     + the `QuietScheduleMode` enum (`Blocked = 0` lean default / `Allowed = 1`),
+     verbatim from the design doc §4 / the register's D2 block (one row per
+     recipient, `RecipientId` identity, `Enabled` floor default `false`,
+     `Hours`/`DaysOfWeek` `int[]` empty = all, `Updated?`).
+  2. `src/Kumunita.Core/Notifications/QuietScheduleEvaluator.cs` — the
+     **pure, static** `IsQuietNow(schedule, now, effectiveZone)` (D3): no
+     session / IO; wall-clock-first (convert `now` → `effectiveZone` local,
+     then read hour + day); empty axis = all; `Blocked` = quiet during the
+     window, `Allowed` = the inverse; `null` / `Enabled == false` → `false`
+     (the C-M20·3 floor).
+  3. `src/Kumunita.Core/M6DocTypes.cs` — additive `.Identity(s => s.RecipientId)`
+     pin for `NotificationQuietSchedule` (the `NotificationPreference` shape —
+     a bare `Schema.For<>()` would fail Marten identity resolution).
+  4. `src/Kumunita.Core/Notifications/NotificationService.cs` — the two
+     **owner-scope** seams (D2, ADR 0019 shape, **no** `AccessAudit` row):
+     `GetQuietScheduleAsync` (returns the row or `null`) and
+     `SetQuietScheduleAsync` (store-or-update; `null` = delete/clear; stamps
+     `Updated` on a real write). Placed with the preference lanes.
+- **Tests (4 new pins, added to `Kumunita.Core.Tests/NotificationServiceTests.cs`):**
+  `IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC` (GATE-2, C-M20·2 — a
+  `Blocked` {22,23} schedule flips between a fixed UTC+2 zone and UTC on the
+  same instant; uses `TimeZoneInfo.CreateCustomTimeZone` for a deterministic
+  no-DST offset), `IsQuietNow_Missing_Schedule_Is_Never_Quiet` (GATE-3, C-M20·3
+  — null + disabled → false; enabled empty-list Blocked → quiet at any hour),
+  `NotificationQuietSchedule_StoreAndLoad_RoundTrips` (store → read →
+  clear→null), and `SetQuietScheduleAsync_Does_Not_Append_AccessAudit`
+  (C-M20·7 — a write appends **no** audit row).
+- **Cross-unit facts locked for the later units:**
+  1. **The evaluator's effective-zone resolution is NOT done here** — U03's
+     `QuietNowForAsync` resolves it via the ADR 0019 chain
+     (`IUserInfoService.GetProfileAsync` `Profile.TimeZone` override →
+     `ILocalizationService.GetDefaultTimezoneAsync()` → `UTC` floor) and passes
+     the concrete `TimeZoneInfo` into `IsQuietNow`. U02's seam read
+     (`GetQuietScheduleAsync`) does not resolve a zone (it is a pure read).
+  2. **The `Notification.EmailDeferred` field is NOT added here** — that is
+     U03's `EmitAsync` gate (D1/D4, C-M20·1). U02 touched no existing seam and
+     did not suppress/drop the inbox row (the drift-guard held).
+  3. **Zero new authorization surface (C-M20·5):** no `AccessAction` /
+     `AccessVia` / `Decide()` branch / `IAuthorizationService` method added —
+     the quiet verdict stays a pure function of (schedule, instant, zone).
+- **Open questions:** none. One implementation note (recorded, not a drift):
+  the delete-on-clear uses the codebase's synchronous `session.Delete<T>(id)`
+  lane (the `AuditPurgeService`/`LocalizationService` precedent), committed by
+  the trailing `SaveChangesAsync` — `IDocumentSession.DeleteAsync` is not
+  available in this Marten binding.
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (6 pre-existing
+  `xUnit1051`/`CS8602` warnings in `Kumunita.Web.Tests` — none in
+  `NotificationServiceTests`); `dotnet exec tests\Kumunita.Core.Tests\bin\
+  Debug\net10.0\Kumunita.Core.Tests.dll` green — **Total 1053, Failed 0** (the
+  four new M20 pins + every existing M6 pin still passing).
+- **Next unit entry point:** **U03** (`in-progress/m20-u03.md`) — the
+  `Notification.EmailDeferred` additive field + the `EmitAsync` quiet gate
+  (defer the email, keep the inbox row — D1/D4, C-M20·1), using the **deferred
+  idempotency key** `notification:{kind}:{source-id}:deferred` (U00's locked
+  fact #3) + the U02 seams/evaluator. Reads the design doc §6 (the exact gate
+  diff) + §5 (the `QuietNowForAsync` helper). Exits on `Kumunita.Core.Tests`.

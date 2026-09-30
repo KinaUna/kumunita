@@ -1121,6 +1121,151 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Null((await LoadRow(store, row.Id))?.ReadAt);
     }
 
+    // ── M20 (ADR 0121) — the pure quiet-schedule evaluator + owner-scope seams
+    //
+    // C-M20·2 (the verdict is pure + timezone-aware, D3) + C-M20·3 (floor =
+    // never quiet, D2) + C-M20·7 (owner-scope, no audit row, D2 / ADR 0019).
+    // The evaluator is a **pure function** (no session, no IO) — it is tested
+    // in isolation, exactly the <c>IcsWriter</c> / <c>UsageCapturePolicy</c>
+    // discipline. The two <c>NotificationService</c> seams are exercised
+    // against the live scratch store (the doc round-trip) + the no-audit-row
+    // pin (the <c>ListInbox_Does_Not_Emit_AuditRow</c> precedent).
+
+    // GATE-2 pin (C-M20·2 — the verdict is timezone-aware): the same
+    // Blocked schedule (hours {22,23}) + the same instant yields a
+    // **different** verdict in UTC+2 than in UTC (the wall-clock hour differs
+    // — the point of ADR 0019).
+    [Fact]
+    public void IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC()
+    {
+        // A fixed UTC+2 zone (no DST, deterministic across platforms — the
+        // CreateCustomTimeZone shape avoids the IANA/Windows zone-id + DST
+        // ambiguity of a named zone like CET, which is only UTC+1 in winter).
+        var utc2 = TimeZoneInfo.CreateCustomTimeZone("UTC+2", TimeSpan.FromHours(2), "UTC+2", "UTC+2");
+        var utc  = TimeZoneInfo.Utc;
+        // The schedule is "quiet during hours 22–23" (Blocked, the lean
+        // default); empty DaysOfWeek = all days.
+        var schedule = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g2",
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 22, 23 },
+            DaysOfWeek = [],
+        };
+
+        // Pick a UTC instant whose UTC+2 wall-clock hour is 23 (quiet) while
+        // the UTC wall-clock hour is 21 (not quiet) — the verdict must flip.
+        // 21:00 UTC == 23:00 UTC+2 (no DST ambiguity at this fixed offset).
+        var instant = new DateTimeOffset(2026, 1, 15, 21, 0, 0, TimeSpan.Zero);
+
+        var inUtc2 = QuietScheduleEvaluator.IsQuietNow(schedule, instant, utc2);
+        var inUtc  = QuietScheduleEvaluator.IsQuietNow(schedule, instant, utc);
+
+        Assert.True(inUtc2);     // 23:00 local → within {22,23} → quiet
+        Assert.False(inUtc);    // 21:00 UTC  → outside {22,23} → not quiet
+        Assert.NotEqual(inUtc2, inUtc);   // the verdict differs (C-M20·2)
+    }
+
+    // GATE-3 pin (C-M20·3 — floor = never quiet): a null schedule and a
+    // stored-but-disabled schedule both evaluate to "not quiet"; an enabled
+    // schedule with empty lists is quiet at any hour (Blocked, empty = all).
+    [Fact]
+    public void IsQuietNow_Missing_Schedule_Is_Never_Quiet()
+    {
+        var utc = TimeZoneInfo.Utc;
+        var instant = new DateTimeOffset(2026, 1, 15, 23, 0, 0, TimeSpan.Zero);
+
+        // (a) null schedule → never quiet (the floor).
+        Assert.False(QuietScheduleEvaluator.IsQuietNow(null, instant, utc));
+
+        // (b) stored-but-disabled → never quiet, regardless of the window.
+        var disabled = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g3-disabled",
+            Enabled = false,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 23 },
+        };
+        Assert.False(QuietScheduleEvaluator.IsQuietNow(disabled, instant, utc));
+
+        // (c) enabled + empty lists + Blocked → the window is "all hours ×
+        //     all days" → quiet at any instant (empty = all, D2).
+        var allWindow = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g3-all",
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = [],
+            DaysOfWeek = [],
+        };
+        Assert.True(QuietScheduleEvaluator.IsQuietNow(allWindow, instant, utc));
+    }
+
+    // Doc round-trip (C-M20·3 / ·7): SetQuietScheduleAsync then
+    // GetQuietScheduleAsync returns the stored row; SetQuietScheduleAsync(null)
+    // clears it to null (the floor = never quiet).
+    [Fact]
+    public async Task NotificationQuietSchedule_StoreAndLoad_RoundTrips()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-rt";
+        var ct = TestContext.Current.CancellationToken;
+
+        // No schedule yet → null (never quiet, the floor).
+        Assert.Null(await svc.GetQuietScheduleAsync(recipient, ct));
+
+        // Store one → the read seam returns the stored row (identity pinned).
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 22, 23 },
+            DaysOfWeek = new[] { 6 },
+        }, ct);
+
+        var loaded = await svc.GetQuietScheduleAsync(recipient, ct);
+        Assert.NotNull(loaded);
+        Assert.Equal(recipient, loaded!.RecipientId);
+        Assert.True(loaded.Enabled);
+        Assert.Equal(QuietScheduleMode.Blocked, loaded.Mode);
+        Assert.Equal(new[] { 22, 23 }, loaded.Hours);
+        Assert.Equal(new[] { 6 }, loaded.DaysOfWeek);
+        Assert.NotNull(loaded.Updated);   // stamped on the real write
+
+        // Clear (null) → the row is deleted → the read seam returns null again.
+        await svc.SetQuietScheduleAsync(recipient, null, ct);
+        Assert.Null(await svc.GetQuietScheduleAsync(recipient, ct));
+    }
+
+    // Owner-scope, no audit row (C-M20·7 / ADR 0019): a write appends **no**
+    // AccessAudit row (the SetProfileTimezoneAsync personal-preference shape —
+    // the ListInbox_Does_Not_Emit_AuditRow precedent).
+    [Fact]
+    public async Task SetQuietScheduleAsync_Does_Not_Append_AccessAudit()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-noaudit";
+        var ct = TestContext.Current.CancellationToken;
+
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 1, 2 },
+        }, ct);
+
+        // The write landed (round-trips)…
+        var loaded = await svc.GetQuietScheduleAsync(recipient, ct);
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.Enabled);
+        // …but appended **no** audit row (C-M20·7 — a personal preference, not
+        // an AccessAction decision).
+        Assert.Empty(await AuditRows(store));
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
