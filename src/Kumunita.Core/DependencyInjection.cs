@@ -300,7 +300,15 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Announcements.IAnnouncementService>(),
             sp.GetRequiredService<Pages.IPageService>(),
             sp.GetRequiredService<Events.IEventService>(),
-            sp.GetRequiredService<Projects.IProjectService>()));
+            sp.GetRequiredService<Projects.IProjectService>(),
+            // ADR 0118 D3/F2 (obs-4 amendment): the frozen IIdentityService,
+            // used in-Core only to resolve the owner's real standing when the
+            // bookmark target is an announcement — so the D3 write-lane check
+            // re-runs the *same read the detail page uses*. Roles never cross
+            // the frozen IBookmarkService seam (the 3-method signature is
+            // unchanged); this is the same category of composition as the
+            // already-composed IUserInfoService.
+            sp.GetRequiredService<IIdentityService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

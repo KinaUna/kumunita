@@ -49,10 +49,12 @@ namespace Kumunita.Web.Tests;
 /// calls the seam's <c>RemoveAsync</c> (the D5 pin — the unbookmark needs no
 /// target read at all, the row is keyed on the owner's own
 /// <see cref="Bookmark"/> row).</item>
-/// <item><b>BmKeys_AreTheClosedTwelveKeySet</b> — the §kw-l pin: the
+/// <item><b>BmKeys_AreTheClosedFourteenKeySet</b> — the §kw-l pin: the
 /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
-/// registry contains **exactly** the 12 <c>bm.*</c> keys (the closed set,
-/// the parity-test shape the U04 / U05 units depend on).</item>
+/// registry contains **exactly** the 14 <c>bm.*</c> keys (the closed set,
+/// the parity-test shape the U04 / U05 units depend on; the two
+/// <c>bm.toggle.*</c> flash keys were added by the obs-2 ADR 0118
+/// amendment, 2026-09-30).</item>
 /// </list>
 /// <para>
 /// **No database, no Testcontainers** — a pure NSubstitute seam test (the
@@ -64,9 +66,10 @@ namespace Kumunita.Web.Tests;
 public sealed class BookmarksControllerTests
 {
     /// <summary>
-    /// The closed 12-key <c>bm.*</c> set (design doc §kw-l, the exact names
+    /// The closed 14-key <c>bm.*</c> set (design doc §kw-l, the exact names
     /// the parity tests pin — the U04 / U05 units consume this set, never
-    /// re-register a subset).
+    /// re-register a subset; the two <c>bm.toggle.*</c> flash keys are the
+    /// obs-2 ADR 0118 amendment, 2026-09-30).
     /// </summary>
     private static readonly string[] BmKeys =
     [
@@ -82,6 +85,8 @@ public sealed class BookmarksControllerTests
         "bm.list.unbookmark",
         "bm.button.bookmark",
         "bm.button.bookmarked",
+        "bm.toggle.bookmarked",
+        "bm.toggle.removed",
     ];
 
     // ── 1 — F3_OwnerList_Loads_Their_Rows_And_NoAuditRow_Commits ─────────
@@ -296,6 +301,12 @@ public sealed class BookmarksControllerTests
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("/bookmarks", redirect.Url);
 
+        // Obs-2 (ADR 0118 amendment) — the flash toast is set on the
+        // localized bm.toggle.removed key (the raw key here — the test
+        // floor: the translation seam is absent in the harness, so the
+        // controller's T() helper falls back to the key itself).
+        Assert.Equal("bm.toggle.removed", controller.TempData["info"]);
+
         // The seam's RemoveAsync was called with the actor's SubjectId as
         // the ownerId + the targetKind / targetId verbatim + the caller's
         // session (the C3 same-transaction lane — the D5 pin: no target
@@ -322,7 +333,7 @@ public sealed class BookmarksControllerTests
     /// registries (en / de / fr / da) carry the same closed set.
     /// </summary>
     [Fact]
-    public void BmKeys_AreTheClosedTwelveKeySet()
+    public void BmKeys_AreTheClosedFourteenKeySet()
     {
         var en = Kumunita.Core.Localization.KnownTranslationKeys.EnValues;
 
@@ -334,14 +345,14 @@ public sealed class BookmarksControllerTests
             Assert.False(string.IsNullOrWhiteSpace(en[key]), $"The '{key}' value must be non-empty.");
         }
 
-        // (2) The closed set is EXACTLY the twelve keys — no more (a
-        // thirteenth bm.* key is a drift event the U04 / U05 units depend
+        // (2) The closed set is EXACTLY the fourteen keys — no more (a
+        // fifteenth bm.* key is a drift event the U04 / U05 units depend
         // on), no less (missing one breaks the parity tests).
         var actualBmKeys = en.Keys
             .Where(k => k.StartsWith("bm.", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(BmKeys.ToHashSet(StringComparer.Ordinal), actualBmKeys);
-        Assert.Equal(12, actualBmKeys.Count);
+        Assert.Equal(14, actualBmKeys.Count);
 
         // (3) All four registries (en / de / fr / da) carry the same closed
         // set (the §kw-l parity pin — the U04 / U05 units consume the full

@@ -20,8 +20,9 @@ groups & delegation, directory & profiles, posts + moderation, multilingual
 events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
 (`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
 design (`M10`), and portability (import/export) (`M11`), on one
-server-rendered stack over a single Postgres. M18 is planned —
-recurring events — and M19 — guest accounts (see the "Roadmap" below).
+server-rendered stack over a single Postgres. M18 — recurring events — is
+the current work, and M19 — guest accounts — is next (see the "Roadmap"
+below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
 milestone-by-milestone breakdown is in the Roadmap below.

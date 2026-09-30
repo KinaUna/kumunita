@@ -83,10 +83,13 @@ public sealed class M17AcceptanceGateTests
         var controller = Build(bookmarks, store, subjectId: actor);
 
         // 1 — Toggle (bookmark the visible post → Bookmarked, one row
-        //    created).
-        var firstToggle = await controller.Toggle(kind, id);
+        //    created). Obs-2 (ADR 0118 amendment): redirect to the
+        //    surface's own URL + the flash toast is set.
+        const string returnUrl = $"/posts/{id}";
+        var firstToggle = await controller.Toggle(kind, id, returnUrl);
         var firstRedirect = Assert.IsType<RedirectResult>(firstToggle);
-        Assert.Equal("/bookmarks", firstRedirect.Url);
+        Assert.Equal(returnUrl, firstRedirect.Url);
+        Assert.Equal("bm.toggle.bookmarked", controller.TempData["info"]);
 
         // 2 — List (the row appears under the "post" group).
         var listResult = await controller.Index();
@@ -100,18 +103,19 @@ public sealed class M17AcceptanceGateTests
         Assert.Equal(id, vm.Groups[0].Items[0].TargetId);
 
         // 3 — Remove (unbookmark the post → the row is physically
-        //    deleted).
+        //    deleted). Obs-2 (ADR 0118 amendment): the flash toast is set.
         var removeResult = await controller.Remove(kind, id);
         var removeRedirect = Assert.IsType<RedirectResult>(removeResult);
         Assert.Equal("/bookmarks", removeRedirect.Url);
+        Assert.Equal("bm.toggle.removed", controller.TempData["info"]);
 
         // 4 — Toggle again (a fresh Created timestamp, one row — the F1
         //    / C-M17·4 witness: the unique index guarantees at most one
         //    row per (owner, target); re-bookmarking after removal is a
         //    fresh Created, D4).
-        var reToggle = await controller.Toggle(kind, id);
+        var reToggle = await controller.Toggle(kind, id, returnUrl);
         var reRedirect = Assert.IsType<RedirectResult>(reToggle);
-        Assert.Equal("/bookmarks", reRedirect.Url);
+        Assert.Equal(returnUrl, reRedirect.Url);
 
         // The seam's ToggleAsync was called exactly twice (the initial
         // bookmark + the re-bookmark after removal).

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Bookmarks;
+using Kumunita.Core.Localization;
 using Kumunita.Web.Security;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
@@ -35,8 +36,8 @@ namespace Kumunita.Web.Controllers;
 /// controller commits in the caller's <c>IDocumentSession</c> (the C3
 /// same-transaction lane — <see cref="BookmarkService"/> never commits
 /// internally; the U02 <c>RunInSession</c> harness witnesses the
-/// caller-commits shape), then redirects back to <c>/bookmarks</c> (the
-/// "redirect after write" precedent).</item>
+/// caller-commits shape), then sets a localized flash (<c>bm.toggle.removed</c>)
+/// and redirects back to <c>/bookmarks</c> (the "redirect after write" precedent).</item>
 /// </list>
 /// <para>
 /// **D2 / C-M17·2:** a bookmark is a personal-by-id record — a
@@ -56,10 +57,29 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class BookmarksController(
     IBookmarkService bookmarks,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    ILocalizationService? localization = null,
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// Resolves a <c>bm.toggle.*</c> kw-l key to the operator's
+    /// effective language (the house <c>EffectiveLanguageCode.ResolveAsync</c>
+    /// + <c>ITranslationProvider.GetAsync</c> seam — the same as the view's
+    /// resolution, so the flash toast renders in the operator's language).
+    /// Falls back to the raw key when the translation seam is absent
+    /// (the test-construction floor — the tests assert the raw key).
+    /// </summary>
+    private async Task<string> T(string key)
+    {
+        if (translationProvider is null || localization is null)
+            return key; // the test floor (no context — the raw key)
+        var lang = await EffectiveLanguageCode.ResolveAsync(
+            HttpContext?.Request, localization, translationProvider);
+        return await translationProvider.GetAsync(key, lang);
+    }
 
     /// <summary>
     /// <c>GET /bookmarks</c> — the owner's own list (the D2 personal read,
@@ -137,6 +157,7 @@ public sealed class BookmarksController(
         await using var session = store.LightweightSession();
         await bookmarks.RemoveAsync(actorId, targetKind, targetId, session);
         await session.SaveChangesAsync();
+        TempData["info"] = await T("bm.toggle.removed");
         return Redirect("/bookmarks");
     }
 
@@ -149,17 +170,22 @@ public sealed class BookmarksController(
     /// the unique-index idempotency witness). The controller commits in its
     /// own fresh <see cref="IDocumentSession"/> (the C3 same-transaction
     /// lane — <see cref="BookmarkService"/> never commits internally; the
-    /// caller owns the single write), then redirects to
-    /// <c>/bookmarks</c> (the "redirect after write" precedent — the M16
-    /// <c>InventoryController</c> / M5 <c>PageController</c> shape; the
-    /// house pattern shared with this controller's <see cref="Remove"/>).
+    /// caller owns the single write), then sets a localized flash
+    /// (<c>bm.toggle.bookmarked</c>) and redirects to the <c>returnUrl</c>
+    /// form field (the surface's own detail URL), falling back to
+    /// <c>/bookmarks</c> when the field is absent (the "redirect after
+    /// write" precedent — the M16 <c>InventoryController</c> / M5
+    /// <c>PageController</c> shape; the house pattern shared with this
+    /// controller's <see cref="Remove"/>).
     /// <para>
-    /// **Status mapping** (design doc §2.3 table 1):
+    /// **Status mapping** (design doc §2.3 table 1, amended by the obs-2
+    /// ADR 0118 amendment):
     /// <list type="bullet">
-    /// <item><c>Bookmarked</c> — row created; redirect to <c>/bookmarks</c>.</item>
+    /// <item><c>Bookmarked</c> — row created; flash <c>bm.toggle.bookmarked</c>;
+    /// redirect to <c>returnUrl</c> (or <c>/bookmarks</c> fallback).</item>
     /// <item><c>AlreadyBookmarked</c> — the F1 no-op (one row, one
-    /// <c>Created</c>, the unique-index witness); redirect to
-    /// <c>/bookmarks</c>.</item>
+    /// <c>Created</c>, the unique-index witness); flash
+    /// <c>bm.toggle.bookmarked</c>; redirect to <c>returnUrl</c>.</item>
     /// <item><c>Refused</c> — the D3 write-lane visibility check failed
     /// (the target is not visible to the owner; **no** row survives; the
     /// Web layer maps to a non-leaky **404**, not 403 — the M16
@@ -178,7 +204,7 @@ public sealed class BookmarksController(
     /// </summary>
     [HttpPost("/bookmarks/toggle")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Toggle(string kind, string id)
+    public async Task<IActionResult> Toggle(string kind, string id, string? returnUrl = null)
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
@@ -215,6 +241,7 @@ public sealed class BookmarksController(
         // — the unique-index witness guarantees at-most-one row per
         // (owner, target)).
         await session.SaveChangesAsync();
-        return Redirect("/bookmarks");
+        TempData["info"] = await T("bm.toggle.bookmarked");
+        return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/bookmarks" : returnUrl);
     }
 }

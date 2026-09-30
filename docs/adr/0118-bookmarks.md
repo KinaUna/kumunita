@@ -225,3 +225,120 @@ others.
 ordering; bookmark sharing / per-surface "top bookmarked" stats;
 bookmarks on **groups** themselves (the ADR 0013 membership-lane
 surfaces have their own visibility world).
+
+## Amendments
+
+### 2026-09-30 — D3/F2 write-lane: the announcement branch resolves the owner's real standing in-Core (the obs-4 lapse closed)
+
+The **D3** write-lane rule — *"re-runs the target's frozen `Read`
+decision … the *same call the detail page uses*"* — is amended in its
+**application to the `announcement` target kind only**, and is a
+**composition detail, not a new frozen surface**. The original
+implementation passed an **empty** role set to
+`IAnnouncementService.GetAsync` (the Bookmarks seam hands us only an
+owner id — roles never cross the frozen `IBookmarkService` seam), so a
+`GlobalAdmin` or community-moderator who could see a **community-targeted**
+announcement on the detail page was **denied** the bookmark of it — a
+direct D3/F2 violation (the write lane was re-running a *stricter* read
+than the detail page uses, the exact divergence D3 forbids).
+
+The amendment: the `announcement` branch of
+`BookmarkService.ResolveTargetAsync` now resolves the owner's real
+standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync`
+(the ADR 0006 §A principal-read seam — the **same category of
+composition** as the already-composed `IUserInfoService`, which
+`GetBySubjectAsync` itself reads), and hands that thin-principal role set
+to the announcement read. A `GlobalAdmin` therefore resolves a
+community-targeted row (matching the detail page) instead of the old
+empty-set denial. **Fail-closed shape preserved:** no EF account row (or
+no principal) ⇒ empty set ⇒ the read degrades exactly as before.
+
+**The frozen surfaces are untouched** (C-M17·1 holds): the
+`IBookmarkService` **3-method public signature is byte-identical**
+(`ListAsync` / `ToggleAsync` / `RemoveAsync` — roles never cross the
+seam); **no** new `AccessAction` / `AccessVia` / `Decide()` branch;
+**no** new method on `IAuthorizationService`; the only change is one
+extra **frozen-seam** composition (the `BookmarkService` ctor gains an
+eighth dependency — `IIdentityService` — and the `DependencyInjection.cs`
+M17 factory passes it), exactly the category the original seven
+(`IUserInfoService`, `IAuthorizationService`, `IDocumentStore`,
+`IAnnouncementService`, `IPageService`, `IEventService`,
+`IProjectService`) already established. Pinned by the 15th
+`BookmarkServiceTests` case
+`GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (it **fails** under
+the pre-amendment empty-roles code and **passes** under this one — the
+witness). The §drift-guard frozen list in the design doc is amended to
+count **15** pinned `BookmarkServiceTests` names and to name
+`IIdentityService` among the frozen seams the `BookmarkService` composes.
+
+### 2026-09-30 — obs-2: redirect-back + flash toast on the bookmark toggle
+
+The original M17 `Toggle` action always redirected to `/bookmarks`
+(the "redirect after write" precedent). This is a **Web-layer
+usability gap**, not a decision-lane change: the user who clicked
+"Bookmark" on a post detail page (or event, or page, or group post, or
+announcement) was **bounced off the surface** they were reading, losing
+their place. The F1 "button reflects bookmarked on reload" pin
+(satisfied by the pre-existing `BookmarkState` ViewData exception path)
+is unchanged — this amendment adds the **post-toggle confirmation** the
+user was previously missing.
+
+The amendment (the house flash-toast + redirect-back idiom — the
+`AdminPortabilityController` precedent):
+
+- **`_BookmarkButton` partial** — the model changes from
+  `(string Kind, string Id)` to `(string Kind, string Id, string?
+  ReturnUrl)`; a new `<input type="hidden" name="returnUrl"
+  value="@Model.ReturnUrl" />` is added to the form. All six render
+  sites pass the surface's own detail URL as the third element (e.g.
+  `("post", Model.Post.Id, $"/posts/{Model.Post.Id}")` for the post
+  detail; `("page", Model.Id, Model.Path)` for the page surface —
+  `Model.Path` is the `PagePaths.Href` the view model already carries).
+- **`BookmarksController.Toggle`** — the signature changes from
+  `Toggle(string kind, string id)` to `Toggle(string kind, string id,
+  string? returnUrl = null)`. On success (`Bookmarked` /
+  `AlreadyBookmarked`), the action sets
+  `TempData["info"] = await T("bm.toggle.bookmarked")` and redirects
+  to `returnUrl` (or falls back to `/bookmarks` when the field is
+  absent — the original M17 behavior, unchanged for callers that don't
+  pass it). `Refused` → 404 (unchanged).
+- **`BookmarksController.Remove`** — sets
+  `TempData["info"] = await T("bm.toggle.removed")` before its
+  existing `return Redirect("/bookmarks")` (the remove is initiated
+  from the `/bookmarks` list — the redirect target is unchanged; the
+  flash toast confirms the removal).
+- **`BookmarksController` ctor** — gains two **optional** parameters:
+  `ILocalizationService? localization = null` and
+  `ITranslationProvider? translationProvider = null` (the
+  `AdminPortabilityController` house idiom). The `T(string key)`
+  private helper resolves the kw-l key to the operator's effective
+  language; when either parameter is null (the test-harness floor),
+  `T` returns the raw key — the tests assert the raw key directly.
+- **Two new `bm.toggle.*` kw-l keys** added to all four registries
+  (en / de / fr / da): `bm.toggle.bookmarked` and
+  `bm.toggle.removed`. The closed `bm.*` key set is now **14 keys**
+  (the original 12 + the obs-2 flash pair). The `BmKeys` array in
+  `BookmarksControllerTests.cs` is extended accordingly; the
+  `BmKeys_AreTheClosedTwelveKeySet` test is renamed
+  `BmKeys_AreTheClosedFourteenKeySet` and asserts
+  `Assert.Equal(14, actualBmKeys.Count)`. The
+  `KnownTranslationKeys_ParityTests` (de/fr counts == en count) pass
+  automatically since both keys are added to all four languages.
+
+**The frozen surfaces are untouched** (C-M17·1 holds): the
+`IBookmarkService` **3-method public signature is byte-identical**;
+**no** new `AccessAction` / `AccessVia` / `Decide()` branch; **no**
+new method on `IAuthorizationService`. The only change is in the
+**Web layer** (the `BookmarksController` + the `_BookmarkButton`
+partial + the six render sites) and the **key registry** (two new
+`bm.toggle.*` keys × 4 languages). Pinned by the retargeted
+`F1_Toggle_Idempotent_One_Row_Second_Call_Returns_AlreadyBookmarked`
+(redirect to the detail URL + `TempData["info"] == "bm.toggle.bookmarked"`),
+the `F4_Unbookmark_On_Degraded_Row_Still_Works` flash pin
+(`TempData["info"] == "bm.toggle.removed"`), the
+`M17AcceptanceGateTests.ClosedLoop` retarget (toggle → detail URL,
+remove → `/bookmarks` + flash), the `BmKeys_AreTheClosedFourteenKeySet`
+(14-key closed set), and the `BmButton_Partial_Form_Posts_To_Toggle_Endpoint`
+structural pin (the `returnUrl` hidden input). The design doc
+§drift-guard frozen list is amended to count **14 keys** in the §kw-l
+key list and to carry the obs-2 drift-log row.

@@ -84,11 +84,13 @@ public sealed class BookmarkButtonTests
     /// returns <c>AlreadyBookmarked</c> (the F1 no-op; the unique
     /// index on <c>(OwnerId, TargetKind, TargetId)</c> is the witness —
     /// the M9 <c>convo_uidx_pair</c> shape). Both results map to a
-    /// redirect to <c>/bookmarks</c> (the "redirect after write"
-    /// precedent — the M16 <c>InventoryController</c> / M5
-    /// <c>PageController</c> shape). The seam's <c>ToggleAsync</c> is
-    /// the sole writer (C-M17·1: the controller never re-derives
-    /// access).
+    /// redirect to the <c>returnUrl</c> form field (the surface's own
+    /// detail URL), with a localized flash toast
+    /// (<c>bm.toggle.bookmarked</c>) set in <c>TempData["info"]</c>
+    /// (the obs-2 ADR 0118 amendment — the button reflects the bookmark
+    /// state on the surface the user clicked it on, not a bounce to
+    /// <c>/bookmarks</c>). The seam's <c>ToggleAsync</c> is the sole
+    /// writer (C-M17·1: the controller never re-derives access).
     /// </summary>
     [Fact]
     public async Task F1_Toggle_Idempotent_One_Row_Second_Call_Returns_AlreadyBookmarked()
@@ -96,6 +98,7 @@ public sealed class BookmarkButtonTests
         const string actor = "subj-f1-owner";
         const string kind = "post";
         const string id = "p-toggle-f1";
+        const string returnUrl = $"/posts/{id}";   // the surface's own URL
 
         var bookmarks = Substitute.For<IBookmarkService>();
         bookmarks
@@ -115,15 +118,20 @@ public sealed class BookmarkButtonTests
 
         var controller = Build(bookmarks, store, subjectId: actor);
 
-        // First call — Bookmarked.
-        var first = await controller.Toggle(kind, id);
+        // First call — Bookmarked; redirect to the surface's own URL.
+        var first = await controller.Toggle(kind, id, returnUrl);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
-        Assert.Equal("/bookmarks", firstRedirect.Url);
+        Assert.Equal(returnUrl, firstRedirect.Url);
 
-        // Second call — AlreadyBookmarked (the F1 no-op).
-        var second = await controller.Toggle(kind, id);
+        // Obs-2 — the flash toast is set (the raw key — the test floor:
+        // the translation seam is absent, so T() returns the key itself).
+        Assert.Equal("bm.toggle.bookmarked", controller.TempData["info"]);
+
+        // Second call — AlreadyBookmarked (the F1 no-op); redirect to the
+        // surface's own URL (the same returnUrl).
+        var second = await controller.Toggle(kind, id, returnUrl);
         var secondRedirect = Assert.IsType<RedirectResult>(second);
-        Assert.Equal("/bookmarks", secondRedirect.Url);
+        Assert.Equal(returnUrl, secondRedirect.Url);
 
         // The seam's ToggleAsync was called twice, both with the actor's
         // SubjectId as the ownerId (C-M17·1: the controller never
@@ -269,6 +277,12 @@ public sealed class BookmarkButtonTests
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("/bookmarks", redirect.Url);
 
+        // Obs-2 (ADR 0118 amendment) — the flash toast is set on the
+        // localized bm.toggle.removed key (the raw key here — the test
+        // floor: the translation seam is absent in the harness, so the
+        // controller's T() helper falls back to the key itself).
+        Assert.Equal("bm.toggle.removed", controller.TempData["info"]);
+
         // The seam's RemoveAsync was called with the actor's SubjectId
         // as the ownerId + the targetKind / targetId verbatim + the
         // caller's session (the C3 same-transaction lane — the D5 pin:
@@ -371,6 +385,12 @@ public sealed class BookmarkButtonTests
         Assert.Contains("name=\"id\"", html);
         Assert.Contains("Model.Kind", html);
         Assert.Contains("Model.Id", html);
+
+        // (2b) Obs-2 (ADR 0118 amendment) — the returnUrl hidden input is
+        // present so the controller can redirect back to the surface's own
+        // URL (the /bookmarks fallback when the value is empty/null).
+        Assert.Contains("name=\"returnUrl\"", html);
+        Assert.Contains("Model.ReturnUrl", html);
 
         // (3) The anti-forgery token is present (the
         // [ValidateAntiForgeryToken] pin — the house convention

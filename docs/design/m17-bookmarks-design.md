@@ -25,7 +25,7 @@ access) — design
 > C-M17·1…7, the FACES F1–F5 + the named trade, the §kw-l key list, and
 > the §gate test names are locked in **ADR 0118 (Accepted, 2026-09-29)**.
 > The `[PROPOSED]` set in the register
-> `docs/plans-milestones/plan-m17-bookmarks.md` is the locked set this
+> `docs/plans-milestones/done/plan-m17-bookmarks.md` is the locked set this
 > doc restates **verbatim** (the U00 handoff entry records the lock;
 > **no veto** was recorded before the lock).
 >
@@ -99,7 +99,7 @@ everywhere to *find* the content (feeds, search, the calendar), but
 nowhere to say *these five things are mine to come back to*. M17 adds
 that surface: one document, one new surface, one service seam, a list
 view + nav entry + toggle button on the five target detail surfaces,
-twelve `bm.*` `kw-l` keys — and **no** new authorization surface, **no**
+twelve `bm.*` `kw-l` keys (the obs-2 ADR 0118 amendment adds the `bm.toggle.*` flash pair — **14 total**) — and **no** new authorization surface, **no**
 notification lane, **no** folders, **no** sharing (§deferred).
 
 M17 builds entirely on **frozen, verified seams** (the list above). This
@@ -108,9 +108,9 @@ is a **milestone** (a roadmap letter, not a named lane): the close unit
 `docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — D8). This design doc (authored U00, **LOCKED**) is the
 **primary tier**; the register
-`docs/plans-milestones/plan-m17-bookmarks.md` is the secondary tier; the
+`docs/plans-milestones/done/plan-m17-bookmarks.md` is the secondary tier; the
 scratch handoff note is
-`docs/plans-milestones/in-progress/m17-bookmarks-handoff-notes.md`.
+`docs/plans-milestones/done/m17-bookmarks-handoff-notes.md`.
 
 ## Scope
 
@@ -272,10 +272,12 @@ public interface IBookmarkService
 The composition root (U02) wires `BookmarkService` over the
 host-registered Marten `IDocumentStore` + the owning surfaces' read seams
 (the existing service reads the list resolution uses) + the frozen
-`IAuthorizationService` (the D3 check only). **No** `INotificationService`
-(D7). The non-owner path is the Web layer's: `[Authorize]` + a controller
-`ownerId == User id` check, **404** on mismatch, **no** `AccessAudit`
-row (§2.4).
+`IAuthorizationService` (the D3 check only) + — per the 2026-09-30
+D3/F2 amendment (ADR 0118) — the frozen `IIdentityService` (the
+announcement branch resolves the owner's real standing in-Core). **No**
+`INotificationService` (D7). The non-owner path is the Web layer's:
+`[Authorize]` + a controller `ownerId == User id` check, **404** on
+mismatch, **no** `AccessAudit` row (§2.4).
 
 ### 2.3 The D3 write-lane visibility table
 
@@ -346,10 +348,16 @@ The **frozen pins**: the frozen seams (`IAuthorizationService`,
 F1–F5 + named trade; the D1–D8 decisions; the §kw-l key list; the closed
 `TargetKind` set; the `Bookmark` doc shape (the exact field set, §2.1);
 the `IBookmarkService` ctor + the 3 public methods + the
-`BookmarkToggleStatus` enum; the §2.3 / §2.4 tables; and the 14 test
-names (§2.5). A change to any of these after U00 is a **drift event**
-(`## U<m> — Drift pause` per the unit-series rules; recorded in the
-§drift-guard drift log below).
+`BookmarkToggleStatus` enum (the ctor **composes** the frozen
+`IAuthorizationService` + the owning surfaces' read seams + — per the
+2026-09-30 D3/F2 amendment, ADR 0118 — the frozen `IIdentityService`
+for the announcement branch only; the **3-method public signature is
+frozen** and the added dependency is a frozen seam, so it is a
+composition detail, not a new surface); the §2.3 / §2.4 tables; and the
+**15** test names (§2.5 — the 14 original + the amendment's
+`GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle`). A change to any
+of these after U00 is a **drift event** (`## U<m> — Drift pause` per the
+unit-series rules; recorded in the §drift-guard drift log below).
 
 ## FACES (F1–F5) + the named trade
 
@@ -544,7 +552,9 @@ resident already crosses.
 - **D7 — No notification lane in M17 (deferred).** M17 composes
   **only** the frozen `IAuthorizationService` (the D3 write-lane
   visibility check) + the owning surfaces' existing read seams (D5 list
-  resolution) over the host-registered Marten `IDocumentStore`. It does
+  resolution) over the host-registered Marten `IDocumentStore` (+, per
+  the 2026-09-30 D3/F2 amendment, the frozen `IIdentityService` — a
+  composition detail, the 3-method public seam unchanged). It does
   **not** take an `INotificationService` emitter and does **not**
   register a Wolverine handler. The "nudge the author on bookmark" lane
   is **deferred** — a follow-on lane with its own ADR. *Forbids:* an
@@ -610,12 +620,14 @@ resident already crosses.
 
 The closed list, locked here so U03 and the parity tests agree (adjust
 individual names to the views as they are authored; the **list** is what
-U03 registers — **12 keys**):
+U03 registers — **14 keys** (the obs-2 ADR 0118 amendment, 2026-09-30, adds
+the two `bm.toggle.*` flash-toast keys to the original 12):
 
 `bm.nav`, `bm.list.title`, `bm.list.empty`, `bm.list.degraded`,
 `bm.list.kind.post`, `bm.list.kind.event`, `bm.list.kind.todo`,
 `bm.list.kind.announcement`, `bm.list.kind.page`,
-`bm.list.unbookmark`, `bm.button.bookmark`, `bm.button.bookmarked`.
+`bm.list.unbookmark`, `bm.button.bookmark`, `bm.button.bookmarked`,
+`bm.toggle.bookmarked`, `bm.toggle.removed`.
 
 ## §gate — the three acceptance tests (U05)
 
@@ -648,14 +660,21 @@ differently by design, and both pins hold together.
 Drift pause` per the unit-series rules): the frozen seams
 (`IAuthorizationService`, `AccessAction`, `AccessVia`, `Decide()`); the
 D1–D8 decisions; the C-M17·1…7 invariants; the F1–F5 + the named trade;
-the §kw-l key list (12 keys); the §gate names (a/b/c); the closed
+the §kw-l key list (14 keys); the §gate names (a/b/c); the closed
 `TargetKind` set {`post`, `event`, `todo`, `announcement`, `page`}; the
 `Bookmark` doc shape (the exact field set, §2.1); the
 `IBookmarkService` ctor + the 3 public methods + the
-`BookmarkToggleStatus` enum (§2.2); the §2.3 / §2.4 tables; and the 14
-pinned test names (§2.5).
+`BookmarkToggleStatus` enum (§2.2 — the ctor composes the frozen
+`IAuthorizationService` + the owning surfaces' read seams +, per the
+2026-09-30 D3/F2 amendment, the frozen `IIdentityService` for the
+announcement branch only; the **3-method public signature is frozen**);
+the §2.3 / §2.4 tables; and the **15** pinned test names (§2.5 — the
+14 original + the amendment's
+`GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle`).
 
-**Drift log** (empty — no drift since the U00 lock):
+**Drift log:**
 
 | Date | Unit | Change | Reason |
 |---|---|---|---|
+| 2026-09-30 | obs-4 (post-U00) | D3/F2 write-lane: the `announcement` branch of `BookmarkService.ResolveTargetAsync` now resolves the owner's real standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync` and hands that role set to `IAnnouncementService.GetAsync`, instead of the pre-amendment **empty** role set. The `BookmarkService` ctor gains an eighth dependency (`IIdentityService`); the `DependencyInjection.cs` M17 factory passes it. The **frozen `IBookmarkService` 3-method public signature is unchanged**; **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the 15th test `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (fails under the old empty-roles code). | The empty-roles lapse was a D3/F2 violation: the write lane re-ran a *stricter* read than the announcement detail page uses, so a `GlobalAdmin` / community-moderator who **could see** a community-targeted announcement was **denied** its bookmark. Resolving the owner's standing via the frozen principal-read seam restores the "same call the detail page uses" invariant (ADR 0118 D3/F2). Fail-closed preserved: no EF account row ⇒ empty set ⇒ degrades exactly as before. See ADR 0118 `## Amendments` (2026-09-30). |
+| 2026-09-30 | obs-2 (post-U00) | **Redirect-back + flash toast** on the bookmark toggle (the button reflects the bookmark state on the surface the user clicked it on, instead of bouncing to `/bookmarks`): the `_BookmarkButton` partial gains a hidden `returnUrl` input (the surface's own detail URL); the `BookmarksController.Toggle` action accepts an optional `returnUrl` form field and redirects to it (or falls back to `/bookmarks` when absent), setting a localized flash (`bm.toggle.bookmarked`) in `TempData["info"]`; `Remove` also sets a flash (`bm.toggle.removed`). The `BookmarksController` ctor gains two **optional** dependencies (`ILocalizationService?`, `ITranslationProvider?`) — the house `T(key)` helper from `AdminPortabilityController`. Two new `bm.toggle.*` kw-l keys added to all four registries (the closed set is now **14 keys**). The **frozen `IBookmarkService` 3-method public signature is unchanged**; **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the retargeted `F1_Toggle_...` / `F4_...` / `M17AcceptanceGateTests.ClosedLoop` (redirect to detail URL + flash key assert) + `BmKeys_AreTheClosedFourteenKeySet` + the partial structural pin `BmButton_Partial_Form_Posts_To_Toggle_Endpoint` (the `returnUrl` hidden input). | The original M17 toggle always redirected to `/bookmarks` — the user lost their place on the detail surface (post, event, page, group post, announcement). The obs-2 amendment restores the surface context via the house flash-toast + redirect-back idiom (`AdminPortabilityController` precedent), without extending the frozen `IBookmarkService` seam. See ADR 0118 `## Amendments` (2026-09-30, obs-2). |

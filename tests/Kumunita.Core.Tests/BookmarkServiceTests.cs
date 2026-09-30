@@ -1,13 +1,21 @@
+using System.Security.Claims;
 using Kumunita.Core;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
 using Marten;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Npgsql;
 using Xunit;
 
 namespace Kumunita.Core.Tests;
@@ -34,6 +42,7 @@ namespace Kumunita.Core.Tests;
 public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     private const string ComponentId = "c-u9-comp";
+    private string? _conn;   // set by BootStoreAsync; used by Services() to build the EF identity schema
 
     // ── 1 — F1_ToggleIsIdempotentOneRow (F1, the unique-index witness) ──
 
@@ -407,19 +416,61 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
+
+        // EF identity schema (ADR 0004): the same MigrateAsync the production boot
+        // does — required by the obs-4 IdentityService (IIdentityService.GetBySubjectAsync
+        // reads the EF `identity` schema for the user/role rows).
+        var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(conn)
+            .Options);
+        await db.Database.MigrateAsync(TestContext.Current.CancellationToken);
+
+        _conn = conn;
         return store;
     }
 
-    private static (UserInfoService User, AuthorizationService Authz, BookmarkService Bm)
+    private (UserInfoService User, AuthorizationService Authz, BookmarkService Bm)
         Services(IDocumentStore store)
     {
         var userInfo = new UserInfoService(store);
+
+        // obs 4 (ADR 0118 D3/F2): the real IdentityService over the migrated EF
+        // identity schema (the GuardianAssignmentTests shape) — so GetBySubjectAsync
+        // resolves the owner's real standing when the bookmark target is an
+        // announcement. The no-op NoClaimsSource/NoMail stand in for the two
+        // Web-side seams (not under test here).
+        var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_conn!)
+            .Options);
+        var userStore = new UserStore<User, IdentityRole, AppDbContext, string,
+            IdentityUserClaim<string>, IdentityUserRole<string>,
+            IdentityUserLogin<string>, IdentityUserToken<string>,
+            IdentityRoleClaim<string>>(db);
+        var userManager = new UserManager<User>(
+            userStore,
+            Options.Create(new IdentityOptions { User = { RequireUniqueEmail = true } }),
+            new PasswordHasher<User>(),
+            new[] { new UserValidator<User>() },
+            new[] { new PasswordValidator<User>() },
+            new UpperInvariantLookupNormalizer(),
+            new IdentityErrorDescriber(),
+            EmptyServiceProvider.Instance,
+            NullLogger<UserManager<User>>.Instance);
+        var identity = new IdentityService(
+            userManager,
+            store,
+            userInfo,
+            NoClaimsSource.Instance,
+            NoMail.Instance,
+            Options.Create(new VerificationOptions()),
+            NullLogger<IdentityService>.Instance);
+
         var authz = new AuthorizationService(store, userInfo);
         var announcements = new AnnouncementService(store, userInfo);
         var pages = new PageService(store);
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
-        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects);
+        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, identity);
         return (userInfo, authz, bm);
     }
 
@@ -466,15 +517,118 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
-        return await s.Query<Bookmark>()
-            .Where(b => b.OwnerId == owner)
-            .ToListAsync(ct);
+        return await Marten.QueryableExtensions.ToListAsync(
+            s.Query<Bookmark>()
+                .Where(b => b.OwnerId == owner),
+            ct);
     }
 
     private static async Task<IReadOnlyList<AccessAudit>> AllAudits(IDocumentStore store)
     {
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
-        return await s.Query<AccessAudit>().ToListAsync(ct);
+        return await Marten.QueryableExtensions.ToListAsync(s.Query<AccessAudit>(), ct);
+    }
+
+    // ── Test doubles (the two Web-side seams the IdentityService takes; minimal
+    //    substitutes — the mailer's durable-envelope path and the claims source
+    //    are not under test here; the same shape as GuardianAssignmentTests) ──
+
+    private sealed class NoClaimsSource : IClaimsSource
+    {
+        public static readonly NoClaimsSource Instance = new();
+        public ClaimsPrincipal? Current => null;   // not request-driven in a Core test
+    }
+
+    private sealed class NoMail : IMailerStage
+    {
+        public static readonly NoMail Instance = new();
+        public Task StageAsync(
+            IDocumentSession session,
+            string idempotencyKey,
+            string recipient,
+            string subject,
+            string body,
+            CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+        public object? GetService(Type serviceType) => null;
+    }
+
+    // ── 15 — GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle (obs 4 / D3/F2) ──
+
+    [Fact]
+    public async Task GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string adminId = "u-obs4-admin";
+        const string communityId = "u-obs4-comm";
+        const string annId = "u-obs4-ann";
+
+        // Seed the EF side: the account, the GlobalAdmin role row, the link
+        // (the same shape IdentityServiceAccountNotificationTests.SeedGlobalAdminAsync uses).
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(_conn!)
+            .Options);
+        var ct = TestContext.Current.CancellationToken;
+        if (!await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .AnyAsync(db.Roles.Where(r => r.Name == Roles.GlobalAdmin), ct))
+        {
+            db.Roles.Add(new IdentityRole
+            {
+                Id = Roles.GlobalAdmin,
+                Name = Roles.GlobalAdmin,
+                NormalizedName = Roles.GlobalAdmin.ToUpperInvariant()
+            });
+        }
+        if (await db.Users.FindAsync(new object[] { adminId }, ct) is null)
+        {
+            db.Users.Add(new User { Id = adminId, UserName = adminId, Email = adminId + "@ex.net" });
+        }
+        if (!await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+                .AnyAsync(db.UserRoles.Where(ur => ur.UserId == adminId && ur.RoleId == Roles.GlobalAdmin), ct))
+        {
+            db.UserRoles.Add(new IdentityUserRole<string> { UserId = adminId, RoleId = Roles.GlobalAdmin });
+        }
+        await db.SaveChangesAsync(ct);
+
+        // The mt side: a verified profile (GetBySubjectAsync checks Profile.Verified → Member role;
+        // the GlobalAdmin role comes from the EF identity role link above).
+        await Plant(store, new Profile
+        {
+            SubjectId = adminId,
+            DisplayName = adminId,
+            Verified = true,
+            Email = adminId + "@ex.net"
+        });
+
+        // A community-targeted announcement (Scope = Community, CommunityId set).
+        // A plain non-member resident with no GlobalAdmin standing would be DENIED
+        // by ResolveReadVisibilityAsync — the obs-4 bug was that BookmarkService
+        // passed an empty role set, so even a GlobalAdmin was denied.
+        await Plant(store, new Announcement
+        {
+            Id = annId,
+            AuthorId = adminId,
+            Title = "Community-targeted notice",
+            Body = "Visible to community members and GlobalAdmins",
+            Scope = AnnouncementScope.Community,
+            CommunityId = communityId,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // obs 4 fix: the owner's real standing is resolved via IIdentityService.GetBySubjectAsync.
+        // A GlobalAdmin (role from the EF identity link) sees a community-targeted
+        // announcement (ResolveReadVisibilityAsync: admin = roles.Contains(GlobalAdmin) → true).
+        var result = await RunInSession(store, s => bm.ToggleAsync(adminId, "announcement", annId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, result.Status);
+
+        // Verify the row was created.
+        var rows = await Bookmarks(store, adminId);
+        Assert.Single(rows, b => b.TargetKind == "announcement" && b.TargetId == annId);
     }
 }

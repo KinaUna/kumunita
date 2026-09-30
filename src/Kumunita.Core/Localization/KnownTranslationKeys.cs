@@ -1751,9 +1751,11 @@ public static class KnownTranslationKeys
 
             // M17 (ADR 0118) — Bookmarks: the personal-pin surface (D6: a
             // standing core surface, no admin toggle). The closed key set is
-            // the design doc §kw-l (12 keys: the nav entry U03 consumes, the
+            // the design doc §kw-l (14 keys: the nav entry U03 consumes, the
             // list / degraded / kind labels U03 consumes, the unbookmark
-            // action U03 consumes, and the toggle button U04 consumes).
+            // action U03 consumes, the toggle button U04 consumes, and the
+            // obs-2 redirect-back flash toast keys (the ADR 0118 amendment,
+            // 2026-09-30)).
             ["bm.nav"]                      = "Bookmarks",
             ["bm.list.title"]               = "Your bookmarks",
             ["bm.list.empty"]               = "No bookmarks yet.",
@@ -1766,6 +1768,9 @@ public static class KnownTranslationKeys
             ["bm.list.unbookmark"]          = "Remove",
             ["bm.button.bookmark"]          = "Bookmark",
             ["bm.button.bookmarked"]        = "Bookmarked",
+            // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
+            ["bm.toggle.bookmarked"]        = "Bookmarked.",
+            ["bm.toggle.removed"]           = "Bookmark removed.",
         };
 
     /// <summary>
@@ -3360,9 +3365,9 @@ public static class KnownTranslationKeys
 
             // M17 (ADR 0118) — Lesezeichen: die persönliche Merk-Oberfläche
             // (D6: dauerhafte Kerno­berfläche, kein Admin-Toggle). Die
-            // geschlossene Schlüsselmenge ist der Design-Doc-§kw-l (12
+            // geschlossene Schlüsselmenge ist der Design-Doc-§kw-l (14
             // Schlüssel: Nav-Eintrag, Listen-/Degradier-/Typ-Labels,
-            // Unmark-Aktion + Umschaltknopf).
+            // Unmark-Aktion + Umschaltknopf + obs-2 Flash-Toast-Schlüssel).
             ["bm.nav"]                      = "Lesezeichen",
             ["bm.list.title"]               = "Deine Lesezeichen",
             ["bm.list.empty"]               = "Noch keine Lesezeichen.",
@@ -3375,6 +3380,9 @@ public static class KnownTranslationKeys
             ["bm.list.unbookmark"]          = "Entfernen",
             ["bm.button.bookmark"]          = "Merken",
             ["bm.button.bookmarked"]        = "Gemerkt",
+            // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
+            ["bm.toggle.bookmarked"]        = "Gemerkt.",
+            ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
         };
 
     /// <summary>
@@ -4972,9 +4980,9 @@ public static class KnownTranslationKeys
 
             // M17 (ADR 0118) — Signets : la surface de repères personnels
             // (D6 : surface cœur permanente, pas de bascule admin). L'ensemble
-            // fermé des clés est le §kw-l du document de conception (12 clés :
+            // fermé des clés est le §kw-l du document de conception (14 clés :
             // entrée de navigation, libellés de liste / dégradé / type,
-            // action de retrait + bouton bascule).
+            // action de retrait + bouton bascule + clés obs-2 toast).
             ["bm.nav"]                      = "Signets",
             ["bm.list.title"]               = "Tes signets",
             ["bm.list.empty"]               = "Aucun signet pour l'instant.",
@@ -4987,6 +4995,9 @@ public static class KnownTranslationKeys
             ["bm.list.unbookmark"]          = "Retirer",
             ["bm.button.bookmark"]          = "Signeter",
             ["bm.button.bookmarked"]        = "Signeté",
+            // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
+            ["bm.toggle.bookmarked"]        = "Signeté.",
+            ["bm.toggle.removed"]           = "Signet retiré.",
         };
 
     /// <summary>
@@ -6575,9 +6586,9 @@ public static class KnownTranslationKeys
 
             // M17 (ADR 0118) — Bogmærker: den personlige mærke-overflade
             // (D6: stående kerne­overflade, ingen admin-toggle). Det lukkede
-            // nøglesæt er design-dokumentets §kw-l (12 nøgler: nav-indeks,
+            // nøglesæt er design-dokumentets §kw-l (14 nøgler: nav-indeks,
             // liste-/degraderings-/type-etiketter, fjern-handling +
-            // tilstandsknap).
+            // tilstandsknap + obs-2 flash-toast-nøgler).
             ["bm.nav"]                      = "Bogmærker",
             ["bm.list.title"]               = "Dine bogmærker",
             ["bm.list.empty"]               = "Ingen bogmærker endnu.",
@@ -6590,6 +6601,9 @@ public static class KnownTranslationKeys
             ["bm.list.unbookmark"]          = "Fjern",
             ["bm.button.bookmark"]          = "Bogmærk",
             ["bm.button.bookmarked"]        = "Bogmærket",
+            // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
+            ["bm.toggle.bookmarked"]        = "Bogmærket.",
+            ["bm.toggle.removed"]           = "Bogmærke fjernet.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

@@ -1,6 +1,7 @@
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -62,11 +63,20 @@ public sealed class BookmarkService : IBookmarkService
     private readonly IPageService _pages;
     private readonly IEventService _events;
     private readonly IProjectService _projects;
+    private readonly IIdentityService _identity;
 
     /// <summary>
-    /// Composes the seven frozen seams over the host-registered Marten
+    /// Composes the eight frozen seams over the host-registered Marten
     /// <see cref="IDocumentStore"/> (design doc §2.2 composition root —
-    /// **no** <c>INotificationService</c>, D7).
+    /// **no** <c>INotificationService</c>, D7). The extra seam versus the
+    /// original seven is the frozen <see cref="IIdentityService"/> (ADR 0006
+    /// §A) — used **only** to resolve the owner's real standing (their
+    /// thin-principal role set) when the bookmark target is an announcement,
+    /// so the D3 write-lane check re-runs the *same* read the announcement
+    /// detail page uses (ADR 0118 D3/F2). It never crosses the frozen
+    /// <see cref="IBookmarkService"/> seam — roles are an in-Core composition
+    /// detail, exactly the category of the already-composed
+    /// <see cref="IUserInfoService"/>.
     /// </summary>
     public BookmarkService(
         IUserInfoService userInfo,
@@ -75,7 +85,8 @@ public sealed class BookmarkService : IBookmarkService
         IAnnouncementService announcements,
         IPageService pages,
         IEventService events,
-        IProjectService projects)
+        IProjectService projects,
+        IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
@@ -84,6 +95,7 @@ public sealed class BookmarkService : IBookmarkService
         _pages = pages ?? throw new ArgumentNullException(nameof(pages));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
 
     // ── List (D5 degraded resolution; C-M17·2 zero-audit personal read) ───
@@ -374,12 +386,26 @@ public sealed class BookmarkService : IBookmarkService
             {
                 // The announcement lane has no AccessAudit / CanAsync of its
                 // own — its GetAsync is the whole visibility gate (the
-                // scope-vs-role split), returning null when not visible. The
-                // actor's role set is empty here (Bookmarks carries no
-                // thin-principal roles); a public-scope row resolves, a
-                // community-targeted one degrades — the conservative,
-                // fail-closed shape.
-                var a = await _announcements.GetAsync(targetId, actorId, new HashSet<string>())
+                // scope-vs-role split), returning null when not visible.
+                //
+                // D3/F2 (ADR 0118): the write-lane check must re-run *the same
+                // read the detail page uses*, so the owner's real standing is
+                // in play. The Bookmarks seam hands us only an owner id (roles
+                // never cross the frozen IBookmarkService seam), so we resolve
+                // the owner's thin-principal role set in-Core via the frozen
+                // IIdentityService (the same category of composition as the
+                // already-composed IUserInfoService) and hand that set to the
+                // announcement read. A GlobalAdmin / community-moderator who is
+                // not a member therefore resolves a community-targeted row —
+                // matching the detail page — instead of the old lapse of an
+                // empty role set denying them. Fail-closed shape preserved:
+                // no EF account row (or no principal) ⇒ empty set ⇒ the read
+                // degrades exactly as before.
+                var principal = await _identity.GetBySubjectAsync(actorId).ConfigureAwait(false);
+                var roles = principal is not null
+                    ? new HashSet<string>(principal.Roles, StringComparer.Ordinal)
+                    : new HashSet<string>(StringComparer.Ordinal);
+                var a = await _announcements.GetAsync(targetId, actorId, roles)
                     .ConfigureAwait(false);
                 if (a is null)
                     return (false, null, null);

@@ -301,7 +301,7 @@
                                set: a group post is the same "post" vocabulary as a community post).
                                D2 / C-M17·2 pin: the label is static per render — this view does
                                not load the owner's bookmark list to decide it. *@
-                            @{ var _bm = ("post", Model.Post.Id); }
+                            @{ var _bm = ("post", Model.Post.Id, $"/groups/{Model.GroupId}/posts/{Model.Post.Id}"); }
                             <partial name="Shared/_BookmarkButton" model="@_bm" />
                             <div class="mb-3 rc-body">
                                 @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
