@@ -856,6 +856,113 @@ public sealed class EventService : IEventService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // ─── M18 (ADR 0119, D5) — the author-only skip / undelete seams (U03) ───
+    //
+    // Skip is a soft-delete of ONE row (IsDeleted = true, C-M18·8); undelete is
+    // its inverse (C-M18·8). Standing (C-M18·4 / D5): author ∪ GlobalAdmin — the
+    // ADR 0014 / 0016 / 0017 edit-lane matrix. The locked seam signature carries
+    // no actorRoles (the PublishAsync author-check precedent), so a non-author —
+    // including a GlobalAdmin whose override is a Web-layer [Authorize] concern —
+    // gets a 404 (KeyNotFoundException, the "absent" no-leak shape, NOT a 403,
+    // C-M18·4 / D5). A head row (RecurrenceRule non-null) is not skippable / not
+    // undeletable via this seam (the head is edited via the existing edit lane,
+    // D5 / C-M18·8). No AccessAudit row (a write side-effect, not an access
+    // decision — the unit plan's posture); no new AccessAction / AccessVia /
+    // adapter (C-M18·5).
+
+    /// <inheritdoc cref="IEventService.SkipOccurrenceAsync"/>
+    /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·8) — **soft-delete one occurrence**: sets
+    /// <see cref="Event.IsDeleted"/> = <c>true</c> on the named row only. Never a
+    /// hard-delete (C-M18·8), never a cascade, never a touch of the head's
+    /// <see cref="Event.RecurrenceRule"/> or any sibling (C-M18·8). Standing
+    /// (server-side, C3): **author ∪ GlobalAdmin** (C-M18·4 — the ADR 0014 /
+    /// 0016 / 0017 edit-lane matrix); the locked seam signature carries no
+    /// <c>actorRoles</c> (the <see cref="PublishAsync"/> author-check precedent),
+    /// so a non-author gets a <c>KeyNotFoundException</c> (404, the "absent"
+    /// no-leak shape, **not** a 403, C-M18·4 / D5). A head row (<see
+    /// cref="Event.RecurrenceRule"/> non-null) is not skippable — the head is
+    /// edited via the existing edit lane (D5 / C-M18·8). **No** <see
+    /// cref="AccessAudit"/> row; **no** new <c>AccessAction</c> / <c>AccessVia</c>
+    /// / adapter (C-M18·5).
+    /// </summary>
+    public async Task<Event> SkipOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new KeyNotFoundException("An event id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Standing (C-M18·4 / D5): author-only at the Core level (the locked seam
+        // signature carries no actorRoles — the PublishAsync author-check
+        // precedent). A non-author gets a 404 (the "absent" no-leak shape — NOT a
+        // 403, C-M18·4); the same observable as a missing id, so a stranger cannot
+        // tell that the row exists.
+        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Head-row guard (design doc §6, D5 / C-M18·8): the head (RecurrenceRule
+        // non-null) is edited via the existing edit lane, never skipped via this
+        // seam (the "no delete-entire-series button" pin). Same 404 observable.
+        if (existing.RecurrenceRule is not null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (!existing.IsDeleted)
+        {
+            existing.IsDeleted = true;                 // C-M18·8 — the soft-delete flag (one row).
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <inheritdoc cref="IEventService.UndeleteOccurrenceAsync"/>
+    /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·8) — the **inverse of
+    /// <see cref="SkipOccurrenceAsync"/>**: sets <see cref="Event.IsDeleted"/> =
+    /// <c>false</c> on the named row only. Same standing (C-M18·4), same one-row
+    /// scope (C-M18·8), same 404 "absent" no-leak shape (C-M18·4 / D5). A skip is
+    /// always reversible by the author (C-M18·8). A head row ( <see
+    /// cref="Event.RecurrenceRule"/> non-null) is not undeletable via this seam (the
+    /// head's <c>IsDeleted</c> is set by the existing edit / delete lanes). **No**
+    /// <see cref="AccessAudit"/> row; **no** new <c>AccessAction</c> /
+    /// <c>AccessVia</c> / adapter (C-M18·5).
+    /// </summary>
+    public async Task<Event> UndeleteOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new KeyNotFoundException("An event id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Standing + head-row guard — the same 404 "absent" no-leak shape as
+        // SkipOccurrenceAsync (C-M18·4 / D5; the head is edited via the existing
+        // edit lane, D5 / C-M18·8).
+        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (existing.RecurrenceRule is not null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (existing.IsDeleted)
+        {
+            existing.IsDeleted = false;                // C-M18·8 — reversible (one row).
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
+
     /// <inheritdoc cref="IEventService.RsvpAsync"/>
     /// <summary>
     /// RSVP to an event (ADR 0054 §3.2) — the **last-write-wins** concurrency
