@@ -40,3 +40,41 @@
   README/STATUS parity). U01 is the **only** unit that opens the milestone; it
   exits on `Kumunita.Web.Tests` (the `MilestonesTests` pin). It reads the design
   doc's §0 + the register's Unit-map row for U01.
+
+## U01 — open M20 (the milestone flip to "In progress")
+
+- **M20 opened:** `src/Kumunita.Web/Milestones.cs` M20 `StatusPlanned` →
+  `StatusNext` (one-line change; M21/M22 stay `StatusPlanned`, M0–M19 stay
+  `StatusDone` — the register's "M20 is the first of the remaining horizon"
+  framing, the inverse of M19-which-was-last).
+- **`MilestonesTests` re-pinned:** `No_Milestone_Is_InProgress_After_M19`
+  (asserted **zero** `StatusNext`) replaced with
+  `M20_Is_The_Single_InProgress_Milestone` (asserts M20 is the single
+  `StatusNext`, M19 done, M21 + M22 still planned) — exactly the register's
+  unit-map row; the other three pins (`Roadmap_Covers_M0_Through_M22_…`,
+  `Shipped_Milestones_Are_Marked_Done`, `No_Milestone_Has_Blank_Title`)
+  untouched — their id order + done-list through M19 were already correct.
+- **README/STATUS parity:** README `## Status` — "The next horizon is planned:
+  M20 …" → "**M20 is in progress** — notification quiet times (… ADR 0121);
+  the remaining planned horizon is M21 … M22 …"; README Roadmap M20 row
+  `**Planned.**` → `**In progress.** (ADR 0121)`; `docs/STATUS.md` line-40
+  tail — "M19 is the last shipped milestone; the planned horizon is **M20** …
+  None of M20–M22 has begun." → "**M20 is in progress** … M19 remains the
+  last **shipped** milestone; the still-planned horizon is **M21** … and
+  **M22** …" — both now name the ADR (0121) as the flip's provenance, per the
+  M16/M17/M18 flip precedent (each names its ADR on the in-progress row).
+- **Open questions:** none. The register's U01 deliverable set (3 files) was
+  implemented verbatim; no D# was touched (U01 is a docs/flip unit — the
+  drift-guard's "only U01/U08 touch `Milestones.cs`/`MilestonesTests`" rule is
+  the only rule it was in scope to exercise, and it held).
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (6 pre-existing
+  `xUnit1051`/`CS8602` warnings in `Bookmark*`/`AdminGuests` tests — none in
+  `MilestonesTests`); `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` green — **Total 669, Failed 0** (the re-pinned
+  `M20_Is_The_Single_InProgress_Milestone` plus the full pre-existing suite).
+- **Next unit entry point:** **U02** (`in-progress/m20-u02.md`) — Core: the
+  `NotificationQuietSchedule` doc + the `M6DocTypes` registration + the pure
+  `QuietScheduleEvaluator.IsQuietNow` + the two owner-scope `NotificationService`
+  seams (`GetQuietScheduleAsync` / `SetQuietScheduleAsync`). Reads the design
+  doc's §4 (the doc shape) + §6 (the evaluator) + the ADR 0121; exits on
+  `Kumunita.Core.Tests`.

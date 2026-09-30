@@ -31,13 +31,17 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void No_Milestone_Is_InProgress_After_M19()
+    public void M20_Is_The_Single_InProgress_Milestone()
     {
-        // M19 is the last shipped milestone; M20/M21/M22 are the planned
-        // horizon (M20 quiet times, M21 document management, M22 onboarding)
-        // — none has begun, so there is no StatusNext.
+        // M20 (quiet times) is open; M19 (guest accounts) is done; M21 (document
+        // management) + M22 (onboarding) are the still-planned horizon.
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
-        Assert.Empty(next);
+        Assert.Single(next);
+        Assert.Equal("M20", next[0].Id);
+        // and the done list has not grown past M19 yet (M20 is in progress, not done)
+        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M19").Status);
+        Assert.Equal(Milestones.StatusPlanned, Milestones.All.Single(x => x.Id == "M21").Status);
+        Assert.Equal(Milestones.StatusPlanned, Milestones.All.Single(x => x.Id == "M22").Status);
     }
 
     [Fact]
