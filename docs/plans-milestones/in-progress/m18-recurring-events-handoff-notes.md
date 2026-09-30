@@ -23,3 +23,12 @@
 - **U01's shipped code left as-is:** `Event.cs` (`public string? RecurrenceHeadId`), `EventRecurrenceExpander.cs`, and `EventRecurrenceExpanderTests.cs` were already correct — no C# was touched in this correction.
 - **Verification:** `rg -n 'RecurrenceHeadId[^)]*Guid'` returns zero hits across the M18 surface docs; `rg -n 'RecurrenceHeadId' src/Kumunita.Core/Events/Event.cs` confirms `string?`.
 - **U02 may now start** without the type conflict — the register, design doc, ADR, and unit plans all annotate `RecurrenceHeadId` as `string?`.
+
+## U02 — Create-time series expansion
+
+- **Built:** `CreateEventRequest.Recurrence: EventRecurrenceRule?` field (D1/D2/D3, GATE-2); the `CreateAsync` materialization branch in `EventService.cs` (the zero-change branch — no rule / `Recurrence.None` — is byte-for-byte unchanged; the recurrence branch calls the pure U01 expander, assigns fresh ids to siblings, stores head + siblings + audit row in one transaction, one `SaveChangesAsync`); GATE-2 tests in new `tests/Kumunita.Core.Tests/EventServiceCreateRecurrenceTests.cs` (`Create_With_A_Weekly_Rule_Materializes_All_Occurrences` + `Create_With_No_Rule_Behaves_Exactly_As_Today`).
+- **Zero-change branch verified:** both `Recurrence: null` and `Recurrence: { Recurrence.None }` create exactly one row, `RecurrenceHeadId = null`, `RecurrenceRule = null` — the existing single-event behavior is unchanged.
+- **`now` source:** `CreateAsync` already computes `var now = DateTimeOffset.UtcNow` before the event is built; the expander is called with that same `now` (the design doc §9's "the service's existing now source"). On a fresh create the head's `Start` is in the future, so the now-floor is a no-op (as documented in the U01 expander).
+- **`UpdateEventRequest` untouched** (U04's deliverable — the cascade re-materializes via the same expander).
+- **GATE-2 green:** `dotnet build Kumunita.slnx -c Debug` green (0 errors); `dotnet exec …Kumunita.Core.Tests.dll` **Total: 1040, Failed: 0** (up from U01's 1038 — both new GATE-2 tests pass; U01's GATE-1 tests still green).
+- **No open questions.** U03 (skip/undelete) can start from the D5 seams; U04 (cascade) can start from D4 + the same expander.

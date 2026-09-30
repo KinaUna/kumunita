@@ -40,6 +40,20 @@ public sealed record CreateEventRequest
     // ImageIds (C-ATT·5 — an event's images stay in ImageIds, its files in
     // AttachmentIds). Nullable default: omitted ⇒ null ⇒ [].
     public IReadOnlyList<string>? AttachmentIds { get; init; }
+    // M18 (ADR 0119, D1/D2/D3) — the author's recurrence choice. <c>null</c> or
+    // <c>Recurrence.None</c> = a single, non-recurring event (the existing
+    // behavior, byte-for-byte unchanged — GATE-2's
+    // <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c> pin). When set
+    // (a non-<c>None</c> <c>Recurrence</c>), <c>CreateAsync</c> materializes
+    // the full series (head + siblings) in one transaction (D1/D3); the head is
+    // occurrence #1 (carrying the rule + <c>RecurrenceHeadId = null</c>),
+    // each sibling carries <c>RecurrenceHeadId = head.Id</c> + a <c>null</c>
+    // rule (D3). The expansion is the pure
+    // <see cref="EventRecurrenceExpander.ExpandRecurrence"/> (C-M18·2) —
+    // <c>CreateAsync</c> only *calls* it and *persists* the returned rows, it
+    // does not re-implement stepping. The <c>UpdateEventRequest</c> field is
+    // <b>not</b> added here — that is U04 (the head-edit cascade).
+    public EventRecurrenceRule? Recurrence { get; init; }
 }
 
 /// <summary>

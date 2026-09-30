@@ -628,7 +628,39 @@ public sealed class EventService : IEventService
         // The helper throws before anything is stored.
         CheckCreateStanding(actorId, StaticEmptyRoles, @event);
 
-        session.Store(@event);
+        // M18 (ADR 0119, D1/D3) — if the author chose a non-None recurrence rule,
+        // materialize the full series (head + siblings) in this same session.
+        // The expander is pure (C-M18·2); this lane only *calls* it and
+        // *persists* the returned rows (U02's scope — the head-edit cascade is
+        // U04). The head is occurrence #1 (carrying the rule + RecurrenceHeadId =
+        // null, D3); each sibling carries RecurrenceHeadId = head.Id + a null
+        // rule. The expander returns the head as row 0 (same object) and non-head
+        // rows with placeholder Ids (string.Empty) — this lane assigns fresh ids
+        // (the U01 contract).
+        //
+        // **Zero-change branch** (GATE-2's second pin): if the rule is null or
+        // Recurrence.None, the code path below is byte-for-byte identical to the
+        // pre-M18 create path (one row, RecurrenceHeadId = null, RecurrenceRule
+        // = null).
+        if (request.Recurrence is { } rule && rule.Recurrence != Recurrence.None)
+        {
+            @event.RecurrenceRule = rule;
+            @event.RecurrenceHeadId = null; // the head is occurrence #1 (D3)
+            var occurrences = EventRecurrenceExpander.ExpandRecurrence(@event, now);
+            // Assign fresh ids to the non-head rows (the expander returns
+            // placeholder Ids — string.Empty — per the U01 contract).
+            for (var i = 1; i < occurrences.Count; i++)
+                occurrences[i].Id = Guid.NewGuid().ToString("N");
+            session.Store(@event);
+            for (var i = 1; i < occurrences.Count; i++)
+                session.Store(occurrences[i]);
+        }
+        else
+        {
+            // Zero-change branch (no rule / Recurrence.None) — byte-for-byte
+            // unchanged (the existing create path).
+            session.Store(@event);
+        }
         StoreAuditRow(session, actorId, "event.create", @event.Id, AccessVia.Owner);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return @event;
