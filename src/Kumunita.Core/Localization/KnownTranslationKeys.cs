@@ -92,6 +92,29 @@ public static class KnownTranslationKeys
                 "You are signed in as a guest. Your access is limited to the " +
                 "surfaces the admin has allowed, for the window they set.",
 
+            // ── M20 (ADR 0121) — notification quiet times: the 5th
+            // /settings/quiet resident section (D7) + the /admin/quiet cadence
+            // surface (D8). U06 authors the COMPLETE 15-key closed set (11
+            // resident settings.quiet.* + 4 admin admin.quiet.*); U06/U07
+            // consume, U07 adds none (the register's closed-kw-l table).
+            ["settings.quiet.title"]        = "Quiet hours",
+            ["settings.quiet.description"]  = "Choose when your notification emails are held. Your quiet " +
+                "schedule is saved on your account, applied in your own time zone — it takes " +
+                "effect the next time a notification is sent, and never affects other residents.",
+            ["settings.quiet.enabled"]      = "Hold notification emails during my quiet hours",
+            ["settings.quiet.mode_label"]   = "When should notification emails be held?",
+            ["settings.quiet.mode_blocked"] = "Held during the selected hours & days",
+            ["settings.quiet.mode_allowed"] = "Held except the selected hours & days",
+            ["settings.quiet.hours_label"]  = "Hours of day",
+            ["settings.quiet.days_label"]   = "Days of week",
+            ["settings.quiet.save"]         = "Save quiet hours",
+            ["settings.quiet.flash_saved"]  = "Quiet hours saved — held emails are released when your quiet hours end.",
+            ["settings.quiet.flash_cleared"] = "Quiet hours cleared — all notification emails will now be sent immediately.",
+            ["admin.quiet.title"]           = "Quiet-time cadence",
+            ["admin.quiet.cadence_label"]   = "Re-check held notifications every (minutes)",
+            ["admin.quiet.save"]            = "Save cadence",
+            ["admin.quiet.flash_saved"]     = "Quiet-time cadence saved.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
@@ -1847,6 +1870,29 @@ public static class KnownTranslationKeys
                 "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
                 "das von ihr gesetzte Zeitfenster.",
 
+            // ── M20 (ADR 0121) — Benachrichtigungs-Stumstunden: die 5. Sektion
+            // /settings/quiet (D7) + die /admin/quiet-Takt-Oberfläche (D8).
+            // U06 authorisiert den vollständigen 15-Schlüssel-Satz; U06/U07
+            // konsumieren, U07 fügt keine Schlüssel hinzu.
+            ["settings.quiet.title"]        = "Stumstunden",
+            ["settings.quiet.description"]  = "Wähle, wann deine Benachrichtigungs-E-Mails zurückgehalten " +
+                "werden. Dein Stumstundenplan wird auf deinem Konto gespeichert, in " +
+                "deiner eigenen Zeitzone angewendet — er wirkt beim nächsten " +
+                "Absenden einer Benachrichtigung und betrifft nie andere Mitglieder.",
+            ["settings.quiet.enabled"]      = "Benachrichtigungs-E-Mails in meinen Stumstunden zurückhalten",
+            ["settings.quiet.mode_label"]   = "Wann sollen Benachrichtigungs-E-Mails zurückgehalten werden?",
+            ["settings.quiet.mode_blocked"] = "Zurückgehalten während der gewählten Stunden & Tage",
+            ["settings.quiet.mode_allowed"] = "Zurückgehalten außer in den gewählten Stunden & Tagen",
+            ["settings.quiet.hours_label"]  = "Stunden des Tages",
+            ["settings.quiet.days_label"]   = "Wochentage",
+            ["settings.quiet.save"]         = "Stumstunden speichern",
+            ["settings.quiet.flash_saved"]  = "Stumstunden gespeichert — zurückgehaltene E-Mails werden gesendet, sobald deine Stumstunden enden.",
+            ["settings.quiet.flash_cleared"] = "Stumstunden entfernt — alle Benachrichtigungs-E-Mails werden jetzt sofort gesendet.",
+            ["admin.quiet.title"]           = "Stumstunden-Takt",
+            ["admin.quiet.cadence_label"]   = "Zurückgehaltene Benachrichtigungen alle (Minuten) erneut prüfen",
+            ["admin.quiet.save"]            = "Takt speichern",
+            ["admin.quiet.flash_saved"]     = "Stumstunden-Takt gespeichert.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
 
@@ -3497,6 +3543,29 @@ public static class KnownTranslationKeys
                 "Vous êtes connecté en tant qu'invité. Votre accès est limité " +
                 "aux surfaces que l'administrateur a autorisées, pour la " +
                 "fenêtre qu'il a définie.",
+
+            // ── M20 (ADR 0121) — heures de silence des notifications : la 5e
+            // section /settings/quiet (D7) + la surface /admin/quiet (D8).
+            // U06 authorise le jeu fermé de 15 clés ; U06/U07 consomment, U07
+            // n'ajoute aucune clé.
+            ["settings.quiet.title"]        = "Heures de silence",
+            ["settings.quiet.description"]  = "Choisis quand tes e-mails de notification sont retenus. Ton " +
+                "horaire de silence est enregistré sur ton compte, appliqué dans " +
+                "ton propre fuseau horaire — il prend effet au prochain envoi d'une " +
+                "notification et n'affecte jamais les autres résidents.",
+            ["settings.quiet.enabled"]      = "Retenir les e-mails de notification pendant mes heures de silence",
+            ["settings.quiet.mode_label"]   = "Quand les e-mails de notification doivent-ils être retenus ?",
+            ["settings.quiet.mode_blocked"] = "Retenus pendant les heures & jours sélectionnés",
+            ["settings.quiet.mode_allowed"] = "Retenus hors des heures & jours sélectionnés",
+            ["settings.quiet.hours_label"]  = "Heures de la journée",
+            ["settings.quiet.days_label"]   = "Jours de la semaine",
+            ["settings.quiet.save"]         = "Enregistrer les heures de silence",
+            ["settings.quiet.flash_saved"]  = "Heures de silence enregistrées — les e-mails retenus sont envoyés dès que tes heures de silence se terminent.",
+            ["settings.quiet.flash_cleared"] = "Heures de silence retirées — tous les e-mails de notification seront désormais envoyés immédiatement.",
+            ["admin.quiet.title"]           = "Cadence des heures de silence",
+            ["admin.quiet.cadence_label"]   = "Revérifier les notifications retenues toutes les (minutes)",
+            ["admin.quiet.save"]            = "Enregistrer la cadence",
+            ["admin.quiet.flash_saved"]     = "Cadence des heures de silence enregistrée.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
@@ -5149,6 +5218,29 @@ public static class KnownTranslationKeys
             ["account.guest_welcome"] =
                 "Du er logget ind som gæst. Din adgang er begrænset til de " +
                 "flader, administratoren har tilladt, for det vindue de har sat.",
+
+            // ── M20 (ADR 0121) — notifikations-stumtid: den 5. sektion
+            // /settings/quiet (D7) + overfladen /admin/quiet (D8). U06
+            // authoriserer det fulde sæt på 15 nøgler; U06/U07 forbruger, U07
+            // tilføjer ingen nøgler.
+            ["settings.quiet.title"]        = "Stumtid",
+            ["settings.quiet.description"]  = "Vælg hvornår dine notifikationse-mails holdes tilbage. Din " +
+                "stumtid gemmes på din konto og anvendes i din egen tidssone — " +
+                "den træder i kraft ved næste afsendelse af en notifikation og " +
+                "betræffer aldrig andre beboere.",
+            ["settings.quiet.enabled"]      = "Hold notifikationse-mails tilbage i min stumtid",
+            ["settings.quiet.mode_label"]   = "Hvornår skal notifikationse-mails holdes tilbage?",
+            ["settings.quiet.mode_blocked"] = "Holdes tilbage i de valgte timer & dage",
+            ["settings.quiet.mode_allowed"] = "Holdes tilbage undtagen de valgte timer & dage",
+            ["settings.quiet.hours_label"]  = "Timer på døgnet",
+            ["settings.quiet.days_label"]   = "Ugedage",
+            ["settings.quiet.save"]         = "Gem stumtid",
+            ["settings.quiet.flash_saved"]  = "Stumtid gemt — tilbageholdte e-mails sendes, når din stumtid slutter.",
+            ["settings.quiet.flash_cleared"] = "Stumtid ryddet — alle notifikationse-mails sendes nu straks.",
+            ["admin.quiet.title"]           = "Stumtid-takt",
+            ["admin.quiet.cadence_label"]   = "Genprøv tilbageholdte notifikationer hver (minut) gang",
+            ["admin.quiet.save"]            = "Gem takt",
+            ["admin.quiet.flash_saved"]     = "Stumtid-takt gemt.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",

@@ -1,0 +1,117 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Quiet hours";
+}
+
+@* M20 (ADR 0121, D7) — the resident's quiet-hours section (the 5th /settings
+   section). Mirrors the ADR 0019 time-zone / ADR 0020 date-format section
+   shape: the settings sub-nav strip, the page heading, the section heading +
+   lede, a save form (master on/off + mode + hours + days) and a separate
+   clear form (clear=1 → "never quiet", the C-M20·3 floor). Every
+   user-visible string is a kw-l key from the closed 15-key M20 set (D9); the
+   data-confirm attribute is hardcoded copy (the ADR 0015 / existing
+   settings-view precedent — a confirm() dialog is out of the TagHelper's
+   reach and stays hardcoded). *@
+@await Html.PartialAsync("_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+
+@* The quiet section is always available to a signed-in resident (the
+   controller's [Authorize] gate); a missing schedule renders the "never
+   quiet" floor (C-M20·3) — the form is the same, just pre-selected to the
+   disabled state. *@
+<h2 class="mt-1"><kw-l key="settings.quiet.title">Quiet hours</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="settings.quiet.description">Choose when your notification emails are held. Your quiet schedule is saved on your account, applied in your own time zone — it takes effect the next time a notification is sent, and never affects other residents.</kw-l>
+</p>
+
+<form method="post" action="/settings/quiet">
+    @Html.AntiForgeryToken()
+    <div class="row g-3">
+        <div class="col-sm-12">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" role="switch" id="quietEnabled"
+                       name="enabled" value="true"
+                       @(Model.QuietEnabled ? "checked" : null) />
+                <label class="form-check-label" for="quietEnabled">
+                    <kw-l key="settings.quiet.enabled">Hold notification emails during my quiet hours</kw-l>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-sm-12">
+            <span class="form-label"><kw-l key="settings.quiet.mode_label">When should notification emails be held?</kw-l></span>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" id="quietModeBlocked"
+                       name="mode" value="blocked"
+                       @(Model.QuietMode == "blocked" ? "checked" : null) />
+                <label class="form-check-label" for="quietModeBlocked">
+                    <kw-l key="settings.quiet.mode_blocked">Held during the selected hours &amp; days</kw-l>
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" id="quietModeAllowed"
+                       name="mode" value="allowed"
+                       @(Model.QuietMode == "allowed" ? "checked" : null) />
+                <label class="form-check-label" for="quietModeAllowed">
+                    <kw-l key="settings.quiet.mode_allowed">Held except the selected hours &amp; days</kw-l>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+        <div class="col-sm-6">
+            <label for="quietHours" class="form-label">
+                <kw-l key="settings.quiet.hours_label">Hours of day</kw-l>
+            </label>
+            <select class="form-select" name="hours" id="quietHours" multiple size="6">
+                @{
+                    var hours = Model.QuietHours ?? Array.Empty<int>();
+                }
+                @for (var h = 0; h < 24; h++)
+                {
+                    <option value="@h" selected="@(hours.Contains(h) ? "selected" : null)">@h</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6">
+            <label for="quietDays" class="form-label">
+                <kw-l key="settings.quiet.days_label">Days of week</kw-l>
+            </label>
+            <select class="form-select" name="daysOfWeek" id="quietDays" multiple size="7">
+                @{
+                    var days = Model.QuietDaysOfWeek ?? Array.Empty<int>();
+                }
+                @for (var d = 0; d < 7; d++)
+                {
+                    <option value="@d" selected="@(days.Contains(d) ? "selected" : null)">@d</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="row g-2 mt-3">
+        <div class="col-sm-12">
+            <button type="submit" class="btn btn-primary">
+                <kw-l key="settings.quiet.save">Save quiet hours</kw-l>
+            </button>
+        </div>
+    </div>
+</form>
+
+@* The clear lane (the ADR 0019 "reset to platform default" affordance shape) —
+   a separate form posting clear=1; the controller maps this to a null schedule
+   (the "never quiet" floor, C-M20·3). The data-confirm is hardcoded copy (the
+   ADR 0015 / settings-view precedent — a confirm() dialog stays hardcoded). *@
+<form method="post" action="/settings/quiet" class="mt-3"
+      data-confirm="Clear your quiet hours? All notification emails will be sent immediately again.">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="clear" value="1" />
+    <button type="submit" class="btn btn-outline-secondary">
+        <kw-l key="settings.quiet.save">Save quiet hours</kw-l>
+    </button>
+</form>

@@ -447,3 +447,77 @@
   `MilestonesTests`. It reads the design doc §7 (the resident section) + §10
   (the closed `kw-l` key set) + U02's two owner-scope seams. Exits on
   `Kumunita.Web.Tests`. **STOP after U05 — do not chain into U06.**
+
+## U06 — the 5th `/settings/quiet` resident section (Web)
+- **What landed (D7 — the ADR 0019 time-zone lane verbatim):**
+  1. `src/Kumunita.Web/Controllers/LocaleController.cs` — a trailing optional
+     `NotificationService? notifications = null` ctor param (the two existing
+     3-arg test-construction sites — `SettingsSectionSplitTests` /
+     `PublicLocaleAndAboutTests` — still compile unchanged); a
+     `[HttpGet("/settings/quiet")]` `SettingsQuiet()` section GET (→ `View("Quiet",
+     await BuildModel())`); the 5 quiet fields on `LocaleSettingsViewModel`
+     (`bool? Quiet`, `bool QuietEnabled`, `string QuietMode` (default
+     "blocked"), `int[] QuietHours`, `int[] QuietDaysOfWeek`) populated in
+     `BuildModel()` from `GetQuietScheduleAsync` (a `null` schedule → the
+     disabled floor, C-M20·3); and the `[HttpPost("/settings/quiet")]
+     [ValidateAntiForgeryToken] SaveQuiet(enabled, mode, hours, daysOfWeek,
+     clear)` owner-scope write lane — the recipient is always
+     `SubjectId(User)`, **no** caller-supplied recipient id (C-M20·7),
+     `clear=1` → `SetQuietScheduleAsync(subject, null)` (the floor), else the
+     form → a `NotificationQuietSchedule` → `SetQuietScheduleAsync(subject,
+     schedule)`; **no** `AccessAudit` row (the owner-scope personal-preference
+     lane, ADR 0019, C-M20·7); the flash writes the registered
+     `settings.quiet.flash_saved` / `settings.quiet.flash_cleared` (the kw-l
+     floor, ADR 0015 D1).
+  2. `src/Kumunita.Web/Views/Locale/_SettingsTabs.cshtml` — the 5th tab
+     (`settings.quiet.title` / "Quiet hours" / `/settings/quiet`, after Date &
+     time format, before Children) + the `SettingsQuiet` active-detection
+     branch.
+  3. `src/Kumunita.Web/Views/Locale/Quiet.cshtml` — the section view (the
+     Timezone/DateFormat shape): a save form (master on/off, mode radios
+     blocked/allowed, hours 0–23, days 0–6) + a `clear=1` clear form; every
+     user-visible label is a registered `kw-l` key.
+  4. `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — **the closed
+     15-key `kw-l` set × 4 languages** (11 resident `settings.quiet.*` + 4
+     admin `admin.quiet.*`; en/de/fr/da). **Note:** the de/fr/da values were
+     **authored by U06** — none were pre-authored by U00 (the design doc §10,
+     ADR 0121, and the handoff notes carry English only; U06 authored all
+     four languages to the M14/M15/M19 registry-voice precedent, including the
+     French gender agreement ("ton propre fuseau horaire") and the Danish verb
+     ("Genprøv")).
+  5. `tests/Kumunita.Web.Tests/LocaleControllerQuietSectionTests.cs` (new, 5
+     pins, the `PostgresFixture` integration shape mirroring
+     `NotificationsControllerTests`) — **save/clear round-trip** (signed-in
+     POST stores a `NotificationQuietSchedule` for the signed-in subject, read
+     back through the seam's own read lane; `clear=1` deletes it → the read
+     lane returns `null`), **signed-out fails closed** (no subject → the seam
+     is never invoked), **no caller-supplied recipient** (the `SaveQuiet`
+     action signature is exactly `enabled`/`mode`/`hours`/`daysOfWeek`/
+     `clear`, none of the recipient-id spellings), and the **kw-l closure
+     witness** (all 15 keys present non-empty in en/de/fr/da). The save lane is
+     driven through the **real** `NotificationService` (concrete sealed) over a
+     live scratch-Postgres `IDocumentStore`; the seam's `Store`/`Delete` are
+     Marten **extension** methods (static, not intercepted by NSubstitute), so
+     the observable effect is asserted by **reading back** through
+     `GetQuietScheduleAsync` (the `NotificationsControllerTests`
+     "assert against the live store" idiom — a fake-`IDocumentSession` call-
+     log approach does not work here because `Store`/`Delete<T>` are extension
+     methods).
+- **Discrepancies resolved:** none against the shipped U02/U04 seams — U06
+  consumed the shipped `GetQuietScheduleAsync`/`SetQuietScheduleAsync` shape
+  verbatim. The one approach that did **not** work was a fake
+  `IDocumentStore` + fake `IDocumentSession` with NSubstitute call-logs:
+  `session.Store(...)` and `session.Delete<T>(id)` are Marten extension
+  methods, so NSubstitute cannot record them — the repo's real-store idiom was
+  the correct (and only) path.
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (0 warnings in
+  the new files); `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` green —
+  **Total 677, Failed 0** (U05's 672 + the five new M20 U06 pins; every
+  existing Web pin still passing).
+- **Next unit entry point:** **U07** — the `/admin/quiet` admin section, an
+  `AdminQuietController` over U04's `GetQuietCheckMinutesAsync` /
+  `SetQuietCheckMinutesAsync` (the `ILocalizationService` cadence seam, no
+  `CancellationToken`), consuming the **4** `admin.quiet.*` keys already
+  authored by U06 and **adding none**. U07 is out of scope for this unit.
+  **STOP after U06 — do not chain into U07.**
