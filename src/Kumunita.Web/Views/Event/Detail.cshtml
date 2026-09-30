@@ -52,6 +52,68 @@
                     </form>
                 }
             }
+            @* M18 (ADR 0119, D7 / F2 / F3) — the series chip + the author's
+               skip / restore buttons. The chip (F2) is shown on **every** row
+               in a series (head + non-head alike — "the chip is shown on
+               every row"); the head row shows the chip but **neither** button
+               (F3 — the head is edited via the existing edit lane, D4); a
+               non-head row additionally shows the "Part of a series" chip
+               (D9 events.series.part_of) + (for the author ∪ GlobalAdmin,
+               C-M18·4) the skip / restore buttons (F3). The buttons POST to
+               the U06 lanes (POST /events/{id}/skip | /undelete); the U03
+               seam re-pins the standing + the head-row guard at POST (a
+               non-author / a head row is a non-leaky 404 — the Web render is
+               the UI guard, the seam is the backstop). *@
+            @if (Model.IsPartOfSeries && Model.Rule is not null)
+            {
+                var sRule = Model.Rule;
+                var sTypeKey = sRule.Recurrence switch
+                {
+                    Recurrence.Daily   => "events.recurrence.daily",
+                    Recurrence.Weekly  => "events.recurrence.weekly",
+                    Recurrence.Monthly => "events.recurrence.monthly",
+                    Recurrence.Yearly  => "events.recurrence.yearly",
+                    _                  => "events.recurrence.none",
+                };
+                <span class="badge text-bg-info">
+                    <kw-l key="events.series.repeats">Repeats</kw-l>
+                    <kw-l key="@sTypeKey">Weekly</kw-l>, every <b>@sRule.Interval</b>
+                    @if (sRule.Count is not null)
+                    {
+                        <span> · <b>@sRule.Count</b> <kw-l key="events.recurrence.count">occurrences</kw-l></span>
+                    }
+                    @if (sRule.Ends is not null)
+                    {
+                        <span> · <kw-l key="events.recurrence.until">until</kw-l> <kw-dt dt="@sRule.Ends.Value" format="d"></kw-dt></span>
+                    }
+                </span>
+                @if (Model.IsNonHead)
+                {
+                    <span class="badge text-bg-light border"><kw-l key="events.series.part_of">Part of a series</kw-l></span>
+                }
+            }
+            @if (Model.IsNonHead && Model.CanSkipOrUndelete)
+            {
+                if (Model.Event.IsDeleted)
+                {
+                    <form class="d-inline" method="post" action="/events/@Model.Event.Id/undelete">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                            <kw-l key="events.series.restore">Restore this occurrence</kw-l>
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <form class="d-inline" method="post" action="/events/@Model.Event.Id/skip"
+                          data-confirm="Skip this occurrence? You can restore it later.">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                            <kw-l key="events.series.skip">Skip this occurrence</kw-l>
+                        </button>
+                    </form>
+                }
+            }
             @* ADR 0082 — the event's action surface: one ⋮ dropdown (the
                ADR 0069 / 0071 todo/board idiom). Edit is a plain link; Delete
                is a confirm form in the menu; translation add / edit each open

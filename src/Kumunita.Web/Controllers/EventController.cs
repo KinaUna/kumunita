@@ -854,6 +854,34 @@ public sealed class EventController : Controller
             }
         }
 
+        // M18 (ADR 0119, D7 / F2 / F3 / C-M18·4) — the detail-page series
+        // shape (U06). The head carries the rule (D3); a non-head sibling
+        // carries <c>RecurrenceHeadId</c> = head.Id. The series chip (F2) is
+        // shown on **every** row in a series (head + non-head alike); the chip
+        // reads the head's rule (a single <c>GetAsync(head.Id)</c> when the
+        // row is a non-head). The skip / restore buttons (F3) are shown **only**
+        // on a non-head row the actor may edit (C-M18·4 — the existing
+        // <c>canEdit</c> standing = author ∪ GlobalAdmin, re-pinned server-side
+        // by the U03 seam at POST); the head shows the chip but **neither**
+        // button (F3 — the head is edited via the existing edit lane, D4).
+        bool isHead = ev.RecurrenceRule is not null;
+        bool isNonHead = ev.RecurrenceHeadId is not null;
+        bool isPartOfSeries = isHead || isNonHead;
+        EventRecurrenceRule? rule = ev.RecurrenceRule;
+        if (isNonHead && rule is null)
+        {
+            // F2 — the chip reads the head's rule (a single GetAsync(head.Id);
+            // C-M18·1: the read seams are concrete-only, this is the one
+            // detail-page read of the head's rule for the chip).
+            try
+            {
+                var head = await this.events.GetAsync(ev.RecurrenceHeadId!, actorId, HttpContext.RequestAborted);
+                rule = head.RecurrenceRule;
+            }
+            catch (KeyNotFoundException) { rule = null; }
+            catch (UnauthorizedAccessException) { rule = null; }
+        }
+
         var vm = new EventDetailViewModel(
             Event: ev,
             AuthorDisplayName: authorName,
@@ -867,7 +895,12 @@ public sealed class EventController : Controller
             Languages: languages,
             CanTranslate: canTranslate,
             OriginalLanguageCode: ev.LanguageCode,
-            LinkedTodos: linkedTodos);
+            LinkedTodos: linkedTodos,
+            IsPartOfSeries: isPartOfSeries,
+            IsHead: isHead,
+            IsNonHead: isNonHead,
+            CanSkipOrUndelete: canEdit,
+            Rule: rule);
 
         return View(vm);
     }
@@ -1497,6 +1530,82 @@ public sealed class EventController : Controller
 
         TempData["info"] = "Event deleted.";
         return Redirect("/events");
+    }
+
+    // ── M18 (ADR 0119, D5 / F3) — the author's skip / restore lane ────────────
+    //
+    // Two thin Web lanes (ADR 0006-D: routes + shape) that delegate the write
+    // + standing decision to the frozen <see cref="IEventService"/> U03 seams
+    // (<see cref="IEventService.SkipOccurrenceAsync"/> /
+    // <see cref="IEventService.UndeleteOccurrenceAsync"/>). The standing
+    // (C-M18·4 — author ∪ GlobalAdmin) + the head-row guard + the no-leak 404
+    // split are all enforced **server-side** by the seam (a non-author, a
+    // missing id, and a head row all surface as the seam's
+    // <see cref="KeyNotFoundException"/> → a non-leaky <c>404</c>, never a
+    // <c>403</c>). No new <see cref="AccessAction"/> /
+    // <see cref="AccessVia"/> / adapter (C-M18·5). The detail page's
+    // <see cref="EventDetailViewModel.CanSkipOrUndelete"/> is only the display
+    // affordance (F3); the seam's 404 is the backstop.
+
+    /// <summary>
+    /// <c>POST /events/{id}/skip</c> — M18 (ADR 0119, D5 / F3) the author's
+    /// "Skip this occurrence" (soft-delete <b>one</b> occurrence row,
+    /// C-M18·8). A thin Web lane delegating to
+    /// <see cref="IEventService.SkipOccurrenceAsync"/>. A non-author, a
+    /// missing id, or a head row is a non-leaky <c>404</c> (the seam's
+    /// <see cref="KeyNotFoundException"/>; C-M18·4 / D5 — never a <c>403</c>).
+    /// On success, redirects back to the detail page.
+    /// </summary>
+    [HttpPost("/events/{id}/skip")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SkipOccurrence(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await this.events.SkipOccurrenceAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        TempData["info"] = "Occurrence skipped.";
+        return Redirect($"/events/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /events/{id}/undelete</c> — M18 (ADR 0119, D5 / F3) the author's
+    /// "Restore this occurrence" (the inverse of
+    /// <see cref="SkipOccurrence"/> — set <c>IsDeleted = false</c> on one row
+    /// only, C-M18·8). A thin Web lane delegating to
+    /// <see cref="IEventService.UndeleteOccurrenceAsync"/>. Same standing
+    /// (C-M18·4), same head-row guard, same non-leaky <c>404</c> split as
+    /// <see cref="SkipOccurrence"/>. On success, redirects back to the detail
+    /// page.
+    /// </summary>
+    [HttpPost("/events/{id}/undelete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UndeleteOccurrence(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await this.events.UndeleteOccurrenceAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        TempData["info"] = "Occurrence restored.";
+        return Redirect($"/events/{id}");
     }
 
     /// <summary>

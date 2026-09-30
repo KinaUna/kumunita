@@ -645,7 +645,23 @@ public sealed record EventDetailViewModel(
     // (the reverse read seam's page, mapped to rows; `null` = no linked
     // readable to-dos, the view renders nothing; the `events.linked_todos`
     // kw-l key labels the section).
-    IReadOnlyList<LinkedTodoRow>? LinkedTodos = null)
+    IReadOnlyList<LinkedTodoRow>? LinkedTodos = null,
+    // M18 (ADR 0119, D7) — the detail-page series shape (U06). Set by the
+    // controller from the <see cref="Kumunita.Core.Events.Event"/> row + the
+    // actor's standing (C-M18·4). The detail page renders the series chip
+    // (F2) + the author's skip / restore buttons (F3) from these flags; the
+    // head row shows the chip but **neither** button (F3 — the head is
+    // edited via the existing edit lane, D4).
+    /// <summary>True when the row is part of a series (the head, or a non-head sibling).</summary>
+    bool IsPartOfSeries = false,
+    /// <summary>True when the row is the **head** (carries the rule). The head shows the chip but NOT the skip / undelete buttons (the head is edited via the edit lane, D4).</summary>
+    bool IsHead = false,
+    /// <summary>True when the row is a **non-head** sibling (<see cref="Kumunita.Core.Events.Event.RecurrenceHeadId"/> non-null). Only a non-head row shows the skip / undelete buttons (F3).</summary>
+    bool IsNonHead = false,
+    /// <summary>True when the actor is author ∪ GlobalAdmin (C-M18·4) — gates the skip / undelete buttons (F3).</summary>
+    bool CanSkipOrUndelete = false,
+    /// <summary>The head's rule (for the chip's "Repeats {type}, every {N} {unit}" + the optional Count / Ends suffix). Non-null when <see cref="IsPartOfSeries"/>.</summary>
+    Kumunita.Core.Events.EventRecurrenceRule? Rule = null)
 {
     /// <summary>The event's translations, coalesced to a non-null empty list (a
     /// never-blank shape for the view).</summary>

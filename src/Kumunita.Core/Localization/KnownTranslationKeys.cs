@@ -110,6 +110,17 @@ public static class KnownTranslationKeys
             ["events.recurrence.count"]      = "occurrences",
             ["events.recurrence.until"]      = "until",
 
+            // ADR 0119 (M18, D9) — the detail-page series chip + skip/restore
+            // button keys (U06). The canonical en floor (the D9 closed set's
+            // `events.series.*` half; the `events.recurrence.*` composer half
+            // landed with U05). These are the `en` source text the provider
+            // floor resolves to; the de/fr/da values land in U07 (the M18
+            // kw-l lane).
+            ["events.series.repeats"]  = "Repeats",
+            ["events.series.skip"]     = "Skip this occurrence",
+            ["events.series.restore"]  = "Restore this occurrence",
+            ["events.series.part_of"]  = "Part of a series",
+
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projects",
             ["projects.todo.title"]          = "To-dos",
