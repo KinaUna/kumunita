@@ -521,3 +521,111 @@
   `CancellationToken`), consuming the **4** `admin.quiet.*` keys already
   authored by U06 and **adding none**. U07 is out of scope for this unit.
   **STOP after U06 — do not chain into U07.**
+
+## U07 — the `/admin/quiet` admin cadence surface (Web)
+- **What landed (D8 — the ADR 0050/0019 singleton-toggle shape verbatim):**
+  1. `src/Kumunita.Web/Controllers/AdminQuietController.cs` (new) —
+     `[Route("admin/quiet")]` + `[Authorize(Roles = Roles.GlobalAdmin)]`,
+     constructor takes **`ILocalizationService`** (the U04 cadence seams) + an
+     optional `ITranslationProvider?` (the flash-resolution seam, the
+     `AdminPortabilityController.T` / `LocaleController.FlashAsync` idiom). A
+     private `FlashAsync(key)` helper resolves `admin.quiet.flash_saved` in
+     the operator's effective language (the `EffectiveLanguageCode.ResolveAsync`
+     + `ITranslationProvider.GetAsync` chain), falling to the
+     `KnownTranslationKeys.EnValues` floor when the provider is absent. `GET`
+     `Index` reads `GetQuietCheckMinutesAsync()` into a nested public
+     `CadenceAdminViewModel { int Minutes }` (= 60 default); `POST Save(int
+     minutes)` `[ValidateAntiForgeryToken]` delegates to
+     `SetQuietCheckMinutesAsync(minutes, ActorId(User) ?? "")`, catches
+     `ArgumentOutOfRangeException` → `TempData["error"]`, success →
+     `TempData["info"] = await FlashAsync("admin.quiet.flash_saved")` +
+     redirect to `Index`.
+  2. `src/Kumunita.Web/Views/AdminQuiet/Index.cshtml` (new) — heading
+     `admin.quiet.title`; a minutes input bound to `Model.Minutes` with the
+     `admin.quiet.cadence_label` label + a `min=5 max=1440` note (the U04 seam's
+     validation floor/ceiling); a `admin.quiet.save` button; `@Html.AntiForgeryToken()`
+     (the `Save` lane's `[ValidateAntiForgeryToken]`). The four `admin.quiet.*`
+     keys are consumed here as `kw-l` TagHelpers (the view-side resolution
+     chain, the `<kw-l>` house idiom) — the U06 closed set is the registry
+     source of truth; U07 adds none.
+  3. `src/Kumunita.Web/Views/Admin/Platform.cshtml` — a **new
+     `list-group-item`** for `/admin/quiet` (after "Sign-up", before "Access
+     audit log") + the lead line extended to mention the flush cadence. Both
+     are **plain English** (this view's documented local convention — an
+     interpolated kw-l key would break the
+     `KwLRegistryConsistencyTests` static key scan, the comment on the existing
+     items says so).
+  4. `tests/Kumunita.Web.Tests/AdminQuietControllerTests.cs` (new, 8 pins, the
+     `AdminSignupControllerTests` / `AdminAnalyticsControllerTests` direct-
+     construction idiom — NSubstitute `ILocalizationService` +
+     `DefaultHttpContext` + an in-memory `ITempDataProvider` for the flash
+     assertions; no Postgres) — (a) `Controller_Carries_GlobalAdmin_Role_Authorize`
+     (the gate is the role, asserted by attribute presence + role value — the
+     house `Route_Exists_And_GlobalAdmin_Only` idiom); (b) `Index` reads the
+     cadence from `GetQuietCheckMinutesAsync` (assert the seam was called
+     exactly once); (c) `Save_Valid_CallsSeamWithMinutesAndActorAndRedirects`
+     (assert `SetQuietCheckMinutesAsync(30, Admin)` + redirect +
+     `TempData["info"]` set + `TempData["error"]` null); (d) `Save_Valid_
+     FlashIsTheRegisteredFlashSavedKwLKey` (assert `TempData["info"]` is the
+     `KnownTranslationKeys.EnValues["admin.quiet.flash_saved"]` floor — the
+     translationProvider is null in this harness); (e) `Save_OutOfRange_
+     BelowFloor_SurfacesErrorAndNoInfoFlash` (assert the seam's
+     `ArgumentOutOfRangeException` was caught → `TempData["error"]` set,
+     `TempData["info"]` null, the seam was called exactly once); (f) `Save_
+     OutOfRange_AboveCeiling_SurfacesErrorAndNoInfoFlash` (same shape, ceiling
+     boundary); (g) `AdminQuiet_Keys_ArePresent_And_NonEmpty_In_All_Four_
+     Languages` (the 4 `admin.quiet.*` keys present non-empty in en/de/fr/da —
+     the M20 admin surface's kw-l closure witness, the M19
+     `AdminGuests_Keys_ArePresent_And_NonEmpty_In_All_Four_Languages`
+     precedent).
+- **Discrepancies resolved (the plan's seam location + view path are stale
+  against the shipped shape — the register is authoritative):**
+  1. **Seam location (the plan's C# sketch shows `NotificationService` with
+     `CancellationToken` params — that is wrong).** The shipped U04 seams live
+     on **`ILocalizationService`** (the U04 handoff + the `ILocalizationService`
+     interface confirm) and **take no `CancellationToken`**: `Task<int>
+     GetQuietCheckMinutesAsync()` + `Task SetQuietCheckMinutesAsync(int
+     minutes, string adminSubjectId)`. U07 consumed the `ILocalizationService`
+     shape verbatim (the controller's constructor) — the design doc §8 / §11 +
+     the interface's XML doc are authoritative over the plan's sketch.
+  2. **View path (the plan says `Views/Admin/Quiet.cshtml` — that would land
+     inside `AdminController`'s 1:1 action-to-view folder, which breaks the
+     `AdminControllerBlockTests` / `AdminControllerMandatoryTests` constructor
+     pins).** The house convention for dedicated admin singletons (ADR 0050 /
+     ADR 0019 / ADR 0020) is a per-controller folder with `Index.cshtml`
+     (`Views/AdminSignup/Index.cshtml`, `Views/AdminTimezone/Index.cshtml`,
+     `Views/AdminDateFormat/Index.cshtml`, `Views/AdminPortability/Index.
+     cshtml`, `Views/AdminGuests/Index.cshtml`). U07 created `Views/
+     AdminQuiet/Index.cshtml` — the `View(model)` call on
+     `AdminQuietController` resolves to that path by the ASP.NET Core
+     convention (no explicit view name needed).
+  3. **Error flash (the plan's C# sketch writes a plain-English
+     `TempData["error"]` with the seam's `ex.Message`; the plan's prose also
+     mentions a `admin.quiet.flash_error` kw-l key that does not exist in the
+     U06 closed set).** U07 used a plain-English `TempData["error"]` string
+     ("The cadence must be between 5 and 1440 minutes.") — the dominant
+     95-place `TempData["error"]` convention across the Web controllers (grep:
+     `AdminController` / `AnnouncementController` / `CommunityController` /
+     `EventController` / `GroupsController` / `LanguagesController` /
+     `LocaleController` / `ModerationController` / `PageController` /
+     `PostsController` / `ProjectsController` / `TagController` all use
+     plain-English error strings, never kw-l keys). The success flash
+     (U06's `admin.quiet.flash_saved`) is kw-l-resolved via `FlashAsync` — the
+     two conventions (success=kw-l, error=plain-English) coexist without
+     conflict and both match the house idiom.
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (0 new
+  warnings; 13 pre-existing warnings in other units' files, none in U07's);
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.
+  Tests.dll` green — **Total 685, Failed 0** (U06's 677 + the 8 new M20 U07
+  pins; every existing Web pin still passing). The 8 U07 pins: 1 gate + 2
+  Index + 4 Save (2 valid — including the kw-l-key witness — + 2
+  out-of-range) + 1 kw-l closure witness (the 4 `admin.quiet.*` keys ×
+  en/de/fr/da present non-empty).
+- **Next unit entry point:** **U08** — the close unit. Flip M20
+  `StatusNext` → `StatusDone`, **promote M21 → `StatusNext`** (M22 stays
+  `StatusPlanned`), re-pin `MilestonesTests` (M20 joins the done list,
+  `M21_Is_The_Single_InProgress_Milestone`), bring README + STATUS +
+  ARCHITECTURE to "M20 done, M21 next", and move the register + all unit
+  plans flat to `done/`. U08 does **not** touch any U07 deliverable (the
+  controller, the view, the Platform.cshtml affordance, the tests). Exits on
+  `Kumunita.Web.Tests`. **STOP after U08 — the M20 milestone is closed.**
