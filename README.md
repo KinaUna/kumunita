@@ -13,8 +13,7 @@ not a code concern.
 
 ## Status
 
-**M17 in progress** (bookmarks — save posts, events, todos, and other
-platform content for quick personal access); M1–M16
+**M18 in progress** (recurring events — repeating events over the M4 events surface); M1–M17
 and all named lanes are done — identity,
 groups & delegation, directory & profiles, posts + moderation, multilingual
 (`ML`/`ML-UI`), rich content (`RC`), guardian controls (`GU`), pages (`PG`),
@@ -246,8 +245,8 @@ stays trivial and the authorization rules can grow freely.
 - **M14** — Integration of Events and Projects: the `TodoItem.EventId?` association (a feed filter / association, **never a gate** — C-M14·1), the `ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane (creator ∪ assignee ∪ GlobalAdmin, one `todo.set_event` audit row, a missing / unreadable event refused 404 — the frozen seam as truth), the both-direction display links (the to-do detail's event chip + the event detail's "linked to-dos" section, both access-scoped + dangling-safe — an unreadable / absent / soft-deleted event omits the chip, never a 404/403, no title / id leak — C-M14·2), and the VTODO iCal surface (the `TodoIcsWriter` pure emitter over the closed RFC-5545 subset + the two `GET /projects/todos.ics` / `GET /projects/todos/{id}.ics` routes — no `RRULE` / recurrence, C-M14·6); **zero new authorization surface** (C-M14·4 — the frozen `AccessAction` set is unchanged, `EventId` rides the read seams, never a decision). **Done.** (ADR 0115)
 - **M15** — Translation bulk: import/export, review, and extend the platform's translations as a batch — instead of working through them one translation at a time — so they can easily be checked, updated, and extended with new languages. **Done.** (ADR 0116)
 - **M16** — Inventory: check-out / check-in shared, community-owned, or private resources (equipment, clothes for sports teams, books, etc.), track where items are, and optionally how much they are used by whom. **Done.** (ADR 0117)
-- **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **In progress.**
-- **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112).
+- **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **Done.** (ADR 0118)
+- **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112). **In progress.**
 - **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long.
 
 ## Deferred (future, by design)

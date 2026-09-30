@@ -37,6 +37,7 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M14** integration of Events and Projects | **coordination** — the two coordination surfaces interlock |
   | **M15** translation bulk | **world seams + coordination** — the platform's translations leave and re-enter the platform as one batch; a new language extends the set in the same loop |
   | **M16** inventory | **coordination** — the neighborhood's shared, community-owned, and private things become trackable: check-out / check-in, where they are, and who has used them |
+  | **M17** bookmarks | **personal quick access** — the resident's own personal list of saved posts, events, todos, announcements, and pages — a personal-by-id pointer, never an audience decision, never granting anything (ADR 0118) |
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
