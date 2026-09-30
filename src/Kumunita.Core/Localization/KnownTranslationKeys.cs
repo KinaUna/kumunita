@@ -94,6 +94,22 @@ public static class KnownTranslationKeys
             ["events.created"]    = "Created",
             ["events.edited"]     = "edited",
 
+            // ADR 0119 (M18, D9) — the composer recurrence picker keys (U05).
+            // The canonical en floor (the D9 closed set's `events.recurrence.*`
+            // half; the `events.series.*` detail-page half lands with U06).
+            // These are the <c>en</c> source text the provider floor resolves to;
+            // the de/fr/da values land in U07 (the M18 kw-l lane).
+            ["events.recurrence.none"]       = "Does not repeat",
+            ["events.recurrence.daily"]      = "Daily",
+            ["events.recurrence.weekly"]     = "Weekly",
+            ["events.recurrence.monthly"]    = "Monthly",
+            ["events.recurrence.yearly"]     = "Yearly",
+            ["events.recurrence.interval"]   = "Every",
+            ["events.recurrence.ends_after"] = "Ends after",
+            ["events.recurrence.ends_on"]    = "Ends on",
+            ["events.recurrence.count"]      = "occurrences",
+            ["events.recurrence.until"]      = "until",
+
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projects",
             ["projects.todo.title"]          = "To-dos",

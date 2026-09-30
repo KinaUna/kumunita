@@ -88,6 +88,61 @@
                 </div>
             </div>
 
+            @* M18 (ADR 0119, D2 / D7 / D3) — the composer's recurrence picker (F1).
+               A plain form-field set (the Location / Capacity shape — no body-parse):
+               a Recurrence select (None / Daily / Weekly / Monthly / Yearly), an
+               Interval number (≥ 1, default 1), and a Count / Ends radio pair
+               ("Ends after" / "Ends on"). The D9 kw-l key names are locked by U00;
+               the string values land in U07 — this markup references the key
+               names only, via the <kw-l> TagHelper idiom. *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-5">
+                            <label class="form-label" for="recurrence" style="font-weight:600;">Repeats</label>
+                            <select class="form-control" id="recurrence" name="Recurrence">
+                                <option value="none" selected="@(Model.Recurrence == "none" ? "selected" : null)"><kw-l key="events.recurrence.none">None</kw-l></option>
+                                <option value="daily" selected="@(Model.Recurrence == "daily" ? "selected" : null)"><kw-l key="events.recurrence.daily">Daily</kw-l></option>
+                                <option value="weekly" selected="@(Model.Recurrence == "weekly" ? "selected" : null)"><kw-l key="events.recurrence.weekly">Weekly</kw-l></option>
+                                <option value="monthly" selected="@(Model.Recurrence == "monthly" ? "selected" : null)"><kw-l key="events.recurrence.monthly">Monthly</kw-l></option>
+                                <option value="yearly" selected="@(Model.Recurrence == "yearly" ? "selected" : null)"><kw-l key="events.recurrence.yearly">Yearly</kw-l></option>
+                            </select>
+                        </div>
+                        <div class="col-sm-3">
+                            <label class="form-label" for="recurrence-interval" style="font-weight:600;"><kw-l key="events.recurrence.interval">Every</kw-l></label>
+                            <input class="form-control" type="number" min="1" id="recurrence-interval" name="RecurrenceInterval"
+                                   value="@Model.RecurrenceInterval" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-3 align-items-end">
+                        <div class="col-sm-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" id="ends-after"
+                                       checked="@(Model.EndsOnDate.HasValue ? null : "checked")" />
+                                <label class="form-check-label" for="ends-after"><kw-l key="events.recurrence.ends_after">Ends after</kw-l></label>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <span class="text-muted small"><kw-l key="events.recurrence.count">occurrences</kw-l></span>
+                            <input class="form-control" type="number" min="2" name="EndsAfterCount"
+                                   value="@Model.EndsAfterCount" />
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" id="ends-on"
+                                       checked="@(Model.EndsOnDate.HasValue ? "checked" : null)" />
+                                <label class="form-check-label" for="ends-on"><kw-l key="events.recurrence.ends_on">Ends on</kw-l></label>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <span class="text-muted small"><kw-l key="events.recurrence.until">until</kw-l></span>
+                            <input class="form-control" type="date" name="EndsOnDate"
+                                   value="@(Model.EndsOnDate?.ToString("yyyy-MM-dd"))" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>

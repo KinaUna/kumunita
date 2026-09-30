@@ -255,6 +255,51 @@ public sealed class EventController : Controller
         return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 
+    /// <summary>
+    /// M18 (ADR 0119, D2 / D7 / D3) — maps the composer's recurrence picker
+    /// (<see cref="EventEditorModel.Recurrence"/> /
+    /// <see cref="EventEditorModel.RecurrenceInterval"/> /
+    /// <see cref="EventEditorModel.EndsAfterCount"/> /
+    /// <see cref="EventEditorModel.EndsOnDate"/>) onto the Core
+    /// <see cref="EventRecurrenceRule"/> the U02 / U04 create / edit lanes
+    /// read (<see cref="CreateEventRequest.Recurrence"/> /
+    /// <see cref="UpdateEventRequest.Recurrence"/>). A "none" / empty /
+    /// unparseable <c>Recurrence</c> posts <c>null</c> (the zero-change
+    /// branch, GATE-2's <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c>
+    /// pin). Otherwise: the parsed <see cref="Recurrence"/> enum, the
+    /// interval (≥ 1, default 1), and the mutually-exclusive end condition
+    /// (D7 — <c>EndsAfterCount</c> → <c>Count</c>, <c>EndsOnDate</c> →
+    /// <c>Ends</c>). The <c>Ends</c> wall-clock date is converted to a UTC
+    /// instant using the actor's effective zone (the ADR 0019 floor — the
+    /// same <c>GetUtcOffset</c> idiom the <c>Start</c> / <c>End</c> map
+    /// through), so the "Ends before the head's Start" comparison the design
+    /// doc §7 pins is zone-consistent. Standing is unchanged (C-M18·5) —
+    /// this is a shape mapping, never an access decision.
+    /// </summary>
+    private static EventRecurrenceRule? BuildRecurrenceRule(
+        EventEditorModel model, TimeZoneInfo zone)
+    {
+        // Zero-change branch (D2 / GATE-2): "none" / empty / unparseable →
+        // null (a single, non-recurring event — the existing behavior).
+        if (!Enum.TryParse<Recurrence>(model.Recurrence, ignoreCase: true, out var rec)
+            || rec == Recurrence.None)
+        {
+            return null;
+        }
+        var interval = model.RecurrenceInterval ?? 1;
+        if (interval < 1) interval = 1;
+        DateTimeOffset? ends = null;
+        if (model.EndsOnDate is { } d)
+            ends = new DateTimeOffset(d, zone.GetUtcOffset(d));
+        return new EventRecurrenceRule
+        {
+            Recurrence = rec,
+            Interval = interval,
+            Count = model.EndsAfterCount,
+            Ends = ends,
+        };
+    }
+
     // ── Read lanes ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1089,6 +1134,16 @@ public sealed class EventController : Controller
                 ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors.
+            if (!string.IsNullOrWhiteSpace(model.Recurrence)
+                && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                if (model.RecurrenceInterval is < 1)
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
+                    ModelState.AddModelError(nameof(model.EndsAfterCount),
+                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+            }
             return View("Create", model);
         }
 
@@ -1121,6 +1176,10 @@ public sealed class EventController : Controller
             TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side body parse.
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U5 — server-side body parse.
+            // M18 (ADR 0119, D2 / D7) — the composer's recurrence picker, mapped
+            // onto the U02 create lane's Recurrence field (null for "none" — the
+            // zero-change branch).
+            Recurrence = BuildRecurrenceRule(model, authorZone),
         };
 
         Event ev;
@@ -1210,7 +1269,27 @@ public sealed class EventController : Controller
             TagIds = ev.TagIds.Count > 0 ? JsonSerializer.Serialize(ev.TagIds) : "[]",
             Languages = await SeedLanguagePickerAsync(),
             Components = await SeedComponentPickerAsync(),
+            // M18 (ADR 0119, D3) — a non-head occurrence's rule is null (the
+            // head carries the rule), so the composer hides the picker on a
+            // non-head row (the @if guard in Edit.cshtml); false on the create
+            // lane and on a head row.
+            IsNonHeadOccurrence = ev.RecurrenceHeadId is not null,
         };
+
+        // M18 (ADR 0119, D2 / D3) — round-trip the head's existing rule into
+        // the composer's picker (a non-head row has a null rule — the picker
+        // is hidden by the IsNonHeadOccurrence guard above, so this is a
+        // no-op for non-head rows).
+        if (ev.RecurrenceRule is { } headRule)
+        {
+            model.Recurrence = headRule.Recurrence.ToString().ToLowerInvariant();
+            model.RecurrenceInterval = headRule.Interval;
+            if (headRule.Count is { } headCount)
+                model.EndsAfterCount = headCount;
+            if (headRule.Ends is { } headEnds)
+                model.EndsOnDate = TimeZoneInfo.ConvertTime(headEnds, editorZone).DateTime;
+        }
+
         await SeedGrantPickerOptionsAsync();
         return View("Edit", model);
     }
@@ -1267,6 +1346,18 @@ public sealed class EventController : Controller
                 ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors
+            // (a head row only — a non-head row's picker is hidden, D3).
+            if (!model.IsNonHeadOccurrence
+                && !string.IsNullOrWhiteSpace(model.Recurrence)
+                && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                if (model.RecurrenceInterval is < 1)
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
+                    ModelState.AddModelError(nameof(model.EndsAfterCount),
+                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+            }
             return View("Edit", model);
         }
 
@@ -1297,6 +1388,11 @@ public sealed class EventController : Controller
             TagIds = TagSlugs.Parse(model.TagIds),
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
+            // M18 (ADR 0119, D2 / D4) — the composer's recurrence picker, mapped
+            // onto the U04 edit lane's Recurrence field (a head edit cascades /
+            // re-materializes; null for "none" / a non-head row — the zero-change
+            // branch).
+            Recurrence = model.IsNonHeadOccurrence ? null : BuildRecurrenceRule(model, editorZone),
         };
 
         try
