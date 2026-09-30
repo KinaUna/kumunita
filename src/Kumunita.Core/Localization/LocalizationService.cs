@@ -696,6 +696,90 @@ public sealed class LocalizationService : ILocalizationService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // ── M20 quiet cadence (ADR 0121, D6) — the admin-set flush-cadence read +
+    //    single audited write lane (the ADR 0050 IsSignupOpenAsync /
+    //    SetSignupOpenAsync shape verbatim) ──────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<int> GetQuietCheckMinutesAsync()
+    {
+        // ADR 0121 D6 read seam: the instance cadence (LocaleSettings.
+        // QuietCheckMinutes) with the `60` floor — a missing singleton or an
+        // unset value both yield `60`, so a fresh instance re-checks held
+        // emails about once an hour (C-M20·6 — a missing settings row reads
+        // as the default, never throws). A read: **no audit row** (the
+        // GetDefaultTimezoneAsync plain-read shape).
+        await using var session = _store.QuerySession();
+        var ct = System.Threading.CancellationToken.None;
+
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        // `60` floor: a null settings row (defensive) or a missing value both
+        // yield the default.
+        return settings is null ? 60 : settings.QuietCheckMinutes;
+    }
+
+    /// <inheritdoc />
+    public async Task SetQuietCheckMinutesAsync(int minutes, string adminSubjectId)
+    {
+        // ADR 0121 D6 write seam: the admin-settled instance cadence
+        // (LocaleSettings singleton) + exactly one audit row (Via = Admin,
+        // action "notification.quiet.cadence", target "notification.quiet")
+        // in the same session (C3 — no silent, unaudited access). The
+        // Web boundary owns the GlobalAdmin standing check (the ADR 0019 /
+        // 0020 split — this seam does not re-check User).
+        //
+        // Fail-closed (the M·7 / RemoveLanguageAsync pin): validate the
+        // value *before* any write. A zero / negative / absurd cadence
+        // throws here — **no audit row** is committed for the blocked attempt.
+        const int floor = 5;
+        const int ceiling = 1440;
+        if (minutes < floor || minutes > ceiling)
+            throw new ArgumentOutOfRangeException(
+                nameof(minutes), minutes,
+                $"The quiet-check cadence must be between {floor} and {ceiling} minutes.");
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = _store.OpenSession(new SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetDefaultTimezoneAsync /
+        // SetSignupOpenAsync shape) and set the cadence; the other singleton
+        // fields are untouched — this is the flush cadence only.
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new LocaleSettings { QuietCheckMinutes = minutes };
+        }
+        else
+        {
+            settings.QuietCheckMinutes = minutes;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "notification.quiet.cadence",
+            TargetKind = "notification.quiet",
+            TargetId = minutes.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // ── Translation / page upserts (M·6: one session + one audit row) ──
 
     /// <inheritdoc />

@@ -125,4 +125,18 @@ public sealed class LocaleSettings
     /// <c>/admin/messaging</c>.
     /// </summary>
     public bool MessagingEnabled { get; set; } = false;
+
+    /// <summary>
+    /// M20 (ADR 0121, D6) — how often the §6.4 notification-flush job re-checks
+    /// the held (deferred) notification emails, in **minutes**. An *additive*
+    /// field on the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="NotifyAdminsOnSignup"/> /
+    /// <see cref="MessagingEnabled"/>. Defaults to <c>60</c> (a fresh instance
+    /// re-checks held emails about once an hour); a missing settings row floors to
+    /// <c>60</c>. A GlobalAdmin tightens it (e.g. <c>15</c> for snappier
+    /// delivery) or loosens it (e.g. <c>360</c> to reduce background churn) on
+    /// <c>/admin/quiet</c> (D8, U07). The read floor (missing row → 60) is
+    /// resolved in the Core read seam, not here.
+    /// </summary>
+    public int QuietCheckMinutes { get; set; } = 60;
 }

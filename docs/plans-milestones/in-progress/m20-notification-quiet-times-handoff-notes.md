@@ -232,3 +232,128 @@
   exact `FlushDeferredAsync` shape) + §8 (the cadence field + the ADR 0050
   `SetSignupOpenAsync` single-write-lane shape) + the ADR 0121; exits on
   `Kumunita.Core.Tests`.
+## U04 — the `NotificationFlushService` (§6.4 flush) + the `LocaleSettings.QuietCheckMinutes` field + the cadence seams (Core)
+
+- **Delivered (Core-only, 3 source files + 2 test files):**
+  1. `src/Kumunita.Core/Notifications/NotificationFlushService.cs` — the
+     **Wolverine-free static** `NotificationFlushService` (the §6.4
+     `EventReminderService` precedent verbatim). **Method name:
+     `FlushDeferredAsync`** (the design-doc §7 authoritative name — NOT the
+     plan file's `FlushAsync`; see "discrepancy" below). Signature, verbatim as
+     implemented:
+     `public static async Task<int> FlushDeferredAsync(IDocumentStore store,
+     DateTimeOffset now, IMailerStage mailer, IUserInfoService userInfo,
+     ILocalizationService localization, ITranslationProvider? translationProvider = null,
+     CancellationToken ct = default)` → returns the count of emails delivered
+     this run. Per run it (1) loads the bounded set of `Notification` rows with
+     `EmailDeferred == true` (ordered by `Created`), (2) per row re-resolves the
+     ADR 0019 effective zone (`userInfo.GetProfileAsync` → `Profile.TimeZone`
+     override → `localization.GetDefaultTimezoneAsync()` → `TimeZoneInfo.Utc`
+     floor) + re-evaluates the **pure** `QuietScheduleEvaluator.IsQuietNow` (U02,
+     D3) at the **run** instant, (3) for each **no longer** quiet, stages the
+     held email via the frozen `IMailerStage` under **U03's**
+     `NotificationService.DeferredKey(kind, sourceId)` (the row's stored
+     `Subject`/`Body` are the localized display values — reused, not re-derived)
+     and flips the row `EmailDeferred = false`, (4) leaves each **still-quiet**
+     row `EmailDeferred = true` (re-checked next run). Reads all rows/schedules
+     **before** any write (the `EventReminderService` discipline), then opens
+     **one** write session, stages + flips, commits **once** (C3). A recipient
+     with no `Profile.Email` is still cleared (resolved, not re-tried forever —
+     C-M20·4). The `translationProvider` param is **accepted to keep U05's
+     call-site compiling** (design-doc §7) but **unused** — the row already
+     carries the localized subject/body.
+  2. `src/Kumunita.Core/Localization/LanguageCatalog.cs` — the additive
+     `public int QuietCheckMinutes { get; set; } = 60;` on `LocaleSettings`
+     (D6, the `IsSignupOpen`/`MessagingEnabled` additive-field precedent; ADR
+     0004 §B.1; zero migration).
+  3. **The cadence read/write seams — landed on `ILocalizationService` /
+     `LocalizationService`, NOT on `NotificationService`** (the design-doc
+     §7/§8 authoritative placement; see "discrepancy" below):
+     `Task<int> GetQuietCheckMinutesAsync()` (a plain read — missing
+     `LocaleSettings` row floors to `60`; **no** audit row) and
+     `Task SetQuietCheckMinutesAsync(int minutes, string adminSubjectId)`
+     (validates `[5, 1440]` → `ArgumentOutOfRangeException` **before** any
+     write; load-or-creates the `LocaleSettings` singleton, sets
+     `QuietCheckMinutes`, appends **exactly one** `AccessAudit` row
+     `Action = "notification.quiet.cadence"` / `TargetKind = "notification.quiet"`
+     / `TargetId = minutes` / `Via = Admin` / `Outcome = Allow`, commits; the
+     Web boundary owns the GlobalAdmin standing check). Both are **frozen
+     signature shapes** — note they take **no** `CancellationToken` (the
+     `LocalizationService` read-lane idiom, matching
+     `GetDefaultTimezoneAsync`/`SetDefaultTimezoneAsync`).
+- **Tests (GATE-4 + GATE-6, 3 new pins):**
+  - `tests/Kumunita.Core.Tests/NotificationFlushServiceTests.cs` (new file,
+    `EventReminderServiceTests` idiom — real `PostgresFixture` `IDocumentStore`
+    booting `M1DocTypes`+`M3DocTypes`+`M6DocTypes`, NSubstitute
+    `IMailerStage` recording staged keys, NSubstitute `IUserInfoService` stubbing
+    the planted `Profile`, NSubstitute `ILocalizationService` returning
+    `GetDefaultTimezoneAsync().Returns("UTC")`):
+    - `Flush_Cleared_Row_Stages_One_Email_Flips_Deferred` (**GATE-4**, C-M20·4)
+      — a held row for a recipient with **no** schedule (the C-M20·3 floor:
+      never quiet) → the flush stages the held email **exactly once** under
+      `DeferredKey` (`notification:post.reply:reply-g4:deferred`) to the planted
+      address and flips `EmailDeferred = false`; a **second** run stages
+      **nothing** (still exactly one email total — idempotent).
+    - `Flush_Still_Quiet_Row_Stays_Deferred_Across_Two_Runs` (**GATE-4**,
+      C-M20·4) — a held row for a recipient with an always-quiet `Blocked`
+      schedule (empty `Hours` = all hours, empty `DaysOfWeek` = all days) → the
+      flush stages **nothing**, and the row stays `EmailDeferred = true` across
+      two consecutive runs.
+  - `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` —
+    `SetQuietCheckMinutes_Stores_Singleton_And_One_Audit_Row` (**GATE-6**,
+    C-M20·6) — a missing `LocaleSettings` row reads back `60`
+    (`GetQuietCheckMinutesAsync`); a valid write (`15`) persists (live on the
+    next read) + appends **exactly one** `AccessAudit` row
+    (`Via = Admin`, `Action = "notification.quiet.cadence"`, `TargetId = "15"`);
+    out-of-range values (`0` and `99999`) throw `ArgumentOutOfRangeException`
+    and write nothing (still exactly one cadence audit row, value unchanged).
+- **Discrepancy resolved toward the design doc (per the U04 instruction):** the
+  register / `m20-u04.md` plan named the flush method `FlushAsync` and placed the
+  cadence seams on `NotificationService` (`SetQuietCheckMinutesAsync(int, string,
+  CancellationToken)` + `GetQuietCheckMinutesAsync(CancellationToken)`). The
+  design doc (the register's "authoritative C#") names it
+  **`FlushDeferredAsync`** and places the cadence read/write seams on
+  **`ILocalizationService`** (no `CancellationToken`, matching the existing
+  `GetDefaultTimezoneAsync`/`SetDefaultTimezoneAsync` read-lane idiom). I
+  implemented the **design-doc** shape (the user directed this resolution).
+  `LocalizationService` is the **sole** `ILocalizationService` implementer, so
+  the two additive interface members broke nothing.
+- **Cross-unit facts locked for U05 (the Web host handler/tick):**
+  1. **U05's `NotificationFlushHandler` calls
+     `NotificationFlushService.FlushDeferredAsync(store, now, mailer, userInfo,
+     localization, translationProvider, ct)`** — the exact signature above (note
+     the param order: `mailer` before `userInfo` before `localization`, with the
+     optional `translationProvider` before `ct`). It returns the delivered count
+     for the log line. U05 **owns** the tick scheduling: it reads the cadence via
+     **`ILocalizationService.GetQuietCheckMinutesAsync()`** (the U04 seam) and
+     re-schedules the `NotificationFlushTick` at `now + QuietCheckMinutes`
+     minutes. The handler does **not** re-run `EmitAsync` (D5's *Forbids* — the
+     flush only stages the held email, D7/§drift-guard).
+  2. **Zero new authorization surface (C-M20·5):** no `AccessAction` /
+     `AccessVia` / `Decide()` branch / `IAuthorizationService` method added. The
+     only new audit lane is the D6 cadence write (`Via = Admin`, the admin-plane
+     precedent) — the flush itself writes **no** audit row (a side effect, the
+     `EventReminderService` posture).
+  3. **The flush never re-derives the deferred key** — it calls U03's
+     `NotificationService.DeferredKey(kind, sourceId)` (the exact static form; a
+     different form breaks the once-delivered guarantee, C-M20·4). It reuses the
+     row's stored localized `Subject`/`Body` (the `translationProvider` param is
+     accepted for the U05 call-site but unused).
+- **Open questions:** none. All three Core deliverables + the three GATE pins
+  are in; the register-vs-design-doc naming/placement discrepancy was resolved
+  toward the design doc (recorded above + in the U05 entry point).
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (the 6 pre-existing
+  `xUnit1051`/`CS8602` warnings in `Kumunita.Web.Tests` — none in the new
+  files); `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+  Kumunita.Core.Tests.dll` green — **Total 1060, Failed 0** (U03's 1057 + the
+  three new M20 U04 pins — the two `NotificationFlushServiceTests` + the
+  `LocalizationServiceTests` cadence pin; every existing Core pin still passing).
+- **Next unit entry point:** **U05** (`in-progress/m20-u05.md`) — Web host: the
+  `NotificationFlushHandler` (the §6.4 durable adapter over
+  `NotificationFlushService.FlushDeferredAsync`) + the `NotificationFlushTick`
+  self-rescheduling at `QuietCheckMinutes` (read via the U04
+  `ILocalizationService.GetQuietCheckMinutesAsync()` seam). U05 is a **Web**
+  unit — it does not re-derive the flush business logic, the deferred key, or
+  the cadence field/seams (all U04's). It reads the design doc §7 (the handler
+  adapter + the tick) + the U04 seam shapes above. Exits on
+  `Kumunita.Web.Tests`. **STOP after U04 — do not chain into U05.**
