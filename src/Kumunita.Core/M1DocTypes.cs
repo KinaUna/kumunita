@@ -77,6 +77,12 @@ public static class M1DocTypes
 
         // Identity
         opts.Schema.For<IdentityToken>();
+        // M19 (ADR 0120, D2) — the admin-settled guest standing. A Marten-native
+        // document with a conventional SubjectId identity (the Profile
+        // precedent) — one allowance per guest account (id = the guest's
+        // SubjectId). The additive-surface delta is applied idempotently at
+        // boot (ADR 0004 §B.1, zero migration).
+        opts.Schema.For<Identity.GuestAccess>().Identity(g => g.SubjectId);
 
         // Outbox (plan M1 step 6/7): the staged email row the domain write commits with
         // (IMailerStage / OutboxEmailStager, invariant C3) and the domain dead-letter

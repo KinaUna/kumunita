@@ -211,4 +211,31 @@ public interface IIdentityService
     /// may call this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId);
+
+    // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ────
+
+    /// <summary>
+    /// The guest standing for a subject (ADR 0120, D2): the bounded window
+    /// (D3) + the closed surface set (D4). A **read** (no audit row — the
+    /// <see cref="IsSignupOpenAsync"/> plain-read shape). Returns <c>null</c> when the
+    /// account has no settled standing yet — a guest with no allowance is a
+    /// shell (C-M19·4, the empty floor). U02's claim mint and U04's admin
+    /// surface both ride this read.
+    /// </summary>
+    Task<GuestAccess?> GetGuestAccessAsync(string subjectId);
+
+    /// <summary>
+    /// Set the guest standing for a subject (ADR 0120, D2): a GlobalAdmin
+    /// settles the bounded window (D3) + the closed surface set (D4) + marks
+    /// the account <see cref="Kumunita.Core.UserInfo.Profile.IsGuest"/>. Writes
+    /// the <see cref="GuestAccess"/> document and appends exactly one
+    /// <c>AccessAudit</c> row (<c>via: Admin</c>, action
+    /// <c>"guest.set-standing"</c>, <c>TargetKind</c> "guest",
+    /// <c>TargetId</c> "guest:{subjectId}") in the same session (C-M19·5 — no
+    /// silent, unaudited access). This is the **single** write lane: the Web's
+    /// <c>AdminGuestsController</c> (U04) enforces the GlobalAdmin standing and
+    /// calls only this — a controller may not <c>IDocumentSession.Store</c> the
+    /// document directly (C-M19·5, D2's *Forbids*).
+    /// </summary>
+    Task SetGuestAccessAsync(GuestAccess access, string adminSubjectId);
 }

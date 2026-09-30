@@ -54,8 +54,20 @@ public sealed class Profile
     /// "no roles", read from <c>mt</c> at sign-in).</summary>
     public bool Blocked { get; set; }
 
-    /// <summary>
-    /// The author-controlled audience (ADR 0003: the author always controls their own
+    /// <summary>    /// M19 (ADR 0120, D1) — the guest standing flag. <c>true</c> means this
+    /// account is a guest (a limited-privilege, outside-the-resident-circle
+    /// account — a consultant/coach/teacher/speaker/entertainer). A guest is
+    /// still a real Identity account (real <c>User</c>, real <c>Profile</c>,
+    /// real <c>SubjectId</c>) so the frozen authorization seams and the audit
+    /// log treat it exactly like any other actor (C-M19·1). A guest **never**
+    /// holds <c>Member</c> (C-M19·2) and its access is limited to the
+    /// <c>GuestAccess.AllowedSurfaces</c> set within the bounded window
+    /// (D3/D4). The flag is additive (ADR 0004 §B.1) — a <c>false</c> default
+    /// means every existing account is non-guest, no migration.
+    /// </summary>
+    public bool IsGuest { get; set; }
+
+    /// <summary>    /// The author-controlled audience (ADR 0003: the author always controls their own
     /// content's audience), kept on the document + editor for the *detailed* non-contact
     /// profile fields (the audience that would gate them once such fields ship). At the
     /// directory/detail presentation layer the profile's <b>basic</b> info
