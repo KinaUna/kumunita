@@ -21,7 +21,10 @@
     var bookmarked = ViewContext.ViewData.TryGetValue("BookmarkState", out var _bmState)
         && string.Equals(_bmState?.ToString(), "Bookmarked", StringComparison.Ordinal);
 }
-<div class="d-flex mb-2">
+@* The button is pinned to the top-right of the main content card (the render
+   site places it first inside .card-body); justify-content-end pushes it to
+   the right edge. *@
+<div class="d-flex justify-content-end mb-3">
     <form method="post" action="/bookmarks/toggle" style="margin:0;">
         @Html.AntiForgeryToken()
         <input type="hidden" name="kind" value="@Model.Kind" />

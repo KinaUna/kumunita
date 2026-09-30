@@ -351,6 +351,12 @@
 
         <div class="card mb-4">
             <div class="card-body">
+                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
+                   set: "todo"). D2 / C-M17·2 pin: the label is static per render —
+                   this view does not load the owner's bookmark list to decide it.
+                   Placed at the top-right of the main card. *@
+                @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
+                <partial name="_BookmarkButton" model="@_bm" />
                 @* ADR 0088 — user-added translations of the to-do (the ADR 0059
                    chip-swap: the original + one variant per translation, the
                    td-swap JS shows the viewer's current-language variant
@@ -370,11 +376,6 @@
                                 @Model.Todo.Title
                             }
                         </h1>
-                        @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                           set: "todo"). D2 / C-M17·2 pin: the label is static per render —
-                           this view does not load the owner's bookmark list to decide it. *@
-                        @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
-                        <partial name="_BookmarkButton" model="@_bm" />
                     </div>
 
                     @if (Model.Translations is { Count: > 0 })

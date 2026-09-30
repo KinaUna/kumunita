@@ -47,6 +47,13 @@
 
         <div class="card mt-2 mb-4">
             <div class="card-body">
+                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
+                   set: a community post is the same "post" vocabulary as a group post).
+                   D2 / C-M17·2 pin: the label is static per render — this view does not
+                   load the owner's bookmark list to decide it. Placed at the top-right
+                   of the main card. *@
+                @{ var _bm = ("post", Model.Post.Id, $"/posts/{Model.Post.Id}"); }
+                <partial name="_BookmarkButton" model="@_bm" />
                 @* Author-only edit + delete entry points (both lanes are
                    author-only at the Web layer — the non-author never sees the
                    buttons, so there is no 403 surface to reach from the
@@ -212,12 +219,7 @@
                                     ? Model.Post.Title
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
                             </h4>
-                            @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                               set: a community post is the same "post" vocabulary as a group post).
-                               D2 / C-M17·2 pin: the label is static per render — this view does
-                               not load the owner's bookmark list to decide it. *@
-                            @{ var _bm = ("post", Model.Post.Id, $"/posts/{Model.Post.Id}"); }
-                            <partial name="_BookmarkButton" model="@_bm" />
+
                             <div class="mb-3 rc-body">
                                 @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
                             </div>
