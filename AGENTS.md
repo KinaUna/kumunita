@@ -70,8 +70,12 @@ records, running several build/test rounds, or applying a change across
 multiple files. Stop only when the task is actually done, or when you hit a
 real blocker (an error, a missing file, an ambiguous requirement, or
 something destructive/irreversible you genuinely need confirmation for) —
-in those cases say what happened and what you need. In VS Code, note the
-workspace's `.vscode/settings.json` also raises `chat.agent.maxRequests`
+in those cases say what happened and what you need. **A failed tool call or
+a terminal command error is a recoverable step, not a stopping point**: read
+the error, adjust, and continue the same task. If the *same* command has
+failed twice, change approach (different command form, different tool)
+rather than retrying it a third time. In VS Code, note the workspace's
+`.vscode/settings.json` also raises `chat.agent.maxRequests`
 from its default of 25, since that cap alone can force a stop mid-task even
 when you intend to keep going.
 
@@ -99,6 +103,41 @@ when you change behavior:
   ADR rather than leaving the design doc stale.
 - A **new capability that settles a design question** gets an ADR under `docs/adr/`
   (numbered after the current highest), not just a prose note in the README.
+- The plans folder is **`docs/plans-milestones/`** (with an "s"), holding `in-progress/`
+  and `done/<lane>/`. Older handoff notes sometimes say `docs/plan-milestones` —
+  that's a stale path, treat it as the same folder.
+
+## Razor verification doctrine
+
+When a user reports a rendering bug, **the rendered HTML is the evidence, not
+the source file** — and the user's report outranks your source reading.
+
+- **Never conclude "stale build / stale process / stale deployment"** unless you
+  have confirmed the served bytes differ from what the current source would
+  produce. If you're about to tell the user "this is stale, refresh it", you
+  own that claim and it has been wrong before.
+- **Verify against the served page**, not the `.cshtml`: fetch the real HTML
+  (`Invoke-WebRequest` with a session cookie, or the integrated browser) and
+  inspect the actual markup. "The view file looks right" is not verification.
+- Known Razor traps in this codebase (each of these has actually bit us):
+  - **Un-awaited `async Task<string>` helpers** interpolated into a string render
+    the type name (`System.Runtime.CompilerServices.AsyncTaskMethodBuilder...`).
+    When a banner/label looks wrong, grep every call site of the async
+    helper for a missing `await` (this hit `SeedLanguageName` in 9 places).
+  - **Razor HTML-encodes expressions inside attribute values** — building a
+    `style`/`data-*` attribute with `@(cond ? " style=\"display:none\"" : null)`
+    produces broken HTML (`style= display:none`). Concatenate or use `Html.Raw`
+    for such attributes; never interpolate quoted attribute strings via `@(...)`.
+  - **A TagHelper tag inside a quoted attribute value renders as raw HTML text**
+    — `<kw-l>` cannot live inside `title="..."`. Put the localized label in a
+    proper inline element (`<span>`/`<button>`) instead.
+  - **Boolean TagHelper flags bind differently as bare vs. quoted**
+    (`<kw-dt TimeOnly>` vs `TimeOnly="true"`) in .NET 10's Razor source
+    generator. When a flag "doesn't take effect", check the generated
+    descriptor or the rendered output — don't trust the markup at face value.
+- A URL or link that shows a **literal `@Model.X`** (404s, `/groups/@Model.GroupId/posts`)
+is the same class of bug — an uninterpolated Razor attribute value, not a
+  routing problem. Fix the markup; don't debug the route.
 
 ## Running the tests (test-runner quirk)
 
@@ -122,6 +161,12 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
 `Kumunita.Web.Tests` runs in well under a second; `Kumunita.Core.Tests` takes ~20 s
 because it starts `postgres:18` via Testcontainers (and leaves Docker containers
 behind if the process is killed — clean up with `docker container prune`).
+
+## Git state gotcha
+
+"Nothing to commit" after staging usually means the commit **already landed**
+(the GUI or an earlier turn committed on your behalf). Verify with
+`git --no-pager log -1` before troubleshooting the working tree.
 
 ## Using the browser (trusted-folder quirk)
 
