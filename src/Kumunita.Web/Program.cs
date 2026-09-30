@@ -708,6 +708,16 @@ await bus.PublishAsync(new EventReminderTick());
 // UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
 // would silently stop honoring the 365-day constant).
 await bus.PublishAsync(new UsagePurgeTick());
+// M20 (ADR 0121) — the deferred-notification email flush tick (the
+// NotificationFlushHandler self-reschedules at the resolved admin cadence
+// QuietCheckMinutes after each run; this seed is the first-boot scheduling).
+// The parameterless form is the standard 60-minute cadence (matching the
+// QuietCheckMinutes default); from the second run onward the handler reads
+// the admin's live value each time. Without this line the flush never fires
+// and the held (EmailDeferred) emails are never delivered. Idempotent: the
+// flush is a no-op when no rows are due (U04's GATE-4 pin proves this), so a
+// double-schedule across two consecutive boots is harmless (the §6.4 shape).
+await bus.PublishAsync(new NotificationFlushTick());
 
 try
 {

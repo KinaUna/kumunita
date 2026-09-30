@@ -357,3 +357,93 @@
   the cadence field/seams (all U04's). It reads the design doc §7 (the handler
   adapter + the tick) + the U04 seam shapes above. Exits on
   `Kumunita.Web.Tests`. **STOP after U04 — do not chain into U05.**
+
+## U05 — the `NotificationFlushHandler` + `NotificationFlushTick` + `Program.cs` seed (Web)
+
+- **Delivered (Web-only, 3 files):**
+  1. `src/Kumunita.Web/SideEffects/NotificationFlushHandler.cs` (new) — the
+     **static** `NotificationFlushHandler.Handle` (the §6.4
+     `EventReminderHandler`/`AuditPurgeHandler` shape) that calls U04's
+     `NotificationFlushService.FlushDeferredAsync` (verbatim U04 signature —
+     param order `mailer` → `userInfo` → `localization` → optional
+     `translationProvider` → `ct`), then re-schedules at the **resolved admin
+     cadence** via U04's `ILocalizationService.GetQuietCheckMinutesAsync()`
+     (which floors a missing `LocaleSettings` row to 60 — the handler does
+     **not** load the singleton or invent a floor constant). The handler does
+     **not** inject `NotificationService` (the stale plan did) — it reads the
+     cadence through the already-injected `ILocalizationService`. No re-run of
+     `EmitAsync` (D5), no new auth surface (C-M20·5).
+  2. Same file: `NotificationFlushTick` — the **one sanctioned divergence**
+     from the three fixed-cadence §6.4 ticks: a record with **two explicit
+     constructors** (a parameterless one — the first-boot seed at 60 min — and
+     a `TimeSpan` one — the resolved-cadence re-schedule). `Wolverine.TimeoutMessage`
+     is itself a **record** (verified: "Only records may inherit from records"),
+     exposes a `TimeSpan` ctor + a settable **`DelayTime`** property (NOT
+     `Delay` — the design-doc §7 sketch's `new() { Delay = cadence }` is a
+     sketch; the real member is `DelayTime`), and the `TimeSpan` ctor populates
+     `DelayTime` (probe-verified: `new Tick()` → 60 min, `new Tick(30 min)` →
+     30 min). The two-ctor form (rather than a default-parameter one) is because
+     C# requires default parameter values to be compile-time constants and
+     `TimeSpan.FromMinutes(60)` is not one (CS1736, hit in the first attempt).
+  3. `src/Kumunita.Web/Program.cs` — `await bus.PublishAsync(new
+     NotificationFlushTick());` added to the post-`StartAsync` seed block (the
+     parameterless 60-min form; idempotent; same constraints as the three
+     existing §6.4 seeds — after `StartAsync`, in the `startupScope`).
+  4. **3 Web pin tests** —
+     `tests/Kumunita.Web.Tests/NotificationFlushHandlerTests.cs` (new,
+     `PostgresFixture` integration shape, mirroring `NotificationsControllerTests`):
+     - `Handle_With_Deferred_Row_Flushes_And_Reschedules_At_Resolved_Cadence`
+       — a held row (no schedule = the C-M20·3 floor) is released: the mailer
+       records one staged email under `DeferredKey` and the returned tick's
+       `DelayTime` is 30 min (the cadence stubbed via the U04 seam).
+     - `Handle_No_Deferred_Rows_Still_Reschedules` — no held rows: exactly one
+       re-schedule tick at 45 min; the mailer records nothing.
+     - `Program_Cs_Contains_NotificationFlushTick_Seed` — `Program.cs` source
+       contains `PublishAsync(new NotificationFlushTick())`.
+- **Discrepancy resolved toward U04's shipped code (per the U05 instruction):**
+  the `m20-u05.md` plan still named the flush method `FlushAsync` and read the
+  cadence via `NotificationService.GetQuietCheckMinutesAsync()` (and injected
+  `NotificationService` for it). U04 shipped **`FlushDeferredAsync`** and placed
+  the cadence seam on **`ILocalizationService`** (no `CancellationToken`). I
+  consumed the **shipped** shape: the handler calls `FlushDeferredAsync` with
+  the verbatim U04 param order and reads the cadence through the
+  already-injected `ILocalizationService.GetQuietCheckMinutesAsync()`. The
+  design doc §7 also uses a `DelayedFor` factory + mutable `Delay` — I resolved
+  that toward the **sanctioned divergence** the plan/user direct (a
+  resolvable-delay tick) and the real `TimeoutMessage` API (a `DelayTime`
+  property, two explicit ctors). Net: the handler is functionally what the
+  register's D5 intends (self-rescheduling at the resolved admin cadence); the
+  one shape I deviated from is the tick's mechanism (two-ctor record vs. a
+  `DelayedFor` factory), which is a presentation detail, not a D# change.
+- **Cross-unit facts locked for U06/U07:**
+  1. **U06 (resident UI) + U07 (admin UI) do NOT touch the handler or the
+     tick.** U06 consumes only U02's two owner-scope seams
+     (`GetQuietScheduleAsync`/`SetQuietScheduleAsync`); U07 consumes U04's
+     `GetQuietCheckMinutesAsync`/`SetQuietCheckMinutesAsync`. The resident
+     page shows only the resident's own blocked/allowed schedule, **not** the
+     admin's flush cadence (the `QuietCheckMinutes` knob is admin-facing).
+  2. **The `NotificationFlushTick` is a record** (not a plain class) — any
+     downstream test that constructs one must use the no-arg or `TimeSpan`
+     ctor; its delay is readable via the inherited `DelayTime` property.
+  3. **Zero new authorization surface (C-M20·5):** no `AccessAction` /
+     `AccessVia` / `Decide()` branch / `IAuthorizationService` method added —
+     the handler is a side-effect adapter (the `EventReminderHandler` posture);
+     the flush writes **no** `AccessAudit` row.
+- **Open questions:** none. The design-doc §7 sketch (`DelayedFor` + `Delay`)
+  was resolved toward the real `TimeoutMessage` API (`DelayTime` + two explicit
+  ctors) — a presentation detail recorded here, not a D# amendment.
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (0 warnings in
+  the new files; a transient slnx `.tmp/` folder reference to my throwaway
+  probe projects was removed — it was an artifact of this unit's verification,
+  not part of the deliverable); `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` green —
+  **Total 672, Failed 0** (U01's 669 + the three new M20 U05 pins; every
+  existing Web pin still passing).
+- **Next unit entry point:** **U06** (`in-progress/m20-u06.md`) — the 5th
+  `/settings/quiet` resident section (D7) + view + **the closed 15-key `kw-l`
+  set** × en/de/fr/da (U06 authors the **complete** set — resident
+  `settings.quiet_*` + admin `admin.quiet_*` — U07 consumes the admin keys and
+  adds none). U06 does **not** touch the handler, the tick, `Milestones.cs`, or
+  `MilestonesTests`. It reads the design doc §7 (the resident section) + §10
+  (the closed `kw-l` key set) + U02's two owner-scope seams. Exits on
+  `Kumunita.Web.Tests`. **STOP after U05 — do not chain into U06.**
