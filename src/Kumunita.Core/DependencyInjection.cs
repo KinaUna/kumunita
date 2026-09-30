@@ -338,7 +338,13 @@ public static class ServiceCollectionExtensions
             // that doesn't register the option degrades to an empty BaseUrl
             // (the link still renders, just relative) via the ctor's null
             // default.
-            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>()));
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>(),
+            // M20 (ADR 0121, D4) — the ADR 0019 platform-default zone read the
+            // quiet gate's effective-zone chain uses (Profile.TimeZone override
+            // → GetDefaultTimezoneAsync → UTC floor). GetRequiredService — the
+            // transient ILocalizationService is always registered in this
+            // composition (the M1/M5/M9 services above rely on the same seam).
+            sp.GetRequiredService<Localization.ILocalizationService>()));
 
         // M8 (ADR 0091, U01): the Search bounded context's service seam (bounded
         // context Kumunita.Core.Search — the "find content by text" read lane over

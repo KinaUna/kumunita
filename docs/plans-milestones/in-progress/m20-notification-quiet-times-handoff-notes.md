@@ -139,3 +139,96 @@
   idempotency key** `notification:{kind}:{source-id}:deferred` (U00's locked
   fact #3) + the U02 seams/evaluator. Reads the design doc §6 (the exact gate
   diff) + §5 (the `QuietNowForAsync` helper). Exits on `Kumunita.Core.Tests`.
+
+## U03 — the `Notification.EmailDeferred` field + the `EmitAsync` quiet gate (Core)
+
+- **Delivered (Core-only, 2 source files + the test file):**
+  1. `src/Kumunita.Core/Notifications/Notification.cs` — the additive
+     `public bool EmailDeferred { get; set; }` (D1, placed after `ReadAt`, the
+     `ReadAt?`/`LinkPath`/`AcceptPath` additive-field precedent — zero
+     migration, ADR 0004 §B.1).
+  2. `src/Kumunita.Core/Notifications/NotificationService.cs` — the
+     **GATE-1** gate in `EmitAsync` (the 9-arg overload, **frozen signature —
+     all existing emitters keep compiling**): inserted **after** the (4) D7
+     email-kind gate and the (4a) `event.reminder` carve-out, **before** step
+     (5) the email nudge. A quiet recipient keeps the inbox row (D7) and the
+     row is marked `EmailDeferred = true`, then `return notification` (not
+     `null` — C-M20·1; the gate never suppresses/drops the row); a non-quiet
+     recipient is byte-identical to pre-M20 (C-M20·3). Plus the
+     **`QuietNowForAsync`** private helper (D4) — loads the U02
+     `NotificationQuietSchedule` on the caller's session, resolves the ADR 0019
+     effective zone (`Profile.TimeZone` override →
+     `ILocalizationService.GetDefaultTimezoneAsync()` → `TimeZoneInfo.Utc`
+     floor; a blank/unknown id degrades to the UTC floor, **never throws into
+     the caller's transaction**), and calls the pure
+     `QuietScheduleEvaluator.IsQuietNow` (U02, D3) — so this is the *only*
+     place a zone is resolved (U02's evaluator stays pure). Plus the
+     **`DeferredKey(kind, sourceId)`** public static →
+     `notification:{kind}:{sourceId}:deferred` (U00's locked fact #3; the
+     **distinct** deferred key U04/U05 consume so the F10 outbox dedup does not
+     collide with the emit-time key — a cleared email is delivered exactly once,
+     C-M20·4).
+  3. **One additive ctor seam** (not a deliverable in the unit plan, but
+     required by it): a **trailing optional** `ILocalizationService?` ctor
+     param (CS1736 idiom, last position) — the design-doc §5 helper needs the
+     ADR 0019 platform-default zone read, which the pre-M20 `NotificationService`
+     ctor did not inject. Because it is **optional and last**, all **nine**
+     existing `new NotificationService(…)` sites (7 test harnesses + the DI
+     lambda) keep compiling unchanged — I verified each. `DependencyInjection.cs`
+     now passes `sp.GetRequiredService<Localization.ILocalizationService>()`
+     (already registered transient). `IUserInfoService.GetProfileAsync` and
+     `ILocalizationService.GetDefaultTimezoneAsync` take **no** `CancellationToken`
+     (the interface shape) — the helper calls them with none.
+- **Tests (4 new pins, `Kumunita.Core.Tests/NotificationServiceTests.cs`):**
+  `EmitAsync_When_Quiet_Stores_Row_Marks_Deferred_Stages_No_Email` (**GATE-1**,
+  C-M20·1 — a quiet-at-any-instant `Blocked` {all hours × all days} schedule:
+  the row is stored, `EmailDeferred == true`, **no** email staged, the row is
+  returned and visible via `ListInboxAsync`),
+  `EmitAsync_NoSchedule_StagesEmailAsBefore` (**GATE-3**, C-M20·3 — no schedule:
+  email staged under the **emit-time** key, `EmailDeferred == false`, the key
+  does NOT end in `:deferred`),
+  `EmitAsync_NonQuietWindow_StagesEmail` (a `Blocked` schedule on one hour 12h
+  away from the current UTC hour — guaranteed not active: email staged,
+  `EmailDeferred == false`, emit-time key used),
+  `EmitAsync_KindDisabled_Still_SuppressesEmail` (a `KindsEnabled` list omitting
+  the kind suppresses the email — the existing D7 gate is untouched, and because
+  it sits **before** the quiet gate the row is `EmailDeferred == false`, proving
+  the gate ordering D4).
+- **Cross-unit facts locked for the later units:**
+  1. **U04's flush reads `EmailDeferred == true` rows and stages them under
+     `NotificationService.DeferredKey(kind, source)`** (the exact static form —
+     do not re-derive it; a different form breaks the once-delivered guarantee,
+     C-M20·4). The row's `SourceId` field is the `{source-id}` argument. The
+     emit path **never** uses the deferred key — it stages under the emit-time
+     key or not at all (the pins assert the staged key never ends in
+     `:deferred` on the emit path).
+  2. **The ADR 0019 zone resolution now lives in `QuietNowForAsync` (U03), not
+     the evaluator (U02).** U02's `IsQuietNow` stays pure; U03 is the single
+     place a `TimeZoneInfo` is resolved. The `ILocalizationService` is now an
+     **optional** `NotificationService` ctor seam — a test that needs a
+     non-UTC platform default passes a stand-in as the **last** ctor argument.
+  3. **Zero new authorization surface (C-M20·5):** no `AccessAction` /
+     `AccessVia` / `Decide()` branch / `IAuthorizationService` method added —
+     the gate is a pure function of (schedule, instant, zone). The `EmailDeferred`
+     field + the gate + `QuietNowForAsync` + `DeferredKey` are the only additions;
+     the frozen `EmitAsync` 9-arg signature and `IMailerStage` seam are untouched.
+- **Open questions:** none. The unit-plan's "6 Entry reads" + "2 files" set was
+  implemented verbatim; the one ctor seam is a **necessary consequence** of the
+  design-doc §5 helper (it names `ILocalizationService.GetDefaultTimezoneAsync`),
+  landed additively + optionally so nothing else changed. No D# was amended.
+- **Exit gate:** `dotnet build Kumunita.slnx -c Debug` green (the 6 pre-existing
+  `xUnit1051`/`CS8602` warnings in `Kumunita.Web.Tests` — none in
+  `NotificationServiceTests`); `dotnet exec tests\Kumunita.Core.Tests\bin\
+  Debug\net10.0\Kumunita.Core.Tests.dll` green — **Total 1057, Failed 0**
+  (U02's 1053 + the four new M20 gate pins; every existing M6 pin — the
+  `EmitAsync` 6-arg/9-arg overloads, the ADR 0084/0095 pins, the ADR 0078
+  sample-suppression pin — still passing).
+- **Next unit entry point:** **U04** (`in-progress/m20-u04.md`) — Core: the
+  `NotificationFlushService` (the §6.4 pure flush — reads `EmailDeferred ==
+  true` rows, re-resolves + re-evaluates at the run instant, stages the now-clear
+  ones under `NotificationService.DeferredKey(kind, source)` and flips them
+  `false`, leaves the still-quiet ones) + the `LocaleSettings.QuietCheckMinutes`
+  additive field + the cadence read/write seams. Reads the design doc §7 (the
+  exact `FlushDeferredAsync` shape) + §8 (the cadence field + the ADR 0050
+  `SetSignupOpenAsync` single-write-lane shape) + the ADR 0121; exits on
+  `Kumunita.Core.Tests`.
