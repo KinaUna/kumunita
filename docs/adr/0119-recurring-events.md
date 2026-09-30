@@ -69,7 +69,7 @@ unchanged pin, the `IcsWriter` unchanged pin, the
 **D1 — Materialized occurrences, zero schema change.** Recurrence is
 expressed **at write time** by expanding the author's rule into one
 concrete `Event` row per occurrence. The `Event` doc gains **two
-additive fields** — `RecurrenceHeadId: Guid?` (non-null on non-head
+additive fields** — `RecurrenceHeadId: string?` (non-null on non-head
 occurrences, links back to the head row; `null` on the head itself and
 on all non-recurring events) and `RecurrenceRule: EventRecurrenceRule?`
 (non-null **only on the head row**, carrying the author's rule so a
@@ -290,6 +290,24 @@ touching the series — D11); group-event recurrence (the M7
 D11); cross-month / cross-year edge cases (the "31st of each month" /
 "last Friday" shapes — D11).
 
+## Amendments
+
+- **2026-09-30 — `RecurrenceHeadId` type annotation corrected to `string?`.**
+  The D1 bullet (the §Decisions section) and the §Affected-files entry
+  originally read `RecurrenceHeadId: Guid?`. In this codebase `Event.Id`
+  (and every other id field — `ComponentId: string?`, `TagIds`, `ImageIds`,
+  `AttachmentIds`) is a **Marten `string` surrogate**, not a `Guid`. A
+  `Guid?` could not hold `head.Id` (a `string`), and the D3 link
+  (`RecurrenceHeadId == head.Id`) + the U03/U04 sibling queries
+  (`Where(e => e.RecurrenceHeadId == head.Id)`) would not compile. U01
+  shipped `Event.cs` with `public string? RecurrenceHeadId { get; set; }`
+  (matching the D1 additive-surface precedent it cites — `ComponentId: string?`)
+  and recorded the deviation in
+  `docs/plans-milestones/in-progress/m18-recurring-events-handoff-notes.md`
+  (the `## U01` section). This amendment brings the ADR's annotation in line
+  with the code. **The D1 decision is unchanged** — only the type annotation
+  moved from `Guid?` to `string?`. Status remains **Accepted**.
+
 ## Supersedes
 
 - **ADR 0112 (M12 iCal)'s "no `RRULE`" pin — in scope.** The
@@ -322,7 +340,7 @@ D11); cross-month / cross-year edge cases (the "31st of each month" /
 ## Affected files
 
 - `src/Kumunita.Core/Events/Event.cs` — the two additive fields
-  (`RecurrenceHeadId: Guid?` + `RecurrenceRule:
+  (`RecurrenceHeadId: string?` + `RecurrenceRule:
   EventRecurrenceRule?`) (D1).
 - `src/Kumunita.Core/Events/Recurrence.cs` — new (the `Recurrence`
   enum + the `EventRecurrenceRule` record) (D2).

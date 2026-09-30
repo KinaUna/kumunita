@@ -12,7 +12,7 @@
 > zero new `*DocTypes` surface, zero new `IAuthorizationService` surface,
 > zero new `AccessAction`, zero new `AccessVia`, zero new adapter
 > (C-M18·5, D8). The **only** schema change is **two additive fields on the
-> existing `Event` POCO** — `RecurrenceHeadId: Guid?` + `RecurrenceRule:
+> existing `Event` POCO** — `RecurrenceHeadId: string?` + `RecurrenceRule:
 > EventRecurrenceRule?` (D1, the ADR 0004 §B "additive surface" shape — the
 > `ComponentId` / `TagIds` / `ImageIds` / `AttachmentIds` precedent). The
 > closed `Recurrence` rule shape (D2) + the pure expansion algorithm (C-M18·2)
@@ -103,7 +103,7 @@ the rule into rows), not a read-time concern (expand rows from a rule).
 **D1 — Materialized occurrences, zero schema change.** Recurrence is
 expressed **at write time** by expanding the author's rule into one
 concrete `Event` row per occurrence. The `Event` doc gains **two additive
-fields** — `RecurrenceHeadId: Guid?` (non-null on non-head occurrences,
+fields** — `RecurrenceHeadId: string?` (non-null on non-head occurrences,
 links back to the head row; `null` on the head itself and on all
 non-recurring events) and `RecurrenceRule: EventRecurrenceRule?` (non-null
 **only on the head row**, carrying the author's rule so a later edit can
@@ -237,10 +237,19 @@ a unit implementing any of these inside an M18 unit.
 
 ### 1.a — Amendments
 
-(None recorded — the register's [PROPOSED] set D1–D11, C-M18·1…8, F1–F7,
-the 14 `kw-l` keys, GATE-1…4, and the §drift-guard are locked verbatim
-without amendment. The D9 key count of **14** (× 4 languages = 56
-strings) is **correct** as written in the register.)
+- **2026-09-30 — `RecurrenceHeadId` type annotation corrected to `string?`.**
+  The D1 bullet (this file's §1) and the §9.1 pointer originally annotated
+  `RecurrenceHeadId: Guid?`. In this codebase `Event.Id` (and every other id
+  field — `ComponentId: string?`, `TagIds`, `ImageIds`, `AttachmentIds`) is a
+  **Marten `string` surrogate**, not a `Guid`. A `Guid?` could not hold
+  `head.Id` (a `string`), and the D3 link (`RecurrenceHeadId == head.Id`) +
+  the U03/U04 sibling queries would not compile. U01 shipped `Event.cs` with
+  `public string? RecurrenceHeadId { get; set; }` (matching the D1
+  additive-surface precedent it cites — `ComponentId: string?`) and recorded
+  the deviation in the handoff notes (the `## U01` section). This entry
+  records the annotation correction; **the D1 decision is unchanged** — only
+  the type annotation moved from `Guid?` to `string?`. ADR 0119's
+  `## Amendments` section records the same correction.
 
 ## 2 — Invariants (C-M18·1 … C-M18·8)
 
@@ -453,7 +462,7 @@ public sealed class Event
     /// <c>GetAsync(head.Id)</c> to fetch the head's rule for the
     /// chip).
     /// </summary>
-    public Guid? RecurrenceHeadId { get; set; }
+    public string? RecurrenceHeadId { get; set; }
 
     /// <summary>
     /// M18 (D1 / D2 / D3): the **author's rule** — non-null **only
@@ -929,7 +938,7 @@ See §4 (the exact C# is verbatim above — the `Recurrence` enum
 (`None`, `Daily`, `Weekly`, `Monthly`, `Yearly`), the
 `EventRecurrenceRule` record (`Recurrence`, `Interval: int`, `Count:
 int?`, `Ends: DateTimeOffset?`), and the two additive `Event` fields
-(`RecurrenceHeadId: Guid?`, `RecurrenceRule: EventRecurrenceRule?`)).
+(`RecurrenceHeadId: string?`, `RecurrenceRule: EventRecurrenceRule?`)).
 
 ### 9.2 The pure expansion algorithm (U01)
 
