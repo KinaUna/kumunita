@@ -297,6 +297,12 @@
                                     ? Model.Post.Title
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
                             </h4>
+                            @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
+                               set: a group post is the same "post" vocabulary as a community post).
+                               D2 / C-M17·2 pin: the label is static per render — this view does
+                               not load the owner's bookmark list to decide it. *@
+                            @{ var _bm = ("post", Model.Post.Id); }
+                            <partial name="Shared/_BookmarkButton" model="@_bm" />
                             <div class="mb-3 rc-body">
                                 @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
                             </div>

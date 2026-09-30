@@ -1,0 +1,34 @@
+@* M17 (ADR 0118) — the shared bookmark toggle control (the per-target write
+   affordance on the five detail surfaces). D2 / C-M17·2 pin: the label is
+   **static** per render — the detail view never loads the owner's bookmark
+   list to decide it, and this control makes no query: the default label is
+   the closed bm.button.bookmark key. Exception: a page that re-renders after
+   a successful toggle carries BookmarkState == "Bookmarked" (in ViewData),
+   and the label switches to the closed bm.button.bookmarked key (the F1
+   "bookmarked" witness). Plain form POST (no JS): the D3 write-lane
+   visibility check + the D4 idempotency run in the seam at POST (the sole
+   writer — C-M17·1: the controller / view never re-derives access). *@
+@model (string Kind, string Id)
+@{
+    // D2 / C-M17·2 — static per render: no owner-list load, no query. Only
+    // the (exceptional) re-render-after-toggle state switches the label.
+    var bookmarked = ViewContext.ViewData.TryGetValue("BookmarkState", out var _bmState)
+        && string.Equals(_bmState?.ToString(), "Bookmarked", StringComparison.Ordinal);
+}
+<div class="d-flex mb-2">
+    <form method="post" action="/bookmarks/toggle" style="margin:0;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="kind" value="@Model.Kind" />
+        <input type="hidden" name="id" value="@Model.Id" />
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+            @if (bookmarked)
+            {
+                <kw-l key="bm.button.bookmarked">Bookmarked</kw-l>
+            }
+            else
+            {
+                <kw-l key="bm.button.bookmark">Bookmark</kw-l>
+            }
+        </button>
+    </form>
+</div>

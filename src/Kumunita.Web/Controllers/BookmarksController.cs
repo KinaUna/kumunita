@@ -139,4 +139,82 @@ public sealed class BookmarksController(
         await session.SaveChangesAsync();
         return Redirect("/bookmarks");
     }
+
+    /// <summary>
+    /// <c>POST /bookmarks/toggle</c> — the bookmark write lane (the D3
+    /// write-lane visibility check + the D4 idempotency). The
+    /// <see cref="IBookmarkService.ToggleAsync"/> seam is the **sole writer**
+    /// (C-M17·1: the controller never re-derives access; the seam composes
+    /// only frozen seams — the target's own frozen <c>CanAsync(Read)</c> +
+    /// the unique-index idempotency witness). The controller commits in its
+    /// own fresh <see cref="IDocumentSession"/> (the C3 same-transaction
+    /// lane — <see cref="BookmarkService"/> never commits internally; the
+    /// caller owns the single write), then redirects to
+    /// <c>/bookmarks</c> (the "redirect after write" precedent — the M16
+    /// <c>InventoryController</c> / M5 <c>PageController</c> shape; the
+    /// house pattern shared with this controller's <see cref="Remove"/>).
+    /// <para>
+    /// **Status mapping** (design doc §2.3 table 1):
+    /// <list type="bullet">
+    /// <item><c>Bookmarked</c> — row created; redirect to <c>/bookmarks</c>.</item>
+    /// <item><c>AlreadyBookmarked</c> — the F1 no-op (one row, one
+    /// <c>Created</c>, the unique-index witness); redirect to
+    /// <c>/bookmarks</c>.</item>
+    /// <item><c>Refused</c> — the D3 write-lane visibility check failed
+    /// (the target is not visible to the owner; **no** row survives; the
+    /// Web layer maps to a non-leaky **404**, not 403 — the M16
+    /// create-gate posture).</item>
+    /// <item><c>Removed</c> / <c>NotBookmarked</c> — not reachable from
+    /// this action (those are the <see cref="IBookmarkService.RemoveAsync"/>
+    /// results).</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// **C-M17·2:** a caller with no <c>SubjectId</c> (a
+    /// <c>GlobalAdmin</c> who is not the owner, an unauthenticated principal,
+    /// or any operator without read standing) gets a non-leaky 404 **before**
+    /// the seam is called — that 404 commits no <c>AccessAudit</c> row.
+    /// </para>
+    /// </summary>
+    [HttpPost("/bookmarks/toggle")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Toggle(string kind, string id)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+        {
+            // C-M17·2 — the "operator has no read standing" gate (the ADR
+            // 0105 precedent): a caller with no <c>SubjectId</c> has no
+            // standing to create a bookmark row. A non-leaky 404 — **no**
+            // <c>AccessAudit</c> row is committed, and the seam's
+            // <c>ToggleAsync</c> is **not** called (the sole-writer pin —
+            // C-M17·1: the controller never re-derives access).
+            return NotFound();
+        }
+
+        // C3 same-transaction lane: the seam's store/delete writes into the
+        // caller's in-flight session (the U02 <c>RunInSession</c> shape);
+        // the controller commits (the <c>BookmarkService</c> never calls
+        // <c>SaveChangesAsync</c> internally — the caller owns the single
+        // write).
+        await using var session = store.LightweightSession();
+        var result = await bookmarks.ToggleAsync(actorId, kind, id, session);
+
+        // D3 write-lane visibility check failed — the target is not visible
+        // to the owner (Deny / absent / soft-deleted). The D4 "no row
+        // survives" pin means the seam already rolled back any partial
+        // write; we return a non-leaky 404 (never 403 — the M16
+        // create-gate posture: the Deny row does not survive).
+        if (result.Status == BookmarkToggleStatus.Refused)
+        {
+            return NotFound();
+        }
+
+        // The seam wrote into the session; the caller commits (C3).
+        // Bookmarked / AlreadyBookmarked both reach here (the F1 idempotency
+        // — the unique-index witness guarantees at-most-one row per
+        // (owner, target)).
+        await session.SaveChangesAsync();
+        return Redirect("/bookmarks");
+    }
 }
