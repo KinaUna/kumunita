@@ -13,7 +13,7 @@ not a code concern.
 
 ## Status
 
-**M18 is done** (recurring events — repeating events over the M4 events surface, ADR 0119); M1–M18
+**M19 is done** (guest accounts — limited-privilege, time-bounded, admin-settled standing for consultants, coaches, teachers, speakers, entertainers, etc.; ADR 0120); M1–M19
 and all named lanes are done — identity,
 groups & delegation, directory & profiles, posts + moderation, multilingual
 (`ML`/`ML-UI`), rich content (`RC`), guardian controls (`GU`), pages (`PG`),
@@ -21,7 +21,8 @@ events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
 (`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
 design (`M10`), and portability (import/export) (`M11`), on one
 server-rendered stack over a single Postgres. M19 — guest accounts — is the
-current work (see the "Roadmap" below).
+final milestone, now done, so the roadmap is fully shipped (see the "Roadmap"
+below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
 milestone-by-milestone breakdown is in the Roadmap below.
@@ -247,7 +248,7 @@ stays trivial and the authorization rules can grow freely.
 - **M16** — Inventory: check-out / check-in shared, community-owned, or private resources (equipment, clothes for sports teams, books, etc.), track where items are, and optionally how much they are used by whom. **Done.** (ADR 0117)
 - **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **Done.** (ADR 0118)
 - **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112). **Done.** (ADR 0119)
-- **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long.
+- **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long. **Done.** (ADR 0120)
 
 ## Deferred (future, by design)
 

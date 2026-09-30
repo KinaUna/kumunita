@@ -23,7 +23,7 @@ public class MilestonesTests
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,11 +31,12 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M19_Is_The_Single_InProgress_Milestone()
+    public void No_Milestone_Is_InProgress_At_Roadmap_End()
     {
+        // M19 is the last milestone; after its close there is no StatusNext
+        // and no StatusPlanned-in-progress — the roadmap is fully shipped.
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
-        Assert.Single(next);
-        Assert.Equal("M19", next[0].Id);
+        Assert.Empty(next);
     }
 
     [Fact]
