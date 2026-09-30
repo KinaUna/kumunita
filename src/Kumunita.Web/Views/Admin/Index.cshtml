@@ -1,3 +1,4 @@
+@using Kumunita.Web.Security
 @model Kumunita.Web.Models.AdminDashboardViewModel
 @{
     ViewData["Title"] = "Admin";
@@ -135,4 +136,21 @@
             </div>
         </a>
     </div>
+    @* M19 (ADR 0120, D6) — the guest accounts affordance. Hidden-not-disabled
+       (the ADR 0050 rule): the link renders only for GlobalAdmin actors (a
+       non-GlobalAdmin actor's /admin index renders no guest link). The
+       controller gate ([Authorize(Roles = GlobalAdmin)]) is the authoritative
+       boundary; this conditional is the UI-level "hidden, not just gated"
+       shape (the admin.guests_title kw-l key, the U03 closed set). *@
+    @if (KumunitaPrincipal.IsGlobalAdmin(User))
+    {
+        <div class="col-md-6 col-lg-4">
+            <a class="card text-decoration-none" href="/admin/guests">
+                <div class="card-body">
+                    <div class="fw-semibold"><kw-l key="admin.guests_title">Guest accounts</kw-l></div>
+                    <small class="text-muted">Settle the bounded window and allowed surfaces for a guest (a limited, time-bounded standing outside the resident circle).</small>
+                </div>
+            </a>
+        </div>
+    }
 </div>

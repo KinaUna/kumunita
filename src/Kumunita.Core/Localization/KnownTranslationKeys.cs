@@ -77,6 +77,21 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> EnValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — the guest-accounts surface: the /admin/guests
+            // admin surface (D6) + the signed-in guest's shell notice (D5) ──
+            ["admin.guests_title"]               = "Guest accounts",
+            ["admin.guests_empty"]               = "No guest accounts yet.",
+            ["admin.guests_create"]              = "Create guest",
+            ["admin.guests_window_label"]        = "Access window",
+            ["admin.guests_surfaces_label"]      = "Allowed surfaces",
+            ["admin.guests_surface_announcements"] = "Announcements",
+            ["admin.guests_surface_events"]      = "Events",
+            ["admin.guests_surface_directory"]   = "Directory",
+            ["admin.guests_saved"]               = "Guest standing saved.",
+            ["account.guest_welcome"] =
+                "You are signed in as a guest. Your access is limited to the " +
+                "surfaces the admin has allowed, for the window they set.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
@@ -1816,6 +1831,22 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> DeValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — die Gastkonten-Oberfläche: die /admin/guests
+            // Admin-Oberfläche (D6) + die Begrüßung der angemeldeten Gäste ──
+            ["admin.guests_title"]               = "Gastkonten",
+            ["admin.guests_empty"]               = "Noch keine Gastkonten.",
+            ["admin.guests_create"]              = "Gast erstellen",
+            ["admin.guests_window_label"]        = "Zugriffsfenster",
+            ["admin.guests_surfaces_label"]      = "Erlaubte Bereiche",
+            ["admin.guests_surface_announcements"] = "Ankündigungen",
+            ["admin.guests_surface_events"]      = "Veranstaltungen",
+            ["admin.guests_surface_directory"]   = "Verzeichnis",
+            ["admin.guests_saved"]               = "Gastzugang gespeichert.",
+            ["account.guest_welcome"] =
+                "Sie sind als Gast angemeldet. Ihr Zugriff ist auf die " +
+                "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
+                "das von ihr gesetzte Zeitfenster.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
 
@@ -3451,6 +3482,22 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> FrValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — la surface des comptes invités : la surface
+            // /admin/guests (D6) + l'accueil de l'invité connecté (D5) ─────
+            ["admin.guests_title"]               = "Comptes invités",
+            ["admin.guests_empty"]               = "Aucun compte invité pour l'instant.",
+            ["admin.guests_create"]              = "Créer un invité",
+            ["admin.guests_window_label"]        = "Fenêtre d'accès",
+            ["admin.guests_surfaces_label"]      = "Surfaces autorisées",
+            ["admin.guests_surface_announcements"] = "Annonces",
+            ["admin.guests_surface_events"]      = "Événements",
+            ["admin.guests_surface_directory"]   = "Annuaire",
+            ["admin.guests_saved"]               = "Statut de l'invité enregistré.",
+            ["account.guest_welcome"] =
+                "Vous êtes connecté en tant qu'invité. Votre accès est limité " +
+                "aux surfaces que l'administrateur a autorisées, pour la " +
+                "fenêtre qu'il a définie.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
 
@@ -5088,6 +5135,21 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> DaValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — gæstekonti-overfladen: /admin/guests
+            // admin-overfladen (D6) + den tilloggede gæsts modtagelse (D5) ──
+            ["admin.guests_title"]               = "Gæstekonti",
+            ["admin.guests_empty"]               = "Ingen gæstekonti endnu.",
+            ["admin.guests_create"]              = "Opret gæst",
+            ["admin.guests_window_label"]        = "Adgangsvindue",
+            ["admin.guests_surfaces_label"]      = "Tilladte flader",
+            ["admin.guests_surface_announcements"] = "Meddelelser",
+            ["admin.guests_surface_events"]      = "Arrangementer",
+            ["admin.guests_surface_directory"]   = "Kontaktliste",
+            ["admin.guests_saved"]               = "Gæstestatus gemt.",
+            ["account.guest_welcome"] =
+                "Du er logget ind som gæst. Din adgang er begrænset til de " +
+                "flader, administratoren har tilladt, for det vindue de har sat.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
 

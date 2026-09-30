@@ -1,0 +1,105 @@
+@model Kumunita.Web.Models.GuestAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Guests";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.guests_title">Guest accounts</kw-l></h1>
+
+<p class="text-muted">
+    The limited, time-bounded standing an admin settles for a guest (a consultant, coach,
+    teacher, speaker, or similar outside-the-resident-circle account). A guest is never a full
+    member: they see only the surfaces you allow, for the window you set.
+</p>
+
+@if (!Model.HasStanding)
+{
+    <div class="alert alert-light border text-muted small">
+        <kw-l key="admin.guests_empty">No guest accounts yet.</kw-l>
+    </div>
+}
+
+<form method="post" action="/admin/guests">
+    @Html.AntiForgeryToken()
+
+    <div class="row g-3 mb-3">
+        <div class="col-sm-12">
+            <label for="subjectId" class="form-label">Guest subject id</label>
+            <input type="text" class="form-control" name="subjectId" id="subjectId"
+                   value="@Model.SubjectId" required />
+            <div class="form-text">
+                The guest account's subject id (the <c>SubjectId</c> of the <c>Profile</c> / <c>User</c> row for the account the guest signs in with). One allowance document per guest account.
+            </div>
+        </div>
+    </div>
+
+    <fieldset class="mb-3">
+        <legend class="form-label h6 mb-2">
+            <kw-l key="admin.guests_window_label">Access window</kw-l>
+        </legend>
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <label for="validFrom" class="form-label small">From (inclusive)</label>
+                <input type="datetime-local" class="form-control" name="validFrom" id="validFrom"
+                       value="@Model.ValidFrom.ToString("yyyy-MM-ddTHH:mm")" required />
+            </div>
+            <div class="col-sm-6">
+                <label for="validUntil" class="form-label small">Until (exclusive)</label>
+                <input type="datetime-local" class="form-control" name="validUntil" id="validUntil"
+                       value="@Model.ValidUntil.ToString("yyyy-MM-ddTHH:mm")" required />
+                <div class="form-text">
+                    The standing is live while <c>now ≥ From</c> and <c>now &lt; Until</c> — a guest outside that window has no standing.
+                </div>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="mb-3">
+        <legend class="form-label h6 mb-2">
+            <kw-l key="admin.guests_surfaces_label">Allowed surfaces</kw-l>
+        </legend>
+        <div class="row g-2">
+            <div class="col-sm-4 col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="surface-announcements" name="announcements" value="true"
+                           @(Model.Announcements ? "checked" : null) />
+                    <label class="form-check-label" for="surface-announcements">
+                        <kw-l key="admin.guests_surface_announcements">Announcements</kw-l>
+                    </label>
+                </div>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="surface-events" name="events" value="true"
+                           @(Model.Events ? "checked" : null) />
+                    <label class="form-check-label" for="surface-events">
+                        <kw-l key="admin.guests_surface_events">Events</kw-l>
+                    </label>
+                </div>
+            </div>
+            <div class="col-sm-4 col-md-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch"
+                           id="surface-directory" name="directory" value="true"
+                           @(Model.Directory ? "checked" : null) />
+                    <label class="form-check-label" for="surface-directory">
+                        <kw-l key="admin.guests_surface_directory">Directory</kw-l>
+                    </label>
+                </div>
+            </div>
+        </div>
+        @if (!Model.HasSurfaces)
+        {
+            <div class="form-text">
+                No surfaces selected — the guest signs in to a shell with no gated content (the least-privileged floor, not an error).
+            </div>
+        }
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary">
+        <kw-l key="admin.guests_create">Create guest</kw-l>
+    </button>
+</form>

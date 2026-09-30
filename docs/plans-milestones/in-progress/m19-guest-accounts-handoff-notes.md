@@ -23,3 +23,19 @@
 - **Divergence (test harness, not a D#):** `UserManager<T>`/`RoleManager<T>` have no parameterless constructor so they can't be NSubstituted directly — the test backs a *real* `UserManager<User>` with a substituted `IUserRoleStore<User>` (stubbed empty) and a nested `EmptyServiceProvider` helper (the Core.Tests one is a private class, not a library type). The seam behavior is unchanged.
 - **Seams for the next units:** U04's `AdminGuestsController` reads `GetGuestAccessAsync` for the index/set-window view model and writes via `SetGuestAccessAsync`; the `Guest` role string it now mints is what `CanSeeAsync`-shaped gates and the nav will key off.
 - **No open questions.** U03 (`kw-l` key set × en/de/fr/da + parity pin) can start from design doc §8/§9.
+
+## U03 — `kw-l` key set
+
+- **Delivered:** the closed 10-key M19 set (design doc §8) added to **all four** of `EnValues`/`DeValues`/`FrValues`/`DaValues` in `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the en baselines verbatim from the §8 table; idiomatic de/fr/da authored to match the existing entries (surface labels reuse the established register: Ankündigungen/Veranstaltungen/Verzeichnis, Annonces/Événements/Annuaire, Meddelelser/Arrangementer/Kontaktliste). All present and non-empty in all four.
+- **Tests green:** no new test file authored — the existing `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` pins (key-set equality across all four dictionaries + non-emptiness) pick up the new keys automatically. Build + full `Kumunita.Core.Tests` (1049) green.
+- **Seams for the next unit:** U04's `AdminGuestsController` **consumes** `admin.guests_*` (title/empty/create/window_label/surfaces_label/surface_announcements/surface_events/surface_directory/saved) + `account.guest_welcome` via the `kw-l` TagHelper; it adds none of these keys.
+- **U05 note:** the close unit's docs-only milestone flip needs no new `kw-l` keys.
+- **No open questions.** U04 (Web `/admin/guests` GlobalAdmin controller + views + nav) can start from design doc §7 + §9.7 (the `AdminGuestsController` actions); the §8 key set above is what it consumes.
+
+## U04 — /admin/guests surface
+
+- **Delivered (Web-only):** `AdminGuestsController` (`[Route("admin/guests")]`, `[Authorize(Roles = Roles.GlobalAdmin)]`, `GET Index(string? subjectId)` seeds the view model from `GetGuestAccessAsync` / `POST Save(...)` composes the `[Flags]` `GuestSurface` and delegates to the single audited `SetGuestAccessAsync` lane — GATE-2) + `GuestAdminViewModel` (`Seed` decomposes the flags into the three checkboxes, null → empty floor) + `Views/AdminGuests/Index.cshtml` (subjectId + window + three surface checkboxes + anti-forgery) + the `/admin` index card (hidden-not-disabled via `KumunitaPrincipal.IsGlobalAdmin`).
+- **Tests green:** `AdminGuestsControllerTests` — index seeds the existing standing, the no-subject floor does not read, `Save` delegates to the single audited lane with the composed surfaces + `SetByAdmin` asserted as the second argument, `Save` with no surfaces composes the `None` floor, inverted window (boundary `ValidUntil <= ValidFrom`) rejects, the GlobalAdmin role-`Authorize` gate-attribute pin, the `/admin` link is hidden-not-disabled for a non-GlobalAdmin (string pin, no TestServer), and the 10 `admin.guests_*` keys are present + non-empty in all four languages. Build + full `Kumunita.Web.Tests` (669) green.
+- **Divergence (test example, not a D#):** the U04 register's prose `GuestSurface[]` array was implemented as the `[Flags]` scalar per the §1.a amendment (matching `GuestAccess.AllowedSurfaces`); the controller composes a single value, not an array.
+- **Seams for the close unit:** U05 (docs-only) needs no new `kw-l` keys; it flips M19 → done in the README Roadmap + `Milestones.cs` + `MilestonesTests.cs`.
+- **No open questions.** M19 is now feature-complete pending U05's docs flip.
