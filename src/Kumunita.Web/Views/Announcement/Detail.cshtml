@@ -313,7 +313,7 @@
                            render — this view does not load the owner's bookmark list to
                            decide it. *@
                         @{ var _bm = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
-                        <partial name="Shared/_BookmarkButton" model="@_bm" />
+                        <partial name="_BookmarkButton" model="@_bm" />
                         @* The full body (the /announcements list shows the
                            first 250 characters and links here). Rendered
                            through the one MarkdownRenderer (R·1). *@

@@ -374,7 +374,7 @@
                            set: "todo"). D2 / C-M17·2 pin: the label is static per render —
                            this view does not load the owner's bookmark list to decide it. *@
                         @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
-                        <partial name="Shared/_BookmarkButton" model="@_bm" />
+                        <partial name="_BookmarkButton" model="@_bm" />
                     </div>
 
                     @if (Model.Translations is { Count: > 0 })

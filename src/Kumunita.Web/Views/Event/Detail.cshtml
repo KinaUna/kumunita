@@ -298,7 +298,7 @@
                            set: "event"). D2 / C-M17·2 pin: the label is static per render —
                            this view does not load the owner's bookmark list to decide it. *@
                         @{ var _bm = ("event", Model.Event.Id, $"/events/{Model.Event.Id}"); }
-                        <partial name="Shared/_BookmarkButton" model="@_bm" />
+                        <partial name="_BookmarkButton" model="@_bm" />
                         @* The full body — rendered through the one MarkdownRenderer (R·1). *@
                         <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
                     </div>
