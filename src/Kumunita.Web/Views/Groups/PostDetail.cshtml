@@ -38,6 +38,13 @@
 
         <div class="card mt-2 mb-4">
             <div class="card-body">
+                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
+                   set: a group post is the same "post" vocabulary as a community post).
+                   D2 / C-M17·2 pin: the label is static per render — this view does
+                   not load the owner's bookmark list to decide it. Placed at the
+                   top-right of the main card. *@
+                @{ var _bm = ("post", Model.Post.Id, $"/groups/{Model.GroupId}/posts/{Model.Post.Id}"); }
+                <partial name="_BookmarkButton" model="@_bm" />
                 @* Author-only edit entry point (ADR 0016 — the edit lane is
                    author-only at the Web layer, so a non-author never sees
                    the button and there is no 404/403 surface to reach from

@@ -456,6 +456,65 @@ public sealed class IdentityService(
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // ── M19 guest standing (ADR 0120, D2 — the single audited write lane) ──
+
+    /// <inheritdoc />
+    public async Task<GuestAccess?> GetGuestAccessAsync(string subjectId)
+    {
+        using var session = documentStore.QuerySession();
+        // The C-M19·4 empty floor: null is a valid state (a guest with no
+        // settled standing), not an error.
+        return await session.LoadAsync<GuestAccess>(subjectId, CancellationToken.None);
+    }
+
+    /// <inheritdoc />
+    public async Task SetGuestAccessAsync(GuestAccess access, string adminSubjectId)
+    {
+        // ADR 0120 write seam: the admin-settled allowance (the GuestAccess
+        // document, id = the guest's SubjectId) + exactly one audit row (via:
+        // Admin, action "guest.set-standing", target "guest:{subjectId}") in
+        // the same session (C-M19·5 — no silent, unaudited access). The
+        // SetSignupOpenAsync body pattern: one write session, store the
+        // document + set Profile.IsGuest (the D1 flag) + one audit row, commit.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Settle the settling admin (the authoritative ActorId) and store the
+        // allowance. access.SubjectId is the guest's subject id (the document
+        // identity) — the caller owns it; we do not re-derive it.
+        access.SetByAdmin = adminSubjectId;
+        session.Store(access);
+
+        // Mark the account a guest (the D1 flag, C-M19·1) in the same session.
+        // A guest is still a real account — the Profile row exists for a real
+        // Identity account; load-or-create so a guest standing can be settled
+        // before the profile row (defensively) rather than failing.
+        var profile = await session.LoadAsync<Kumunita.Core.UserInfo.Profile>(
+            access.SubjectId, ct).ConfigureAwait(false);
+        if (profile is not null)
+        {
+            profile.IsGuest = true;
+            session.Store(profile);
+        }
+
+        // Exactly one audit row (C-M19·5, D2) — the singleton-toggle shape
+        // (the signup.set-open precedent).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "guest.set-standing",
+            TargetKind = "guest",
+            TargetId = $"guest:{access.SubjectId}",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
 
     /// <summary>

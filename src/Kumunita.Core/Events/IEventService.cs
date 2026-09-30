@@ -260,6 +260,41 @@ public interface IEventService
     Task DeleteAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
     /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·4 / C-M18·8) — soft-delete **one** occurrence:
+    /// set <see cref="Event.IsDeleted"/> = <c>true</c> on the named row only.
+    /// Never a hard-delete, never a cascade, never a touch of the head's
+    /// <see cref="Event.RecurrenceRule"/> or any sibling (C-M18·8). Standing is
+    /// **author ∪ GlobalAdmin** (C-M18·4 — the ADR 0014 / 0016 / 0017 edit-lane
+    /// matrix): at the Core level the locked seam signature carries no
+    /// <c>actorRoles</c> (the <see cref="PublishAsync"/> author-check precedent),
+    /// so a non-author — including a GlobalAdmin whose override is a Web-layer
+    /// <c>[Authorize]</c> concern — gets a <c>KeyNotFoundException</c> (the frozen
+    /// seam's "absent" 404 shape, **not** a 403, C-M18·4 / D5). A head row
+    /// (<see cref="Event.RecurrenceRule"/> non-null) is not skippable — it is
+    /// edited via the existing edit lane (the "no delete-entire-series button"
+    /// pin). **No** new <c>AccessAction</c> / <c>AccessVia</c> / adapter (C-M18·5).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, the actor
+    /// is not the author, or the row is a head row — the same 404 "absent"
+    /// observable (no leak, C-M18·4).</exception>
+    Task<Event> SkipOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·4 / C-M18·8) — the inverse of
+    /// <see cref="SkipOccurrenceAsync"/>: set <see cref="Event.IsDeleted"/> =
+    /// <c>false</c> on the named row only. Same standing (C-M18·4), same one-row
+    /// scope (C-M18·8), same 404 "absent" no-leak shape (C-M18·4 / D5). A skip is
+    /// always reversible by the author (C-M18·8). A head row ( <see
+    /// cref="Event.RecurrenceRule"/> non-null) is not undeletable via this seam (the
+    /// head's <c>IsDeleted</c> is set by the existing edit / delete lanes). **No**
+    /// new <c>AccessAction</c> / <c>AccessVia</c> / adapter (C-M18·5).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, the actor
+    /// is not the author, or the row is a head row — the same 404 "absent"
+    /// observable (no leak, C-M18·4).</exception>
+    Task<Event> UndeleteOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
     /// RSVP — the **last-write-wins** concurrency exception (§3.2): upserts the
     /// actor's <c>(EventId, UserId)</c> row with the latest <see cref="RsvpStatus"/>;
     /// a conflicting write is a no-op or self-converging. **No <c>AccessAudit</c>

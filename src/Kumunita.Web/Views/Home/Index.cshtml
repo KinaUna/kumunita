@@ -1,4 +1,8 @@
 @using Kumunita.Web
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.HomeViewModel
 @{
     ViewData["Title"] = "Home";
@@ -6,6 +10,13 @@
     // run full-bleed (the About page's pattern, _Layout.cshtml + the .kmb-*
     // rules in site.css).
     ViewData["FullBleed"] = true;
+
+    // Effective language code (ADR 0049 chain: cookie → Accept-Language →
+    // instance default → en), the same seam the kw-l TagHelper resolves UI
+    // strings in. Used to resolve the roadmap's show-more button labels
+    // (kw-l can't substitute {n}, so the count is filled in with C# .Replace,
+    // the same pattern the About page uses for its "N earlier versions").
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
 }
 
 <!-- ══════════ 1. Intro: what Kumunita is and does ══════════ -->
@@ -231,15 +242,84 @@
             </div>
         </div>
 
-        <ul class="kmb-roadmap mt-5">
-            @foreach (var m in Milestones.All)
+        @* Roadmap disclosure window — the About-page "show more" pattern
+           (VN lane, ADR 0110) extended to BOTH directions. The visible
+           window is the last 3 finished milestones + the first 3 upcoming
+           ones; everything before it is a hidden-earlier item, everything
+           after a hidden-upcoming item (a JS-less visitor still sees the
+           window, and the whole list stays in the markup for SEO +
+           screen-reader users who expand a button). Each button resolves its
+           localized "{n} …" label server-side (kw-l can't substitute {n}) and
+           passes it to the client module via data-rm-label; the label's count
+           is filled in here for first paint and refreshed by the JS as the
+           resident clicks (batches of 10, data-rm-batch-size). *@
+        @{
+            var _rm = Milestones.All;
+            int _n = _rm.Count;
+            int _lastDone = -1;
+            for (int _i = 0; _i < _n; _i++)
+                if (_rm[_i].Status == Milestones.StatusDone) _lastDone = _i; else break;
+            int _upcomingTotal = _n - (_lastDone + 1);
+            int _windowStart = (_lastDone + 1) - Math.Min(3, _lastDone + 1);
+            int _windowEnd = _lastDone + 1 + Math.Min(3, _upcomingTotal);
+            int _earlierHidden = _windowStart;
+            int _upcomingHidden = _n - _windowEnd;
+            string _earlierRaw = (await Translation.GetAsync("home.roadmap.show_more_earlier", effLang)) ?? "";
+            string _upcomingRaw = (await Translation.GetAsync("home.roadmap.show_more_upcoming", effLang)) ?? "";
+            string _earlierLabel = (string.IsNullOrWhiteSpace(_earlierRaw) || _earlierRaw == "home.roadmap.show_more_earlier")
+                ? "Show the {n} earlier milestones" : _earlierRaw;
+            string _upcomingLabel = (string.IsNullOrWhiteSpace(_upcomingRaw) || _upcomingRaw == "home.roadmap.show_more_upcoming")
+                ? "Show the {n} upcoming milestones" : _upcomingRaw;
+            string _earlierText = _earlierLabel.Replace("{n}", _earlierHidden.ToString());
+            string _upcomingText = _upcomingLabel.Replace("{n}", _upcomingHidden.ToString());
+            // Precompute per-row attributes so the markup-level @for body is pure markup.
+            string[] _rowAttr = new string[_n];
+            string[] _rowHidden = new string[_n];
+            for (int _ri = 0; _ri < _n; _ri++)
             {
-                <li>
-                    <span class="flex-grow-1"><span class="kmb-milestone-id me-2">@m.Id</span>@m.Title</span>
-                    <span class="badge rounded-pill @Milestones.BadgeClass(m.Status)">@Milestones.LabelFor(m.Status)</span>
-                </li>
+                if (_ri < _windowStart)          { _rowAttr[_ri] = "earlier";  _rowHidden[_ri] = "hidden"; }
+                else if (_ri >= _windowEnd)      { _rowAttr[_ri] = "upcoming"; _rowHidden[_ri] = "hidden"; }
+                else                             { _rowAttr[_ri] = "visible";  _rowHidden[_ri] = ""; }
             }
-        </ul>
+        }
+        <div class="mt-5">
+            @if (_earlierHidden > 0)
+            {
+                <div class="text-center mb-3" id="roadmap-earlier-wrap">
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm kmb-roadmap-show-more"
+                            data-rm-batch-size="10"
+                            data-rm-label="@_earlierLabel"
+                            aria-label="@_earlierText">
+                        @_earlierText
+                    </button>
+                </div>
+            }
+
+            <ul class="kmb-roadmap mb-0" id="roadmap-list">
+                @for (int _ri = 0; _ri < _n; _ri++)
+                {
+                    var _m = _rm[_ri];
+                    <li @_rowHidden[_ri] data-rm="@_rowAttr[_ri]">
+                        <span class="flex-grow-1"><span class="kmb-milestone-id me-2">@_m.Id</span>@_m.Title</span>
+                        <span class="badge rounded-pill @Milestones.BadgeClass(_m.Status)">@Milestones.LabelFor(_m.Status)</span>
+                    </li>
+                }
+            </ul>
+
+            @if (_upcomingHidden > 0)
+            {
+                <div class="text-center mt-3" id="roadmap-upcoming-wrap">
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm kmb-roadmap-show-more"
+                            data-rm-batch-size="10"
+                            data-rm-label="@_upcomingLabel"
+                            aria-label="@_upcomingText">
+                        @_upcomingText
+                    </button>
+                </div>
+            }
+        </div>
 
         <div class="d-flex flex-wrap justify-content-center gap-2 mt-5">
             @foreach (var link in RepositoryInfo.Links)

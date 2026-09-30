@@ -255,6 +255,51 @@ public sealed class EventController : Controller
         return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 
+    /// <summary>
+    /// M18 (ADR 0119, D2 / D7 / D3) — maps the composer's recurrence picker
+    /// (<see cref="EventEditorModel.Recurrence"/> /
+    /// <see cref="EventEditorModel.RecurrenceInterval"/> /
+    /// <see cref="EventEditorModel.EndsAfterCount"/> /
+    /// <see cref="EventEditorModel.EndsOnDate"/>) onto the Core
+    /// <see cref="EventRecurrenceRule"/> the U02 / U04 create / edit lanes
+    /// read (<see cref="CreateEventRequest.Recurrence"/> /
+    /// <see cref="UpdateEventRequest.Recurrence"/>). A "none" / empty /
+    /// unparseable <c>Recurrence</c> posts <c>null</c> (the zero-change
+    /// branch, GATE-2's <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c>
+    /// pin). Otherwise: the parsed <see cref="Recurrence"/> enum, the
+    /// interval (≥ 1, default 1), and the mutually-exclusive end condition
+    /// (D7 — <c>EndsAfterCount</c> → <c>Count</c>, <c>EndsOnDate</c> →
+    /// <c>Ends</c>). The <c>Ends</c> wall-clock date is converted to a UTC
+    /// instant using the actor's effective zone (the ADR 0019 floor — the
+    /// same <c>GetUtcOffset</c> idiom the <c>Start</c> / <c>End</c> map
+    /// through), so the "Ends before the head's Start" comparison the design
+    /// doc §7 pins is zone-consistent. Standing is unchanged (C-M18·5) —
+    /// this is a shape mapping, never an access decision.
+    /// </summary>
+    private static EventRecurrenceRule? BuildRecurrenceRule(
+        EventEditorModel model, TimeZoneInfo zone)
+    {
+        // Zero-change branch (D2 / GATE-2): "none" / empty / unparseable →
+        // null (a single, non-recurring event — the existing behavior).
+        if (!Enum.TryParse<Recurrence>(model.Recurrence, ignoreCase: true, out var rec)
+            || rec == Recurrence.None)
+        {
+            return null;
+        }
+        var interval = model.RecurrenceInterval ?? 1;
+        if (interval < 1) interval = 1;
+        DateTimeOffset? ends = null;
+        if (model.EndsOnDate is { } d)
+            ends = new DateTimeOffset(d, zone.GetUtcOffset(d));
+        return new EventRecurrenceRule
+        {
+            Recurrence = rec,
+            Interval = interval,
+            Count = model.EndsAfterCount,
+            Ends = ends,
+        };
+    }
+
     // ── Read lanes ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -809,6 +854,34 @@ public sealed class EventController : Controller
             }
         }
 
+        // M18 (ADR 0119, D7 / F2 / F3 / C-M18·4) — the detail-page series
+        // shape (U06). The head carries the rule (D3); a non-head sibling
+        // carries <c>RecurrenceHeadId</c> = head.Id. The series chip (F2) is
+        // shown on **every** row in a series (head + non-head alike); the chip
+        // reads the head's rule (a single <c>GetAsync(head.Id)</c> when the
+        // row is a non-head). The skip / restore buttons (F3) are shown **only**
+        // on a non-head row the actor may edit (C-M18·4 — the existing
+        // <c>canEdit</c> standing = author ∪ GlobalAdmin, re-pinned server-side
+        // by the U03 seam at POST); the head shows the chip but **neither**
+        // button (F3 — the head is edited via the existing edit lane, D4).
+        bool isHead = ev.RecurrenceRule is not null;
+        bool isNonHead = ev.RecurrenceHeadId is not null;
+        bool isPartOfSeries = isHead || isNonHead;
+        EventRecurrenceRule? rule = ev.RecurrenceRule;
+        if (isNonHead && rule is null)
+        {
+            // F2 — the chip reads the head's rule (a single GetAsync(head.Id);
+            // C-M18·1: the read seams are concrete-only, this is the one
+            // detail-page read of the head's rule for the chip).
+            try
+            {
+                var head = await this.events.GetAsync(ev.RecurrenceHeadId!, actorId, HttpContext.RequestAborted);
+                rule = head.RecurrenceRule;
+            }
+            catch (KeyNotFoundException) { rule = null; }
+            catch (UnauthorizedAccessException) { rule = null; }
+        }
+
         var vm = new EventDetailViewModel(
             Event: ev,
             AuthorDisplayName: authorName,
@@ -822,7 +895,12 @@ public sealed class EventController : Controller
             Languages: languages,
             CanTranslate: canTranslate,
             OriginalLanguageCode: ev.LanguageCode,
-            LinkedTodos: linkedTodos);
+            LinkedTodos: linkedTodos,
+            IsPartOfSeries: isPartOfSeries,
+            IsHead: isHead,
+            IsNonHead: isNonHead,
+            CanSkipOrUndelete: canEdit,
+            Rule: rule);
 
         return View(vm);
     }
@@ -1089,6 +1167,16 @@ public sealed class EventController : Controller
                 ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors.
+            if (!string.IsNullOrWhiteSpace(model.Recurrence)
+                && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                if (model.RecurrenceInterval is < 1)
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
+                    ModelState.AddModelError(nameof(model.EndsAfterCount),
+                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+            }
             return View("Create", model);
         }
 
@@ -1121,6 +1209,10 @@ public sealed class EventController : Controller
             TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side body parse.
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U5 — server-side body parse.
+            // M18 (ADR 0119, D2 / D7) — the composer's recurrence picker, mapped
+            // onto the U02 create lane's Recurrence field (null for "none" — the
+            // zero-change branch).
+            Recurrence = BuildRecurrenceRule(model, authorZone),
         };
 
         Event ev;
@@ -1210,7 +1302,27 @@ public sealed class EventController : Controller
             TagIds = ev.TagIds.Count > 0 ? JsonSerializer.Serialize(ev.TagIds) : "[]",
             Languages = await SeedLanguagePickerAsync(),
             Components = await SeedComponentPickerAsync(),
+            // M18 (ADR 0119, D3) — a non-head occurrence's rule is null (the
+            // head carries the rule), so the composer hides the picker on a
+            // non-head row (the @if guard in Edit.cshtml); false on the create
+            // lane and on a head row.
+            IsNonHeadOccurrence = ev.RecurrenceHeadId is not null,
         };
+
+        // M18 (ADR 0119, D2 / D3) — round-trip the head's existing rule into
+        // the composer's picker (a non-head row has a null rule — the picker
+        // is hidden by the IsNonHeadOccurrence guard above, so this is a
+        // no-op for non-head rows).
+        if (ev.RecurrenceRule is { } headRule)
+        {
+            model.Recurrence = headRule.Recurrence.ToString().ToLowerInvariant();
+            model.RecurrenceInterval = headRule.Interval;
+            if (headRule.Count is { } headCount)
+                model.EndsAfterCount = headCount;
+            if (headRule.Ends is { } headEnds)
+                model.EndsOnDate = TimeZoneInfo.ConvertTime(headEnds, editorZone).DateTime;
+        }
+
         await SeedGrantPickerOptionsAsync();
         return View("Edit", model);
     }
@@ -1267,6 +1379,18 @@ public sealed class EventController : Controller
                 ModelState.AddModelError(nameof(model.End), "The end time must be after the start time.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape errors
+            // (a head row only — a non-head row's picker is hidden, D3).
+            if (!model.IsNonHeadOccurrence
+                && !string.IsNullOrWhiteSpace(model.Recurrence)
+                && !model.Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                if (model.RecurrenceInterval is < 1)
+                    ModelState.AddModelError(nameof(model.RecurrenceInterval), "The interval must be at least 1.");
+                if (model.EndsAfterCount.HasValue == model.EndsOnDate.HasValue)
+                    ModelState.AddModelError(nameof(model.EndsAfterCount),
+                        "Pick exactly one end: \"Ends after\" a number of occurrences, or \"Ends on\" a date.");
+            }
             return View("Edit", model);
         }
 
@@ -1297,6 +1421,11 @@ public sealed class EventController : Controller
             TagIds = TagSlugs.Parse(model.TagIds),
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
+            // M18 (ADR 0119, D2 / D4) — the composer's recurrence picker, mapped
+            // onto the U04 edit lane's Recurrence field (a head edit cascades /
+            // re-materializes; null for "none" / a non-head row — the zero-change
+            // branch).
+            Recurrence = model.IsNonHeadOccurrence ? null : BuildRecurrenceRule(model, editorZone),
         };
 
         try
@@ -1401,6 +1530,82 @@ public sealed class EventController : Controller
 
         TempData["info"] = "Event deleted.";
         return Redirect("/events");
+    }
+
+    // ── M18 (ADR 0119, D5 / F3) — the author's skip / restore lane ────────────
+    //
+    // Two thin Web lanes (ADR 0006-D: routes + shape) that delegate the write
+    // + standing decision to the frozen <see cref="IEventService"/> U03 seams
+    // (<see cref="IEventService.SkipOccurrenceAsync"/> /
+    // <see cref="IEventService.UndeleteOccurrenceAsync"/>). The standing
+    // (C-M18·4 — author ∪ GlobalAdmin) + the head-row guard + the no-leak 404
+    // split are all enforced **server-side** by the seam (a non-author, a
+    // missing id, and a head row all surface as the seam's
+    // <see cref="KeyNotFoundException"/> → a non-leaky <c>404</c>, never a
+    // <c>403</c>). No new <see cref="AccessAction"/> /
+    // <see cref="AccessVia"/> / adapter (C-M18·5). The detail page's
+    // <see cref="EventDetailViewModel.CanSkipOrUndelete"/> is only the display
+    // affordance (F3); the seam's 404 is the backstop.
+
+    /// <summary>
+    /// <c>POST /events/{id}/skip</c> — M18 (ADR 0119, D5 / F3) the author's
+    /// "Skip this occurrence" (soft-delete <b>one</b> occurrence row,
+    /// C-M18·8). A thin Web lane delegating to
+    /// <see cref="IEventService.SkipOccurrenceAsync"/>. A non-author, a
+    /// missing id, or a head row is a non-leaky <c>404</c> (the seam's
+    /// <see cref="KeyNotFoundException"/>; C-M18·4 / D5 — never a <c>403</c>).
+    /// On success, redirects back to the detail page.
+    /// </summary>
+    [HttpPost("/events/{id}/skip")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SkipOccurrence(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await this.events.SkipOccurrenceAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        TempData["info"] = "Occurrence skipped.";
+        return Redirect($"/events/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /events/{id}/undelete</c> — M18 (ADR 0119, D5 / F3) the author's
+    /// "Restore this occurrence" (the inverse of
+    /// <see cref="SkipOccurrence"/> — set <c>IsDeleted = false</c> on one row
+    /// only, C-M18·8). A thin Web lane delegating to
+    /// <see cref="IEventService.UndeleteOccurrenceAsync"/>. Same standing
+    /// (C-M18·4), same head-row guard, same non-leaky <c>404</c> split as
+    /// <see cref="SkipOccurrence"/>. On success, redirects back to the detail
+    /// page.
+    /// </summary>
+    [HttpPost("/events/{id}/undelete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UndeleteOccurrence(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await this.events.UndeleteOccurrenceAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        TempData["info"] = "Occurrence restored.";
+        return Redirect($"/events/{id}");
     }
 
     /// <summary>

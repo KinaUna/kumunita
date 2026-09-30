@@ -179,6 +179,37 @@ public sealed class Event
     /// </summary>
     public IReadOnlyList<string> AttachmentIds { get; set; } = [];
 
+    /// <summary>
+    /// M18 (ADR 0119, D1/D3) — the series link. <c>null</c> on the head row and
+    /// on all non-recurring events; non-null on every non-head occurrence (the
+    /// value is the head's <c>Id</c>). Read seams (C-M18·1) never key on this —
+    /// they see concrete rows; this field is a write-time bookkeeping link (the
+    /// head edit cascade, D4, uses it to find the siblings). Additive on the
+    /// existing POCO (the ADR 0004 §B "additive surface" shape — the
+    /// <see cref="ComponentId"/> / <see cref="TagIds"/> / <see cref="ImageIds"/>
+    /// / <see cref="AttachmentIds"/> precedent); no new doc type, no new index,
+    /// no <c>M4DocTypes</c> change.
+    /// <para>
+    /// <b>U01 note (handoff):</b> the register / ADR 0119 / design doc annotate
+    /// this as <c>Guid?</c>, but <see cref="Id"/> is a Marten <b>string</b>
+    /// surrogate in this codebase (as is every other id field — <see
+    /// cref="ComponentId"/> <c>string?</c>, <see cref="TagIds"/>,
+    /// <see cref="ImageIds"/>/<see cref="AttachmentIds"/>). A <c>Guid?</c>
+    /// cannot hold <c>head.Id</c> (a string) and would break the D3 link and
+    /// the U03/U04 <c>RecurrenceHeadId == head.Id</c> queries. It is therefore
+    /// typed <c>string?</c> to match the D1 additive-surface precedent it cites.
+    /// </para>
+    /// </summary>
+    public string? RecurrenceHeadId { get; set; }
+
+    /// <summary>
+    /// M18 (ADR 0119, D2/D3) — the author's rule. Non-null **only on the head
+    /// row**; <c>null</c> on every non-head occurrence and on every non-recurring
+    /// event. The head edit cascade (D4) re-reads this to re-expand the series
+    /// when the rule / <c>Start</c> / <c>End</c> changes.
+    /// </summary>
+    public EventRecurrenceRule? RecurrenceRule { get; set; }
+
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }
 }

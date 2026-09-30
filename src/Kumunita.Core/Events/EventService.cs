@@ -628,7 +628,39 @@ public sealed class EventService : IEventService
         // The helper throws before anything is stored.
         CheckCreateStanding(actorId, StaticEmptyRoles, @event);
 
-        session.Store(@event);
+        // M18 (ADR 0119, D1/D3) — if the author chose a non-None recurrence rule,
+        // materialize the full series (head + siblings) in this same session.
+        // The expander is pure (C-M18·2); this lane only *calls* it and
+        // *persists* the returned rows (U02's scope — the head-edit cascade is
+        // U04). The head is occurrence #1 (carrying the rule + RecurrenceHeadId =
+        // null, D3); each sibling carries RecurrenceHeadId = head.Id + a null
+        // rule. The expander returns the head as row 0 (same object) and non-head
+        // rows with placeholder Ids (string.Empty) — this lane assigns fresh ids
+        // (the U01 contract).
+        //
+        // **Zero-change branch** (GATE-2's second pin): if the rule is null or
+        // Recurrence.None, the code path below is byte-for-byte identical to the
+        // pre-M18 create path (one row, RecurrenceHeadId = null, RecurrenceRule
+        // = null).
+        if (request.Recurrence is { } rule && rule.Recurrence != Recurrence.None)
+        {
+            @event.RecurrenceRule = rule;
+            @event.RecurrenceHeadId = null; // the head is occurrence #1 (D3)
+            var occurrences = EventRecurrenceExpander.ExpandRecurrence(@event, now);
+            // Assign fresh ids to the non-head rows (the expander returns
+            // placeholder Ids — string.Empty — per the U01 contract).
+            for (var i = 1; i < occurrences.Count; i++)
+                occurrences[i].Id = Guid.NewGuid().ToString("N");
+            session.Store(@event);
+            for (var i = 1; i < occurrences.Count; i++)
+                session.Store(occurrences[i]);
+        }
+        else
+        {
+            // Zero-change branch (no rule / Recurrence.None) — byte-for-byte
+            // unchanged (the existing create path).
+            session.Store(@event);
+        }
         StoreAuditRow(session, actorId, "event.create", @event.Id, AccessVia.Owner);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return @event;
@@ -700,6 +732,14 @@ public sealed class EventService : IEventService
             || !ListsEqual(existing.ImageIds, request.ImageIds ?? [])
             || !ListsEqual(existing.AttachmentIds, request.AttachmentIds ?? []);
 
+        // M18 (ADR 0119, D4) — capture the prior rule / Start / End **before**
+        // the field-assignment block below mutates them. Used by the cascade
+        // branch (which runs after the assignment block) to detect a rule or
+        // Start / End change (the re-materialization trigger, D4).
+        var priorRule = existing.RecurrenceRule;
+        var priorStart = existing.Start;
+        var priorEnd = existing.End;
+
         // Apply the author's choices verbatim (ADR 0001-B). AuthorId / Created /
         // IsDraft / IsDeleted are **deliberately not** reassigned here — the
         // author of record is whoever created it, the draft/delete state is
@@ -720,6 +760,100 @@ public sealed class EventService : IEventService
         existing.AttachmentIds = request.AttachmentIds ?? []; // ATT ADR 0034 — server-side; separate from ImageIds.
         if (changed)
             existing.Modified = DateTimeOffset.UtcNow;
+
+        // M18 (ADR 0119, D4) — head-edit cascade.
+        // A "head" is the row whose RecurrenceRule is non-null (D3). A head edit
+        // cascades text / display / audience / language fields to every
+        // non-deleted sibling (RecurrenceHeadId == head.Id && IsDeleted ==
+        // false) in the same transaction (one SaveChangesAsync below — F4 / D4).
+        // If the rule itself (D2 closed shape) or the head's Start / End
+        // changed, the series is re-materialized: old non-head siblings are
+        // soft-deleted (C-M18·8 — reversible, never hard-deleted), the pure
+        // U01 expander re-expands from the updated head (C-M18·2), and the new
+        // set is inserted with fresh Ids. The head's own Id is stable (it was
+        // updated in place above, D4 — never reassigned).
+        // A non-head row (RecurrenceRule == null) or a head with no rule takes
+        // the existing single-row edit path unchanged (the zero-change branch —
+        // the pre-M18 byte-for-byte shape).
+        // Standing (C-M18·4 / C-M18·5): unchanged — CheckEditStanding (author ∪
+        // GlobalAdmin) already ran above; no new AccessAction / AccessVia /
+        // adapter is added by the cascade. The audit row is the same single
+        // event.update row the existing lane commits (not one per occurrence).
+        if (priorRule is not null)
+        {
+            var ruleChanged = !RulesEqual(priorRule, request.Recurrence);
+            var startEndChanged = priorStart != existing.Start || priorEnd != existing.End;
+
+            // Update the head's RecurrenceRule to the new rule (null if the
+            // author chose "stop repeating" — request.Recurrence null/None,
+            // D4). Always set it: if the rule is unchanged the values are the
+            // same (just a different object instance from the request record);
+            // if the rule changed this carries the new values.
+            var newRule = request.Recurrence is { Recurrence: Recurrence.None } ? null : request.Recurrence;
+            existing.RecurrenceRule = newRule;
+
+            if (ruleChanged || startEndChanged)
+                existing.Modified = DateTimeOffset.UtcNow;
+
+            var siblings = await session.Query<Event>()
+                .Where(e => e.RecurrenceHeadId == existing.Id && e.IsDeleted == false)
+                .ToListAsync(ct).ConfigureAwait(false);
+
+            if (ruleChanged || startEndChanged)
+            {
+                // Re-materialization (D4): soft-delete all existing non-head
+                // siblings (C-M18·8 — reversible soft-delete, never hard-delete),
+                // then re-expand from the updated head via the pure U01
+                // expander (C-M18·2) and insert the new set with fresh Ids.
+                // The head's Id is stable (updated in place above, D4 — never
+                // reassigned).
+                foreach (var sib in siblings)
+                {
+                    sib.IsDeleted = true;
+                    session.Store(sib);
+                }
+
+                // Only re-expand if the new rule is a real (non-null, non-None)
+                // rule — a "stop repeating" edit clears the rule + deletes
+                // siblings and leaves no new set.
+                if (newRule is not null && newRule.Recurrence != Recurrence.None)
+                {
+                    var newOccurrences = EventRecurrenceExpander.ExpandRecurrence(existing, DateTimeOffset.UtcNow);
+                    // Row 0 is the head (same object — Id stable). Rows 1+ are
+                    // new non-head occurrences with placeholder Ids (string.Empty)
+                    // — assign fresh Ids (the U01 contract).
+                    for (var i = 1; i < newOccurrences.Count; i++)
+                    {
+                        newOccurrences[i].Id = Guid.NewGuid().ToString("N");
+                        session.Store(newOccurrences[i]);
+                    }
+                }
+            }
+            else
+            {
+                // Text / display / audience / language cascade (D4, F4): the
+                // rule + Start/End are unchanged, so the existing sibling rows
+                // stay — but their display fields must reflect the new head
+                // values. Update them in place, in the same transaction.
+                // The expander's CloneForOccurrence already copies these from
+                // the head at creation time, but on a head edit the siblings
+                // already exist and must be updated in place.
+                foreach (var sib in siblings)
+                {
+                    sib.Title = existing.Title;
+                    sib.Body = existing.Body;
+                    sib.Location = existing.Location;
+                    sib.Capacity = existing.Capacity;
+                    sib.Color = existing.Color;
+                    sib.Audience = existing.Audience;
+                    sib.ReminderEnabled = existing.ReminderEnabled;
+                    sib.LanguageCode = existing.LanguageCode;
+                    if (changed)
+                        sib.Modified = DateTimeOffset.UtcNow;
+                    session.Store(sib);
+                }
+            }
+        }
 
         session.Store(existing);
         // ADR 0054 §3.4 — the audit row tags the branch the actor qualified
@@ -822,6 +956,113 @@ public sealed class EventService : IEventService
         // author → Owner, non-author GlobalAdmin override → Admin.
         StoreAuditRow(session, actorId, "event.delete", existing.Id, AuditViaFor(actorId, existing.AuthorId));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ─── M18 (ADR 0119, D5) — the author-only skip / undelete seams (U03) ───
+    //
+    // Skip is a soft-delete of ONE row (IsDeleted = true, C-M18·8); undelete is
+    // its inverse (C-M18·8). Standing (C-M18·4 / D5): author ∪ GlobalAdmin — the
+    // ADR 0014 / 0016 / 0017 edit-lane matrix. The locked seam signature carries
+    // no actorRoles (the PublishAsync author-check precedent), so a non-author —
+    // including a GlobalAdmin whose override is a Web-layer [Authorize] concern —
+    // gets a 404 (KeyNotFoundException, the "absent" no-leak shape, NOT a 403,
+    // C-M18·4 / D5). A head row (RecurrenceRule non-null) is not skippable / not
+    // undeletable via this seam (the head is edited via the existing edit lane,
+    // D5 / C-M18·8). No AccessAudit row (a write side-effect, not an access
+    // decision — the unit plan's posture); no new AccessAction / AccessVia /
+    // adapter (C-M18·5).
+
+    /// <inheritdoc cref="IEventService.SkipOccurrenceAsync"/>
+    /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·8) — **soft-delete one occurrence**: sets
+    /// <see cref="Event.IsDeleted"/> = <c>true</c> on the named row only. Never a
+    /// hard-delete (C-M18·8), never a cascade, never a touch of the head's
+    /// <see cref="Event.RecurrenceRule"/> or any sibling (C-M18·8). Standing
+    /// (server-side, C3): **author ∪ GlobalAdmin** (C-M18·4 — the ADR 0014 /
+    /// 0016 / 0017 edit-lane matrix); the locked seam signature carries no
+    /// <c>actorRoles</c> (the <see cref="PublishAsync"/> author-check precedent),
+    /// so a non-author gets a <c>KeyNotFoundException</c> (404, the "absent"
+    /// no-leak shape, **not** a 403, C-M18·4 / D5). A head row (<see
+    /// cref="Event.RecurrenceRule"/> non-null) is not skippable — the head is
+    /// edited via the existing edit lane (D5 / C-M18·8). **No** <see
+    /// cref="AccessAudit"/> row; **no** new <c>AccessAction</c> / <c>AccessVia</c>
+    /// / adapter (C-M18·5).
+    /// </summary>
+    public async Task<Event> SkipOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new KeyNotFoundException("An event id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Standing (C-M18·4 / D5): author-only at the Core level (the locked seam
+        // signature carries no actorRoles — the PublishAsync author-check
+        // precedent). A non-author gets a 404 (the "absent" no-leak shape — NOT a
+        // 403, C-M18·4); the same observable as a missing id, so a stranger cannot
+        // tell that the row exists.
+        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Head-row guard (design doc §6, D5 / C-M18·8): the head (RecurrenceRule
+        // non-null) is edited via the existing edit lane, never skipped via this
+        // seam (the "no delete-entire-series button" pin). Same 404 observable.
+        if (existing.RecurrenceRule is not null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (!existing.IsDeleted)
+        {
+            existing.IsDeleted = true;                 // C-M18·8 — the soft-delete flag (one row).
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <inheritdoc cref="IEventService.UndeleteOccurrenceAsync"/>
+    /// <summary>
+    /// M18 (ADR 0119, D5 / C-M18·8) — the **inverse of
+    /// <see cref="SkipOccurrenceAsync"/>**: sets <see cref="Event.IsDeleted"/> =
+    /// <c>false</c> on the named row only. Same standing (C-M18·4), same one-row
+    /// scope (C-M18·8), same 404 "absent" no-leak shape (C-M18·4 / D5). A skip is
+    /// always reversible by the author (C-M18·8). A head row ( <see
+    /// cref="Event.RecurrenceRule"/> non-null) is not undeletable via this seam (the
+    /// head's <c>IsDeleted</c> is set by the existing edit / delete lanes). **No**
+    /// <see cref="AccessAudit"/> row; **no** new <c>AccessAction</c> /
+    /// <c>AccessVia</c> / adapter (C-M18·5).
+    /// </summary>
+    public async Task<Event> UndeleteOccurrenceAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new KeyNotFoundException("An event id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        // Standing + head-row guard — the same 404 "absent" no-leak shape as
+        // SkipOccurrenceAsync (C-M18·4 / D5; the head is edited via the existing
+        // edit lane, D5 / C-M18·8).
+        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (existing.RecurrenceRule is not null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+        if (existing.IsDeleted)
+        {
+            existing.IsDeleted = false;                // C-M18·8 — reversible (one row).
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
     }
 
     /// <inheritdoc cref="IEventService.RsvpAsync"/>
@@ -1426,6 +1667,23 @@ public sealed class EventService : IEventService
     /// server-side; this sentinel is a non-null stand-in for the lanes that
     /// never look at roles.
     /// </summary>
+    // M18 (ADR 0119, D4) — rule equality for the head-edit cascade.
+    // Two rules are "equal" when Recurrence / Interval / Count / Ends all match.
+    // null and Recurrence.None are treated as equivalent (both mean "no
+    // recurrence"). The cascade uses this to detect whether a re-materialization
+    // is needed (a rule change triggers soft-delete + re-expand, D4).
+    private static bool RulesEqual(EventRecurrenceRule? a, EventRecurrenceRule? b)
+    {
+        if (a is null && b is null) return true;
+        if (a is null || b is null) return false;
+        var aRec = a.Recurrence == Recurrence.None ? (Recurrence?)null : a.Recurrence;
+        var bRec = b.Recurrence == Recurrence.None ? (Recurrence?)null : b.Recurrence;
+        return aRec == bRec
+            && a.Interval == b.Interval
+            && a.Count == b.Count
+            && a.Ends == b.Ends;
+    }
+
     private static readonly IReadOnlySet<string> StaticEmptyRoles = new HashSet<string>(StringComparer.Ordinal);
 
     /// <summary>

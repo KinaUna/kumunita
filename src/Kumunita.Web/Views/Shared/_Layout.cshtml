@@ -49,6 +49,23 @@
        author placed them. *@
     @await Html.PartialAsync("_FlashToast")
     @await Html.PartialAsync("_PinnedAnnouncement")
+    @* M19 F2 — the guest shell notice (the account.guest_welcome key).
+       Renders only when the Guest role is present, which is only minted by
+       KumunitaClaimsPrincipalFactory when the allowance window is live
+       (ValidFrom ≤ now < ValidUntil). An expired guest gets no Guest claim,
+       so the notice disappears automatically — no job, no extra DB read.
+       Use KumunitaPrincipal.HasRole (NOT ClaimsPrincipal.IsInRole): Kumunita's
+       roles ride the custom "Kumunita.Role" claim type, not the BCL default,
+       so the built-in IsInRole would never match. The kw-l TagHelper resolves
+       the label in the viewer's language. *@
+    @if (User.Identity?.IsAuthenticated == true && KumunitaPrincipal.HasRole(User, "Guest"))
+    {
+        <div class="container-fluid">
+            <div class="alert alert-info mb-3 py-2" role="status">
+                <kw-l key="account.guest_welcome">You are signed in as a guest. Your access is limited to the surfaces the admin has allowed, for the window they set.</kw-l>
+            </div>
+        </div>
+    }
     @* What's-new toast (the VN lane, ADR 0110) — announces the current
        platform version (WhatsNew.Latest) with a link to the About page's
        "What's new" section. Dismissal is remembered per browser (see
@@ -111,6 +128,10 @@
                                            standing core surface, no admin toggle; the M5
                                            projects nav-entry shape). *@
                                         <li><a class="dropdown-item text-dark" href="/inventory"><kw-l key="inv.nav">Inventory</kw-l></a></li>
+                                        @* M17 (ADR 0118) — the Bookmarks surface (D6: a
+                                           standing core surface, no admin toggle; the M16
+                                           inventory nav-entry shape). *@
+                                        <li><a class="dropdown-item text-dark" href="/bookmarks"><kw-l key="bm.nav">Bookmarks</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/tags"><kw-l key="nav.tags">Tags</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a></li>
@@ -186,6 +207,14 @@
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="5" width="11" height="8" rx="1"/><path d="M6 5V3.5h4V5M8 8v3M6.5 9.5h3"/></svg>
                             <span class="visually-hidden"><kw-l key="inv.nav">Inventory</kw-l></span>
                             <span class="kmb-rail-tip"><kw-l key="inv.nav">Inventory</kw-l></span>
+                        </a>
+                        @* M17 (ADR 0118) — the Bookmarks surface rail icon
+                           (the M16 inventory nav-entry shape; D6 standing
+                           core surface). *@
+                        <a class="kmb-rail-btn" href="/bookmarks">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+                            <span class="visually-hidden"><kw-l key="bm.nav">Bookmarks</kw-l></span>
+                            <span class="kmb-rail-tip"><kw-l key="bm.nav">Bookmarks</kw-l></span>
                         </a>
                         <a class="kmb-rail-btn" href="/pages">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
@@ -347,6 +376,11 @@
          reveals the hidden earlier releases in batches of 10 on click.
          Self-guards: no-op if the list has ≤3 entries (no button). -->
     <script type="module" src="~/js/lib/whatsnew-more.js"></script>
+    <!-- Home roadmap "show more" (both directions; see Home/Index.cshtml):
+         reveals the hidden earlier + upcoming milestones in batches of 10
+         on click. Self-guards: no-op on pages without #roadmap-list, and
+         per-side no-op where a direction has no button (≤3 items). -->
+    <script type="module" src="~/js/lib/roadmap-more.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class

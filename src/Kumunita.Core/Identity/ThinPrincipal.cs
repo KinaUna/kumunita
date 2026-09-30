@@ -53,6 +53,20 @@ public static class Roles
     /// </summary>
     public const string Translator = "Translator";
 
+    /// <summary>
+    /// M19 (ADR 0120, D5) — the guest standing: a limited-privilege,
+    /// time-bounded account **outside** the resident circle (a
+    /// consultant/coach/teacher/speaker/entertainer). A guest **never** holds
+    /// <see cref="Member"/> (C-M19·2); its access is limited to the
+    /// <see cref="GuestAccess.AllowedSurfaces"/> set within the bounded window
+    /// (D3/D4). The claim rides the frozen authorization seams (C-M19·6) — the
+    /// only new claim string is this one; the <see cref="ClaimTypes.All"/> set
+    /// is unchanged. Minted at the Identity↔cookie seam
+    /// (<see cref="KumunitaClaimsPrincipalFactory"/>) iff the account is a
+    /// guest, not blocked, and the allowance window is live (C-M19·3).
+    /// </summary>
+    public const string Guest = "Guest";
+
     /// <summary>A component-scope claim: a Moderator governs <paramref name="componentId"/>.</summary>
     public static string ModeratorComponent(string componentId) => $"moderator:{componentId}";
 }

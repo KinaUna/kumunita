@@ -40,6 +40,20 @@ public sealed record CreateEventRequest
     // ImageIds (C-ATT·5 — an event's images stay in ImageIds, its files in
     // AttachmentIds). Nullable default: omitted ⇒ null ⇒ [].
     public IReadOnlyList<string>? AttachmentIds { get; init; }
+    // M18 (ADR 0119, D1/D2/D3) — the author's recurrence choice. <c>null</c> or
+    // <c>Recurrence.None</c> = a single, non-recurring event (the existing
+    // behavior, byte-for-byte unchanged — GATE-2's
+    // <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c> pin). When set
+    // (a non-<c>None</c> <c>Recurrence</c>), <c>CreateAsync</c> materializes
+    // the full series (head + siblings) in one transaction (D1/D3); the head is
+    // occurrence #1 (carrying the rule + <c>RecurrenceHeadId = null</c>),
+    // each sibling carries <c>RecurrenceHeadId = head.Id</c> + a <c>null</c>
+    // rule (D3). The expansion is the pure
+    // <see cref="EventRecurrenceExpander.ExpandRecurrence"/> (C-M18·2) —
+    // <c>CreateAsync</c> only *calls* it and *persists* the returned rows, it
+    // does not re-implement stepping. The <c>UpdateEventRequest</c> field is
+    // <b>not</b> added here — that is U04 (the head-edit cascade).
+    public EventRecurrenceRule? Recurrence { get; init; }
 }
 
 /// <summary>
@@ -72,8 +86,20 @@ public sealed record UpdateEventRequest
     // Announcement edit lane's shape). Server-side; the client never sends them
     // (a form field would be spoofable). Nullable default: omitted ⇒ null ⇒ [].
     public IReadOnlyList<string>? ImageIds { get; init; }
-    // ATT (ADR 0034) — the re-parsed attachment ids from the (re-submitted)
-    // body (replace-style). Server-side; separate from ImageIds (C-ATT·5).
+    // ATT (ADR 0034) — re-parsed attachment IDs from the (re-submitted)
+    // body (replace style). Server-side; separate from ImageIds (C-ATT·5).
     // Nullable default: omitted ⇒ null ⇒ [].
     public IReadOnlyList<string>? AttachmentIds { get; init; }
+    // M18 (ADR 0119, D1/D2/D4) — the (possibly changed) recurrence rule for head edits.
+    // <c>null</c> / <c>Recurrence.None</c> = "no recurrence" (for non-head rows and for heads
+    // without a rule, the existing single-row edit behavior is byte-for-byte unchanged —
+    // the zero-change branch). When the rule (or the head's <c>Start</c> / <c>End</c>)
+    // differs from the head's current <c>RecurrenceRule</c>, <c>UpdateAsync</c>
+    // re-materializes the series (D4): soft-deletes the old non-head siblings,
+    // re-expands from the new head <c>Start</c>, and inserts the new set
+    // (the head's <c>Id</c> is stable, never reassigned).
+    // The shape mirrors <see cref="CreateEventRequest.Recurrence"/> (U02, D1/D2/D3).
+    // GATE-4 pins both branches
+    // (<see cref="EventService"/> cascade tests).
+    public EventRecurrenceRule? Recurrence { get; init; }
 }

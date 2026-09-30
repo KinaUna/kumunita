@@ -1,0 +1,88 @@
+@model Kumunita.Core.Bookmarks.BookmarkListResult
+@{
+    ViewData["Title"] = "Bookmarks";
+}
+@* M17 (ADR 0118) — the personal-pin surface (D6: a standing core surface).
+   The owner's own bookmarks, grouped by the closed TargetKind set
+   (D1 — post / event / todo / announcement / page). NOT paged (M17's
+   list is the owner's full own-rows set — the M16 _Pager partial is
+   *not* used). The D5 degraded row (C-M17·5) renders a closed
+   <span> carrying exactly one static bm.list.degraded string — no
+   <a> tag, no title, no TargetId. The per-row unbookmark form is
+   rendered identically for degraded and non-degraded rows (the D5
+   pin — the unbookmark needs no target read at all, the row is
+   keyed on the owner's own Bookmark row). *@
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="bm.list.title">Your bookmarks</kw-l></h1>
+                </div>
+            </div>
+        </header>
+
+        @if (Model.Groups.Count == 0)
+        {
+            <div class="p-4 text-muted"><kw-l key="bm.list.empty">No bookmarks yet.</kw-l></div>
+        }
+        else
+        {
+            @foreach (var group in Model.Groups)
+            {
+                <section class="mb-4">
+                    @* The group's bm.list.kind.<kind> label — the dynamic-key
+                       idiom (the same helper-mapped closed-code-set label the
+                       M16 Inventory List view's ownerKind badge uses): the
+                       KwLRegistryConsistencyTests scan skips keys containing
+                       '@', so bm.list.kind.@(group.Kind) is the house pattern
+                       for the closed TargetKind set's label. *@
+                    <h2><kw-l key="bm.list.kind.@(group.Kind)">@group.Kind</kw-l></h2>
+                    <ul class="airy-ann-list list-unstyled p-0 m-0">
+                        @foreach (var row in group.Items)
+                        {
+                            <li class="airy-ann-row d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <div>
+                                    @if (row.Degraded)
+                                    {
+                                        @* D5 / C-M17·5 — the closed degraded
+                                           label: exactly one static string, no
+                                           <a> tag, no title, no TargetId. The
+                                           row's entire leak surface is this
+                                           single kw-l string. *@
+                                        <h3 class="airy-ann-title text-muted">
+                                            <span><kw-l key="bm.list.degraded">No longer available</kw-l></span>
+                                        </h3>
+                                    }
+                                    else
+                                    {
+                                        <h3 class="airy-ann-title">
+                                            <a href="@row.Link">@row.Title</a>
+                                        </h3>
+                                        <div class="text-muted small">
+                                            <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                                        </div>
+                                    }
+                                </div>
+
+                                @* The per-row unbookmark control — rendered
+                                   identically for degraded and non-degraded
+                                   rows (the D5 pin: unbookmark on a degraded
+                                   row still works — the row is keyed on the
+                                   owner's own Bookmark row, not the target's
+                                   id, so the unbookmark needs no target read
+                                   at all — D5 / F4). *@
+                                <form method="post" action="@($"/bookmarks/{row.TargetKind}/{row.TargetId}/remove")"
+                                      style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm"><kw-l key="bm.list.unbookmark">Remove</kw-l></button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </section>
+            }
+        }
+    </div>
+</div>

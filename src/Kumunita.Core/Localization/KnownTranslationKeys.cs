@@ -77,6 +77,21 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> EnValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — the guest-accounts surface: the /admin/guests
+            // admin surface (D6) + the signed-in guest's shell notice (D5) ──
+            ["admin.guests_title"]               = "Guest accounts",
+            ["admin.guests_empty"]               = "No guest accounts yet.",
+            ["admin.guests_create"]              = "Create guest",
+            ["admin.guests_window_label"]        = "Access window",
+            ["admin.guests_surfaces_label"]      = "Allowed surfaces",
+            ["admin.guests_surface_announcements"] = "Announcements",
+            ["admin.guests_surface_events"]      = "Events",
+            ["admin.guests_surface_directory"]   = "Directory",
+            ["admin.guests_saved"]               = "Guest standing saved.",
+            ["account.guest_welcome"] =
+                "You are signed in as a guest. Your access is limited to the " +
+                "surfaces the admin has allowed, for the window they set.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
@@ -93,6 +108,33 @@ public static class KnownTranslationKeys
             ["nav.events"]        = "Events",
             ["events.created"]    = "Created",
             ["events.edited"]     = "edited",
+
+            // ADR 0119 (M18, D9) — the composer recurrence picker keys (U05).
+            // The canonical en floor (the D9 closed set's `events.recurrence.*`
+            // half; the `events.series.*` detail-page half lands with U06).
+            // These are the <c>en</c> source text the provider floor resolves to;
+            // the de/fr/da values land in U07 (the M18 kw-l lane).
+            ["events.recurrence.none"]       = "Does not repeat",
+            ["events.recurrence.daily"]      = "Daily",
+            ["events.recurrence.weekly"]     = "Weekly",
+            ["events.recurrence.monthly"]    = "Monthly",
+            ["events.recurrence.yearly"]     = "Yearly",
+            ["events.recurrence.interval"]   = "Every",
+            ["events.recurrence.ends_after"] = "Ends after",
+            ["events.recurrence.ends_on"]    = "Ends on",
+            ["events.recurrence.count"]      = "occurrences",
+            ["events.recurrence.until"]      = "until",
+
+            // ADR 0119 (M18, D9) — the detail-page series chip + skip/restore
+            // button keys (U06). The canonical en floor (the D9 closed set's
+            // `events.series.*` half; the `events.recurrence.*` composer half
+            // landed with U05). These are the `en` source text the provider
+            // floor resolves to; the de/fr/da values land in U07 (the M18
+            // kw-l lane).
+            ["events.series.repeats"]  = "Repeats",
+            ["events.series.skip"]     = "Skip this occurrence",
+            ["events.series.restore"]  = "Restore this occurrence",
+            ["events.series.part_of"]  = "Part of a series",
 
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projects",
@@ -529,6 +571,8 @@ public static class KnownTranslationKeys
 
             // ── home roadmap (the plan, after the intro) ────────────────────
             ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
+            ["home.roadmap.show_more_earlier"] = "Show the {n} earlier milestones",
+            ["home.roadmap.show_more_upcoming"]  = "Show the {n} upcoming milestones",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Sign in",
@@ -1746,6 +1790,29 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Check in",
             ["inv.edit.title"]              = "Edit item",
             ["inv.edit.submit"]             = "Save changes",
+
+            // M17 (ADR 0118) — Bookmarks: the personal-pin surface (D6: a
+            // standing core surface, no admin toggle). The closed key set is
+            // the design doc §kw-l (14 keys: the nav entry U03 consumes, the
+            // list / degraded / kind labels U03 consumes, the unbookmark
+            // action U03 consumes, the toggle button U04 consumes, and the
+            // obs-2 redirect-back flash toast keys (the ADR 0118 amendment,
+            // 2026-09-30)).
+            ["bm.nav"]                      = "Bookmarks",
+            ["bm.list.title"]               = "Your bookmarks",
+            ["bm.list.empty"]               = "No bookmarks yet.",
+            ["bm.list.degraded"]            = "No longer available",
+            ["bm.list.kind.post"]           = "Posts",
+            ["bm.list.kind.event"]          = "Events",
+            ["bm.list.kind.todo"]           = "To-dos",
+            ["bm.list.kind.announcement"]   = "Announcements",
+            ["bm.list.kind.page"]           = "Pages",
+            ["bm.list.unbookmark"]          = "Remove",
+            ["bm.button.bookmark"]          = "Bookmark",
+            ["bm.button.bookmarked"]        = "Bookmarked",
+            // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
+            ["bm.toggle.bookmarked"]        = "Bookmarked.",
+            ["bm.toggle.removed"]           = "Bookmark removed.",
         };
 
     /// <summary>
@@ -1764,6 +1831,22 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> DeValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — die Gastkonten-Oberfläche: die /admin/guests
+            // Admin-Oberfläche (D6) + die Begrüßung der angemeldeten Gäste ──
+            ["admin.guests_title"]               = "Gastkonten",
+            ["admin.guests_empty"]               = "Noch keine Gastkonten.",
+            ["admin.guests_create"]              = "Gast erstellen",
+            ["admin.guests_window_label"]        = "Zugriffsfenster",
+            ["admin.guests_surfaces_label"]      = "Erlaubte Bereiche",
+            ["admin.guests_surface_announcements"] = "Ankündigungen",
+            ["admin.guests_surface_events"]      = "Veranstaltungen",
+            ["admin.guests_surface_directory"]   = "Verzeichnis",
+            ["admin.guests_saved"]               = "Gastzugang gespeichert.",
+            ["account.guest_welcome"] =
+                "Sie sind als Gast angemeldet. Ihr Zugriff ist auf die " +
+                "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
+                "das von ihr gesetzte Zeitfenster.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
 
@@ -1780,6 +1863,27 @@ public static class KnownTranslationKeys
             ["nav.events"]        = "Veranstaltungen",
             ["events.created"]    = "Erstellt",
             ["events.edited"]     = "bearbeitet",
+
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Wiederholt sich nicht",
+            ["events.recurrence.daily"]      = "Täglich",
+            ["events.recurrence.weekly"]     = "Wöchentlich",
+            ["events.recurrence.monthly"]    = "Monatlich",
+            ["events.recurrence.yearly"]     = "Jährlich",
+            ["events.recurrence.interval"]   = "Alle",
+            ["events.recurrence.ends_after"] = "Endet nach",
+            ["events.recurrence.ends_on"]    = "Endet am",
+            ["events.recurrence.count"]      = "Terminen",
+            ["events.recurrence.until"]      = "bis",
+            ["events.series.repeats"]        = "Wiederholt sich",
+            ["events.series.skip"]           = "Diesen Termin überspringen",
+            ["events.series.restore"]        = "Diesen Termin wiederherstellen",
+            ["events.series.part_of"]        = "Teil einer Serie",
 
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projekte",
@@ -2208,6 +2312,8 @@ public static class KnownTranslationKeys
 
             // ── home Roadmap (der Plan, nach der Intro) ────────────────────
             ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
+            ["home.roadmap.show_more_earlier"] = "Die {n} früheren Meilensteine anzeigen",
+            ["home.roadmap.show_more_upcoming"]  = "Die {n} kommenden Meilensteine anzeigen",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Anmelden",
@@ -3335,6 +3441,27 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Zurückgeben",
             ["inv.edit.title"]              = "Gegenstand bearbeiten",
             ["inv.edit.submit"]             = "Änderungen speichern",
+
+            // M17 (ADR 0118) — Lesezeichen: die persönliche Merk-Oberfläche
+            // (D6: dauerhafte Kerno­berfläche, kein Admin-Toggle). Die
+            // geschlossene Schlüsselmenge ist der Design-Doc-§kw-l (14
+            // Schlüssel: Nav-Eintrag, Listen-/Degradier-/Typ-Labels,
+            // Unmark-Aktion + Umschaltknopf + obs-2 Flash-Toast-Schlüssel).
+            ["bm.nav"]                      = "Lesezeichen",
+            ["bm.list.title"]               = "Deine Lesezeichen",
+            ["bm.list.empty"]               = "Noch keine Lesezeichen.",
+            ["bm.list.degraded"]            = "Nicht mehr verfügbar",
+            ["bm.list.kind.post"]           = "Beiträge",
+            ["bm.list.kind.event"]          = "Veranstaltungen",
+            ["bm.list.kind.todo"]           = "Aufgaben",
+            ["bm.list.kind.announcement"]   = "Ankündigungen",
+            ["bm.list.kind.page"]           = "Seiten",
+            ["bm.list.unbookmark"]          = "Entfernen",
+            ["bm.button.bookmark"]          = "Merken",
+            ["bm.button.bookmarked"]        = "Gemerkt",
+            // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
+            ["bm.toggle.bookmarked"]        = "Gemerkt.",
+            ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
         };
 
     /// <summary>
@@ -3355,6 +3482,22 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> FrValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — la surface des comptes invités : la surface
+            // /admin/guests (D6) + l'accueil de l'invité connecté (D5) ─────
+            ["admin.guests_title"]               = "Comptes invités",
+            ["admin.guests_empty"]               = "Aucun compte invité pour l'instant.",
+            ["admin.guests_create"]              = "Créer un invité",
+            ["admin.guests_window_label"]        = "Fenêtre d'accès",
+            ["admin.guests_surfaces_label"]      = "Surfaces autorisées",
+            ["admin.guests_surface_announcements"] = "Annonces",
+            ["admin.guests_surface_events"]      = "Événements",
+            ["admin.guests_surface_directory"]   = "Annuaire",
+            ["admin.guests_saved"]               = "Statut de l'invité enregistré.",
+            ["account.guest_welcome"] =
+                "Vous êtes connecté en tant qu'invité. Votre accès est limité " +
+                "aux surfaces que l'administrateur a autorisées, pour la " +
+                "fenêtre qu'il a définie.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
 
@@ -3419,6 +3562,27 @@ public static class KnownTranslationKeys
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["events.created"]    = "Créé le",
             ["events.edited"]     = "modifié le",
+
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Ne se répète pas",
+            ["events.recurrence.daily"]      = "Quotidien",
+            ["events.recurrence.weekly"]     = "Hebdomadaire",
+            ["events.recurrence.monthly"]    = "Mensuel",
+            ["events.recurrence.yearly"]     = "Annuel",
+            ["events.recurrence.interval"]   = "Tous les",
+            ["events.recurrence.ends_after"] = "Se termine après",
+            ["events.recurrence.ends_on"]    = "Se termine le",
+            ["events.recurrence.count"]      = "événements",
+            ["events.recurrence.until"]      = "jusqu'au",
+            ["events.series.repeats"]        = "Se répète",
+            ["events.series.skip"]           = "Passer cet événement",
+            ["events.series.restore"]        = "Restaurer cet événement",
+            ["events.series.part_of"]        = "Fait partie d'une série",
 
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projets",
@@ -3797,6 +3961,8 @@ public static class KnownTranslationKeys
 
             // ── home feuille de route (le plan, après l'intro) ─────────────
             ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
+            ["home.roadmap.show_more_earlier"] = "Afficher les {n} jalons précédents",
+            ["home.roadmap.show_more_upcoming"]  = "Afficher les {n} prochains jalons",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Se connecter",
@@ -4927,6 +5093,27 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Restituer",
             ["inv.edit.title"]              = "Modifier l'article",
             ["inv.edit.submit"]             = "Enregistrer les modifications",
+
+            // M17 (ADR 0118) — Signets : la surface de repères personnels
+            // (D6 : surface cœur permanente, pas de bascule admin). L'ensemble
+            // fermé des clés est le §kw-l du document de conception (14 clés :
+            // entrée de navigation, libellés de liste / dégradé / type,
+            // action de retrait + bouton bascule + clés obs-2 toast).
+            ["bm.nav"]                      = "Signets",
+            ["bm.list.title"]               = "Tes signets",
+            ["bm.list.empty"]               = "Aucun signet pour l'instant.",
+            ["bm.list.degraded"]            = "Non plus disponible",
+            ["bm.list.kind.post"]           = "Publications",
+            ["bm.list.kind.event"]          = "Événements",
+            ["bm.list.kind.todo"]           = "À faire",
+            ["bm.list.kind.announcement"]   = "Annonces",
+            ["bm.list.kind.page"]           = "Pages",
+            ["bm.list.unbookmark"]          = "Retirer",
+            ["bm.button.bookmark"]          = "Signeter",
+            ["bm.button.bookmarked"]        = "Signeté",
+            // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
+            ["bm.toggle.bookmarked"]        = "Signeté.",
+            ["bm.toggle.removed"]           = "Signet retiré.",
         };
 
     /// <summary>
@@ -4948,6 +5135,21 @@ public static class KnownTranslationKeys
     public static IReadOnlyDictionary<string, string> DaValues { get; } =
         new Dictionary<string, string>
         {
+            // ── M19 (ADR 0120) — gæstekonti-overfladen: /admin/guests
+            // admin-overfladen (D6) + den tilloggede gæsts modtagelse (D5) ──
+            ["admin.guests_title"]               = "Gæstekonti",
+            ["admin.guests_empty"]               = "Ingen gæstekonti endnu.",
+            ["admin.guests_create"]              = "Opret gæst",
+            ["admin.guests_window_label"]        = "Adgangsvindue",
+            ["admin.guests_surfaces_label"]      = "Tilladte flader",
+            ["admin.guests_surface_announcements"] = "Meddelelser",
+            ["admin.guests_surface_events"]      = "Arrangementer",
+            ["admin.guests_surface_directory"]   = "Kontaktliste",
+            ["admin.guests_saved"]               = "Gæstestatus gemt.",
+            ["account.guest_welcome"] =
+                "Du er logget ind som gæst. Din adgang er begrænset til de " +
+                "flader, administratoren har tilladt, for det vindue de har sat.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
 
@@ -5012,6 +5214,27 @@ public static class KnownTranslationKeys
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["events.created"]    = "Oprettet",
             ["events.edited"]     = "redigeret",
+
+            // ADR 0119 (M18, D9) — the recurring-events key set. 14 keys, all under
+            // the existing `events.*` namespace (the `events.created` / `events.edited`
+            // entries above are the anchor; no new `event.*` / `recurrence.*` /
+            // `series.*` namespace). Closed set × en/de/fr/da: every key below must
+            // appear in all four dictionaries (see the closure test in
+            // tests/Kumunita.Core.Tests/KnownTranslationKeysClosureTests.cs, U07).
+            ["events.recurrence.none"]       = "Gentages ikke",
+            ["events.recurrence.daily"]      = "Dagligt",
+            ["events.recurrence.weekly"]     = "Ugentligt",
+            ["events.recurrence.monthly"]    = "Månedligt",
+            ["events.recurrence.yearly"]     = "Årligt",
+            ["events.recurrence.interval"]   = "Hver",
+            ["events.recurrence.ends_after"] = "Slutter efter",
+            ["events.recurrence.ends_on"]    = "Slutter den",
+            ["events.recurrence.count"]      = "arrangementer",
+            ["events.recurrence.until"]      = "til",
+            ["events.series.repeats"]        = "Gentages",
+            ["events.series.skip"]           = "Spring dette arrangement over",
+            ["events.series.restore"]        = "Gendan dette arrangement",
+            ["events.series.part_of"]        = "En del af en serie",
 
             // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
             ["nav.projects"]                 = "Projekter",
@@ -5388,6 +5611,8 @@ public static class KnownTranslationKeys
 
             // ── home milepæler (planen, efter introen) ─────────────────────
             ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",
+            ["home.roadmap.show_more_earlier"] = "Vis de {n} tidligere milepæle",
+            ["home.roadmap.show_more_upcoming"]  = "Vis de {n} kommende milepæle",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Log ind",
@@ -6510,6 +6735,27 @@ public static class KnownTranslationKeys
             ["inv.detail.checkIn"]          = "Returnér",
             ["inv.edit.title"]              = "Redigér emne",
             ["inv.edit.submit"]             = "Gem ændringer",
+
+            // M17 (ADR 0118) — Bogmærker: den personlige mærke-overflade
+            // (D6: stående kerne­overflade, ingen admin-toggle). Det lukkede
+            // nøglesæt er design-dokumentets §kw-l (14 nøgler: nav-indeks,
+            // liste-/degraderings-/type-etiketter, fjern-handling +
+            // tilstandsknap + obs-2 flash-toast-nøgler).
+            ["bm.nav"]                      = "Bogmærker",
+            ["bm.list.title"]               = "Dine bogmærker",
+            ["bm.list.empty"]               = "Ingen bogmærker endnu.",
+            ["bm.list.degraded"]            = "Ikke længere tilgængelig",
+            ["bm.list.kind.post"]           = "Indlæg",
+            ["bm.list.kind.event"]          = "Begivenheder",
+            ["bm.list.kind.todo"]           = "Opgaver",
+            ["bm.list.kind.announcement"]   = "Bekendtgørelser",
+            ["bm.list.kind.page"]           = "Sider",
+            ["bm.list.unbookmark"]          = "Fjern",
+            ["bm.button.bookmark"]          = "Bogmærk",
+            ["bm.button.bookmarked"]        = "Bogmærket",
+            // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
+            ["bm.toggle.bookmarked"]        = "Bogmærket.",
+            ["bm.toggle.removed"]           = "Bogmærke fjernet.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

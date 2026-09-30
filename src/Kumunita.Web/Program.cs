@@ -180,6 +180,16 @@ var marten = builder.Services.AddMarten(opts =>
     // boot both pick the surface up automatically.
     M16DocTypes.Configure(opts);
 
+    // M17 (ADR 0118 D1, plan U01): the Bookmarks bounded context's document
+    // (Bookmark, ADR 0004 §B.1 — the (OwnerId, TargetKind, TargetId) unique
+    // business-key index on Bookmark (the F1 idempotency witness, the M9
+    // convo_uidx_pair shape) and the (OwnerId, Created) list-ordering index).
+    // Without this call the Bookmark doc is invisible to Marten (the
+    // M3/Media/Page/Tag/M4/M5/M6/M9/M16 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M17DocTypes.Configure(opts);
+
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
     // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses

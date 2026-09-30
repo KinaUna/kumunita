@@ -19,6 +19,18 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.16.0", "2026-09-30", new List<string>
+        {
+            "Guest accounts — a GlobalAdmin settles a limited, time-bounded standing for a guest (a consultant, coach, teacher, speaker, or similar outside-the-resident-circle account): the bounded window the standing is live, and a closed set of read surfaces the guest may see (announcements, events, directory). A guest is never a full member — the standing is live only inside the window, settled by data, and read per request; one audited write lane, zero new authorization surface (ADR 0120).",
+        }),
+        new("0.15.0", "2026-09-30", new List<string>
+        {
+            "Recurring events — set up an event that repeats daily, weekly, monthly, or yearly (with an interval, and either a fixed number of occurrences or a last date). Each occurrence is its own concrete event, so RSVPs, reminders, the calendar, and the iCal feed all keep working per occurrence; the author can skip or restore a single occurrence without touching the rest of the series.",
+        }),
+        new("0.14.0", "2026-09-30", new List<string>
+        {
+            "Bookmarks — save the posts, events, to-dos, announcements, and pages you care about into one private list you can come back to: a one-click pin on each of those pages, your personal list grouped by type, and a pin that quietly greys out (never breaks, never leaks) when its target is removed.",
+        }),
         new("0.13.0", "2026-09-29", new List<string>
         {
             "Inventory — check out and check in shared, community-owned, or private items (equipment, sports-team clothes, books, …): the item's page shows who has it now, and its usage history keeps a running record of every check-out — how much it's used and by whom.",

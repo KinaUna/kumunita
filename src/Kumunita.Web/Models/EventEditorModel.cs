@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Kumunita.Web.Models;
@@ -152,6 +153,73 @@ public sealed class EventEditorModel
     /// default.</summary>
     public string? Color { get; set; }
 
+    // ── M18 (ADR 0119, D2 / D7 / D3) — the composer's recurrence picker ────────
+    // Plain form fields (the <see cref="Location"/> / <see cref="Capacity"/>
+    // shape — display / author metadata, no body-parse). The controller maps
+    // these onto the <see cref="Kumunita.Core.Events.CreateEventRequest"/>
+    // / <see cref="Kumunita.Core.Events.UpdateEventRequest"/> .Recurrence
+    // field (U02 / U04). <c>Recurrence</c> is a string form field ("none" /
+    // "daily" / "weekly" / "monthly" / "yearly" — the <see cref="Recurrence"/>
+    // enum, the D2 closed set); <c>RecurrenceInterval</c> is a number (≥ 1);
+    // <c>EndsAfterCount</c> and <c>EndsOnDate</c> are the two mutually-
+    // exclusive end conditions (D7 — the author picks one; the other posts
+    // null / empty). The picker is **hidden** on the edit lane for a
+    // non-head row (a non-head occurrence's <see
+    // cref="Kumunita.Core.Events.Event.RecurrenceRule"/> is <c>null</c> — only
+    // the head carries the rule, D3); <see cref="IsNonHeadOccurrence"/> drives
+    // that hide.
+
+    /// <summary>The composer's recurrence **type** (a form-bound
+    /// <see cref="string"/> — the <see cref="Recurrence"/> enum as a
+    /// lowercase token: "none" / "daily" / "weekly" / "monthly" /
+    /// "yearly" — the D2 closed set). "none" is the default (a single,
+    /// non-recurring event — the zero-change branch, GATE-2's
+    /// <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c> pin). The D9
+    /// key <c>events.recurrence.none</c> labels the "None" option (the
+    /// string values land in U07; this unit references the key *names*
+    /// only).</summary>
+    [Display(Name = "events.recurrence.none")]
+    public string Recurrence { get; set; } = "none";
+
+    /// <summary>The composer's recurrence **interval** (the D2 <see
+    /// cref="EventRecurrenceRule.Interval"/> field — the step size, ≥ 1,
+    /// default 1). "Every 2 weeks" is <c>weekly</c> + <c>2</c>. The
+    /// design doc §7 "the composer's HTML <c>min=\"1\"</c> + the service's
+    /// validation (U02 / U04)" pin — a value &lt; 1 is refused with the
+    /// composer's existing validation error shape. <c>null</c> (the author
+    /// cleared the input) is treated as <c>1</c> at map time (the controller's
+    /// default backstop).</summary>
+    [Range(1, 365)]
+    public int? RecurrenceInterval { get; set; } = 1;
+
+    /// <summary>The composer's "Ends **after**" end condition (the D2 <see
+    /// cref="EventRecurrenceRule.Count"/> field — the total number of
+    /// occurrences including the head). The D7 radio branch — the author
+    /// picks one of <c>EndsAfterCount</c> / <c>EndsOnDate</c> (the two are
+    /// mutually exclusive in intent; <c>Count</c> wins if both are set, the
+    /// D2 pin). <c>null</c> = this branch is not chosen (the other branch —
+    /// <see cref="EndsOnDate"/> — is chosen, or "none" is chosen and neither
+    /// applies).</summary>
+    public int? EndsAfterCount { get; set; }
+
+    /// <summary>The composer's "Ends **on**" end condition (the D2 <see
+    /// cref="EventRecurrenceRule.Ends"/> field — the last occurrence's
+    /// <c>Start</c> must be ≤ this wall-clock date, in the author's effective
+    /// time zone — the ADR 0019 / 0020 floor). The D7 radio branch — the
+    /// author picks one of <see cref="EndsAfterCount"/> / this (mutually
+    /// exclusive in intent). <c>null</c> = this branch is not chosen.</summary>
+    public DateTime? EndsOnDate { get; set; }
+
+    /// <summary>The row's existing series state (set by the controller on
+    /// the edit lane): <c>true</c> when this row is a **non-head** occurrence
+    /// (<see cref="Kumunita.Core.Events.Event.RecurrenceHeadId"/> non-null) —
+    /// the composer **hides** the picker in that case (only the head carries
+    /// the rule, D3). <c>false</c> on the create lane and on a head row.
+    /// <b>[BindNever]</b> — the form does not POST this; the controller sets
+    /// it from the stored row before rendering <c>Edit.cshtml</c>.</summary>
+    [BindNever]
+    public bool IsNonHeadOccurrence { get; set; }
+
     /// <summary>The event's <b>audience</b> editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the single-source pin — the
     /// one form-bound audience editor; <see
@@ -273,6 +341,16 @@ public sealed class EventEditorModel
     /// mode is a malformed post, not a silent default to
     /// <c>Any</c>, which would <b>change the audience's meaning</b> in
     /// the All-mode-deny-on-empty-grants invariant (C1)).
+    /// <para>
+    /// **M18 (ADR 0119, D2 / D7)** — when <see cref="Recurrence"/> is
+    /// not "none" (a non-None rule), <see cref="RecurrenceInterval"/> must
+    /// be ≥ 1 (the D2 closed set's step size, default 1) and **exactly one**
+    /// of <see cref="EndsAfterCount"/> / <see cref="EndsOnDate"/> must be set
+    /// (the D7 mutual-exclusion-in-intent — the author picks one end
+    /// condition; both or neither is a malformed shape). A "none" row
+    /// validates exactly as today (the zero-change branch, GATE-2's
+    /// <c>Create_With_No_Rule_Behaves_Exactly_As_Today</c> pin).
+    /// </para>
     /// </summary>
     public bool IsValid
     {
@@ -286,6 +364,22 @@ public sealed class EventEditorModel
                 return false;
             if (Audience is null || !Audience.IsValid)
                 return false;
+            // M18 (ADR 0119, D2 / D7) — the recurrence picker's shape gate.
+            if (!string.IsNullOrWhiteSpace(Recurrence)
+                && !Recurrence.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                var interval = RecurrenceInterval ?? 1;
+                if (interval < 1)
+                    return false;
+                // D7 — exactly one of the two radio branches chosen. Both set
+                // (a malformed double-pick) or neither (a missing end
+                // condition) is a shape error — the controller adds a model
+                // error on <see cref="EndsAfterCount"/> / <see cref="EndsOnDate"/>.
+                var hasCount = EndsAfterCount.HasValue;
+                var hasEnds = EndsOnDate.HasValue;
+                if (hasCount == hasEnds)
+                    return false;
+            }
             return true;
         }
     }
@@ -551,7 +645,23 @@ public sealed record EventDetailViewModel(
     // (the reverse read seam's page, mapped to rows; `null` = no linked
     // readable to-dos, the view renders nothing; the `events.linked_todos`
     // kw-l key labels the section).
-    IReadOnlyList<LinkedTodoRow>? LinkedTodos = null)
+    IReadOnlyList<LinkedTodoRow>? LinkedTodos = null,
+    // M18 (ADR 0119, D7) — the detail-page series shape (U06). Set by the
+    // controller from the <see cref="Kumunita.Core.Events.Event"/> row + the
+    // actor's standing (C-M18·4). The detail page renders the series chip
+    // (F2) + the author's skip / restore buttons (F3) from these flags; the
+    // head row shows the chip but **neither** button (F3 — the head is
+    // edited via the existing edit lane, D4).
+    /// <summary>True when the row is part of a series (the head, or a non-head sibling).</summary>
+    bool IsPartOfSeries = false,
+    /// <summary>True when the row is the **head** (carries the rule). The head shows the chip but NOT the skip / undelete buttons (the head is edited via the edit lane, D4).</summary>
+    bool IsHead = false,
+    /// <summary>True when the row is a **non-head** sibling (<see cref="Kumunita.Core.Events.Event.RecurrenceHeadId"/> non-null). Only a non-head row shows the skip / undelete buttons (F3).</summary>
+    bool IsNonHead = false,
+    /// <summary>True when the actor is author ∪ GlobalAdmin (C-M18·4) — gates the skip / undelete buttons (F3).</summary>
+    bool CanSkipOrUndelete = false,
+    /// <summary>The head's rule (for the chip's "Repeats {type}, every {N} {unit}" + the optional Count / Ends suffix). Non-null when <see cref="IsPartOfSeries"/>.</summary>
+    Kumunita.Core.Events.EventRecurrenceRule? Rule = null)
 {
     /// <summary>The event's translations, coalesced to a non-null empty list (a
     /// never-blank shape for the view).</summary>

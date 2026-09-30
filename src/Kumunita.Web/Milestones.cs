@@ -55,8 +55,12 @@ public static class Milestones
         new("M14", "Integration of Events and Projects", StatusDone),
         new("M15", "Translation bulk — import/export, review & extend the platform's translations as a batch rather than one at a time", StatusDone),
         new("M16", "Inventory — check-out / check-in shared, community-owned, or private items (equipment, sports-team clothes, books, …); track where items are and, optionally, who uses them how much", StatusDone),
-        new("M17", "Bookmarks — save posts, events, todos, etc. for quick personal access", StatusNext),
-        new("M18", "Recurring events — repeating events over the M4 events surface", StatusPlanned),
+        new("M17", "Bookmarks — save posts, events, todos, etc. for quick personal access", StatusDone),
+        new("M18", "Recurring events — repeating events over the M4 events surface", StatusDone),
+        new("M19", "Guest accounts — limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, etc.; admins set what a guest may access and when", StatusDone),
+        new("M20", "Notification quiet times — per-resident quiet schedules (allowed/blocked hours of day and days of week) on the M6 notification lane; admin-set check cadence for pending notifications", StatusPlanned),
+        new("M21", "Document management — a shared repository for official documents, contracts, etc., with per-document access controls", StatusPlanned),
+        new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch

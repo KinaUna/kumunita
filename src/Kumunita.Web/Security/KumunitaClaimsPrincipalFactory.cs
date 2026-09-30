@@ -27,6 +27,7 @@ public sealed class KumunitaClaimsPrincipalFactory(
     UserManager<User> userManager,
     RoleManager<IdentityRole> roleManager,
     IUserInfoService userInfo,
+    Kumunita.Core.Identity.IIdentityService identity,   // NEW (M19, D5)
     IOptions<IdentityOptions> options)
     : UserClaimsPrincipalFactory<User, IdentityRole>(userManager, roleManager, options)
 {
@@ -55,7 +56,7 @@ public sealed class KumunitaClaimsPrincipalFactory(
         // (ADR 0006-B), so the cookie never holds standing for a blocked account.
         var roles = blocked
             ? Array.Empty<string>()
-            : await BuildRoleListAsync(user, verified);
+            : await BuildRoleListAsync(user, verified, profile);
 
         return ClaimShaping.Build(
             subjectId: user.Id ?? string.Empty,
@@ -69,13 +70,32 @@ public sealed class KumunitaClaimsPrincipalFactory(
     /// computation) so the claim set and the thin-principal API surface always
     /// agree. <see cref="Roles.Member"/> is added only for verified residents.
     /// </summary>
-    private async Task<IReadOnlyList<string>> BuildRoleListAsync(User user, bool verified)
+    private async Task<IReadOnlyList<string>> BuildRoleListAsync(User user, bool verified, Profile? profile)
     {
         var userRoleNames = (await UserManager.GetRolesAsync(user)).ToList();
 
         var roles = new List<string>();
         if (verified)
             roles.Add(Roles.Member);          // Member = verified-resident standing
+
+        // M19 (ADR 0120, D5/C-M19·3) — the guest standing. Minted iff the account
+        // is a guest (Profile.IsGuest), not blocked, and the allowance window is
+        // live (ValidFrom ≤ now < ValidUntil). A guest OUTSIDE the window mints
+        // NO Guest claim (no standing — C-M19·3). A guest NEVER gets Member
+        // (C-M19·2) — the guest is outside the resident circle. The window read
+        // rides U01's GetGuestAccessAsync seam (one extra mt read, **only** when
+        // the account is a guest — non-guests short-circuit before the read).
+        if (profile?.IsGuest == true)
+        {
+            var guestAccess = await identity.GetGuestAccessAsync(user.Id ?? string.Empty);
+            var now = DateTimeOffset.UtcNow;
+            if (guestAccess is not null
+                && now >= guestAccess.ValidFrom
+                && now < guestAccess.ValidUntil)
+            {
+                roles.Add(Roles.Guest);
+            }
+        }
 
         roles.AddRange(userRoleNames);        // explicit Identity roles (GlobalAdmin, Moderator, …)
 
