@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.19.0", "2026-10-01", new List<string>
+        {
+            "Extended profiles — add a biography and your own tags (skills, interests, knowledge, expertise) to your profile, visible to the people your profile's visibility allows; find neighbours with something in common by tag or by a word in their bio — a match only surfaces people you can already see, and every such read is audited (ADR 0123).",
+        }),
         new("0.18.0", "2026-10-01", new List<string>
         {
             "Documents — a shared repository for the community's official documents (contracts, minutes, notices, bylaws): each document is readable only by the people its uploader chose (an empty audience is a public denial), is served as a download (never rendered in the browser), and is audited every time it is opened; a GlobalAdmin or Moderator uploads a document and chooses who can see it (ADR 0122).",

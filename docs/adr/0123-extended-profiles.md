@@ -1,7 +1,6 @@
 # ADR 0123 — Extended user profiles (a resident biography + free author-set tags + a find-people read)
 
-Status: **Accepted** (M23, in-progress — U00 sign-off; `**Done** (M23)` is
-tagged by U06 at close)
+Status: Accepted
 Date: 2026-10-01
 
 The README roadmap names M23 exactly: "**Extended user profiles** — a
