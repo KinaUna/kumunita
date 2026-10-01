@@ -23,7 +23,7 @@ public class MilestonesTests
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,16 +31,15 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M21_Is_The_Single_InProgress_Milestone()
+    public void M22_Is_The_Single_InProgress_Milestone()
     {
-        // M21 (document management) is open; M20 (quiet times) is done; M22
-        // (onboarding) is the still-planned horizon.
+        // M22 (onboarding) is now open; M21 (document management) is done;
+        // M22 is the last milestone on the roadmap — no M-letter milestone past it.
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Single(next);
-        Assert.Equal("M21", next[0].Id);
-        // and the done list has grown to M20 (M21 is in progress, not done)
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M20").Status);
-        Assert.Equal(Milestones.StatusPlanned, Milestones.All.Single(x => x.Id == "M22").Status);
+        Assert.Equal("M22", next[0].Id);
+        // the done list has grown to M21 (M22 is in progress, not done)
+        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M21").Status);
     }
 
     [Fact]
