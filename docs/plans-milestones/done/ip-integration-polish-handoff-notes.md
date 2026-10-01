@@ -165,3 +165,25 @@ green** (`KnownTranslationKeys_ParityTests` pin the 3 keys × 4 languages);
 `Kumunita.Web.Tests` **736/736 green** (`KwLRegistryConsistencyTests` pin the 3
 keys registered + `LoginErrorCodeMappingTests`). **Open questions:** none.
 **Next unit:** U07 — the close (move all IP artifacts flat to `done/`).
+
+## Summary (U07 — close)
+
+| Unit | Goal (one-liner) | Test assembly | Deviations |
+| --- | --- | --- | --- |
+| U00 | Docs parity: ADR range → 0001–0123, value-chain table → M18–M23, handoff notes created. | (no build/test — docs only) | — |
+| U01 | `AccessAuditFactory.SingleTarget` + delete the three `StoreAuditRow` copies. | Core.Tests | — |
+| U02 | `StandingMatrix.AuditVia` + delete the four `*AuditViaFor` copies. | Core.Tests | — |
+| U03 | Two rate-limit policies (`message` 20/15min, `write` 30/15min) + three `[EnableRateLimiting]` placements. | Web.Tests | — |
+| U04 | `ILogger<T>` injection + `catch (Exception ex) when (ex is not UnauthorizedAccessException)` in `HomeController` + `MessagesController`. | Web.Tests | — |
+| U05 | `BlockedAccountMiddlewareTests` + `PrivilegedStampMiddlewareTests`. | Web.Tests | — |
+| U06 | Login view `?error=` code → 3-row `kw-l` table + 3 keys × 4 languages. | Core.Tests + Web.Tests (named exception) | — |
+
+**Deferred lanes (not in IP, each needs its own ADR):**
+- God-service split (`ProjectService` at 4,128 lines).
+- `BookmarkService` seam abstraction.
+- `KnownTranslationKeys` split (the 6,000+ line single file).
+- `INotificationService` interface (forbidden by ADRs 0076/0077/0083/0084/
+  0117/0118).
+
+**IP is closed.** All artifacts moved to `done/`. The handoff notes are
+the lane's observable record.
