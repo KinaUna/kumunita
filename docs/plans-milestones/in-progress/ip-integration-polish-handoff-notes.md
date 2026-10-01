@@ -142,3 +142,26 @@ middleware untouched. Exit: `dotnet build Kumunita.slnx -c Debug` clean
 `Kumunita.Web.Tests` **730/730 green** (U04's 721 + 9 new).
 **Open questions:** none. **Next unit:** U06 — the Login view error-code
 mapping (D6) + the three `account.login.error.*` `kw-l` keys (en/de/fr/da).
+
+## U06 — Login view `?error=` code→localized message (D6, the cognitive-integration seam)
+
+**Delivered:** the controller passes the `?error=` code through verbatim
+(`Error = error`) — the `const string blockedMessage` + the
+`errorText` switch are **gone** (grep `blockedMessage`=0, `Error = error`=1).
+The Login view gains the D6 "3-row table in the view": an `@switch (Model.Error)`
+with one case per known code (`blocked` → `account.login.error.blocked`,
+`account-removed` → `account.login.error.removed`, `role-changed` →
+`account.login.error.role_changed`) each rendering its `kw-l`-localized
+message, and a `default` fallback to `@Model.Error` (forward-compatible). The
+three `kw-l` keys are registered in **all four** languages (en/de/fr/da) in
+`KnownTranslationKeys.cs` (grep `account.login.error.*`=4 each). New
+`tests/Kumunita.Web.Tests/LoginErrorCodeMappingTests.cs` (6 controller-seam
+tests: the three codes pass through verbatim + are distinct + no code collapses
+to null/empty + an unknown code still surfaces). No new `IErrorMessageService`,
+no new `AccessAction`/`TargetKind`, no middleware/redirect change (D6 frozen).
+Exit (the **named exception** — BOTH assemblies): `dotnet build Kumunita.slnx -c
+Debug` clean (0 warnings in touched files); `Kumunita.Core.Tests` **1091/1091
+green** (`KnownTranslationKeys_ParityTests` pin the 3 keys × 4 languages);
+`Kumunita.Web.Tests` **736/736 green** (`KwLRegistryConsistencyTests` pin the 3
+keys registered + `LoginErrorCodeMappingTests`). **Open questions:** none.
+**Next unit:** U07 — the close (move all IP artifacts flat to `done/`).

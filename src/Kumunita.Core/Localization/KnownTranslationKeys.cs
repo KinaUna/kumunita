@@ -609,6 +609,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Sign up",
             ["account.signup_submit"] = "Sign up",
             ["account.signup_has_account"] = "Already have an account?",
+            ["account.login.error.blocked"] =
+                "Your account has been temporarily suspended. Contact an administrator.",
+            ["account.login.error.removed"] =
+                "Your account has been removed. Contact an administrator.",
+            ["account.login.error.role_changed"] =
+                "Your role has been changed. Please sign in again.",
 
             // ── posts (Index / New / Edit — headings, actions, empty-states) ─
             // The all-sections feed (/community) header — the single feed
@@ -2406,6 +2412,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Registrieren",
             ["account.signup_submit"] = "Registrieren",
             ["account.signup_has_account"] = "Du hast schon ein Konto?",
+            ["account.login.error.blocked"] =
+                "Ihr Konto wurde vorübergehend gesperrt. Wenden Sie sich an einen Administrator.",
+            ["account.login.error.removed"] =
+                "Ihr Konto wurde entfernt. Wenden Sie sich an einen Administrator.",
+            ["account.login.error.role_changed"] =
+                "Ihre Rolle wurde geändert. Bitte melden Sie sich erneut an.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Gemeinschaft",
@@ -4112,6 +4124,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "S'inscrire",
             ["account.signup_submit"] = "S'inscrire",
             ["account.signup_has_account"] = "Tu as déjà un compte ?",
+            ["account.login.error.blocked"] =
+                "Votre compte a été suspendu temporairement. Contactez un administrateur.",
+            ["account.login.error.removed"] =
+                "Votre compte a été supprimé. Contactez un administrateur.",
+            ["account.login.error.role_changed"] =
+                "Votre rôle a été modifié. Veuillez vous reconnecter.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Communauté",
@@ -5819,6 +5837,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Opret konto",
             ["account.signup_submit"] = "Opret konto",
             ["account.signup_has_account"] = "Har du allerede en konto?",
+            ["account.login.error.blocked"] =
+                "Din konto er midlertidigt suspenderet. Kontakt en administrator.",
+            ["account.login.error.removed"] =
+                "Din konto er blevet fjernet. Kontakt en administrator.",
+            ["account.login.error.role_changed"] =
+                "Din rolle er blevet ændret. Log venligst ind igen.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Fællesskab",
