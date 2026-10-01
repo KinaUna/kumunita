@@ -38,6 +38,11 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M15** translation bulk | **world seams + coordination** — the platform's translations leave and re-enter the platform as one batch; a new language extends the set in the same loop |
   | **M16** inventory | **coordination** — the neighborhood's shared, community-owned, and private things become trackable: check-out / check-in, where they are, and who has used them |
   | **M17** bookmarks | **personal quick access** — the resident's own personal list of saved posts, events, todos, announcements, and pages — a personal-by-id pointer, never an audience decision, never granting anything (ADR 0118) |
+  | **M18** recurring events | **coordination** — a recurring event is not five separate events but one event with a recurrence rule; the RSVP + audit + notification seams all operate on the *series*, not the instance (ADR 0119) |
+  | **M19** guest accounts | **shared awareness** — the identity model extends from "a member of this community" to "a member, or a guest invited by a member," and the authorization model resolves both through the same `IAuthorizationService` seam (ADR 0120) |
+  | **M20** notification quiet times | **shared awareness** — the notification system respects the resident's attention rhythm; the "deferred" state is a first-class concept in the notification lifecycle (ADR 0121) |
+  | **M21** document management | **outcome + world seams** — the neighborhood's official documents live in the platform with per-document access controls; a shared repository closes the loop into the residents' paperwork (ADR 0122) |
+  | **M23** extended profiles | **shared awareness → understanding** — the directory is not just a list of names but a discoverable index of people by skill, interest, and expertise; the bio + tag fields are the integration points between the profile and the post/reply/tag surfaces (ADR 0123) |
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
@@ -81,7 +86,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0053 (the running decision ledger — append-only, highest number = newest)
+    │   ├── adr/                    # 0001 onward (the running decision ledger — append-only, highest number = newest)
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
