@@ -6,6 +6,8 @@ using Kumunita.Web.Controllers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Kumunita.Web.Tests;
@@ -434,7 +436,7 @@ public class MessagesControllerTests
         // thread). Tests that need specific profile data override this.
         userInfo.GetProfileAsync(Actor).Returns(new Profile { SubjectId = Actor, DisplayName = "Ben" });
 
-        var controller = new MessagesController(messaging, userInfo);
+        var controller = new MessagesController(NullLogger<MessagesController>.Instance, messaging, userInfo);
         WireControllerContext(controller, Actor);
 
         return (controller, messaging, userInfo);

@@ -99,3 +99,23 @@ touch (C-IP·2). Exit: `dotnet build Kumunita.slnx -c Debug` clean;
 `EnableRateLimiting("write")`=2. **Open questions:** none. **Next unit:**
 U04 — the two `catch {}` log-and-degrade fixes (`HomeController`,
 `MessagesController`); inject `ILogger<T>` into each.
+
+## U04 — Log + narrow the two silent `catch {}` blocks (D4, the degraded-but-signed-in seam)
+
+**Delivered:** injected `ILogger<T>` into both controllers (`HomeController`
+classic ctor — added as the required first param + `_logger` field;
+`MessagesController` primary ctor — added as the first param +
+`private readonly` field). Replaced the two bare `catch {}` D4-named blocks —
+`HomeController` profile read (`profile = null`) and `MessagesController`
+`Thread` actor display-name read (`actorDisplayName = null`) — with
+`catch (Exception ex) when (ex is not UnauthorizedAccessException)` that calls
+`_logger.LogWarning(ex, …)` before the null degrade. Trap blocks left untouched
+(`HomeController` `effLang` catch + outer whole-feed catch). No rethrow, no
+`IErrorHandlingService`, no `catch` removal, no Core touch (D4/C-IP·3). Test
+ctor call sites in `HomeControllerTests.cs` + `MessagesControllerTests.cs`
+updated to pass `NullLogger<T>.Instance`. Exit: `dotnet build Kumunita.slnx
+-c Debug` clean; `Kumunita.Web.Tests` 721/721 green; grep `LogWarning`=1 in
+each controller, `when (ex is not UnauthorizedAccessException)`=1 each.
+**Open questions:** none. **Next unit:** U05 — the two middleware unit-test
+files (`BlockedAccountMiddlewareTests` + `PrivilegedStampMiddlewareTests`) in
+`tests/Kumunita.Web.Tests/`.
