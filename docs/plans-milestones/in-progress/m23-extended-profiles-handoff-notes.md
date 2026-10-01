@@ -290,3 +290,69 @@
   on the Web, authoring its own `profile.find.*` / `nav.people` `kw-l` keys
   in all four languages) + the visible-only + one-aggregate-row + no-leak
   gate (GATE-2).
+
+## U05
+
+- **Delivered:** the **`/people` find-people surface** over the frozen U03
+  `IProfileFindService`. (1) **`FindPeopleController`** (`[Authorize]`,
+  `[Route("people")]`) — **zero new authorization surface** (C-M23·2, D7): it
+  supplies only the signed-in subject (the `KumunitaPrincipal.SubjectId` idiom
+  over `User`) + the page, then hands the caller state to the frozen service; it
+  never re-derives access and never projects a field the U03 service did not
+  surface. **`Index(bio, tag, page)`**: a non-blank `tag` **302-redirects** to
+  the canonical `/people/tag/{slug}` (the by-tag form is a GET — a form GET
+  cannot place a field into a path segment without inline script, so the index
+  form posts the slug as a `tag` query field and this action redirects; the
+  `ByTag` route stays the results URL + the paging link target); a non-blank
+  `bio` calls `FindPeopleByBioAsync(bio.Trim(), viewer, page)` and views
+  `Bio`; a blank bio renders the `Index` forms (the U03 "no decision, no row"
+  shape — the service is never consulted for a blank query, no 404/no error).
+  **`ByTag(slug, page)`** → `FindPeopleByTagAsync` → views `Tag`.
+  (2) **`FindPeopleViewModels`** (`FindPeopleIndexViewModel` /
+  `FindPeopleTagViewModel(Slug, Result, Page)` + `TagDisplayName` /
+  `FindPeopleBioViewModel(Query, Result, Page)`) project the U03 `ProfileTagPage`
+  / `ProfileBioPage` verbatim (the ADR 0090 D6 `HasMore` + `PageSize = 30`
+  idiom carried straight through). (3) **Three views** — `Views/People/Index.cshtml`
+  (the by-tag + by-bio forms; both `aria-label`s are **plain text** to avoid the
+  `<kw-l>`-in-attribute Razor trap), `Tag.cshtml` (empty-state `profile.find.empty`
+  when `Profiles.Count == 0`, tag display name, profile rows →
+  `Directory/Detail?subjectId=…`, a `pagination.next` link when `HasMore`),
+  `Bio.cshtml` (same shape). (4) **Nav entry** in **both** `_Layout` variants —
+  the variant-B "More ▾" dropdown (next to Directory) and the variant-C icon
+  rail — each `asp-controller="FindPeople" asp-action="Index"` with the
+  `nav.people` `kw-l` key. (5) **U05 `kw-l` authorship (locked §7):** the **six**
+  U05 keys `nav.people` / `profile.find.title` / `profile.find.by_tag` /
+  `profile.find.by_bio` / `profile.find.results` (the `{0}` format-string key,
+  consumed via `ITranslationProvider.GetAsync` + `string.Format` — the
+  `_GrantPickers` `grant.count_selected` idiom, since `kw-l` does not support
+  format args) / `profile.find.empty` — each non-empty in all four languages
+  (en/de/fr/da) in `KnownTranslationKeys`.
+- **Idiom note (codebase wins for mechanics):** `FindPeopleController` returns
+  `Task<IActionResult>` — tests must `await` the action before `IsType<ViewResult>`.
+  The by-bio query is **trimmed before the service call** (the D4 substring
+  engine + the Face-2 "trimmed query" pin). The `profile.find.results` key is a
+  `{0}` template (not a static `kw-l` value) because the count is dynamic —
+  `kw-l` emits its string verbatim, so a format-string key must go through
+  `Translation.GetAsync` + `string.Format`.
+- **Tests:** `tests/Kumunita.Web.Tests/M23FindPeopleTests.cs` (12 tests) —
+  (1) by-tag passes slug+subject+page + projects the U03 page verbatim (tag
+  display name + `HasMore`); (2) by-bio passes the **trimmed** query + subject +
+  page + projects the U03 page; (3) blank bio → the index forms, **zero** find
+  calls (the U03 service never consulted); (4) missing tag → the empty-state
+  view (**not** a 404); (5) the by-tag form 302-redirects to the canonical
+  `/people/tag/{slug}` route; (6) paging carries the `HasMore` flag + page;
+  (7) the nav entry is present in **both** `_Layout` variants; (8) the people
+  views carry the empty state + the paging link + the directory-link target;
+  (9) the **six** U05 `kw-l` keys are non-empty in en/de/fr/da; (10) the
+  controller carries `[Authorize]` (no anonymous find); (11) **zero-new-
+  authorization-surface** reflection pin (8 `IAuthorizationService` methods, 4
+  claims).
+- **Open question:** none — no D# amended; the register's [PROPOSED] set was
+  locked verbatim by U00.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean** (pre-existing
+  CS8603/CS8602 in `DirectoryController.cs` + xUnit1051 warnings in pre-existing
+  test files only — none in U05 code); `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` **green**
+  (Total: 721, Errors: 0, Failed: 0, Skipped: 0). No drift. **U06 next** — the
+  close flip (Milestones.cs + README Roadmap + the ADR 0123 `**Done** (M23)`
+  tag).

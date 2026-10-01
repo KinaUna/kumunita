@@ -1,0 +1,89 @@
+@model Kumunita.Web.Models.FindPeopleBioViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = "People";
+
+    // M23 (ADR 0123 D4) — the "X residents" result count. The {0} template
+    // (profile.find.results) is a format-string key the <kw-l> TagHelper cannot
+    // format (it emits the resolved string verbatim), so it is resolved through
+    // the same ITranslationProvider chain the TagHelper uses and formatted in
+    // C# here — the _GrantPickers.cshtml grant.count_selected idiom.
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    string resultsTemplate = await Translation.GetAsync("profile.find.results", _kwL);
+    string resultsText = System.String.Format(System.Globalization.CultureInfo.InvariantCulture, resultsTemplate, Model.Result.Profiles.Count);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/people" class="btn btn-link p-0">
+                <kw-l key="profile.find.title">Find people</kw-l>
+            </a>
+        </p>
+
+        @if (Model.Result.Profiles.Count == 0)
+        {
+            @* M23 (ADR 0123 D4/F6) — the empty state: a blank query (the U03
+               "no decision, no row" shape) is a valid result — no 404, no
+               error (D6: a match is a feed organizer, never a gate). *@
+            <div class="alert alert-info">
+                <kw-l key="profile.find.empty">No one matches — yet.</kw-l>
+            </div>
+        }
+        else
+        {
+            <header class="airy-head">
+                <div class="head-row">
+                    <div>
+                        <h1><kw-l key="profile.find.by_bio">Find by bio</kw-l></h1>
+                        <p class="lede">
+                            @resultsText
+                            <span class="text-muted">— “@Model.Query”</span>
+                        </p>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dir-cards">
+                @foreach (var p in Model.Result.Profiles)
+                {
+                    @* Each row is an already-Visibility-gated, actor-visible
+                       profile (the U03 gate, D6). The profile link is the
+                       existing /directory/[subjectId] target (the design-doc
+                       §7 reuse pin — not re-keyed). The verified badge reuses
+                       the Directory list's shape. *@
+                    string avatarInitial = !string.IsNullOrWhiteSpace(p.DisplayName)
+                        ? char.ToUpperInvariant(p.DisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <div class="dir-card">
+                        <span class="d-inline-flex align-items-center justify-content-center">
+                            <img class="avatar avatar-lg" src="/profile/avatar/@p.SubjectId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
+                        </span>
+                        <span class="dname">
+                            <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
+                        </span>
+                        <span class="dfoot">
+                            @if (p.Verified)
+                            {
+                                <span class="badge text-bg-success">Verified</span>
+                            }
+                        </span>
+                    </div>
+                }
+            </div>
+
+            @if (Model.Result.HasMore)
+            {
+                <nav aria-label="pagination" class="mt-3">
+                    <a class="page-link" href="/people?bio=@Uri.EscapeDataString(Model.Query)&page=@(Model.Page + 1)" rel="next">
+                        <kw-l key="pagination.next">Older</kw-l>
+                    </a>
+                </nav>
+            }
+        }
+    </div>
+</div>

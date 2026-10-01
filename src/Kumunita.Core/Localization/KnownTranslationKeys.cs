@@ -319,6 +319,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Pages",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Directory",
+            ["nav.people"]        = "People",
             ["nav.sign_in"]       = "Sign in",
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
@@ -813,6 +814,13 @@ public static class KnownTranslationKeys
             ["profile.detail.tags"] = "Interests & skills",
             ["profile.detail.tags.empty"] = "No tags set.",
             ["profile.flash.saved"] = "Profile updated.",
+
+            // ── M23 (U05) — the /people find-people surface ─────────────
+            ["profile.find.title"]   = "Find people",
+            ["profile.find.by_tag"]  = "Find by tag",
+            ["profile.find.by_bio"]  = "Find by bio",
+            ["profile.find.results"] = "{0} people found",
+            ["profile.find.empty"]   = "No one matches — yet.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Display name",
@@ -2114,6 +2122,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Seiten",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Verzeichnis",
+            ["nav.people"]        = "Menschen",
             ["nav.sign_in"]       = "Anmelden",
             ["nav.sign_up"]       = "Registrieren",
             ["nav.profile"]       = "Profil",
@@ -2584,6 +2593,13 @@ public static class KnownTranslationKeys
             ["profile.detail.tags"] = "Interessen & Fähigkeiten",
             ["profile.detail.tags.empty"] = "Keine Tags.",
             ["profile.flash.saved"] = "Profil aktualisiert.",
+
+            // ── M23 (U05) — die /people Personen-Find-Oberfläche ─────────
+            ["profile.find.title"]   = "Menschen finden",
+            ["profile.find.by_tag"]  = "Nach Tag finden",
+            ["profile.find.by_bio"]  = "Nach Bio finden",
+            ["profile.find.results"] = "{0} Personen gefunden",
+            ["profile.find.empty"]   = "Niemand passt — noch nicht.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Anzeigename",
@@ -3668,6 +3684,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Pages",
             ["nav.tags"]          = "Étiquettes",
             ["nav.directory"]     = "Annuaire",
+            ["nav.people"]        = "Personnes",
             ["nav.sign_in"]       = "Se connecter",
             ["nav.sign_up"]       = "S'inscrire",
             ["nav.profile"]       = "Profil",
@@ -4282,6 +4299,13 @@ public static class KnownTranslationKeys
             ["profile.detail.tags"] = "Centres d'intérêt & compétences",
             ["profile.detail.tags.empty"] = "Aucun tag.",
             ["profile.flash.saved"] = "Profil mis à jour.",
+
+            // ── M23 (U05) — la surface /people de recherche de personnes ──
+            ["profile.find.title"]   = "Trouver des personnes",
+            ["profile.find.by_tag"]  = "Trouver par tag",
+            ["profile.find.by_bio"]  = "Trouver par bio",
+            ["profile.find.results"] = "{0} personnes trouvées",
+            ["profile.find.empty"]   = "Personne ne correspond — pour l'instant.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Nom affiché",
@@ -5369,6 +5393,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Sider",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Kontaktliste",
+            ["nav.people"]        = "Personer",
             ["nav.sign_in"]       = "Log ind",
             ["nav.sign_up"]       = "Opret konto",
             ["nav.profile"]       = "Profil",
@@ -5979,6 +6004,13 @@ public static class KnownTranslationKeys
             ["profile.detail.tags"] = "Interesser & færdigheder",
             ["profile.detail.tags.empty"] = "Ingen tags.",
             ["profile.flash.saved"] = "Profil opdateret.",
+
+            // ── M23 (U05) — /people-personsøgningsoverfladen ────────────
+            ["profile.find.title"]   = "Find personer",
+            ["profile.find.by_tag"]  = "Find efter tag",
+            ["profile.find.by_bio"]  = "Find efter bio",
+            ["profile.find.results"] = "{0} personer fundet",
+            ["profile.find.empty"]   = "Ingen matcher — endnu.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Vistnavn",
