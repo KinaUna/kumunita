@@ -52,14 +52,20 @@ namespace Kumunita.Web.Tests;
 /// the seam's <c>RemoveAsync</c> (the D5 pin — the unbookmark needs
 /// no target read at all, the row is keyed on the owner's own
 /// <see cref="Bookmark"/> row).</item>
-/// <item><b>BmButton_Partial_Renders_Correct_Label_For_State</b> — the
-/// <c>_BookmarkButton</c> partial: a button on a page whose model
-/// carries <c>BookmarkState == Bookmarked</c> renders the
-/// <c>bm.button.bookmarked</c> label; a button on a page whose model
-/// does **not** carry <c>BookmarkState</c> renders the
-/// <c>bm.button.bookmark</c> label (the D2 / C-M17·2 pin — the
-/// detail view does **not** load the owner's bookmark list to decide
-/// the button's label).</item>
+/// <item><b>BmButton_Partial_Renders_Correct_Lane_For_State</b> — the
+/// <c>_BookmarkButton</c> partial: a page whose owner has a bookmark row
+/// for the target renders a "Remove" form POSTing to
+/// <c>/bookmarks/{kind}/{id}/remove</c> (the D4 physical-removal lane);
+/// a page whose owner has **no** row renders a "Bookmark" form POSTing to
+/// <c>/bookmarks/toggle</c> (the D3 write-lane). The state is resolved
+/// per target by the partial itself, which <c>@inject</c>s the frozen
+/// <c>IBookmarkService</c> and <c>await</c>s
+/// <c>IsBookmarkedAsync</c> in its <c>@{ }</c> block (the house
+/// <c>@inject</c>-in-view idiom) — reading the owner's
+/// <c>KumunitaPrincipal.SubjectId</c> and branching on the result. The
+/// partial is the sole resolver: it makes exactly one targeted personal
+/// read and no other service call (the C-M17·2 pin: the read is targeted,
+/// not the owner's full bookmark list; no <c>CanAsync</c> branch).</item>
 /// <item><b>BmButton_Partial_Form_Posts_To_Toggle_Endpoint</b> — the
 /// <c>_BookmarkButton</c> partial: the form POSTs to
 /// <c>/bookmarks/toggle</c> with the correct <c>kind</c> + <c>id</c>
@@ -295,22 +301,38 @@ public sealed class BookmarkButtonTests
         await session.Received(1).SaveChangesAsync();
     }
 
-    // ── 5 — BmButton_Partial_Renders_Correct_Label_For_State ──────────────
+    // ── 5 — BmButton_Partial_Renders_Correct_Lane_For_State ───────────────
 
     /// <summary>
-    /// The <c>_BookmarkButton</c> partial (the D2 / C-M17·2 pin — the
-    /// detail view does **not** load the owner's bookmark list to decide
-    /// the button's label): the partial's label logic is
-    /// <c>ViewData["BookmarkState"] == "Bookmarked"</c> ⇒
-    /// <c>bm.button.bookmarked</c>, else <c>bm.button.bookmark</c>.
-    /// The house structural-pin idiom (the
-    /// <see cref="BookmarksControllerTests"/>
+    /// The <c>_BookmarkButton</c> partial (F1 — "the button reflects
+    /// 'bookmarked' on reload", completed): two lanes, branched on
+    /// <c>ViewData["BookmarkState"]</c>.
+    /// <list type="bullet">
+    /// <item><b>Not bookmarked</b> (the default) — a form POSTing to
+    /// <c>/bookmarks/toggle</c> with the <c>bm.button.bookmark</c> label.</item>
+    /// <item><b>Bookmarked</b> — a form POSTing to
+    /// <c>/bookmarks/{kind}/{id}/remove</c> with the
+    /// <c>bm.list.unbookmark</c> ("Remove") label (the D4 physical-removal
+    /// lane; the row is keyed on the owner's own row, so the remove needs no
+    /// target read — D5 / F4).</item>
+    /// </list>
+    /// The state itself is resolved per target by the partial itself, via
+    /// the frozen <c>IBookmarkService.IsBookmarkedAsync</c> seam (the
+    /// 2026-10-04 F1 amendment, ADR 0118) — a targeted single-row personal
+    /// read (the C-M17·2 shape: no AccessAudit row, no CanAsync pass, no
+    /// target read; the <c>ListAsync</c> precedent). The partial is the sole
+    /// resolver (no sibling element, no ViewData hand-off, no TagHelper
+    /// ordering concern); it reads the owner's SubjectId from the principal
+    /// and branches on the <c>IsBookmarkedAsync</c> result — the "no
+    /// owner-list load to decide the button's label" pin still holds (the
+    /// read is targeted, not the full list). The house structural-pin idiom
+    /// (the <see cref="BookmarksControllerTests"/>
     /// <c>F5_Degraded_Row_Renders_BmListDegrading_Key_NoTitle_NoLink</c>
     /// "string pin, no TestServer" precedent): read the partial file,
-    /// verify the both-branch structure + the two closed kw-l keys.
+    /// verify both lanes + the seam read + the owner id.
     /// </summary>
     [Fact]
-    public void BmButton_Partial_Renders_Correct_Label_For_State()
+    public void BmButton_Partial_Renders_Correct_Lane_For_State()
     {
         var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_BookmarkButton.cshtml");
         Assert.True(File.Exists(path), $"Views/Shared/_BookmarkButton.cshtml not found at {path}.");
@@ -323,27 +345,37 @@ public sealed class BookmarkButtonTests
             "",
             System.Text.RegularExpressions.RegexOptions.Singleline);
 
-        // (1) Both label keys are present (the two-branch structure:
-        // the default bm.button.bookmark + the exceptional
-        // bm.button.bookmarked).
+        // (1) The not-bookmarked lane: the bookmark form POSTs to
+        // /bookmarks/toggle with the bm.button.bookmark label.
+        Assert.Contains("/bookmarks/toggle", html);
         Assert.Contains("key=\"bm.button.bookmark\"", html);
-        Assert.Contains("key=\"bm.button.bookmarked\"", html);
 
-        // (2) The label-switching logic is driven by ViewData's
-        // BookmarkState == "Bookmarked" (the D2 / C-M17·2 pin — the
-        // detail view does not load the owner's bookmark list to decide
-        // the label; the (exceptional) re-render-after-toggle state
-        // carries BookmarkState in ViewData).
-        Assert.Contains("BookmarkState", html);
-        Assert.Contains("Bookmarked", html);
+        // (2) The bookmarked lane: the remove form POSTs to
+        // /bookmarks/{kind}/{id}/remove with the bm.list.unbookmark
+        // ("Remove") label — the D4 physical-removal affordance.
+        Assert.Contains("/bookmarks/{Model.Kind}/{Model.Id}/remove", html);
+        Assert.Contains("key=\"bm.list.unbookmark\"", html);
 
-        // (3) The button's label logic is a static per-render
-        // conditional (no query, no service call, no owner-list load —
-        // the D2 / C-M17·2 pin: the detail view does not load the
-        // owner's bookmark list to decide the button's label).
-        Assert.DoesNotContain("IBookmarkService", html);
+        // (3) The state is resolved per target by the partial itself, via the
+        // frozen IBookmarkService.IsBookmarkedAsync seam (the 2026-10-04 F1
+        // amendment, ADR 0118) — a targeted single-row personal read (the
+        // C-M17·2 shape: no AccessAudit row, no CanAsync pass, no target
+        // read; the ListAsync precedent). The partial is the sole resolver
+        // (no sibling element, no ViewData hand-off, no TagHelper ordering
+        // concern); it reads the owner's SubjectId from the principal and
+        // branches on the IsBookmarkedAsync result.
+        Assert.Contains("IBookmarkService", html);
+        Assert.Contains("IsBookmarkedAsync", html);
+        Assert.Contains("KumunitaPrincipal.SubjectId", html);
+
+        // (4) The partial's state read is the targeted personal read — it
+        // does NOT load the owner's bookmark list and does not re-derive
+        // access inline (the C-M17·2 pin: no owner-list load to decide the
+        // button's label; no CanAsync branch — the sole writer / reader is
+        // the seam).
         Assert.DoesNotContain("ListAsync", html);
         Assert.DoesNotContain("ToggleAsync", html);
+        Assert.DoesNotContain("CanAsync", html);
     }
 
     // ── 6 — BmButton_Partial_Form_Posts_To_Toggle_Endpoint ─────────────────

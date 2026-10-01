@@ -1,47 +1,71 @@
-@* M17 (ADR 0118) — the shared bookmark toggle control (the per-target write
-   affordance on the five detail surfaces). D2 / C-M17·2 pin: the label is
-   **static** per render — the detail view never loads the owner's bookmark
-   list to decide it, and this control makes no query: the default label is
-   the closed bm.button.bookmark key. Exception: a page that re-renders after
-   a successful toggle carries BookmarkState == "Bookmarked" (in ViewData),
-   and the label switches to the closed bm.button.bookmarked key (the F1
-   "bookmarked" witness). Plain form POST (no JS): the D3 write-lane
-   visibility check + the D4 idempotency run in the seam at POST (the sole
-   writer — C-M17·1: the controller / view never re-derives access).
-   Obs-2 (ADR 0118 amendment, 2026-09-30): the form carries a hidden
-   bmReturn input (the surface's own detail URL) so the controller can
+@* M17 (ADR 0118) — the shared bookmark control (the per-target affordance on
+   the five detail surfaces). Two states, resolved per target (F1 — "the
+   button reflects 'bookmarked' on reload"):
+   • **Not bookmarked** (the default) — a "Bookmark" button posting to
+     /bookmarks/toggle (the D3 write-lane visibility check + the D4
+     idempotency run in the seam at POST — the sole writer, C-M17·1: the
+     controller / view never re-derives access).
+   • **Bookmarked** — a "Remove" button posting to
+     /bookmarks/{kind}/{id}/remove (the D4 physical-removal lane; the row is
+     keyed on the owner's own Bookmark row, so the remove needs no target
+     read — D5 / F4 — and works even on a dangling row).
+   The state is resolved per target by the partial itself, via
+   IBookmarkService.IsBookmarkedAsync (the 2026-10-04 F1 amendment, ADR
+   0118): a targeted single-row **personal read** (the C-M17·2 shape — no
+   AccessAudit row, no CanAsync pass, no target read; the ListAsync
+   precedent). The partial is the sole place the state is resolved — it
+   makes exactly one such read and calls no other service (the "no
+   owner-list load to decide the button's label" pin holds; the read is
+   targeted, not the full list). An unsigned-in visitor (no SubjectId)
+   resolves NotBookmarked with no query (the C-M17·2 "operator has no read
+   standing" gate). Plain form POST (no JS) for both lanes.
+   Obs-2 (ADR 0118 amendment, 2026-09-30): each form carries a hidden
+   returnUrl input (the surface's own detail URL) so the controller can
    redirect back to the surface the button was clicked on (with the house
-   TempData["info"] flash toast confirming the bookmark), instead of
-   bouncing to /bookmarks. Absent bmReturn ⇒ the /bookmarks fallback
-   (the original M17 behavior, unchanged for callers that don't pass it). *@
+   TempData["info"] flash toast), instead of bouncing to /bookmarks. Absent
+   returnUrl ⇒ the /bookmarks fallback (the original M17 behavior). *@
 @model (string Kind, string Id, string? ReturnUrl)
-@{
-    // D2 / C-M17·2 — static per render: no owner-list load, no query. Only
-    // the (exceptional) re-render-after-toggle state switches the label.
-    var bookmarked = ViewContext.ViewData.TryGetValue("BookmarkState", out var _bmState)
-        && string.Equals(_bmState?.ToString(), "Bookmarked", StringComparison.Ordinal);
-}
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Bookmarks.IBookmarkService Bookmarks
 @* The button is pinned to the top-right of the main content card (the render
    site places it first inside .card-body); justify-content-end pushes it to
-   the right edge. *@
+   the right edge. The owner's per-target bookmark state is resolved once
+   here (the partial is the sole resolver — no sibling element, no ViewData
+   hand-off, no TagHelper ordering concern) and drives the two lanes below. *@
+@{
+    var ownerId = User is not null ? KumunitaPrincipal.SubjectId(User) : null;
+    var bookmarked = ownerId is not null
+        && await Bookmarks.IsBookmarkedAsync(ownerId, Model.Kind, Model.Id);
+}
 <div class="d-flex justify-content-end mb-3">
-    <form method="post" action="/bookmarks/toggle" style="margin:0;">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="kind" value="@Model.Kind" />
-        <input type="hidden" name="id" value="@Model.Id" />
-        @* Obs-2 (ADR 0118 amendment) — the surface's own URL so the
-           controller can redirect back to it (the /bookmarks fallback
-           when null — the original M17 behavior). *@
-        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-        <button type="submit" class="btn btn-sm btn-outline-secondary">
-            @if (bookmarked)
-            {
-                <kw-l key="bm.button.bookmarked">Bookmarked</kw-l>
-            }
-            else
-            {
+    @if (bookmarked)
+    {
+        @* Bookmarked — the "Remove" lane (D4 physical removal; no target read
+           — D5 / F4, keyed on the owner's own row so a dangling row still
+           removes). The returnUrl hidden input sends the controller back to
+           this surface (the obs-2 redirect-back shape). *@
+        <form method="post" action="@($"/bookmarks/{Model.Kind}/{Model.Id}/remove")" style="margin:0;">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                <kw-l key="bm.list.unbookmark">Remove</kw-l>
+            </button>
+        </form>
+    }
+    else
+    {
+        @* Not bookmarked (the default) — the "Bookmark" lane (the D3 write-lane
+           visibility check + D4 idempotency run in the seam at POST). The
+           returnUrl hidden input sends the controller back to this surface
+           (the obs-2 redirect-back shape). *@
+        <form method="post" action="/bookmarks/toggle" style="margin:0;">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="kind" value="@Model.Kind" />
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
                 <kw-l key="bm.button.bookmark">Bookmark</kw-l>
-            }
-        </button>
-    </form>
+            </button>
+        </form>
+    }
 </div>

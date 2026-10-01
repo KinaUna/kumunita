@@ -266,6 +266,15 @@ public interface IBookmarkService
     ///   owner's row present => Removed;  absent => NotBookmarked (no-op).
     /// NO target read at all — a dangling row is removable (D5 / F4).
     Task<BookmarkToggleResult> RemoveAsync(string ownerId, string targetKind, string targetId, IDocumentSession session);
+
+    /// The owner's own per-target state (F1 — the button reflects
+    /// "bookmarked" on reload): does the owner have a row for
+    /// (targetKind, targetId)? A **read** keyed on the owner's own row —
+    /// NO target read (D5 / F4 — a dangling row still answers `true`), NO
+    /// AccessAudit row, NO CanAsync pass (C-M17·2 — the `ListAsync`
+    /// personal-read precedent). A composition detail of the personal-read
+    /// surface, not a new authorization surface (§2.7 amendment).
+    Task<bool> IsBookmarkedAsync(string ownerId, string targetKind, string targetId);
 }
 ```
 
@@ -347,13 +356,14 @@ The **frozen pins**: the frozen seams (`IAuthorizationService`,
 `AccessAction`, `AccessVia`, `Decide()`); the C-M17·1…7 table; the
 F1–F5 + named trade; the D1–D8 decisions; the §kw-l key list; the closed
 `TargetKind` set; the `Bookmark` doc shape (the exact field set, §2.1);
-the `IBookmarkService` ctor + the 3 public methods + the
+the `IBookmarkService` ctor + the 4 public methods + the
 `BookmarkToggleStatus` enum (the ctor **composes** the frozen
 `IAuthorizationService` + the owning surfaces' read seams + — per the
 2026-09-30 D3/F2 amendment, ADR 0118 — the frozen `IIdentityService`
-for the announcement branch only; the **3-method public signature is
-frozen** and the added dependency is a frozen seam, so it is a
-composition detail, not a new surface); the §2.3 / §2.4 tables; and the
+for the announcement branch only; the **4-method public signature is
+frozen** — the 4th, `IsBookmarkedAsync`, added by the 2026-10-04 F1
+amendment, ADR 0118 — and the added dependencies are frozen seams, so
+they are composition detail, not a new surface); the §2.3 / §2.4 tables; and the
 **15** test names (§2.5 — the 14 original + the amendment's
 `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle`). A change to any
 of these after U00 is a **drift event** (`## U<m> — Drift pause` per the
@@ -364,8 +374,22 @@ unit-series rules; recorded in the §drift-guard drift log below).
 - **F1 — The toggle is idempotent and atomic.** Bookmarking the same
   target twice commits **one** row (the unique index is the witness — the
   M9 `convo_uidx_pair` shape); the button reflects "bookmarked" on
-  reload. Unbookmarking removes the row; re-bookmarking is a fresh
-  `Created` (C-M17·4).
+  reload — **completed** (the 2026-10-04 F1 amendment, ADR 0118): the
+  detail-surface `_BookmarkButton` partial now `@inject`s the frozen
+  `IBookmarkService` and resolves the owner's own per-target state inline
+  via `await Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id)` (a
+  C-M17·2-shape personal read — no `AccessAudit`, no `CanAsync`, no target
+  read; the `ListAsync` precedent), and renders a **"Remove"** form
+  POSTing to `/bookmarks/{kind}/{id}/remove` when bookmarked (the D4
+  physical-removal lane; the `Remove` action's `returnUrl` redirect-back
+  keeps the actor on the detail page), vs. the **"Bookmark"** form POSTing
+  to `/bookmarks/toggle` otherwise. The partial is the **sole** resolver —
+  it makes exactly one targeted personal read and no other service call
+  (the "no owner-list load to decide the button's label" pin holds; the
+  read is targeted, not the full list; no `CanAsync` branch). An
+  unsigned-in visitor (no `SubjectId`) resolves NotBookmarked with no
+  query (the C-M17·2 "operator has no read standing" gate). Unbookmarking
+  removes the row; re-bookmarking is a fresh `Created` (C-M17·4).
 - **F2 — The write lane is the target's own frozen decision.**
   Bookmarking a post you cannot see ⇒ **404**, no row, no Deny row
   surviving (the M16 create-gate posture); the *same* `CanAsync(Read)`
@@ -629,6 +653,19 @@ the two `bm.toggle.*` flash-toast keys to the original 12):
 `bm.list.unbookmark`, `bm.button.bookmark`, `bm.button.bookmarked`,
 `bm.toggle.bookmarked`, `bm.toggle.removed`.
 
+> `bm.button.bookmarked` ("Bookmarked") is the button's **label** key — it is
+> **not** consumed by `_BookmarkButton`. The 2026-10-04 F1 amendment
+> (ADR 0118) completed the F1 design intent (the button reflects
+> "bookmarked" on reload) with a two-lane affordance: the bookmarked state
+> renders a **"Remove"** button that reuses the closed
+> `bm.list.unbookmark` key (the D4 physical-removal lane), and the
+> not-bookmarked state renders the **"Bookmark"** button (the D3
+> `bm.button.bookmark` key). No new key was added — the closed 14-key set
+> (pinned by `BmKeys_AreTheClosedFourteenKeySet`) is unchanged; the
+> `bm.button.bookmarked` key stays registered in all four registries but is
+> orphaned by the button markup (acceptable: the parity pin checks
+> registration, not per-key consumption).
+
 ## §gate — the three acceptance tests (U05)
 
 (a) **closed-loop** — a resident bookmarks a post they can see → it
@@ -663,18 +700,20 @@ D1–D8 decisions; the C-M17·1…7 invariants; the F1–F5 + the named trade;
 the §kw-l key list (14 keys); the §gate names (a/b/c); the closed
 `TargetKind` set {`post`, `event`, `todo`, `announcement`, `page`}; the
 `Bookmark` doc shape (the exact field set, §2.1); the
-`IBookmarkService` ctor + the 3 public methods + the
+`IBookmarkService` ctor + the **4** public methods (the 4th,
+`IsBookmarkedAsync`, added by the 2026-10-04 F1 amendment) + the
 `BookmarkToggleStatus` enum (§2.2 — the ctor composes the frozen
 `IAuthorizationService` + the owning surfaces' read seams +, per the
 2026-09-30 D3/F2 amendment, the frozen `IIdentityService` for the
-announcement branch only; the **3-method public signature is frozen**);
-the §2.3 / §2.4 tables; and the **15** pinned test names (§2.5 — the
-14 original + the amendment's
+announcement branch only; the added dependencies are frozen seams, so they
+are composition detail, not a new surface); the §2.3 / §2.4 tables; and
+the **15** pinned test names (§2.5 — the 14 original + the amendment's
 `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle`).
 
 **Drift log:**
 
 | Date | Unit | Change | Reason |
 |---|---|---|---|
-| 2026-09-30 | obs-4 (post-U00) | D3/F2 write-lane: the `announcement` branch of `BookmarkService.ResolveTargetAsync` now resolves the owner's real standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync` and hands that role set to `IAnnouncementService.GetAsync`, instead of the pre-amendment **empty** role set. The `BookmarkService` ctor gains an eighth dependency (`IIdentityService`); the `DependencyInjection.cs` M17 factory passes it. The **frozen `IBookmarkService` 3-method public signature is unchanged**; **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the 15th test `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (fails under the old empty-roles code). | The empty-roles lapse was a D3/F2 violation: the write lane re-ran a *stricter* read than the announcement detail page uses, so a `GlobalAdmin` / community-moderator who **could see** a community-targeted announcement was **denied** its bookmark. Resolving the owner's standing via the frozen principal-read seam restores the "same call the detail page uses" invariant (ADR 0118 D3/F2). Fail-closed preserved: no EF account row ⇒ empty set ⇒ degrades exactly as before. See ADR 0118 `## Amendments` (2026-09-30). |
-| 2026-09-30 | obs-2 (post-U00) | **Redirect-back + flash toast** on the bookmark toggle (the button reflects the bookmark state on the surface the user clicked it on, instead of bouncing to `/bookmarks`): the `_BookmarkButton` partial gains a hidden `returnUrl` input (the surface's own detail URL); the `BookmarksController.Toggle` action accepts an optional `returnUrl` form field and redirects to it (or falls back to `/bookmarks` when absent), setting a localized flash (`bm.toggle.bookmarked`) in `TempData["info"]`; `Remove` also sets a flash (`bm.toggle.removed`). The `BookmarksController` ctor gains two **optional** dependencies (`ILocalizationService?`, `ITranslationProvider?`) — the house `T(key)` helper from `AdminPortabilityController`. Two new `bm.toggle.*` kw-l keys added to all four registries (the closed set is now **14 keys**). The **frozen `IBookmarkService` 3-method public signature is unchanged**; **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the retargeted `F1_Toggle_...` / `F4_...` / `M17AcceptanceGateTests.ClosedLoop` (redirect to detail URL + flash key assert) + `BmKeys_AreTheClosedFourteenKeySet` + the partial structural pin `BmButton_Partial_Form_Posts_To_Toggle_Endpoint` (the `returnUrl` hidden input). | The original M17 toggle always redirected to `/bookmarks` — the user lost their place on the detail surface (post, event, page, group post, announcement). The obs-2 amendment restores the surface context via the house flash-toast + redirect-back idiom (`AdminPortabilityController` precedent), without extending the frozen `IBookmarkService` seam. See ADR 0118 `## Amendments` (2026-09-30, obs-2). |
+| 2026-10-04 | F1 (post-U00) | **F1 completed — the button reflects "bookmarked" on reload** (the F1 design intent left unfinished at ship: the detail-surface `_BookmarkButton` was a static "Bookmark" with no remove affordance, because `Toggle` always 302-redirects so the partial's "bookmarked" branch was dead code). The frozen `IBookmarkService` seam gains a **4th public method**, `Task<bool> IsBookmarkedAsync(ownerId, targetKind, targetId)` — a C-M17·2-shape personal read: NO target read (D5 / F4 — a dangling row still answers `true`), NO `AccessAudit` row, NO `CanAsync` pass (the `ListAsync` precedent), NO new `AccessAction` / `AccessVia` / `Decide()` branch. The Web layer needs **no new component**: `_BookmarkButton` `@inject`s the frozen `IBookmarkService` (the house `@inject`-in-view idiom, e.g. `Documents/New.cshtml`) and resolves the owner's per-target state inline via `await Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id)` (a C-M17·2-shape personal read; an unsigned-in visitor / no `SubjectId` resolves NotBookmarked with no query — the C-M17·2 "operator has no read standing" gate). `_BookmarkButton` becomes two-lane: **bookmarked** ⇒ a form POSTing to `/bookmarks/{kind}/{id}/remove` with the `bm.list.unbookmark` ("Remove") label (the D4 physical-removal lane); **not bookmarked** ⇒ the existing `bm.button.bookmark` "Bookmark" form POSTing to `/bookmarks/toggle`. The `BookmarksController.Remove` action gains an **optional** `returnUrl` form field (redirect-back to the detail surface, the obs-2 precedent) — the `returnUrl`-carrying hidden input is already in the partial from obs-2, so no new markup beyond the lane branch. The partial is the **sole** resolver — it makes exactly one targeted personal read and no other service call (the C-M17·2 pin holds: the read is targeted, not the owner's full bookmark list; no `CanAsync` branch). **No** new `bm.*` key (the closed 14-key set is unchanged — the remove lane reuses `bm.list.unbookmark`; `bm.button.bookmarked` is now orphaned by the button, §kw-l note). The test-churn alternative (a mandatory `IBookmarkService` ctor param on the 6 detail controllers + view-model threading) was rejected — it would break ~29 test harnesses; the TagHelper is the house idiom for this. Pinned by the retargeted `BmButton_Partial_Renders_Correct_Lane_For_State` (the old `..._Label_For_State`; now asserts the two-lane structure + the `IBookmarkService` / `IsBookmarkedAsync` seam read + the `KumunitaPrincipal.SubjectId` owner read) + `BookmarkServiceTests` (the `IsBookmarkedAsync` personal read). | F1's design intent ("the button reflects 'bookmarked' on reload") was left unfinished at ship: the U04 handoff notes said it would be satisfied via `BookmarkState` from the row's `IsBookmarked` flag, but `Toggle` always redirects so no detail view ever set `ViewData["BookmarkState"]` and the partial's "bookmarked" branch was dead code — the button was a static "Bookmark" with no way to *remove* a bookmark from the detail surface. Adding one read-only personal-read method (the exact C-M17·2 shape) + a TagHelper (the house idiom for a per-request value consumed by many views) completes F1 without touching the frozen authorization surface, the closed key set, or the 6 detail controllers. See ADR 0118 `## Amendments` (2026-10-04, F1). |
+| 2026-09-30 | obs-4 (post-U00) | D3/F2 write-lane: the `announcement` branch of `BookmarkService.ResolveTargetAsync` now resolves the owner's real standing **in-Core** via the frozen `IIdentityService.GetBySubjectAsync` and hands that role set to `IAnnouncementService.GetAsync`, instead of the pre-amendment **empty** role set. The `BookmarkService` ctor gains an eighth dependency (`IIdentityService`); the `DependencyInjection.cs` M17 factory passes it. The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the 15th test `GlobalAdmin_Beats_CommunityScope_On_Bookmark_Toggle` (fails under the old empty-roles code). | The empty-roles lapse was a D3/F2 violation: the write lane re-ran a *stricter* read than the announcement detail page uses, so a `GlobalAdmin` / community-moderator who **could see** a community-targeted announcement was **denied** its bookmark. Resolving the owner's standing via the frozen principal-read seam restores the "same call the detail page uses" invariant (ADR 0118 D3/F2). Fail-closed preserved: no EF account row ⇒ empty set ⇒ degrades exactly as before. See ADR 0118 `## Amendments` (2026-09-30). |
+| 2026-09-30 | obs-2 (post-U00) | **Redirect-back + flash toast** on the bookmark toggle (the button reflects the bookmark state on the surface the user clicked it on, instead of bouncing to `/bookmarks`): the `_BookmarkButton` partial gains a hidden `returnUrl` input (the surface's own detail URL); the `BookmarksController.Toggle` action accepts an optional `returnUrl` form field and redirects to it (or falls back to `/bookmarks` when absent), setting a localized flash (`bm.toggle.bookmarked`) in `TempData["info"]`; `Remove` also sets a flash (`bm.toggle.removed`). The `BookmarksController` ctor gains two **optional** dependencies (`ILocalizationService?`, `ITranslationProvider?`) — the house `T(key)` helper from `AdminPortabilityController`. Two new `bm.toggle.*` kw-l keys added to all four registries (the closed set is now **14 keys**). The **frozen `IBookmarkService` public signature is unchanged** (3 methods at that point; the 4th, `IsBookmarkedAsync`, landed with the 2026-10-04 F1 amendment); **no** new `AccessAction` / `AccessVia` / `Decide()` branch. Pinned by the retargeted `F1_Toggle_...` / `F4_...` / `M17AcceptanceGateTests.ClosedLoop` (redirect to detail URL + flash key assert) + `BmKeys_AreTheClosedFourteenKeySet` + the partial structural pin `BmButton_Partial_Form_Posts_To_Toggle_Endpoint` (the `returnUrl` hidden input). | The original M17 toggle always redirected to `/bookmarks` — the user lost their place on the detail surface (post, event, page, group post, announcement). The obs-2 amendment restores the surface context via the house flash-toast + redirect-back idiom (`AdminPortabilityController` precedent), without extending the frozen `IBookmarkService` seam. See ADR 0118 `## Amendments` (2026-09-30, obs-2). |

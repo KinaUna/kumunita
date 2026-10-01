@@ -128,13 +128,16 @@ public sealed class BookmarksController(
     /// controller commits in the caller's <see cref="IDocumentSession"/>
     /// (the C3 same-transaction lane — <see cref="BookmarkService"/> never
     /// commits internally; the U02 <c>RunInSession</c> harness witnesses
-    /// the caller-commits shape), then redirects back to
-    /// <c>/bookmarks</c> (the "redirect after write" precedent — the M16
-    /// <c>InventoryController</c> / M5 <c>PageController</c> shape).
+    /// the caller-commits shape), then redirects back to the
+    /// <c>returnUrl</c> form field (the surface's own detail URL) when present,
+    /// falling back to <c>/bookmarks</c> when it is absent (the obs-2
+    /// redirect-back shape, the <see cref="Toggle"/> precedent — the M16
+    /// <c>InventoryController</c> / M5 <c>PageController</c> "redirect after
+    /// write" shape).
     /// </summary>
     [HttpPost("/bookmarks/{targetKind}/{targetId}/remove")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Remove(string targetKind, string targetId)
+    public async Task<IActionResult> Remove(string targetKind, string targetId, string? returnUrl = null)
     {
         var actorId = SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
@@ -158,7 +161,7 @@ public sealed class BookmarksController(
         await bookmarks.RemoveAsync(actorId, targetKind, targetId, session);
         await session.SaveChangesAsync();
         TempData["info"] = await T("bm.toggle.removed");
-        return Redirect("/bookmarks");
+        return Redirect(string.IsNullOrWhiteSpace(returnUrl) ? "/bookmarks" : returnUrl);
     }
 
     /// <summary>

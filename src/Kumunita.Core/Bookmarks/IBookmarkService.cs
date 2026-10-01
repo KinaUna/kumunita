@@ -88,4 +88,23 @@ public interface IBookmarkService
     /// </summary>
     Task<BookmarkToggleResult> RemoveAsync(
         string ownerId, string targetKind, string targetId, IDocumentSession session);
+
+    /// <summary>
+    /// Answers the detail-page button-state question (F1 — "the button
+    /// reflects 'bookmarked' on reload"): does the owner have a pin for
+    /// this (targetKind, targetId)? Returns <c>true</c> when a
+    /// <see cref="Bookmark"/> row exists for the owner; <c>false</c>
+    /// otherwise (no row, or no <c>ownerId</c>).
+    /// <para>
+    /// **No target read at all** (the same D5 / F4 principle as
+    /// <see cref="RemoveAsync"/>): the answer is keyed on the owner's own
+    /// row alone, so a row whose target is absent or deleted still answers
+    /// <c>true</c> (the row is the owner's personal record, and the
+    /// button's remove affordance must work even for a dangling row).
+    /// No <c>AccessAudit</c> row, no <c>CanAsync</c> call
+    /// (C-M17·2 — the personal-read shape, the <see cref="ListAsync"/>
+    /// precedent).
+    /// </para>
+    /// </summary>
+    Task<bool> IsBookmarkedAsync(string ownerId, string targetKind, string targetId);
 }
