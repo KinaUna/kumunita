@@ -1,4 +1,5 @@
 using Kumunita.Core.Documents;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -34,8 +35,35 @@ public sealed class DocumentController(
     DocumentService documents,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // The per-request translation read seam (the flash-message resolution —
+    // the LocaleController.FlashAsync / AdminPortabilityController.T /
+    // BookmarksController.T idiom). Optional (default null) so a
+    // test-construction site that builds this controller without the provider
+    // keeps compiling and resolves the flash to the raw key floor; DI always
+    // supplies the live ITranslationProvider + ILocalizationService in the app.
+    ILocalizationService? localization = null,
+    ITranslationProvider? translationProvider = null) : Controller
 {
+    /// <summary>
+    /// Resolves a <c>documents.*</c> kw-l key to the operator's effective
+    /// language (the house <see cref="EffectiveLanguageCode.ResolveAsync"/> +
+    /// <see cref="ITranslationProvider.GetAsync"/> seam — the same chain the
+    /// view's <c>&lt;kw-l&gt;</c> TagHelper uses, so the upload flash toast
+    /// renders in the operator's language). Falls back to the raw key when
+    /// the translation seam is absent (the test-construction floor — the
+    /// <c>DocumentControllerTests</c> pin the raw key, the
+    /// <see cref="BookmarksController"/>'s <c>T()</c> idiom).
+    /// </summary>
+    private async Task<string> T(string key)
+    {
+        if (translationProvider is null || localization is null)
+            return key;
+        var lang = await EffectiveLanguageCode.ResolveAsync(
+            HttpContext?.Request, localization, translationProvider);
+        return await translationProvider.GetAsync(key, lang);
+    }
+
     // ── GET /documents — the repository feed (D4, C-M21·3) ────────────────
     [HttpGet("/documents")]
     [Authorize]
@@ -151,8 +179,10 @@ public sealed class DocumentController(
         await using var session = store.LightweightSession();
         var doc = await documents.UploadAsync(draft, subject, session);
 
-        // Flash the closed kw-l key (U04 renders it) + redirect to the detail.
-        TempData["info"] = "documents.flash_uploaded";
+        // Flash the closed kw-l key, localized to the operator's language
+        // (the house T() idiom — BookmarksController / AdminQuietController) +
+        // redirect to the detail.
+        TempData["info"] = await T("documents.flash_uploaded");
         return Redirect($"/documents/{doc.Id}");
     }
 

@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.18.0", "2026-10-01", new List<string>
+        {
+            "Documents — a shared repository for the community's official documents (contracts, minutes, notices, bylaws): each document is readable only by the people its uploader chose (an empty audience is a public denial), is served as a download (never rendered in the browser), and is audited every time it is opened; a GlobalAdmin or Moderator uploads a document and chooses who can see it (ADR 0122).",
+        }),
         new("0.17.0", "2026-09-30", new List<string>
         {
             "Notification quiet hours — choose when your notification emails are held, in your own time zone: a per-resident schedule of quiet hours of day and days of week. Your emails are held (never lost) and arrive once the quiet window lifts, while your inbox always keeps the full record. An admin sets how often held notifications are re-checked (ADR 0121).",
