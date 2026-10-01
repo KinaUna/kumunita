@@ -79,6 +79,18 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IUserInfoService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
 
+        // M23 (ADR 0123 D4): the find-people composition root — the
+        // DirectoryService shape above, extended with the host-registered Marten
+        // IDocumentStore (the tag resolve + the CanSeeAsync aggregate audit row)
+        // so the two paged reads (by-tag + bio-substring) compose the frozen
+        // seams only (the ADR 0006-D lane pin — zero new authorization surface,
+        // C-M23·2/D7). An interface (unlike DirectoryService) so the Web layer
+        // resolves a stable seam.
+        services.AddTransient<IProfileFindService>(sp => new ProfileFindService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-8 (M1 plan): the /health degraded seam (OPS §8) — counts
         // EmailDeadLetter rows through a Marten IQuerySession. Web-side consumers
         // (HealthController) resolve this, so tests can substitute a canned count

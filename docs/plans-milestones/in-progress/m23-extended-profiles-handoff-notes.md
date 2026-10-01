@@ -159,3 +159,61 @@
   get, one `tag.create` row per **newly created** tag), **no** new
   `IUserInfoService` method, **no** profile-write audit row; exits on
   `Kumunita.Core.Tests`.
+
+## U03
+
+- **Delivered:** the **one new composition service** (ADR 0006-D "composes only
+  the frozen seams") in `Kumunita.Core.UserInfo` — `IProfileFindService`
+  (interface + the two page records `ProfileTagPage(IReadOnlyList<Profile>,
+  Tag?, bool HasMore)` and `ProfileBioPage(IReadOnlyList<Profile>, bool
+  HasMore)` in `IProfileFindService.cs`) + `ProfileFindService`
+  (implementation in `ProfileFindService.cs`) + the DI registration (one
+  `AddTransient<IProfileFindService>` immediately after `DirectoryService`).
+  Two **paged** finds (`PageSize = 30`, ADR 0090 D6 `HasMore` idiom) over
+  **profiles the viewer may already see**: **by profile-tag** (slug → the
+  frozen ADR 0044 `Tag` doc → `TagIds` containment) + **bio-substring**
+  (case-insensitive `Contains`). Each gates the candidate set with the
+  **single** `CanSeeAsync(actorId, Read, candidates.Select(p => new
+  ProfileToAuditableResource(p)))` pass (U00's §1.a C1 pin — the aggregate
+  `directory` row is emitted **by the frozen seam itself**, `TargetKind
+  "directory"`, counts set, `TargetId = null`), then returns only the visible
+  survivors. **Blank query / missing tag / 0 candidates ⇒ empty page, no
+  decision, no row** (the early return happens **before** `CanSeeAsync`, so
+  zero audit rows of any kind). **Zero new authorization surface** (GATE-4).
+- **Idiom note (codebase wins for mechanics):** `Profile.TagIds` is
+  `IReadOnlyList<string>` (U01's shape, its four siblings' idiom) not the
+  register's `string[]`; `Profile` has **no `.Id`** — identity is
+  `.SubjectId` (so `GateAsync` filters survivors on `p.SubjectId` while reading
+  the `Visible` ids via `v.Id`); the candidate filter also drops
+  `!p.Blocked` (mirroring `DirectoryService.ListAsync`). The **`HasMore`
+  idiom** is the M3 paged-slice shape — `pageSlice.Count == PageSize` (the
+  sliced page), **not** `candidates.Count == PageSize` (the full filtered
+  list); a 31-candidate set → page 1 full (30) → `HasMore = true`, the
+  `TagService.ListPostsByTagPagedAsync` / `PostService.ListFeedAsync`
+  precedent.
+- **Tests:** `tests/Kumunita.Core.Tests/UserInfo/ProfileFindServiceTests.cs`
+  (7 tests, `PostgresFixture` + `TagDocTypes.Configure` in the boot) —
+  (1) by-tag **visible-only** (a denied survivor never surfaces, GATE-2);
+  (2) by-bio **visible-only** (same pin); (3) a non-empty read emits **exactly
+  one** aggregate audit row (`TargetKind "directory" && TargetId == null`) —
+  isolated from the per-item `directory` rows the frozen seam also writes for
+  non-null `Audience` profiles (that per-item behavior is the frozen seam's
+  own, not drift); (4) **blank/missing** input ⇒ empty page + **zero** audit
+  rows (total count, the early return precedes `CanSeeAsync`); (5) the **owner
+  always sees own** profile even when `Visibility` denies others (F3);
+  (6) **paging** — 31 candidates → page 1 full (`HasMore` true) + page 2 the
+  remainder (1, `HasMore` false), ADR 0090 D6; (7) the `IAuthorizationService`
+  **surface is unchanged** (a reflection pin — still exactly 8 methods,
+  zero new, GATE-4).
+- **Open question:** none — no D# amended; the register's [PROPOSED] set was
+  locked verbatim by U00.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  **green** (Total: 1086, Errors: 0, Failed: 0, Skipped: 0). No drift.
+  **U04 next** — the Web editor (bio textarea + tag picker on the profile-edit
+  page, authoring its own `kw-l` keys `profile.edit.*` / `profile.flash.saved`
+  in all four languages) + the directory-detail bio/tags gate (F2's two
+  independent gates: bio+tags behind `Visibility`, contact block behind the
+  unchanged `ContactVisibility`); it passes `SubjectId(User)` as `actorBy`
+  into `UpsertProfileAsync` (U02's optional param) and renders the bio via
+  `MarkdownRenderer.RenderHtml` (GATE-5, null-safe).
