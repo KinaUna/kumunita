@@ -1836,6 +1836,22 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
+
+            // ── M21 (ADR 0122) — document management: the /documents feed +
+            // detail + upload form (D5 standing, D6 download, D7 Deny → 404).
+            // U04 authors the COMPLETE 12-key closed set; U03's views consume.
+            ["documents.title"]             = "Documents",
+            ["documents.empty"]             = "No documents are visible to you yet.",
+            ["documents.upload"]            = "Upload a document",
+            ["documents.upload_title"]      = "Upload a document",
+            ["documents.upload_summary"]    = "One-line description (optional)",
+            ["documents.upload_file"]       = "File",
+            ["documents.upload_audience"]   = "Who can see this document",
+            ["documents.upload.submit"]     = "Upload document",
+            ["documents.download"]          = "Download",
+            ["documents.detail.type_size"]  = "File type / size",
+            ["documents.detail.updated"]    = "Last updated",
+            ["documents.flash_uploaded"]    = "Document uploaded.",
         };
 
     /// <summary>
@@ -3508,6 +3524,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
+
+            // ── M21 (ADR 0122) — Dokumentverwaltung: die /documents-Feed- +
+            // Detail- + Upload-Oberfläche (D5 Standing, D6 Download, D7
+            // Deny → 404). U04 erstellt das komplette 12-Schlüssel-Satz;
+            // U03's Ansichten konsumieren.
+            ["documents.title"]             = "Dokumente",
+            ["documents.empty"]             = "Noch keine Dokumente sind für dich sichtbar.",
+            ["documents.upload"]            = "Dokument hochladen",
+            ["documents.upload_title"]      = "Dokument hochladen",
+            ["documents.upload_summary"]    = "Einzeilige Beschreibung (optional)",
+            ["documents.upload_file"]       = "Datei",
+            ["documents.upload_audience"]   = "Wer darf dieses Dokument sehen",
+            ["documents.upload.submit"]     = "Dokument hochladen",
+            ["documents.download"]          = "Herunterladen",
+            ["documents.detail.type_size"]  = "Dateitype / Größe",
+            ["documents.detail.updated"]    = "Zuletzt aktualisiert",
+            ["documents.flash_uploaded"]    = "Dokument hochgeladen.",
         };
 
     /// <summary>
@@ -5183,6 +5216,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
+
+            // ── M21 (ADR 0122) — gestion des documents : la liste /documents +
+            // la page détail + le formulaire de dépôt (D5 standing, D6
+            // téléchargement, D7 refus → 404). U04 crée le jeu fermé de 12
+            // clés ; les vues de U03 le consomment.
+            ["documents.title"]             = "Documents",
+            ["documents.empty"]             = "Aucun document n'est visible pour l'instant.",
+            ["documents.upload"]            = "Téléverser un document",
+            ["documents.upload_title"]      = "Téléverser un document",
+            ["documents.upload_summary"]    = "Description en une ligne (facultatif)",
+            ["documents.upload_file"]       = "Fichier",
+            ["documents.upload_audience"]   = "Qui peut voir ce document",
+            ["documents.upload.submit"]     = "Téléverser le document",
+            ["documents.download"]          = "Télécharger",
+            ["documents.detail.type_size"]  = "Type / taille du fichier",
+            ["documents.detail.updated"]    = "Dernière mise à jour",
+            ["documents.flash_uploaded"]    = "Document téléversé.",
         };
 
     /// <summary>
@@ -6848,6 +6898,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
+
+            // ── M21 (ADR 0122) — dokumenthåndtering: /documents-feed +
+            // detalje + upload-formular (D5 standing, D6 download, D7
+            // afvisning → 404). U04 skaber det lukkede 12-nøgler-sæt; U03's
+            // views forbruger det.
+            ["documents.title"]             = "Dokumenter",
+            ["documents.empty"]             = "Ingen dokumenter er endnu synlige for dig.",
+            ["documents.upload"]            = "Upload et dokument",
+            ["documents.upload_title"]      = "Upload et dokument",
+            ["documents.upload_summary"]    = "En-linjes beskrivelse (valgfri)",
+            ["documents.upload_file"]       = "Fil",
+            ["documents.upload_audience"]   = "Hvem kan se dette dokument",
+            ["documents.upload.submit"]     = "Upload dokumentet",
+            ["documents.download"]          = "Download",
+            ["documents.detail.type_size"]  = "Filtype / størrelse",
+            ["documents.detail.updated"]    = "Senest opdateret",
+            ["documents.flash_uploaded"]    = "Dokument uploadet.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

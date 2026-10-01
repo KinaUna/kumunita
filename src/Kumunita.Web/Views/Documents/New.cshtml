@@ -1,0 +1,161 @@
+@model DocumentUploadViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Web.Models
+@using Kumunita.Core.Authorization
+@inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@{
+    ViewData["Title"] = "Upload a document";
+    string[] modes = { "Any", "All" };
+    // Null-safe: U03's GET New() returns View("New") with no model (the form is
+    // blank); the POST re-render path passes the bound form. So read the model
+    // through Model? — both paths render.
+    var editor = Model?.Audience
+        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty };
+
+    // Seed the shared "Who to grant to" option lists (the M2 / M3 / M4
+    // composer idiom — the U03 controller's New() does not, so this view
+    // owns the seeding, the same candidate source PostsController uses).
+    var profiles = await UserInfo.GetProfilesAsync(verifiedOnly: true);
+    var selfId = User is not null ? KumunitaPrincipal.SubjectId(User) : null;
+    ViewData["Audience_Users"] = profiles
+        .Where(p => !p.Blocked)
+        .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
+        .Select(p => new GrantOption
+        {
+            Id    = p.SubjectId,
+            Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+            Kind  = "User",
+        })
+        .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    // ADR 0010: the audience = public groups only (a private group is an
+    // organizing unit, never granted as an audience).
+    var groups = await UserInfo.GetPublicGroupsAsync();
+    ViewData["Audience_Groups"] = groups
+        .Select(g => new GrantOption
+        {
+            Id    = g.Id,
+            Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+            Kind  = "Group",
+        })
+        .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="documents.upload_title">Upload a document</kw-l></h1>
+
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" action="/documents" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="title" style="font-weight:600;">
+                        <kw-l key="common.title">Title</kw-l>
+                    </label>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="200" value="@Model?.Title" required />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="summary" style="font-weight:600;">
+                        <kw-l key="documents.upload_summary">One-line description (optional)</kw-l>
+                    </label>
+                    <input class="form-control" type="text" id="summary" name="Summary"
+                           maxlength="280" value="@Model?.Summary" />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="file" style="font-weight:600;">
+                        <kw-l key="documents.upload_file">File</kw-l>
+                    </label>
+                    <input class="form-control" type="file" id="file" name="File" required />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;">
+                        <kw-l key="documents.upload_audience">Who can see this document</kw-l>
+                    </h6>
+
+                    <div class="form-label mt-2" style="font-weight:600;">
+                        <kw-l key="profile.audience_match_mode">Match mode</kw-l>
+                    </div>
+                    @foreach (var m in modes)
+                    {
+                        var checkedMark = string.Equals(editor.Mode, m, StringComparison.OrdinalIgnoreCase)
+                            ? "checked"
+                            : null;
+                        <div class="form-check" style="margin-left:0.5rem;">
+                            <input class="form-check-input" type="radio"
+                                   name="Audience.Mode" id="@($"doc-aud-mode-{m}")"
+                                   value="@m" @checkedMark required />
+                            <label class="form-check-label" for="@($"doc-aud-mode-{m}")">
+                                @if (m == "Any")
+                                {
+                                    <kw-l key="profile.audience_mode_any_word">Any</kw-l>
+                                    <text> — <kw-l key="profile.audience_mode_any">a person is allowed if they meet any of the people/groups you picked</kw-l></text>
+                                }
+                                else
+                                {
+                                    <kw-l key="profile.audience_mode_all_word">All</kw-l>
+                                    <text> — <kw-l key="profile.audience_mode_all">a person is allowed only if they meet all of the people/groups you picked</kw-l></text>
+                                }
+                            </label>
+                        </div>
+                    }
+
+                    <div class="form-check" style="margin-left:0.5rem; margin-top:0.75rem;">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.AllResidentsVisible"
+                               id="doc-aud-all-residents"
+                               value="true" @(editor.AllResidentsVisible ? "checked" : null) />
+                        <label class="form-check-label" for="doc-aud-all-residents">
+                            <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
+                        </label>
+                    </div>
+
+                    @* The shared "Who to grant to" picker (the M2 / M3 / M4
+                       idiom): the hidden <c>Audience.Grants</c> textarea the
+                       partial renders is the only form-bound grant field;
+                       U03's <c>form.Audience.BuildAudience()</c> reads it back
+                       (the M2 single-deserialization-site pin). *@
+                    <partial name="_GrantPickers" model="@(new GrantPickersModel
+                    {
+                        EditorName = "Audience",
+                        Editor     = editor,
+                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                    })" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="documents.upload.submit">Upload document</kw-l></button>
+                <a href="/documents" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>

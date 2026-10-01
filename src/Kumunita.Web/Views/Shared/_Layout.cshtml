@@ -132,6 +132,11 @@
                                            standing core surface, no admin toggle; the M16
                                            inventory nav-entry shape). *@
                                         <li><a class="dropdown-item text-dark" href="/bookmarks"><kw-l key="bm.nav">Bookmarks</kw-l></a></li>
+                                        @* M21 (ADR 0122) — the Document management surface
+                                           (D5 standing, D6 download; the M16/M17 nav-entry
+                                           shape). Reuses documents.title (the closed 12-key set
+                                           stays closed — no 13th nav.documents key). *@
+                                        <li><a class="dropdown-item text-dark" href="/documents"><kw-l key="documents.title">Documents</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" href="/tags"><kw-l key="nav.tags">Tags</kw-l></a></li>
                                         <li><a class="dropdown-item text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a></li>

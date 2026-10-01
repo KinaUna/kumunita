@@ -269,3 +269,79 @@
   `KnownTranslationKeys_ParityTests` pin updates. U04 **consumes** the flash
   key `documents.flash_uploaded` and the `CanUpload` / `CanDownload` view-model
   flags shipped here.
+
+## U04
+
+- **Delivered (5 plan deliverables):**
+  (1) `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the **12-key
+  closed set** (the exact names from the register/design-doc §8, no renames)
+  added to **all four** dictionaries (`EnValues` / `DeValues` / `FrValues` /
+  `DaValues`) under a `── M21 (ADR 0122) ──` section banner, en source text
+  authored + plausible de/fr/da. `AllKeys` is `EnValues.Keys.ToList()` — no
+  change (the 12 keys flow in automatically). (2)
+  `src/Kumunita.Web/Views/Documents/Index.cshtml` (new) — the feed: the
+  `documents.title` h1, the upload button gated on `@Model.CanUpload` →
+  `/documents/new`, the `documents.empty` empty-state, the feed rows (detail
+  link `/documents/@d.Id` + download link `/documents/@d.Id/download`), and a
+  "next" link iff `@Model.HasMore` (reusing the existing shared
+  `pagination.next` key — the feed is newest-first, so page+1 is "Older").
+  (3) `src/Kumunita.Web/Views/Documents/Detail.cshtml` (new) — the title (UGC,
+  not a key), the optional summary, the meta block (`documents.detail.type_size`
+  + `documents.detail.updated` with the `kw-dt` tag on
+  `@Model.Document.Modified ?? @Model.Document.Created`), and the download
+  button gated on `@Model.CanDownload` → `@(Model.DownloadUrl)`. (4)
+  `src/Kumunita.Web/Views/Documents/New.cshtml` (new) — the compose form bound
+  to U03's **actual** `DocumentUploadViewModel` (`Title` / `Summary?` /
+  `File: IFormFile?` / `Audience: AudienceEditorModel`), `multipart/form-data`
+  + anti-forgery, reusing the M2 audience editor (mode radios
+  `Audience.Mode`, the `Audience.AllResidentsVisible` checkbox, and the shared
+  `_GrantPickers` partial whose hidden `Audience.Grants` textarea is the only
+  form-bound grant field — agreeing with U03's `form.Audience.BuildAudience()`).
+  (5) `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the `More` dropdown nav
+  entry → `/documents` with `documents.title` (reuses the key — the closed set
+  stays at 12, no 13th `nav.documents`).
+- **Exit (both green):** `dotnet build Kumunita.slnx -c Debug` → Build
+  succeeded, **0 errors / 13 warnings** (the pre-existing baseline — none from
+  the new files). `dotnet exec …\Kumunita.Web.Tests.dll` → **`Total: 699,
+  Errors: 0, Failed: 0, Skipped: 0`** (the 14 U03 `DocumentControllerTests`
+  green incl. the `TempData["info"] == "documents.flash_uploaded"` pin, plus
+  `KwLRegistryConsistencyTests` — every static `kw-l` key in the new views is
+  registered). Separately (Core.Tests, the assembly that guards
+  `KnownTranslationKeys`): `dotnet exec …\Kumunita.Core.Tests.dll -class
+  KnownTranslationKeys_ParityTests -class KnownTranslationKeysClosureTests
+  -class SurfaceKeyTests` → **`Total: 11, Errors: 0, Failed: 0`** — the
+  four-dictionary **parity** (en/de/fr/da all carry the identical 12-key
+  M21 block, non-empty), the **closure** (`AllKeys` == `EnValues.Keys`), and
+  the **surface-key** invariants all green. **No new drift; zero new
+  authorization surface** (C-M21·2 / D8).
+- **Deviation (flag for U05's doc-parity pass):** U03's `New()` action returns
+  `View("New")` with **no model** (the GET form is blank), but U03's
+  `Upload` re-render path passes the bound form (`return View(form)`). The New
+  view therefore reads the model **null-safely** (`@Model?.Title` /
+  `@Model?.Summary` / `Model?.Audience`) so both paths render — a non-null
+  `@Model` read would NRE on the GET. The **audience-picker option seeding**
+  (`ViewData["Audience_Users"]` / `Audience_Groups`, the M2/M3/M4 composer
+  idiom) is done **in the view's `@{}` block** (injecting
+  `IUserInfoService`) because U03's `New()` does not seed it and the `_GrantPickers`
+  partial reads it — keeping the 5-deliverable scope (no controller change).
+  U05 may optionally move the seeding into the controller if it prefers the
+  `PostsController`-owned seam; the shape is identical either way.
+- **Open question:** none blocking. The flash **renders as the raw key**
+  `documents.flash_uploaded` (U03 stores the *key* in `TempData["info"]`,
+  `_FlashToast` renders `@info` verbatim, and `DocumentControllerTests` pins
+  `TempData["info"] == "documents.flash_uploaded"`). I authored the key in all
+  four languages (my scope) and **did not** touch the controller or that test —
+  localizing the toast (e.g. `await T("documents.flash_uploaded")`) is a
+  controller change outside U04's 5 deliverables and would break the pin.
+  **U05's decision surface** if it wants a localized flash.
+- **Next unit (U05) entry point:** the **close-flip** — the **only** unit
+  touching `Milestones.cs` / `MilestonesTests`. U05 flips M21 `StatusNext` →
+  `StatusDone`, promotes M22 `StatusPlanned` → `StatusNext`, re-pins
+  `MilestonesTests` (`M22_Is_The_Single_InProgress_Milestone` + the
+  `Shipped_Milestones_Are_Marked_Done` done-list append), does the
+  README/STATUS/ARCHITECTURE parity pass, tags ADR 0122's index row
+  `**Done** (M21)`, and moves all M21 artifacts flat to `done/`. U05 should
+  **reconcile design-doc §4 (U01) + §5 (U02) + the §7 `Serve` sketch (U03)**
+  to the shipped shapes (recorded in the U01/U02/U03 sections above), and
+  **decide the flash-localization question** (above). U05 exits on
+  `Kumunita.Web.Tests`.
