@@ -68,3 +68,48 @@
   (D1/D3). U01 owns the **two additive `Profile` fields** + the **`ProfileUpdate`
   extension** (the data model only — no write-lane logic, no find-people); it
   exits on `Kumunita.Core.Tests`.
+
+## U01
+
+- **Delivered:** the two additive `Profile` fields
+  (`Bio` `string?` + `TagIds` `IReadOnlyList<string> = []`) in
+  `src/Kumunita.Core/UserInfo/Profile.cs`, **after `EmailLanguage`** (the
+  additive-fields-at-the-end shape, ADR 0004 §B.1), each with the §B.1
+  doc-comment shape; + the `ProfileUpdate` extension — **appended** two optional
+  trailing fields `string? Bio = null` + `IReadOnlyCollection<string>? TagIds =
+  null` after the frozen `Address` default (the `Address` appended-with-default
+  precedent; the frozen five positional fields' order/types are **unchanged**).
+- **Idiom note (codebase wins for mechanics):** the design doc / register spell
+  the POCO field `string[] TagIds = []`, but the **real** codebase idiom —
+  `Post.TagIds` / `Page.TagIds` / `TodoItem.TagIds` / `Event.TagIds` — is
+  `public IReadOnlyList<string> TagIds { get; set; } = [];`. Per the unit
+  plan's "copy the field shape verbatim / the codebase wins for mechanics,"
+  the **POCO** field is `IReadOnlyList<string>` (consistent with its four
+  siblings); the **`ProfileUpdate` patch** field stays the locked surface's
+  `IReadOnlyCollection<string>?` (the patch's nullability is what "null ⇒
+  don't touch" needs, and it's interface-compatible with the POCO). No
+  round-trip or equality code is affected.
+- **Tests:** `tests/Kumunita.Core.Tests/UserInfo/ProfileBioTagsShapeTests.cs`
+  (4 tests, `PostgresFixture` harness, mirrors `ProfileTimezoneLaneTests`) —
+  (1) the two `Profile` fields **round-trip** (store the `Profile` doc directly
+  through the document store, reload verbatim via `GetProfileAsync`); (2) a
+  fresh profile defaults `Bio = null` / `TagIds` empty (the §B.1 no-reseed
+  pin); (3) `ProfileUpdate` **carries** the two fields — the frozen six-field
+  positional shape still compiles (new fields `null`), a set shape reflects
+  them; (4) `null` ⇒ don't-touch is **distinguishable** from set (and
+  null-vs-empty list). These are **shape** tests only — the write-lane
+  behavior (bio verbatim, tag create-or-get, the `tag.create` row, no
+  profile-write audit row) is **U02's**.
+- **Boundary confirmed (not a bug):** the current
+  `UserInfoService.UpsertProfileAsync` (line 1641) does **not** persist
+  `Bio`/`TagIds` (its create-branch field list + patch-application block lack
+  them) — that extension is **U02's** (the F13 single-write-surface pin, D3).
+  U01 is data-model shape only; `UpsertProfileAsync` is untouched here.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` **green**
+  (Total: 1072, Errors: 0, Failed: 0, Skipped: 0). No drift. **U02 next** —
+  extend `UpsertProfileAsync` to write `Profile.Bio` verbatim + resolve
+  `Profile.TagIds` to `Tag.Id`s (the `TagService.AttachToPostAsync` create-or-
+  get, one `tag.create` row per **newly created** tag), **no** new
+  `IUserInfoService` method, **no** profile-write audit row; exits on
+  `Kumunita.Core.Tests`.

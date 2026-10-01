@@ -156,6 +156,36 @@ public sealed class Profile
     /// <see cref="TimeZone"/> and <see cref="DateFormat"/>.
     /// </summary>
     public string? EmailLanguage { get; set; }
+
+    // M23 ADD (ADR 0123 D1/D5, ADR 0004 §B.1 additive — the 9th/10th additive
+    // Profile fields after AvatarId, TimeZone, DateFormat, EmailLanguage):
+    /// <summary>
+    /// The resident's **biography** (M23, ADR 0123 D1/D5) — the rich-content body
+    /// (Markdown + optional in-content images, the ADR 0025/0031 shape), rendered
+    /// on the directory detail by the single <c>MarkdownRenderer.RenderHtml</c>
+    /// helper. Stored as the authored Markdown <c>string</c>; <c>null</c>/empty
+    /// means "no bio" (the detail renders no bio block, C-M23·5). Gated by
+    /// <see cref="Visibility"/> (C-M23·1, D2 — the M2 "kept for the detailed
+    /// fields" audience finally takes over). An **additive** field (ADR 0004
+    /// §B.1), like <see cref="EmailLanguage"/>: delta-detected, idempotent, no
+    /// re-seed, no EF migration.
+    /// </summary>
+    public string? Bio { get; set; }
+
+    /// <summary>
+    /// The resident's **author-set tags** (M23, ADR 0123 D1/D3) — the
+    /// <c>string</c> <see cref="Kumunita.Core.Tags.Tag"/> ids the resident picked
+    /// (skills, interests, knowledge, expertise). References the **frozen ADR 0044
+    /// shared <c>Tag</c> doc** by <c>Tag.Id</c> — the
+    /// <see cref="Kumunita.Core.Posts.Post.TagIds"/> /
+    /// <see cref="Kumunita.Core.Pages.Page.TagIds"/> idiom verbatim (a third
+    /// referencer of the same doc, **not** a new tag type, C-M23·6/D1). Default
+    /// <see cref="IReadOnlyList{T}">empty</see> — a profile with no tags reads
+    /// back with an empty list (the ADR 0004 §B.1 additive no-reseed pin). A tag
+    /// is a **label, never a gate** (C-TG·1 carried to profiles, C-M23·6). An
+    /// **additive** field (ADR 0004 §B.1), like <see cref="EmailLanguage"/>.
+    /// </summary>
+    public IReadOnlyList<string> TagIds { get; set; } = [];
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
@@ -171,4 +201,15 @@ public sealed record ProfileUpdate(
     /// default after the frozen M1/M2 five-field shape so existing positional call sites
     /// compile unchanged; null leaves the current value untouched (the "null ⇒ don't touch"
     /// patch rule every other field follows).</summary>
-    string? Address = null);
+    string? Address = null,
+    /// <summary>The resident's biography (see <see cref="Profile.Bio"/>). M23 (ADR 0123 D3)
+    /// — the rich-content body. Appended with a default after the frozen six-field shape so
+    /// existing positional call sites compile unchanged; null leaves the current value
+    /// untouched (the "null ⇒ don't touch" patch rule).</summary>
+    string? Bio = null,
+    /// <summary>The resident's author-set tags (see <see cref="Profile.TagIds"/>). M23
+    /// (ADR 0123 D3) — the list of <see cref="Kumunita.Core.Tags.Tag"/> ids (the create-or-get
+    /// resolve is U02's). Appended with a default after the frozen seven-field shape so
+    /// existing positional call sites compile unchanged; null leaves the current value
+    /// untouched.</summary>
+    IReadOnlyCollection<string>? TagIds = null);
