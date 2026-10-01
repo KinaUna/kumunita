@@ -57,4 +57,39 @@ public sealed class MediaOptions
         !System.String.IsNullOrWhiteSpace(contentType)
         && ResolvedAttachmentAllowedTypes.Any(t =>
             System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Comma-separated allowed Content-Types for the document lane (case-insensitive;
+    /// M21, ADR 0122 D3). Distinct from <see cref="AttachmentAllowedContentTypes"/>
+    /// (C-ATT·6) and <see cref="AllowedContentTypes"/> (C-MED·5) — the document lane
+    /// has its own gate; the config key is
+    /// <c>Media:DocumentAllowedContentTypes</c>. Positive-only; SVG excluded (a
+    /// document is a download, never inline — D6).
+    /// </summary>
+    public string? DocumentAllowedContentTypes { get; set; }
+
+    /// <summary>
+    /// The resolved document allowlist (M21, ADR 0122 D3). A neighborhood set of
+    /// OFFICIAL document types — PDF / Office docs / text / csv / zip (the
+    /// attachment set minus the raster image types — an official document is not
+    /// a photo). Reuses <see cref="MaxBytes"/> (not a second size cap). The
+    /// attachment lane's <see cref="ResolvedAttachmentAllowedTypes"/> and the
+    /// image lane's <see cref="ResolvedAllowedTypes"/> are both untouched.
+    /// </summary>
+    public IEnumerable<string> ResolvedDocumentAllowedTypes =>
+        (DocumentAllowedContentTypes ??
+         "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/zip")
+            .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Whether <paramref name="contentType"/> is on the document allowlist
+    /// (case-insensitive; M21, ADR 0122 D3). Mirrors <see cref="IsAttachmentAllowed"/>
+    /// over the document set — the attachment lane's
+    /// <see cref="IsAttachmentAllowed"/> and the image lane's
+    /// <see cref="IsAllowed"/> are untouched.
+    /// </summary>
+    public bool IsDocumentAllowed(string? contentType) =>
+        !System.String.IsNullOrWhiteSpace(contentType)
+        && ResolvedDocumentAllowedTypes.Any(t =>
+            System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
 }

@@ -110,3 +110,74 @@
   U01's `Document` + `DocumentToAuditableResource` against the frozen
   `IAuthorizationService` Read path + the ADR 0011 `IMediaStore`; it exits on
   `Kumunita.Core.Tests`.
+
+## U02
+
+- **Delivered (7 plan deliverables — 5 new + 2 additive):**
+  (1) `src/Kumunita.Core/Documents/DocumentListResult.cs` — the feed DTO
+  (`Visible`/`HiddenCount`/`Page`/`Total`/`HasMore`; **no `ComponentId`** —
+  community-level, D2). (2)
+  `src/Kumunita.Core/Documents/DocumentDetailResult.cs` — the detail DTO
+  (`Document?`, null on **both** the missing and the deny fail-closed cases —
+  D7: feed and detail agree). (3)
+  `src/Kumunita.Core/Documents/DocumentUpload.cs` — the upload draft (`Audience`
+  is `Authorization.Audience`, matching U01's `Document.Audience`). (4)
+  `src/Kumunita.Core/Documents/DocumentService.cs` — `ListAsync` (feed, one
+  `CanSeeAsync`, one aggregate row, 0-candidate early return + `CountAsync`
+  candidate count), `GetAsync` (detail, one `CanAsync`, one decision row,
+  Deny→`Document = null`), `UploadAsync` (caller's `IDocumentSession`,
+  `session.Store` + one `SaveChangesAsync`, **no audit row**). Ctor is exactly
+  the three frozen deps (userInfo, authz, store) — M21 has no tag/notification
+  seams, so no optional params (unlike `PostService`). (5)
+  `src/Kumunita.Core/Media/MediaOptions.cs` — the additive `Document*` lane
+  (`DocumentAllowedContentTypes` / `ResolvedDocumentAllowedTypes` /
+  `IsDocumentAllowed`) **beside** the `Attachment*` lane; the image + attachment
+  lanes are **untouched**; the default document allowlist is the attachment set
+  **minus** the raster image types (a document is a download, not a photo — D3/D6).
+  (6) `src/Kumunita.Core/DependencyInjection.cs` — the `DocumentService`
+  `AddTransient` registration in `AddKumunitaCore`, immediately after the
+  `PostService` registration (same factory shape). (7)
+  `tests/Kumunita.Core.Tests/Documents/DocumentServiceTests.cs` — 6 seam tests
+  mirroring `PostServiceTests` (scratch-Postgres `PostgresFixture`,
+  `BootStoreAsync`/`Services`/`Plant`/`RunInSession` helpers, `DocumentAudits`
+  re-pointed at the `"document"` `TargetKind` pin): GATE-4 feed (one aggregate
+  row, `TargetKind = "document"`), C-M21·1 empty-audience (owner-allow /
+  non-author-deny, owner's id never the actor), C-M21·5 feed+detail agree,
+  GATE-3 detail (one decision row, deny still audited, missing ⇒ no row), and
+  C-M21·4 upload (standing-agnostic, **zero audit rows**, `Audience` verbatim,
+  `OwnerId` = actor, `Modified = null`).
+- **Exit (both green):** `dotnet build Kumunita.slnx -c Debug` → Build
+  succeeded, **0 warnings / 0 errors** (an initial xUnit2029 on an `Assert.Empty`
+  over a filtered LINQ query in my test was fixed to `Assert.DoesNotContain`,
+  matching `PostServiceTests`'s idiom). `dotnet exec …\Kumunita.Core.Tests.dll`
+  → **`Total: 1068, Errors: 0, Failed: 0, Skipped: 0`** (U01 had 1062 — my 6
+  new tests are green). **No new drift; zero new authorization surface**
+  (C-M21·2 / D8) — the service *rides* the frozen `Read` path (`CanSeeAsync` /
+  `CanAsync`), no new `AccessAction` / `Decide()` / `AccessVia` /
+  `IAuthorizationService` method.
+- **Deviation (flag for U05's doc-parity pass):** design doc **§5**'s
+  `DocumentService` shows the ctor as `(IAuthorizationService authz,
+  IDocumentStore store, IMediaStore media)` and `GetAsync` returning
+  `Task<DocumentDetailResult?>` (nullable result, `null` on both missing and
+  deny). The **unit plan (authoritative) + `PostService` (codebase wins for
+  mechanics)** both specify the ctor as `(IUserInfoService, IAuthorizationService,
+  IDocumentStore)` and `GetAsync` returning `Task<DocumentDetailResult>` with
+  `Document = null` on both fail-closed cases — that is what shipped. The
+  `IMediaStore` is **not** a `DocumentService` dependency in the unit plan (the
+  Web layer — U03 — owns `IMediaStore.PutAsync`/`OpenReadAsync`, the
+  `AttachmentController` lane shape); U03 does **not** need a Core service seam
+  for the bytes. **U05 should reconcile design doc §5** to the shipped shape
+  (three-dep ctor incl. `IUserInfoService`, non-nullable `DocumentDetailResult`
+  with `Document?`, no `IMediaStore` dep in Core) so the doc matches the code.
+- **Open question:** none blocking. The upload lane writes **no `AccessAudit`
+  row** (U00's §1.a A2 lock, the `PostService.CreatePostAsync` /
+  `AttachmentController.Upload` convention) — the C-M21·4 test pins **zero**
+  document audit rows on upload. `Document`'s `Modified` is `null` in M21 (set
+  only on a future replace — D9·1).
+- **Next unit (U03) entry point:** the `DocumentController` (index/detail/new +
+  upload POST + download GET) + view models, serving behind the `Read` decision
+  with Deny→404 (D7) and `Content-Disposition: attachment` (D6), composing U02's
+  `DocumentService` (`ListAsync`/`GetAsync`/`UploadAsync`) + the frozen
+  `IMediaStore` (the `AttachmentController` lane shape). It **consumes** the
+  `MediaOptions.IsDocumentAllowed` gate U02 added. It exits on
+  `Kumunita.Web.Tests`.

@@ -103,6 +103,17 @@ public static class ServiceCollectionExtensions
             // fire in production (the C-M6 lane).
             sp.GetRequiredService<Notifications.NotificationService>()));
 
+        // M21 (ADR 0122, U02): the documents-side composition root — a concrete
+        // class pairing the two frozen seams with the host-registered Marten
+        // IDocumentStore (mirrors the M3 PostService registration shape).
+        // Standing-agnostic (D5): the upload right is gated at the Web boundary;
+        // the Core service composes the frozen seams only (the ADR 0006-D lane
+        // pin — zero new authorization surface, C-M21·2/D8).
+        services.AddTransient<Documents.DocumentService>(sp => new Documents.DocumentService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
         // service kept behind an interface so the Web-side consumer (the
