@@ -464,18 +464,6 @@ public sealed class EventService : IEventService
     }
 
     /// <summary>
-    /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
-    /// audit tag (ADR 0054 §3.4): the event's <see cref="Event.AuthorId"/>
-    /// → <see cref="AccessVia.Owner"/>; a non-author actor (only reachable when
-    /// a <see cref="Roles.GlobalAdmin"/> took the ADR 0017 override branch)
-    /// → <see cref="AccessVia.Admin"/>.
-    /// </summary>
-    private static AccessVia AuditViaFor(string actorId, string authorId)
-        => string.Equals(authorId, actorId, StringComparison.Ordinal)
-            ? AccessVia.Owner
-            : AccessVia.Admin;
-
-    /// <summary>
     /// The **translation** display pin (ADR 0059, the
     /// <see cref="Posts.PostService.CanAddTranslation"/> shape): <c>true</c> when
     /// <paramref name="actorId"/> may add / edit / remove a translation of the
@@ -552,7 +540,7 @@ public sealed class EventService : IEventService
     // <c>Via</c> =
     // <see cref="AccessVia.Owner"/> (create, publish) or
     // <see cref="AccessVia.Admin"/> (edit / delete by a non-author GlobalAdmin —
-    // the <see cref="AuditViaFor"/> derivation; and the ADR 0059 translation
+    // the <see cref="StandingMatrix.AuditVia"/> derivation; and the ADR 0059 translation
     // lanes — author → Owner, Translator / GlobalAdmin → Admin, the
     // <see cref="ResolveTranslationStanding"/> derivation), <c>Outcome</c> =
     // <see cref="AccessOutcome.Allow"/>. **No**
@@ -858,7 +846,7 @@ public sealed class EventService : IEventService
         session.Store(existing);
         // ADR 0054 §3.4 — the audit row tags the branch the actor qualified
         // under: the author → Owner, a non-author GlobalAdmin override → Admin.
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.update", "event", existing.Id, AuditViaFor(actorId, existing.AuthorId)));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.update", "event", existing.Id, StandingMatrix.AuditVia(actorId, existing.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return existing;
     }
@@ -954,7 +942,7 @@ public sealed class EventService : IEventService
         session.Store(existing);
         // ADR 0054 §3.4 — tag the branch the actor qualified under:
         // author → Owner, non-author GlobalAdmin override → Admin.
-        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.delete", "event", existing.Id, AuditViaFor(actorId, existing.AuthorId)));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.delete", "event", existing.Id, StandingMatrix.AuditVia(actorId, existing.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

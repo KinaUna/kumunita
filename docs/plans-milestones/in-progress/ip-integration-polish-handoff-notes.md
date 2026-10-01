@@ -52,3 +52,34 @@ sites. Entry: `src/Kumunita.Core/Authorization/AccessAudit.cs`,
 register estimated ~62, projecting ~45 Project) — codebase wins for mechanics.
 
 **Next unit:** U02 — `StandingMatrix` + the four `*AuditViaFor` mappers.
+
+## U02 — `StandingMatrix` + the five author-based mapper deletions
+
+**Delivered:**
+- New `src/Kumunita.Core/Authorization/StandingMatrix.cs` — a pure static
+  class with `AuditVia(actorId, ownerId)`:
+  `string.Equals(ownerId, actorId, Ordinal) ? Owner : Admin`. Zero new
+  authorization surface (C-IP·2): no new `AccessVia` value, no DI registration.
+- Deleted the five author-based mappers: `AuditViaFor` (EventService) +
+  `TodoAuditViaFor` / `BoardAuditViaFor` / `GoalAuditViaFor` /
+  `ProjectAuditViaFor` (ProjectService). All five bodies were the same
+  `string.Equals(resource.AuthorId, actorId, Ordinal) ? Owner : Admin` — the
+  register's "owner property name differs per resource" line was a stale
+  estimate; the codebase wins (all `.AuthorId`).
+- Replaced all **26** call sites (2 EventService + 24 ProjectService) with
+  `StandingMatrix.AuditVia(actorId, <resource>.AuthorId)`; updated 8 stale
+  `<see cref="…"/>` references (7 ProjectService + 1 EventService) to point at
+  `StandingMatrix.AuditVia`.
+- `InventoryService.AuditVia(IReadOnlySet<string>)` (role-based, a different
+  pattern) left in place, as the register requires.
+- New `tests/Kumunita.Core.Tests/StandingMatrixTests.cs` (3 pin tests: owner →
+  Owner, non-owner → Admin, ordinal case-sensitive).
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` clean (0 warnings);
+  `Kumunita.Core.Tests` 1091/1091 green (U01's 1088 + 3 new); `AuditViaFor`
+  grep empty in `EventService.cs` + `ProjectService.cs`.
+
+**Open questions:** none. **Note:** actual call-site count is 26 (the register
+estimated ~22) — codebase wins for mechanics.
+
+**Next unit:** U03 — the two rate-limit policies (`message` + `write`) + the
+`[EnableRateLimiting]` attributes in `Kumunita.Web`.
