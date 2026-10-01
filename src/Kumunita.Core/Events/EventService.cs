@@ -661,7 +661,7 @@ public sealed class EventService : IEventService
             // unchanged (the existing create path).
             session.Store(@event);
         }
-        StoreAuditRow(session, actorId, "event.create", @event.Id, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.create", "event", @event.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return @event;
     }
@@ -858,7 +858,7 @@ public sealed class EventService : IEventService
         session.Store(existing);
         // ADR 0054 §3.4 — the audit row tags the branch the actor qualified
         // under: the author → Owner, a non-author GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "event.update", existing.Id, AuditViaFor(actorId, existing.AuthorId));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.update", "event", existing.Id, AuditViaFor(actorId, existing.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return existing;
     }
@@ -903,7 +903,7 @@ public sealed class EventService : IEventService
         }
 
         session.Store(existing);
-        StoreAuditRow(session, actorId, "event.publish", existing.Id, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.publish", "event", existing.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return existing;
     }
@@ -954,7 +954,7 @@ public sealed class EventService : IEventService
         session.Store(existing);
         // ADR 0054 §3.4 — tag the branch the actor qualified under:
         // author → Owner, non-author GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "event.delete", existing.Id, AuditViaFor(actorId, existing.AuthorId));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.delete", "event", existing.Id, AuditViaFor(actorId, existing.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -1362,7 +1362,7 @@ public sealed class EventService : IEventService
         // CanSeeGroupAsync above (TargetKind "grouppost") — two rows on create,
         // mirroring how the community create stores a write row and the
         // group-post create stores a gate row (ADR 0089 Decision).
-        StoreAuditRow(session, actorId, "event.create", @event.Id, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "event.create", "event", @event.Id, AccessVia.Owner));
 
         // One SaveChangesAsync — the C3 same-transaction lane: the gate decision
         // row + the new event commit atomically.
@@ -1545,7 +1545,7 @@ public sealed class EventService : IEventService
         };
 
         session.Store(translation);
-        StoreAuditRow(session, actorId, "eventtranslation.add", eventId, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.add", "event", eventId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return translation;
     }
@@ -1603,7 +1603,7 @@ public sealed class EventService : IEventService
         row.Created = DateTimeOffset.UtcNow;
 
         session.Store(row);
-        StoreAuditRow(session, actorId, "eventtranslation.update", eventId, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.update", "event", eventId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return row;
     }
@@ -1651,7 +1651,7 @@ public sealed class EventService : IEventService
             throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to remove.");
 
         session.Delete(row);
-        StoreAuditRow(session, actorId, "eventtranslation.remove", eventId, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "eventtranslation.remove", "event", eventId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -1685,30 +1685,6 @@ public sealed class EventService : IEventService
     }
 
     private static readonly IReadOnlySet<string> StaticEmptyRoles = new HashSet<string>(StringComparer.Ordinal);
-
-    /// <summary>
-    /// Appends the single <see cref="AccessAudit"/> row for a write lane
-    /// (invariant C3): <c>TargetKind = "event"</c> (the exact string — the
-    /// <see cref="EventToAuditableResource"/> discriminator), the given
-    /// <c>Action</c>, <c>Via</c>, <c>Outcome = Allow</c>, single-target
-    /// (<c>TargetId</c> set; counts null). Stored in the caller's write
-    /// session (it commits atomically with the domain write — C3).
-    /// </summary>
-    private static void StoreAuditRow(IDocumentSession session, string actorId, string action, string targetId, AccessVia via)
-    {
-        session.Store(new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = DateTimeOffset.UtcNow,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,   // the author acts as themself (no delegation in these lanes).
-            Action = action,
-            TargetKind = "event",             // the exact string (C3 — the adapter's discriminator).
-            TargetId = targetId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        });
-    }
 
     /// <summary>
     /// ADR 0018 — resolves the authored-in <see cref="Event.LanguageCode"/>:

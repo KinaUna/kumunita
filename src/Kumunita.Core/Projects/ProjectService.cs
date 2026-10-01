@@ -328,7 +328,7 @@ public sealed class ProjectService : IProjectService
     /// <see cref="ResolveLanguageCodeAsync"/> shape). One
     /// <see cref="AccessAudit"/> row (<c>todo.comment.create</c>,
     /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3 —
-    /// the <see cref="StoreAuditRow"/> shape).
+    /// the <see cref="AccessAuditFactory.SingleTarget"/> shape).
     /// </summary>
     public async Task<TodoComment> CreateTodoCommentAsync(
         string todoId, string actorId, IReadOnlySet<string> actorRoles,
@@ -389,7 +389,7 @@ public sealed class ProjectService : IProjectService
         };
 
         session.Store(comment);
-        StoreAuditRow(session, actorId, "todo.comment.create", todoId, TargetKindTodo, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.comment.create", TargetKindTodo, todoId, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return comment;
     }
@@ -440,7 +440,7 @@ public sealed class ProjectService : IProjectService
 
         comment.DeletedAt = DateTimeOffset.UtcNow;       // ADR 0024 — the soft-delete stamp.
         session.Store(comment);
-        StoreAuditRow(session, actorId, "todo.comment.delete", todoId, TargetKindTodo, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.comment.delete", TargetKindTodo, todoId, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return comment;
     }
@@ -1032,7 +1032,7 @@ public sealed class ProjectService : IProjectService
         }
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.create", todo.Id, TargetKindTodo, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.create", TargetKindTodo, todo.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -1232,7 +1232,7 @@ public sealed class ProjectService : IProjectService
         session.Store(todo);
         // Design doc §2.5 — the audit row tags the branch the actor qualified
         // under: creator → Owner, assignee / GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "todo.update", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.update", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -1303,7 +1303,7 @@ public sealed class ProjectService : IProjectService
         todo.Modified = DateTimeOffset.UtcNow;
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.assign", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.assign", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
 
         // M6 (U04, F8) — todo-assign emitter (design doc §6.3): the
         // assignee is notified. `null` = unassign (no recipient); skip the
@@ -1388,7 +1388,7 @@ public sealed class ProjectService : IProjectService
         todo.Modified = DateTimeOffset.UtcNow;
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.claim", todo.Id, TargetKindTodo, via);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.claim", TargetKindTodo, todo.Id, via));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -1636,7 +1636,7 @@ public sealed class ProjectService : IProjectService
         subtask.LanguageCode = await ResolveLanguageCodeAsync(subtask.LanguageCode, session, ct).ConfigureAwait(false);
 
         session.Store(subtask);
-        StoreAuditRow(session, actorId, "todo.add_subtask", subtask.Id, TargetKindTodo, TodoAuditViaFor(actorId, parent));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.add_subtask", TargetKindTodo, subtask.Id, TodoAuditViaFor(actorId, parent)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return subtask;
     }
@@ -1704,7 +1704,7 @@ public sealed class ProjectService : IProjectService
         todo.Modified = DateTimeOffset.UtcNow;
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.delete", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.delete", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -1769,7 +1769,7 @@ public sealed class ProjectService : IProjectService
             });
         }
 
-        StoreAuditRow(session, actorId, "board.create", board.Id, TargetKindBoard, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.create", TargetKindBoard, board.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }
@@ -1839,7 +1839,7 @@ public sealed class ProjectService : IProjectService
         // CreateBoardAsync `session.Store(...)` shape) — the sibling write
         // lanes never rely on dirty-tracking of a loaded row.
         session.Store(board);
-        StoreAuditRow(session, actorId, "board.update", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.update", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }
@@ -1973,7 +1973,7 @@ public sealed class ProjectService : IProjectService
         goal.LanguageCode = await ResolveLanguageCodeAsync(goal.LanguageCode, session, ct).ConfigureAwait(false);
 
         session.Store(goal);
-        StoreAuditRow(session, actorId, "goal.create", goal.Id, TargetKindGoal, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "goal.create", TargetKindGoal, goal.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return goal;
     }
@@ -2034,7 +2034,7 @@ public sealed class ProjectService : IProjectService
         // `session.Store(...)` shape) — the sibling write lanes never rely on
         // dirty-tracking of a loaded row.
         session.Store(goal);
-        StoreAuditRow(session, actorId, "goal.update", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "goal.update", TargetKindGoal, goal.Id, GoalAuditViaFor(actorId, goal)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return goal;
     }
@@ -2265,7 +2265,7 @@ public sealed class ProjectService : IProjectService
         project.LanguageCode = await ResolveLanguageCodeAsync(project.LanguageCode, session, ct).ConfigureAwait(false);
 
         session.Store(project);
-        StoreAuditRow(session, actorId, "project.create", project.Id, TargetKindProject, AccessVia.Owner);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "project.create", TargetKindProject, project.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return project;
     }
@@ -2372,7 +2372,7 @@ public sealed class ProjectService : IProjectService
         // `session.Store(...)` shape) — the sibling write lanes never rely on
         // dirty-tracking of a loaded row.
         session.Store(project);
-        StoreAuditRow(session, actorId, "project.update", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "project.update", TargetKindProject, project.Id, ProjectAuditViaFor(actorId, project)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return project;
     }
@@ -2462,7 +2462,7 @@ public sealed class ProjectService : IProjectService
         todo.Modified = DateTimeOffset.UtcNow;
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.set_project", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.set_project", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -2527,7 +2527,7 @@ public sealed class ProjectService : IProjectService
         todo.Modified = DateTimeOffset.UtcNow;
 
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.set_event", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.set_event", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -2598,7 +2598,7 @@ public sealed class ProjectService : IProjectService
         board.Modified = DateTimeOffset.UtcNow;
 
         session.Store(board);
-        StoreAuditRow(session, actorId, "board.set_project", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.set_project", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }
@@ -2665,7 +2665,7 @@ public sealed class ProjectService : IProjectService
         // Design doc §2.5 — the audit row targets the **board** (the lane is
         // not its own auditable resource); the branch: creator → Owner,
         // GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "board.update_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.update_lane", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return lane;
     }
@@ -2769,7 +2769,7 @@ public sealed class ProjectService : IProjectService
         // Design doc §2.5 — the audit row targets the **board** (the lane is
         // not its own auditable resource); the branch: creator → Owner,
         // GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "board.move_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.move_lane", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return lane;
     }
@@ -2878,7 +2878,7 @@ public sealed class ProjectService : IProjectService
         // Design doc §2.5 — the audit row targets the **board** (the
         // placement is not its own auditable resource); the branch: creator →
         // Owner, GlobalAdmin override → Admin.
-        StoreAuditRow(session, actorId, "board.add_todo", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.add_todo", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
@@ -2939,7 +2939,7 @@ public sealed class ProjectService : IProjectService
         };
 
         session.Store(lane);
-        StoreAuditRow(session, actorId, "board.add_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.add_lane", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return lane;
     }
@@ -3037,7 +3037,7 @@ public sealed class ProjectService : IProjectService
         }
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        StoreAuditRow(session, actorId, "board.move_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.move_lane", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         // The loaded `lane` instance is a separate object from the queried
@@ -3133,7 +3133,7 @@ public sealed class ProjectService : IProjectService
             session.Store(remaining[i]);
         }
 
-        StoreAuditRow(session, actorId, "board.delete_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.delete_lane", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -3271,7 +3271,7 @@ public sealed class ProjectService : IProjectService
 
         todo.Modified = now;
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.move_to_lane", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.move_to_lane", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return placement;
     }
@@ -3346,7 +3346,7 @@ public sealed class ProjectService : IProjectService
         board.Modified = DateTimeOffset.UtcNow;
 
         session.Store(board);
-        StoreAuditRow(session, actorId, "board.delete", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.delete", TargetKindBoard, board.Id, BoardAuditViaFor(actorId, board)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -3410,7 +3410,7 @@ public sealed class ProjectService : IProjectService
         goal.Modified = DateTimeOffset.UtcNow;
 
         session.Store(goal);
-        StoreAuditRow(session, actorId, "goal.delete", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "goal.delete", TargetKindGoal, goal.Id, GoalAuditViaFor(actorId, goal)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -3460,7 +3460,7 @@ public sealed class ProjectService : IProjectService
         project.Modified = DateTimeOffset.UtcNow;
 
         session.Store(project);
-        StoreAuditRow(session, actorId, "project.delete", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "project.delete", TargetKindProject, project.Id, ProjectAuditViaFor(actorId, project)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -3485,31 +3485,6 @@ public sealed class ProjectService : IProjectService
     /// string the <see cref="ProjectToAuditableResource"/> discriminator carries
     /// (U01, ADR 0086).</summary>
     private const string TargetKindProject = "project";
-
-    /// <summary>
-    /// Appends the single <see cref="AccessAudit"/> row for a write lane
-    /// (invariant C3): the given <c>TargetKind</c> (the exact string — the
-    /// U03 adapter's discriminator), the given <c>Action</c>, <c>Via</c>,
-    /// <c>Outcome = Allow</c>, single-target (<c>TargetId</c> set; counts
-    /// null). Stored in the caller's write session (it commits atomically
-    /// with the domain write — C3). The <see cref="Events.EventService"/>
-    /// StoreAuditRow shape.
-    /// </summary>
-    private static void StoreAuditRow(IDocumentSession session, string actorId, string action, string targetId, string targetKind, AccessVia via)
-    {
-        session.Store(new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = DateTimeOffset.UtcNow,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,   // the actor acts as themself (no delegation in these lanes).
-            Action = action,
-            TargetKind = targetKind,          // the exact string (C3 — the adapter's discriminator).
-            TargetId = targetId,
-            Via = via,
-            Outcome = AccessOutcome.Allow
-        });
-    }
 
     /// <summary>
     /// ADR 0018 — resolves the authored-in <see cref="TodoItem.LanguageCode"/>
@@ -3758,7 +3733,7 @@ public sealed class ProjectService : IProjectService
         };
 
         session.Store(translation);
-        StoreAuditRow(session, actorId, "todotranslation.add", todoItemId, TargetKindTodo, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.add", TargetKindTodo, todoItemId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return translation;
     }
@@ -3802,7 +3777,7 @@ public sealed class ProjectService : IProjectService
         row.Created = DateTimeOffset.UtcNow;
 
         session.Store(row);
-        StoreAuditRow(session, actorId, "todotranslation.update", todoItemId, TargetKindTodo, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.update", TargetKindTodo, todoItemId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return row;
     }
@@ -3839,7 +3814,7 @@ public sealed class ProjectService : IProjectService
             throw new KeyNotFoundException($"To-do '{todoItemId}' has no translation for '{languageCode}'; nothing to remove.");
 
         session.Delete(row);
-        StoreAuditRow(session, actorId, "todotranslation.remove", todoItemId, TargetKindTodo, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todotranslation.remove", TargetKindTodo, todoItemId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -3896,7 +3871,7 @@ public sealed class ProjectService : IProjectService
         };
 
         session.Store(translation);
-        StoreAuditRow(session, actorId, "boardtranslation.add", boardId, TargetKindBoard, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.add", TargetKindBoard, boardId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return translation;
     }
@@ -3940,7 +3915,7 @@ public sealed class ProjectService : IProjectService
         row.Created = DateTimeOffset.UtcNow;
 
         session.Store(row);
-        StoreAuditRow(session, actorId, "boardtranslation.update", boardId, TargetKindBoard, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.update", TargetKindBoard, boardId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return row;
     }
@@ -3977,7 +3952,7 @@ public sealed class ProjectService : IProjectService
             throw new KeyNotFoundException($"Board '{boardId}' has no translation for '{languageCode}'; nothing to remove.");
 
         session.Delete(row);
-        StoreAuditRow(session, actorId, "boardtranslation.remove", boardId, TargetKindBoard, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "boardtranslation.remove", TargetKindBoard, boardId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -4034,7 +4009,7 @@ public sealed class ProjectService : IProjectService
         };
 
         session.Store(translation);
-        StoreAuditRow(session, actorId, "projecttranslation.add", projectId, TargetKindProject, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.add", TargetKindProject, projectId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return translation;
     }
@@ -4078,7 +4053,7 @@ public sealed class ProjectService : IProjectService
         row.Created = DateTimeOffset.UtcNow;
 
         session.Store(row);
-        StoreAuditRow(session, actorId, "projecttranslation.update", projectId, TargetKindProject, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.update", TargetKindProject, projectId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return row;
     }
@@ -4115,7 +4090,7 @@ public sealed class ProjectService : IProjectService
             throw new KeyNotFoundException($"Project '{projectId}' has no translation for '{languageCode}'; nothing to remove.");
 
         session.Delete(row);
-        StoreAuditRow(session, actorId, "projecttranslation.remove", projectId, TargetKindProject, via.Value);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "projecttranslation.remove", TargetKindProject, projectId, via.Value));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -4221,7 +4196,7 @@ public sealed class ProjectService : IProjectService
 
         session.Store(placement);
         session.Store(adjacent[0]);
-        StoreAuditRow(session, actorId, "todo.move_within_lane", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.move_within_lane", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return placement;
     }
@@ -4344,7 +4319,7 @@ public sealed class ProjectService : IProjectService
 
         session.Store(todo);
         session.Store(placement);
-        StoreAuditRow(session, actorId, "todo.move_to_lane", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.move_to_lane", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return placement;
     }
@@ -4467,7 +4442,7 @@ public sealed class ProjectService : IProjectService
 
         todo.Modified = DateTimeOffset.UtcNow;
         session.Store(todo);
-        StoreAuditRow(session, actorId, "todo.move_to_board", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.move_to_board", TargetKindTodo, todo.Id, TodoAuditViaFor(actorId, todo)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return placement;
     }
@@ -4590,7 +4565,7 @@ public sealed class ProjectService : IProjectService
         // Design doc §2.3 — the audit row targets the **copy** (the AddSubtaskAsync
         // precedent: the new to-do's id is the target); the branch the actor
         // qualified under (creator / assignee / GlobalAdmin over the original).
-        StoreAuditRow(session, actorId, "todo.copy_to_board", copy.Id, TargetKindTodo, TodoAuditViaFor(actorId, original));
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.copy_to_board", TargetKindTodo, copy.Id, TodoAuditViaFor(actorId, original)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return copy;
     }

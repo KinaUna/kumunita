@@ -31,3 +31,24 @@ sites. Entry: `src/Kumunita.Core/Authorization/AccessAudit.cs`,
 `src/Kumunita.Core/Events/EventService.cs` (StoreAuditRow, ~line 1697),
 `src/Kumunita.Core/Inventory/InventoryService.cs` (StoreAuditRow, line 507),
 `src/Kumunita.Core/Projects/ProjectService.cs` (StoreAuditRow, ~line 3498).
+
+## U01 — `AccessAuditFactory` + the three `StoreAuditRow` deletions
+
+**Delivered:**
+- New `src/Kumunita.Core/Authorization/AccessAuditFactory.cs` — a pure
+  static class with `SingleTarget(actorId, action, targetKind, targetId, via,
+  outcome = Allow)`: sets all 9 `AccessAudit` fields, `EffectivePrincipalId =
+  actorId`, `VisibleCount`/`HiddenCount` = null (single-target shape).
+- Deleted the private `StoreAuditRow` from `EventService`, `InventoryService`,
+  and `ProjectService`; all **57** call sites (8 + 9 + 40) now call
+  `session.Store(AccessAuditFactory.SingleTarget(...))` — the "caller's
+  session" idiom preserved. `InventoryService.AuditVia` (role-based) left in
+  place; the `*AuditViaFor` mappers untouched (U02).
+- New `tests/Kumunita.Core.Tests/AccessAuditFactoryTests.cs` (2 pin tests).
+- **Exit:** `dotnet build` clean; `Kumunita.Core.Tests` 1088/1088 green;
+  `private static void StoreAuditRow` grep empty across `Kumunita.Core`.
+
+**Open questions:** none. **Note:** actual call-site count is 57 (the
+register estimated ~62, projecting ~45 Project) — codebase wins for mechanics.
+
+**Next unit:** U02 — `StandingMatrix` + the four `*AuditViaFor` mappers.
