@@ -197,6 +197,16 @@ var marten = builder.Services.AddMarten(opts =>
     // business-key index is pinned). Without this call the UsageEvent doc
     // is invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent).
     UsageDocTypes.Configure(opts);
+
+    // M21 (ADR 0122 D1, plan U01): the Document bounded context's document
+    // (Document, ADR 0004 §B.1 — a parallel surface to M17DocTypes /
+    // MediaDocTypes / UsageDocTypes, not additive on an existing one:
+    // Document uses the conventional string Id, so no non-default convention
+    // or business-key index is pinned). Without this call the Document doc is
+    // invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9/M16/M17
+    // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
+    // SchemaBootstrap versioned boot both pick the surface up automatically.
+    DocumentDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
