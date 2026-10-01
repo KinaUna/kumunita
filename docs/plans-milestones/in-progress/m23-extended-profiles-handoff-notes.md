@@ -108,6 +108,52 @@
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `dotnet exec
   tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` **green**
   (Total: 1072, Errors: 0, Failed: 0, Skipped: 0). No drift. **U02 next** —
+
+## U02
+
+- **Delivered:** the F13 single-write-lane extension (D3, C-M23·3, C-M23·6,
+  GATE-3) — **one optional trailing param** appended to
+  `IUserInfoService.UpsertProfileAsync(profile, patch, string? actorBy = null)`
+  (the `SetProfileTimezoneAsync` `actorBy` idiom — the ADR 0006-E
+  compatible-addition lane; the existing two-param call site
+  `ProfileController.Edit` line 261 compiles unchanged). In
+  `UserInfoService.UpsertProfileAsync`, after the "patch wins" block:
+  `if (patch.Bio is not null) doc.Bio = patch.Bio;` (**verbatim**, ADR 0001-B,
+  `null` ⇒ don't touch) + the **inlined** ADR 0044 tag create-or-get
+  (`TagService.AttachToPostAsync` shape — **not** a new `ITagService` method):
+  a missing `Slug` **creates** a `Tag` (+ exactly **one** `tag.create`
+  `AccessAudit` row, `CreatedBy = actorBy ?? subjectId`, `Via = Owner`,
+  C-TG·9); a present `Slug` is **reused** (no row, C-TG·4); blank slugs
+  skipped. The profile write itself emits **no** audit row (a Profile field
+  write, not an access decision — the existing shape); the create-branch field
+  list also carries `Bio`/`TagIds`; still **one** `SaveChangesAsync` (C3).
+- **Open question:** none — the register's D3 [PROPOSED] set was locked
+  verbatim by U00; no D# amended here. `LanguageCode` is set to `"en"` on new
+  profile tags (the profile doc has no language field to derive from — the
+  `TagService` post/page lane uses the content's `LanguageCode`; the profile
+  has none, so the `en` floor matches the existing `Tag` default).
+- **Tests:** `tests/Kumunita.Core.Tests/UserInfo/ProfileBioTagsWriteLaneTests.cs`
+  (7 tests, `PostgresFixture` + `TagDocTypes.Configure` in the boot) —
+  (1) bio stored **byte-for-byte verbatim** (no Core Markdown processing);
+  (2) `null` `Bio`/`TagIds` ⇒ don't-touch (both preserved); (3) new slug
+  creates a `Tag` + exactly one `tag.create` row (`CreatedBy = actor`,
+  `Via = Owner`, `Outcome = Allow`) and **no other** audit row; (4) reuse of a
+  present slug creates no new tag/row; (5) a bio-only write emits **zero**
+  audit rows; (6) `actorBy = null` ⇒ `CreatedBy` falls back to the owner;
+  (7) the `ProfileToAuditableResource` six-member shape + `"directory"`
+  `TargetKind` is unchanged (zero-new-authorization-surface pin, C-M23·2).
+- **Boundary confirmed:** the `ProfileController.Edit` call site
+  (`UpsertProfileAsync(profile, patch)`) keeps compiling via the optional
+  `actorBy` default; U04 will pass `SubjectId(User)` explicitly for a
+  non-fallback `CreatedBy` (its own deliverable).
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` **green**
+  (Total: 1079, Errors: 0, Failed: 0, Skipped: 0). No drift. **U03 next** —
+  adds `IProfileFindService` (the find-people read) in `Kumunita.Core.UserInfo`;
+  it composes the existing `GetProfilesAsync` candidate set + the **single**
+  `CanSeeAsync` pass over `ProfileToAuditableResource` (U00's §1.a C1 pin),
+  reuses the frozen ADR 0044 `ITagService` for tag display names, and emits the
+  aggregate `directory` `AccessAudit` row via `CanSeeAsync` itself.
   extend `UpsertProfileAsync` to write `Profile.Bio` verbatim + resolve
   `Profile.TagIds` to `Tag.Id`s (the `TagService.AttachToPostAsync` create-or-
   get, one `tag.create` row per **newly created** tag), **no** new
