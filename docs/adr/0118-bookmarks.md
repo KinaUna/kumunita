@@ -228,6 +228,81 @@ surfaces have their own visibility world).
 
 ## Amendments
 
+### 2026-10-04 — F1 completed: the button reflects "bookmarked" on reload (the remove affordance)
+
+The F1 design intent — *"the button reflects 'bookmarked' on reload"* —
+was left **unfinished** at ship: the detail-surface `_BookmarkButton`
+partial was a static **"Bookmark"** button with **no remove affordance**.
+The root cause: `Toggle` always 302-redirects, so the partial's
+"bookmarked" branch (driven by `ViewData["BookmarkState"]`) was **dead
+code** — no detail view ever set `ViewData["BookmarkState"]`, because the
+state was only meaningful on a same-request re-render, which the
+redirect-after-write flow never produces. The obs-2 amendment (2026-09-30)
+noted the F1 pin was "satisfied by the pre-existing `BookmarkState`
+ViewData exception path" — but that path was never exercised by the detail
+surfaces, so the user could bookmark a post and then have **no way to
+remove it** except via the `/bookmarks` list.
+
+The amendment (completing F1 with the house's **`@inject`-in-view idiom** —
+resolve a per-target value inline in the view that renders it, e.g.
+`Documents/New.cshtml` `@inject`s `IUserInfoService` and `await`s a read in
+its `@{ }` block — rather than threading state through every controller +
+view-model):
+
+- **`IBookmarkService` seam gains a 4th public method**,
+  `Task<bool> IsBookmarkedAsync(string ownerId, string targetKind, string
+  targetId)` — a **C-M17·2-shape personal read**: it queries the owner's
+  own row (`Where(b => b.OwnerId == ownerId && b.TargetKind == targetKind
+  && b.TargetId == targetId)`) with **NO target read** (D5 / F4 — a
+  dangling row still answers `true`), **NO** `AccessAudit` row, **NO**
+  `CanAsync` pass (the `ListAsync` precedent), and **NO** new
+  `AccessAction` / `AccessVia` / `Decide()` branch. It is a read-only
+  personal-read method in the exact C-M17·2 shape, not a new
+  authorization surface — the frozen-seam surface (D2 / C-M17·1) is
+  unchanged.
+- **`_BookmarkButton` becomes two-lane** — the partial `@inject`s the
+  frozen `IBookmarkService` and resolves the state inline in its `@{ }`
+  block: `var ownerId = User is not null ? KumunitaPrincipal.SubjectId(User)
+  : null; var bookmarked = ownerId is not null && await
+  Bookmarks.IsBookmarkedAsync(ownerId, Kind, Id);`. An unsigned-in visitor
+  (no `SubjectId`) resolves NotBookmarked with **no query** (the C-M17·2
+  "operator has no read standing" gate). **Bookmarked** ⇒ a form POSTing
+  to `/bookmarks/{kind}/{id}/remove` with the **`bm.list.unbookmark`**
+  ("Remove") label — the D4 physical-removal lane; **not bookmarked** ⇒
+  the existing **`bm.button.bookmark`** "Bookmark" form POSTing to
+  `/bookmarks/toggle` (the D3 write-lane). The partial is the **sole**
+  resolver — it makes exactly one targeted personal read and no other
+  service call (the C-M17·2 pin holds: the read is targeted, not the
+  owner's full bookmark list; no `CanAsync` branch).
+- **`BookmarksController.Remove`** — the signature gains an **optional**
+  `returnUrl` form field (`Remove(string targetKind, string targetId,
+  string? returnUrl = null)`), redirecting to `returnUrl` when present
+  (the obs-2 precedent, the `Toggle` shape) so removing a bookmark from a
+  detail surface keeps the actor on that surface; it still sets the
+  `bm.toggle.removed` flash.
+- **No new `bm.*` key** — the remove lane reuses the closed
+  `bm.list.unbookmark` key; the `bm.button.bookmarked` label key is now
+  **orphaned** by the button (still registered in all four registries, the
+  closed 14-key set pinned by `BmKeys_AreTheClosedFourteenKeySet` is
+  unchanged; the parity pin checks registration, not per-key
+  consumption). See the design doc §kw-l note.
+- **Test churn avoided** — the alternative (a mandatory
+  `IBookmarkService` ctor param on the 6 detail controllers + view-model
+  threading) would have broken ~29 test harnesses; the house
+  `@inject`-in-view idiom resolves a per-target value in the view that
+  renders it, so no controller or view-model change was needed.
+
+Pinned by the retargeted `BmButton_Partial_Renders_Correct_Lane_For_State`
+(the old `BmButton_Partial_Renders_Correct_Label_For_State`; now asserts
+the two-lane structure + the `IBookmarkService` / `IsBookmarkedAsync`
+seam read + the `KumunitaPrincipal.SubjectId` owner read) +
+`BookmarkServiceTests` (the `IsBookmarkedAsync` personal read). The
+**frozen `IBookmarkService` public signature** changes from 3 to 4
+methods — recorded as a **deliberate amendment** (the design doc §2.7
+drift log, 2026-10-04 row), not a silent drift: it is one read-only
+personal-read method in the C-M17·2 shape, adding no `AccessAudit`
+surface, no `CanAsync` branch, and no authorization decision of its own.
+
 ### 2026-09-30 — D3/F2 write-lane: the announcement branch resolves the owner's real standing in-Core (the obs-4 lapse closed)
 
 The **D3** write-lane rule — *"re-runs the target's frozen `Read`

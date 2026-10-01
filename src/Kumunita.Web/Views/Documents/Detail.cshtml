@@ -1,0 +1,67 @@
+@model Kumunita.Web.Models.DocumentDetailViewModel
+@using Kumunita.Core.Documents
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Document.Title) ? "Document" : Model.Document.Title;
+
+    // Human-readable byte size (the detail meta block).
+    string FormatSize(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0 ? $"{bytes} {units[unit]}" : $"{size:0.#} {units[unit]}";
+    }
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/documents" class="btn btn-link p-0">
+                &larr; <kw-l key="documents.title">Documents</kw-l>
+            </a>
+        </p>
+
+        <h1>@Model.Document.Title</h1>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Document.Summary))
+        {
+            <p class="lede text-muted">@Model.Document.Summary</p>
+        }
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-sm-3 col-md-2 fw-semibold">
+                        <kw-l key="documents.detail.type_size">File type / size</kw-l>
+                    </div>
+                    <div class="col-sm-9 col-md-10">
+                        @Model.Document.ContentType
+                        &middot; @FormatSize(Model.Document.SizeBytes)
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-sm-3 col-md-2 fw-semibold">
+                        <kw-l key="documents.detail.updated">Last updated</kw-l>
+                    </div>
+                    <div class="col-sm-9 col-md-10">
+                        <kw-dt dt="@(Model.Document.Modified ?? Model.Document.Created)" format="g"></kw-dt>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.CanDownload)
+        {
+            <div class="d-flex gap-2">
+                <a class="btn btn-primary" href="@(Model.DownloadUrl)">
+                    <kw-l key="documents.download">Download</kw-l>
+                </a>
+            </div>
+        }
+    </div>
+</div>

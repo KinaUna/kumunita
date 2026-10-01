@@ -343,8 +343,31 @@ public interface IUserInfoService
     /// default per ADR 0001-B — the author's choice, absolute by default — i.e.
     /// *self-only* visibility on bootstrap). Called by the IdentityModule's
     /// lifecycle (signup, seed-admin setup) and by the M1 profile-bootstrap
-    /// surface (the M2 editing UI is out of scope, M1 design §"Out of scope").</summary>
-    Task UpsertProfileAsync(Profile profile, ProfileUpdate patch);
+    /// surface (the M2 editing UI is out of scope, M1 design §"Out of scope").
+    /// <para>
+    /// M23 (ADR 0123 D3) extends this single write lane — <b>no new method</b>:
+    /// <see cref="ProfileUpdate.Bio"/> is written <b>verbatim</b> (the author's
+    /// choice, ADR 0001-B), and <see cref="ProfileUpdate.TagIds"/> is resolved
+    /// to <see cref="Tags.Tag"/> ids — a missing <c>Slug</c> <b>creates</b> a
+    /// <c>Tag</c> (+ one <c>tag.create</c> audit row, C-TG·9), a present
+    /// <c>Slug</c> is <b>reused</b> (no row, C-TG·4). The profile write itself
+    /// emits <b>no</b> audit row (a Profile field write, not an access decision
+    /// — the existing shape). A <c>null</c> <c>Bio</c> / <c>TagIds</c> leaves
+    /// the current value untouched (the "null ⇒ don't touch" patch rule every
+    /// other field follows).
+    /// </para>
+    /// </summary>
+    /// <param name="actorBy">
+    /// M23 (D3): the acting resident's subject id — the <c>CreatedBy</c> on any
+    /// newly created <see cref="Tags.Tag"/>. The caller (the self-edit Web
+    /// boundary) passes the owner's id; a <c>null</c> falls back to
+    /// <c>profile.SubjectId</c> (the only standing is the author's own profile,
+    /// D3). Appended as an optional trailing param (the
+    /// <see cref="SetProfileTimezoneAsync"/> <c>actorBy</c> idiom — the ADR
+    /// 0006-E compatible-addition lane); existing two-param call sites compile
+    /// unchanged.
+    /// </param>
+    Task UpsertProfileAsync(Profile profile, ProfileUpdate patch, string? actorBy = null);
 
     /// <summary>The four seeded components (Safety, Maintenance, Social,
     /// Governance) at first boot — idempotent (upsert by <c>key</c> /

@@ -58,9 +58,11 @@ public static class Milestones
         new("M17", "Bookmarks — save posts, events, todos, etc. for quick personal access", StatusDone),
         new("M18", "Recurring events — repeating events over the M4 events surface", StatusDone),
         new("M19", "Guest accounts — limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, etc.; admins set what a guest may access and when", StatusDone),
-        new("M20", "Notification quiet times — per-resident quiet schedules (allowed/blocked hours of day and days of week) on the M6 notification lane; admin-set check cadence for pending notifications", StatusPlanned),
-        new("M21", "Document management — a shared repository for official documents, contracts, etc., with per-document access controls", StatusPlanned),
-        new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusPlanned),
+        new("M20", "Notification quiet times — per-resident quiet schedules (allowed/blocked hours of day and days of week) on the M6 notification lane; admin-set check cadence for pending notifications", StatusDone),
+        new("M21", "Document management — a shared repository for official documents, contracts, etc., with per-document access controls", StatusDone),
+        // M23 ships before M22: M23 (extended profiles) was pulled forward and completed while M22 (onboarding) remained StatusPlanned/deferred; the order M20, M21, M23, M22 is pinned by MilestonesTests.cs — do not reorder.
+        new("M23", "Extended user profiles — a biography + free author-set tags (skills, interests, knowledge, expertise) to make it easier to find people with something in common", StatusDone),
+        new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusNext),
     };
 
     public static string LabelFor(string status) => status switch

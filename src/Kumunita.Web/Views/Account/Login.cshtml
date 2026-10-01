@@ -10,7 +10,27 @@
 
         @if (!string.IsNullOrEmpty(Model.Error))
         {
-            <div class="alert alert-danger">@Model.Error</div>
+            <div class="alert alert-danger">
+                @* D6 — the code→message table (three known codes render their
+                   localized kw-l message; an unknown code falls back to
+                   Model.Error verbatim — forward-compatible). The controller
+                   passes the code through verbatim (no server-side copy). *@
+                @switch (Model.Error)
+                {
+                    case "blocked":
+                        <kw-l key="account.login.error.blocked">Your account has been temporarily suspended. Contact an administrator.</kw-l>
+                        break;
+                    case "account-removed":
+                        <kw-l key="account.login.error.removed">Your account has been removed. Contact an administrator.</kw-l>
+                        break;
+                    case "role-changed":
+                        <kw-l key="account.login.error.role_changed">Your role has been changed. Please sign in again.</kw-l>
+                        break;
+                    default:
+                        @Model.Error
+                        break;
+                }
+            </div>
         }
 
         <form asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl" method="post">

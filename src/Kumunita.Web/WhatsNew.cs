@@ -19,6 +19,18 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.19.0", "2026-10-01", new List<string>
+        {
+            "Extended profiles — add a biography and your own tags (skills, interests, knowledge, expertise) to your profile, visible to the people your profile's visibility allows; find neighbours with something in common by tag or by a word in their bio — a match only surfaces people you can already see, and every such read is audited (ADR 0123).",
+        }),
+        new("0.18.0", "2026-10-01", new List<string>
+        {
+            "Documents — a shared repository for the community's official documents (contracts, minutes, notices, bylaws): each document is readable only by the people its uploader chose (an empty audience is a public denial), is served as a download (never rendered in the browser), and is audited every time it is opened; a GlobalAdmin or Moderator uploads a document and chooses who can see it (ADR 0122).",
+        }),
+        new("0.17.0", "2026-09-30", new List<string>
+        {
+            "Notification quiet hours — choose when your notification emails are held, in your own time zone: a per-resident schedule of quiet hours of day and days of week. Your emails are held (never lost) and arrive once the quiet window lifts, while your inbox always keeps the full record. An admin sets how often held notifications are re-checked (ADR 0121).",
+        }),
         new("0.16.0", "2026-09-30", new List<string>
         {
             "Guest accounts — a GlobalAdmin settles a limited, time-bounded standing for a guest (a consultant, coach, teacher, speaker, or similar outside-the-resident-circle account): the bounded window the standing is live, and a closed set of read surfaces the guest may see (announcements, events, directory). A guest is never a full member — the standing is live only inside the window, settled by data, and read per request; one audited write lane, zero new authorization surface (ADR 0120).",

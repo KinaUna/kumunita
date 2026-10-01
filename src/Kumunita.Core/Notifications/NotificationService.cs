@@ -36,6 +36,15 @@ public sealed class NotificationService
     private readonly IUserInfoService _userInfo;
     private readonly ITranslationProvider _translator;
     private readonly IMailerStage _mailer;
+    // M20 (ADR 0121, D4) — the ADR 0019 platform-default time zone read
+    // (GetDefaultTimezoneAsync) the quiet gate's effective-zone chain rides:
+    // Profile.TimeZone override → platform default → UTC floor. Optional
+    // (CS1736) so the existing test-construction sites that pass only the
+    // four frozen seams keep compiling unchanged; a test that needs the quiet
+    // gate to resolve a non-UTC zone passes it explicitly. Absence (null) →
+    // the chain falls through to the UTC floor (the safe, never-quiet-for-zone
+    // default: a schedule is still evaluated against UTC, never throws).
+    private readonly ILocalizationService? _localization;
     private readonly bool _suppressSampleAccounts;
     // The instance's public base URL (the VerificationOptions.BaseUrl
     // absolute-link precedent — the M1 verification email builds its link the
@@ -54,12 +63,19 @@ public sealed class NotificationService
         // The instance base URL for the email's absolute link. Optional
         // (CS1736 trailing-param idiom) so the existing test-construction
         // sites that pass only the four frozen seams keep compiling unchanged.
-        IOptions<Identity.VerificationOptions>? baseUrlOptions = null)
+        IOptions<Identity.VerificationOptions>? baseUrlOptions = null,
+        // M20 (ADR 0121, D4) — the ADR 0019 platform-default zone read the
+        // quiet gate's effective-zone chain uses. Optional (CS1736 trailing
+        // param) so the eight existing construction sites (seven test
+        // harnesses + the DI lambda) keep compiling unchanged; a test that
+        // needs the gate to resolve a non-UTC zone passes a stand-in.
+        ILocalizationService? localization = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _translator = translator ?? throw new ArgumentNullException(nameof(translator));
         _mailer = mailer ?? throw new ArgumentNullException(nameof(mailer));
+        _localization = localization;
         // ADR 0078 — the host binds SuppressForSampleAccountsInProduction to
         // !IsDevelopment() in Program.cs; in Development (Mailpit) sample
         // accounts behave like real residents; in Production/Staging they are
@@ -275,6 +291,22 @@ public sealed class NotificationService
         if (kind == NotificationKinds.EventReminder)
             return notification;
 
+        // (M20 — the quiet-hours gate, D4) — consulted AFTER the inbox row is
+        // stored (D7) and AFTER the D7 email-kind gate, BEFORE the email is
+        // staged. A quiet recipient keeps the inbox row (D7) but the email is
+        // DEFERRED, not dropped (D1): mark the row EmailDeferred and return —
+        // no IMailerStage.StageAsync. A non-quiet recipient falls through to
+        // the existing (5) email-nudge path unchanged (byte-identical to
+        // pre-M20, C-M20·3). The gate is a pure function of (schedule,
+        // instant, effective zone) — no authorization surface (C-M20·5), and
+        // it never returns null / never skips the session.Store above
+        // (C-M20·1 / ADR 0076 D7 — the inbox is always durable).
+        if (await QuietNowForAsync(session, recipientId, now: DateTimeOffset.UtcNow, ct).ConfigureAwait(false))
+        {
+            notification.EmailDeferred = true;
+            return notification;   // inbox row stored (D7); email held (D1)
+        }
+
         // (5) The email nudge — the <see cref="IMailerStage"/> idempotency
         //     guarantee is the **sole** email-side dedup (D4). Staged on the
         //     caller's session — one caller <c>SaveChangesAsync</c> = the row
@@ -483,6 +515,65 @@ public sealed class NotificationService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // --- M20 (ADR 0121) — the per-resident quiet schedule (D2) ─────────
+    // The <see cref="SetProfileTimezoneAsync"/> single-write-lane shape:
+    // owner scope, **no** AccessAudit row (the ADR 0019 personal-preference
+    // lane, C-M20·7). The Web boundary (U06) owns the owner check (the
+    // signed-in subject must equal recipientId); these seams do **not**
+    // re-check User.
+
+    /// <summary>
+    /// M20 (ADR 0121, D2) — the quiet-schedule READ (owner-scope, no audit row
+    /// — the <c>SetProfileTimezoneAsync</c> personal-preference shape, ADR
+    /// 0019). Returns the recipient's schedule, or <c>null</c> = "never quiet"
+    /// (the floor, C-M20·3). The Web boundary owns the owner check (the
+    /// signed-in subject must equal <paramref name="recipientId"/>); this seam
+    /// does not re-check <c>User</c>.
+    /// </summary>
+    public async Task<NotificationQuietSchedule?> GetQuietScheduleAsync(
+        string recipientId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+
+        await using var session = _store.QuerySession();
+        return await session.LoadAsync<NotificationQuietSchedule>(recipientId, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// M20 (ADR 0121, D2) — the quiet-schedule WRITE (owner-scope, **no** audit
+    /// row — a personal preference, C-M20·7 / ADR 0019). Store-or-update the
+    /// recipient's schedule; a <c>null</c> <paramref name="schedule"/> clears
+    /// it (the recipient's schedule is deleted = "never quiet", the floor). The
+    /// Web boundary owns the owner check; this seam does not re-check
+    /// <c>User</c> and appends **no** <c>AccessAudit</c> row (the
+    /// <c>SetProfileTimezoneAsync</c> shape — C-M20·7). Stamps <c>Updated</c>
+    /// on a real write.
+    /// </summary>
+    public async Task SetQuietScheduleAsync(
+        string recipientId, NotificationQuietSchedule? schedule, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        if (schedule is null)
+        {
+            // Clear = never quiet (the floor): delete the recipient's row, if
+            // any. A delete is the record of "the resident cleared their
+            // schedule" — the read seam returns null (C-M20·3). (The synchronous
+            // <c>session.Delete&lt;T&gt;(id)</c> lane — the
+            // <c>AuditPurgeService</c> / <c>LocalizationService</c> precedent —
+            // the <c>SaveChangesAsync</c> below commits it.)
+            session.Delete<NotificationQuietSchedule>(recipientId);
+        }
+        else
+        {
+            schedule.RecipientId = recipientId;    // pin the identity (the Web layer owns the owner check, C-M20·7)
+            schedule.Updated = DateTimeOffset.UtcNow;
+            session.Store(schedule);
+        }
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // --- ADR 0084 — per-target subscription lanes (the §6.1
     //     NotificationSubscription shape; the same personal-read / no-audit
     //     convention as the NotificationPreference lanes, D3 / F11) ──────
@@ -593,6 +684,83 @@ public sealed class NotificationService
     }
 
     // --- Internals ------------------------------------------------------------
+
+    /// <summary>
+    /// M20 (ADR 0121, D4) — the quiet-gate resolution: (1) load the recipient's
+    /// <see cref="NotificationQuietSchedule"/> (the D2 read seam, on the
+    /// caller's session), (2) resolve the ADR 0019 effective zone
+    /// (<see cref="IUserInfoService"/> profile <c>TimeZone</c> override →
+    /// <see cref="ILocalizationService.GetDefaultTimezoneAsync()"/> platform
+    /// default → <see cref="TimeZoneInfo.Utc"/> floor), and (3) call the pure
+    /// <see cref="QuietScheduleEvaluator.IsQuietNow"/> (D3). <paramref
+    /// name="now"/> is the emit instant (the caller passes
+    /// <see cref="DateTimeOffset.UtcNow"/>; a test may pin a different
+    /// instant). A missing schedule / a disabled schedule → <c>false</c>
+    /// (never quiet, C-M20·3). A zone-resolution failure (blank / unknown
+    /// id) degrades to the UTC floor — **never throws into the caller's
+    /// transaction** (the safe default is "evaluate against UTC", never
+    /// "fail the emit").
+    /// </summary>
+    private async Task<bool> QuietNowForAsync(
+        IDocumentSession session, string recipientId, DateTimeOffset now, CancellationToken ct)
+    {
+        // (1) The schedule — the floor: no row, or the master off → never
+        //     quiet (C-M20·3). Loaded on the caller's session (a pure read —
+        //     no commit, the caller's transaction is unaffected).
+        var schedule = await session.LoadAsync<NotificationQuietSchedule>(recipientId, ct).ConfigureAwait(false);
+        if (schedule is null || !schedule.Enabled)
+            return false;
+
+        // (2) The ADR 0019 effective-zone chain (the EventReminderService
+        //     "recipient's Profile is the actor" shape + the platform default
+        //     read): Profile.TimeZone override → GetDefaultTimezoneAsync →
+        //     UTC floor. Each blank / unknown id falls through to the next;
+        //     the UTC floor guarantees a concrete zone (never a throw).
+        var profile = await _userInfo.GetProfileAsync(recipientId).ConfigureAwait(false);
+        var zoneId = profile?.TimeZone;
+        if (string.IsNullOrWhiteSpace(zoneId) && _localization is not null)
+            zoneId = await _localization.GetDefaultTimezoneAsync().ConfigureAwait(false);
+        var zone = TryResolveZone(zoneId) ?? TimeZoneInfo.Utc;
+
+        // (3) The pure evaluator (D3) — the verdict is a function of
+        //     (schedule, instant, zone) only (C-M20·2 / C-M20·5).
+        return QuietScheduleEvaluator.IsQuietNow(schedule, now, zone);
+    }
+
+    /// <summary>
+    /// An IANA zone id → a <see cref="TimeZoneInfo"/>, or <c>null</c> when the
+    /// id is blank / not present on the OS (the
+    /// <see cref="Events.EventReminderService"/> "TryResolveZone fall through"
+    /// rule — never a throw). The UTC floor is the caller's responsibility.
+    /// </summary>
+    private static TimeZoneInfo? TryResolveZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+        try
+        {
+            return System.TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// M20 (ADR 0121, D4) — the **deferred-email idempotency key form**.
+    /// Distinct from the emit-time key
+    /// (<c>notification:{kind}:{source-id}</c>) so the outbox dedup (F10)
+    /// does **not** collide with an earlier emit-time stage; the flush job
+    /// (D5, U04) stages the held email under this key, so a cleared email is
+    /// delivered **exactly once** (C-M20·4). <paramref name="sourceId"/> is
+    /// the row's stable source id (the <see cref="Notification.SourceId"/>
+    /// field). This form is **recorded here (U03)** and **consumed by U04 /
+    /// U05** — the flush job reuses this exact shape; it must not be re-derived
+    /// (a different form would break the once-delivered guarantee).
+    /// </summary>
+    public static string DeferredKey(string kind, string sourceId) =>
+        $"notification:{kind}:{sourceId}:deferred";
 
     /// <summary>
     /// The D7 gate, on the caller's session: <c>true</c> when the recipient's

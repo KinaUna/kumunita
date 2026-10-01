@@ -197,6 +197,16 @@ var marten = builder.Services.AddMarten(opts =>
     // business-key index is pinned). Without this call the UsageEvent doc
     // is invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent).
     UsageDocTypes.Configure(opts);
+
+    // M21 (ADR 0122 D1, plan U01): the Document bounded context's document
+    // (Document, ADR 0004 §B.1 — a parallel surface to M17DocTypes /
+    // MediaDocTypes / UsageDocTypes, not additive on an existing one:
+    // Document uses the conventional string Id, so no non-default convention
+    // or business-key index is pinned). Without this call the Document doc is
+    // invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9/M16/M17
+    // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
+    // SchemaBootstrap versioned boot both pick the surface up automatically.
+    DocumentDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -311,6 +321,16 @@ builder.Services.AddRateLimiter(opts =>
 
     // Setup (admin first-boot token): 5 per 15 minutes per IP (token brute-force).
     AddWindow(opts, "setup", limit: 5, window: TimeSpan.FromMinutes(15));
+
+    // Message send: 20 per 15 minutes per IP (the highest-volume
+    // authenticated write surface — direct-message spam).
+    AddWindow(opts, "message", limit: 20, window: TimeSpan.FromMinutes(15));
+
+    // Resident write lane (post create, reply create): 30 per 15 minutes
+    // per IP (a general write-lane guard — a resident posting or replying
+    // more than 30 times in 15 minutes is an anomaly at this platform's
+    // scale; the limit is generous for normal use and tight for spam).
+    AddWindow(opts, "write", limit: 30, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
@@ -708,6 +728,16 @@ await bus.PublishAsync(new EventReminderTick());
 // UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
 // would silently stop honoring the 365-day constant).
 await bus.PublishAsync(new UsagePurgeTick());
+// M20 (ADR 0121) — the deferred-notification email flush tick (the
+// NotificationFlushHandler self-reschedules at the resolved admin cadence
+// QuietCheckMinutes after each run; this seed is the first-boot scheduling).
+// The parameterless form is the standard 60-minute cadence (matching the
+// QuietCheckMinutes default); from the second run onward the handler reads
+// the admin's live value each time. Without this line the flush never fires
+// and the held (EmailDeferred) emails are never delivered. Idempotent: the
+// flush is a no-op when no rows are due (U04's GATE-4 pin proves this), so a
+// double-schedule across two consecutive boots is harmless (the §6.4 shape).
+await bus.PublishAsync(new NotificationFlushTick());
 
 try
 {

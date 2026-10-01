@@ -1,0 +1,65 @@
+@model Kumunita.Web.Models.DocumentIndexViewModel
+@using Kumunita.Core.Documents
+@{
+    ViewData["Title"] = "Documents";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="documents.title">Documents</kw-l></h1>
+                </div>
+                @if (Model.CanUpload)
+                {
+                    <a class="btn btn-outline-primary" href="/documents/new">
+                        <kw-l key="documents.upload">Upload a document</kw-l>
+                    </a>
+                }
+            </div>
+        </header>
+
+        <div class="airy-ann-list">
+            @if (Model.Visible.Count == 0)
+            {
+                <div class="p-4 text-muted">
+                    <kw-l key="documents.empty">No documents are visible to you yet.</kw-l>
+                </div>
+            }
+            @foreach (var d in Model.Visible)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="/documents/@d.Id">@d.Title</a>
+                        </h3>
+                        @if (!string.IsNullOrWhiteSpace(d.Summary))
+                        {
+                            <p class="airy-ann-preview mb-2">@d.Summary</p>
+                        }
+                        <div class="airy-ann-meta">
+                            <span><kw-dt dt="@d.Created" format="g"></kw-dt></span>
+                        </div>
+                    </div>
+                    <div class="airy-ann-side">
+                        <div class="airy-ann-actions">
+                            <a class="link-quiet small text-decoration-none" href="/documents/@d.Id/download">
+                                <kw-l key="documents.download">Download</kw-l>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Model.HasMore)
+            {
+                <nav aria-label="pagination" class="mt-3">
+                    <a class="page-link" href="/documents?page=@(Model.Page + 1)" rel="next">
+                        <kw-l key="pagination.next">Older</kw-l>
+                    </a>
+                </nav>
+            }
+        </div>
+    </div>
+</div>

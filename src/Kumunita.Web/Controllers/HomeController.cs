@@ -7,6 +7,7 @@ using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -33,6 +34,7 @@ public class HomeController : Controller
     /// name directly).</summary>
     public const string BadgePinned = "pinned";
 
+    private readonly ILogger<HomeController> _logger;
     private readonly CommunityOptions _community;
 
     /// <param name="posts">Optional feed seam — the all-sections feed
@@ -52,6 +54,7 @@ public class HomeController : Controller
     /// seam; when present, rows show the viewer's-language variant (the
     /// ADR 0022 floor) where one exists.</param>
     public HomeController(
+        ILogger<HomeController> logger,
         IOptions<CommunityOptions> community,
         PostService? posts = null,
         IAnnouncementService? announcements = null,
@@ -61,6 +64,7 @@ public class HomeController : Controller
         IUserInfoService? userInfo = null,
         ITranslationProvider? translationProvider = null)
     {
+        _logger = logger;
         _community = community.Value;
         Posts = posts;
         Announcements = announcements;
@@ -194,7 +198,11 @@ public class HomeController : Controller
 
                 Profile? profile = null;
                 try { profile = await UserInfo.GetProfileAsync(post.AuthorId).ConfigureAwait(false); }
-                catch { profile = null; }
+                catch (Exception ex) when (ex is not UnauthorizedAccessException)
+                {
+                    _logger.LogWarning(ex, "Home feed author-profile read failed for post {PostId}; rendering without it.", post.AuthorId);
+                    profile = null;
+                }
 
                 var preview = (string.IsNullOrWhiteSpace(post.Title)
                     ? MarkdownRenderer.PlainTextPreview(body, 200)

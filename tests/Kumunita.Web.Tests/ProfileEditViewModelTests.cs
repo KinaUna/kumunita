@@ -13,8 +13,13 @@ namespace Kumunita.Web.Tests;
 /// </summary>
 public sealed class ProfileEditViewModelTests
 {
+    // M23 (ADR 0123 D1/D5) supersedes the M2 U11 "exactly seven form fields"
+    // pin: the two extended-profile fields (Bio rich content + Tags free-form
+    // tag input) are added to the editor, so the editor now carries exactly
+    // NINE writable form fields. The seven M2 fields are unchanged; the two
+    // new ones are the M23 surface.
     [Fact]
-    public void ProfileEditViewModel_Has_Exactly_Seven_FormFields()
+    public void ProfileEditViewModel_Has_Exactly_Nine_FormFields()
     {
         var fields = typeof(ProfileEditViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -26,11 +31,13 @@ public sealed class ProfileEditViewModelTests
         Assert.Equal(new[]
         {
             "Address",
+            "Bio",
             "ContactVisibility",
             "DisplayName",
             "Email",
             "OptInContactVisibility",
             "Phone",
+            "Tags",
             "Visibility",
         }, fields);
     }

@@ -1121,6 +1121,320 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Null((await LoadRow(store, row.Id))?.ReadAt);
     }
 
+    // ── M20 (ADR 0121) — the pure quiet-schedule evaluator + owner-scope seams
+    //
+    // C-M20·2 (the verdict is pure + timezone-aware, D3) + C-M20·3 (floor =
+    // never quiet, D2) + C-M20·7 (owner-scope, no audit row, D2 / ADR 0019).
+    // The evaluator is a **pure function** (no session, no IO) — it is tested
+    // in isolation, exactly the <c>IcsWriter</c> / <c>UsageCapturePolicy</c>
+    // discipline. The two <c>NotificationService</c> seams are exercised
+    // against the live scratch store (the doc round-trip) + the no-audit-row
+    // pin (the <c>ListInbox_Does_Not_Emit_AuditRow</c> precedent).
+
+    // GATE-2 pin (C-M20·2 — the verdict is timezone-aware): the same
+    // Blocked schedule (hours {22,23}) + the same instant yields a
+    // **different** verdict in UTC+2 than in UTC (the wall-clock hour differs
+    // — the point of ADR 0019).
+    [Fact]
+    public void IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC()
+    {
+        // A fixed UTC+2 zone (no DST, deterministic across platforms — the
+        // CreateCustomTimeZone shape avoids the IANA/Windows zone-id + DST
+        // ambiguity of a named zone like CET, which is only UTC+1 in winter).
+        var utc2 = TimeZoneInfo.CreateCustomTimeZone("UTC+2", TimeSpan.FromHours(2), "UTC+2", "UTC+2");
+        var utc  = TimeZoneInfo.Utc;
+        // The schedule is "quiet during hours 22–23" (Blocked, the lean
+        // default); empty DaysOfWeek = all days.
+        var schedule = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g2",
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 22, 23 },
+            DaysOfWeek = [],
+        };
+
+        // Pick a UTC instant whose UTC+2 wall-clock hour is 23 (quiet) while
+        // the UTC wall-clock hour is 21 (not quiet) — the verdict must flip.
+        // 21:00 UTC == 23:00 UTC+2 (no DST ambiguity at this fixed offset).
+        var instant = new DateTimeOffset(2026, 1, 15, 21, 0, 0, TimeSpan.Zero);
+
+        var inUtc2 = QuietScheduleEvaluator.IsQuietNow(schedule, instant, utc2);
+        var inUtc  = QuietScheduleEvaluator.IsQuietNow(schedule, instant, utc);
+
+        Assert.True(inUtc2);     // 23:00 local → within {22,23} → quiet
+        Assert.False(inUtc);    // 21:00 UTC  → outside {22,23} → not quiet
+        Assert.NotEqual(inUtc2, inUtc);   // the verdict differs (C-M20·2)
+    }
+
+    // GATE-3 pin (C-M20·3 — floor = never quiet): a null schedule and a
+    // stored-but-disabled schedule both evaluate to "not quiet"; an enabled
+    // schedule with empty lists is quiet at any hour (Blocked, empty = all).
+    [Fact]
+    public void IsQuietNow_Missing_Schedule_Is_Never_Quiet()
+    {
+        var utc = TimeZoneInfo.Utc;
+        var instant = new DateTimeOffset(2026, 1, 15, 23, 0, 0, TimeSpan.Zero);
+
+        // (a) null schedule → never quiet (the floor).
+        Assert.False(QuietScheduleEvaluator.IsQuietNow(null, instant, utc));
+
+        // (b) stored-but-disabled → never quiet, regardless of the window.
+        var disabled = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g3-disabled",
+            Enabled = false,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 23 },
+        };
+        Assert.False(QuietScheduleEvaluator.IsQuietNow(disabled, instant, utc));
+
+        // (c) enabled + empty lists + Blocked → the window is "all hours ×
+        //     all days" → quiet at any instant (empty = all, D2).
+        var allWindow = new NotificationQuietSchedule
+        {
+            RecipientId = "u-g3-all",
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = [],
+            DaysOfWeek = [],
+        };
+        Assert.True(QuietScheduleEvaluator.IsQuietNow(allWindow, instant, utc));
+    }
+
+    // Doc round-trip (C-M20·3 / ·7): SetQuietScheduleAsync then
+    // GetQuietScheduleAsync returns the stored row; SetQuietScheduleAsync(null)
+    // clears it to null (the floor = never quiet).
+    [Fact]
+    public async Task NotificationQuietSchedule_StoreAndLoad_RoundTrips()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-rt";
+        var ct = TestContext.Current.CancellationToken;
+
+        // No schedule yet → null (never quiet, the floor).
+        Assert.Null(await svc.GetQuietScheduleAsync(recipient, ct));
+
+        // Store one → the read seam returns the stored row (identity pinned).
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 22, 23 },
+            DaysOfWeek = new[] { 6 },
+        }, ct);
+
+        var loaded = await svc.GetQuietScheduleAsync(recipient, ct);
+        Assert.NotNull(loaded);
+        Assert.Equal(recipient, loaded!.RecipientId);
+        Assert.True(loaded.Enabled);
+        Assert.Equal(QuietScheduleMode.Blocked, loaded.Mode);
+        Assert.Equal(new[] { 22, 23 }, loaded.Hours);
+        Assert.Equal(new[] { 6 }, loaded.DaysOfWeek);
+        Assert.NotNull(loaded.Updated);   // stamped on the real write
+
+        // Clear (null) → the row is deleted → the read seam returns null again.
+        await svc.SetQuietScheduleAsync(recipient, null, ct);
+        Assert.Null(await svc.GetQuietScheduleAsync(recipient, ct));
+    }
+
+    // Owner-scope, no audit row (C-M20·7 / ADR 0019): a write appends **no**
+    // AccessAudit row (the SetProfileTimezoneAsync personal-preference shape —
+    // the ListInbox_Does_Not_Emit_AuditRow precedent).
+    [Fact]
+    public async Task SetQuietScheduleAsync_Does_Not_Append_AccessAudit()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-noaudit";
+        var ct = TestContext.Current.CancellationToken;
+
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { 1, 2 },
+        }, ct);
+
+        // The write landed (round-trips)…
+        var loaded = await svc.GetQuietScheduleAsync(recipient, ct);
+        Assert.NotNull(loaded);
+        Assert.True(loaded!.Enabled);
+        // …but appended **no** audit row (C-M20·7 — a personal preference, not
+        // an AccessAction decision).
+        Assert.Empty(await AuditRows(store));
+    }
+
+    // ── M20 (ADR 0121) — the EmitAsync quiet gate (D4) ──────────────────────
+    //
+    // U03's pins (design doc §6 / §11): the gate is consulted AFTER the inbox
+    // row is stored (D7) and AFTER the D7 email-kind gate, BEFORE the email is
+    // staged. A quiet recipient keeps the row (EmailDeferred = true) but the
+    // email is deferred, not dropped (D1, C-M20·1); a non-quiet recipient is
+    // byte-identical to pre-M20 (C-M20·3). The gate is a pure function of
+    // (schedule, instant, zone) — zero new authorization surface (C-M20·5).
+    // The harness's IUserInfoService stand-in reads the planted Profile (so the
+    // ADR 0019 chain resolves the effective zone: no override + no platform
+    // default → the UTC floor), and the RecordingMailer records any staged
+    // email so "stages no email" is a direct assertion.
+
+    // GATE-1 pin (C-M20·1 — defers the email, never the inbox): a quiet
+    // recipient stores the row (D7), marks it EmailDeferred = true, stages no
+    // email, and the row is returned (not null) and visible in the inbox.
+    [Fact]
+    public async Task EmitAsync_When_Quiet_Stores_Row_Marks_Deferred_Stages_No_Email()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-g1-quiet";
+        var ct = TestContext.Current.CancellationToken;
+
+        // A profile with an email (so the pre-M20 path would have staged) + a
+        // **quiet at any instant** schedule: Blocked with empty Hours/Days =
+        // "all hours × all days" (D2 empty-axis = all), so the gate fires
+        // regardless of the emit instant.
+        await PlantProfile(store, recipient, "g1@kumunita", emailLanguage: "en");
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = [],
+            DaysOfWeek = [],
+        }, ct);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-g1", "snippet", ct);
+        await session.SaveChangesAsync(ct);
+
+        // The row is RETURNED (not null — the gate never suppresses it, D1) …
+        Assert.NotNull(row);
+        // …and it is the deferred row (D1).
+        Assert.True(row.EmailDeferred);
+        // The inbox row is the durable record (D7) — stored, count 1, and
+        // visible in the recipient's inbox (the GATE-1 "the recipient's inbox
+        // shows the row immediately" half).
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var inbox = await svc.ListInboxAsync(recipient, ct);
+        Assert.Contains(inbox, n => n.Id == row.Id && n.EmailDeferred);
+        // The email is DEFERRED, not dropped: nothing was staged (the gate
+        // returned before IMailerStage.StageAsync).
+        Assert.Empty(staged);
+    }
+
+    // GATE-3 pin (C-M20·3 — floor = never quiet): a recipient with **no**
+    // NotificationQuietSchedule row goes through the pre-M20 path — the email
+    // is staged and the row is not deferred (byte-identical to pre-M20).
+    [Fact]
+    public async Task EmitAsync_NoSchedule_StagesEmailAsBefore()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-g3-nosched";
+        var ct = TestContext.Current.CancellationToken;
+
+        // A profile with an email; **no** quiet schedule planted (the floor).
+        await PlantProfile(store, recipient, "g3@kumunita", emailLanguage: "en");
+        Assert.Null(await svc.GetQuietScheduleAsync(recipient, ct));   // confirm: floor = never quiet
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-g3", "snippet", ct);
+        await session.SaveChangesAsync(ct);
+
+        Assert.NotNull(row);
+        Assert.False(row.EmailDeferred);   // not deferred — the pre-M20 path
+        // The email staged exactly once, under the **emit-time** key (not the
+        // deferred form — the gate never fired, so DeferredKey was not used).
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:post.reply:reply-g3", email.Key);
+        Assert.False(email.Key.EndsWith(":deferred", StringComparison.Ordinal));
+    }
+
+    // Not-quiet path (D4 / C-M20·3): a schedule that is **not** active at the
+    // emit instant stages the email normally (EmailDeferred = false) and does
+    // not use the deferred idempotency key.
+    [Fact]
+    public async Task EmitAsync_NonQuietWindow_StagesEmail()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-nonquiet";
+        var ct = TestContext.Current.CancellationToken;
+
+        await PlantProfile(store, recipient, "nonquiet@kumunita", emailLanguage: "en");
+        // A Blocked window on **one** hour that is 12 hours away from the
+        // current UTC hour — guaranteed NOT to contain the emit instant
+        // (DateTimeOffset.UtcNow), so the gate is **not** active: the email
+        // flows (not deferred). 12-hours-away is immune to the top-of-hour
+        // race a fixed window (e.g. hours 01–02) would be flaky about.
+        var blockedHour = (DateTimeOffset.UtcNow.Hour + 12) % 24;
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = new[] { blockedHour },
+            DaysOfWeek = [],
+        }, ct);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-nonquiet", "snippet", ct);
+        await session.SaveChangesAsync(ct);
+
+        Assert.NotNull(row);
+        Assert.False(row.EmailDeferred);   // not quiet at the instant → not deferred
+        var email = Assert.Single(staged);
+        // The email is staged under the **emit-time** key — the deferred form
+        // (notification:{kind}:{source}:deferred) is NOT used on the emit
+        // path (that key is the flush job's, U04).
+        Assert.Equal("notification:post.reply:reply-nonquiet", email.Key);
+        Assert.False(email.Key.EndsWith(":deferred", StringComparison.Ordinal));
+    }
+
+    // The quiet gate is **after** the D7 email-kind gate: a recipient whose
+    // NotificationPreference.KindsEnabled omits the kind still suppresses the
+    // email — the existing D7 gate is untouched (the quiet gate does not widen
+    // it). Here the recipient is **also** quiet, so this pins the *ordering*:
+    // the kind gate resolves "email disabled" first (step 4), returning
+    // EmailDeferred = false — the gate is never reached (it sits after step 4).
+    [Fact]
+    public async Task EmitAsync_KindDisabled_Still_SuppressesEmail()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-kindgate";
+        var ct = TestContext.Current.CancellationToken;
+
+        await PlantProfile(store, recipient, "kindgate@kumunita", emailLanguage: "en");
+        // The D7 email-kind gate: KindsEnabled = a non-empty list that omits
+        // post.reply → the kind is disabled (the lean-default is null/empty).
+        await svc.SetPreferencesAsync(recipient, new[] { NotificationKinds.GroupPost }, ct);
+        // Also make the recipient quiet at any instant (Blocked, all axes) —
+        // the pin is that the **kind gate** (step 4) still suppresses, and
+        // the row is not marked deferred (the quiet gate sits after step 4).
+        await svc.SetQuietScheduleAsync(recipient, new NotificationQuietSchedule
+        {
+            RecipientId = recipient,
+            Enabled = true,
+            Mode = QuietScheduleMode.Blocked,
+            Hours = [],
+            DaysOfWeek = [],
+        }, ct);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-kindgate", "snippet", ct);
+        await session.SaveChangesAsync(ct);
+
+        // The D7 gate suppressed the email (step 4 returned before step 5)…
+        Assert.NotNull(row);
+        Assert.Empty(staged);
+        // …and because the gate sat **after** the kind gate, the row was never
+        // marked deferred — the existing gate is untouched (the quiet gate did
+        // not widen or reorder it, D4).
+        Assert.False(row.EmailDeferred);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>

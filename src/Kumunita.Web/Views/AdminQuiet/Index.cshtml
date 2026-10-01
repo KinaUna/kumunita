@@ -1,0 +1,35 @@
+@model Kumunita.Web.Controllers.AdminQuietController.CadenceAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Quiet-time cadence";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.quiet.title">Quiet-time cadence</kw-l></h1>
+
+<p class="text-muted">
+    How often the notification-flush job re-checks the held (deferred) emails —
+    a quiet resident's email is held until their quiet hours end, then released
+    on the next check. Residents set their own quiet window on
+    <code>/settings/quiet</code>; this only sets how often the held ones are
+    re-checked.
+</p>
+
+<form method="post" action="/admin/quiet">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="minutes" class="form-label"><kw-l key="admin.quiet.cadence_label">Re-check held notifications every (minutes)</kw-l></label>
+            <input type="number" min="5" max="1440" step="1"
+                   class="form-control" name="minutes" id="minutes"
+                   value="@Model.Minutes" />
+            <div class="form-text small">
+                Valid range is 5–1440 minutes. A missing value floors to the
+                instance default of 60 minutes.
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.quiet.save">Save cadence</kw-l></button>
+        </div>
+    </div>
+</form>

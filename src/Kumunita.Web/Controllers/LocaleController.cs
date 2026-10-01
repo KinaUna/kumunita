@@ -1,4 +1,5 @@
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Security;
@@ -50,7 +51,13 @@ public sealed class LocaleController(
     // null) so any test-construction site that builds this controller
     // without the seam keeps compiling and renders the provider floor's
     // English; DI always supplies the live ITranslationProvider in the app.
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // M20 (ADR 0121, D7) — the owner-scope quiet-schedule seams
+    // (GetQuietScheduleAsync / SetQuietScheduleAsync, U02). Optional (CS1736
+    // trailing-param idiom) so the existing test-construction sites that build
+    // this controller without the seam keep compiling and render the "never
+    // quiet" floor; DI always supplies the live NotificationService in the app.
+    NotificationService? notifications = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -129,6 +136,22 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// <c>GET /settings/quiet</c> — the resident's quiet-hours section (ADR
+    /// 0121, D7) on its own linkable page (ADR 0080, the ADR 0019 time-zone
+    /// section verbatim). The model is the full
+    /// <see cref="LocaleSettingsViewModel"/>; the view renders only the quiet
+    /// section. The schedule is read through the U02 owner-scope seam for the
+    /// signed-in subject (owner-scope — the page always resolves the signed-in
+    /// subject, never a caller-supplied id, C-M20·7). A missing schedule
+    /// renders the "never quiet" floor (C-M20·3).
+    /// </summary>
+    [HttpGet("/settings/quiet")]
+    public async Task<IActionResult> SettingsQuiet()
+    {
+        return View("Quiet", await BuildModel());
+    }
+
+    /// <summary>
     /// <c>GET /settings/email-language</c> — retired as its own page: the
     /// email &amp; notification language section (ADR 0061) was folded into
     /// the **Language** tab (ADR 0080, 2026-09-30). The route is kept as a
@@ -159,6 +182,15 @@ public sealed class LocaleController(
         string? currentTz = profile?.TimeZone;
         string? currentDf = profile?.DateFormat;
         string? currentEl = profile?.EmailLanguage;
+
+        // M20 (ADR 0121, D7) — the resident's quiet schedule (U02 owner-scope
+        // seam). A null seam / no subject → null (the "never quiet" floor,
+        // C-M20·3); the owner check is this page's [Authorize] + the actor
+        // being the subject (C-M20·7).
+        NotificationQuietSchedule? quiet =
+            (notifications is not null && subject is not null)
+                ? await notifications.GetQuietScheduleAsync(subject)
+                : null;
 
         // The instance default (M·1: preference → default → "en").
         // ILocalizationService does not expose a GetDefaultLanguageAsync;
@@ -215,6 +247,18 @@ public sealed class LocaleController(
                     SelectedCode = string.IsNullOrWhiteSpace(currentEl) ? defaultCode : currentEl,
                     DefaultCode = defaultCode,
                 },
+
+            // M20 (ADR 0121, D7) — the quiet-hours section: the resident's
+            // saved schedule read through the U02 owner-scope seam (the
+            // signed-in subject; a null schedule is the "never quiet" floor,
+            // C-M20·3). No seam / no subject → the floor (all false/empty).
+            Quiet = quiet?.Enabled,
+            QuietEnabled = quiet?.Enabled ?? false,
+            QuietMode = quiet is null
+                ? "blocked"
+                : quiet.Mode == QuietScheduleMode.Allowed ? "allowed" : "blocked",
+            QuietHours = quiet?.Hours ?? [],
+            QuietDaysOfWeek = quiet?.DaysOfWeek ?? [],
         };
     }
 
@@ -478,6 +522,59 @@ public sealed class LocaleController(
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// <c>POST /settings/quiet</c> — the quiet-hours save (ADR 0121, D2/D7).
+    /// Owner-scope: the recipient is ALWAYS the signed-in subject
+    /// (<c>SubjectId(User)</c>) — there is **no caller-supplied recipient id**,
+    /// so a resident cannot write another resident's schedule (the C-M20·7
+    /// owner-scope rule, the <see cref="SaveTimezone"/> shape verbatim). With
+    /// <c>clear=1</c>: the U02 seam with a <c>null</c> schedule (= never quiet,
+    /// the floor, C-M20·3). Otherwise: build a
+    /// <see cref="NotificationQuietSchedule"/> from the form (enabled, mode,
+    /// hours, days) and store it through the same seam. **No**
+    /// <c>AccessAudit</c> row (the owner-scope personal-preference lane, ADR
+    /// 0019, C-M20·7). A missing seam (a test harness without the service)
+    /// fails closed on the save lane — the redirect is returned and nothing is
+    /// half-written.
+    /// </summary>
+    [HttpPost("/settings/quiet")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveQuiet(
+        bool enabled,
+        string? mode,
+        int[]? hours,
+        int[]? daysOfWeek,
+        string? clear)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+            return RedirectToAction(nameof(SettingsQuiet));
+
+        if (notifications is null)
+            return RedirectToAction(nameof(SettingsQuiet));
+
+        if (clear == "1")
+        {
+            await notifications.SetQuietScheduleAsync(subject, null);
+            TempData["info"] = await FlashAsync("settings.quiet.flash_cleared");
+        }
+        else
+        {
+            var schedule = new NotificationQuietSchedule
+            {
+                RecipientId = subject,
+                Enabled = enabled,
+                Mode = mode == "allowed" ? QuietScheduleMode.Allowed : QuietScheduleMode.Blocked,
+                Hours = hours ?? Array.Empty<int>(),
+                DaysOfWeek = daysOfWeek ?? Array.Empty<int>(),
+            };
+            await notifications.SetQuietScheduleAsync(subject, schedule);
+            TempData["info"] = await FlashAsync("settings.quiet.flash_saved");
+        }
+
+        return RedirectToAction(nameof(SettingsQuiet));
+    }
+
     // ── View model (public nested type so the Razor view can bind to it) ──
 
     public sealed class LocaleSettingsViewModel
@@ -509,6 +606,36 @@ public sealed class LocaleController(
         /// picker renders the language section only). Reuses the enabled
         /// catalog list (<see cref="Languages"/>) as its picker.</summary>
         public EmailLanguageSettings? EmailLanguage { get; init; }
+
+        // ── M20 (ADR 0121, D7) — the quiet-hours section (the 5th resident
+        // section). Flat fields (the ADR 0019 time-zone section's shape,
+        // flattened so the view binds directly). A missing schedule (the
+        // floor, C-M20·3) renders Quiet = null + QuietEnabled = false.
+
+        /// <summary>M20 (ADR 0121, D7) — <c>null</c> when the resident has
+        /// no saved quiet schedule (the "never quiet" floor, C-M20·3);
+        /// <c>true</c> when a schedule row exists (the view's "a schedule is
+        /// saved" read-through, distinct from <see cref="QuietEnabled"/>
+        /// which is the schedule's own master on/off).</summary>
+        public bool? Quiet { get; init; }
+
+        /// <summary>M20 (ADR 0121, D2) — the quiet schedule's master on/off
+        /// (the schedule's <c>Enabled</c> flag); <c>false</c> when there is no
+        /// schedule (the floor).</summary>
+        public bool QuietEnabled { get; init; }
+
+        /// <summary>M20 (ADR 0121, D2) — the schedule's mode as the form
+        /// posts it: <c>"blocked"</c> (the lean default) or
+        /// <c>"allowed"</c> (the allow-list reading).</summary>
+        public string QuietMode { get; init; } = "blocked";
+
+        /// <summary>M20 (ADR 0121, D2) — the hours of day (0–23) the mode
+        /// applies to; empty = all hours.</summary>
+        public int[] QuietHours { get; init; } = [];
+
+        /// <summary>M20 (ADR 0121, D2) — the days of week (0=Sunday…6) the
+        /// mode applies to; empty = all days.</summary>
+        public int[] QuietDaysOfWeek { get; init; } = [];
 
         /// <summary>The email &amp; notification language section of the
         /// settings page (ADR 0061) — the resident's

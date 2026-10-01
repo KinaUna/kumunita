@@ -23,4 +23,18 @@ public sealed class Notification
 
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? ReadAt { get; set; }                // `null` = unread (D8 — the "mark all read" set is one bulk update)
+
+    /// <summary>
+    /// M20 (ADR 0121, D1) — the quiet-hours deferral flag. <c>true</c> means
+    /// the inbox row is stored (ADR 0076 D7 — the inbox is the durable record)
+    /// but the email nudge is **held** because the recipient was in their
+    /// quiet window at emit time (D1). The §6.4 flush job (D5) re-checks the
+    /// row; when the quiet window has lifted it stages the held email via the
+    /// frozen <see cref="IMailerStage"/> with the deferred idempotency key
+    /// (<c>notification:{kind}:{source-id}:deferred</c>, D4) and flips this
+    /// flag back to <c>false</c>. A <c>false</c> default means every pre-M20
+    /// row reads as "not deferred" — no migration (ADR 0004 §B.1). **This is
+    /// the ONLY additive change to the M6 inbox row.**
+    /// </summary>
+    public bool EmailDeferred { get; set; }
 }

@@ -721,7 +721,61 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         // the service's own read lane proves the state did not shift.
         Assert.Equal(DateFormat.FloorFormat, await svc.GetDefaultDateFormatAsync());
     }
+    // 24 — M20 SetQuietCheckMinutes_Stores_Singleton_And_One_Audit_Row (GATE-6,
+    //      ADR 0121 D6)
+    // The admin-set flush cadence lane: a missing LocaleSettings row reads back
+    // the `60` floor; a valid write persists the singleton AND appends exactly
+    // ONE audited write row (Via = Admin, action "notification.quiet.cadence");
+    // an out-of-range value throws and writes nothing (no audit row, singleton
+    // unchanged — the fail-closed shape of tests 21/23).
+    [Fact]
+    public async Task SetQuietCheckMinutes_Stores_Singleton_And_One_Audit_Row()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
 
+        const string actor = "admin-a24";
+        var svc = new LocalizationService(store);
+
+        // A fresh instance's LocaleSettings has no cadence set → the read lane
+        // returns the `60` floor (C-M20·6 — a missing value reads as the
+        // default, never throws).
+        Assert.Equal(60, await svc.GetQuietCheckMinutesAsync());
+
+        // A valid write (15 minutes) persists the singleton...
+        await svc.SetQuietCheckMinutesAsync(15, actor);
+
+        // ...is live on the very next read (data, not config — the M·4 lane).
+        Assert.Equal(15, await svc.GetQuietCheckMinutesAsync());
+
+        // ...and appends EXACTLY ONE audited write row, Via = Admin, the D6
+        // action / target shape.
+        var audits = await AuditRows(store, action: "notification.quiet.cadence");
+        Assert.Single(audits);
+        var row = audits[0];
+        Assert.Equal("notification.quiet.cadence", row.Action);
+        Assert.Equal("notification.quiet", row.TargetKind);
+        Assert.Equal("15", row.TargetId);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(actor, row.ActorId);
+
+        // ── Fail-closed: an out-of-range cadence throws BEFORE any write. ──
+        // Zero (below the floor) ...
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => svc.SetQuietCheckMinutesAsync(0, actor));
+        // ...and an absurd value (above the ceiling).
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => svc.SetQuietCheckMinutesAsync(99999, actor));
+
+        // The blocked attempts committed nothing: still exactly ONE cadence
+        // audit row (not two) ...
+        var auditsAfterThrows = await AuditRows(store, action: "notification.quiet.cadence");
+        Assert.Single(auditsAfterThrows);
+
+        // ...and the persisted value did not shift (the writes failed closed).
+        Assert.Equal(15, await svc.GetQuietCheckMinutesAsync());
+    }
     // ── Shared helpers ───────────────────────────────────────────────────────
 
     /// <summary>

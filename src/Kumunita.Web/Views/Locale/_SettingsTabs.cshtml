@@ -1,12 +1,14 @@
 @* The /settings section sub-nav (the _EventsTabs.cshtml Bootstrap nav-tabs idiom,
-   ADR 0062 / ADR 0080). Four tabs — Language (now also the home of the email &
+   ADR 0062 / ADR 0080). Five tabs — Language (now also the home of the email &
    notification language section, folded in 2026-09-30), Time zone, Date & time
-   format, and Children — so a resident can jump between sections without
+   format, Quiet hours (M20, ADR 0121 D7 — the 5th resident section, added
+   2026-09-30), and Children — so a resident can jump between sections without
    scrolling. The active tab is derived from the current controller + action:
-   LocaleController owns the three settings GET actions (Index, SettingsTimezone,
-   SettingsDateFormat) and GuardianController owns the Children page. Active
-   detection is controller-aware because the Children page's action is also named
-   "Index" (GuardianController.Index), so the action name alone is ambiguous. *@
+   LocaleController owns the four settings GET actions (Index, SettingsTimezone,
+   SettingsDateFormat, SettingsQuiet) and GuardianController owns the Children
+   page. Active detection is controller-aware because the Children page's action
+   is also named "Index" (GuardianController.Index), so the action name alone is
+   ambiguous. *@
 @{
     var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "Locale";
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
@@ -15,6 +17,7 @@
         ("locale.language_heading", "Language",         "/settings/language"),
         ("settings.timezone_title", "Time zone",        "/settings/timezone"),
         ("settings.dateformat_title", "Date & time format", "/settings/dateformat"),
+        ("settings.quiet.title",    "Quiet hours",      "/settings/quiet"),
         ("nav.children",            "Children",         "/me/children"),
     };
     var activeLabel = controller == "Guardian"
@@ -23,6 +26,7 @@
         {
             "SettingsTimezone"   => "Time zone",
             "SettingsDateFormat" => "Date & time format",
+            "SettingsQuiet"      => "Quiet hours",
             _                    => "Language",
         };
 }

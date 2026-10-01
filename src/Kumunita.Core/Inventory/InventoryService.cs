@@ -246,7 +246,7 @@ public sealed class InventoryService : IInventoryService
 
         session.Store(item);
         // C-M16·2 — one Allow row; the actor is the creator → Via Owner.
-        StoreAuditRow(session, actorId, "inventory.create", item.Id, AccessVia.Owner, AccessOutcome.Allow);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.create", "inventory", item.Id, AccessVia.Owner, AccessOutcome.Allow));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return item;
     }
@@ -285,7 +285,7 @@ public sealed class InventoryService : IInventoryService
         if (!hasStanding)
         {
             // C-M16·2 — a standing Deny writes exactly one AccessAudit row.
-            StoreAuditRow(session, actorId, "inventory.update", item.Id, AuditVia(actorRoles), AccessOutcome.Deny);
+            session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.update", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Deny));
             await session.SaveChangesAsync(ct).ConfigureAwait(false);
             throw new UnauthorizedAccessException("Only the author or a GlobalAdmin may edit this item.");
         }
@@ -297,7 +297,7 @@ public sealed class InventoryService : IInventoryService
         item.Modified = DateTimeOffset.UtcNow;
 
         session.Store(item);
-        StoreAuditRow(session, actorId, "inventory.update", item.Id, AuditVia(actorRoles), AccessOutcome.Allow);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.update", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Allow));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return item;
     }
@@ -329,7 +329,7 @@ public sealed class InventoryService : IInventoryService
         if (!hasStanding)
         {
             // C-M16·2 — a standing Deny writes exactly one AccessAudit row.
-            StoreAuditRow(session, actorId, "inventory.delete", item.Id, AuditVia(actorRoles), AccessOutcome.Deny);
+            session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.delete", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Deny));
             await session.SaveChangesAsync(ct).ConfigureAwait(false);
             throw new UnauthorizedAccessException("Only the author or a GlobalAdmin may delete this item.");
         }
@@ -338,7 +338,7 @@ public sealed class InventoryService : IInventoryService
         item.Modified = DateTimeOffset.UtcNow;
 
         session.Store(item);
-        StoreAuditRow(session, actorId, "inventory.delete", item.Id, AuditVia(actorRoles), AccessOutcome.Allow);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.delete", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Allow));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -381,7 +381,7 @@ public sealed class InventoryService : IInventoryService
         var hasStanding = isPrivate ? (isOwner || isAdmin) : true;
         if (!hasStanding)
         {
-            StoreAuditRow(session, actorId, "inventory.checkout", item.Id, AuditVia(actorRoles), AccessOutcome.Deny);
+            session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.checkout", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Deny));
             await session.SaveChangesAsync(ct).ConfigureAwait(false);
             throw new UnauthorizedAccessException("You do not have standing to check out this item.");
         }
@@ -405,7 +405,7 @@ public sealed class InventoryService : IInventoryService
 
         session.Store(item);
         session.Store(checkout);
-        StoreAuditRow(session, actorId, "inventory.checkout", item.Id, AuditVia(actorRoles), AccessOutcome.Allow);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.checkout", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Allow));
 
         try
         {
@@ -461,7 +461,7 @@ public sealed class InventoryService : IInventoryService
         var hasStanding = isAdmin || isHolder || isCreator;
         if (!hasStanding)
         {
-            StoreAuditRow(session, actorId, "inventory.checkin", item.Id, AuditVia(actorRoles), AccessOutcome.Deny);
+            session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.checkin", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Deny));
             await session.SaveChangesAsync(ct).ConfigureAwait(false);
             throw new UnauthorizedAccessException("You do not have standing to check in this item.");
         }
@@ -473,7 +473,7 @@ public sealed class InventoryService : IInventoryService
 
         session.Store(open);
         session.Store(item);
-        StoreAuditRow(session, actorId, "inventory.checkin", item.Id, AuditVia(actorRoles), AccessOutcome.Allow);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "inventory.checkin", "inventory", item.Id, AuditVia(actorRoles), AccessOutcome.Allow));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return open;
     }
@@ -494,31 +494,6 @@ public sealed class InventoryService : IInventoryService
     /// <c>EventService.AuditViaFor</c> least-distortion mapping).</summary>
     private static AccessVia AuditVia(IReadOnlySet<string> actorRoles)
         => IsGlobalAdmin(actorRoles) ? AccessVia.Admin : AccessVia.Owner;
-
-    /// <summary>
-    /// Appends the **single** <see cref="AccessAudit"/> row for a write lane
-    /// (C-M16·2 — Allow **and** Deny): <c>TargetKind = "inventory"</c> (the
-    /// exact string — the U01 adapter's discriminator, C3), the given
-    /// <paramref name="action"/>, <paramref name="targetId"/>,
-    /// <paramref name="via"/>, and <paramref name="outcome"/>. Stored in the
-    /// write session (it commits atomically with the domain write, C3 — the
-    /// <c>ProjectService.StoreAuditRow</c> shape).
-    /// </summary>
-    private static void StoreAuditRow(IDocumentSession session, string actorId, string action, string targetId, AccessVia via, AccessOutcome outcome)
-    {
-        session.Store(new AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = DateTimeOffset.UtcNow,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,   // the actor acts as themself (no delegation in these lanes).
-            Action = action,
-            TargetKind = "inventory",          // the exact string (C3 — the adapter's discriminator).
-            TargetId = targetId,
-            Via = via,
-            Outcome = outcome,
-        });
-    }
 
     /// <summary>
     /// Recognizes a Postgres **unique violation** (SQLSTATE <c>23505</c>)

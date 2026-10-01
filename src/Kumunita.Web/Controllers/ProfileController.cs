@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -77,10 +78,38 @@ public sealed class ProfileController(
     IUserInfoService userInfo,
     DirectoryService directory,
     IMediaStore media,
-    IOptions<MediaOptions> mediaOpts) : Controller
+    IOptions<MediaOptions> mediaOpts,
+    // M23 (U04) — the per-request localization read seams for the saved-flash
+    // resolution (the AdminQuietController.FlashAsync idiom). **Optional**
+    // (default null) so the existing test-construction sites that build this
+    // controller without the provider keep compiling — the flash resolves to
+    // the KnownTranslationKeys.EnValues floor when the seam is absent; DI
+    // always supplies the live ILocalizationService + ITranslationProvider in
+    // the app.
+    ILocalizationService? localization = null,
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// Resolve a <c>profile.*</c> kw-l key to the resident's effective
+    /// language (the house <see cref="EffectiveLanguageCode.ResolveAsync"/> +
+    /// <see cref="ITranslationProvider.GetAsync"/> seam — the same chain the
+    /// view's <c>&lt;kw-l&gt;</c> TagHelper uses, so the flash string renders
+    /// in the resident's language). Falls back to the
+    /// <see cref="KnownTranslationKeys.EnValues"/> source text when the
+    /// translation seam is absent (the test-construction floor, ADR 0015 D1 —
+    /// code is the floor, so a resident never sees a raw key).
+    /// </summary>
+    private async Task<string> FlashAsync(string key)
+    {
+        if (localization is null || translationProvider is null)
+            return KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key;
+        return await translationProvider.GetAsync(
+            key,
+            await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider));
+    }
 
     // ── Edit (GET + POST — the write lane) ─────────────────────────────────
 
@@ -258,9 +287,25 @@ public sealed class ProfileController(
         // the editor's <c>ContactVisibility</c> IS the profile's
         // <c>ContactVisibility</c>.
         var (profile, patch) = model.ToProfileUpdate(subject);
-        await userInfo.UpsertProfileAsync(profile, patch);
 
-        TempData["info"] = "Profile updated.";
+        // M23 (ADR 0123 D3) — the write lane: the extended ProfileUpdate
+        // (U01/U02) is written through the single existing write lane
+        // (UpsertProfileAsync). The viewer's subject is the actorBy (the
+        // C-TG·9 tag-`createdBy` provenance — the U02 optional trailing
+        // parameter, the ADR 0006-E shape; the ADR 0044 create-or-get loop
+        // writes one tag.create row per new tag with this as `createdBy`).
+        // The bio is written verbatim (D3); the tags are resolved by slug via
+        // the create-or-get loop (C-M23·6). No separate profile-write audit
+        // row (the M2 UpsertProfileAsync shape, U02).
+        await userInfo.UpsertProfileAsync(profile, patch, subject);
+
+        // M23 (U04) — the saved flash resolves through the house
+        // EffectiveLanguageCode.ResolveAsync + ITranslationProvider.GetAsync
+        // seam (the AdminQuietController.FlashAsync / LocaleController.T
+        // idiom) so the resident sees the confirmation in their effective
+        // language; the KnownTranslationKeys.EnValues source text is the
+        // floor when the seam is absent (a test-construction site).
+        TempData["info"] = await FlashAsync("profile.flash.saved");
         return RedirectToAction("Edit");
     }
 

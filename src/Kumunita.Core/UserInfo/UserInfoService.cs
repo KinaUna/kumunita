@@ -1638,7 +1638,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     // ── Components + profile (plan step 6) ───────────────────────────────
 
     /// <inheritdoc />
-    public async Task UpsertProfileAsync(Profile profile, ProfileUpdate patch)
+    public async Task UpsertProfileAsync(Profile profile, ProfileUpdate patch, string? actorBy = null)
     {
         // Load-or-create by SubjectId (the pinned document identity). When creating, the
         // `profile` argument is the base record (its fields define the initial row); the
@@ -1662,7 +1662,9 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             ContactVisibility = profile.ContactVisibility,
             Email = profile.Email,
             Phone = profile.Phone,
-            Address = profile.Address
+            Address = profile.Address,
+            Bio = profile.Bio,
+            TagIds = profile.TagIds
         };
 
         // Patch wins on every non-null field; a null field leaves the current value untouched.
@@ -1672,6 +1674,60 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         if (patch.Visibility is not null) doc.Visibility = patch.Visibility;
         if (patch.ContactVisibility is not null) doc.ContactVisibility = patch.ContactVisibility;
         if (patch.Address is not null) doc.Address = patch.Address;
+        if (patch.Bio is not null) doc.Bio = patch.Bio;   // M23 (D3): verbatim (ADR 0001-B); null ⇒ don't touch
+
+        // M23 (D3): resolve the profile's author-set tags to Tag.Id values — the inlined
+        // ADR 0044 create-or-get (TagService.AttachToPostAsync shape). A missing Slug creates
+        // a Tag (+ one tag.create row, C-TG·9); a present Slug is reused (no row, C-TG·4).
+        // The profile write itself emits no audit row (a Profile field write, not an access
+        // decision — the existing shape above). The actor id for any new Tag.CreatedBy is the
+        // acting resident (the self-edit standing, D3) — falls back to the owner.
+        if (patch.TagIds is not null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var creator = actorBy ?? subjectId;
+            var resolved = new List<string>(patch.TagIds.Count);
+            foreach (var raw in patch.TagIds)
+            {
+                if (string.IsNullOrWhiteSpace(raw)) continue;
+                var slug = raw.Trim().ToLowerInvariant();   // DeriveSlug (C-TG·4), the TagService idiom
+                if (slug.Length == 0) continue;
+                var existingTag = await session.Query<Kumunita.Core.Tags.Tag>()
+                    .Where(t => t.Slug == slug)
+                    .FirstOrDefaultAsync();
+                if (existingTag is not null)
+                {
+                    resolved.Add(existingTag.Id);           // reuse — no row (C-TG·4)
+                }
+                else
+                {
+                    var tag = new Kumunita.Core.Tags.Tag
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        Slug = slug,
+                        Name = slug,
+                        LanguageCode = "en",
+                        CreatedBy = creator,
+                        Created = now
+                    };
+                    session.Store(new Authorization.AccessAudit
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        At = now,
+                        ActorId = creator,
+                        EffectivePrincipalId = creator,
+                        Action = "tag.create",
+                        TargetKind = "tag",
+                        TargetId = tag.Id,
+                        Via = Authorization.AccessVia.Owner,
+                        Outcome = Authorization.AccessOutcome.Allow
+                    });
+                    session.Store(tag);
+                    resolved.Add(tag.Id);                   // one tag.create row (C-TG·9)
+                }
+            }
+            doc.TagIds = resolved.ToArray();
+        }
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);

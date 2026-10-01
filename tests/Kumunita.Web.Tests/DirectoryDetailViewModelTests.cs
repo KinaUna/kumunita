@@ -22,15 +22,19 @@ namespace Kumunita.Web.Tests;
 public sealed class DirectoryDetailViewModelTests
 {
     /// <summary>
-    /// Plan U8 pin — the <see cref="DirectoryViewModel.Detail"/> record has exactly six fields,
-    /// and <b>nothing else</b>. No <c>Visibility</c>, no <c>ContactVisibility</c>, no
-    /// <c>HouseholdId</c>, no <c>ExternalId</c>, no <c>SubjectId</c> (the row is already
-    /// addressed by its route). The contact surface is a *subset* of
-    /// <c>Kumunita.Core.UserInfo.Profile</c> (<c>Address</c>/<c>Email</c>/<c>Phone</c>) —
-    /// nothing more.
+    /// Plan U8 pin (M2), superseded by M23 (ADR 0123 D2/D6) — the
+    /// <see cref="DirectoryViewModel.Detail"/> record now carries exactly EIGHT
+    /// fields, and <b>nothing else</b>. No <c>Visibility</c>, no
+    /// <c>ContactVisibility</c>, no <c>HouseholdId</c>, no <c>ExternalId</c>,
+    /// no <c>SubjectId</c> (the row is already addressed by its route). The
+    /// contact surface is a *subset* of <c>Kumunita.Core.UserInfo.Profile</c>
+    /// (<c>Address</c>/<c>Email</c>/<c>Phone</c>); the two M23 fields
+    /// (<c>Bio</c> + <c>TagNames</c>) ride the profile's <c>Visibility</c>
+    /// gate — a *separate* gate from the contact block's
+    /// <c>ContactVisibility</c> (F2 "two independent gates").
     /// </summary>
     [Fact]
-    public void Detail_Has_Exactly_Six_Fields()
+    public void Detail_Has_Exactly_Eight_Fields()
     {
         var fields = typeof(DirectoryViewModel.Detail)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -38,11 +42,21 @@ public sealed class DirectoryDetailViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // DisplayName, Verified, ShowContactBlock, Address, Email, Phone — the U8 freeze
-        // extended for the neighbor-surface address (the contact block's address/email/phone
-        // are all behind the same ShowContactBlock gate).
+        // M2: DisplayName, Verified, ShowContactBlock, Address, Email, Phone.
+        // M23 (ADR 0123): + Bio, TagNames (the extended-profile surface, on the
+        // profile's Visibility gate — independent of ShowContactBlock).
         Assert.Equal(
-            new[] { "Address", "DisplayName", "Email", "Phone", "ShowContactBlock", "Verified" },
+            new[]
+            {
+                "Address",
+                "Bio",
+                "DisplayName",
+                "Email",
+                "Phone",
+                "ShowContactBlock",
+                "TagNames",
+                "Verified",
+            },
             fields);
     }
 

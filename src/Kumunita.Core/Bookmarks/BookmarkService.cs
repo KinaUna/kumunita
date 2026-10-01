@@ -225,6 +225,37 @@ public sealed class BookmarkService : IBookmarkService
         return new BookmarkToggleResult(BookmarkToggleStatus.Removed);
     }
 
+    // ── Button-state read (F1; the C-M17·2 personal-read shape) ───────────
+
+    /// <inheritdoc />
+    public async Task<bool> IsBookmarkedAsync(
+        string ownerId, string targetKind, string targetId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetKind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetId);
+
+        // No ownerId ⇒ no personal read standing (the C-M17·2 "operator has
+        // no read standing" gate): an anonymous / no-SubjectId caller can
+        // never own a row, so answer false with no query at all.
+        if (string.IsNullOrWhiteSpace(ownerId))
+            return false;
+
+        // The closed set is the boundary of the pin world (D1): a kind
+        // outside it has no owning surface, so it can never be bookmarked.
+        if (!ClosedTargetKinds.Contains(targetKind))
+            return false;
+
+        // C-M17·2 — a pure existence check over the owner's own row, by the
+        // identity predicate alone: no AccessAudit row, no CanAsync pass,
+        // no target read (a dangling row still answers true — the button's
+        // remove affordance must work even when the target is gone, D5 / F4).
+        await using var q = _store.QuerySession();
+        return await q.Query<Bookmark>()
+            .Where(b => b.OwnerId == ownerId && b.TargetKind == targetKind && b.TargetId == targetId)
+            .AnyAsync()
+            .ConfigureAwait(false);
+    }
+
     // ── The D5 list resolution — a pure, non-auditing doc load ────────────
 
     /// <summary>

@@ -13,17 +13,17 @@ public class MilestonesTests
         Milestones.All.Select(m => m.Id);
 
     [Fact]
-    public void Roadmap_Covers_M0_Through_M22_Plus_Named_Lanes_In_Order()
+    public void Roadmap_Covers_M0_Through_M23_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M22" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22" },
             Ids.ToList());
     }
 
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,13 +31,18 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void No_Milestone_Is_InProgress_After_M19()
+    public void M22_Is_The_Single_InProgress_Milestone()
     {
-        // M19 is the last shipped milestone; M20/M21/M22 are the planned
-        // horizon (M20 quiet times, M21 document management, M22 onboarding)
-        // — none has begun, so there is no StatusNext.
+        // M23 (extended user profiles) is DONE — closed in the U06 close unit
+        // (ADR 0123); M22 (onboarding) is now open (promoted to the single
+        // in-progress milestone, the order unchanged); M21 (document
+        // management) is still done.
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
-        Assert.Empty(next);
+        Assert.Single(next);
+        Assert.Equal("M22", next[0].Id);
+        // the done list has grown to M23 (M22 is not done)
+        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M23").Status);
+        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M21").Status);
     }
 
     [Fact]

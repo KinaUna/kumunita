@@ -4,6 +4,8 @@ using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace Kumunita.Web.Controllers;
 
@@ -44,9 +46,11 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class MessagesController(
+    ILogger<MessagesController> logger,
     IMessagingService messaging,
     IUserInfoService userInfo) : Controller
 {
+    private readonly ILogger<MessagesController> _logger = logger;
     private readonly IMessagingService _messaging = messaging;
     private readonly IUserInfoService _userInfo = userInfo;
 
@@ -188,7 +192,12 @@ public sealed class MessagesController(
         // The actor's own display name — the view's "You" sender label
         // (best-effort; a missing profile degrades to the otherWord fallback).
         string? actorDisplayName = null;
-        try { actorDisplayName = (await _userInfo.GetProfileAsync(actorId))?.DisplayName; } catch { /* read seam not fatal */ }
+        try { actorDisplayName = (await _userInfo.GetProfileAsync(actorId))?.DisplayName; }
+        catch (Exception ex) when (ex is not UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Thread actor display-name read failed for {ActorId}; degrading to the sender fallback.", actorId);
+            actorDisplayName = null;
+        }
 
         PagedViewModel? pager = null;
         if (detail.HasMore || pageNum > 1)
@@ -218,6 +227,7 @@ public sealed class MessagesController(
     /// did the deciding. On success: a flash + redirect back to the thread.
     /// </summary>
     [HttpPost("/messages/{id}/send")]
+    [EnableRateLimiting("message")]
     public async Task<IActionResult> Send(string id, [FromForm] string? body)
     {
         var actorId = KumunitaPrincipal.SubjectId(User);

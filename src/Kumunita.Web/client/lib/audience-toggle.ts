@@ -15,7 +15,14 @@
 (() => {
   'use strict';
   for (const box of document.querySelectorAll<HTMLInputElement>('[data-audience-toggle]')) {
-    const panel = document.querySelector<HTMLElement>('[data-audience-panel]');
+    // Scope the panel lookup to the checkbox's own editor card when one
+    // exists (Profile/Edit renders TWO _AudienceEditor instances on one
+    // page — Visibility + ContactVisibility — so a page-wide querySelector
+    // would point every checkbox at the first panel). Pages with a single
+    // editor (the M3/M4/M5 composers) have no .audience-editor ancestor, so
+    // the fallback to document keeps their single panel working unchanged.
+    const scope = box.closest<HTMLElement>('.audience-editor') || document;
+    const panel = scope.querySelector<HTMLElement>('[data-audience-panel]');
     if (!panel) continue;
     const sync = () => panel.classList.toggle('d-none', box.checked);
     box.addEventListener('change', sync);

@@ -3,6 +3,8 @@ using Kumunita.Web;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -22,7 +24,7 @@ public class HomeControllerTests
             Name = name,
             SupportEmail = supportEmail,
         });
-        var controller = new HomeController(options);
+        var controller = new HomeController(NullLogger<HomeController>.Instance, options);
         var action = await controller.Index();
         var view = Assert.IsType<ViewResult>(action);
         return (controller, Assert.IsType<HomeViewModel>(view.ViewData.Model));
@@ -50,7 +52,7 @@ public class HomeControllerTests
         // Program.cs binds Community__* on startup; if nothing is set, the POCO
         // default "Kumunita" surfaces — pinning this here protects the OPS default.
         var options = Options.Create(new CommunityOptions());
-        var controller = new HomeController(options);
+        var controller = new HomeController(NullLogger<HomeController>.Instance, options);
         var view = Assert.IsType<ViewResult>(await controller.Index());
 
         var vm = Assert.IsType<HomeViewModel>(view.ViewData.Model);
@@ -62,7 +64,7 @@ public class HomeControllerTests
     {
         // The feed is signed-in only; an anonymous visitor (no SubjectId claim)
         // gets null Feed — the view renders hero + roadmap only.
-        var controller = new HomeController(Options.Create(new CommunityOptions()));
+        var controller = new HomeController(NullLogger<HomeController>.Instance, Options.Create(new CommunityOptions()));
         // No controller context ⇒ User is null ⇒ SubjectId null.
         var view = Assert.IsType<ViewResult>(await controller.Index());
 

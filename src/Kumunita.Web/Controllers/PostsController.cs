@@ -825,6 +825,7 @@ public sealed class PostsController(
     /// </summary>
     [HttpPost("/posts/new")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> New([FromForm] PostComposeViewModel model)
     {
         var actor = SubjectId(User);
@@ -1218,6 +1219,7 @@ public sealed class PostsController(
     /// </para>
     /// </summary>
     [HttpPost("/posts/{id}/replies")]
+    [EnableRateLimiting("write")]
     public async Task<IActionResult> Replies([FromRoute] string id, [FromForm] string? body, [FromForm] string? languageCode)
     {
         if (string.IsNullOrEmpty(id))

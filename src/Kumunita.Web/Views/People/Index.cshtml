@@ -1,0 +1,55 @@
+@model Kumunita.Web.Models.FindPeopleIndexViewModel
+@{
+    ViewData["Title"] = "People";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="profile.find.title">Find people</kw-l></h1>
+                    <p class="lede"><kw-l key="nav.people">People</kw-l></p>
+                </div>
+            </div>
+        </header>
+
+        <div class="row g-3">
+            @* M23 (ADR 0123 D4) — the by-tag form: a tag-slug input (the ADR
+               0044 tag-input shape) + a Find submit. A form GET cannot place
+               a field into the /people/tag/{slug} path segment (that needs
+               inline script — SECURITY.md §6 forbids it), so the slug is
+               posted as a `tag` query field and Index 302-redirects to the
+               canonical ByTag route (the results URL + paging link target). *@
+            <div class="col-md-6">
+                <form method="get" action="/people" class="d-flex flex-column gap-2"
+                      role="search" aria-label="Find by tag">
+                    <label class="form-label" for="find-tag-slug">
+                        <kw-l key="profile.find.by_tag">Find by tag</kw-l>
+                    </label>
+                    <input class="form-control" type="text" name="tag" id="find-tag-slug"
+                           placeholder="e.g. gardening" autocomplete="off" required />
+                    <button type="submit" class="btn btn-outline-primary align-self-start">
+                        <kw-l key="profile.find.by_tag">Find by tag</kw-l>
+                    </button>
+                </form>
+            </div>
+
+            @* M23 (ADR 0123 D4) — the by-bio form: a substring query + a Find
+               submit. GETs /people?bio={q}. *@
+            <div class="col-md-6">
+                <form method="get" action="/people" class="d-flex flex-column gap-2"
+                      role="search" aria-label="Find by bio">
+                    <label class="form-label" for="find-bio-q">
+                        <kw-l key="profile.find.by_bio">Find by bio</kw-l>
+                    </label>
+                    <input class="form-control" type="search" name="bio" id="find-bio-q"
+                           placeholder="a word in someone's bio…" autocomplete="off" required />
+                    <button type="submit" class="btn btn-outline-primary align-self-start">
+                        <kw-l key="profile.find.by_bio">Find by bio</kw-l>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

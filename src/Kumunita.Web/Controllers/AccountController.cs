@@ -194,18 +194,15 @@ public sealed class AccountController(
             return Redirect("/profile/edit");
 
         // `error` arrives as a short code (not the message text) — the query string is
-        // user-visible and may be bookmarked/shared, so keep it token-like. "blocked"
-        // is set by BlockedAccountMiddleware when it forces a sign-out of an account
-        // suspended mid-session, and by the POST-Login guard when a login attempt
-        // succeeds against a blocked account (the two land on this page the same way).
-        const string blockedMessage =
-            "Your account has been blocked by an administrator. " +
-            "Contact them if you believe this is a mistake.";
-        var errorText = error switch
-        {
-            "blocked" => blockedMessage,
-            _ => null
-        };
+        // user-visible and may be bookmarked/shared, so keep it token-like. The
+        // code→message table lives in the Login view (D6 — "the mapping is a 3-row
+        // table in the view"). The three known codes are:
+        //   "blocked"          — BlockedAccountMiddleware (suspension mid-session)
+        //                        + the POST-Login block-enforcement guard.
+        //   "account-removed"  — PrivilegedStampMiddleware (user deleted).
+        //   "role-changed"     — PrivilegedStampMiddleware (role-set mismatch).
+        // An unknown code is passed through verbatim — the view falls back to
+        // `Model.Error` (forward-compatible: a future code still shows something).
 
         // Hide the "Received a first-boot setup token?" hint once the seed-admin
         // setup has already been completed (or its token has since expired) — after
@@ -221,7 +218,7 @@ public sealed class AccountController(
         return View(new LoginViewModel
         {
             ReturnUrl = returnUrl,
-            Error = errorText,
+            Error = error,   // ← the code, not a resolved message (D6: the view does the mapping)
             ShowSetupLink = showSetupLink,
             SignupOpen = signupOpen,
         });

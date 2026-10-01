@@ -11,8 +11,9 @@
 <h1>Platform</h1>
 <p class="text-muted">
     Instance-wide management — the platform's languages and translated UI strings,
-    the default time zone and date &amp; time format, the sign-up gate, the access
-    audit log, and the break-glass elevation path.
+    the default time zone and date &amp; time format, the sign-up gate, the
+    notification-flush cadence, the access audit log, and the break-glass
+    elevation path.
 </p>
 
 @* Each surface is a list-group item with a title + one-line description, so an
@@ -34,6 +35,10 @@
     <a href="/admin/signup" class="list-group-item list-group-item-action">
         <div class="fw-semibold">Sign-up</div>
         <small class="text-muted">Whether new residents may create an account on their own — close it for invitation-only sign-up.</small>
+    </a>
+    <a href="/admin/quiet" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Quiet-time cadence</div>
+        <small class="text-muted">How often held notification emails are re-checked and delivered — residents set their own quiet window on /settings/quiet.</small>
     </a>
     <a asp-action="Audit" class="list-group-item list-group-item-action">
         <div class="fw-semibold">Access audit log</div>

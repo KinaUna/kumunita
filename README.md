@@ -20,8 +20,12 @@ groups & delegation, directory & profiles, posts + moderation, multilingual
 events + calendar (`M4`/`GE`/`EV-DWM`), projects (`M5`), notifications
 (`M6`), pagination (`M7`), search (`M8`), messaging (`M9`), PWA + responsive
 design (`M10`), and portability (import/export) (`M11`), on one
-server-rendered stack over a single Postgres. The next horizon is planned:
-M20 — notification quiet times, M21 — document management, M22 — onboarding
+server-rendered stack over a single Postgres. **M20 is done** —
+notification quiet times (per-resident quiet schedules on the M6 notification
+lane + the admin-set check cadence for pending notifications; ADR 0121). **M21 is done** —
+document management (a shared repository for official documents, contracts, etc., with per-document access controls; ADR 0122).
+**M23 is done** — extended user profiles (a biography + free author-set tags for skills, interests, knowledge, and expertise, to make it easier to find people with something in common; ADR 0123).
+**M22 is in progress** — onboarding (a guided walk-through that walks a new user through account setup)
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -249,9 +253,10 @@ stays trivial and the authorization rules can grow freely.
 - **M17** — Bookmarks: save posts, events, todos, etc. for quick personal access. **Done.** (ADR 0118)
 - **M18** — Repeating / recurring events over the M4 events surface (the `RRULE` home deferred by ADR 0112). **Done.** (ADR 0119)
 - **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long. **Done.** (ADR 0120)
-- **M20** — Notification quiet times: a per-resident quiet schedule over the M6 notification lane — allowed/blocked hours of day and days of the week for how (or whether) notifications are delivered; admins set how often the system checks for pending notifications. **Planned.**
-- **M21** — Document management: a shared repository for official documents, contracts, and similar community-owned files, with per-document access controls. **Planned.**
-- **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **Planned.**
+- **M20** — Notification quiet times: a per-resident quiet schedule over the M6 notification lane — allowed/blocked hours of day and days of the week for how (or whether) notifications are delivered; admins set how often the system checks for pending notifications. **Done.** (ADR 0121)
+- **M21** — Document management: a shared repository for official documents, contracts, and similar community-owned files, with per-document access controls. **Done.** (ADR 0122)
+- **M23** — Extended user profiles: a resident biography + free author-set tags (skills, interests, knowledge, and expertise) to make it easier to find people with something in common. **Done** (ADR 0123).
+- **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **In progress.**
 
 ## Deferred (future, by design)
 

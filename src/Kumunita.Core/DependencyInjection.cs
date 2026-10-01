@@ -79,6 +79,18 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IUserInfoService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
 
+        // M23 (ADR 0123 D4): the find-people composition root — the
+        // DirectoryService shape above, extended with the host-registered Marten
+        // IDocumentStore (the tag resolve + the CanSeeAsync aggregate audit row)
+        // so the two paged reads (by-tag + bio-substring) compose the frozen
+        // seams only (the ADR 0006-D lane pin — zero new authorization surface,
+        // C-M23·2/D7). An interface (unlike DirectoryService) so the Web layer
+        // resolves a stable seam.
+        services.AddTransient<IProfileFindService>(sp => new ProfileFindService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-8 (M1 plan): the /health degraded seam (OPS §8) — counts
         // EmailDeadLetter rows through a Marten IQuerySession. Web-side consumers
         // (HealthController) resolve this, so tests can substitute a canned count
@@ -102,6 +114,17 @@ public static class ServiceCollectionExtensions
             // DI-registered instance so the post-reply / group-post emitters
             // fire in production (the C-M6 lane).
             sp.GetRequiredService<Notifications.NotificationService>()));
+
+        // M21 (ADR 0122, U02): the documents-side composition root — a concrete
+        // class pairing the two frozen seams with the host-registered Marten
+        // IDocumentStore (mirrors the M3 PostService registration shape).
+        // Standing-agnostic (D5): the upload right is gated at the Web boundary;
+        // the Core service composes the frozen seams only (the ADR 0006-D lane
+        // pin — zero new authorization surface, C-M21·2/D8).
+        services.AddTransient<Documents.DocumentService>(sp => new Documents.DocumentService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>()));
 
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
@@ -338,7 +361,13 @@ public static class ServiceCollectionExtensions
             // that doesn't register the option degrades to an empty BaseUrl
             // (the link still renders, just relative) via the ctor's null
             // default.
-            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>()));
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>(),
+            // M20 (ADR 0121, D4) — the ADR 0019 platform-default zone read the
+            // quiet gate's effective-zone chain uses (Profile.TimeZone override
+            // → GetDefaultTimezoneAsync → UTC floor). GetRequiredService — the
+            // transient ILocalizationService is always registered in this
+            // composition (the M1/M5/M9 services above rely on the same seam).
+            sp.GetRequiredService<Localization.ILocalizationService>()));
 
         // M8 (ADR 0091, U01): the Search bounded context's service seam (bounded
         // context Kumunita.Core.Search — the "find content by text" read lane over

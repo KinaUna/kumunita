@@ -92,6 +92,29 @@ public static class KnownTranslationKeys
                 "You are signed in as a guest. Your access is limited to the " +
                 "surfaces the admin has allowed, for the window they set.",
 
+            // ── M20 (ADR 0121) — notification quiet times: the 5th
+            // /settings/quiet resident section (D7) + the /admin/quiet cadence
+            // surface (D8). U06 authors the COMPLETE 15-key closed set (11
+            // resident settings.quiet.* + 4 admin admin.quiet.*); U06/U07
+            // consume, U07 adds none (the register's closed-kw-l table).
+            ["settings.quiet.title"]        = "Quiet hours",
+            ["settings.quiet.description"]  = "Choose when your notification emails are held. Your quiet " +
+                "schedule is saved on your account, applied in your own time zone — it takes " +
+                "effect the next time a notification is sent, and never affects other residents.",
+            ["settings.quiet.enabled"]      = "Hold notification emails during my quiet hours",
+            ["settings.quiet.mode_label"]   = "When should notification emails be held?",
+            ["settings.quiet.mode_blocked"] = "Held during the selected hours & days",
+            ["settings.quiet.mode_allowed"] = "Held except the selected hours & days",
+            ["settings.quiet.hours_label"]  = "Hours of day",
+            ["settings.quiet.days_label"]   = "Days of week",
+            ["settings.quiet.save"]         = "Save quiet hours",
+            ["settings.quiet.flash_saved"]  = "Quiet hours saved — held emails are released when your quiet hours end.",
+            ["settings.quiet.flash_cleared"] = "Quiet hours cleared — all notification emails will now be sent immediately.",
+            ["admin.quiet.title"]           = "Quiet-time cadence",
+            ["admin.quiet.cadence_label"]   = "Re-check held notifications every (minutes)",
+            ["admin.quiet.save"]            = "Save cadence",
+            ["admin.quiet.flash_saved"]     = "Quiet-time cadence saved.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
@@ -296,6 +319,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Pages",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Directory",
+            ["nav.people"]        = "People",
             ["nav.sign_in"]       = "Sign in",
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
@@ -585,6 +609,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Sign up",
             ["account.signup_submit"] = "Sign up",
             ["account.signup_has_account"] = "Already have an account?",
+            ["account.login.error.blocked"] =
+                "Your account has been temporarily suspended. Contact an administrator.",
+            ["account.login.error.removed"] =
+                "Your account has been removed. Contact an administrator.",
+            ["account.login.error.role_changed"] =
+                "Your role has been changed. Please sign in again.",
 
             // ── posts (Index / New / Edit — headings, actions, empty-states) ─
             // The all-sections feed (/community) header — the single feed
@@ -781,6 +811,22 @@ public static class KnownTranslationKeys
                 "it in the box below.",
             ["profile.save"] = "Save",
             ["profile.preview_link"] = "Preview — how I appear",
+
+            // ── M23 (U04) — extended-profile editor + directory detail ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "e.g. gardening, baking, cycling…",
+            ["profile.detail.bio"] = "About",
+            ["profile.detail.tags"] = "Interests & skills",
+            ["profile.detail.tags.empty"] = "No tags set.",
+            ["profile.flash.saved"] = "Profile updated.",
+
+            // ── M23 (U05) — the /people find-people surface ─────────────
+            ["profile.find.title"]   = "Find people",
+            ["profile.find.by_tag"]  = "Find by tag",
+            ["profile.find.by_bio"]  = "Find by bio",
+            ["profile.find.results"] = "{0} people found",
+            ["profile.find.empty"]   = "No one matches — yet.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Display name",
@@ -1813,6 +1859,22 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
+
+            // ── M21 (ADR 0122) — document management: the /documents feed +
+            // detail + upload form (D5 standing, D6 download, D7 Deny → 404).
+            // U04 authors the COMPLETE 12-key closed set; U03's views consume.
+            ["documents.title"]             = "Documents",
+            ["documents.empty"]             = "No documents are visible to you yet.",
+            ["documents.upload"]            = "Upload a document",
+            ["documents.upload_title"]      = "Upload a document",
+            ["documents.upload_summary"]    = "One-line description (optional)",
+            ["documents.upload_file"]       = "File",
+            ["documents.upload_audience"]   = "Who can see this document",
+            ["documents.upload.submit"]     = "Upload document",
+            ["documents.download"]          = "Download",
+            ["documents.detail.type_size"]  = "File type / size",
+            ["documents.detail.updated"]    = "Last updated",
+            ["documents.flash_uploaded"]    = "Document uploaded.",
         };
 
     /// <summary>
@@ -1846,6 +1908,29 @@ public static class KnownTranslationKeys
                 "Sie sind als Gast angemeldet. Ihr Zugriff ist auf die " +
                 "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
                 "das von ihr gesetzte Zeitfenster.",
+
+            // ── M20 (ADR 0121) — Benachrichtigungs-Stumstunden: die 5. Sektion
+            // /settings/quiet (D7) + die /admin/quiet-Takt-Oberfläche (D8).
+            // U06 authorisiert den vollständigen 15-Schlüssel-Satz; U06/U07
+            // konsumieren, U07 fügt keine Schlüssel hinzu.
+            ["settings.quiet.title"]        = "Stumstunden",
+            ["settings.quiet.description"]  = "Wähle, wann deine Benachrichtigungs-E-Mails zurückgehalten " +
+                "werden. Dein Stumstundenplan wird auf deinem Konto gespeichert, in " +
+                "deiner eigenen Zeitzone angewendet — er wirkt beim nächsten " +
+                "Absenden einer Benachrichtigung und betrifft nie andere Mitglieder.",
+            ["settings.quiet.enabled"]      = "Benachrichtigungs-E-Mails in meinen Stumstunden zurückhalten",
+            ["settings.quiet.mode_label"]   = "Wann sollen Benachrichtigungs-E-Mails zurückgehalten werden?",
+            ["settings.quiet.mode_blocked"] = "Zurückgehalten während der gewählten Stunden & Tage",
+            ["settings.quiet.mode_allowed"] = "Zurückgehalten außer in den gewählten Stunden & Tagen",
+            ["settings.quiet.hours_label"]  = "Stunden des Tages",
+            ["settings.quiet.days_label"]   = "Wochentage",
+            ["settings.quiet.save"]         = "Stumstunden speichern",
+            ["settings.quiet.flash_saved"]  = "Stumstunden gespeichert — zurückgehaltene E-Mails werden gesendet, sobald deine Stumstunden enden.",
+            ["settings.quiet.flash_cleared"] = "Stumstunden entfernt — alle Benachrichtigungs-E-Mails werden jetzt sofort gesendet.",
+            ["admin.quiet.title"]           = "Stumstunden-Takt",
+            ["admin.quiet.cadence_label"]   = "Zurückgehaltene Benachrichtigungen alle (Minuten) erneut prüfen",
+            ["admin.quiet.save"]            = "Takt speichern",
+            ["admin.quiet.flash_saved"]     = "Stumstunden-Takt gespeichert.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
@@ -2043,6 +2128,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Seiten",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Verzeichnis",
+            ["nav.people"]        = "Menschen",
             ["nav.sign_in"]       = "Anmelden",
             ["nav.sign_up"]       = "Registrieren",
             ["nav.profile"]       = "Profil",
@@ -2326,6 +2412,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Registrieren",
             ["account.signup_submit"] = "Registrieren",
             ["account.signup_has_account"] = "Du hast schon ein Konto?",
+            ["account.login.error.blocked"] =
+                "Ihr Konto wurde vorübergehend gesperrt. Wenden Sie sich an einen Administrator.",
+            ["account.login.error.removed"] =
+                "Ihr Konto wurde entfernt. Wenden Sie sich an einen Administrator.",
+            ["account.login.error.role_changed"] =
+                "Ihre Rolle wurde geändert. Bitte melden Sie sich erneut an.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Gemeinschaft",
@@ -2504,6 +2596,22 @@ public static class KnownTranslationKeys
                 "unten aus, wer es sehen darf.",
             ["profile.save"] = "Speichern",
             ["profile.preview_link"] = "Vorschau — so erscheine ich",
+
+            // ── M23 (U04) — erweiterte Profil-Editor + Verzeichnis-Details ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "z. B. Gärtnern, Backen, Radfahren…",
+            ["profile.detail.bio"] = "Über mich",
+            ["profile.detail.tags"] = "Interessen & Fähigkeiten",
+            ["profile.detail.tags.empty"] = "Keine Tags.",
+            ["profile.flash.saved"] = "Profil aktualisiert.",
+
+            // ── M23 (U05) — die /people Personen-Find-Oberfläche ─────────
+            ["profile.find.title"]   = "Menschen finden",
+            ["profile.find.by_tag"]  = "Nach Tag finden",
+            ["profile.find.by_bio"]  = "Nach Bio finden",
+            ["profile.find.results"] = "{0} Personen gefunden",
+            ["profile.find.empty"]   = "Niemand passt — noch nicht.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Anzeigename",
@@ -3462,6 +3570,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
+
+            // ── M21 (ADR 0122) — Dokumentverwaltung: die /documents-Feed- +
+            // Detail- + Upload-Oberfläche (D5 Standing, D6 Download, D7
+            // Deny → 404). U04 erstellt das komplette 12-Schlüssel-Satz;
+            // U03's Ansichten konsumieren.
+            ["documents.title"]             = "Dokumente",
+            ["documents.empty"]             = "Noch keine Dokumente sind für dich sichtbar.",
+            ["documents.upload"]            = "Dokument hochladen",
+            ["documents.upload_title"]      = "Dokument hochladen",
+            ["documents.upload_summary"]    = "Einzeilige Beschreibung (optional)",
+            ["documents.upload_file"]       = "Datei",
+            ["documents.upload_audience"]   = "Wer darf dieses Dokument sehen",
+            ["documents.upload.submit"]     = "Dokument hochladen",
+            ["documents.download"]          = "Herunterladen",
+            ["documents.detail.type_size"]  = "Dateitype / Größe",
+            ["documents.detail.updated"]    = "Zuletzt aktualisiert",
+            ["documents.flash_uploaded"]    = "Dokument hochgeladen.",
         };
 
     /// <summary>
@@ -3497,6 +3622,29 @@ public static class KnownTranslationKeys
                 "Vous êtes connecté en tant qu'invité. Votre accès est limité " +
                 "aux surfaces que l'administrateur a autorisées, pour la " +
                 "fenêtre qu'il a définie.",
+
+            // ── M20 (ADR 0121) — heures de silence des notifications : la 5e
+            // section /settings/quiet (D7) + la surface /admin/quiet (D8).
+            // U06 authorise le jeu fermé de 15 clés ; U06/U07 consomment, U07
+            // n'ajoute aucune clé.
+            ["settings.quiet.title"]        = "Heures de silence",
+            ["settings.quiet.description"]  = "Choisis quand tes e-mails de notification sont retenus. Ton " +
+                "horaire de silence est enregistré sur ton compte, appliqué dans " +
+                "ton propre fuseau horaire — il prend effet au prochain envoi d'une " +
+                "notification et n'affecte jamais les autres résidents.",
+            ["settings.quiet.enabled"]      = "Retenir les e-mails de notification pendant mes heures de silence",
+            ["settings.quiet.mode_label"]   = "Quand les e-mails de notification doivent-ils être retenus ?",
+            ["settings.quiet.mode_blocked"] = "Retenus pendant les heures & jours sélectionnés",
+            ["settings.quiet.mode_allowed"] = "Retenus hors des heures & jours sélectionnés",
+            ["settings.quiet.hours_label"]  = "Heures de la journée",
+            ["settings.quiet.days_label"]   = "Jours de la semaine",
+            ["settings.quiet.save"]         = "Enregistrer les heures de silence",
+            ["settings.quiet.flash_saved"]  = "Heures de silence enregistrées — les e-mails retenus sont envoyés dès que tes heures de silence se terminent.",
+            ["settings.quiet.flash_cleared"] = "Heures de silence retirées — tous les e-mails de notification seront désormais envoyés immédiatement.",
+            ["admin.quiet.title"]           = "Cadence des heures de silence",
+            ["admin.quiet.cadence_label"]   = "Revérifier les notifications retenues toutes les (minutes)",
+            ["admin.quiet.save"]            = "Enregistrer la cadence",
+            ["admin.quiet.flash_saved"]     = "Cadence des heures de silence enregistrée.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
@@ -3548,6 +3696,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Pages",
             ["nav.tags"]          = "Étiquettes",
             ["nav.directory"]     = "Annuaire",
+            ["nav.people"]        = "Personnes",
             ["nav.sign_in"]       = "Se connecter",
             ["nav.sign_up"]       = "S'inscrire",
             ["nav.profile"]       = "Profil",
@@ -3975,6 +4124,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "S'inscrire",
             ["account.signup_submit"] = "S'inscrire",
             ["account.signup_has_account"] = "Tu as déjà un compte ?",
+            ["account.login.error.blocked"] =
+                "Votre compte a été suspendu temporairement. Contactez un administrateur.",
+            ["account.login.error.removed"] =
+                "Votre compte a été supprimé. Contactez un administrateur.",
+            ["account.login.error.role_changed"] =
+                "Votre rôle a été modifié. Veuillez vous reconnecter.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Communauté",
@@ -4153,6 +4308,22 @@ public static class KnownTranslationKeys
                 "qui peut les voir dans le bloc ci-dessous.",
             ["profile.save"] = "Enregistrer",
             ["profile.preview_link"] = "Aperçu — comment je me présente",
+
+            // ── M23 (U04) — éditeur de profil étendu + détails du répertoire ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "ex. jardinage, pâtisserie, vélo…",
+            ["profile.detail.bio"] = "À propos",
+            ["profile.detail.tags"] = "Centres d'intérêt & compétences",
+            ["profile.detail.tags.empty"] = "Aucun tag.",
+            ["profile.flash.saved"] = "Profil mis à jour.",
+
+            // ── M23 (U05) — la surface /people de recherche de personnes ──
+            ["profile.find.title"]   = "Trouver des personnes",
+            ["profile.find.by_tag"]  = "Trouver par tag",
+            ["profile.find.by_bio"]  = "Trouver par bio",
+            ["profile.find.results"] = "{0} personnes trouvées",
+            ["profile.find.empty"]   = "Personne ne correspond — pour l'instant.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Nom affiché",
@@ -5114,6 +5285,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
+
+            // ── M21 (ADR 0122) — gestion des documents : la liste /documents +
+            // la page détail + le formulaire de dépôt (D5 standing, D6
+            // téléchargement, D7 refus → 404). U04 crée le jeu fermé de 12
+            // clés ; les vues de U03 le consomment.
+            ["documents.title"]             = "Documents",
+            ["documents.empty"]             = "Aucun document n'est visible pour l'instant.",
+            ["documents.upload"]            = "Téléverser un document",
+            ["documents.upload_title"]      = "Téléverser un document",
+            ["documents.upload_summary"]    = "Description en une ligne (facultatif)",
+            ["documents.upload_file"]       = "Fichier",
+            ["documents.upload_audience"]   = "Qui peut voir ce document",
+            ["documents.upload.submit"]     = "Téléverser le document",
+            ["documents.download"]          = "Télécharger",
+            ["documents.detail.type_size"]  = "Type / taille du fichier",
+            ["documents.detail.updated"]    = "Dernière mise à jour",
+            ["documents.flash_uploaded"]    = "Document téléversé.",
         };
 
     /// <summary>
@@ -5149,6 +5337,29 @@ public static class KnownTranslationKeys
             ["account.guest_welcome"] =
                 "Du er logget ind som gæst. Din adgang er begrænset til de " +
                 "flader, administratoren har tilladt, for det vindue de har sat.",
+
+            // ── M20 (ADR 0121) — notifikations-stumtid: den 5. sektion
+            // /settings/quiet (D7) + overfladen /admin/quiet (D8). U06
+            // authoriserer det fulde sæt på 15 nøgler; U06/U07 forbruger, U07
+            // tilføjer ingen nøgler.
+            ["settings.quiet.title"]        = "Stumtid",
+            ["settings.quiet.description"]  = "Vælg hvornår dine notifikationse-mails holdes tilbage. Din " +
+                "stumtid gemmes på din konto og anvendes i din egen tidssone — " +
+                "den træder i kraft ved næste afsendelse af en notifikation og " +
+                "betræffer aldrig andre beboere.",
+            ["settings.quiet.enabled"]      = "Hold notifikationse-mails tilbage i min stumtid",
+            ["settings.quiet.mode_label"]   = "Hvornår skal notifikationse-mails holdes tilbage?",
+            ["settings.quiet.mode_blocked"] = "Holdes tilbage i de valgte timer & dage",
+            ["settings.quiet.mode_allowed"] = "Holdes tilbage undtagen de valgte timer & dage",
+            ["settings.quiet.hours_label"]  = "Timer på døgnet",
+            ["settings.quiet.days_label"]   = "Ugedage",
+            ["settings.quiet.save"]         = "Gem stumtid",
+            ["settings.quiet.flash_saved"]  = "Stumtid gemt — tilbageholdte e-mails sendes, når din stumtid slutter.",
+            ["settings.quiet.flash_cleared"] = "Stumtid ryddet — alle notifikationse-mails sendes nu straks.",
+            ["admin.quiet.title"]           = "Stumtid-takt",
+            ["admin.quiet.cadence_label"]   = "Genprøv tilbageholdte notifikationer hver (minut) gang",
+            ["admin.quiet.save"]            = "Gem takt",
+            ["admin.quiet.flash_saved"]     = "Stumtid-takt gemt.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
@@ -5200,6 +5411,7 @@ public static class KnownTranslationKeys
             ["nav.pages"]         = "Sider",
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Kontaktliste",
+            ["nav.people"]        = "Personer",
             ["nav.sign_in"]       = "Log ind",
             ["nav.sign_up"]       = "Opret konto",
             ["nav.profile"]       = "Profil",
@@ -5625,6 +5837,12 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Opret konto",
             ["account.signup_submit"] = "Opret konto",
             ["account.signup_has_account"] = "Har du allerede en konto?",
+            ["account.login.error.blocked"] =
+                "Din konto er midlertidigt suspenderet. Kontakt en administrator.",
+            ["account.login.error.removed"] =
+                "Din konto er blevet fjernet. Kontakt en administrator.",
+            ["account.login.error.role_changed"] =
+                "Din rolle er blevet ændret. Log venligst ind igen.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Fællesskab",
@@ -5801,6 +6019,22 @@ public static class KnownTranslationKeys
                 "nedenfor, hvem der kan se den.",
             ["profile.save"] = "Gem",
             ["profile.preview_link"] = "Forhåndsvisning — sådan ser jeg ud",
+
+            // ── M23 (U04) — udvidet profilredigering + stikordsbog-detaljer ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "f.eks. havearbejde, bagning, cykling…",
+            ["profile.detail.bio"] = "Om mig",
+            ["profile.detail.tags"] = "Interesser & færdigheder",
+            ["profile.detail.tags.empty"] = "Ingen tags.",
+            ["profile.flash.saved"] = "Profil opdateret.",
+
+            // ── M23 (U05) — /people-personsøgningsoverfladen ────────────
+            ["profile.find.title"]   = "Find personer",
+            ["profile.find.by_tag"]  = "Find efter tag",
+            ["profile.find.by_bio"]  = "Find efter bio",
+            ["profile.find.results"] = "{0} personer fundet",
+            ["profile.find.empty"]   = "Ingen matcher — endnu.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Vistnavn",
@@ -6756,6 +6990,23 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
+
+            // ── M21 (ADR 0122) — dokumenthåndtering: /documents-feed +
+            // detalje + upload-formular (D5 standing, D6 download, D7
+            // afvisning → 404). U04 skaber det lukkede 12-nøgler-sæt; U03's
+            // views forbruger det.
+            ["documents.title"]             = "Dokumenter",
+            ["documents.empty"]             = "Ingen dokumenter er endnu synlige for dig.",
+            ["documents.upload"]            = "Upload et dokument",
+            ["documents.upload_title"]      = "Upload et dokument",
+            ["documents.upload_summary"]    = "En-linjes beskrivelse (valgfri)",
+            ["documents.upload_file"]       = "Fil",
+            ["documents.upload_audience"]   = "Hvem kan se dette dokument",
+            ["documents.upload.submit"]     = "Upload dokumentet",
+            ["documents.download"]          = "Download",
+            ["documents.detail.type_size"]  = "Filtype / størrelse",
+            ["documents.detail.updated"]    = "Senest opdateret",
+            ["documents.flash_uploaded"]    = "Dokument uploadet.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

@@ -358,6 +358,39 @@ public interface ILocalizationService
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys are
     /// present vs. missing for a language.</summary>
     Task<LanguageCompleteness> GetCompletenessAsync(string languageCode);
+
+    // ── M20 quiet cadence (ADR 0121, D6) — the admin-set flush-cadence
+    //    read + single audited write lane (the ADR 0050
+    //    IsSignupOpenAsync/SetSignupOpenAsync shape verbatim) ──────────
+
+    /// <summary>
+    /// M20 (ADR 0121, D6) — the quiet-check cadence READ (no audit row — the
+    /// <see cref="GetDefaultTimezoneAsync"/> plain-read shape). Returns the
+    /// instance's <see cref="LocaleSettings.QuietCheckMinutes"/>; floors to
+    /// <c>60</c> minutes on a missing/unset row (C-M20·6 — a missing settings
+    /// row reads as the default, never throws).
+    /// </summary>
+    Task<int> GetQuietCheckMinutesAsync();
+
+    /// <summary>
+    /// M20 (ADR 0121, D6) — the quiet-check cadence WRITE: the **single audited
+    /// write lane** (the exact <see cref="LocalizationService"/>
+    /// <c>SetSignupOpenAsync</c> shape — load-or-create the
+    /// <see cref="LocaleSettings"/> singleton, set
+    /// <see cref="LocaleSettings.QuietCheckMinutes"/>, store exactly one
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/> in the same
+    /// session, C-M20·6). Validates the value (a floor of <c>5</c> minutes and
+    /// a ceiling of <c>1440</c>, so an admin cannot set a zero/negative or
+    /// absurd cadence — <see cref="ArgumentOutOfRangeException"/> thrown
+    /// **before** any write → no audit row for the blocked attempt, the
+    /// <see cref="LocalizationService.RemoveLanguageAsync"/> M·7 pin shape).
+    /// The Web boundary owns the GlobalAdmin standing check (the Core seam does
+    /// not re-check <c>User</c> — the ADR 0019/0020 split).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="minutes"/> is below <c>5</c> or above <c>1440</c>.</exception>
+    Task SetQuietCheckMinutesAsync(int minutes, string adminSubjectId);
 }
 
 /// <summary>
