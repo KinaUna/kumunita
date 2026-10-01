@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.17.0", "2026-09-30", new List<string>
+        {
+            "Notification quiet hours — choose when your notification emails are held, in your own time zone: a per-resident schedule of quiet hours of day and days of week. Your emails are held (never lost) and arrive once the quiet window lifts, while your inbox always keeps the full record. An admin sets how often held notifications are re-checked (ADR 0121).",
+        }),
         new("0.16.0", "2026-09-30", new List<string>
         {
             "Guest accounts — a GlobalAdmin settles a limited, time-bounded standing for a guest (a consultant, coach, teacher, speaker, or similar outside-the-resident-circle account): the bounded window the standing is live, and a closed set of read surfaces the guest may see (announcements, events, directory). A guest is never a full member — the standing is live only inside the window, settled by data, and read per request; one audited write lane, zero new authorization surface (ADR 0120).",

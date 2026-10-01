@@ -23,10 +23,12 @@ public static class QuietScheduleEvaluator
     /// <paramref name="effectiveZone"/>'s wall clock FIRST (ADR 0019), then:
     /// <see cref="QuietScheduleMode.Blocked"/> — quiet iff (Hours empty OR
     /// wallHour in Hours) AND (DaysOfWeek empty OR wallDow in DaysOfWeek).
-    /// <see cref="QuietScheduleMode.Allowed"/> — the INVERSE: quiet iff NOT
-    /// (wallHour in Hours OR wallDow in DaysOfWeek) — the email flows only
-    /// during a listed hour/day, held otherwise (an allowed schedule with both
-    /// lists empty is "always quiet").
+    /// <see cref="QuietScheduleMode.Allowed"/> — the INVERSE of that same
+    /// window test: quiet iff NOT windowMatches (the wall clock is outside the
+    /// listed hours/days) — the email flows only while the instant is inside a
+    /// listed window, held otherwise. (An allowed schedule with both lists
+    /// empty is the "all hours × all days" window, so it is "never quiet" —
+    /// the mirror of a Blocked all-window schedule, which is "always quiet".)
     /// </summary>
     public static bool IsQuietNow(
         NotificationQuietSchedule? schedule,
