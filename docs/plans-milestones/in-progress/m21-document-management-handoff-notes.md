@@ -181,3 +181,91 @@
   `IMediaStore` (the `AttachmentController` lane shape). It **consumes** the
   `MediaOptions.IsDocumentAllowed` gate U02 added. It exits on
   `Kumunita.Web.Tests`.
+
+## U03
+
+- **Delivered (3 plan deliverables + 1 form class + 1 test file — all new):**
+  (1) `src/Kumunita.Web/Models/DocumentIndexViewModel.cs` — the feed record
+  (`Visible`/`HasMore`/`Page`/`CanUpload`; **no `HiddenCount`** — F1: the feed
+  never leaks "how many you cannot see"). (2)
+  `src/Kumunita.Web/Models/DocumentDetailViewModel.cs` — the detail record
+  (`Document`/`CanDownload`/`DownloadUrl`). (3)
+  `src/Kumunita.Web/Models/DocumentUploadViewModel.cs` — the upload form (a
+  `class`, `Title`/`Summary?`/`File: IFormFile?`/`Audience:
+  AudienceEditorModel = new()`, the `PostComposeViewModel.Audience` idiom, not
+  a JSON string; not in the unit plan's explicit 3-deliverable list, but the
+  controller's `[FromForm]` shape requires it). (4)
+  `src/Kumunita.Web/Controllers/DocumentController.cs` — the five routes
+  (`Index`/`Detail`/`New`/`Upload`/`Serve`), all `[Authorize]` (plain, no
+  `[Authorize(Roles=…)]` — the standing is the per-call `Read` decision for the
+  three read surfaces; the D5 upload standing is an in-method `GlobalAdmin ∪
+  Moderator` gate returning **404 not 403**). Serve = the ADR 0034 /
+  `AttachmentController` 5-step (validate id → 400; `GetAsync` null → 404;
+  blob miss → 404; `OpenReadAsync` → `File(stream, stored.ContentType)` +
+  `X-Content-Type-Options: nosniff` + `Content-Disposition: attachment;
+  filename=…; filename*=UTF-8''…`). Upload = the ADR 0011
+  guards-before-write (empty → 400, oversize → 413, disallowed type → 415,
+  **no file written on any guard**), then one `IMediaStore.PutAsync`
+  (store-first, orphan-safe — D3/C-MED·7), then one
+  `DocumentService.UploadAsync` in the caller's `store.LightweightSession()`
+  (one `Document` row, one `SaveChangesAsync`, **no `AccessAudit` row** — A2),
+  flash `documents.flash_uploaded` via `TempData["info"]` + redirect to the
+  detail. (5) `tests/Kumunita.Web.Tests/DocumentControllerTests.cs` — 14 seam
+  tests (GATE-1/2/5/6 + the D3 allowlist + the no-audit-row A2 pin + the
+  no-`PutAsync`-on-guard pins + the `FileStreamResult` serve shape + the
+  `ClaimTypes.Subject`/`.Role` principal fixture).
+- **Exit (both green):** `dotnet build Kumunita.slnx -c Debug` → Build
+  succeeded, **0 errors / 13 warnings** (the pre-existing baseline — none from
+  the new src/test files; the 11 compile errors that surfaced in the test file
+  were all test-side: `FileContent` → `FileStreamResult.FileContents`, the
+  4-tuple destructure in the four guard tests, the `await` on the void
+  `Store(...)` NSubstitute call, the ambiguous `ClaimTypes` (fully-qualified),
+  the `ITempDataProvider` using for the upload's flash write).
+  `dotnet exec …\Kumunita.Web.Tests.dll` → **`Total: 699, Errors: 0, Failed:
+  0, Skipped: 0`** (the 14 new `DocumentControllerTests` are green; the
+  pre-existing suite is untouched). **No new drift; zero new authorization
+  surface** (C-M21·2 / D8) — the controller *rides* the frozen `Read` path
+  (`CanSeeAsync` feed / `CanAsync` detail/serve) through U02's `DocumentService`;
+  no new `AccessAction` / `Decide()` / `AccessVia` / `IAuthorizationService`
+  method, no `AccessAudit` row written by the controller (the upload lane is
+  the single `Document` store, A2).
+- **Deviation (flag for U05's doc-parity pass):** the **unit plan's `Serve`
+  sketch** says "No `[Authorize]` — an anonymous visitor to a public document
+  must be served," but the **design doc §7 (locked surface)** — which is the
+  authoritative source per the unit plan's own rule ("the codebase wins for
+  mechanics; the design doc wins for the locked surface") — **is `[Authorize]`**
+  and notes "the C-M21·1 floor is deny, so a public document is reachable only
+  via the owner branch or a delegated Read." The shipped shape is `[Authorize]`
+  (plain) + a defensive `actorId is null → Unauthorized()` — the correct
+  locked-surface resolution. U05 should reconcile the unit-plan sketch to the
+  shipped shape so the three sources agree.
+- **Deviation (resolved, no action needed):** the unit plan's `TODO(U03)`
+  `ParseAudience(string audienceJson)` → resolved to the codebase's
+  `PostComposeViewModel.Audience.BuildAudience()` idiom (the `AudienceEditorModel`
+  form-bound class, non-nullable, `BuildAudience()` → the frozen `Audience`
+  shape — the M2 single-deserialization-site precedent). The unit plan's
+  `TODO(U03)` `store.OpenTransactionSession()` → resolved to `store
+  .LightweightSession()` (the `PostService.CreatePostAsync` C3 same-transaction
+  lane; the `IDocumentStore` interface exposes `LightweightSession()`, not
+  `OpenTransactionSession()` — the codebase wins for mechanics).
+- **Deviation (test-only, no action needed):** the **feed** tests (GATE-1)
+  drive a **real** scratch-Postgres store (the `PostgresFixture` in this
+  assembly, the `ProjectsControllerTests` / `M14InterlockTests` precedent)
+  because Marten 9's `ToListAsync()` casts to the internal
+  `MartenLinqQueryable` and cannot be NSubstituted — the documented seam gap.
+  The **detail / serve / upload** tests are pure NSubstitute (the
+  `IQuerySession.LoadAsync` / `IDocumentStore.LightweightSession()` seams are
+  directly stubbable).
+- **Open question:** none blocking. The upload lane writes **no
+  `AccessAudit` row** (U00's §1.a A2 lock, the `PostService.CreatePostAsync` /
+  `AttachmentController.Upload` convention) — the `Upload_Valid_Redirects
+  _OneWrite_NoAuditRow` test pins **zero** `AccessAudit` rows on the upload
+  write. The flash key `documents.flash_uploaded` is set via
+  `TempData["info"]` (the `M17AcceptanceGateTests` idiom); U04 authors the
+  `KnownTranslationKeys` entry in all four languages.
+- **Next unit (U04) entry point:** the Razor views (`Index.cshtml` /
+  `Detail.cshtml` / `New.cshtml`) + the `kw-l` key authoring (the closed 12-key
+  set from the design doc §8) + the `KwLRegistryConsistencyTests` +
+  `KnownTranslationKeys_ParityTests` pin updates. U04 **consumes** the flash
+  key `documents.flash_uploaded` and the `CanUpload` / `CanDownload` view-model
+  flags shipped here.
