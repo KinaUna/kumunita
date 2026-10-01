@@ -561,6 +561,103 @@ public static class SampleDataSeeder
         session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "fr", Name = "Jardin",    AuthorId = sophie.Id, Created = now.AddDays(-24) });
         session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "da", Name = "Have",      AuthorId = sophie.Id, Created = now.AddDays(-24) });
 
+        // ── M23 — Extended profiles (a resident bio + free author-set tags) ──────────
+        // The profile's *author-set* tags (ADR 0123 D1) are the same frozen ADR 0044
+        // Tag doc the posts above already reference — so `tagRepair` (assigned to Ben
+        // below) is genuinely shared across a post and a profile (the "third
+        // referencer, not a second tag type" pin), while the six skill/interest tags
+        // are new. Each carries the seeder's established de/fr/da matrix (Sophie is
+        // the author, like the other translation lanes). The bios are rich content
+        // (ADR 0025 shape — Markdown, rendered read-only by the single
+        // MarkdownRenderer on the directory detail).
+        //
+        // ADR 0123 D2: the bio + tags ride the profile's *Visibility* audience (the
+        // M2 "audience for the detailed non-contact fields" shape M23 is that moment
+        // for) — independent of the ContactVisibility gate that hides e-mail/phone.
+        // An empty `new Audience()` would deny everyone (the C1 empty-audience-denies
+        // invariant), so to make the demo profiles *discoverable* ("find neighbours
+        // with something in common") each resident's Visibility is opened to every
+        // signed-in resident via the AllResidents flag (the branch-4.5 "all
+        // residents" shape, the same resident-only standing the contact block uses).
+        var ptagBaking      = new Tag { Id = Id(), Slug = "baking",      Name = "Baking",      LanguageCode = "en", CreatedBy = anna.Id,   Created = now.AddDays(-12) };
+        var ptagGardening   = new Tag { Id = Id(), Slug = "gardening",   Name = "Gardening",   LanguageCode = "en", CreatedBy = carla.Id,  Created = now.AddDays(-12) };
+        var ptagPhotography = new Tag { Id = Id(), Slug = "photography", Name = "Photography", LanguageCode = "en", CreatedBy = david.Id,  Created = now.AddDays(-12) };
+        var ptagFirstaid    = new Tag { Id = Id(), Slug = "firstaid",    Name = "First aid",   LanguageCode = "en", CreatedBy = maria.Id,  Created = now.AddDays(-12) };
+        var ptagTranslation = new Tag { Id = Id(), Slug = "translation", Name = "Translation", LanguageCode = "en", CreatedBy = sophie.Id, Created = now.AddDays(-12) };
+        var ptagCycling     = new Tag { Id = Id(), Slug = "cycling",     Name = "Cycling",     LanguageCode = "en", CreatedBy = ben.Id,    Created = now.AddDays(-12) };
+        var ptagHistory     = new Tag { Id = Id(), Slug = "history",     Name = "History",     LanguageCode = "en", CreatedBy = david.Id,  Created = now.AddDays(-12) };
+        session.Store(ptagBaking);
+        session.Store(ptagGardening);
+        session.Store(ptagPhotography);
+        session.Store(ptagFirstaid);
+        session.Store(ptagTranslation);
+        session.Store(ptagCycling);
+        session.Store(ptagHistory);
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "de", Name = "Backen",       AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "fr", Name = "Boulangerie",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "da", Name = "Bagning",      AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "de", Name = "Gartenarbeit", AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "fr", Name = "Jardinage",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "da", Name = "Havearbejde",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "de", Name = "Fotografie",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "fr", Name = "Photographie", AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "da", Name = "Fotografi",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "de", Name = "Erste Hilfe",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "fr", Name = "Premiers secours", AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "da", Name = "Første hjælp", AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "de", Name = "Übersetzung",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "fr", Name = "Traduction",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "da", Name = "Oversættelse", AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "de", Name = "Radfahren",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "fr", Name = "Cyclisme",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "da", Name = "Cykling",      AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "de", Name = "Geschichte",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "fr", Name = "Histoire",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
+        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "da", Name = "Historie",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
+
+        // Apply the extended profile to a resident already created in step 1: set the
+        // bio + author-set tags, and open the *Visibility* audience to every signed-in
+        // resident (the demo audience) so the bio/tags render on the directory detail.
+        // Runs in the single content session (invariant C3 — commits once, below).
+        async Task ApplyExtendedProfileAsync(string subjectId, string bio, params string[] tagIds)
+        {
+            var profile = await session.LoadAsync<Profile>(subjectId, ct);
+            if (profile is null) return; // pristine gate means all 7 exist; be safe.
+            profile.Bio = bio;
+            profile.TagIds = [.. tagIds];
+            profile.Visibility = new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true };
+            session.Store(profile);
+        }
+
+        await ApplyExtendedProfileAsync(
+            admin.Id,
+            "Setting up the board and keeping it running — ping me when something misbehaves; half the time the answer is in the OPS notes, the other half I'll work it out. Happy to help get your profile or your group sorted.",
+            ptagFirstaid.Id, ptagTranslation.Id);
+        await ApplyExtendedProfileAsync(
+            maria.Id,
+            "I look after the **safety** and **social** boards. Trained in first aid — if it's an emergency, call the local number first, then reach out. I'm happy to settle the small stuff before it grows.",
+            ptagFirstaid.Id, ptagGardening.Id);
+        await ApplyExtendedProfileAsync(
+            sophie.Id,
+            "Neighbours from everywhere — so I translate whatever needs it. If a post or announcement is still only in English, drop me a line and I'll find the words. I also do most of the weekend **baking**.",
+            ptagTranslation.Id, ptagBaking.Id);
+        await ApplyExtendedProfileAsync(
+            anna.Id,
+            "Mum of two, on the block since 2019. I do the neighbourhood **baking** (the sourdough never lasts) and we've coaxed a little **garden** into the back yard. Always up for a potluck or a ride on the canal.",
+            ptagBaking.Id, ptagGardening.Id, ptagCycling.Id);
+        await ApplyExtendedProfileAsync(
+            ben.Id,
+            "Handy around the house — happy to help with a wobbly shelf or a fuse that keeps tripping. I **cycle** everywhere I can, and I photograph a lot of the little things going on around the block.",
+            ptagCycling.Id, ptagPhotography.Id, tagRepair.Id);
+        await ApplyExtendedProfileAsync(
+            carla.Id,
+            "The one who runs the green and the seedling corner. **Gardening** is my happy place, and I bake whatever the garden gives me. Come along to a Saturday tidy-up.",
+            ptagGardening.Id, ptagBaking.Id);
+        await ApplyExtendedProfileAsync(
+            david.Id,
+            "Long-time resident and a bit of a local-history nerd — I like to know why the street has its name. I also enjoy **photography**, especially the light at the river bend. Ask me for the good spots.",
+            ptagHistory.Id, ptagPhotography.Id);
+
         // Three more announcements — the first carries a full de/fr/da translation
         // set so every enabled language shows up in the demo, not just de/fr.
         var waterDrop = new Announcement
