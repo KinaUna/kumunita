@@ -227,6 +227,15 @@
                             <span class="visually-hidden"><kw-l key="bm.nav">Bookmarks</kw-l></span>
                             <span class="kmb-rail-tip"><kw-l key="bm.nav">Bookmarks</kw-l></span>
                         </a>
+                        @* M21 (ADR 0122) — the Document management surface rail
+                           icon (the M17 bookmarks rail-entry shape). Reuses
+                           documents.title — the closed 12-key nav set stays
+                           closed (no 13th nav.documents key). *@
+                        <a class="kmb-rail-btn" href="/documents">
+                            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h5l3.5 3.5v7.5h-8.5z"/><path d="M9 2.5V6h3.5"/><path d="M6 9.5h4M6 12h3"/></svg>
+                            <span class="visually-hidden"><kw-l key="documents.title">Documents</kw-l></span>
+                            <span class="kmb-rail-tip"><kw-l key="documents.title">Documents</kw-l></span>
+                        </a>
                         <a class="kmb-rail-btn" href="/pages">
                             <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
                             <span class="visually-hidden"><kw-l key="nav.pages">Pages</kw-l></span>
