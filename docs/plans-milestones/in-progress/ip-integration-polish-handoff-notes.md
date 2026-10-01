@@ -119,3 +119,26 @@ each controller, `when (ex is not UnauthorizedAccessException)`=1 each.
 **Open questions:** none. **Next unit:** U05 — the two middleware unit-test
 files (`BlockedAccountMiddlewareTests` + `PrivilegedStampMiddlewareTests`) in
 `tests/Kumunita.Web.Tests/`.
+
+## U05 — Unit tests for `BlockedAccountMiddleware` + `PrivilegedStampMiddleware` (D5, the two per-request security gates)
+
+**Delivered:** two new test files in `tests/Kumunita.Web.Tests/` —
+`BlockedAccountMiddlewareTests.cs` (4 tests: unauthenticated pass-through,
+profile-null pass-through, not-blocked pass-through, blocked → sign-out +
+redirect to `/Account/Login?error=blocked`) and
+`PrivilegedStampMiddlewareTests.cs` (5 tests: unauthenticated pass-through,
+no-elevated-role fast-path pass-through, role-set match pass-through,
+user-deleted → sign-out + redirect to `?error=account-removed`,
+role-set mismatch → sign-out + redirect to `?error=role-changed`). Both
+exercise `InvokeAsync` directly with a stubbed `DefaultHttpContext` +
+`RequestServices` provider — no Postgres. `IUserInfoService` and
+`IUserRoleStore<User>` are NSubstituted; `UserManager<User>` is a real instance
+backed by a substituted `IUserRoleStore<User>` (the repo's `GuestClaimMintTests`
+idiom); `SignInManager<User>` is proxied via
+`Substitute.For<SignInManager<User>>(ctorArgs…)` (the plan's illustrative Moq
+code was adapted to the codebase's NSubstitute-only convention). Production
+middleware untouched. Exit: `dotnet build Kumunita.slnx -c Debug` clean
+(13 pre-existing warnings in untouched files, 0 in the new files);
+`Kumunita.Web.Tests` **730/730 green** (U04's 721 + 9 new).
+**Open questions:** none. **Next unit:** U06 — the Login view error-code
+mapping (D6) + the three `account.login.error.*` `kw-l` keys (en/de/fr/da).
