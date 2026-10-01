@@ -1768,15 +1768,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — the one /search page + nav entry.
             ["search.nav"] = "Search",
             ["search.title"] = "Search",
-            ["search.placeholder"] = "Search posts, events, pages and announcements…",
+            ["search.placeholder"] = "Search posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people…",
             ["search.no-results"] = "No results for",
             ["search.section.posts"] = "Posts",
             ["search.section.events"] = "Events",
             ["search.section.pages"] = "Pages",
             ["search.section.announcements"] = "Announcements",
+            ["search.section.projects"] = "Projects",
+            ["search.section.boards"] = "Boards",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventory",
+            ["search.section.documents"] = "Documents",
+            ["search.section.people"] = "People",
             ["search.scope.community"] = "Community",
             ["search.scope.groups"] = "Groups",
-            ["search.empty.hint"] = "Find posts, events, pages and announcements by text — the results only show content you can already read.",
+            ["search.empty.hint"] = "Find posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people by text or tag — the results only show content you can already read.",
 
             // M10 (ADR 0107 D10) — the one quiet install affordance's label
             // (U03's pwa-install.ts renders it on beforeinstallprompt; the
@@ -3489,15 +3495,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — die eine /search-Seite + Nav-Eintrag.
             ["search.nav"] = "Suche",
             ["search.title"] = "Suche",
-            ["search.placeholder"] = "Beiträge, Events, Seiten und Ankündigungen durchsuchen…",
+            ["search.placeholder"] = "Beiträge, Events, Seiten, Ankündigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen durchsuchen…",
             ["search.no-results"] = "Keine Ergebnisse für",
             ["search.section.posts"] = "Beiträge",
             ["search.section.events"] = "Events",
             ["search.section.pages"] = "Seiten",
             ["search.section.announcements"] = "Ankündigungen",
+            ["search.section.projects"] = "Projekte",
+            ["search.section.boards"] = "Boards",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventar",
+            ["search.section.documents"] = "Dokumente",
+            ["search.section.people"] = "Personen",
             ["search.scope.community"] = "Gemeinschaft",
             ["search.scope.groups"] = "Gruppen",
-            ["search.empty.hint"] = "Finde Beiträge, Events, Seiten und Ankündigungen nach Text — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
+            ["search.empty.hint"] = "Finde Beiträge, Events, Seiten, Ankündigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen nach Text oder Tag — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
 
             // M10 (ADR 0107 D10) — das eine stille Install-Affordance-Label
             // (U03, pwa-install.ts). Kein Banner, kein Modal — ein Button.
@@ -5204,15 +5216,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — la page /search unique + l'entrée de navigation.
             ["search.nav"] = "Recherche",
             ["search.title"] = "Recherche",
-            ["search.placeholder"] = "Rechercher dans les publications, événements, pages et annonces…",
+            ["search.placeholder"] = "Rechercher dans les publications, événements, pages, annonces, projets, tableaux, tâches, inventaire, documents et personnes…",
             ["search.no-results"] = "Aucun résultat pour",
             ["search.section.posts"] = "Publications",
             ["search.section.events"] = "Événements",
             ["search.section.pages"] = "Pages",
             ["search.section.announcements"] = "Annonces",
+            ["search.section.projects"] = "Projets",
+            ["search.section.boards"] = "Tableaux",
+            ["search.section.todos"] = "Tâches",
+            ["search.section.inventory"] = "Inventaire",
+            ["search.section.documents"] = "Documents",
+            ["search.section.people"] = "Personnes",
             ["search.scope.community"] = "Communauté",
             ["search.scope.groups"] = "Groupes",
-            ["search.empty.hint"] = "Retrouvez des publications, événements, pages et annonces par texte — seules les contenus que vous pouvez déjà lire s'affichent.",
+            ["search.empty.hint"] = "Retrouvez des publications, événements, pages, annonces, projets, tableaux, tâches, inventaire, documents et personnes par texte ou étiquette — seules les contenus que vous pouvez déjà lire s'affichent.",
 
             // M10 (ADR 0107 D10) — le libellé du seul affordance d'installation
             // (U03, pwa-install.ts). Pas de bannière, pas de modale — un bouton.
@@ -6909,15 +6927,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — den ene /search-side + nav-indgang.
             ["search.nav"] = "Søg",
             ["search.title"] = "Søg",
-            ["search.placeholder"] = "Søg i indlæg, arrangementer, sider og meddelelser…",
+            ["search.placeholder"] = "Søg i indlæg, arrangementer, sider, meddelelser, projekter, brætter, to-dos, inventar, dokumenter og personer…",
             ["search.no-results"] = "Ingen resultater for",
             ["search.section.posts"] = "Indlæg",
             ["search.section.events"] = "Arrangementer",
             ["search.section.pages"] = "Sider",
             ["search.section.announcements"] = "Meddelelser",
+            ["search.section.projects"] = "Projekter",
+            ["search.section.boards"] = "Brætter",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventar",
+            ["search.section.documents"] = "Dokumenter",
+            ["search.section.people"] = "Personer",
             ["search.scope.community"] = "Fællesskab",
             ["search.scope.groups"] = "Grupper",
-            ["search.empty.hint"] = "Find indlæg, arrangementer, sider og meddelelser efter tekst — kun indhold, du allerede kan læse, vises.",
+            ["search.empty.hint"] = "Find indlæg, arrangementer, sider, meddelelser, projekter, brætter, to-dos, inventar, dokumenter og personer efter tekst eller tag — kun indhold, du allerede kan læse, vises.",
 
             // M10 (ADR 0107 D10) — det ene stille installations-affordance
             // (U03, pwa-install.ts). Ingen banner, ingen modal — én knap.

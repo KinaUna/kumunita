@@ -1,9 +1,13 @@
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Documents;
 using Kumunita.Core.Events;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
 using Kumunita.Core.Search;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Xunit;
@@ -537,13 +541,422 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
         Assert.Equal(1, floored.Page);
     }
 
+    // ── 15 — ADR 0124 — Search_Projects_TitleAndBody_SignedIn ──────────────
+    //
+    // ADR 0124 D1: a Project is searchable by Title + Description. The actor
+    // is the author (owner branch), so the project is visible. Anonymous → [].
+
+    [Fact]
+    public async Task Search_Projects_TitleAndDescription_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t15-actor";
+
+        await Plant(store, new Project
+        {
+            Id = "t15-title", ComponentId = ComponentId, AuthorId = actor,
+            Title = "Quarterly Garden Project", Description = "plan the beds",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Project
+        {
+            Id = "t15-body", ComponentId = ComponentId, AuthorId = actor,
+            Title = "Housekeeping", Description = "organize the garden shed",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("projects"));
+        var projects = result.Sections["projects"];
+        Assert.Contains("t15-title", projects.Select(h => h.Id));
+        Assert.Contains("t15-body", projects.Select(h => h.Id));
+    }
+
+    // ── 16 — ADR 0124 — Search_Projects_Anonymous_Zero ─────────────────────
+    //
+    // The canonical ProjectsController feed is [Authorize]; anonymous search
+    // returns zero projects (C1-style degrade, C-M8·2).
+
+    [Fact]
+    public async Task Search_Projects_Anonymous_Zero()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+
+        await Plant(store, new Project
+        {
+            Id = "t16-p", ComponentId = ComponentId, AuthorId = "u-m8-t16-author",
+            Title = "public garden", Description = "x", Created = DateTimeOffset.UtcNow,
+            Audience = null,
+        });
+
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null);
+        Assert.False(result.Sections.ContainsKey("projects"));
+    }
+
+    // ── 17 — ADR 0124 — Search_Projects_SoftDeleted_Excluded ───────────────
+    //
+    // C-M8·7: a soft-deleted project is never a hit (the canonical !IsDeleted
+    // pre-filter).
+
+    [Fact]
+    public async Task Search_Projects_SoftDeleted_Excluded()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t17-actor";
+
+        await Plant(store, new Project
+        {
+            Id = "t17-live", ComponentId = ComponentId, AuthorId = actor,
+            Title = "live garden", Description = "x", Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Project
+        {
+            Id = "t17-deleted", ComponentId = ComponentId, AuthorId = actor,
+            Title = "deleted garden", Description = "x", Created = DateTimeOffset.UtcNow,
+            IsDeleted = true,
+        });
+
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var projects = result.Sections["projects"];
+        Assert.Contains("t17-live", projects.Select(h => h.Id));
+        Assert.DoesNotContain("t17-deleted", projects.Select(h => h.Id));
+    }
+
+    // ── 18 — ADR 0124 — Search_Boards_TitleAndDescription_SignedIn ─────────
+
+    [Fact]
+    public async Task Search_Boards_TitleAndDescription_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t18-actor";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "t18-title", ComponentId = ComponentId, AuthorId = actor,
+            Title = "Garden Planning Board", Description = "columns for each bed",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("boards"));
+        Assert.Contains("t18-title", result.Sections["boards"].Select(h => h.Id));
+    }
+
+    // ── 19 — ADR 0124 — Search_Todos_TitleAndBody_SignedIn ─────────────────
+
+    [Fact]
+    public async Task Search_Todos_TitleAndBody_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t19-actor";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "t19-title", ComponentId = ComponentId, AuthorId = actor,
+            Title = "Buy garden seeds", Body = "marigolds + basil",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "t19-body", ComponentId = ComponentId, AuthorId = actor,
+            Title = "Grocery run", Body = "pick up the garden soil",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("todos"));
+        var todos = result.Sections["todos"];
+        Assert.Contains("t19-title", todos.Select(h => h.Id));
+        Assert.Contains("t19-body", todos.Select(h => h.Id));
+    }
+
+    // ── 20 — ADR 0124 — Search_Inventory_NameAndDescription_SignedIn ───────
+
+    [Fact]
+    public async Task Search_Inventory_NameAndDescription_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t20-actor";
+
+        await Plant(store, new InventoryItem
+        {
+            Id = "t20-name", ComponentId = ComponentId, AuthorId = actor,
+            Name = "Garden Ladder", Description = "the tall one",
+            Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new InventoryItem
+        {
+            Id = "t20-desc", ComponentId = ComponentId, AuthorId = actor,
+            Name = "Step Stool", Description = "for the garden shelf",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("inventory"));
+        var inv = result.Sections["inventory"];
+        Assert.Contains("t20-name", inv.Select(h => h.Id));
+        Assert.Contains("t20-desc", inv.Select(h => h.Id));
+    }
+
+    // ── 21 — ADR 0124 — Search_Documents_TitleAndSummary_SignedIn ──────────
+
+    [Fact]
+    public async Task Search_Documents_TitleAndSummary_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t21-actor";
+
+        await Plant(store, new Document
+        {
+            Id = "t21-title", OwnerId = actor,
+            Title = "Garden Bylaws", Summary = "the rules for beds",
+            MediaId = "media-1", ContentType = "text/plain", SizeBytes = 100,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("documents"));
+        Assert.Contains("t21-title", result.Sections["documents"].Select(h => h.Id));
+    }
+
+    // ── 22 — ADR 0124 — Search_People_DisplayNameAndBio_SignedIn ───────────
+    //
+    // The people surface (M23 / ADR 0123): DisplayName + Bio match,
+    // CanSeeAsync-gated, signed-in only. The hit's id is the Profile.SubjectId
+    // (the directory route's parameter).
+
+    [Fact]
+    public async Task Search_People_DisplayNameAndBio_SignedIn()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t22-actor";
+        const string other = "u-m8-t22-other";
+
+        // The actor sees their own profile (owner branch) and the other
+        // resident's (a community platform — the directory lists every
+        // non-blocked resident to signed-in viewers).
+        await Plant(store, new Profile
+        {
+            SubjectId = actor, DisplayName = "Alice Gardener",
+            Bio = "I love growing tomatoes",
+        });
+        await Plant(store, new Profile
+        {
+            SubjectId = other, DisplayName = "Bob",
+            Bio = "my garden is the best",
+        });
+
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        Assert.True(result.Sections.ContainsKey("people"));
+        var people = result.Sections["people"];
+        Assert.Contains(actor, people.Select(h => h.Id));
+        Assert.Contains(other, people.Select(h => h.Id));
+    }
+
+    // ── 23 — ADR 0124 — Search_People_Anonymous_Zero ────────────────────────
+
+    [Fact]
+    public async Task Search_People_Anonymous_Zero()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+
+        await Plant(store, new Profile
+        {
+            SubjectId = "u-m8-t23-resident", DisplayName = "Carol Gardener",
+            Bio = "x",
+        });
+
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null);
+        Assert.False(result.Sections.ContainsKey("people"));
+    }
+
+    // ── 24 — ADR 0124 — Search_People_Blocked_Excluded ─────────────────────
+    //
+    // The canonical ProfileFindService predicate (!Blocked) — a blocked
+    // profile is never a hit.
+
+    [Fact]
+    public async Task Search_People_Blocked_Excluded()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t24-actor";
+
+        await Plant(store, new Profile
+        {
+            SubjectId = "u-m8-t24-blocked", DisplayName = "Dave Gardener",
+            Bio = "x", Blocked = true,
+        });
+        await Plant(store, new Profile
+        {
+            SubjectId = "u-m8-t24-live", DisplayName = "Eve Gardener",
+            Bio = "x",
+        });
+
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var people = result.Sections["people"];
+        Assert.Contains("u-m8-t24-live", people.Select(h => h.Id));
+        Assert.DoesNotContain("u-m8-t24-blocked", people.Select(h => h.Id));
+    }
+
+    // ── 25 — ADR 0124 — Search_Posts_MatchesOnTagName ──────────────────────
+    //
+    // Fork #2: a post carrying a tag whose Name matches the query is a hit,
+    // even when Title/Body do not. The tag is a label, never a gate (C-TG·1)
+    // — the post's own Read decision is what gates visibility.
+
+    [Fact]
+    public async Task Search_Posts_MatchesOnTagName()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t25-actor";
+
+        await Plant(store, new Tag
+        {
+            Id = "tag-tomato", Slug = "tomato", Name = "Tomato",
+        });
+        await Plant(store, new Post
+        {
+            Id = "t25-tagged", ComponentId = ComponentId, AuthorId = actor,
+            Title = "seedlings", Body = "sowing time",
+            TagIds = ["tag-tomato"],
+            Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+        });
+
+        var result = await svc.SearchAsync("TOMATO", SearchScope.Community, actor);
+        var posts = result.Sections["posts"];
+        Assert.Contains("t25-tagged", posts.Select(h => h.Id));
+    }
+
+    // ── 26 — ADR 0124 — Search_Todos_MatchesOnTagName ──────────────────────
+
+    [Fact]
+    public async Task Search_Todos_MatchesOnTagName()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t26-actor";
+
+        await Plant(store, new Tag
+        {
+            Id = "tag-sprinkler", Slug = "sprinkler", Name = "Sprinkler",
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "t26-tagged", ComponentId = ComponentId, AuthorId = actor,
+            Title = "fix it", Body = "the drip line",
+            TagIds = ["tag-sprinkler"],
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var result = await svc.SearchAsync("SPRINKLER", SearchScope.Community, actor);
+        var todos = result.Sections["todos"];
+        Assert.Contains("t26-tagged", todos.Select(h => h.Id));
+    }
+
+    // ── 27 — ADR 0124 — Search_People_MatchesOnProfileTag ──────────────────
+    //
+    // A profile carrying a tag whose Name matches is a hit even if
+    // DisplayName/Bio do not match.
+
+    [Fact]
+    public async Task Search_People_MatchesOnProfileTag()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t27-actor";
+        const string other = "u-m8-t27-other";
+
+        await Plant(store, new Tag
+        {
+            Id = "tag-bees", Slug = "bees", Name = "Bees",
+        });
+        await Plant(store, new Profile
+        {
+            SubjectId = other, DisplayName = "Frank",
+            Bio = "hello", TagIds = ["tag-bees"],
+        });
+
+        var result = await svc.SearchAsync("BEE", SearchScope.Community, actor);
+        var people = result.Sections["people"];
+        Assert.Contains(other, people.Select(h => h.Id));
+    }
+
+    // ── 28 — ADR 0124 — Search_SurfacePaged_Projects ───────────────────────
+    //
+    // ADR 0090 D1/D3: HasMore paging discipline over the visible set for a
+    // new surface (projects). 21 visible → page 1 has 20 + HasMore, page 2
+    // has 1.
+
+    [Fact]
+    public async Task Search_SurfacePaged_Projects()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t28-actor";
+
+        var baseCreated = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < 21; i++)
+            await Plant(store, new Project
+            {
+                Id = $"t28-p-{i}", ComponentId = ComponentId, AuthorId = actor,
+                Title = $"garden project {i}", Description = "x",
+                Created = baseCreated.AddHours(i),
+            });
+
+        var page1 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
+            SearchScope.Community, actor, page: 1);
+        Assert.Equal(SearchService.PageSize, page1.Hits.Count);
+        Assert.True(page1.HasMore);
+
+        var page2 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
+            SearchScope.Community, actor, page: 2);
+        Assert.Single(page2.Hits);
+        Assert.False(page2.HasMore);
+    }
+
+    // ── 29 — ADR 0124 — Search_AuditRow_PerNewSurface ──────────────────────
+    //
+    // C-M8·3: each signed-in visit over a new surface with ≥ 1 candidate
+    // emits exactly one "search:<surface>" aggregate row (TargetId null).
+
+    [Fact]
+    public async Task Search_AuditRow_PerNewSurface()
+    {
+        var store = await BootAsync();
+        var svc = NewSearchService(store);
+        const string actor = "u-m8-t29-actor";
+
+        await Plant(store, new Project
+        {
+            Id = "t29-p", ComponentId = ComponentId, AuthorId = actor,
+            Title = "garden plan", Description = "x", Created = DateTimeOffset.UtcNow,
+        });
+
+        _ = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var row = (await SearchAudit(store, "search:projects")).Single();
+        Assert.Null(row.TargetId);
+        Assert.Equal(1, row.VisibleCount);
+    }
+
     // ── Boot / composition / seed helpers ────────────────────────────────────
 
     /// <summary>
-    /// Boot a scratch Postgres with the doc surfaces the four search surfaces
-    /// need: posts + announcements (M3) + events (M4) + pages (PG) + the
-    /// Authorization / Kumunita features (AccessAudit + UserInfo documents,
-    /// incl. GroupMembership).
+    /// Boot a scratch Postgres with the doc surfaces all ten search surfaces
+    /// need: posts + announcements (M3) + events (M4) + pages (PG) +
+    /// projects/boards/todos (M5) + inventory (M16) + documents (M21) +
+    /// tags (ADR 0044) + the Authorization / Kumunita features (AccessAudit
+    /// + UserInfo documents, incl. GroupMembership).
     /// </summary>
     private Task<IDocumentStore> BootAsync()
     {
@@ -553,6 +966,10 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             M3DocTypes.Configure(store);
             M4DocTypes.Configure(store);
             PageDocTypes.Configure(store);
+            M5DocTypes.Configure(store);
+            M16DocTypes.Configure(store);
+            DocumentDocTypes.Configure(store);
+            TagDocTypes.Configure(store);
         });
     }
 

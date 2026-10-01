@@ -46,7 +46,7 @@ public static class Milestones
         new("M5", "Projects — goals, tasks, contributors", StatusDone),
         new("M6", "Notifications", StatusDone),
         new("M7", "Pagination and filtering", StatusDone),
-        new("M8", "Search — one /search surface (nav search box, anonymous + signed-in) over the four resident content surfaces: community + group posts, community + group events, pages, announcements; `all` top-5 per surface, single-surface paged on the M7 HasMore/_Pager discipline, group scope on the frozen ADR 0013 seams, zero schema change (ADR 0091)", StatusDone),
+        new("M8", "Search — one /search surface (nav search box, anonymous + signed-in) over the ten resident content surfaces: posts, events, pages, announcements (ADR 0091) + projects, boards, todos, inventory, documents, people (ADR 0124); tag-name match; `all` top-5 per surface, single-surface paged on the M7 HasMore/_Pager discipline, group scope on the frozen ADR 0013 seams, zero schema change", StatusDone),
         new("M9", "Messaging — 1:1 resident messaging: a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; an admin can enable or disable the feature instance-wide (ADR 0105)", StatusDone),
         new("M10", "PWA and responsive design", StatusDone),
         new("M11", "Portability (import/export)", StatusDone),

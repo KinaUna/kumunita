@@ -142,20 +142,26 @@ milestone-by-milestone breakdown is in the Roadmap below.
   default → Long floor) via the `kw-dt` TagHelper — the same per-request
   resolution shape as timezone and multilingual, data-driven, no rebuild
   (ADR 0020).
-- **Search** — one nav search box (anonymous + signed-in) over the four
+- **Search** — one nav search box (anonymous + signed-in) over the **ten**
   resident content surfaces: posts (community **and** group), events
-  (community + group), pages, and announcements. `/search` renders `all`
+  (community + group), pages, and announcements (the original four, ADR 0091)
+  **plus** projects, boards, todos, inventory, documents, and people (the six
+  extended by ADR 0124). `/search` renders `all`
   (top 5 hits per surface — a search-box answer, no pager) or a single-surface
   paged list on the M7 `HasMore` / `_Pager` discipline (pager links carry
   `q` + `surface` + `scope`); the `groups` scope is signed-in-only and rides
   the **frozen** ADR 0013 group seams (a group you can't see contributes no
   hit and no count; anonymous silently degrades to community — no 403).
-  Drafts, soft-deletes, and hidden content are never hits; every decided
-  visit audits (one aggregate row per (query, surface, scope), `TargetKind =
-  "search:<surface>"`); the render surface is hits + `HasMore` only — never a
-  count. Case-insensitive substring match over authored-in `Title` + `Body`
-  — zero schema change; language-scoped search and `tsvector` full-text are
-  the named deferred lanes (ADR 0018's own consequence; ADR 0091).
+  The six extended surfaces are signed-in-only (their canonical feeds are
+  gated; anonymous sees the original four). Drafts, soft-deletes, and hidden
+  content are never hits; every decided visit audits (one aggregate row per
+  (query, surface, scope), `TargetKind = "search:<surface>"`); the render
+  surface is hits + `HasMore` only — never a count. Case-insensitive substring
+  match over authored-in `Title` + `Body`, **and** the names of a document's
+  own tags (a tag is a label, never a gate — C-TG·1); the people surface
+  matches `DisplayName` + `Bio` + profile tags. Zero schema change;
+  language-scoped search and `tsvector` full-text are the named deferred
+  lanes (ADR 0018's own consequence; ADR 0091 + ADR 0124).
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered

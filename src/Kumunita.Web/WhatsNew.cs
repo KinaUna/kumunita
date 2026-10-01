@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.20.0", "2026-10-02", new List<string>
+        {
+            "Search, expanded — the nav search box now finds across all ten resident content surfaces: the original four (posts, events, pages, announcements) plus projects, boards, to-dos, inventory items, documents, and people. A search now also matches the names of a post's, event's, page's, or to-do's own tags — a tag is a label, never a gate, so a tag-name match never widens what you can see, only what it finds. The people surface folds the directory's “who is here” into the same box (a search for a neighbour by name or bio word, signed-in only). Zero schema change (ADR 0124).",
+        }),
         new("0.19.0", "2026-10-01", new List<string>
         {
             "Extended profiles — add a biography and your own tags (skills, interests, knowledge, expertise) to your profile, visible to the people your profile's visibility allows; find neighbours with something in common by tag or by a word in their bio — a match only surfaces people you can already see, and every such read is audited (ADR 0123).",
