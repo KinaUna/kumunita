@@ -217,3 +217,76 @@
   unchanged `ContactVisibility`); it passes `SubjectId(User)` as `actorBy`
   into `UpsertProfileAsync` (U02's optional param) and renders the bio via
   `MarkdownRenderer.RenderHtml` (GATE-5, null-safe).
+
+## U04
+
+- **Delivered:** the **Web profile-edit surface** (the U04 exit gate's
+  Web.Tests-only half). (1) **`ProfileEditViewModel`** gains the two new editor
+  fields — `Bio` (`string?`) + `Tags` (`string?`, the ADR 0044 tag-input
+  string) — and `ToProfileUpdate` maps them onto the U02
+  `ProfileUpdate` extension: `Bio` **verbatim** (D3, `null` when blank) and
+  `TagIds` the parsed slugs (split on comma/space, trimmed, lowercased,
+  de-duplicated, C-TG·4 `>64`-char + blank tokens dropped, order-preserving;
+  `null` when the input is whitespace-only — the "null ⇒ don't touch" shape).
+  (2) **`ProfileController.Edit`** (POST) writes through the **single** U02 lane
+  `UpsertProfileAsync(profile, patch, subject)` — passing `SubjectId(User)`
+  explicitly as `actorBy` (C-TG·9 provenance) — and flashes
+  `TempData["info"]` to the `profile.flash.saved` key (the
+  `FlashAsync` `KnownTranslationKeys.EnValues` floor when the translation seam
+  is absent). (3) **`DirectoryController.Detail`** projects the bio + tag names
+  **only** when the profile's `Visibility` admits the viewer — a **self-view
+  short-circuit** (`viewer == p.SubjectId` → `true`, no `CanAsync`, no row)
+  else **one** `CanAsync(viewer, Read, new ProfileToAuditableResource(p))`
+  (frozen seam, zero new authorization surface, C-M23·2); a **missing** authz
+  seam is fail-closed (`false`). The contact block (Email/Phone/Address)
+  stays on the **independent** `ContactVisibility` gate owned by
+  `DirectoryService.DetailAsync` (F2 "two independent gates, zero new
+  audiences" — admitting one does not admit the other). (4)
+  **`DirectoryViewModel.Detail`** gains `Bio` + `TagNames` (the eight-field
+  shape). (5) **`Views/Directory/Detail.cshtml`** renders the bio via
+  `MarkdownRenderer.RenderHtml` (GATE-5, null-safe) + the tag badge chips
+  (`profile.detail.bio` / `profile.detail.tags` /
+  `profile.detail.tags.empty`). (6) **`Views/Profile/Edit.cshtml`** adds the
+  bio rich-content card (`rc-editor`, `~/js/lib/rich-editor.js`) + the tags
+  free-form input (`profile.edit.bio` / `profile.edit.tags` /
+  `profile.edit.tags.placeholder`, the already-registered `tag.input.hint`).
+- **`kw-l` authorship (locked §7, U04's set):** the **seven** U04 keys
+  `profile.edit.bio` / `profile.edit.tags` / `profile.edit.tags.placeholder` /
+  `profile.detail.bio` / `profile.detail.tags` /
+  `profile.detail.tags.empty` / `profile.flash.saved` — each non-empty in all
+  four languages (en/de/fr/da) in `KnownTranslationKeys`. **No unit consumes a
+  key it has not authored**; no key invented outside the locked set (the
+  `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests` gate).
+- **Idiom note (codebase wins for mechanics):** `ProfileUpdate.TagIds` is
+  `IReadOnlyCollection<string>?` (U01's patch shape); the editor's `ToProfileUpdate`
+  emits a `string[]` via `.ToArray()` (interface-compatible). The
+  **`null` vs empty-list** distinction on `TagIds` is deliberate and pinned:
+  a whitespace-only input → `null` ("don't touch"); a **separators-only**
+  input ("  ,  ") → **`[]`** ("clear all"), NOT `null` (a non-blank input
+  parses to the empty slug list). `Decision` is a **class** (sealed record) —
+  NSubstitute's default `Task<Decision>` return is `null` (→ NRE on
+  `.Allowed`), so any test driving `DirectoryService.EvaluateContactGateAsync`
+  with a non-self viewer must set a default `Decision` on the stub.
+- **Tests:** `tests/Kumunita.Web.Tests/M23ProfileExtendedTests.cs` (10 tests)
+  — (1) editor binds bio+tags to the patch (verbatim bio + parsed slugs);
+  (2) blank bio/tags → `null`/`null`; (3) the `null`-vs-`[]` distinction
+  (separators-only → `[]`); (4) the C-TG·4 `>64`-char + blank-token floor;
+  (5) POST Edit passes `SubjectId(User)` as `actorBy` (single
+  `UpsertProfileAsync` lane, the `profile.flash.saved` en-floor flash);
+  (6) bio gate admits A / denies B (contact block independent, on
+  `ContactVisibility`); (7) **self-view** — owner sees own bio, **zero**
+  `CanAsync` calls; (8) **two independent gates** — contact-ADMITS/bio-DENIES
+  and contact-DENIES/bio-ADMITS; (9) **fail-closed** missing authz seam;
+  (10) **zero-new-authorization-surface** reflection pin (8 methods, 4
+  claims) + the **seven** U04 `kw-l` keys non-empty in en/de/fr/da.
+- **Open question:** none — no D# amended; the register's [PROPOSED] set was
+  locked verbatim by U00.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  **green** (Total: 710, Errors: 0, Failed: 0, Skipped: 0); `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  **green** (Total: 1086, Errors: 0, Failed: 0, Skipped: 0). No drift.
+  **U05 next** — the find-people surface (U03's `IProfileFindService` exposed
+  on the Web, authoring its own `profile.find.*` / `nav.people` `kw-l` keys
+  in all four languages) + the visible-only + one-aggregate-row + no-leak
+  gate (GATE-2).

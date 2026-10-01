@@ -1,6 +1,10 @@
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -39,10 +43,75 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("directory")]
-public sealed class DirectoryController(DirectoryService directory) : Controller
+public sealed class DirectoryController(
+    DirectoryService directory,
+    // M23 (ADR 0123 D2/D6/F6) — the bio/tags gate's seams.
+    //   • authz — the frozen IAuthorizationService.CanAsync decision path
+    //     (C-M23·2: zero new authorization surface — the existing
+    //     ProfileToAuditableResource + CanAsync, the M2 contact-block gate
+    //     shape).
+    //   • store — the Marten document store, read here to resolve the
+    //     profile's TagIds to Tag + TagTranslation docs (the ADR 0044
+    //     display-name idiom — a profile-only tag, used on no post/page, is
+    //     NOT in ITagService.ListForActorAsync's access-scoped set, so the
+    //     Web boundary resolves the docs directly by the profile's ids; the
+    //     single Read decision already ran for the profile, C-TG·1 "a read,
+    //     not a decision").
+    //   • localization / translationProvider — the ADR 0005 display-name
+    //     resolution (effective language → TagTranslation → base Name), the
+    //     same chain the <kw-l> TagHelper + TagService.BuildTagItemsAsync use.
+    // All four default null so any test-construction site that builds this
+    // controller with only DirectoryService keeps compiling — the bio/tags
+    // gate is a no-op (not shown) when a seam is absent; DI always supplies
+    // all four in the app.
+    Kumunita.Core.Authorization.IAuthorizationService? authz = null,
+    IDocumentStore? store = null,
+    ILocalizationService? localization = null,
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// M23 (ADR 0123 D1/D2/D6) — resolve the profile's <c>TagIds</c> to
+    /// display names in the viewer's effective language, mirroring
+    /// <c>TagService.BuildTagItemsAsync</c>'s idiom (the ADR 0005
+    /// preference order: the effective language → the
+    /// <see cref="TagTranslation"/> for it → the base <see cref="Tag.Name"/>).
+    /// A dangling id (whose <see cref="Tag"/> row is gone) is dropped silently
+    /// (C-TG·1 broken-reference floor — a label, never a gate, so a broken
+    /// reference renders as nothing, not an error). A no-op (null) when the
+    /// document store or translation seam is absent (the test-construction
+    /// floor).
+    /// </summary>
+    private async Task<IReadOnlyList<string>>? ResolveTagDisplayNamesAsync(IReadOnlyList<string> tagIds)
+    {
+        if (tagIds is null || tagIds.Count == 0)
+            return [];
+        if (store is null || localization is null || translationProvider is null)
+            return null;
+
+        await using var session = store.QuerySession();
+        var idSet = tagIds.ToHashSet(StringComparer.Ordinal);
+        var tags = await session.Query<Tag>().Where(t => idSet.Contains(t.Id)).ToListAsync();
+        var translations = await session.Query<TagTranslation>()
+            .Where(t => idSet.Contains(t.TagId)).ToListAsync();
+
+        var effective = await translationProvider.ResolveEffectiveLanguageAsync((string?)null);
+        var translated = translations
+            .Where(t => string.Equals(t.LanguageCode, effective, StringComparison.Ordinal))
+            .ToDictionary(t => t.TagId, t => t.Name, StringComparer.Ordinal);
+        var baseName = tags.ToDictionary(t => t.Id, t => t.Name, StringComparer.Ordinal);
+
+        // Display name per id (the ADR 0005 preference order: the effective-
+        // language translation, else the base Name) — the BuildTagItemsAsync
+        // idiom. Preserve the profile's tag order (the author's set order); a
+        // dangling id (no Tag doc) is dropped silently.
+        return tagIds
+            .Where(id => baseName.ContainsKey(id))
+            .Select(id => translated.TryGetValue(id, out var n) ? n : baseName[id])
+            .ToList();
+    }
 
     /// <summary>
     /// The directory list (F1/F11/F15): every non-blocked resident, projected to
@@ -122,7 +191,35 @@ public sealed class DirectoryController(DirectoryService directory) : Controller
         if (detail.Profile is null)
             return NotFound();
 
-        return View(ProjectDetail(detail));
+        // M23 (ADR 0123 D2/D6/F6) — the directory-detail bio/tags gate: the
+        // resident's Bio + tags are projected ONLY when the profile's
+        // Profile.Visibility audience admits the viewer (the F2/D2 pin —
+        // bio/tags ride the Profile.Visibility audience, the M2 "audience
+        // for the detailed non-contact fields" shape that M23 is "that
+        // moment" for). The contact block (Email/Phone/Address) stays on
+        // ContactVisibility (independent — F2, "two gates, zero new
+        // audiences").
+        //
+        // Self-view short-circuit (F3) — the author always sees their own
+        // bio/tags; no CanAsync, no audit row (the M2 self-view shape).
+        //
+        // Zero new authorization surface (C-M23·2, D7) — the existing
+        // ProfileToAuditableResource + IAuthorizationService.CanAsync (the
+        // frozen seams, the M2 contact-block gate shape). One AccessAudit
+        // row per non-self-view read (C-M23·4, the CanAsync commit).
+        var p = detail.Profile!;
+        // Self-view short-circuit (F3) — the author always sees their own
+        // bio/tags (no CanAsync, no row). Otherwise one CanAsync decision on
+        // the profile's Visibility audience (fail-closed: a missing seam is
+        // treated as a deny, so a test-construction site never leaks bio/tags).
+        var showBioTags = viewer == p.SubjectId
+            ? true
+            : (authz is null
+                ? false
+                : (await authz.CanAsync(
+                    viewer, AccessAction.Read, new ProfileToAuditableResource(p))).Allowed);
+
+        return View(await ProjectDetail(detail, showBioTags));
     }
 
     /// <summary>
@@ -135,13 +232,18 @@ public sealed class DirectoryController(DirectoryService directory) : Controller
     /// <c>ShowContactBlock</c> gate allowed them — a resident who opted out (or whose
     /// contact audience denied the viewer) gets <c>DisplayName</c>/<c>Verified</c> but
     /// <c>Email</c>/<c>Phone = null</c> (the §2.4 "null ⇒ not opted in" / "audience denied"
-    /// rows). Because a missing/suspended profile never reaches this method (the
-    /// <c>Detail</c> action returns <c>NotFound()</c> for <c>Profile == null</c>), this
-    /// assumes <see cref="Kumunita.Core.UserInfo.DirectoryDetail.Profile"/> is non-null.
-    /// The view model's <c>Detail</c> is *exactly* these five fields — the U8 pin —
-    /// nothing more.
+    /// rows). The <b>bio/tags pin</b> (M23, ADR 0123 D2/D6) is the <i>independent</i>
+    /// second gate (<paramref name="showBioTags"/>): the bio + tags are projected only
+    /// when the profile's <c>Visibility</c> audience admitted the viewer (or the viewer
+    /// is the author) — admitting the contact block does not admit the bio/tags, and
+    /// vice versa (F2 "two independent gates"). Because a missing/suspended profile never
+    /// reaches this method (the <c>Detail</c> action returns <c>NotFound()</c> for
+    /// <c>Profile == null</c>), this assumes <see cref="Kumunita.Core.UserInfo.DirectoryDetail.Profile"/>
+    /// is non-null. The view model's <c>Detail</c> is *exactly* these eight fields (the
+    /// U8 pin extended for M23) — nothing more.
     /// </remarks>
-    private static DirectoryViewModel.Detail ProjectDetail(Kumunita.Core.UserInfo.DirectoryDetail detail)
+    private async Task<DirectoryViewModel.Detail> ProjectDetail(
+        Kumunita.Core.UserInfo.DirectoryDetail detail, bool showBioTags)
     {
         var p = detail.Profile!;
         return new DirectoryViewModel.Detail(
@@ -154,6 +256,16 @@ public sealed class DirectoryController(DirectoryService directory) : Controller
             // block" surface).
             Email: detail.ShowContactBlock ? p.Email : null,
             Phone: detail.ShowContactBlock ? p.Phone : null,
-            Address: detail.ShowContactBlock ? p.Address : null);
+            Address: detail.ShowContactBlock ? p.Address : null,
+            // M23 (ADR 0123 D2/D6) — the bio/tags are projected only when the
+            // showBioTags gate (the profile's Visibility decision) allowed them; a
+            // denied viewer gets the name + verified badge but no bio/tags (the M2
+            // contact-block "null ⇒ hidden" projection shape, the §2.5 "a profile the
+            // viewer cannot see never surfaces and its bio/tag never leaks" pin).
+            Bio: showBioTags ? p.Bio : null,
+            // The tag display names — the ADR 0005 display-name resolution (the
+            // current-language name, falling back to the base Name), the same
+            // shape the ADR 0044 tag-chip surface uses.
+            TagNames: showBioTags ? await ResolveTagDisplayNamesAsync(p.TagIds) : null);
     }
 }

@@ -120,6 +120,25 @@ public sealed class ProfileEditViewModel
     /// <c>null</c>).</summary>
     public AudienceEditorModel? ContactVisibility { get; set; }
 
+    // ── M23 (ADR 0123 D1/D5): the extended-profile editor fields ───────────
+
+    /// <summary>M23 (ADR 0123 D5) — the resident's bio: **rich content** (the
+    /// <c>MarkdownRenderer</c> render path on display, the WYSIWYG
+    /// <c>bindRichEditor</c> on edit). Stored verbatim (D3); null/blank is
+    /// "no bio" (rendered as absent — the "no bio block" shape). Optional: a
+    /// resident who keeps no biography simply leaves it empty.</summary>
+    [Display(Name = "Bio")]
+    public string? Bio { get; set; }
+
+    /// <summary>M23 (ADR 0123 D1/D5) — the resident's free tags, as the
+    /// ADR 0044 tag-input editor string (comma/space-separated slugs). Mapped
+    /// to the U02 <c>ProfileUpdate.TagIds</c> (the resolved slugs) in
+    /// <see cref="ToProfileUpdate"/> (C-M23·6: the match is the tag itself; a
+    /// tag is a label, never a gate — C-TG·1). Optional: a resident with no
+    /// tags leaves it empty.</summary>
+    [Display(Name = "Tags")]
+    public string? Tags { get; set; }
+
     /// <summary>
     /// The single validation site
     /// U11's exit test target):
@@ -213,10 +232,28 @@ public sealed class ProfileEditViewModel
                         Kumunita.Core.Authorization.AudienceMode.Any,
                         Array.Empty<Kumunita.Core.Authorization.AudienceGrant>()))
                 : null,                             // §2.4 "null => short-circuit" shape
-            Address?.Trim() ?? string.Empty        // optional + clearable: a blank edit clears it;
+            Address?.Trim() ?? string.Empty,       // optional + clearable: a blank edit clears it;
                                                    // never null here, so the patch's "null => don't
                                                    // touch" rule stays consistent (a resident who
                                                    // wants no address saves it empty, not deleted)
+            // M23 (ADR 0123 D1/D3/D5) — the two extended-profile fields:
+            //   • Bio  — written VERBATIM (D3); a blank string is treated as
+            //     "no bio" (null) so the display layer's "no bio block" is the
+            //     canonical no-bio state.
+            //   • TagIds — the ADR 0044 tag-input string parsed to slugs
+            //     (lowercase + trimmed, de-duplicated — the TagService.DeriveSlug
+            //     idiom); the U02 write lane resolves each slug via the create-or-
+            //     get loop (one tag.create row per new tag, C-TG·9).
+            //     null ⇒ the field is untouched (the "null ⇒ don't touch" patch
+            //     rule, the ProfileUpdate idiom).
+            Bio: string.IsNullOrWhiteSpace(Bio) ? null : Bio.Trim(),
+            TagIds: string.IsNullOrWhiteSpace(Tags)
+                ? null
+                : Tags.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                      .Select(s => s.Trim().ToLowerInvariant())
+                      .Where(s => s.Length > 0 && s.Length <= 64)   // C-TG·4 slug shape
+                      .Distinct()
+                      .ToArray()
         );
         return (profile, patch);
     }

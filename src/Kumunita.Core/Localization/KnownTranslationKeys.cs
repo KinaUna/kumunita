@@ -805,6 +805,15 @@ public static class KnownTranslationKeys
             ["profile.save"] = "Save",
             ["profile.preview_link"] = "Preview — how I appear",
 
+            // ── M23 (U04) — extended-profile editor + directory detail ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "e.g. gardening, baking, cycling…",
+            ["profile.detail.bio"] = "About",
+            ["profile.detail.tags"] = "Interests & skills",
+            ["profile.detail.tags.empty"] = "No tags set.",
+            ["profile.flash.saved"] = "Profile updated.",
+
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Display name",
             ["profile.address_label"] = "Address (the street you live at)",
@@ -2567,6 +2576,15 @@ public static class KnownTranslationKeys
             ["profile.save"] = "Speichern",
             ["profile.preview_link"] = "Vorschau — so erscheine ich",
 
+            // ── M23 (U04) — erweiterte Profil-Editor + Verzeichnis-Details ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "z. B. Gärtnern, Backen, Radfahren…",
+            ["profile.detail.bio"] = "Über mich",
+            ["profile.detail.tags"] = "Interessen & Fähigkeiten",
+            ["profile.detail.tags.empty"] = "Keine Tags.",
+            ["profile.flash.saved"] = "Profil aktualisiert.",
+
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Anzeigename",
             ["profile.address_label"] = "Adresse (die Straße, an der du wohnst)",
@@ -4256,6 +4274,15 @@ public static class KnownTranslationKeys
             ["profile.save"] = "Enregistrer",
             ["profile.preview_link"] = "Aperçu — comment je me présente",
 
+            // ── M23 (U04) — éditeur de profil étendu + détails du répertoire ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "ex. jardinage, pâtisserie, vélo…",
+            ["profile.detail.bio"] = "À propos",
+            ["profile.detail.tags"] = "Centres d'intérêt & compétences",
+            ["profile.detail.tags.empty"] = "Aucun tag.",
+            ["profile.flash.saved"] = "Profil mis à jour.",
+
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Nom affiché",
             ["profile.address_label"] = "Adresse (la rue où tu vis)",
@@ -5943,6 +5970,15 @@ public static class KnownTranslationKeys
                 "nedenfor, hvem der kan se den.",
             ["profile.save"] = "Gem",
             ["profile.preview_link"] = "Forhåndsvisning — sådan ser jeg ud",
+
+            // ── M23 (U04) — udvidet profilredigering + stikordsbog-detaljer ──
+            ["profile.edit.bio"] = "Bio",
+            ["profile.edit.tags"] = "Tags",
+            ["profile.edit.tags.placeholder"] = "f.eks. havearbejde, bagning, cykling…",
+            ["profile.detail.bio"] = "Om mig",
+            ["profile.detail.tags"] = "Interesser & færdigheder",
+            ["profile.detail.tags.empty"] = "Ingen tags.",
+            ["profile.flash.saved"] = "Profil opdateret.",
 
             // ── profile (Edit page — field labels + input placeholders) ──────
             ["profile.display_name_label"] = "Vistnavn",

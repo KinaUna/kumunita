@@ -52,7 +52,20 @@ public sealed class DirectoryViewModel
         string? Phone,
         /// <summary>The resident's address — carried alongside the gated contact block; null
         /// unless <see cref="ShowContactBlock"/> is true (same gate as <see cref="Email"/>/<see cref="Phone"/>).</summary>
-        string? Address = null);
+        string? Address = null,
+        /// <summary>M23 (ADR 0123 D2/D6/F6) — the resident's bio, rich content (rendered
+        /// via <c>MarkdownRenderer</c> in the view). A <b>separate</b> gate from the contact
+        /// block: projected only when the profile's <c>Visibility</c> audience admits the
+        /// viewer (the F2 "two independent gates" pin — <c>Visibility</c> for bio/tags,
+        /// <c>ContactVisibility</c> for the contact block). Null ⇒ absent (a denied viewer, or
+        /// a resident with no bio, renders no bio block).</summary>
+        string? Bio = null,
+        /// <summary>M23 (ADR 0123 D1/D2/D6) — the resident's tags as display names (the
+        /// ADR 0005 language-resolution idiom: the effective-language <c>TagTranslation</c>,
+        /// else the base <c>Tag.Name</c>). Same <c>Visibility</c> gate as <see cref="Bio"/>;
+        /// null ⇒ the gate denied (a denied viewer renders no tags) or empty ⇒ the resident
+        /// set none (the "No tags set." shape).</summary>
+        IReadOnlyList<string>? TagNames = null);
 }
 
 /// <summary>

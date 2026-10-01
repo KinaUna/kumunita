@@ -14,6 +14,9 @@
         ViewContext.HttpContext?.Request, Localization, Translation);
     var addressPlaceholder = await Translation.GetAsync("profile.address_placeholder", kwlLang);
     var phonePlaceholder = await Translation.GetAsync("profile.phone_placeholder", kwlLang);
+    // M23 (U04) — the tags input's placeholder (one of the seven U04 kw-l
+    // keys), resolved in the same effective language as the field labels.
+    var tagsPlaceholder = await Translation.GetAsync("profile.edit.tags.placeholder", kwlLang);
 }
 
 <div class="row justify-content-center">
@@ -175,6 +178,55 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-body">
+            @*
+              M23 (ADR 0123 D5) — the extended-profile editor surface: a bio
+              (rich content — the WYSIWYG bindRichEditor on edit, the
+              MarkdownRenderer render path on display, the ADR 0031/0033
+              rc-editor idiom the group/post editors use) + free author-set
+              tags (the ADR 0044 tag-input string — comma/space-separated
+              slugs, parsed server-side in ToProfileUpdate). Both are optional:
+              a resident with no bio/tags simply leaves them empty.
+            *@
+            <div class="mb-3">
+                <label class="form-label" for="Bio" style="font-weight:600;">
+                    <kw-l key="profile.edit.bio">Bio</kw-l>
+                </label>
+                <div class="rc-editor">
+                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                        <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                        <partial name="_RichEditorToggle" />
+                    </div>
+                    <textarea class="form-control" id="Bio" name="Bio" rows="5"
+                              placeholder="…" data-rich-editor>@Model.Bio</textarea>
+                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                </div>
+            </div>
+
+            <div>
+                <label class="form-label" for="Tags" style="font-weight:600;">
+                    <kw-l key="profile.edit.tags">Tags</kw-l>
+                </label>
+                <input class="form-control" type="text" id="Tags" name="Tags"
+                       value="@(Model.Tags ?? string.Empty)"
+                       maxlength="256"
+                       placeholder="@tagsPlaceholder" />
+                <div class="text-muted small mt-1">
+                    <kw-l key="tag.input.hint">Type to search existing tags, or start a new one.</kw-l>
+                </div>
+            </div>
+            </div>
+        </div>
+
             <div class="d-flex gap-2 mt-4">
                 <button type="submit" class="btn btn-primary"><kw-l key="profile.save">Save</kw-l></button>
                 <a class="btn btn-outline-secondary"
@@ -196,11 +248,11 @@
        user-friendly UX) in two-way sync. The textarea is the only
        element posted; the pickers are display-only (no name=). *@
     <partial name="_GrantPickerScripts" />
-    @* The simple image editor (ADR 0075, client/lib/image-editor.ts, tsc-built).
-       This page has no rich editor, so load the module directly; it self-wires
-       the data-avatar-upload form to offer crop + resize before the native
-       POST to /profile/avatar. On editor pages rich-editor.js already imports
-       it, so this is a no-op there (idempotent, guarded self-wire). *@
-    <script type="module" src="~/js/lib/image-editor.js"></script>
+    @* The rich editor (RE U03, client/lib/rich-editor.ts, tsc-built — the
+       toolbar + live preview pane). M23 (U04): the bio field is now a rich
+       editor (the ADR 0031/0033 rc-editor idiom, self-wires the .rc-editor
+       surface). rich-editor.js already imports image-editor.ts, so it is
+       loaded transitively for the avatar crop/resize self-wire. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
 }
 

@@ -52,6 +52,46 @@
         </div>
 
         @*
+          M23 (ADR 0123 D2/D6) — the bio/tags surface, on the profile's
+          Visibility gate (a SEPARATE gate from the contact block below — the
+          F2 "two independent gates" pin). Model.Bio is null when the gate
+          denied (or the resident set no bio) — the view renders no bio block
+          (the "no bio block" shape); Model.TagNames is null when the gate
+          denied (render no tag row at all) or an empty list when the gate
+          allowed but the resident set none (the "No tags set." shape). The
+          bio is rich content, rendered via MarkdownRenderer (the M22/rc-body
+          idiom) — never an un-awaited async helper.
+        *@
+        @if (!string.IsNullOrWhiteSpace(Model.Bio))
+        {
+            <div class="card mt-4">
+                <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.detail.bio">About</kw-l></span></div>
+                <div class="card-body">
+                    <div class="rc-body">@Html.Raw(Kumunita.Web.Security.MarkdownRenderer.RenderHtml(Model.Bio))</div>
+                </div>
+            </div>
+        }
+        @if (Model.TagNames is not null)
+        {
+            <div class="mt-4">
+                <div class="fw-semibold mb-2"><kw-l key="profile.detail.tags">Interests &amp; skills</kw-l></div>
+                @if (Model.TagNames.Count > 0)
+                {
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        @foreach (var tag in Model.TagNames)
+                        {
+                            <span class="badge rounded-pill text-bg-light border">@tag</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0"><kw-l key="profile.detail.tags.empty">No tags set.</kw-l></p>
+                }
+            </div>
+        }
+
+        @*
           Contact-block opt-in pin (M2 design doc §2.4, invariant C-M2·1,
           ARCHITECTURE.md §9): the contact block is rendered ONLY when the
           service's ContactVisibility decision allowed *this* viewer — a
