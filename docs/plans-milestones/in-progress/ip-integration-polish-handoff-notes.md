@@ -83,3 +83,19 @@ estimated ~22) — codebase wins for mechanics.
 
 **Next unit:** U03 — the two rate-limit policies (`message` + `write`) + the
 `[EnableRateLimiting]` attributes in `Kumunita.Web`.
+
+## U03 — Rate-limit policies for message send + post/reply create
+
+**Delivered:** `Program.cs` `AddRateLimiter` block gains two fixed-window
+policies (the existing five unchanged): `message` 20/15min, `write` 30/15min.
+`[EnableRateLimiting("message")]` on `MessagesController.Send`;
+`[EnableRateLimiting("write")]` on `PostsController.New` + `PostsController.Replies`
+(create surfaces only — `Edit`/`EditReply`/translation actions untouched, per D3).
+Added the missing `using Microsoft.AspNetCore.RateLimiting;` to
+`MessagesController.cs` (the trap the register flagged; `PostsController.cs`
+already had it). No new DI registration, no new authorization surface, no Core
+touch (C-IP·2). Exit: `dotnet build Kumunita.slnx -c Debug` clean;
+`Kumunita.Web.Tests` 721/721 green; grep `EnableRateLimiting("message")`=1,
+`EnableRateLimiting("write")`=2. **Open questions:** none. **Next unit:**
+U04 — the two `catch {}` log-and-degrade fixes (`HomeController`,
+`MessagesController`); inject `ILogger<T>` into each.

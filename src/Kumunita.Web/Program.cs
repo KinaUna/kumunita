@@ -321,6 +321,16 @@ builder.Services.AddRateLimiter(opts =>
 
     // Setup (admin first-boot token): 5 per 15 minutes per IP (token brute-force).
     AddWindow(opts, "setup", limit: 5, window: TimeSpan.FromMinutes(15));
+
+    // Message send: 20 per 15 minutes per IP (the highest-volume
+    // authenticated write surface — direct-message spam).
+    AddWindow(opts, "message", limit: 20, window: TimeSpan.FromMinutes(15));
+
+    // Resident write lane (post create, reply create): 30 per 15 minutes
+    // per IP (a general write-lane guard — a resident posting or replying
+    // more than 30 times in 15 minutes is an anomaly at this platform's
+    // scale; the limit is generous for normal use and tight for spam).
+    AddWindow(opts, "write", limit: 30, window: TimeSpan.FromMinutes(15));
 });
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the

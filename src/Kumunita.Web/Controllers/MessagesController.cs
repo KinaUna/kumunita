@@ -4,6 +4,7 @@ using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -218,6 +219,7 @@ public sealed class MessagesController(
     /// did the deciding. On success: a flash + redirect back to the thread.
     /// </summary>
     [HttpPost("/messages/{id}/send")]
+    [EnableRateLimiting("message")]
     public async Task<IActionResult> Send(string id, [FromForm] string? body)
     {
         var actorId = KumunitaPrincipal.SubjectId(User);
