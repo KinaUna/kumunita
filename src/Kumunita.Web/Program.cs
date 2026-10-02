@@ -20,7 +20,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Mail;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Marten;
@@ -502,9 +501,12 @@ builder.Services.AddAuthorization();
 //  4. Retry policy per §6.2 — an explicit RetryWithCooldown TimeSpan list (Wolverine's
 //     "delay list sets retry count" shape, not a maxRetries integer). Six cooldowns sum
 //     to 24 h exactly: 5 + 15 + 45 + 120 + 275 + 980 min = 1 440 min. Applied to the
-//     two SMTP failure classes (SmtpClient throws SmtpException or TimeoutException on
-//     send) — narrower than Exception so a real programming error doesn't sit retrying
-//     for a day.
+//     two SMTP failure classes (MailKit's SmtpClient throws SmtpCommandException for
+//     relay-level rejections — AUTH / mailbox / delivery — or ProtocolException for
+//     connection / TLS / protocol-level failures) — narrower than Exception so a real
+//     programming error doesn't sit retrying for a day. (The BCL-era
+//     SmtpException / TimeoutException pair was replaced by these two types when the
+//     transport moved to MailKit — ADR 0131.)
 var backoff = new[]
 {
     TimeSpan.FromMinutes(5),   TimeSpan.FromMinutes(15),
@@ -521,8 +523,14 @@ builder.UseWolverine(opts =>
     // Ancillary-role store that confuses the Main/Ancillary resolution.
     opts.Policies.UseDurableLocalQueues();
     opts.PublishFaultEvents();
-    opts.OnException<SmtpException>().RetryWithCooldown(backoff);
-    opts.OnException<TimeoutException>().RetryWithCooldown(backoff);
+    // ADR 0131 — the BCL System.Net.Mail.SmtpException / TimeoutException pair was
+    // replaced by MailKit's two SMTP failure classes when the transport swapped
+    // from the .NET BCL to MailKit.SmtpClient. Both cover the "relay-level
+    // rejection" surface the original pair did, plus the connection/TLS surface
+    // (MailKit.ProtocolException) that the BCL's TimeoutException did.
+    opts.OnException<MailKit.Net.Smtp.SmtpCommandException>().RetryWithCooldown(backoff);
+    opts.OnException<MailKit.Net.Smtp.SmtpProtocolException>().RetryWithCooldown(backoff);
+    opts.OnException<MailKit.ProtocolException>().RetryWithCooldown(backoff);
 });
 
 var app = builder.Build();

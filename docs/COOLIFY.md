@@ -153,15 +153,17 @@ addon's page / psql connection block).
 The `SmtpSender` reads six options from the `SMTP` section: `Host`, `Port`,
 `User`, `Pass`, `Secure`, and `From` (`SmtpOptions` in
 `src/Kumunita.Core/Identity/SmtpSender.cs`); all are bound through
-`Configure<SmtpOptions>` in `Program.cs`. The BCL `SmtpClient` is used as-is,
-and the BCL **only supports STARTTLS** (`EnableSsl = true`) — there is no
-implicit-TLS / SMTPS mode (the .NET API reference for `SmtpClient.EnableSsl`
-is explicit that an "SSL session established up front," i.e. port 465, is
-**not currently supported**). Practical consequence: **pick a relay that
-exposes a STARTTLS port** (conventionally 587). Virtually every SaaS relay —
-Mailgun, Resend, MailerSend, Postmark, SendGrid, MS 365 — does; if yours is
-465-only, it needs a relay swap or a `SmtpSender` implementation change before
-deploy (see note in §5.1B).
+`Configure<SmtpOptions>` in `Program.cs`. The transport is **MailKit's
+`SmtpClient`** (ADR 0131, 2026-10-02) — it supports all three TLS shapes the
+`Secure` option offers: `Tls` (STARTTLS, the conventional 587 shape; the
+default), `Ssl` (implicit TLS / SMTPS, the "TLS up front" 465 shape), and
+`None` (no enforced encryption — take TLS if the relay offers it, plain
+otherwise; the local-only Mailpit shape). The original BCL
+`System.Net.Mail.SmtpClient` was replaced because the .NET 10 BCL transport
+reached `MAIL FROM` without a live AUTH session on a real relay (Proton Mail
+`smtp.protonmail.ch:587`) even though the identical credentials authenticated
+cleanly from the same container and from the VPS host — a live, reproducible
+BCL regression (see ADR 0131 for the full evidence trail).
 
 **A. Local dev loop (compose / Mailpit):** run via `docker-compose.yml` at the
 repo root, which brings up `Mailpit` (SMTP on port 1025, web UI on 8025) plus
@@ -188,14 +190,11 @@ is the `ASPNETCORE_ENVIRONMENT=Development` path, not a Coolify deploy:
 | `SMTP__Pass` | the relay's password / API key — **secret**; store in the secrets manager, inject via env, never in the runbook |
 | `SMTP__From` | the resident-facing address shown in verification emails (often the same as `Community__SupportEmail`) |
 
-> **465 / implicit TLS (SMTPS) is not supported by the BCL `SmtpClient`.** If
-> the only relay available to the instance is 465-only, your options are
-> (a) pick a different relay that also exposes a STARTTLS port (most do), or
-> (b) replace `SmtpSender`'s BCL `SmtpClient` with a hand-rolled `Sockets`
-> client that wraps the stream in `SslStream.AuthenticateAsClient(...)` before
-> speaking SMTP — i.e. a real code change, not an env value. Do **not** set
-> `SMTP__Secure=Ssl`: the value is rejected with an actionable error message
-> that says exactly this.
+> **465 / implicit TLS (SMTPS) is supported.** The MailKit transport
+> (ADR 0131) drives `SecureSocketOptions.SslOnConnect` for the `Ssl` value, so
+> a 465-only relay is a first-class shape: set `SMTP__Port=465` and
+> `SMTP__Secure=Ssl`. (The prior BCL transport could not do this; that
+> limitation is what drove the swap.)
 >
 > **`SMTP__User` and `SMTP__Pass` are a pair.** Setting only one (or an empty
 > string for one and a real value for the other) is a configuration error:
