@@ -1567,7 +1567,14 @@ public static class SampleDataSeeder
         await using var session = mt.OpenSession(new SessionOptions());
         var profile = await session.LoadAsync<Profile>(existing.Id, ct);
         profile ??= new Profile { SubjectId = existing.Id };
-        profile.DisplayName = displayName;
+        // Create-if-missing, never clobber (ADR 0042 D1): a DisplayName the resident set
+        // in-app must survive a reboot — the seeder is a development convenience, not the
+        // owner of the user's profile. Only an unset name, or FirstBootSeeder's e-mail
+        // placeholder (which is the seed admin's name before the sample name lands on a
+        // pristine boot), is replaced by the sample name.
+        if (string.IsNullOrEmpty(profile.DisplayName)
+            || string.Equals(profile.DisplayName, email, StringComparison.OrdinalIgnoreCase))
+            profile.DisplayName = displayName;
         profile.Email = email;
         profile.Verified = true;
         if (profile.Visibility is null)
