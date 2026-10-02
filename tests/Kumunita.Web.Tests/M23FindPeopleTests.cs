@@ -278,7 +278,9 @@ public sealed class M23FindPeopleTests
     {
         foreach (var view in new[] { "Tag", "Bio" })
         {
-            var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "People", view + ".cshtml");
+            // The FindPeopleController's views live in Views/FindPeople/ (the
+            // controller-name folder — Razor's View("Tag") resolves against it).
+            var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "FindPeople", view + ".cshtml");
             Assert.True(File.Exists(path), $"{view}.cshtml not found at {path}.");
             var html = File.ReadAllText(path);
 

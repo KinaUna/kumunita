@@ -92,4 +92,42 @@ public sealed class MediaOptions
         !System.String.IsNullOrWhiteSpace(contentType)
         && ResolvedDocumentAllowedTypes.Any(t =>
             System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Comma-separated allowed Content-Types for the **inline-preview** subset
+    /// of the attachment lane (case-insensitive; ADR 0126 C-PV·2). The
+    /// browser-displayable members of <see cref="AttachmentAllowedContentTypes"/>
+    /// (C-PV·10) — the four raster image types, <c>application/pdf</c>,
+    /// <c>text/plain</c>, <c>text/csv</c>. A previewable type is always also an
+    /// attachment-allowed type (C-PV·10); deliberately a **separate** member
+    /// (not derived from the allowlist) so growing the upload allowlist never
+    /// silently grows the inline-render surface. Positive-only; SVG /
+    /// <c>text/html</c> / <c>image/svg+xml</c> / <c>application/javascript</c>
+    /// are never previewable (C-PV·1). The config key is
+    /// <c>Media:PreviewableContentTypes</c>.
+    /// </summary>
+    public string? PreviewableContentTypes { get; set; }
+
+    /// <summary>
+    /// The resolved previewable set (ADR 0126 C-PV·2). The browser-displayable
+    /// members of the attachment allowlist (the default), overridable by
+    /// <see cref="PreviewableContentTypes"/>. A subset of
+    /// <see cref="ResolvedAttachmentAllowedTypes"/> (C-PV·10).
+    /// </summary>
+    public IEnumerable<string> ResolvedPreviewableTypes =>
+        (PreviewableContentTypes ??
+         "image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain,text/csv")
+            .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Whether <paramref name="contentType"/> is a **previewable** attachment
+    /// (ADR 0126 C-PV·2): case-insensitive membership in
+    /// <see cref="ResolvedPreviewableTypes"/>. Mirrors
+    /// <see cref="IsAttachmentAllowed"/> / <see cref="IsDocumentAllowed"/>.
+    /// The **only** classification the serve branch (C-PV·3) consults.
+    /// </summary>
+    public bool IsPreviewable(string? contentType) =>
+        !System.String.IsNullOrWhiteSpace(contentType)
+        && ResolvedPreviewableTypes.Any(t =>
+            System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
 }

@@ -302,8 +302,17 @@ public static class MarkdownRenderer
                     // (a literal & in a query string must be entity-encoded in
                     // an HTML attribute; the browser decodes it on navigation).
                     var escUrl = target.Replace("&", "&amp;").Replace("\"", "&quot;");
+                    // An attachment download (/attachment/{id}) opens in a new
+                    // tab so the reader keeps their place on the page; every
+                    // other link (internal nav, external) keeps the same-tab
+                    // default. rel=noopener pairs with target=_blank (no
+                    // window.opener to the cross-origin/new-context target).
+                    var targetAttr = IsAttachmentLink(target)
+                        ? " target=\"_blank\" rel=\"noopener\""
+                        : string.Empty;
                     result.Append("<a href=\"").Append(escUrl)
-                           .Append("\">").Append(escLabel).Append("</a>");
+                           .Append("\"").Append(targetAttr).Append('>')
+                           .Append(escLabel).Append("</a>");
                 }
                 else
                 {
@@ -357,6 +366,27 @@ public static class MarkdownRenderer
             .Replace(">", "&gt;")
             .Replace("\"", "&quot;")
             .Replace("'", "&#39;");
+    }
+
+    /// <summary>
+    /// Whether <paramref name="url"/> is an attachment-download link
+    /// (<c>/attachment/{id}</c>, the ADR 0034 serve route) — and therefore the
+    /// only link the renderer opens in a new tab. The <c>id</c> is the same
+    /// 1–128 lowercase-hex shape the serve route validates
+    /// (<see cref="AttachmentController"/> step 1) and
+    /// <see cref="AttachmentIds.ExtractAttachmentIds"/> matches, so a
+    /// malformed id is not treated as an attachment (no new-tab attribute —
+    /// the link would 400 anyway). Other routes (<c>/content-image/{id}</c>,
+    /// internal nav, external URLs) are <b>not</b> attachment links.
+    /// </summary>
+    private static bool IsAttachmentLink(string url)
+    {
+        const string route = "/attachment/";
+        if (!url.StartsWith(route, StringComparison.Ordinal))
+            return false;
+        var id = url[route.Length..];
+        return id.Length is >= 1 and <= 128
+            && System.Text.RegularExpressions.Regex.IsMatch(id, @"^[0-9a-f]+$");
     }
 
     /// <summary>

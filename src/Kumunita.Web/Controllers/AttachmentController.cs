@@ -202,18 +202,40 @@ public sealed class AttachmentController(
 
     /// <summary>
     /// The shared serve block (C-ATT·2): opens the stored stream, sets the
-    /// <b>download</b> headers (the one serve difference from the image lane,
-    /// which omits <c>Content-Disposition</c> and renders inline), and returns
-    /// the file with the **stored** <c>Content-Type</c> (already validated at
-    /// write — no second allowlist check at read, C-ATT·3/9).
+    /// <b>disposition</b> headers, and returns the file with the **stored**
+    /// <c>Content-Type</c> (already validated at write — no second allowlist
+    /// check at read, C-ATT·3/9). The disposition is a <b>display property of
+    /// the already-authorized stream</b> (ADR 0126 C-PV·3 — post-decision):
+    /// <c>inline</c> iff the stored <c>Content-Type</c> is in the closed
+    /// previewable set (<see cref="MediaOptions.IsPreviewable"/>, C-PV·2) so
+    /// the browser <b>previews</b> it, else <c>attachment</c> (a download,
+    /// C-PV·9 — Office / zip / any non-previewable type). <c>nosniff</c> stays
+    /// <b>unconditional</b> (C-PV·4 — the browser must render exactly the
+    /// declared stored type, never a sniff; this is what makes
+    /// <c>text/plain</c> / <c>text/csv</c> safe to render). The preview is the
+    /// browser's own top-level document in a new tab (the ADR 0126
+    /// <c>target="_blank" rel="noopener"</c> affordance, C-PV·5) — not an
+    /// in-page <c>&lt;iframe&gt;</c>/<c>&lt;img&gt;</c>.
     /// </summary>
     private async Task<IActionResult> ServeFile(string id, MediaObject stored)
     {
         var stream = await media.OpenReadAsync(id);
+
+        // THE BRANCH (ADR 0126 C-PV·3): inline iff the stored Content-Type is
+        // in the closed, declared previewable set (C-PV·2) — otherwise a
+        // download (C-PV·9). The stored type is authoritative (C-PV·6 — no
+        // client-influenced override), and the branch runs post-decision (the
+        // stream is already authorized).
+        var disposition = mediaOpts.Value.IsPreviewable(stored.ContentType)
+            ? "inline"
+            : "attachment";
+
+        // nosniff is UNCONDITIONAL (C-PV·4): inline *and* attachment — the
+        // browser must not sniff the bytes into text/html.
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         var filename = SanitizeFilename(stored.Filename, id);
         Response.Headers["Content-Disposition"] =
-            "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + Uri.EscapeDataString(filename);
+            disposition + "; filename=\"" + filename + "\"; filename*=UTF-8''" + Uri.EscapeDataString(filename);
         return File(stream, stored.ContentType);
     }
 
