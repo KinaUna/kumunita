@@ -285,4 +285,32 @@ public interface IPageService
     /// </summary>
     Task ResetToSeededAsync(
         string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
+
+    /// <summary>
+    /// ADR 0128 — the **status** of every seeded page (the four-surface set
+    /// + the UG guides, in seed order): its slug, current title, the id of
+    /// the stored page (for the per-page reset link), and whether the stored
+    /// text (en body + de/fr/da translations) **differs** from the current
+    /// code's seeded baseline. A page is "stale" (has a newer shipped text)
+    /// when any field the baseline defines differs from the stored value.
+    /// Pages that the seed never wrote (absent from the DB, e.g. deleted or
+    /// never created) are **excluded** from the result. Read-only — opens its
+    /// own query session, writes nothing, no audit row.
+    /// </summary>
+    Task<IReadOnlyList<SeededPageStatus>> GetSeededPageStatusAsync();
+
+    /// <summary>
+    /// ADR 0128 — **batch reset**: resets every seeded page (the
+    /// four-surface set + the UG guides) back to its seeded baseline in a
+    /// single session + single save. Delegates the per-page applier to
+    /// <see cref="Bootstrap.FirstBootSeeder.ResetSeededTextAsync"/> (the
+    /// same content the per-page lane uses, ADR 0058). Writes one
+    /// <c>page.reset</c> audit row per page (the same trail the per-page
+    /// lane emits). Standing is the same as the per-page lane: GlobalAdmin
+    /// only (all seeded pages are <see cref="PageKind.System"/>). A denied
+    /// actor is an <see cref="UnauthorizedAccessException"/> (403). Returns
+    /// the number of pages reset.
+    /// </summary>
+    Task<int> ResetAllSeededPagesAsync(
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
 }

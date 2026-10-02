@@ -1322,6 +1322,195 @@ public sealed class PageService : IPageService
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
+    // ─── ADR 0128 — the /admin/help status + batch reset ─────────────────
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SeededPageStatus>> GetSeededPageStatusAsync()
+    {
+        // Read-only: opens its own query session (the read-lane convention,
+        // the same as GetTreeAsync / GetTranslationsAsync). Writes nothing,
+        // no audit row — the status is a display probe for the admin, not a
+        // decision.
+        await using var session = _store.QuerySession();
+
+        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+        var slugSet = new HashSet<string>(slugs, StringComparer.Ordinal);
+
+        // One bulk query over the seeded slugs (the (ParentId, Slug) index is
+        // not needed — a slug is unique per parent, and the seeded set never
+        // has two pages with the same slug under different parents: the
+        // four-surface set lives under `system`, the guides under `help`;
+        // slugs are globally distinct across the two registries).
+        var pages = await session
+            .Query<Page>()
+            .Where(p => slugSet.Contains(p.Slug) && p.IsDeleted == false)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        var pageBySlug = pages.ToDictionary(
+            p => p.Slug, StringComparer.Ordinal);
+
+        // The translation rows for the seeded pages (one query).
+        var pageIds = pageBySlug.Values.Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
+        var translations = await session
+            .Query<PageTranslation>()
+            .Where(t => pageIds.Contains(t.PageId))
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var enDefault = Bootstrap.FirstBootSeeder.EnDefaultPages();
+        var deDefault = Bootstrap.FirstBootSeeder.DeDefaultPages();
+        var frDefault = Bootstrap.FirstBootSeeder.FrDefaultPages();
+        var daDefault = Bootstrap.FirstBootSeeder.DaDefaultPages();
+        var enGuides = Bootstrap.FirstBootSeeder.GuidePages();
+        var deGuides = Bootstrap.FirstBootSeeder.DeGuidePages();
+        var frGuides = Bootstrap.FirstBootSeeder.FrGuidePages();
+        var daGuides = Bootstrap.FirstBootSeeder.DaGuidePages();
+
+        var result = new List<SeededPageStatus>(slugs.Count);
+        foreach (var slug in slugs)
+        {
+            // The code's seeded baseline for this slug (en body + title).
+            var seededEn = enDefault.FirstOrDefault(b => b.Slug == slug);
+            if (seededEn == default)
+                seededEn = enGuides.FirstOrDefault(b => b.Slug == slug);
+            if (seededEn == default)
+                continue;   // no seeded baseline (should not happen for AllSeededSlugs)
+
+            // A page that was never seeded (or was deleted) is excluded —
+            // the admin sees only pages that exist.
+            if (!pageBySlug.TryGetValue(slug, out var page))
+                continue;
+
+            // Compare the stored text against the baseline. Any field the
+            // baseline defines that differs (title, en body, or any of the
+            // de/fr/da translation rows the baseline carries) is "newer
+            // shipped text" — the admin can pull it in.
+            var hasNewer = page.Title != seededEn.Title
+                          || page.Body != seededEn.Body;
+
+            if (!hasNewer)
+            {
+                // Compare the translation rows the baseline defines for this
+                // slug (a baseline that does not carry a row for a language
+                // does not count — the reset only writes what the seed knows,
+                // ADR 0058 D4).
+                var rowsByLang = translations
+                    .Where(t => t.PageId == page.Id)
+                    .GroupBy(t => t.LanguageCode)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+                (string Code, (string Title, string Body)? Baseline)[] toCheck =
+                {
+                    ("de", MatchBaseline(deDefault, deGuides, slug)),
+                    ("fr", MatchBaseline(frDefault, frGuides, slug)),
+                    ("da", MatchBaseline(daDefault, daGuides, slug)),
+                };
+
+                foreach (var (code, baseline) in toCheck)
+                {
+                    if (baseline == null) continue;   // the baseline does not carry this language.
+                    if (!rowsByLang.TryGetValue(code, out var row))
+                    {
+                        // A missing row is "newer shipped text" — the baseline
+                        // has a row the stored page does not.
+                        hasNewer = true;
+                        break;
+                    }
+                    if (row.Title != baseline.Value.Title || row.Body != baseline.Value.Body)
+                    {
+                        hasNewer = true;
+                        break;
+                    }
+                }
+            }
+
+            result.Add(new SeededPageStatus(slug, page.Id, page.Title, hasNewer));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// ADR 0128 — looks up a slug's baseline in either the four-surface
+    /// registry or the UG guide registry for the given non-en language set.
+    /// <c>null</c> when the baseline does not carry this slug in this
+    /// language (the reset applier's "skip" branch, ADR 0058 D4).
+    /// </summary>
+    private static (string Title, string Body)? MatchBaseline(
+        (string Slug, string Title, string Body)[] fourSurface,
+        (string Slug, string Title, string Body)[] guides,
+        string slug)
+    {
+        var match = fourSurface.FirstOrDefault(b => b.Slug == slug);
+        if (match != default) return (match.Title, match.Body);
+        match = guides.FirstOrDefault(b => b.Slug == slug);
+        if (match != default) return (match.Title, match.Body);
+        return null;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> ResetAllSeededPagesAsync(
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        // Standing check (C3, single source of truth — the same gate the
+        // per-page lane uses, ADR 0058 D3): a system page is GlobalAdmin
+        // only. All seeded pages are PageKind.System, so the gate is
+        // "is the actor a GlobalAdmin".
+        if (!actorRoles.Contains(Roles.GlobalAdmin))
+            throw new UnauthorizedAccessException(
+                "Resetting the seeded pages requires GlobalAdmin standing.");
+
+        var now = DateTimeOffset.UtcNow;
+        var slugs = Bootstrap.FirstBootSeeder.AllSeededSlugs();
+
+        // Load every seeded page that exists in one query (the read path's
+        // slug-set shape).
+        var slugSet = new HashSet<string>(slugs, StringComparer.Ordinal);
+        var pages = await session
+            .Query<Page>()
+            .Where(p => slugSet.Contains(p.Slug) && p.IsDeleted == false)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var resetCount = 0;
+        foreach (var page in pages)
+        {
+            // The applier (ADR 0058) — pure content write, no standing re-check
+            // (the caller owns it). It throws InvalidOperationException when
+            // the slug has no seeded baseline; the slug came from AllSeededSlugs
+            // so that cannot happen here.
+            await Bootstrap.FirstBootSeeder
+                .ResetSeededTextAsync(session, page, now, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            // One page.reset audit row per page (the same trail the per-page
+            // lane emits, ADR 0058 D6). The Via is Admin (the only branch a
+            // GlobalAdmin takes on a system page, ADR 0040).
+            session.Store(new AccessAudit
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                At = now,
+                ActorId = actorId,
+                EffectivePrincipalId = actorId,
+                Action = "page.reset",
+                TargetKind = "page",
+                TargetId = page.Id,
+                Via = AccessVia.Admin,
+                Outcome = AccessOutcome.Allow
+            });
+
+            resetCount++;
+        }
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return resetCount;
+    }
+
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
 
     /// <summary>

@@ -2025,6 +2025,182 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.False(FirstBootSeeder.HasSeededText("about"));   // not seeded (the U05 pin)
     }
 
+    // ─── ADR 0128 — the /admin/help status probe + bulk reset ──────────────
+    //
+    // ADR 0128 adds a read-only "which seeded pages have newer shipped text"
+    // probe (PageService.GetSeededPageStatusAsync) and a GlobalAdmin bulk
+    // reset (PageService.ResetAllSeededPagesAsync) on top of the ADR 0058
+    // per-page lane. These tests pin: the probe flags a customized en body
+    // and a customized/missing translation row, the probe's skip rule (a
+    // language the baseline does not carry is not "newer"), the bulk reset's
+    // destructive overwrite + one page.reset audit row per page, and the
+    // GlobalAdmin-standing gate (a non-GlobalAdmin is denied, no audit).
+
+    [Fact]
+    public async Task A128_Status_FreshSeed_NoPagesFlaggedNewer()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        var status = await svc.GetSeededPageStatusAsync();
+
+        // Every seeded four-surface page is present and up to date (the body
+        // and the de/fr/da rows are byte-identical to the baseline).
+        foreach (var slug in new[] { "terms", "help", "privacy", "conduct" })
+        {
+            var row = status.Single(p => p.Slug == slug);
+            Assert.False(row.HasNewerShippedText);
+            Assert.False(string.IsNullOrEmpty(row.PageId));
+        }
+    }
+
+    [Fact]
+    public async Task A128_Status_CustomizedEnBody_PageFlaggedNewer()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        // Customize the `terms` en body (the "keep my customizations" state).
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await q.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            await UpdatePageAsync(store, terms.Id, p => p.Body = "My custom terms.");
+        }
+
+        var status = await svc.GetSeededPageStatusAsync();
+
+        var termsRow = Assert.Single(status, p => p.Slug == "terms");
+        Assert.True(termsRow.HasNewerShippedText);
+        // A sibling page that was not touched is still up to date.
+        Assert.False(status.Single(p => p.Slug == "privacy").HasNewerShippedText);
+    }
+
+    [Fact]
+    public async Task A128_Status_CustomizedTranslationRow_PageFlaggedNewer()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        // Customize a `de` translation row (the body differs; the en body does
+        // not) — the probe must flag this via the translation comparison.
+        await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var systemRoot = await w.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await w.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var de = await w.Query<PageTranslation>()
+                .Where(t => t.PageId == terms.Id && t.LanguageCode == "de")
+                .FirstAsync(ct);
+            de.Body = "Mein eigener Text.";
+            w.Store(de);
+            await w.SaveChangesAsync(ct);
+        }
+
+        var status = await svc.GetSeededPageStatusAsync();
+        Assert.True(status.Single(p => p.Slug == "terms").HasNewerShippedText);
+    }
+
+    [Fact]
+    public async Task A128_ResetAll_GlobalAdmin_OverwritesAndAuditsPerPage()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        // Customize two pages (en body + a de row) so the bulk reset has
+        // something destructive to undo.
+        string termsId;
+        string privacyId;
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await q.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var privacy = await q.Query<Page>()
+                .Where(p => p.Slug == "privacy" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            termsId = terms.Id;
+            privacyId = privacy.Id;
+        }
+        await UpdatePageAsync(store, termsId, p => p.Body = "Custom terms.");
+        await UpdatePageAsync(store, privacyId, p => p.Body = "Custom privacy.");
+
+        // Bulk reset (a GlobalAdmin).
+        var count = 0;
+        await using (var s = newSession(store))
+        {
+            count = await svc.ResetAllSeededPagesAsync("u-admin", RolesSet(Roles.GlobalAdmin), s);
+        }
+        Assert.True(count >= 4, $"Expected all four seeded pages reset, got {count}.");
+
+        // The customized bodies are back to the seeded baseline (destructive).
+        await using (var q2 = store.QuerySession())
+        {
+            var systemRoot = await q2.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await q2.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var seededEn = FirstBootSeeder.EnDefaultPages().Single(b => b.Slug == "terms");
+            Assert.Equal(seededEn.Body, terms.Body);
+
+            // One page.reset audit row for the terms page, Via = Admin.
+            var audits = (await AuditsFor(store, terms.Id, "page.reset")).ToList();
+            Assert.Single(audits);
+            Assert.Equal(AccessVia.Admin, audits[0].Via);
+        }
+    }
+
+    [Fact]
+    public async Task A128_ResetAll_NonGlobalAdmin_Denied_NoAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await SeedCanonicalPagesAndTranslationsAsync(store, TestContext.Current.CancellationToken);
+
+        // A community Moderator (or a plain Member) has no reset standing on
+        // a system page (ADR 0058 D3 / ADR 0128 D4).
+        await using (var s = newSession(store))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                svc.ResetAllSeededPagesAsync("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), s));
+        }
+
+        // No audit row was written for any page (the write never happened).
+        var slugs = FirstBootSeeder.AllSeededSlugs();
+        var ct = TestContext.Current.CancellationToken;
+        await using (var q = store.QuerySession())
+        {
+            var pages = await q.Query<Page>()
+                .Where(p => slugs.Contains(p.Slug) && p.IsDeleted == false)
+                .ToListAsync(ct);
+            var pageIds = pages.Select(p => p.Id).ToHashSet();
+            var audits = await q.Query<AccessAudit>()
+                .Where(a => a.Action == "page.reset" && pageIds.Contains(a.TargetId))
+                .ToListAsync(ct);
+            Assert.Empty(audits);
+        }
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page doc types) and

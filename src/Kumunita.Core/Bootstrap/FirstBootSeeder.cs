@@ -3795,6 +3795,27 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
+    /// ADR 0128 — the **full set of seeded page slugs** in display order:
+    /// the four-surface set (terms / help / privacy / conduct) followed by the
+    /// UG guides (the <see cref="GuidePages"/> registry, in the order the
+    /// seeder writes them on first boot). The <c>/admin/help</c> surface
+    /// (ADR 0128) iterates this to list every page the operator can reset, and
+    /// to detect which have newer shipped text. Pure registry read — no DB, no
+    /// session. The set is a **closed superset** of <see cref="HasSeededText"/>:
+    /// every slug here passes <c>HasSeededText == true</c>, but the reverse is
+    /// not required (a slug is in <c>AllSeededSlugs</c> iff it has a seeded
+    /// <c>en</c> baseline in <see cref="EnDefaultPages"/> or
+    /// <see cref="GuidePages"/>).
+    /// </summary>
+    public static IReadOnlyList<string> AllSeededSlugs()
+    {
+        var slugs = new List<string>();
+        foreach (var p in EnDefaultPages()) slugs.Add(p.Slug);
+        foreach (var g in GuidePages()) slugs.Add(g.Slug);
+        return slugs.AsReadOnly();
+    }
+
+    /// <summary>
     /// ADR 0058 — the **reset applier**: overwrites the <see cref="Page"/>
     /// <c>en</c> <see cref="Kumunita.Core.Pages.Page.Title"/> /
     /// <see cref="Kumunita.Core.Pages.Page.Body"/> and the <c>de</c> /
