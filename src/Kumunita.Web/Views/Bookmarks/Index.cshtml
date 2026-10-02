@@ -76,7 +76,7 @@
                                 <form method="post" action="@($"/bookmarks/{row.TargetKind}/{row.TargetId}/remove")"
                                       style="margin:0;">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm"><kw-l key="bm.list.unbookmark">Remove</kw-l></button>
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg><kw-l key="bm.list.unbookmark">Remove</kw-l></button>
                                 </form>
                             </li>
                         }
