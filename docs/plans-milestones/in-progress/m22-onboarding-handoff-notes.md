@@ -91,6 +91,65 @@ subjectId, string actorBy)` · `GetOnboardingCompletedAsync(string subjectId)`.
 `OnboardingCompletedAt` shape: nullable `DateTimeOffset?`, `null` = not
 completed (the banner floor).
 
+## U02 — the `OnboardingController` + the `OnboardingViewModel` (Web)
+
+**Delivered (2 Web files + 1 test file):**
+- `src/Kumunita.Web/Controllers/OnboardingController.cs` — `[Authorize]` +
+  `Controller` base (the `LocaleController` settings-tabs shape). Three actions:
+  `GET /onboarding` (`Index` — seeds the model from the owner-scope
+  `GetProfileAsync` read + the per-step hints + the `LocaleCookie.Read` UI-
+  language hint), `POST /onboarding/finish` (`Finish` — the **one** write: calls
+  U01's `CompleteOnboardingAsync(subjectId, subjectId)`, `KeyNotFoundException`
+  catch → redirect home, else `TempData["info"]` = the `onboarding.flash_done`
+  flash + `RedirectToAction("Index","Home")`), and `POST /onboarding/skip`
+  (`Skip` — `§1.a-C2`, routes to the **same** `Finish()` lane). Mirrors the real
+  `FlashAsync` idiom **verbatim** — i.e. it takes **both** `ILocalizationService?`
+  **and** `ITranslationProvider?` (default-null) and guards `FlashAsync` on both
+  being non-null. **Deviation from the plan snippet (corrected against the
+  codebase):** the unit-plan snippet passed `null` for the `ILocalizationService`
+  to `EffectiveLanguageCode.ResolveAsync` — but the real `ResolveAsync` requires
+  a non-null `ILocalizationService` (it dereferences it), so I followed the
+  real `LocaleController.FlashAsync` / `ProfileController.FlashAsync` shape (both
+  seams optional, both checked). The flash key is still `onboarding.flash_done`
+  (U03 authors it).
+- `src/Kumunita.Web/Models/OnboardingViewModel.cs` — the D4/D5 read-only model
+  per design doc §7: `OnboardingCompletedAt` (the completion read) + derived
+  `BannerEligible` (`=> OnboardingCompletedAt is null`) + the per-step hints
+  `HasDisplayName`/`HasAvatar`/`HasTimezone`/`HasDateFormat`/`HasEmailLanguage`
+  + `UiLanguageCode` (the `LocaleCookie.Read` string — a cookie, not a
+  `Profile` field, the thin-token rule). All `{ get; init; }` — no setter, no
+  write, no `Can`/`Decide`/`AccessVia`.
+
+**Controller routes (locked):** `GET /onboarding` · `POST /onboarding/finish` ·
+`POST /onboarding/skip`. The only write the walk-through performs is
+`CompleteOnboardingAsync` (D3/C-M22·4) — it **calls** U01's lane, it never
+writes `Profile` itself, and it calls **no** other field-write lane.
+
+**Test added:** `tests/Kumunita.Web.Tests/OnboardingControllerTests.cs` — 5
+facts pinning GATE-3/GATE-4/GATE-5: `Index` not-completed → `BannerEligible`
+`true` + `CompletedAt` null (GATE-5) · `Index` completed → `BannerEligible`
+`false` + all hints `true` + the `UiLanguageCode` cookie read (GATE-5) ·
+`Finish` calls `CompleteOnboardingAsync` exactly once for the signed-in subject
++ **no** other field-write lane (NSubstitute `DidNotReceive` on the five frozen
+lanes) + redirect to home + a flash written (GATE-3/C-M22·4) · `Skip` routes to
+the same single lane (GATE-3/§1.a-C2) · the controller injects **no**
+`IAuthorizationService` and the view model exposes no `Can*`/`Decide*`/
+`AccessVia` member (GATE-4/C-M22·2). (The test project uses **NSubstitute**, not
+the `Mock<>` prose the unit plan suggested — matched the real idiom.)
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` clean; `dotnet exec
+…\Kumunita.Web.Tests.dll` **760 passed, 0 failed, 0 skipped** (the 5 new facts
++ the pre-existing suite). No drift: zero new authorization surface, zero new
+field-write lane, zero `AccessAudit` write, zero claim read. The `onboarding.*`
+`kw-l` keys are **not** authored here — U03 owns them (U02 consumes).
+
+**U03 next —** read the design doc **§8** + ADR 0132 **§Decision** (D7). Own the
+`Views/Onboarding/*` + the home/nav **banner** (gated on
+`OnboardingViewModel.BannerEligible`) + **author the full closed
+`onboarding.*` key set × en/de/fr/da** (the 15 keys, §8) in
+`KnownTranslationKeys`. U03 consumes the `OnboardingViewModel` + the
+`OnboardingController` routes U02 shipped. Exit on `Kumunita.Web.Tests`.
+
 **Test added:** `tests/Kumunita.Core.Tests/UserInfo/OnboardingCompletionLaneTests.cs`
 — 4 facts pinning GATE-1/GATE-2/C-M22·3: fresh profile reads `null` (both
 seams) · complete-then-read returns the stamp (strong consistency C4, and the
