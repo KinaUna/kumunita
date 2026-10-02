@@ -25,7 +25,8 @@ notification quiet times (per-resident quiet schedules on the M6 notification
 lane + the admin-set check cadence for pending notifications; ADR 0121). **M21 is done** —
 document management (a shared repository for official documents, contracts, etc., with per-document access controls; ADR 0122).
 **M23 is done** — extended user profiles (a biography + free author-set tags for skills, interests, knowledge, and expertise, to make it easier to find people with something in common; ADR 0123).
-**M22 is in progress** — onboarding (a guided walk-through that walks a new user through account setup)
+**M22 is done** — onboarding (a guided walk-through that walks a new user through account setup; ADR 0132).
+**M24 is next** — storage metrics (an admin view of storage: total used space, available space, user-content used space, and space used per user)
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -263,8 +264,8 @@ stays trivial and the authorization rules can grow freely.
 - **M21** — Document management: a shared repository for official documents, contracts, and similar community-owned files, with per-document access controls. **Done.** (ADR 0122)
 - **Document edit lane** (`DOC-EDIT`, ADR 0125) — the **owner-only** edit-by-replacement half of M21's D9·7 (the uploader, `full stop` — a non-owner GlobalAdmin/Moderator is **denied**, the ADR 0014/0016 author-only precedent; non-owner → **404, not 403** — the ADR 0122 D7 "no existence leak" posture): re-choose **who can access it** (the `Audience`, written verbatim via the M2 single deserialization site, prefilled via `FromAudience`) and/or **replace the file** (optional — a blank file keeps the stored blob, a present file stores **first** through the frozen ADR 0011 `IMediaStore` with the same guards-before-write, orphan-safe); `Title` / `Summary` editable alongside (a label, never a gate); `Id` / `OwnerId` / `Created` **immutable**, `Modified` stamped; **one write, no `AccessAudit` row** (the write-lane convention, ADR 0122 A2); **zero new authorization surface** (rides the frozen `Read` path's owner branch through the unchanged `DocumentToAuditableResource` adapter). The **author soft-delete** half of D9·7 remains deferred (a future ADR). **Done.**
 - **M23** — Extended user profiles: a resident biography + free author-set tags (skills, interests, knowledge, and expertise) to make it easier to find people with something in common. **Done** (ADR 0123).
-- **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **In progress.**
-- **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Planned.**
+- **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **Done** (ADR 0132).
+- **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **In progress.**
 - **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Planned.**
 - **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Planned.**
 - **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Planned.**

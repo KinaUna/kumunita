@@ -43,6 +43,7 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M20** notification quiet times | **shared awareness** — the notification system respects the resident's attention rhythm; the "deferred" state is a first-class concept in the notification lifecycle (ADR 0121) |
   | **M21** document management | **outcome + world seams** — the neighborhood's official documents live in the platform with per-document access controls; a shared repository closes the loop into the residents' paperwork (ADR 0122) |
   | **M23** extended profiles | **shared awareness → understanding** — the directory is not just a list of names but a discoverable index of people by skill, interest, and expertise; the bio + tag fields are the integration points between the profile and the post/reply/tag surfaces (ADR 0123) |
+  | **M22** onboarding | **shared awareness** — a new resident is walked through the account-setup surface that already exists (display name, avatar, UI language, time zone, date format, contact) and the banner clears once they finish; a guided shell over the frozen owner-scope lanes + one additive completion field, not a new data surface (ADR 0132) |
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 

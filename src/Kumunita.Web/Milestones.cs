@@ -60,10 +60,10 @@ public static class Milestones
         new("M19", "Guest accounts — limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, etc.; admins set what a guest may access and when", StatusDone),
         new("M20", "Notification quiet times — per-resident quiet schedules (allowed/blocked hours of day and days of week) on the M6 notification lane; admin-set check cadence for pending notifications", StatusDone),
         new("M21", "Document management — a shared repository for official documents, contracts, etc., with per-document access controls", StatusDone),
-        // M23 ships before M22: M23 (extended profiles) was pulled forward and completed while M22 (onboarding) remained StatusPlanned/deferred; the order M20, M21, M23, M22 is pinned by MilestonesTests.cs — do not reorder.
+        // M23 shipped before M22: M23 (extended profiles) was pulled forward and completed while M22 (onboarding) remained planned; M22 (onboarding) has now shipped. The order M20, M21, M23, M22, M24 is pinned by MilestonesTests.cs — do not reorder (the "named lane, not a renumber" precedent).
         new("M23", "Extended user profiles — a biography + free author-set tags (skills, interests, knowledge, expertise) to make it easier to find people with something in common", StatusDone),
-        new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusNext),
-        new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusPlanned),
+        new("M22", "Onboarding — a guided walk-through that walks a new user through account setup (ADR 0132)", StatusDone),
+        new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusNext),
         new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusPlanned),
         new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order (the M7 sibling that pagination & filtering shipped without)", StatusPlanned),
         new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusPlanned),
