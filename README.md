@@ -266,6 +266,8 @@ stays trivial and the authorization rules can grow freely.
 - **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **In progress.**
 - **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Planned.**
 - **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Planned.**
+- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Planned.**
+- **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Planned.**
 
 ## Deferred (future, by design)
 

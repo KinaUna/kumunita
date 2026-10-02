@@ -65,6 +65,8 @@ public static class Milestones
         new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusNext),
         new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusPlanned),
         new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusPlanned),
+        new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order (the M7 sibling that pagination & filtering shipped without)", StatusPlanned),
+        new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch
