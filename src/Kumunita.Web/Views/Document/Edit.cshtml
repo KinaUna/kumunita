@@ -1,0 +1,178 @@
+@model DocumentEditViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Web.Models
+@using Kumunita.Core.Authorization
+@inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@{
+    ViewData["Title"] = "Edit a document";
+    string[] modes = { "Any", "All" };
+    // ADR 0125 (U03) — the owner-only edit form. The audience editor is
+    // pre-filled from the stored Document.Audience (ADR 0036 single source,
+    // AudienceEditorModel.FromAudience — the controller did that on GET); the
+    // title/summary are prefilled; the file is OPTIONAL (a null/empty file
+    // keeps the stored blob — D3). The POST re-render (audience-invalid)
+    // re-binds this same view with the bound form, so read through Model?.
+    var editor = Model?.Audience
+        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty };
+    // The form action needs the route id. The controller sets DocumentId on both
+    // render paths (GET edit form: DocumentId = id; POST re-render:
+    // form.DocumentId = id) — so it is always present here.
+    var docId = Model?.DocumentId ?? string.Empty;
+
+    // Seed the shared "Who to grant to" option lists (the M2 / M3 / M4
+    // composer idiom — the same candidate source the New form uses).
+    var profiles = await UserInfo.GetProfilesAsync(verifiedOnly: true);
+    var selfId = User is not null ? KumunitaPrincipal.SubjectId(User) : null;
+    ViewData["Audience_Users"] = profiles
+        .Where(p => !p.Blocked)
+        .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
+        .Select(p => new GrantOption
+        {
+            Id    = p.SubjectId,
+            Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+            Kind  = "User",
+        })
+        .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    // ADR 0010: the audience = public groups only (a private group is an
+    // organizing unit, never granted as an audience).
+    var groups = await UserInfo.GetPublicGroupsAsync();
+    ViewData["Audience_Groups"] = groups
+        .Select(g => new GrantOption
+        {
+            Id    = g.Id,
+            Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+            Kind  = "Group",
+        })
+        .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="documents.edit_title">Edit a document</kw-l></h1>
+
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" action="@($"/documents/{docId}/edit")" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="title" style="font-weight:600;">
+                        <kw-l key="common.title">Title</kw-l>
+                    </label>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="200" value="@Model?.Title" required />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="summary" style="font-weight:600;">
+                        <kw-l key="documents.edit_summary">One-line description (optional)</kw-l>
+                    </label>
+                    <input class="form-control" type="text" id="summary" name="Summary"
+                           maxlength="280" value="@Model?.Summary" />
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="file" style="font-weight:600;">
+                        <kw-l key="documents.edit_file">Replace the file (optional)</kw-l>
+                    </label>
+                    <div class="text-muted small mb-2">
+                        <kw-l key="documents.edit_file_hint">Leave blank to keep the current file.</kw-l>
+                    </div>
+                    <input class="form-control" type="file" id="file" name="File" />
+                </div>
+            </div>
+
+            <div class="card mb-4 audience-editor">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;">
+                        <kw-l key="documents.edit_audience">Who can see this document</kw-l>
+                    </h6>
+
+                    @* ADR 0057 — "Everyone on the platform" (the AllResidents
+                       flag) is rendered FIRST, above the granular block, exactly
+                       like the New form: when checked, the "Match mode" radios +
+                       "Who to grant to" picker are hidden via data-audience-toggle
+                       + client/lib/audience-toggle.js (loaded in _Layout). The
+                       AllResidents branch grants every signed-in resident BEFORE
+                       the grant-match branch. *@
+                    <div class="form-check" style="margin-left:0.5rem;">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.AllResidentsVisible"
+                               id="doc-aud-all-residents"
+                               data-audience-toggle
+                               value="true" @(editor.AllResidentsVisible ? "checked" : null) />
+                        <label class="form-check-label" for="doc-aud-all-residents">
+                            <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
+                        </label>
+                    </div>
+                    <div class="text-muted small" style="margin-left:1rem; margin-bottom:0.75rem;">
+                        <kw-l key="profile.audience_all_residents_hint">New residents can see this automatically — no need to re-edit when someone joins.</kw-l>
+                    </div>
+
+                    <div data-audience-panel class="audience-restricted @(editor.AllResidentsVisible ? "d-none" : null)">
+                    <div class="form-label mt-2" style="font-weight:600;">
+                        <kw-l key="profile.audience_match_mode">Match mode</kw-l>
+                    </div>
+                    @foreach (var m in modes)
+                    {
+                        var checkedMark = string.Equals(editor.Mode, m, StringComparison.OrdinalIgnoreCase)
+                            ? "checked"
+                            : null;
+                        <div class="form-check" style="margin-left:0.5rem;">
+                            <input class="form-check-input" type="radio"
+                                   name="Audience.Mode" id="@($"doc-aud-mode-{m}")"
+                                   value="@m" @checkedMark required />
+                            <label class="form-check-label" for="@($"doc-aud-mode-{m}")">
+                                @if (m == "Any")
+                                {
+                                    <kw-l key="profile.audience_mode_any_word">Any</kw-l>
+                                    <text> — <kw-l key="profile.audience_mode_any">a person is allowed if they meet any of the people/groups you picked</kw-l></text>
+                                }
+                                else
+                                {
+                                    <kw-l key="profile.audience_mode_all_word">All</kw-l>
+                                    <text> — <kw-l key="profile.audience_mode_all">a person is allowed only if they meet all of the people/groups you picked</kw-l></text>
+                                }
+                            </label>
+                        </div>
+                    }
+
+                    <partial name="_GrantPickers" model="@(new GrantPickersModel
+                    {
+                        EditorName = "Audience",
+                        Editor     = editor,
+                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                    })" />
+                    </div><!-- /data-audience-panel -->
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="documents.edit.submit">Save changes</kw-l></button>
+                <a href="@($"/documents/{docId}")" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>

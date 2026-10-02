@@ -1881,6 +1881,17 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "File type / size",
             ["documents.detail.updated"]    = "Last updated",
             ["documents.flash_uploaded"]    = "Document uploaded.",
+            // ADR 0125 (U03) — the owner-only edit lane (D1 standing, D2 title/
+            // summary, D3 file-replace, D4 audit-by-owner). The /documents/{id}
+            // /edit form (GET + POST); the detail's "Edit" affordance.
+            ["documents.edit"]              = "Edit",
+            ["documents.edit_title"]        = "Edit a document",
+            ["documents.edit_summary"]      = "One-line description (optional)",
+            ["documents.edit_file"]         = "Replace the file (optional)",
+            ["documents.edit_file_hint"]    = "Leave blank to keep the current file.",
+            ["documents.edit_audience"]     = "Who can see this document",
+            ["documents.edit.submit"]       = "Save changes",
+            ["documents.flash_edited"]      = "Document updated.",
         };
 
     /// <summary>
@@ -3599,6 +3610,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Dateitype / Größe",
             ["documents.detail.updated"]    = "Zuletzt aktualisiert",
             ["documents.flash_uploaded"]    = "Dokument hochgeladen.",
+            // ADR 0125 (U03) — die nur-für-den-Inhaber-Bearbeitungslane.
+            ["documents.edit"]              = "Bearbeiten",
+            ["documents.edit_title"]        = "Dokument bearbeiten",
+            ["documents.edit_summary"]      = "Einzeilige Beschreibung (optional)",
+            ["documents.edit_file"]         = "Datei ersetzen (optional)",
+            ["documents.edit_file_hint"]    = "Leer lassen, um die aktuelle Datei zu behalten.",
+            ["documents.edit_audience"]     = "Wer darf dieses Dokument sehen",
+            ["documents.edit.submit"]       = "Änderungen speichern",
+            ["documents.flash_edited"]      = "Dokument aktualisiert.",
         };
 
     /// <summary>
@@ -5320,6 +5340,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Type / taille du fichier",
             ["documents.detail.updated"]    = "Dernière mise à jour",
             ["documents.flash_uploaded"]    = "Document téléversé.",
+            // ADR 0125 (U03) — la lane d'édition réservée au propriétaire.
+            ["documents.edit"]              = "Modifier",
+            ["documents.edit_title"]        = "Modifier un document",
+            ["documents.edit_summary"]      = "Description en une ligne (facultatif)",
+            ["documents.edit_file"]         = "Remplacer le fichier (facultatif)",
+            ["documents.edit_file_hint"]    = "Laisser vide pour conserver le fichier actuel.",
+            ["documents.edit_audience"]     = "Qui peut voir ce document",
+            ["documents.edit.submit"]       = "Enregistrer les modifications",
+            ["documents.flash_edited"]      = "Document mis à jour.",
         };
 
     /// <summary>
@@ -7031,6 +7060,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Filtype / størrelse",
             ["documents.detail.updated"]    = "Senest opdateret",
             ["documents.flash_uploaded"]    = "Dokument uploadet.",
+            // ADR 0125 (U03) — ejeren-kan-ændre-lanen.
+            ["documents.edit"]              = "Rediger",
+            ["documents.edit_title"]        = "Rediger et dokument",
+            ["documents.edit_summary"]      = "En-linjes beskrivelse (valgfri)",
+            ["documents.edit_file"]         = "Erstat filen (valgfri)",
+            ["documents.edit_file_hint"]    = "Lad være tom for at beholde den nuværende fil.",
+            ["documents.edit_audience"]     = "Hvem kan se dette dokument",
+            ["documents.edit.submit"]       = "Gem ændringer",
+            ["documents.flash_edited"]      = "Dokument opdateret.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

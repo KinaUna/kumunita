@@ -268,6 +268,147 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Empty(await DocumentAudits(store, actor: actor));
     }
 
+    // ── 5 — ADR 0125 — the owner-only edit lane (UpdateAsync) ──────────────
+    //
+    // The owner (the uploader — Document.OwnerId) may edit: re-choose who can
+    // access it (the audience, verbatim — C-M21·1) and replace the file (D3).
+    // Ownership is immutable (OwnerId preserved, ADR 0014/0016/0017 precedent),
+    // Created is preserved, Modified is stamped. A non-owner (a hard gate at
+    // the Core level — the Web boundary 404s it) is an
+    // UnauthorizedAccessException. The write lane appends **no AccessAudit row**
+    // (§1.a A2 — the write is authenticated, not an audience-restricted read).
+
+    [Fact]
+    public async Task ADR0125_Update_Owner_AudienceAndFileReplaced_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner  = "u-u3-owner-edit";
+        const string other  = "u-u3-other-user";
+        const string docId  = "u-edit-owner-doc";
+
+        await Plant(store, new Document
+        {
+            Id = docId, Title = "Condo bylaws", Summary = "Original",
+            MediaId = "sha-media-orig", Filename = "bylaws.pdf",
+            ContentType = "application/pdf", SizeBytes = 42,
+            OwnerId = owner, Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, other),
+        });
+
+        var edit = new DocumentEdit(
+            Title: "Condo bylaws (rev 2)",
+            Summary: "Revised",
+            MediaId: "sha-media-new",
+            Filename: "bylaws-rev2.pdf",
+            ContentType: "application/pdf",
+            SizeBytes: 999,
+            Audience: Audience(GrantKind.User, owner),
+            FileReplaced: true);
+
+        var updated = await RunInSession(store, s => svc.UpdateAsync(docId, edit, owner, s));
+
+        Assert.Equal(docId, updated.Id);
+        // C-M21·1 — the new audience is stored verbatim (the owner granted it to self).
+        Assert.Equal(GrantsOf(edit.Audience), GrantsOf(updated.Audience));
+        // ADR 0125 D3 — the file surface is replaced (the new reference).
+        Assert.Equal("sha-media-new", updated.MediaId);
+        Assert.Equal("bylaws-rev2.pdf", updated.Filename);
+        Assert.Equal(999, updated.SizeBytes);
+        // ADR 0125 D2 — the title/summary are the owner's labels, updated.
+        Assert.Equal("Condo bylaws (rev 2)", updated.Title);
+        Assert.Equal("Revised", updated.Summary);
+        // Ownership is immutable — the owner is preserved, never reassigned.
+        Assert.Equal(owner, updated.OwnerId);
+        // ADR 0125 D4 — Modified is stamped (was null on the planted row).
+        Assert.NotNull(updated.Modified);
+
+        var loaded = await LoadDocumentAsync(store, docId);
+        Assert.NotNull(loaded);
+        Assert.Equal("sha-media-new", loaded!.MediaId);
+        Assert.Equal(owner, loaded.OwnerId);
+        Assert.NotNull(loaded.Modified);
+
+        // §1.a A2 — the write lane appends **no** audit row.
+        Assert.Empty(await DocumentAudits(store, actor: owner));
+    }
+
+    [Fact]
+    public async Task ADR0125_Update_Owner_NoFile_KeepsStoredBlob()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-u3-owner-no-replace";
+        const string docId = "u-edit-no-replace-doc";
+
+        await Plant(store, new Document
+        {
+            Id = docId, Title = "Charter",
+            MediaId = "sha-media-keep", Filename = "charter.pdf",
+            ContentType = "application/pdf", SizeBytes = 77,
+            OwnerId = owner, Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, owner),
+        });
+
+        // ADR 0125 D3 — FileReplaced = false: only the audience/title change;
+        // the byte surface (MediaId/Filename/ContentType/SizeBytes) is kept.
+        var edit = new DocumentEdit(
+            Title: "Charter (amended)",
+            Summary: null,
+            MediaId: "sha-media-keep", Filename: "charter.pdf",
+            ContentType: "application/pdf", SizeBytes: 77,
+            Audience: Audience(GrantKind.User, owner),
+            FileReplaced: false);
+
+        var updated = await RunInSession(store, s => svc.UpdateAsync(docId, edit, owner, s));
+
+        // The stored blob is kept (the MediaId is unchanged).
+        Assert.Equal("sha-media-keep", updated.MediaId);
+        Assert.Equal("charter.pdf", updated.Filename);
+        Assert.Equal(77, updated.SizeBytes);
+        Assert.NotNull(updated.Modified);
+        Assert.Empty(await DocumentAudits(store, actor: owner));
+    }
+
+    [Fact]
+    public async Task ADR0125_Update_NonOwner_Throws_NoWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner  = "u-u3-owner-nonowner";
+        const string other  = "u-u3-nonowner";
+        const string docId  = "u-edit-nonowner-doc";
+
+        await Plant(store, new Document
+        {
+            Id = docId, Title = "Restricted",
+            MediaId = "sha-media-nn", Filename = "restricted.pdf",
+            ContentType = "application/pdf", SizeBytes = 10,
+            OwnerId = owner, Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, other),
+        });
+
+        var edit = new DocumentEdit(
+            Title: "Hijacked",
+            Summary: null,
+            MediaId: "sha-media-nn", Filename: "restricted.pdf",
+            ContentType: "application/pdf", SizeBytes: 10,
+            Audience: Audience(GrantKind.User, other),
+            FileReplaced: false);
+
+        // ADR 0125 D1 — a non-owner is refused at the Core level (a hard gate):
+        // the Web boundary maps this to a 404 (the ADR 0122 D7 posture).
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, s => svc.UpdateAsync(docId, edit, other, s)));
+
+        // The row is unchanged (nothing was written before the gate fired).
+        var loaded = await LoadDocumentAsync(store, docId);
+        Assert.NotNull(loaded);
+        Assert.Equal("Restricted", loaded!.Title);
+        Assert.Equal("sha-media-nn", loaded.MediaId);
+        Assert.Null(loaded.Modified); // Modified was never stamped
+    }
+
     // ── Shared helpers (the PostServiceTests shape, re-pointed) ─────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

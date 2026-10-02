@@ -100,13 +100,163 @@ public sealed class DocumentController(
         var result = await documents.GetAsync(id, actorId);
         if (result.Document is null) return NotFound();
 
+        // ADR 0125 D1 — the owner (the uploader) may edit; a non-owner sees no
+        // affordance (the ADR 0122 D7 posture — the form's existence is not
+        // leaked; the edit route returns 404 for a non-owner, not a 403).
+        var isOwner = string.Equals(result.Document.OwnerId, actorId, StringComparison.Ordinal);
+
         var vm = new DocumentDetailViewModel(
             Document: result.Document,
             // The GetAsync decision allowed — the download re-runs the same Read
             // (C-M21·5). The view (U04) renders the download link only here.
             CanDownload: true,
-            DownloadUrl: $"/documents/{id}/download");
+            DownloadUrl: $"/documents/{id}/download",
+            // ADR 0125 — the owner-only edit affordance (U04).
+            CanEdit: isOwner,
+            EditUrl: $"/documents/{id}/edit");
         return View("Detail", vm);
+    }
+
+    // ── GET /documents/{id}/edit — the owner-only edit form (ADR 0125 D1) ───
+    //
+    // ADR 0125 (U03) — the owner (the uploader — Document.OwnerId) re-chooses
+    // who can access it (the audience — the sole access boundary, C-M21·1) and
+    // replaces the file (the ADR 0011 content-addressed blob — ADR 0122 D3,
+    // unchanged lane). Title/summary editable alongside (D2). File optional
+    // (D3): no file = keep the stored blob; a present file = the new reference.
+    // Ownership is immutable, Created is preserved, Modified is stamped (D4).
+    // The owner gate is owner-ONLY (a non-owner GlobalAdmin is denied — D1); a
+    // non-owner (including a non-owner GlobalAdmin) gets a 404 (not a 403 — the
+    // ADR 0122 D7 posture: the form's existence is not leaked). One write, no
+    // AccessAudit row (D6 — the read lane already audited the visibility).
+    [HttpGet("/documents/{id}/edit")]
+    [Authorize]
+    public async Task<IActionResult> Edit(string id)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest("A document id is required.");
+
+        // The Read path (audience) — the document must be visible to the actor;
+        // the owner branch always passes for the owner. A missing doc is null.
+        var result = await documents.GetAsync(id, subject).ConfigureAwait(false);
+        if (result.Document is null)
+            return NotFound();
+
+        // ADR 0125 D1 — owner gate: only the owner may open the form. A
+        // non-owner (including a non-owner GlobalAdmin) is a 404, not a 403 (the
+        // ADR 0122 D7 posture — the form's existence is not leaked).
+        if (!string.Equals(result.Document.OwnerId, subject, StringComparison.Ordinal))
+            return NotFound();
+
+        // ADR 0036 — the audience editor pre-fills from the stored audience (the
+        // single source of the editor shape); the grant pickers seed the
+        // audience members from the same IUserInfoService the M2 editor uses.
+        var doc = result.Document;
+        var vm = new DocumentEditViewModel
+        {
+            DocumentId = id,
+            Title = doc.Title,
+            Summary = doc.Summary,
+            Audience = AudienceEditorModel.FromAudience(doc.Audience)
+        };
+
+        return View("Edit", vm);
+    }
+
+    // ── POST /documents/{id}/edit — the owner-only edit write lane (ADR 0125) ──
+    [HttpPost("/documents/{id}/edit")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(string id, [FromForm] DocumentEditViewModel form)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null) return Unauthorized();
+        if (!IsValidDocId(id))
+            return BadRequest("A document id is required.");
+
+        // ADR 0125 D1 — owner gate (re-checked on the write; the owner branch of
+        // the Read path passes for the owner). A non-owner is a 404 (not a 403
+        // — the ADR 0122 D7 posture).
+        var result = await documents.GetAsync(id, subject).ConfigureAwait(false);
+        if (result.Document is null)
+            return NotFound();
+        if (!string.Equals(result.Document.OwnerId, subject, StringComparison.Ordinal))
+            return NotFound();
+
+        // A malformed audience is a form error, not a 404 (the M2 mode-required
+        // pin — the PostComposeViewModel / DocumentUpload precedents).
+        if (form.Audience is null || !form.Audience.IsValid)
+        {
+            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            form.DocumentId = id; // the form action needs the route id on re-render
+            return View("Edit", form);
+        }
+
+        if (string.IsNullOrWhiteSpace(form.Title))
+            return BadRequest("A title is required.");
+
+        // ADR 0125 D3 — the file is OPTIONAL on the edit lane: a present,
+        // non-empty file is the new reference; a null / zero-byte file keeps the
+        // stored blob. Store-first (C-M21·6) — the media write precedes the
+        // document write so the document's MediaId never dangles.
+        var doc = result.Document;
+        var mediaId = doc.MediaId;
+        var filename = doc.Filename;
+        var contentType = doc.ContentType;
+        var sizeBytes = doc.SizeBytes;
+        var fileReplaced = false;
+
+        if (form.File is not null && form.File.Length > 0)
+        {
+            if (mediaOpts.Value.MaxBytes > 0 && form.File.Length > mediaOpts.Value.MaxBytes)
+                return StatusCode(StatusCodes.Status413RequestEntityTooLarge);
+
+            if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
+                return StatusCode(StatusCodes.Status415UnsupportedMediaType);
+
+            using var stream = new MemoryStream();
+            await form.File.CopyToAsync(stream).ConfigureAwait(false);
+            var stored = await media.PutAsync(stream.ToArray(), form.File.FileName, form.File.ContentType, subject)
+                .ConfigureAwait(false);
+
+            mediaId = stored.Id;
+            filename = SanitizeFilename(form.File.FileName, stored.Id);
+            contentType = stored.ContentType;
+            sizeBytes = stored.SizeBytes;
+            fileReplaced = true;
+        }
+
+        var edit = new DocumentEdit(
+            Title: form.Title.Trim(),
+            Summary: string.IsNullOrWhiteSpace(form.Summary) ? null : form.Summary.Trim(),
+            MediaId: mediaId,
+            Filename: filename,
+            ContentType: contentType,
+            SizeBytes: sizeBytes,
+            Audience: form.Audience.BuildAudience(),
+            FileReplaced: fileReplaced);
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await documents.UpdateAsync(id, edit, subject, session).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Concurrent delete (the owner deleted the doc between GET and POST).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Defense in depth (the Core gate is authoritative; the owner gate
+            // above should have caught this first) — a 404, not a 403.
+            return NotFound();
+        }
+
+        TempData["info"] = await T("documents.flash_edited");
+        return Redirect($"/documents/{id}");
     }
 
     // ── GET /documents/new — the compose form (D5) ─────────────────────────

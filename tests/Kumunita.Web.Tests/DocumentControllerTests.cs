@@ -443,6 +443,242 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // Edit (ADR 0125 — the owner-only edit lane) — NSubstitute
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// ADR 0125 / D1 / D7 — <c>GET /documents/{id}/edit</c> for a
+    /// **non-owner** (including a non-owner GlobalAdmin) returns <b>404</b>
+    /// (not 403 — the form's existence is not leaked, the ADR 0122 D7 posture).
+    /// The Read path (audience) allows the actor to <em>see</em> the document,
+    /// but the owner gate (<c>OwnerId == actorId</c>) refuses the form; the
+    /// Core write lane is never reached.
+    /// </summary>
+    [Fact]
+    public async Task EditGet_NonOwner_Returns_404_Not_403()
+    {
+        const string other = "subj-m21-other";
+        var (controller, _, _, _, write, authz) = BuildEditController(subject: other);
+
+        var result = await controller.Edit(DocId);
+
+        Assert.IsType<NotFoundResult>(result); // 404, not 403 (D7 — no existence leak)
+        // The Read decision ran (the actor may see it); the owner gate refused.
+        await authz.Received(1).CanAsync(
+            other, AccessAction.Read, Arg.Any<IAuditableResource>());
+        // The Core write lane never loads (the owner gate is before any write).
+        write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 / D7 — <c>GET /documents/{id}/edit</c> for a **missing**
+    /// document returns 404 (the Read path loads null → the controller 404s
+    /// before the owner gate; no decision ran).
+    /// </summary>
+    [Fact]
+    public async Task EditGet_Missing_Returns_404()
+    {
+        var (controller, _, _, _, _, authz) = BuildEditController(missing: true);
+
+        var result = await controller.Edit(DocId);
+
+        Assert.IsType<NotFoundResult>(result);
+        await authz.DidNotReceiveWithAnyArgs().CanAsync(
+            Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
+    }
+
+    /// <summary>
+    /// ADR 0125 / D1 / D2 — <c>GET /documents/{id}/edit</c> for the
+    /// **owner** returns 200 + the <c>Edit</c> view, with the form pre-filled
+    /// from the stored document (the title <c>Bylaws</c>, the audience via
+    /// <see cref="AudienceEditorModel.FromAudience"/> — the ADR 0036 single
+    /// source). The single <see cref="IAuthorizationService.CanAsync"/> Read
+    /// decision ran (one decision row, by the seam).
+    /// </summary>
+    [Fact]
+    public async Task EditGet_Owner_Returns_200_Prefilled()
+    {
+        var (controller, _, _, _, _, authz) = BuildEditController();
+
+        var result = await controller.Edit(DocId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<DocumentEditViewModel>(view.ViewData.Model);
+        Assert.Equal(DocId, vm.DocumentId);
+        Assert.Equal("Bylaws", vm.Title);
+        Assert.NotNull(vm.Audience);
+        Assert.True(vm.Audience.IsValid, "The stored audience pre-fills a valid editor (ADR 0036).");
+        await authz.Received(1).CanAsync(
+            Actor, AccessAction.Read, Arg.Any<IAuditableResource>());
+    }
+
+    /// <summary>
+    /// ADR 0125 / D1 / D7 — <c>POST /documents/{id}/edit</c> for a
+    /// **non-owner** returns <b>404</b> (the owner gate is re-checked on the
+    /// write, before any guard or write). The <see cref="IMediaStore
+    /// .PutAsync"/> is **never** called and the Core write lane never loads.
+    /// </summary>
+    [Fact]
+    public async Task EditPost_NonOwner_Returns_404_Not_403()
+    {
+        const string other = "subj-m21-other";
+        var (controller, media, _, _, write, authz) = BuildEditController(subject: other);
+
+        var form = ValidEditForm(TestFile("revised.pdf", "application/pdf", Pdf));
+        var result = await controller.Edit(DocId, form);
+
+        Assert.IsType<NotFoundResult>(result); // 404, not 403 (D7)
+        await authz.Received(1).CanAsync(
+            other, AccessAction.Read, Arg.Any<IAuditableResource>());
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 / D3 — <c>POST /documents/{id}/edit</c> for the owner with
+    /// **no file** (a <c>null</c> <c>IFormFile</c>) is a **no-op on the byte
+    /// surface**: the stored blob is kept (the document's
+    /// <c>MediaId</c>/<c>ContentType</c> are unchanged), the
+    /// <see cref="IMediaStore.PutAsync"/> is **never** called, and the
+    /// <see cref="DocumentService.UpdateAsync"/> write stamps <c>Modified</c>
+    /// with one <c>Document</c> store + <c>SaveChangesAsync</c> and **no
+    /// <c>AccessAudit</c> row** (the write lane is authenticated, not a read —
+    /// ADR 0122 §1.a A2). The controller redirects to the detail + sets the
+    /// flash (<c>documents.flash_edited</c>).
+    /// </summary>
+    [Fact]
+    public async Task EditPost_Owner_NoFile_KeepsBlob_Redirects_NoPut()
+    {
+        var (controller, media, _, _, write, _) = BuildEditController();
+
+        var form = ValidEditForm(file: null); // no replacement file
+        var result = await controller.Edit(DocId, form);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.StartsWith("/documents/", redirect.Url, StringComparison.Ordinal);
+        Assert.Equal("documents.flash_edited", controller.TempData["info"]);
+
+        // D3: the stored blob is kept (no new media write) — the document's
+        // MediaId is unchanged in the written row.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        write.Received(1).Store(Arg.Is<Document>(d => d.MediaId == MediaId && d.OwnerId == Actor));
+        await write.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        // A2: no AccessAudit row (the write lane is authenticated, not a read).
+        write.DidNotReceive().Store(Arg.Is<AccessAudit>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 / D3 — <c>POST /documents/{id}/edit</c> for the owner with a
+    /// **valid** replacement file: the guards pass, one
+    /// <see cref="IMediaStore.PutAsync"/> write (store-first, orphan-safe —
+    /// D3/C-M21·6), then the <see cref="DocumentService.UpdateAsync"/> write
+    /// stores the document with the **new** <c>MediaId</c> (the blob reference
+    /// is replaced). No <c>AccessAudit</c> row (A2).
+    /// </summary>
+    [Fact]
+    public async Task EditPost_Owner_ValidFile_StoresNewMedia_Redirects()
+    {
+        var (controller, media, _, _, write, _) = BuildEditController();
+
+        var stored = new MediaObject
+        {
+            Id = MediaId, ContentType = "application/pdf",
+            SizeBytes = Pdf.Length, CreatedById = Actor,
+        };
+        media.PutAsync(
+            Arg.Is<byte[]>(b => b.SequenceEqual(Pdf)), "revised.pdf", "application/pdf", Actor,
+            Arg.Any<CancellationToken>())
+            .Returns(stored);
+
+        var form = ValidEditForm(TestFile("revised.pdf", "application/pdf", Pdf));
+        var result = await controller.Edit(DocId, form);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.StartsWith("/documents/", redirect.Url, StringComparison.Ordinal);
+        Assert.Equal("documents.flash_edited", controller.TempData["info"]);
+
+        // Exactly one media write (store-first, D3):
+        await media.Received(1).PutAsync(
+            Arg.Is<byte[]>(b => b.SequenceEqual(Pdf)), "revised.pdf", "application/pdf", Actor,
+            Arg.Any<CancellationToken>());
+        // The document's MediaId is now the replaced reference (D3 — the blob
+        // surface changed):
+        write.Received(1).Store(Arg.Is<Document>(d => d.MediaId == MediaId && d.OwnerId == Actor));
+        await write.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        write.DidNotReceive().Store(Arg.Is<AccessAudit>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 / D3 / C-M21·7 — <c>POST /documents/{id}/edit</c> with a
+    /// present **oversize** replacement file (over
+    /// <see cref="MediaOptions.MaxBytes"/>) → 413, and <em>no file
+    /// written</em>: the guard fires before <c>PutAsync</c>. The owner gate
+    /// passes first (a non-owner would have 404'd earlier).
+    /// </summary>
+    [Fact]
+    public async Task EditPost_Owner_OversizeFile_413_NoPut()
+    {
+        var (controller, media, _, _, write, _) = BuildEditController(maxBytes: 16);
+
+        var result = await controller.Edit(DocId, ValidEditForm(TestFile("big.pdf", "application/pdf", new byte[32])));
+
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 / D3 / C-M21·7 — <c>POST /documents/{id}/edit</c> with a
+    /// present **disallowed** replacement file (an <c>image/svg+xml</c> —
+    /// outside the closed document allowlist) → 415, and <em>no file
+    /// written</em>: the guard fires before <c>PutAsync</c>.
+    /// </summary>
+    [Fact]
+    public async Task EditPost_Owner_WrongTypeFile_415_NoPut()
+    {
+        var (controller, media, _, _, write, _) = BuildEditController();
+
+        var result = await controller.Edit(DocId, ValidEditForm(TestFile("logo.svg", "image/svg+xml", Pdf)));
+
+        Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(result).StatusCode);
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    /// <summary>
+    /// ADR 0125 — <c>POST /documents/{id}/edit</c> with a **malformed
+    /// audience** (a mode of <c>null</c> — <see
+    /// cref="AudienceEditorModel.IsValid"/> false) is a <b>form error</b>
+    /// (re-render of the <c>Edit</c> view with the bound form + a
+    /// <c>Audience.Mode</c> error), not a 404 — the M2 mode-required pin. The
+    /// owner gate passes first; the guard fires before any media write or the
+    /// Core write lane.
+    /// </summary>
+    [Fact]
+    public async Task EditPost_Owner_MalformedAudience_Renders_ErrorView()
+    {
+        var (controller, media, _, _, write, _) = BuildEditController();
+
+        var form = ValidEditForm(file: null);
+        form.Audience = new AudienceEditorModel { Mode = null, Grants = "[]" };
+        var result = await controller.Edit(DocId, form);
+
+        // A form error re-renders the view (not a 404).
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Edit", view.ViewName);
+        Assert.Same(form, view.ViewData.Model);
+        Assert.NotEmpty(controller.ModelState["Audience.Mode"]!.Errors);
+        // No media write, no Core write (the guard fires before either).
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        write.DidNotReceive().Store(Arg.Is<Document>(_ => true));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // fixtures
     // ══════════════════════════════════════════════════════════════════════
 
@@ -462,6 +698,76 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
             File = file,
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
         };
+
+    /// <summary>
+    /// A well-formed <see cref="DocumentEditViewModel"/> for the edit tests:
+    /// a non-blank title + a valid <see cref="AudienceEditorModel"/> (Mode
+    /// "Any", empty grants — <see cref="AudienceEditorModel.IsValid"/> true) +
+    /// the optional replacement file (null = keep the stored blob, ADR 0125 D3).
+    /// </summary>
+    private static DocumentEditViewModel ValidEditForm(IFormFile? file, string title = "Bylaws") =>
+        new()
+        {
+            DocumentId = DocId,
+            Title = title,
+            Summary = null,
+            File = file,
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+
+    /// <summary>
+    /// Builds a <see cref="DocumentController"/> for the **edit** lane (ADR
+    /// 0125): the Read path (<c>GetAsync</c> → <c>store.QuerySession()
+    /// .LoadAsync&lt;Document&gt;</c>, stubbed present/missing) + one
+    /// <see cref="IAuthorizationService.CanAsync"/> decision (Allow) for the
+    /// actor's <paramref name="subject"/> (the owner unless overridden) + one
+    /// <see cref="IMediaStore.PutAsync"/> (the replacement-file write) + one
+    /// <see cref="DocumentService.UpdateAsync"/> write in the caller's
+    /// <see cref="IDocumentSession"/> (the real service's
+    /// <c>session.LoadAsync</c> + <c>Store</c> + <c>SaveChangesAsync</c> —
+    /// stubbed present so the owner gate passes). Pure NSubstitute.
+    /// <para>
+    /// Returns <c>(controller, media, store, readSession, writeSession,
+    /// authz)</c>. The owner gate (the Core <c>UpdateAsync</c>) re-checks
+    /// <c>OwnerId == actorId</c>, so the principal's subject must match the
+    /// stored <c>OwnerId</c> (= <see cref="Actor"/>) for the happy path — pass
+    /// <paramref name="subject"/> = another id to exercise the non-owner 404.
+    /// </para>
+    /// </summary>
+    private static (DocumentController Controller, IMediaStore Media, IDocumentStore Store,
+        IQuerySession Read, IDocumentSession Write, IAuthorizationService Authz) BuildEditController(
+        bool missing = false, long maxBytes = 0, string subject = Actor)
+    {
+        var doc = MakeDoc();
+
+        var store = Substitute.For<IDocumentStore>();
+        var read = Substitute.For<IQuerySession>();
+        read.LoadAsync<Document>(DocId)
+            .Returns(Task.FromResult<Document?>(missing ? null : doc));
+        store.QuerySession().Returns(read);
+
+        var write = Substitute.For<IDocumentSession>();
+        write.LoadAsync<Document>(DocId).Returns(doc); // the owner gate sees the stored row
+        store.LightweightSession().Returns(write);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        if (!missing)
+        {
+            authz.CanAsync(subject, AccessAction.Read, Arg.Any<IAuditableResource>())
+                .Returns(Task.FromResult(new Decision(true, AccessVia.Owner, subject)));
+        }
+
+        var media = Substitute.For<IMediaStore>();
+        var httpContext = PrincipalHttpContext(new[] { "GlobalAdmin" }, subject);
+        var controller = new DocumentController(
+            new DocumentService(Substitute.For<IUserInfoService>(), authz, store),
+            media, Options.Create(new MediaOptions { MaxBytes = maxBytes }), store);
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        // The happy path sets TempData["info"] (the flash key) — close the bag
+        // with a no-op provider (the AdminDateFormatControllerTests idiom).
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+        return (controller, media, store, read, write, authz);
+    }
 
     /// <summary>
     /// Boots a real Marten <see cref="IDocumentStore"/> over a fresh scratch
@@ -651,9 +957,9 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     /// given <see cref="ClaimTypes.Role"/> claims (the D5 standing the
     /// <see cref="KumunitaPrincipal"/> helpers read).
     /// </summary>
-    private static DefaultHttpContext PrincipalHttpContext(string[] roles)
+    private static DefaultHttpContext PrincipalHttpContext(string[] roles, string subject = Actor)
     {
-        var claims = new List<Claim> { new(Kumunita.Core.Identity.ClaimTypes.Subject, Actor) };
+        var claims = new List<Claim> { new(Kumunita.Core.Identity.ClaimTypes.Subject, subject) };
         claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(

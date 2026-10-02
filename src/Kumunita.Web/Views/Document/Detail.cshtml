@@ -55,12 +55,24 @@
             </div>
         </div>
 
-        @if (Model.CanDownload)
+        @if (Model.CanDownload || Model.CanEdit)
         {
             <div class="d-flex gap-2">
-                <a class="btn btn-primary" href="@(Model.DownloadUrl)">
-                    <kw-l key="documents.download">Download</kw-l>
-                </a>
+                @if (Model.CanDownload)
+                {
+                    <a class="btn btn-primary" href="@(Model.DownloadUrl)">
+                        <kw-l key="documents.download">Download</kw-l>
+                    </a>
+                }
+                @* ADR 0125 (U03) — the owner-only edit affordance. Rendered only
+                   when the actor is the document's owner (CanEdit — D1); a
+                   non-owner never sees it (the ADR 0122 D7 posture). *@
+                @if (Model.CanEdit)
+                {
+                    <a class="btn btn-outline-secondary" href="@(Model.EditUrl)">
+                        <kw-l key="documents.edit">Edit</kw-l>
+                    </a>
+                }
             </div>
         }
     </div>
