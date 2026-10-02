@@ -1893,6 +1893,28 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Who can see this document",
             ["documents.edit.submit"]       = "Save changes",
             ["documents.flash_edited"]      = "Document updated.",
+
+            // ── M22 (ADR 0132) — onboarding: the /onboarding guided
+            // walk-through (D4) + the dismissible home/nav banner (D5) + the
+            // finish/skip flash (D2/D4). U03 authors the COMPLETE closed set;
+            // U02/U03 consume. The parity pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Set up your account",
+            ["onboarding.intro"]            = "A quick guided tour of the few things that make Kumunita work for you. Everything links into the setting that already owns it — you can finish in a minute or come back any time.",
+            ["onboarding.step_displayname"] = "Your display name",
+            ["onboarding.step_avatar"]      = "Your avatar",
+            ["onboarding.step_language"]    = "Your interface language",
+            ["onboarding.step_timezone"]    = "Your time zone",
+            ["onboarding.step_dateformat"]  = "Your date & time format",
+            ["onboarding.step_email"]       = "Your email & notification language",
+            ["onboarding.step_contact"]     = "Your contact details & who can see them",
+            ["onboarding.visit"]            = "Go to this setting",
+            ["onboarding.finish"]           = "I'm all set — finish setup",
+            ["onboarding.skip"]             = "Skip for now",
+            ["onboarding.flash_done"]       = "Setup complete — welcome to your neighborhood.",
+            ["onboarding.banner.text"]      = "Finish setting up your account?",
+            ["onboarding.banner.action"]    = "Start setup",
         };
 
     /// <summary>
@@ -3621,6 +3643,27 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Wer darf dieses Dokument sehen",
             ["documents.edit.submit"]       = "Änderungen speichern",
             ["documents.flash_edited"]      = "Dokument aktualisiert.",
+
+            // ── M22 (ADR 0132) — Onboarding: die /onboarding-Führung (D4) +
+            // die schließbare Home-/Nav-Anzeige (D5) + der Finish/Skip-Flash
+            // (D2/D4). U03 erstellt den VOLLSTÄNDIGEN geschlossenen Satz;
+            // U02/U03 nutzen ihn. Die Paritäts-Sicherung verlangt jeden
+            // Schlüssel in allen vier Sprachen, nicht leer (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Dein Konto einrichten",
+            ["onboarding.intro"]            = "Ein kurzer geführter Rundgang durch die wenigen Dinge, die Kumunita für dich zum Laufen bringen. Alles führt in die Einstellung, die es bereits besitzt — du schließt in einer Minute ab oder kommst jederzeit wieder.",
+            ["onboarding.step_displayname"] = "Dein Anzeigename",
+            ["onboarding.step_avatar"]      = "Dein Avatar",
+            ["onboarding.step_language"]    = "Deine Schnittstellensprache",
+            ["onboarding.step_timezone"]    = "Deine Zeitzone",
+            ["onboarding.step_dateformat"]  = "Dein Datums- und Zeitformat",
+            ["onboarding.step_email"]       = "Deine E-Mail- und Benachrichtigungssprache",
+            ["onboarding.step_contact"]     = "Deine Kontaktdaten & wer sie sehen kann",
+            ["onboarding.visit"]            = "Zu dieser Einstellung",
+            ["onboarding.finish"]           = "Alles klar — Einrichtung abschließen",
+            ["onboarding.skip"]             = "Jetzt überspringen",
+            ["onboarding.flash_done"]       = "Einrichtung abgeschlossen — willkommen in deiner Nachbarschaft.",
+            ["onboarding.banner.text"]      = "Dein Konto fertig einrichten?",
+            ["onboarding.banner.action"]    = "Einrichtung starten",
         };
 
     /// <summary>
@@ -5352,6 +5395,27 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Qui peut voir ce document",
             ["documents.edit.submit"]       = "Enregistrer les modifications",
             ["documents.flash_edited"]      = "Document mis à jour.",
+
+            // ── M22 (ADR 0132) — onboarding : le parcours guidé /onboarding
+            // (D4) + le bandeau fermable d'accueil/nav (D5) + le flash
+            // finish/skip (D2/D4). U03 crée le jeu FERMÉ COMPLET ; U02/U03 le
+            // consomment. La pin de parité exige chaque clé présente, non
+            // vide, dans les quatre langues (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Configurer votre compte",
+            ["onboarding.intro"]            = "Une brève visite guidée des quelques réglages qui font fonctionner Kumunita pour vous. Tout mène au réglage qui l'a déjà — terminez en une minute ou revenez quand vous voulez.",
+            ["onboarding.step_displayname"] = "Votre nom d'affichage",
+            ["onboarding.step_avatar"]      = "Votre avatar",
+            ["onboarding.step_language"]    = "Votre langue d'interface",
+            ["onboarding.step_timezone"]    = "Votre fuseau horaire",
+            ["onboarding.step_dateformat"]  = "Votre format de date et d'heure",
+            ["onboarding.step_email"]       = "Votre langue des e-mails et des notifications",
+            ["onboarding.step_contact"]     = "Vos coordonnées et qui peut les voir",
+            ["onboarding.visit"]            = "Aller à ce réglage",
+            ["onboarding.finish"]           = "Tout est prêt — terminer la configuration",
+            ["onboarding.skip"]             = "Passer pour l'instant",
+            ["onboarding.flash_done"]       = "Configuration terminée — bienvenue dans votre quartier.",
+            ["onboarding.banner.text"]      = "Terminer la configuration de votre compte ?",
+            ["onboarding.banner.action"]    = "Démarrer la configuration",
         };
 
     /// <summary>
@@ -7073,6 +7137,27 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Hvem kan se dette dokument",
             ["documents.edit.submit"]       = "Gem ændringer",
             ["documents.flash_edited"]      = "Dokument opdateret.",
+
+            // ── M22 (ADR 0132) — onboarding: /onboarding-guideturen (D4) +
+            // den lukkelige home-/nav-banner (D5) + finish/skip-flaschen
+            // (D2/D4). U03 opretter det FULDE lukkede sæt; U02/U03 forbruger
+            // det. Paritets-pin'eren kræver hver nøgle til stede, ikke tom,
+            // på alle fire sprog (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Opsæt din konto",
+            ["onboarding.intro"]            = "En kort guidet tur gennem de få ting, der får Kumunita til at fungere for dig. Alt henviser til den indstilling, der allerede ejer det — du kan færdiggøre det på et minut eller komme tilbage, når du vil.",
+            ["onboarding.step_displayname"] = "Dit visningsnavn",
+            ["onboarding.step_avatar"]      = "Din avatar",
+            ["onboarding.step_language"]    = "Dit grænsefladesprog",
+            ["onboarding.step_timezone"]    = "Din tidszone",
+            ["onboarding.step_dateformat"]  = "Dit dato- og tidsformat",
+            ["onboarding.step_email"]       = "Dit e-mail- og beskedssprog",
+            ["onboarding.step_contact"]     = "Dine kontaktoplysninger og hvem der kan se dem",
+            ["onboarding.visit"]            = "Gå til denne indstilling",
+            ["onboarding.finish"]           = "Alt er klar — afslut opsætningen",
+            ["onboarding.skip"]             = "Spring over for nu",
+            ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen i din nabolag.",
+            ["onboarding.banner.text"]      = "Færdiggøre opsætningen af din konto?",
+            ["onboarding.banner.action"]    = "Start opsætning",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

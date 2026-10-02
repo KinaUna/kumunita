@@ -167,3 +167,81 @@ the `OnboardingController` (`GET /onboarding` + `POST /onboarding/finish`) + the
 `OnboardingViewModel` (banner-eligibility read via `GetOnboardingCompletedAsync`
 / `GetProfileAsync`). U02 **calls** `CompleteOnboardingAsync`; it never writes
 `Profile` itself. Exit on `Kumunita.Web.Tests`.
+
+## U03 — `Views/Onboarding/*` + the home/nav **banner** + the closed `onboarding.*` set (Web)
+
+**Delivered (1 registry edit + 3 new Web files + 1 new JS module + 1 test file):**
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the **complete
+  closed 15-key `onboarding.*` set (D7)** added to **all four** dictionaries
+  (`EnValues`/`DeValues`/`FrValues`/`DaValues`), same keys, same order, one
+  `M22 (ADR 0132)` section banner each, immediately after the M23 `profile.*`
+  / `documents.*` block (the `documents.flash_edited` closing). The 15 keys,
+  verbatim: `title` · `intro` · `step_displayname` · `step_avatar` ·
+  `step_language` · `step_timezone` · `step_dateformat` · `step_email` ·
+  `step_contact` · `visit` · `finish` · `skip` · `flash_done` · `banner.text` ·
+  `banner.action`. Non-empty in all four (the parity pin closure).
+- `src/Kumunita.Web/Views/Onboarding/Index.cshtml` — the `/onboarding` step
+  sequence (consumes U02's `OnboardingViewModel`, `@model OnboardingViewModel`).
+  The 7 step cards each link into the **frozen-lane** target (D3): display name
+  → `/profile/edit` · avatar → `/profile` · UI language → `/settings/language` ·
+  timezone → `/settings/timezone` · date format → `/settings/dateformat` · email
+  language → `/settings/language` · contact → `/profile/edit`. Each card: the
+  `onboarding.step_*` label + a **decorative** set/not-set marker (a `✓`/`–`
+  glyph, `aria-hidden` — a *symbol, not a translatable string*, so it stays
+  inside the closed 15-key set while still giving the "set / not set" hint off
+  the owner-scope `Has*` read) + the `onboarding.visit` link. The finish/skip
+  actions are two POST forms to `/onboarding/finish` + `/onboarding/skip` with
+  anti-forgery (the `onboarding.finish`/`onboarding.skip` buttons). **Every
+  user-visible string is a `<kw-l key="onboarding.*"/>` key** — no inline
+  English (the `KwLRegistryConsistencyTests` view↔registry scan enforces it).
+- `src/Kumunita.Web/Views/Shared/_OnboardingBanner.cshtml` — the dismissible
+  home/nav **banner** (D5, C-M22·5). Injects `IUserInfoService`, reads the
+  owner-scope `GetProfileAsync(subjectId)` → `OnboardingCompletedAt is null`
+  gate (the `BannerEligible` shape, **never a claim** — thin-token rule
+  ADR 0001-B/D6). Signed-in residents only (unauthenticated → no subject → no
+  banner). Renders `onboarding.banner.text` + the `onboarding.banner.action`
+  CTA link to `/onboarding` + a `btn-close` (`data-dismiss-key`).
+- `src/Kumunita.Web/client/lib/onboarding-banner.ts` (+ compiled
+  `wwwroot/js/lib/onboarding-banner.js`) — the **non-blocking** dismiss: a
+  `sessionStorage` flag (the `_PinnedAnnouncement` idiom verbatim), the close
+  button sets it, on load it hides if set. An *affordance only* — it **never**
+  writes `OnboardingCompletedAt` and never gates sign-in (the only way to clear
+  the banner for real is the explicit finish/skip POST, D2/D4). CSP-safe
+  (`script-src 'self'`).
+- `_Layout.cshtml` — mounted `@await Html.PartialAsync("_OnboardingBanner")`
+  right after the M19 guest-welcome notice (the existing signed-in-resident
+  banner slot).
+- `tests/Kumunita.Web.Tests/Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages.cs`
+  — the **GATE-6 / C-M22·6** pin: the closed set is exactly 15 keys; every key
+  present + non-empty in **en/de/fr/da**; and the `onboarding.*` set is
+  **closed** (no 16th key in the registry). (U02 already pins GATE-3/4/5 +
+  the `BannerEligible` shape on the controller side.)
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` **clean**; `npm --prefix
+src/Kumunita.Web run build` **clean**; `dotnet exec
+…\Kumunita.Web.Tests.dll` **763 passed, 0 failed, 0 skipped** (my 3 new GATE-6
+facts + U02's 5 controller facts + the `KwLRegistryConsistencyTests` view↔
+registry scan + the rest of the suite). **Browser-verified against the live
+server** (the Razor verification doctrine): the banner renders on home for a
+not-completed resident ("Finish setting up your account?" + "Start setup" →
+`/onboarding`); the `/onboarding` step page shows the 7 cards with the correct
+frozen-lane links + set/not-set markers + finish/skip; the finish POST
+redirects home with the `onboarding.flash_done` flash ("Setup complete —
+welcome to your neighborhood.") and the **banner clears** (completion stamped
+→ `BannerEligible` false). No drift: zero new field-write lane (rides the
+frozen lanes), zero new authorization surface, zero claim read, no inline
+English, no 16th key, no per-step POST, no persisted cursor, no modal, no
+sign-in gating.
+
+**U04 next —** read the register **§"done/ layout note"** + the ADR index.
+**Close M22**: flip M22 `StatusDone`, promote **M24** to `StatusNext` (the
+**order unchanged** — `…"M20","M21","M23","M22","M24"`), re-pin
+`MilestonesTests` (replace
+`M22_Is_The_Single_InProgress_Milestone` with
+`M24_Is_The_Single_InProgress_Milestone` + append `"M22"` to the
+`Shipped_Milestones_Are_Marked_Done` done-list), README/STATUS/ARCHITECTURE
+parity, tag the ADR 0132 index row `**Done** (M22)`, and move **all** M22
+artifacts (the register, the `m22-uNN.md` plans, the handoff notes) to
+`done/m22/` (the **subfolder** convention — `done/m22/` already holds
+`m22-u01.md` + `m22-u02.md`, which U01/U02 moved). U04 owns the roadmap flip;
+no unit before it touches `Milestones.cs` / `MilestonesTests`.

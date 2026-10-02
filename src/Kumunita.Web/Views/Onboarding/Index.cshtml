@@ -1,0 +1,86 @@
+@using Kumunita.Web.Security
+@model OnboardingViewModel
+@{
+    ViewData["Title"] = "Onboarding";
+    // The closed onboarding.* kw-l key set (D7) is the ONLY user-visible copy
+    // on this surface — every label goes through <kw-l> by key (the
+    // LocalizeTagHelper floor, ADR 0015 D1). No inline English, no 16th key.
+    //
+    // The "set / not set" state per step is a *decorative* glyph (✓ / a
+    // neutral dash), aria-hidden — a symbol, not a translatable string, so it
+    // stays inside the closed 15-key set (the register's D7 lock) while still
+    // giving the resident a "set / not set" hint off the owner-scope Has* read
+    // (D4/D5, C-M22·5). The step label + the "go to this setting" link are the
+    // two localized strings per card.
+}
+
+<h1><kw-l key="onboarding.title">Set up your account</kw-l></h1>
+<p class="text-muted">
+    <kw-l key="onboarding.intro">A quick guided tour of the few things that make Kumunita work for you. Everything links into the setting that already owns it — you can finish in a minute or come back any time.</kw-l>
+</p>
+
+@* A step card: the localized label + a decorative set/not-set marker + the
+   "go to this setting" link into the frozen lane that owns that field (D3).
+   The walk-through links into the surface; it never re-implements a write
+   (C-M22·4). The href + the label are the only user-visible strings. *@
+@{
+    (string LabelKey, bool Set, string Href)[] steps =
+    {
+        // display name + contact details ride the /profile/edit editor
+        // (IUserInfoService.UpsertProfileAsync, the F13 single-write surface).
+        ("onboarding.step_displayname", Model.HasDisplayName, "/profile/edit"),
+        // avatar rides the avatar upload (IUserInfoService.SetProfileAvatarAsync).
+        ("onboarding.step_avatar",      Model.HasAvatar,      "/profile"),
+        // UI language rides the LocaleController language-cookie lane
+        // (a per-request string, not a Profile field — the thin-token rule,
+        // ADR 0001-B). The "set" state is the saved preference (UiLanguageCode).
+        ("onboarding.step_language",    !string.IsNullOrWhiteSpace(Model.UiLanguageCode), "/settings/language"),
+        // time zone rides IUserInfoService.SetProfileTimezoneAsync.
+        ("onboarding.step_timezone",    Model.HasTimezone,    "/settings/timezone"),
+        // date & time format rides IUserInfoService.SetProfileDateFormatAsync.
+        ("onboarding.step_dateformat",  Model.HasDateFormat,  "/settings/dateformat"),
+        // email & notification language rides
+        // IUserInfoService.SetProfileEmailLanguageAsync (the /settings/language
+        // email section).
+        ("onboarding.step_email",       Model.HasEmailLanguage, "/settings/language"),
+        // contact details + visibility ride the /profile/edit editor too
+        // (UpsertProfileAsync owns contact + the audience visibility).
+        ("onboarding.step_contact",     Model.HasDisplayName, "/profile/edit"),
+    };
+}
+<ol class="list-group kmb-onboarding-steps">
+    @foreach (var step in steps)
+    {
+        <li class="list-group-item d-flex align-items-center gap-2">
+            @* Decorative set/not-set marker (✓ when the frozen read seam the
+               step links into is set, a neutral dash otherwise). A symbol —
+               not a translatable string — so it carries no kw-l key and
+               stays inside the closed 15-key set (D7). *@
+            <span class="badge @(step.Set ? "text-bg-success" : "text-bg-light") me-1"
+                  aria-hidden="true">
+                @(step.Set ? "✓" : "–")
+            </span>
+            <span class="me-auto me-2">
+                <kw-l key="@step.LabelKey"></kw-l>
+            </span>
+            <a class="btn btn-sm btn-outline-primary text-nowrap" href="@step.Href">
+                <kw-l key="onboarding.visit">Go to this setting</kw-l>
+            </a>
+        </li>
+    }
+</ol>
+
+@* The finish/skip actions (D4): the ONE write is CompleteOnboardingAsync
+   (U01's lane, C-M22·3/C-M22·4); both forms POST to that single lane —
+   finish and skip route to the same stamp (§1.a-C2). Non-blocking (D5):
+   these are the explicit actions; nothing here gates sign-in. *@
+<div class="d-flex flex-wrap gap-2 mt-3 kmb-onboarding-actions">
+    <form method="post" action="/onboarding/finish">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-primary"><kw-l key="onboarding.finish">I'm all set — finish setup</kw-l></button>
+    </form>
+    <form method="post" action="/onboarding/skip">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="onboarding.skip">Skip for now</kw-l></button>
+    </form>
+</div>

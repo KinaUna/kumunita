@@ -1,0 +1,61 @@
+@*
+    _OnboardingBanner.cshtml — the M22 onboarding affordance (D5, ADR 0132).
+
+    Rendered in _Layout.cshtml (next to _PinnedAnnouncement / the guest
+    notice). It is the dismissible home/nav banner for the guided walk-through:
+
+      - Renders ONLY when the signed-in resident's OnboardingCompletedAt is
+        null (the floor — a fresh resident sees it). The gate is the owner-
+        scope read of the profile field (the OnboardingViewModel.BannerEligible
+        shape, D5), NEVER a claim (the thin-token rule, ADR 0001-B / D6).
+      - Non-blocking (D5): it never gates sign-in. The [Authorize] on the
+        walk-through is the standard signed-in gate; this banner is a plain
+        affordance. The only way to clear it for real is the explicit
+        finish/skip POST (D2/D4); the close button is a *client-side* dismiss
+        only (the onboarding-banner.js module — a sessionStorage flag, never a
+        write to OnboardingCompletedAt).
+      - The copy is the closed onboarding.banner.* kw-l set (D7, the 15-key
+        set U03 authored) — never an inline string (C-M22·6).
+      - Signed-in residents only: an unauthenticated request has no subject,
+        so there is no profile read and no banner (the LocaleController.
+        BuildModel null-safe idiom).
+
+    Dismissal is remembered per browser via sessionStorage (the pinned-
+    announcement dismiss idiom, _PinnedAnnouncement.cshtml) — a plain ES
+    module (tsc-built, no bundler), CSP-safe (script-src 'self').
+*@
+@using Kumunita.Core.UserInfo
+@using Kumunita.Web.Security
+@inject IUserInfoService UserInfo
+@{
+    // Signed-in resident only: an unauthenticated request has no subject →
+    // no profile read, no banner (the null-safe idiom, D5/D6).
+    string? subject = User.Identity?.IsAuthenticated == true
+        ? KumunitaPrincipal.SubjectId(User)
+        : null;
+    // The owner-scope read (the profile field, never a claim — D6). A null
+    // profile (a profile-less actor can't finish onboarding) yields no banner.
+    Profile? profile = subject is null ? null : await UserInfo.GetProfileAsync(subject);
+
+    // BannerEligible = the completion read is null (the floor, D5). Non-null
+    // → the banner clears (the resident finished / skipped).
+    bool bannerEligible = profile is not null && profile.OnboardingCompletedAt is null;
+}
+@if (bannerEligible)
+{
+    <div class="kumunita-onboarding-banner alert alert-secondary alert-dismissible fade show mb-3"
+         role="region" aria-label="Account setup">
+        <div class="container-fluid py-2 d-flex align-items-center gap-2">
+            <span class="me-auto me-2">
+                <kw-l key="onboarding.banner.text">Finish setting up your account?</kw-l>
+            </span>
+            <a class="btn btn-sm btn-primary text-nowrap" href="/onboarding"
+               aria-label="Start setup"><kw-l key="onboarding.banner.action">Start setup</kw-l></a>
+            <button type="button" class="btn-close"
+                    data-dismiss-key="kumunita-onboarding-banner-dismissed"
+                    aria-label="Dismiss this banner"></button>
+        </div>
+    </div>
+
+    <script type="module" src="~/js/lib/onboarding-banner.js"></script>
+}

@@ -66,6 +66,14 @@
             </div>
         </div>
     }
+    @* M22 (ADR 0132, D5) — the onboarding affordance: the dismissible home/nav
+       banner (the _OnboardingBanner partial). Rendered by the partial only
+       when the signed-in resident's OnboardingCompletedAt is null (the owner-
+       scope read, never a claim — the thin-token rule, ADR 0001-B / D6).
+       Non-blocking (D5): it never gates sign-in; the close button is a
+       client-side dismiss (onboarding-banner.js), and the only way to clear
+       it for real is the explicit finish/skip POST (D2/D4). *@
+    @await Html.PartialAsync("_OnboardingBanner")
     @* What's-new toast (the VN lane, ADR 0110) — announces the current
        platform version (WhatsNew.Latest) with a link to the About page's
        "What's new" section. Dismissal is remembered per browser (see
