@@ -63,6 +63,8 @@ public static class Milestones
         // M23 ships before M22: M23 (extended profiles) was pulled forward and completed while M22 (onboarding) remained StatusPlanned/deferred; the order M20, M21, M23, M22 is pinned by MilestonesTests.cs — do not reorder.
         new("M23", "Extended user profiles — a biography + free author-set tags (skills, interests, knowledge, expertise) to make it easier to find people with something in common", StatusDone),
         new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusNext),
+        new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusPlanned),
+        new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch
