@@ -165,4 +165,66 @@ public sealed class DocumentService
         await session.SaveChangesAsync().ConfigureAwait(false);
         return doc;
     }
+
+    /// <summary>
+    /// The owner-only edit write lane (ADR 0125, D1/D2/D3): the <b>owner</b>
+    /// (the uploader — <see cref="Document.OwnerId"/>) of a document may re-choose
+    /// <b>who can access it</b> (<see cref="DocumentEdit.Audience"/>, written
+    /// verbatim — C-M21·1) and <b>replace the file</b> (<see
+    /// cref="DocumentEdit.MediaId"/> + <see cref="DocumentEdit.FileReplaced"/> —
+    /// ADR 0125 D3: an empty file is a no-op on the byte surface). The Core lane
+    /// is the **sole real gate**: it loads the stored row first (the missing-id
+    /// → <see cref="KeyNotFoundException"/> contract is preserved and the stored
+    /// <c>OwnerId</c> is in hand), then re-checks <c>OwnerId == actorId</c>
+    /// before any write — a non-owner is a hard
+    /// <see cref="UnauthorizedAccessException"/> (the Web boundary 404s; the ADR
+    /// 0122 D7 posture: the form's existence is not leaked to a non-owner).
+    /// <para>
+    /// **Ownership is immutable** (ADR 0014/0016/0017 precedent): the stored
+    /// <c>OwnerId</c> is preserved and never re-assigned — editing does not
+    /// transfer the document to another owner. <c>Created</c> is preserved;
+    /// <c>Modified</c> is stamped (the ADR 0122 D1 "set on a future replace"
+    /// field, now exercised). **No <c>AccessAudit</c> row** (ADR 0122 §1.a A2 —
+    /// the write is authenticated, not an audience-restricted read).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The document id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the document's owner.</exception>
+    public async Task<Document> UpdateAsync(string documentId, DocumentEdit edit, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(documentId)) throw new ArgumentException("A document id is required.", nameof(documentId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting owner is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(edit);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var doc = await session.LoadAsync<Document>(documentId).ConfigureAwait(false);
+        if (doc is null)
+            throw new KeyNotFoundException($"Document '{documentId}' was not found in the session; nothing to edit.");
+
+        // Owner-only gate (the sole decision on this lane — ADR 0125 D1): only
+        // the owner may edit. A non-owner (including a non-owner GlobalAdmin —
+        // the ADR 0125 D1 "owner" reading is the uploader, not an elevated
+        // standing) throws before anything is written.
+        if (!string.Equals(doc.OwnerId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the owner of a document may edit it.");
+
+        // The two named edit fields (ADR 0125): the audience (the access control
+        // — written verbatim, C-M21·1) and the file (the replacement — D3). The
+        // title/summary are the owner's labels, editable alongside them (D2).
+        doc.Audience = edit.Audience;
+        doc.Title = edit.Title;
+        doc.Summary = edit.Summary;
+        if (edit.FileReplaced)
+        {
+            doc.MediaId = edit.MediaId;
+            doc.Filename = edit.Filename;
+            doc.ContentType = edit.ContentType;
+            doc.SizeBytes = edit.SizeBytes;
+        }
+        doc.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(doc);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return doc;
+    }
 }

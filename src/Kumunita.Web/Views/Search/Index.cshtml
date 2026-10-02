@@ -68,10 +68,16 @@
         }
         else
         {
-            // The four surfaces, fixed order; a surface absent from
+            // The ten surfaces, fixed order; a surface absent from
             // Model.Sections had zero visible hits (the SearchResults
-            // contract — C-M8·2/4) and renders nothing.
-            var surfaces = new[] { "posts", "events", "pages", "announcements" };
+            // contract — C-M8·2/4) and renders nothing. ADR 0124 extends
+            // the original four (posts, events, pages, announcements) with
+            // projects, boards, todos, inventory, documents, people.
+            var surfaces = new[]
+            {
+                "posts", "events", "pages", "announcements",
+                "projects", "boards", "todos", "inventory", "documents", "people",
+            };
             @foreach (var s in surfaces)
             {
                 if (!Model.Sections.TryGetValue(s, out var hits) || hits.Count == 0)

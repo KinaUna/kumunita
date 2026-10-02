@@ -822,6 +822,16 @@ body.kmb-nav-rail-mode {
   padding: 0.375rem 0;
   gap: 0.25rem;
   z-index: 1030;
+  /* The rail is viewport-height (bottom:0) and now carries 13 section icons;
+     on shorter viewports the icons can exceed the available height. Let the
+     rail scroll rather than clip the last icon (flex: none stops the buttons
+     from shrinking to fit). Inert when the content fits. */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.kmb-rail-brand,
+.kmb-rail-btn {
+  flex: none;
 }
 .kmb-rail-brand {
   display: inline-flex;

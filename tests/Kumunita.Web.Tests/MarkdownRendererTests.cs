@@ -108,6 +108,58 @@ public class MarkdownRendererTests
     }
 
     /// <summary>
+    /// An attachment-download link (<c>[label](/attachment/{id})</c>) is the
+    /// only link the renderer opens in a new tab — it carries
+    /// <c>target="_blank" rel="noopener"</c> so the reader keeps their place
+    /// on the page. The exact pinned emission is
+    /// <c>&lt;a href="/attachment/{id}" target="_blank" rel="noopener"&gt;</c>.
+    /// <para>
+    /// Every other link keeps the same-tab default (no <c>target</c>):
+    /// an internal nav link, an external <c>https://</c> link, and a
+    /// <c>/content-image/{id}</c> route link all render as
+    /// <c>&lt;a href="…"&gt;…&lt;/a&gt;</c> with <b>no</b>
+    /// <c>target=</c> / <c>rel="noopener"</c>. The new-tab attribute is
+    /// scoped to the attachment route shape only (1–128 lowercase hex id) —
+    /// the same shape <see cref="Kumunita.Web.Controllers.AttachmentController"/>'s
+    /// serve route validates and <c>AttachmentIds.ExtractAttachmentIds</c>
+    /// matches, so a malformed id is not treated as an attachment.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void Attachment_Link_OpensInNewTab_OthersDoNot()
+    {
+        // The attachment link gets the new-tab attributes, with the pinned
+        // emission order (href, then target, then rel, then the label).
+        var att = MarkdownRenderer.RenderHtml("[Docs](/attachment/deadbeefcafe)");
+        Assert.Contains(
+            "<a href=\"/attachment/deadbeefcafe\" target=\"_blank\" rel=\"noopener\">Docs</a>",
+            att);
+
+        // Internal nav link: same tab (no target / rel=noopener).
+        var nav = MarkdownRenderer.RenderHtml("[About](/pages/about)");
+        Assert.Contains("<a href=\"/pages/about\">About</a>", nav);
+        Assert.DoesNotContain("target=", nav);
+        Assert.DoesNotContain("rel=\"noopener\"", nav);
+
+        // External link: same tab.
+        var ext = MarkdownRenderer.RenderHtml("[Site](https://example.com/x)");
+        Assert.Contains("<a href=\"https://example.com/x\">Site</a>", ext);
+        Assert.DoesNotContain("target=", ext);
+        Assert.DoesNotContain("rel=\"noopener\"", ext);
+
+        // A /content-image/ link is not an attachment — same tab.
+        var ci = MarkdownRenderer.RenderHtml("[pic](/content-image/deadbeef)");
+        Assert.Contains("<a href=\"/content-image/deadbeef\">pic</a>", ci);
+        Assert.DoesNotContain("target=", ci);
+
+        // A malformed attachment id (non-hex) is not treated as an attachment
+        // — same tab, no new-tab attribute.
+        var malformed = MarkdownRenderer.RenderHtml("[x](/attachment/notahexid)");
+        Assert.Contains("<a href=\"/attachment/notahexid\">x</a>", malformed);
+        Assert.DoesNotContain("target=", malformed);
+    }
+
+    /// <summary>
     /// An image in the middle of a text line stays inside that single
     /// <c>&lt;p&gt;</c> — the paragraph's open tag precedes the
     /// <c>&lt;img&gt;</c> and its close tag follows; it is not emitted as a

@@ -247,9 +247,14 @@ a second copy of it.
 
 ## Follow-on
 
-None — the lane is self-contained. (The deferred items above are *separate*
-lanes, not follow-ons: they each settle their own design question and get their
-own ADR.)
+- **ADR 0128** — the **bulk** variant on top of this lane: an `/admin/help`
+  surface that surfaces *which* seeded pages have newer shipped text and resets
+  **every** seeded page in one audited action. It reuses this lane's
+  `ResetSeededTextAsync` applier and `page.reset` audit verbatim; this per-page
+  lane is the primitive it builds on.
+
+(The deferred items above are *separate* lanes, not follow-ons: they each settle
+their own design question and get their own ADR.)
 
 ## References
 

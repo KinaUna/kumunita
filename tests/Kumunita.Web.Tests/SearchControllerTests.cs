@@ -489,6 +489,115 @@ public class SearchControllerTests
     }
 
     // ────────────────────────────────────────────────────────────────────────
+    // ADR 0124 — HrefFor projection for the six extended surfaces
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <see cref="SearchIndexViewModel.HrefFor"/> maps each of the six ADR 0124
+    /// surfaces to the correct detail route (the Web-side projection the
+    /// <c>Index.cshtml</c> links use). The hit's <c>Id</c> is the document id
+    /// (not the subject id for people — the people route uses the subject id
+    /// which <b>is</b> the hit's id by construction).
+    /// </summary>
+    [Fact]
+    public void Search_HrefFor_ExtendedSurfaces_CorrectRoutes()
+    {
+        var model = new SearchIndexViewModel(
+            "q", SearchScope.Community, "all", 1,
+            new Dictionary<string, IReadOnlyList<SearchHit>>(),
+            new Dictionary<string, string>(),
+            null);
+        var sections = new Dictionary<string, IReadOnlyList<SearchHit>>
+        {
+            ["projects"] = new List<SearchHit>
+            {
+                new("proj-1", "projects", null, "Project title", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+            },
+            ["boards"] = new List<SearchHit>
+            {
+                new("brd-1", "boards", null, "Board title", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+            },
+            ["todos"] = new List<SearchHit>
+            {
+                new("todo-1", "todos", null, "Todo title", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+            },
+            ["inventory"] = new List<SearchHit>
+            {
+                new("inv-1", "inventory", null, "Item name", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+            },
+            ["documents"] = new List<SearchHit>
+            {
+                new("doc-1", "documents", null, "Doc title", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+            },
+            ["people"] = new List<SearchHit>
+            {
+                new("subj-1", "people", null, "Alice", "…", DateTimeOffset.MinValue),
+            },
+        };
+
+        Assert.Equal("/projects/projects/proj-1", model.HrefFor(sections["projects"][0]));
+        Assert.Equal("/projects/boards/brd-1", model.HrefFor(sections["boards"][0]));
+        Assert.Equal("/projects/todos/todo-1", model.HrefFor(sections["todos"][0]));
+        Assert.Equal("/inventory/inv-1", model.HrefFor(sections["inventory"][0]));
+        Assert.Equal("/documents/doc-1", model.HrefFor(sections["documents"][0]));
+        Assert.Equal("/directory/subj-1", model.HrefFor(sections["people"][0]));
+    }
+
+    /// <summary>
+    /// A <c>surface=projects</c> request (single-surface paged view) is
+    /// accepted by the controller — the service is called with
+    /// <see cref="SearchService.ProjectsSurface"/> and the returned view
+    /// model carries the surface name in the pager's
+    /// <see cref="PagedViewModel.FilterParams"/> for the pager's links.
+    /// </summary>
+    [Fact]
+    public async Task Search_Surface_Projects_Accepted()
+    {
+        var search = Substitute.For<ISearchService>();
+        search.SearchSurfaceAsync(SearchService.ProjectsSurface, "proj",
+            SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>())
+            .Returns(new SearchSurfacePage(
+                "projects",
+                new List<SearchHit>
+                {
+                    new("proj-1", "projects", null, "A project", "…", new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero)),
+                },
+                1, true));   // HasMore=true so the pager renders
+
+        var controller = Build(search, IsAuthenticated: true, subjectId: "subj-1");
+        var result = await controller.Index("proj", "projects", null, 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<SearchIndexViewModel>(view.ViewData.Model);
+        Assert.Equal("projects", model.Surface);
+        Assert.NotNull(model.Pager);
+        Assert.Equal("projects", model.Pager!.FilterParams["surface"]);
+        Assert.Equal("proj", model.Pager.FilterParams["q"]);
+
+        await search.Received(1).SearchSurfaceAsync(
+            SearchService.ProjectsSurface, "proj", SearchScope.Community,
+            "subj-1", 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The <c>Index.cshtml</c> view's <c>surfaces</c> array contains all ten
+    /// surface names (the original four from ADR 0091 + the six from ADR 0124)
+    /// — the view renders one filter chip per surface.
+    /// </summary>
+    [Fact]
+    public void Search_IndexView_SurfacesArray_TenSurfaces()
+    {
+        var source = ReadViewSource("Search", "Index.cshtml");
+        // The surfaces array in the JS block.
+        Assert.Contains(@"""projects""", source);
+        Assert.Contains(@"""boards""", source);
+        Assert.Contains(@"""todos""", source);
+        Assert.Contains(@"""inventory""", source);
+        Assert.Contains(@"""documents""", source);
+        Assert.Contains(@"""people""", source);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
     // Harness
     // ────────────────────────────────────────────────────────────────────────
 

@@ -2,8 +2,10 @@ namespace Kumunita.Core.Search;
 
 /// <summary>
 /// The M8 search seam (D8 — one bounded context, one interface). Two read
-/// methods over the four resident content surfaces (posts, events, pages,
-/// announcements), both composed entirely on the **frozen**
+/// methods over the ten resident content surfaces (posts, events, pages,
+/// announcements, projects, boards, todos, inventory, documents, people —
+/// the original four, ADR 0091, plus the six extended by ADR 0124), both
+/// composed entirely on the **frozen**
 /// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/> surface and
 /// the M7 paging idiom (ADR 0090 D1/D3):
 /// <para>

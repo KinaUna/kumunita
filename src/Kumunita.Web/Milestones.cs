@@ -46,7 +46,7 @@ public static class Milestones
         new("M5", "Projects — goals, tasks, contributors", StatusDone),
         new("M6", "Notifications", StatusDone),
         new("M7", "Pagination and filtering", StatusDone),
-        new("M8", "Search — one /search surface (nav search box, anonymous + signed-in) over the four resident content surfaces: community + group posts, community + group events, pages, announcements; `all` top-5 per surface, single-surface paged on the M7 HasMore/_Pager discipline, group scope on the frozen ADR 0013 seams, zero schema change (ADR 0091)", StatusDone),
+        new("M8", "Search — one /search surface (nav search box, anonymous + signed-in) over the ten resident content surfaces: posts, events, pages, announcements (ADR 0091) + projects, boards, todos, inventory, documents, people (ADR 0124); tag-name match; `all` top-5 per surface, single-surface paged on the M7 HasMore/_Pager discipline, group scope on the frozen ADR 0013 seams, zero schema change", StatusDone),
         new("M9", "Messaging — 1:1 resident messaging: a signed-in resident opens a conversation with another resident, exchanges messages, and sees read state; an admin can enable or disable the feature instance-wide (ADR 0105)", StatusDone),
         new("M10", "PWA and responsive design", StatusDone),
         new("M11", "Portability (import/export)", StatusDone),
@@ -63,6 +63,10 @@ public static class Milestones
         // M23 ships before M22: M23 (extended profiles) was pulled forward and completed while M22 (onboarding) remained StatusPlanned/deferred; the order M20, M21, M23, M22 is pinned by MilestonesTests.cs — do not reorder.
         new("M23", "Extended user profiles — a biography + free author-set tags (skills, interests, knowledge, expertise) to make it easier to find people with something in common", StatusDone),
         new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusNext),
+        new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusPlanned),
+        new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusPlanned),
+        new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order (the M7 sibling that pagination & filtering shipped without)", StatusPlanned),
+        new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch

@@ -62,4 +62,15 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Development sample data (ADR 0129): the mock neighborhood lives in a single
+       embedded JSON document so a developer grows the corpus (more accounts, posts,
+       replies, events, translations, groups, tags, blog pages — the material the
+       Search lane, ADR 0091/0124, needs to exercise) by editing Data/sample-data.json,
+       with no C# change. SampleDataSeeder reads it via the stable LogicalName below
+       and materializes the documents; the event de/fr/da baselines it exposes for the
+       warm-boot backfill (ADR 0060) are sourced from the same file. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Data\sample-data.json" LogicalName="Kumunita.Core.sample-data.json" />
+  </ItemGroup>
+
 </Project>

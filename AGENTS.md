@@ -139,6 +139,21 @@ the source file** — and the user's report outranks your source reading.
 is the same class of bug — an uninterpolated Razor attribute value, not a
   routing problem. Fix the markup; don't debug the route.
 
+**Getting a live server.** `dotnet run` requires a `ConnectionStrings:Kumunita`
+value the agent does not have; the docker-compose stack carries all credentials
+and seeds sample data on first boot. To render a page end-to-end:
+
+```bash
+docker compose build app && docker compose up -d app   # rebuild + recreate (volumes persist)
+```
+
+The app needs ~8 s to finish booting (Marten schema + Wolverine leadership).
+App URL: `http://localhost:5080`. Sample-data GlobalAdmin: `admin@examplium.com`
+/ `Admin123!` (the `SampleDataSeeder` constants in `Kumunita.Core/Bootstrap/`).
+Sign in in the integrated browser (or `Invoke-WebRequest` with a session cookie
++ anti-forgery token), then navigate to the target page. The browser snapshot
+is the evidence.
+
 ## Running the tests (test-runner quirk)
 
 Both test projects use **xunit.v3** (`Microsoft.Testing.Platform`), surfaced to VS

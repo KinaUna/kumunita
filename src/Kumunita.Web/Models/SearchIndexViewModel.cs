@@ -56,10 +56,23 @@ public sealed record SearchIndexViewModel(
 
     /// <summary>
     /// The detail href for a hit — the page surface resolves through
-    /// <see cref="PageHrefs"/> (path-derived), every other surface is its
-    /// canonical id route (<c>/posts/{id}</c> / <c>/events/{id}</c> /
-    /// <c>/announcements/{id}</c>; group-scope hits use their
-    /// <c>/groups/{groupId}/posts|events/{id}</c> route).
+    /// <see cref="PageHrefs"/> (path-derived), group-scope hits use their
+    /// <c>/groups/{groupId}/posts|events/{id}</c> route, and every other
+    /// surface maps to its canonical id route (the controller's
+    /// <c>[HttpGet]</c> shape):
+    /// <list type="bullet">
+    /// <item><c>posts</c> → <c>/posts/{id}</c></item>
+    /// <item><c>events</c> → <c>/events/{id}</c></item>
+    /// <item><c>announcements</c> → <c>/announcements/{id}</c></item>
+    /// <item><c>projects</c> → <c>/projects/projects/{id}</c> (ADR 0124 — the doubled
+    /// segment is the controller's route, <c>ProjectsController</c> line 3450).</item>
+    /// <item><c>boards</c> → <c>/projects/boards/{id}</c></item>
+    /// <item><c>todos</c> → <c>/projects/todos/{id}</c></item>
+    /// <item><c>inventory</c> → <c>/inventory/{id}</c></item>
+    /// <item><c>documents</c> → <c>/documents/{id}</c></item>
+    /// <item><c>people</c> → <c>/directory/{id}</c> (the profile's id is its
+    /// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>).</item>
+    /// </list>
     /// </summary>
     public string HrefFor(SearchHit hit)
     {
@@ -67,6 +80,17 @@ public sealed record SearchIndexViewModel(
             return PageHrefs.TryGetValue(hit.Id, out var href) ? href : "/pages/";
         if (hit.GroupId is { } gid)
             return $"/groups/{gid}/{hit.Surface}/{hit.Id}";
-        return $"/{hit.Surface}/{hit.Id}";
+
+        return hit.Surface switch
+        {
+            "projects" => $"/projects/projects/{hit.Id}",
+            "boards" => $"/projects/boards/{hit.Id}",
+            "todos" => $"/projects/todos/{hit.Id}",
+            "inventory" => $"/inventory/{hit.Id}",
+            "documents" => $"/documents/{hit.Id}",
+            "people" => $"/directory/{hit.Id}",
+            // posts / events / announcements — the original M8 canonical id routes.
+            _ => $"/{hit.Surface}/{hit.Id}",
+        };
     }
 }

@@ -73,6 +73,7 @@ public sealed class UsageCaptureMiddleware
                 await using var session = _store.LightweightSession();
                 session.Store(new UsageEvent
                 {
+                    Id            = Guid.NewGuid().ToString("N"), // externally-assigned string id (the repo's `SampleDataSeeder.Id()` shape)
                     At            = DateTimeOffset.UtcNow,
                     ActorId       = decision.ActorId,
                     RouteTemplate = decision.RouteTemplate

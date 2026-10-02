@@ -56,14 +56,14 @@ namespace Kumunita.Web.Tests;
 ///       The service's <c>AddTagTranslationAsync</c> is never called (the
 ///       blank-field check is a Web-layer pin, not a service
 ///       responsibility).</item>
-/// <item><b>U8c reword surface display (C-TG·5)</b>: <see
+/// <item><b>U8c reword surface render (C-TG·5)</b>: <see
 ///       cref="TagController.ByTag"/> seeds
 ///       <see cref="TagByTagViewModel.Translation"/> with
 ///       <see cref="TagTranslationForm.CanTranslate"/> = <c>true</c> for
 ///       the tag's <c>CreatedBy</c> (creator) and for a GlobalAdmin, and
-///       <c>false</c> for a non-creator attacher (the form renders disabled
-///       — the display affordance pin; the real deny is the POST lane's
-///       standing re-check, C3).</item>
+///       <c>false</c> for a non-creator attacher (the by-tag view renders
+///       the Translations section only when <c>true</c> — the render-gate
+///       pin; the real deny is the POST lane's standing re-check, C3).</item>
 /// </list>
 /// <para>
 /// The harness mirrors <see cref="PageControllerTests"/>: a NSubstitute
@@ -325,14 +325,15 @@ public sealed class TagControllerTests(PostgresFixture fixture) : IClassFixture<
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
 
-    // ── U8c reword surface — C-TG·5 display affordance on ByTag ─────────────
+    // ── U8c reword surface ── C-TG·5 render gate on ByTag ─────────────
 
     /// <summary>
     /// <see cref="TagController.ByTag"/> seeds
     /// <see cref="TagByTagViewModel.Translation"/> with
     /// <see cref="TagTranslationForm.CanTranslate"/> = <c>true</c> when the
     /// actor is the tag's <c>CreatedBy</c> (creator) — the C-TG·5 standing
-    /// probe is wired through to the form (the display affordance pin).
+    /// probe is wired through to the form (the render-gate pin: the by-tag
+    /// view shows the Translations section only when this is true).
     /// The pin: the form's <c>CanTranslate</c> reflects the
     /// <see cref="ITagService.CanTranslateTag"/> probe result verbatim
     /// (the controller does not re-derive standing itself).
@@ -370,10 +371,11 @@ public sealed class TagControllerTests(PostgresFixture fixture) : IClassFixture<
     /// <see cref="TagTranslationForm.CanTranslate"/> = <c>false</c> when
     /// the actor is a **non-creator attacher** (Member, not the tag's
     /// <c>CreatedBy</c>, not a GlobalAdmin) — the C-TG·5 standing probe is
-    /// <c>false</c>, the form renders **disabled** (the display affordance
-    /// pin; the real deny is the POST lane's standing re-check, C3). The
-    /// pin: the form's <c>CanTranslate</c> reflects the
-    /// <see cref="ITagService.CanTranslateTag"/> probe result verbatim.
+    /// <c>false</c>, so the by-tag view hides the Translations section from
+    /// this actor (the render-gate pin; the real deny is the POST lane's
+    /// standing re-check, C3). The pin: the form's <c>CanTranslate</c>
+    /// reflects the <see cref="ITagService.CanTranslateTag"/> probe result
+    /// verbatim.
     /// </summary>
     [Fact]
     public async Task ByTag_When_NonCreator_SeesTranslationFormDisabled()

@@ -156,13 +156,14 @@ public sealed class TagController(
                 : null,
         };
 
-        // U8c — seed the reword form (C-TG·5 standing split: the form is
-        // rendered editable for the creator ∪ GlobalAdmin, disabled for a
-        // non-creator attacher; the real deny is the POST lane's standing
-        // re-check, the C-TG·5 pin). Only seeded when the tag is readable
-        // to this actor (the 404-floor above already returned for the
-        // unreadable shape, so a null `tag` here means the tag is unknown
-        // — defensive; the form is a display surface, never a gate).
+        // U8c — seed the reword form (C-TG·5 standing split: the view renders
+        // the Translations card only for the creator ∪ GlobalAdmin, and hides
+        // it from a non-creator attacher; the real deny is the POST lane's
+        // standing re-check, the C-TG·5 pin). Only seeded when the tag is
+        // readable to this actor (the 404-floor above already returned for
+        // the unreadable shape, so a null `tag` here means the tag is unknown
+        // — defensive; the form's CanTranslate is the render gate, and the
+        // POST lane's standing re-check is the real deny).
         var tag = tagItems.FirstOrDefault(t => t.Tag.Slug == slug)?.Tag;
         if (tag is not null)
             model.Translation = await SeedTranslationFormAsync(tag, actor, ActorRoles(User));
@@ -180,7 +181,9 @@ public sealed class TagController(
     /// decision to <see cref="ITagService.AddTagTranslationAsync"/> (the
     /// standing — the tag's <c>CreatedBy</c> ∪ GlobalAdmin — is re-pinned
     /// server-side; the <see cref="TagTranslationForm.CanTranslate"/> probe
-    /// is only the display affordance).
+    /// is the render gate the by-tag view uses to show the section only to
+    /// the creator ∪ GlobalAdmin, the ADR 0009 / 0026 "the name is the
+    /// creator's artifact" rule carried to tags).
     /// <para>
     /// **Precondition (C-TG·1):** the tag must be readable to this actor
     /// (re-run the read seam via <see cref="ITagService.ListForActorAsync"/>
@@ -276,8 +279,9 @@ public sealed class TagController(
     /// <see cref="Tag.Name"/> (the creator's own spelling — the ADR 0005
     /// preference-order fallback). <see cref="TagTranslationForm
     /// .CanTranslate"/> is the <see cref="ITagService.CanTranslateTag"/>
-    /// probe (a display pin — the real deny is the POST lane's standing
-    /// re-check, C-TG·5, C3).
+    /// probe (the render gate — the by-tag view shows the Translations
+    /// section only to the creator ∪ GlobalAdmin; the real deny is the
+    /// POST lane's standing re-check, C-TG·5, C3).
     /// <para>
     /// The <see cref="TagTranslation"/> rows are read directly via the
     /// controller's <see cref="IDocumentStore"/> (a plain read, no audit row

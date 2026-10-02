@@ -142,20 +142,26 @@ milestone-by-milestone breakdown is in the Roadmap below.
   default → Long floor) via the `kw-dt` TagHelper — the same per-request
   resolution shape as timezone and multilingual, data-driven, no rebuild
   (ADR 0020).
-- **Search** — one nav search box (anonymous + signed-in) over the four
+- **Search** — one nav search box (anonymous + signed-in) over the **ten**
   resident content surfaces: posts (community **and** group), events
-  (community + group), pages, and announcements. `/search` renders `all`
+  (community + group), pages, and announcements (the original four, ADR 0091)
+  **plus** projects, boards, todos, inventory, documents, and people (the six
+  extended by ADR 0124). `/search` renders `all`
   (top 5 hits per surface — a search-box answer, no pager) or a single-surface
   paged list on the M7 `HasMore` / `_Pager` discipline (pager links carry
   `q` + `surface` + `scope`); the `groups` scope is signed-in-only and rides
   the **frozen** ADR 0013 group seams (a group you can't see contributes no
   hit and no count; anonymous silently degrades to community — no 403).
-  Drafts, soft-deletes, and hidden content are never hits; every decided
-  visit audits (one aggregate row per (query, surface, scope), `TargetKind =
-  "search:<surface>"`); the render surface is hits + `HasMore` only — never a
-  count. Case-insensitive substring match over authored-in `Title` + `Body`
-  — zero schema change; language-scoped search and `tsvector` full-text are
-  the named deferred lanes (ADR 0018's own consequence; ADR 0091).
+  The six extended surfaces are signed-in-only (their canonical feeds are
+  gated; anonymous sees the original four). Drafts, soft-deletes, and hidden
+  content are never hits; every decided visit audits (one aggregate row per
+  (query, surface, scope), `TargetKind = "search:<surface>"`); the render
+  surface is hits + `HasMore` only — never a count. Case-insensitive substring
+  match over authored-in `Title` + `Body`, **and** the names of a document's
+  own tags (a tag is a label, never a gate — C-TG·1); the people surface
+  matches `DisplayName` + `Bio` + profile tags. Zero schema change;
+  language-scoped search and `tsvector` full-text are the named deferred
+  lanes (ADR 0018's own consequence; ADR 0091 + ADR 0124).
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered
@@ -255,8 +261,13 @@ stays trivial and the authorization rules can grow freely.
 - **M19** — Guest accounts: limited-privilege accounts for consultants, coaches, teachers, speakers, entertainers, and similar community-adjacent roles who need a place in the platform without full resident standing; admins set the limits on what a guest may access and for how long. **Done.** (ADR 0120)
 - **M20** — Notification quiet times: a per-resident quiet schedule over the M6 notification lane — allowed/blocked hours of day and days of the week for how (or whether) notifications are delivered; admins set how often the system checks for pending notifications. **Done.** (ADR 0121)
 - **M21** — Document management: a shared repository for official documents, contracts, and similar community-owned files, with per-document access controls. **Done.** (ADR 0122)
+- **Document edit lane** (`DOC-EDIT`, ADR 0125) — the **owner-only** edit-by-replacement half of M21's D9·7 (the uploader, `full stop` — a non-owner GlobalAdmin/Moderator is **denied**, the ADR 0014/0016 author-only precedent; non-owner → **404, not 403** — the ADR 0122 D7 "no existence leak" posture): re-choose **who can access it** (the `Audience`, written verbatim via the M2 single deserialization site, prefilled via `FromAudience`) and/or **replace the file** (optional — a blank file keeps the stored blob, a present file stores **first** through the frozen ADR 0011 `IMediaStore` with the same guards-before-write, orphan-safe); `Title` / `Summary` editable alongside (a label, never a gate); `Id` / `OwnerId` / `Created` **immutable**, `Modified` stamped; **one write, no `AccessAudit` row** (the write-lane convention, ADR 0122 A2); **zero new authorization surface** (rides the frozen `Read` path's owner branch through the unchanged `DocumentToAuditableResource` adapter). The **author soft-delete** half of D9·7 remains deferred (a future ADR). **Done.**
 - **M23** — Extended user profiles: a resident biography + free author-set tags (skills, interests, knowledge, and expertise) to make it easier to find people with something in common. **Done** (ADR 0123).
 - **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **In progress.**
+- **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Planned.**
+- **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Planned.**
+- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Planned.**
+- **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Planned.**
 
 ## Deferred (future, by design)
 

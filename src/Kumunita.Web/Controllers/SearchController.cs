@@ -58,6 +58,12 @@ public sealed class SearchController : Controller
         SearchService.EventsSurface,
         SearchService.PagesSurface,
         SearchService.AnnouncementsSurface,
+        SearchService.ProjectsSurface,
+        SearchService.BoardsSurface,
+        SearchService.TodosSurface,
+        SearchService.InventorySurface,
+        SearchService.DocumentsSurface,
+        SearchService.PeopleSurface,
     };
 
     private readonly ISearchService _search;
@@ -76,8 +82,9 @@ public sealed class SearchController : Controller
     /// </summary>
     /// <param name="q">The query text (trimmed; blank → the empty state).</param>
     /// <param name="surface"><c>all</c> (default) / <c>posts</c> / <c>events</c> / <c>pages</c> /
-    /// <c>announcements</c>; an unknown value degrades to <c>all</c> (a display fallback,
-    /// never an error — the C-DWM·8 discipline).</param>
+    /// <c>announcements</c> / <c>projects</c> / <c>boards</c> / <c>todos</c> / <c>inventory</c> /
+    /// <c>documents</c> / <c>people</c> (ADR 0124); an unknown value degrades to <c>all</c>
+    /// (a display fallback, never an error — the C-DWM·8 discipline).</param>
     /// <param name="scope"><c>community</c> (default) / <c>groups</c> (D3 — anonymous
     /// degrades to community-only, the service's silent lane).</param>
     /// <param name="page">The page (floored to 1); meaningful only on a single-surface view.</param>

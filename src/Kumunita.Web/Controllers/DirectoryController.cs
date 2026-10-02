@@ -84,7 +84,7 @@ public sealed class DirectoryController(
     /// document store or translation seam is absent (the test-construction
     /// floor).
     /// </summary>
-    private async Task<IReadOnlyList<string>>? ResolveTagDisplayNamesAsync(IReadOnlyList<string> tagIds)
+    private async Task<IReadOnlyList<string>?> ResolveTagDisplayNamesAsync(IReadOnlyList<string> tagIds)
     {
         if (tagIds is null || tagIds.Count == 0)
             return [];

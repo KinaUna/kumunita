@@ -939,6 +939,11 @@ them — D9, verbatim):
    lane is the ADR 0121 §6.4 durable-job shape applied to documents (a future
    lane).
 7. **Edit-by-replacement / author soft-delete** — the M14/M24 lane shape.
-   *Why deferred:* M21's write lane is **upload-only** (the uploader's own
-   document is visible to them via the owner branch); a public replace/edit or
-   a soft-delete is the M14/M24 edit-lane carried to documents (a future ADR).
+   *Partially resolved — see **ADR 0125** (2026-10-03):* the **edit-by-replacement**
+   half of this lane now ships (the owner re-chooses who can access it and
+   replaces the file; title/summary editable alongside; ownership immutable,
+   `Modified` stamped; owner-only gate, non-owner → 404 — the ADR 0122 D7
+   posture). The **author soft-delete** half remains **deferred**: M21's write
+   lane is **upload-only** (the uploader's own document is visible to them via
+   the owner branch); a soft-delete is the M14/M24 edit-lane carried to
+   documents (a future ADR).

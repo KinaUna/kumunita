@@ -97,7 +97,7 @@ the `UsageEvent` row is not an auditable resource). The
 `AdminAnalyticsController` (`[Authorize(Roles = Roles.GlobalAdmin)]`, the
 `AdminController` shape verbatim — the ADR 0105 "the gate is the role"
 posture): `GET /admin/analytics?window=7|30|90` (default 30) →
-`AnalyticsViewModel` → `Views/Admin/Analytics.cshtml`; `GET
+`AnalyticsViewModel` → `Views/AdminAnalytics/Index.cshtml`; `GET
 /admin/analytics/export?window=7|30|90` → CSV + **exactly one
 `AccessAudit` row** (`TargetKind == "analytics"`, `Action ==
 "analytics.export"`, `ActorId == the current user's ClaimTypes.Subject`,
@@ -159,7 +159,7 @@ surface (D1), the pure `UsageCapturePolicy` (D1), the pure `SurfaceKey`
 closed-list mapper (D2); the thin Web `UsageCaptureMiddleware` + its
 `Program.cs` pipeline position (D1); the `IUsageAnalyticsService` seam +
 impl + the `UsageAnalyticsResult` / `SurfaceRow` / `UsageCsvRow` POCOs
-(D3); the `AdminAnalyticsController` + `Views/Admin/Analytics.cshtml` +
+(D3); the `AdminAnalyticsController` + `Views/AdminAnalytics/Index.cshtml` +
 the `_AdminNav.cshtml` "Analytics" tab + the `AnalyticsViewModel` POCO +
 the `admin.analytics_*` `kw-l` block × en/de/fr/da (D4); the retention
 tick — `UsagePurgeService` (Core, static) + `UsagePurgeHandler` (Web) +
@@ -219,3 +219,29 @@ tick — `UsagePurgeService` (Core, static) + `UsagePurgeHandler` (Web) +
   neighborhood-scale instance does not need sampling; the capture is one
   `UsageEvent` row per recognized request, and the operator's psql
   surface handles the volume.
+
+## Amendments
+
+### 2026-10-02 — D4 view path correction
+
+**View location.** The U05 deliverable placed the analytics view at
+`Views/Admin/Analytics.cshtml`, but the `AdminAnalyticsController` is
+its own controller class (the ADR 0062 section-split precedent, matching
+every other `Admin*Controller` in this codebase: `AdminDateFormat`,
+`AdminQuiet`, `AdminGuests`, `AdminSignup`, …). ASP.NET Core MVC's view
+lookup for `AdminAnalyticsController.Index` searches
+`Views/AdminAnalytics/Index.cshtml` then `Views/Shared/Index.cshtml`
+(the `/Views/{Controller}/{Action}.cshtml` + shared format) — neither of
+which existed at `Views/Admin/Analytics.cshtml`, so every request to
+`/admin/analytics` 500'd with `InvalidOperationException: The view
+'Index' was not found`.
+
+The view is relocated to `Views/AdminAnalytics/Index.cshtml` (the path
+MVC searches, and the convention every other section-split controller
+already follows), and the controller action uses plain `View(model)`
+as all its sibling controllers do. The `_AdminNav` partial — still
+housed in `Views/Admin/` — is referenced from the relocated view via
+the site-root-absolute form `~/Views/Admin/_AdminNav.cshtml` (the same
+idiom `Guardian/Index.cshtml` already uses for its cross-folder
+`~/Views/Locale/_SettingsTabs.cshtml` reference). All other decisions
+in this ADR are unchanged.

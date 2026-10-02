@@ -1403,7 +1403,6 @@ public static class KnownTranslationKeys
                 "No matching tags — keep typing or start a new one.",
             ["tag.translate.heading"] = "Translations",
             ["tag.translate.save"] = "Save",
-            ["tag.translate.disabled"] = "Only the tag's creator or a GlobalAdmin can reword it.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -1768,15 +1767,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — the one /search page + nav entry.
             ["search.nav"] = "Search",
             ["search.title"] = "Search",
-            ["search.placeholder"] = "Search posts, events, pages and announcements…",
+            ["search.placeholder"] = "Search posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people…",
             ["search.no-results"] = "No results for",
             ["search.section.posts"] = "Posts",
             ["search.section.events"] = "Events",
             ["search.section.pages"] = "Pages",
             ["search.section.announcements"] = "Announcements",
+            ["search.section.projects"] = "Projects",
+            ["search.section.boards"] = "Boards",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventory",
+            ["search.section.documents"] = "Documents",
+            ["search.section.people"] = "People",
             ["search.scope.community"] = "Community",
             ["search.scope.groups"] = "Groups",
-            ["search.empty.hint"] = "Find posts, events, pages and announcements by text — the results only show content you can already read.",
+            ["search.empty.hint"] = "Find posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people by text or tag — the results only show content you can already read.",
 
             // M10 (ADR 0107 D10) — the one quiet install affordance's label
             // (U03's pwa-install.ts renders it on beforeinstallprompt; the
@@ -1875,6 +1880,17 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "File type / size",
             ["documents.detail.updated"]    = "Last updated",
             ["documents.flash_uploaded"]    = "Document uploaded.",
+            // ADR 0125 (U03) — the owner-only edit lane (D1 standing, D2 title/
+            // summary, D3 file-replace, D4 audit-by-owner). The /documents/{id}
+            // /edit form (GET + POST); the detail's "Edit" affordance.
+            ["documents.edit"]              = "Edit",
+            ["documents.edit_title"]        = "Edit a document",
+            ["documents.edit_summary"]      = "One-line description (optional)",
+            ["documents.edit_file"]         = "Replace the file (optional)",
+            ["documents.edit_file_hint"]    = "Leave blank to keep the current file.",
+            ["documents.edit_audience"]     = "Who can see this document",
+            ["documents.edit.submit"]       = "Save changes",
+            ["documents.flash_edited"]      = "Document updated.",
         };
 
     /// <summary>
@@ -3153,7 +3169,6 @@ public static class KnownTranslationKeys
                 "Keine passenden Tags — weiter tippen oder ein neues starten.",
             ["tag.translate.heading"] = "Übersetzungen",
             ["tag.translate.save"] = "Speichern",
-            ["tag.translate.disabled"] = "Nur der Ersteller oder ein GlobalAdmin kann den Text ändern.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -3489,15 +3504,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — die eine /search-Seite + Nav-Eintrag.
             ["search.nav"] = "Suche",
             ["search.title"] = "Suche",
-            ["search.placeholder"] = "Beiträge, Events, Seiten und Ankündigungen durchsuchen…",
+            ["search.placeholder"] = "Beiträge, Events, Seiten, Ankündigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen durchsuchen…",
             ["search.no-results"] = "Keine Ergebnisse für",
             ["search.section.posts"] = "Beiträge",
             ["search.section.events"] = "Events",
             ["search.section.pages"] = "Seiten",
             ["search.section.announcements"] = "Ankündigungen",
+            ["search.section.projects"] = "Projekte",
+            ["search.section.boards"] = "Boards",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventar",
+            ["search.section.documents"] = "Dokumente",
+            ["search.section.people"] = "Personen",
             ["search.scope.community"] = "Gemeinschaft",
             ["search.scope.groups"] = "Gruppen",
-            ["search.empty.hint"] = "Finde Beiträge, Events, Seiten und Ankündigungen nach Text — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
+            ["search.empty.hint"] = "Finde Beiträge, Events, Seiten, Ankündigungen, Projekte, Boards, To-dos, Inventar, Dokumente und Personen nach Text oder Tag — es werden nur Inhalte gezeigt, die du ohnehin lesen kannst.",
 
             // M10 (ADR 0107 D10) — das eine stille Install-Affordance-Label
             // (U03, pwa-install.ts). Kein Banner, kein Modal — ein Button.
@@ -3587,6 +3608,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Dateitype / Größe",
             ["documents.detail.updated"]    = "Zuletzt aktualisiert",
             ["documents.flash_uploaded"]    = "Dokument hochgeladen.",
+            // ADR 0125 (U03) — die nur-für-den-Inhaber-Bearbeitungslane.
+            ["documents.edit"]              = "Bearbeiten",
+            ["documents.edit_title"]        = "Dokument bearbeiten",
+            ["documents.edit_summary"]      = "Einzeilige Beschreibung (optional)",
+            ["documents.edit_file"]         = "Datei ersetzen (optional)",
+            ["documents.edit_file_hint"]    = "Leer lassen, um die aktuelle Datei zu behalten.",
+            ["documents.edit_audience"]     = "Wer darf dieses Dokument sehen",
+            ["documents.edit.submit"]       = "Änderungen speichern",
+            ["documents.flash_edited"]      = "Dokument aktualisiert.",
         };
 
     /// <summary>
@@ -4867,7 +4897,6 @@ public static class KnownTranslationKeys
                 "Aucune étiquette correspondante — continue à écrire ou crée-en une.",
             ["tag.translate.heading"] = "Traductions",
             ["tag.translate.save"] = "Enregistrer",
-            ["tag.translate.disabled"] = "Seul le créateur ou un GlobalAdmin peut la reformuler.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -5204,15 +5233,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — la page /search unique + l'entrée de navigation.
             ["search.nav"] = "Recherche",
             ["search.title"] = "Recherche",
-            ["search.placeholder"] = "Rechercher dans les publications, événements, pages et annonces…",
+            ["search.placeholder"] = "Rechercher dans les publications, événements, pages, annonces, projets, tableaux, tâches, inventaire, documents et personnes…",
             ["search.no-results"] = "Aucun résultat pour",
             ["search.section.posts"] = "Publications",
             ["search.section.events"] = "Événements",
             ["search.section.pages"] = "Pages",
             ["search.section.announcements"] = "Annonces",
+            ["search.section.projects"] = "Projets",
+            ["search.section.boards"] = "Tableaux",
+            ["search.section.todos"] = "Tâches",
+            ["search.section.inventory"] = "Inventaire",
+            ["search.section.documents"] = "Documents",
+            ["search.section.people"] = "Personnes",
             ["search.scope.community"] = "Communauté",
             ["search.scope.groups"] = "Groupes",
-            ["search.empty.hint"] = "Retrouvez des publications, événements, pages et annonces par texte — seules les contenus que vous pouvez déjà lire s'affichent.",
+            ["search.empty.hint"] = "Retrouvez des publications, événements, pages, annonces, projets, tableaux, tâches, inventaire, documents et personnes par texte ou étiquette — seules les contenus que vous pouvez déjà lire s'affichent.",
 
             // M10 (ADR 0107 D10) — le libellé du seul affordance d'installation
             // (U03, pwa-install.ts). Pas de bannière, pas de modale — un bouton.
@@ -5302,6 +5337,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Type / taille du fichier",
             ["documents.detail.updated"]    = "Dernière mise à jour",
             ["documents.flash_uploaded"]    = "Document téléversé.",
+            // ADR 0125 (U03) — la lane d'édition réservée au propriétaire.
+            ["documents.edit"]              = "Modifier",
+            ["documents.edit_title"]        = "Modifier un document",
+            ["documents.edit_summary"]      = "Description en une ligne (facultatif)",
+            ["documents.edit_file"]         = "Remplacer le fichier (facultatif)",
+            ["documents.edit_file_hint"]    = "Laisser vide pour conserver le fichier actuel.",
+            ["documents.edit_audience"]     = "Qui peut voir ce document",
+            ["documents.edit.submit"]       = "Enregistrer les modifications",
+            ["documents.flash_edited"]      = "Document mis à jour.",
         };
 
     /// <summary>
@@ -6573,7 +6617,6 @@ public static class KnownTranslationKeys
                 "Ingen matchende tags — fortsæt med at skrive eller start et nyt.",
             ["tag.translate.heading"] = "Oversættelser",
             ["tag.translate.save"] = "Gem",
-            ["tag.translate.disabled"] = "Kun tags' opretter eller en GlobalAdmin kan omformulere den.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -6909,15 +6952,21 @@ public static class KnownTranslationKeys
             // M8 (ADR 0091 D1/D4) — den ene /search-side + nav-indgang.
             ["search.nav"] = "Søg",
             ["search.title"] = "Søg",
-            ["search.placeholder"] = "Søg i indlæg, arrangementer, sider og meddelelser…",
+            ["search.placeholder"] = "Søg i indlæg, arrangementer, sider, meddelelser, projekter, brætter, to-dos, inventar, dokumenter og personer…",
             ["search.no-results"] = "Ingen resultater for",
             ["search.section.posts"] = "Indlæg",
             ["search.section.events"] = "Arrangementer",
             ["search.section.pages"] = "Sider",
             ["search.section.announcements"] = "Meddelelser",
+            ["search.section.projects"] = "Projekter",
+            ["search.section.boards"] = "Brætter",
+            ["search.section.todos"] = "To-dos",
+            ["search.section.inventory"] = "Inventar",
+            ["search.section.documents"] = "Dokumenter",
+            ["search.section.people"] = "Personer",
             ["search.scope.community"] = "Fællesskab",
             ["search.scope.groups"] = "Grupper",
-            ["search.empty.hint"] = "Find indlæg, arrangementer, sider og meddelelser efter tekst — kun indhold, du allerede kan læse, vises.",
+            ["search.empty.hint"] = "Find indlæg, arrangementer, sider, meddelelser, projekter, brætter, to-dos, inventar, dokumenter og personer efter tekst eller tag — kun indhold, du allerede kan læse, vises.",
 
             // M10 (ADR 0107 D10) — det ene stille installations-affordance
             // (U03, pwa-install.ts). Ingen banner, ingen modal — én knap.
@@ -7007,6 +7056,15 @@ public static class KnownTranslationKeys
             ["documents.detail.type_size"]  = "Filtype / størrelse",
             ["documents.detail.updated"]    = "Senest opdateret",
             ["documents.flash_uploaded"]    = "Dokument uploadet.",
+            // ADR 0125 (U03) — ejeren-kan-ændre-lanen.
+            ["documents.edit"]              = "Rediger",
+            ["documents.edit_title"]        = "Rediger et dokument",
+            ["documents.edit_summary"]      = "En-linjes beskrivelse (valgfri)",
+            ["documents.edit_file"]         = "Erstat filen (valgfri)",
+            ["documents.edit_file_hint"]    = "Lad være tom for at beholde den nuværende fil.",
+            ["documents.edit_audience"]     = "Hvem kan se dette dokument",
+            ["documents.edit.submit"]       = "Gem ændringer",
+            ["documents.flash_edited"]      = "Dokument opdateret.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
