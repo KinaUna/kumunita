@@ -30,9 +30,17 @@ public sealed class MessagingService : IMessagingService
     /// §Drift-guard may amend the number, not the cap rule).</summary>
     public const int MaxBodyChars = 2000;
 
-    /// <summary>The list / thread page size (the ADR 0090 D4 neighborhood-scale
-    /// page; <c>HasMore</c> is the sole paging signal, ADR 0090 D1).</summary>
+    /// <summary>The conversation-list page size (the ADR 0090 D4
+    /// neighborhood-scale page; <c>HasMore</c> is the sole paging signal,
+    /// ADR 0090 D1).</summary>
     public const int PageSize = 20;
+
+    /// <summary>The thread page size — the <b>10 most recent</b> messages a
+    /// single thread read returns (the "show only the 10 latest" pin; a
+    /// "load earlier" button pages backwards through the rest). Smaller than
+    /// the list's <see cref="PageSize"/>: a 1:1 thread is a tight, recent
+    /// exchange, not a directory-scale feed.</summary>
+    public const int ThreadPageSize = 10;
 
     private readonly IDocumentStore _store;
     // The OtherDisplayName resolution lane (design doc refinement 8) —
@@ -198,11 +206,11 @@ public sealed class MessagingService : IMessagingService
         var messages = await session.Query<Message>()
             .Where(m => m.ConversationId == convo.Id)
             .OrderByDescending(m => m.Created)
-            .Skip((p - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((p - 1) * ThreadPageSize)
+            .Take(ThreadPageSize)
             .ToListAsync(ct)
             .ConfigureAwait(false);
-        var hasMore = messages.Count == PageSize;
+        var hasMore = messages.Count == ThreadPageSize;
 
         var other = actorId == convo.ParticipantA ? convo.ParticipantB : convo.ParticipantA;
         return new ConversationDetail(

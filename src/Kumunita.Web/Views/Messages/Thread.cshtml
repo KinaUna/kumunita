@@ -12,6 +12,7 @@
     var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var composePlaceholder = await Translation.GetAsync("message.compose.placeholder", lang);
     var otherWord = await Translation.GetAsync("message.other", lang);
+    var loadEarlierWord = await Translation.GetAsync("message.load_earlier", lang);
     // The header name: the other participant's display name, or the fallback
     // word when the conversation is unnamed (or absent in the error states).
     string headerName = Model.Conversation is { } hConv && !string.IsNullOrEmpty(hConv.OtherDisplayName)
@@ -57,7 +58,7 @@
             </div>
         }
 
-        @* ── The thread (newest-first — the service's ordering) ──────────── *@
+        @* ── The thread (chronological — latest last, the view's rendering) ── *@
         @if (Model.Messages.Count == 0)
         {
             <div class="alert alert-secondary" role="status">
@@ -66,36 +67,55 @@
         }
         else
         {
-            <ul class="list-group mb-4">
+            @if (Model.Pager is { HasNext: true } p)
+            {
+                <div class="text-center mb-3">
+                    <a class="btn btn-outline-secondary btn-sm"
+                       href="@p.BaseUrl?page=@(p.CurrentPage + 1)"
+                       title="@loadEarlierWord">@loadEarlierWord</a>
+                </div>
+            }
+
+            <ul class="message-thread">
                 @foreach (var m in Model.Messages)
                 {
                     bool mine = m.SenderId == Model.ActorId;
                     bool unread = !mine && m.ReadBy is null;
-                    <li class="list-group-item d-flex flex-column gap-1 @(unread ? "border-start border-primary border-4" : "")">
-                        <div class="d-flex justify-content-between align-items-baseline gap-2">
-                            <span class="fw-semibold small">
-                                @(mine
-                                    ? (!string.IsNullOrEmpty(Model.ActorDisplayName) ? Model.ActorDisplayName : otherWord)
-                                    : (Model.Conversation is { } tConv
-                                        ? (string.IsNullOrEmpty(tConv.OtherDisplayName) ? otherWord : tConv.OtherDisplayName)
-                                        : otherWord))
+                    string senderName = mine
+                        ? (!string.IsNullOrEmpty(Model.ActorDisplayName) ? Model.ActorDisplayName : otherWord)
+                        : (Model.Conversation is { } tConv
+                            ? (string.IsNullOrEmpty(tConv.OtherDisplayName) ? otherWord : tConv.OtherDisplayName)
+                            : otherWord);
+                    string senderAvatarId = mine
+                        ? Model.ActorId
+                        : (Model.Conversation?.OtherParticipantId ?? string.Empty);
+                    string senderInitial = !string.IsNullOrWhiteSpace(senderName)
+                        ? char.ToUpperInvariant(senderName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="msg-row @(mine ? "mine" : "other") @(unread ? "unread" : "")">
+                        @if (!string.IsNullOrEmpty(senderAvatarId))
+                        {
+                            <span class="msg-avatar d-inline-flex align-items-center">
+                                <img class="avatar" src="/profile/avatar/@senderAvatarId" alt="" data-avatar-fallback>
+                                <span class="avatar-mono" style="display:none;">@senderInitial</span>
                             </span>
-                            <span class="small text-secondary">
-                                <kw-dt dt="@m.Created" format="g"></kw-dt>
-                                @if (unread)
-                                {
-                                    <span class="badge text-bg-primary ms-2"><kw-l key="message.unread">unread</kw-l></span>
-                                }
-                            </span>
+                        }
+                        <div class="msg-bundle">
+                            <div class="msg-meta d-flex gap-2 align-items-baseline flex-wrap">
+                                <span class="fw-semibold small">@senderName</span>
+                                <span class="small text-secondary">
+                                    <kw-dt dt="@m.Created" format="g"></kw-dt>
+                                    @if (unread)
+                                    {
+                                        <span class="badge text-bg-primary ms-2"><kw-l key="message.unread">unread</kw-l></span>
+                                    }
+                                </span>
+                            </div>
+                            <div class="message-body">@m.Body</div>
                         </div>
-                        <div class="message-body">@m.Body</div>
                     </li>
                 }
             </ul>
-            @if (Model.Pager is not null)
-            {
-                <partial name="_Pager" model="Model.Pager" />
-            }
         }
 
         @* ── The composer ───────────────────────────────────────────────── *@
