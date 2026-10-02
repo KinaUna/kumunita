@@ -186,6 +186,20 @@ public sealed class Profile
     /// **additive** field (ADR 0004 §B.1), like <see cref="EmailLanguage"/>.
     /// </summary>
     public IReadOnlyList<string> TagIds { get; set; } = [];
+
+    // M22 ADD (ADR 0132 D1; ADR 0004 §B.1 additive — the 11th additive Profile
+    // field after AvatarId, TimeZone, DateFormat, EmailLanguage, Bio, TagIds):
+    /// <summary>
+    /// M22 (ADR 0132, D1) — the onboarding completion stamp. <c>null</c> =
+    /// the resident has not finished the guided walk-through (the floor: the
+    /// banner shows, the nav entry is present). A non-null value = finished /
+    /// skipped; the banner clears. Written only by the owner-scope
+    /// <see cref="IUserInfoService.CompleteOnboardingAsync"/> lane (D2); read
+    /// through the existing <see cref="IUserInfoService.GetProfileAsync"/>
+    /// read (never a claim, D6). Additive per ADR 0004 §B.1: delta-detected,
+    /// idempotent, no re-seed, no EF migration, no new <c>*DocTypes</c> surface.
+    /// </summary>
+    public DateTimeOffset? OnboardingCompletedAt { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

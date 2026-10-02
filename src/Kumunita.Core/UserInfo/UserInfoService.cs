@@ -1825,6 +1825,41 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task CompleteOnboardingAsync(string subjectId, string actorBy)
+    {
+        // ADR 0132 (D2) — the onboarding-completion stamp write lane. Mirrors
+        // SetProfileTimezoneAsync exactly (the C-MED·8 single write-lane shape):
+        // the self-scope check happens at the Web boundary (the owner is the
+        // actor); this lane writes Profile.OnboardingCompletedAt only. One
+        // session, one SaveChangesAsync (C3); no audit row (a Profile field
+        // write — the UpsertProfileAsync shape, "not an access decision").
+        // Fail closed on a missing profile (never load-or-create, the
+        // SetProfileTimezoneAsync pin). Strong consistency (C4): the stamp is
+        // live on the very next GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.OnboardingCompletedAt = DateTimeOffset.UtcNow;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId)
+    {
+        // ADR 0132 (D2) — the onboarding-completion read seam. The
+        // GetProfileAsync read re-projected (owner-scope, no audit row,
+        // never load-or-creates — null is the floor, not a write).
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        return profile?.OnboardingCompletedAt;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,

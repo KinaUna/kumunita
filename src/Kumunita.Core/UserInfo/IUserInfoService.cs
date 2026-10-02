@@ -236,6 +236,36 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileDateFormatAsync"/> pin).</exception>
     Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy);
 
+    // ── Onboarding addition (ADR 0132; the *single* completion-stamp write
+    // lane + its owner-scope read — the ADR 0006-E compatible-addition idiom
+    // this file uses, the exact shape of SetProfileTimezoneAsync) ──────────
+
+    /// <summary>
+    /// M22 (ADR 0132, D2) — stamp the onboarding-completed state. Owner-scope
+    /// single write lane (the <see cref="SetProfileTimezoneAsync"/> shape
+    /// verbatim): stamps <see cref="Profile.OnboardingCompletedAt"/> = now, one
+    /// <c>SaveChangesAsync</c>, **no <see cref="Authorization.AccessAudit"/>
+    /// row** (a profile-field write — the <see cref="UpsertProfileAsync"/>
+    /// shape, "not an access decision"). Strong consistency (invariant C4): the
+    /// stamp is live on the very next <see cref="GetProfileAsync"/> call. The
+    /// self-scope check happens at the Web boundary (the owner is the actor);
+    /// this lane writes <c>Profile.OnboardingCompletedAt</c> only.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task CompleteOnboardingAsync(string subjectId, string actorBy);
+
+    /// <summary>
+    /// M22 (ADR 0132, D2) — owner-scope read of the completion stamp
+    /// (<see cref="Profile.OnboardingCompletedAt"/>; <c>null</c> = not
+    /// completed, the floor). The <see cref="GetProfileAsync"/> read re-
+    /// projected: owner-scope, **no audit row**, **never load-or-creates**
+    /// (returns <c>null</c> when no <see cref="Profile"/> exists — the read is
+    /// the floor, not a write). Mirrors <see cref="GetProfileAsync"/>.
+    /// </summary>
+    Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

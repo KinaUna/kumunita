@@ -66,3 +66,45 @@ seams (`CompleteOnboardingAsync` / `GetOnboardingCompletedAsync`) on
 load-or-create, **not** write any field other than `OnboardingCompletedAt`,
 **not** add any authorization surface (the §10 drift-guard, §9 of the design
 doc).
+
+## U01 — the additive `Profile.OnboardingCompletedAt` field + the two owner-scope seams (Core)
+
+**Delivered (3 code files, Core only):**
+- `src/Kumunita.Core/UserInfo/Profile.cs` — one additive field
+  `public DateTimeOffset? OnboardingCompletedAt { get; set; }` placed after the
+  M23 `Bio`/`TagIds` fields (the ADR 0004 §B.1 additive placement, the 11th
+  additive field on the same doc). **Not** part of `ProfileUpdate` (its own
+  owner-scope lane, D2). No new DocTypes surface / boot line / EF migration.
+- `src/Kumunita.Core/UserInfo/IUserInfoService.cs` — two seams added immediately
+  after `SetProfileEmailLanguageAsync` (the ADR 0006-E compatible-addition
+  idiom, the `SetProfileTimezoneAsync` doc-comment shape verbatim):
+  `Task CompleteOnboardingAsync(string subjectId, string actorBy)` (write) +
+  `Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId)` (read).
+- `src/Kumunita.Core/UserInfo/UserInfoService.cs` — the two impls mirroring
+  `SetProfileTimezoneAsync` **verbatim** (load → `KeyNotFoundException` if null
+  → stamp `OnboardingCompletedAt = UtcNow` → `Store` → one `SaveChangesAsync`,
+  **no `AccessAudit` row**); the read mirrors `GetProfileAsync` (returns
+  `profile?.OnboardingCompletedAt`, `null` = floor). **No new DI registration.**
+
+**Seam signatures (locked, for U02 to call):** `CompleteOnboardingAsync(string
+subjectId, string actorBy)` · `GetOnboardingCompletedAsync(string subjectId)`.
+`OnboardingCompletedAt` shape: nullable `DateTimeOffset?`, `null` = not
+completed (the banner floor).
+
+**Test added:** `tests/Kumunita.Core.Tests/UserInfo/OnboardingCompletionLaneTests.cs`
+— 4 facts pinning GATE-1/GATE-2/C-M22·3: fresh profile reads `null` (both
+seams) · complete-then-read returns the stamp (strong consistency C4, and the
+write touched no other field) · missing profile throws `KeyNotFoundException`
+(never load-or-create, and the read seam returns `null`) · **zero**
+`AccessAudit` rows after the write.
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` clean;
+`dotnet exec …\Kumunita.Core.Tests.dll` **1130 passed, 0 failed, 0 skipped**
+(the 4 new facts + the pre-existing suite). No drift: zero new authorization
+surface, zero new Marten surface, owner-scope only.
+
+**U02 next —** read the design doc **§7** + ADR 0132 **§Decision** (D2/D4). Own
+the `OnboardingController` (`GET /onboarding` + `POST /onboarding/finish`) + the
+`OnboardingViewModel` (banner-eligibility read via `GetOnboardingCompletedAsync`
+/ `GetProfileAsync`). U02 **calls** `CompleteOnboardingAsync`; it never writes
+`Profile` itself. Exit on `Kumunita.Web.Tests`.
