@@ -63,10 +63,7 @@ public sealed class AdminAnalyticsController(
     public async Task<IActionResult> Index([FromQuery] int window = 30)
     {
         var result = await analytics.GetWindowAsync(window);
-        // The view lives at Views/Admin/Analytics.cshtml (the U05 deliverable
-        // pin) rather than in an AdminAnalytics/ folder, so name it explicitly
-        // — the default lookup (Views/AdminAnalytics/Index.cshtml) would miss.
-        return View("Admin/Analytics", new AnalyticsViewModel
+        return View(new AnalyticsViewModel
         {
             WindowDays         = result.WindowDays,
             Total              = result.Total,

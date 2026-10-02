@@ -4,8 +4,10 @@
 }
 
 @* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): the "Analytics"
-   tab is the strip's sixth entry (the ADR 0114 D4 surface). *@
-@await Html.PartialAsync("_AdminNav.cshtml")
+   tab is the strip's sixth entry (the ADR 0114 D4 surface). The partial
+   lives in Views/Admin/ (the AdminController's own section), so this view
+   — sitting in Views/AdminAnalytics/ — must reference it absolutely. *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
 
 <h1><kw-l key="admin.analytics_title">Usage analytics</kw-l></h1>
 <p class="text-muted">

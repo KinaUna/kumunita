@@ -113,7 +113,7 @@ mapper (D2, §surface-key); the thin Web `UsageCaptureMiddleware` + its
 `Program.cs` pipeline position (D1, §middleware); the
 `IUsageAnalyticsService` seam + impl + the `UsageAnalyticsResult` /
 `SurfaceRow` / `UsageCsvRow` POCOs (D3, §aggregation); the
-`AdminAnalyticsController` + `Views/Admin/Analytics.cshtml` + the
+`AdminAnalyticsController` + `Views/AdminAnalytics/Index.cshtml` + the
 `_AdminNav.cshtml` "Analytics" tab + the `AnalyticsViewModel` POCO + the
 `admin.analytics_*` `kw-l` block × en/de/fr/da (D4, §admin-surface + §kw-l);
 the retention tick — `UsagePurgeService` (Core, static) +
@@ -168,7 +168,7 @@ not by discipline).
 - **New — Web:** `src/Kumunita.Web/Middleware/UsageCaptureMiddleware.cs`;
   `src/Kumunita.Web/Controllers/AdminAnalyticsController.cs`;
   `src/Kumunita.Web/Models/AnalyticsViewModel.cs`;
-  `src/Kumunita.Web/Views/Admin/Analytics.cshtml`;
+  `src/Kumunita.Web/Views/AdminAnalytics/Index.cshtml`;
   `src/Kumunita.Web/SideEffects/UsagePurgeHandler.cs`.
 - **Extended (one-line or block-additions only):** `Program.cs` (the
   `AddFileSink` call — U01; the `UsageDocTypes.Configure(opts)` line —
@@ -216,7 +216,7 @@ resource).
 controller (the ADR 0062 section-split precedent — a section-specific
 controller, not a new action on the god-controller): `GET
 /admin/analytics?window=7|30|90` (default 30) → `AnalyticsViewModel` →
-`Views/Admin/Analytics.cshtml`; `GET /admin/analytics/export?window=
+`Views/AdminAnalytics/Index.cshtml`; `GET /admin/analytics/export?window=
 7|30|90` → CSV + **exactly one `AccessAudit` row**
 (`TargetKind == "analytics"`, `Action == "analytics.export"`,
 `ActorId == the current user's ClaimTypes.Subject`, `Via =
@@ -983,7 +983,7 @@ public class AnalyticsViewModel
 }
 ```
 
-`Views/Admin/Analytics.cshtml` — the `Admin/Audit.cshtml` table shape
+`Views/AdminAnalytics/Index.cshtml` — the `Admin/Audit.cshtml` table shape
 (the `kw-l` labels × en/de/fr/da — the `admin.analytics_*` keys from
 §kw-l below), the summary row (the `Total` / `AuthenticatedTotal` /
 `AnonymousTotal` / `DistinctActors`), the `SurfaceRanking` table loop
