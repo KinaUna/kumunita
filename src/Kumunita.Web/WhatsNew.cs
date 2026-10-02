@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.25.0", "2026-10-02", new List<string>
+        {
+            "Onboarding — a guided walk-through for your first sign-in: one page walks you through display name, avatar, interface language, time zone, date & time format, email & notification language, and contact details, each step linking into the setting that already owns it, and a dismissible reminder banner nudges you until you finish or skip (ADR 0132).",
+        }),
         new("0.24.0", "2026-10-03", new List<string>
         {
             "Messaging, as a conversation — a 1:1 thread now reads as a chat: messages run oldest-to-newest, your own on the right and the other person's on the left, each with the sender's avatar; a \"Load earlier\" button pulls in older messages; and a message you send confirms with the other person's name (\"Sent to …\").",
