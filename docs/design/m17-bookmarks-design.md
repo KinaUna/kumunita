@@ -25,7 +25,7 @@ access) — design
 > C-M17·1…7, the FACES F1–F5 + the named trade, the §kw-l key list, and
 > the §gate test names are locked in **ADR 0118 (Accepted, 2026-09-29)**.
 > The `[PROPOSED]` set in the register
-> `docs/plans-milestones/done/plan-m17-bookmarks.md` is the locked set this
+> `docs/plans-milestones/done/m17/plan-m17-bookmarks.md` is the locked set this
 > doc restates **verbatim** (the U00 handoff entry records the lock;
 > **no veto** was recorded before the lock).
 >
@@ -108,9 +108,9 @@ is a **milestone** (a roadmap letter, not a named lane): the close unit
 `docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — D8). This design doc (authored U00, **LOCKED**) is the
 **primary tier**; the register
-`docs/plans-milestones/done/plan-m17-bookmarks.md` is the secondary tier; the
+`docs/plans-milestones/done/m17/plan-m17-bookmarks.md` is the secondary tier; the
 scratch handoff note is
-`docs/plans-milestones/done/m17-bookmarks-handoff-notes.md`.
+`docs/plans-milestones/done/m17/m17-bookmarks-handoff-notes.md`.
 
 ## Scope
 

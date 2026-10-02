@@ -87,7 +87,7 @@ unit (U07) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
 parity contract, C-M11·8). The design doc
 `docs/design/m11-portability-design.md` (authored U00, **LOCKED**) is the
 primary tier; the register
-`docs/plans-milestones/done/plan-m11-portability.md` is the secondary tier.
+`docs/plans-milestones/done/m11/plan-m11-portability.md` is the secondary tier.
 
 ## Decision
 
