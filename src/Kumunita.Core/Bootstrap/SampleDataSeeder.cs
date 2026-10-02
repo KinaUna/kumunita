@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
@@ -5,6 +6,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -30,26 +32,34 @@ namespace Kumunita.Core.Bootstrap;
 /// outbox, and the admin keeps its <c>SeedAdmin__</c> token lane (no weak credential
 /// is stored on a public instance).
 /// <para>
-/// <b>Idempotent + pristine-gated.</b> Like <see cref="FirstBootSeeder"/>, every step is
-/// a create-if-missing no-op (accounts keyed by e-mail, content keyed by its own ids) and
-/// the pristine outer gate keeps it from touching a warm database. <b>No e-mail</b> is
-/// staged (the seeder is not a user-facing sign-up — there is no <see cref="IMailerStage"/>
-/// dependency, which also sidesteps the Wolverine <c>IMessageContext</c> requirement the
-/// outbox staging needs).
+/// <b>Data lives in an embedded JSON document (ADR 0129).</b> The mock neighborhood is
+/// described by the single <see cref="SampleDataDocument"/> in
+/// <c>Data/sample-data.json</c> (embedded in this assembly, <see cref="LoadDocument"/>).
+/// A developer grows the corpus — more accounts, posts, replies, events, translations,
+/// groups, tags, blog pages — by editing that one file, with **no C# change**; this class
+/// is a generic materializer that resolves the file's human-readable cross-references
+/// (accounts by e-mail, tags/groups by slug, blog pages by parent slug) to Marten
+/// document ids and stores the documents. The <see cref="EventTranslationBaselines"/>
+/// the warm-boot backfill (<see cref="BackfillEventTranslationsAsync"/>) reads are sourced
+/// from the same file, so a fresh and a backfilled instance agree on the de / fr / da
+/// rows (the ADR 0060 D1 "one registry, two lanes" shape).
 /// <para>
-/// <b>Session discipline (invariant C3):</b> the EF / <c>identity</c>-side writes (accounts,
-/// roles, passwords) commit per <see cref="UserManager"/> call; every <c>mt</c>-side
-/// document (profiles, groups, content, translations) is stored in a <b>single</b>
-/// <see cref="IDocumentSession"/> and committed once. The component-mandatory flags ride
-/// the <see cref="IUserInfoService.SetCommunityMandatoryAsync"/> write lane (its own
-/// session + audit row) because that is the single sanctioned writer for
-/// <c>Component.Mandatory</c> (ADR 0012).
+/// <b>Idempotent + pristine-gated.</b> Every step is a create-if-missing no-op and the
+/// pristine outer gate keeps it from touching a warm database. No e-mail is staged except
+/// in the deploy posture (a credentials summary to the seed admin).
 /// <para>
-/// <b>Visibility model.</b> The four seeded communities are marked <b>mandatory</b>
+/// <b>Session discipline (invariant C3):</b> the EF / <c>identity</c>-side writes
+/// (accounts, roles, passwords, base profiles) commit per <see cref="UserManager"/>
+/// call; every <c>mt</c>-side document (extended profiles, groups, content, translations)
+/// is stored in a <b>single</b> <see cref="IDocumentSession"/> and committed once. The
+/// component-mandatory flags ride the <see cref="IUserInfoService.SetCommunityMandatoryAsync"/>
+/// write lane (its own session + audit row) because that is the single sanctioned writer
+/// for <c>Component.Mandatory</c> (ADR 0012).
+/// <para>
+/// <b>Visibility model.</b> The seeded communities are marked <b>mandatory</b>
 /// (ADR 0012), so <b>every verified resident is a member of every board</b> and the
 /// default community-visible posts (<see cref="Audience.Community"/> = true) are visible
-/// to all of them without per-account grant rows. A content item's audience therefore only
-/// needs the flat <c>Community = true</c> shape — no per-user grants.
+/// to all of them without per-account grant rows.
 /// </summary>
 public static class SampleDataSeeder
 {
@@ -72,107 +82,98 @@ public static class SampleDataSeeder
     /// <c>NotificationOptions.SuppressForSampleAccountsInProduction</c>) compares a
     /// recipient's profile e-mail against in production. A recipient is a sample
     /// account when — and only when — their e-mail (case-insensitive, trimmed) is a
-    /// member of this set. The four residents, the scoped moderator, the translator,
-    /// and the seed admin are all covered.
+    /// member of this set. Sourced from the <c>accounts</c> list in the embedded
+    /// sample-data document (ADR 0129) — the same file the seeder materializes, so the
+    /// closed set and the seeded corpus cannot drift apart.
     /// </summary>
     public static readonly IReadOnlySet<string> SampleAccountEmails =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            AdminEmail,        // admin@examplium.com
-            ModeratorEmail,    // moderator@examplium.com
-            TranslatorEmail,   // translator@examplium.com
-            "anna@examplium.com",
-            "ben@examplium.com",
-            "carla@examplium.com",
-            "david@examplium.com",
-        };
+        new HashSet<string>(
+            LoadDocument().Accounts.Select(a => a.Email),
+            StringComparer.OrdinalIgnoreCase);
 
     private static readonly IReadOnlySet<string> GlobalAdminRoles =
         new HashSet<string> { Roles.GlobalAdmin };
 
     private static string Id() => Guid.NewGuid().ToString("N");
 
+    // ── The embedded sample-data document (ADR 0129) ─────────────────────────────────
+    // A single, lazily-cached read of the embedded JSON. Every consumer (the closed
+    // e-mail set, the event baselines, and SeedAsync itself) reads the SAME instance,
+    // so the data is loaded once and the cross-references resolve identically.
+    private static SampleDataDocument? _document;
+
     /// <summary>
-    /// Store the de / fr / da <see cref="Kumunita.Core.Events.EventTranslation"/> rows for
-    /// one sample event from the <see cref="EventTranslationBaselines"/> registry, if that
-    /// event's English title is one of the sample events (all four are; an event added
-    /// without baselines is simply skipped). Shared by <see cref="SeedAsync"/> (a fresh
-    /// instance) so both it and <see cref="BackfillEventTranslationsAsync"/> agree on the
-    /// exact de / fr / da text (the ADR 0060 D1 "one registry, two lanes" shape).
+    /// Load the sample-data document from the embedded resource
+    /// (<c>Kumunita.Core.sample-data.json</c>, see <c>Kumunita.Core.csproj</c>).
+    /// Cached after first read; a missing/undecodable resource is a hard, loud error —
+    /// the seeder is a Development-only surface, so a broken file must fail fast rather
+    /// than seed a silent partial neighborhood.
     /// </summary>
-    private static void StoreEventTranslations(
-        IDocumentSession session, string eventId, string englishTitle,
-        string authorId, DateTimeOffset created)
+    private static SampleDataDocument LoadDocument()
     {
-        if (!EventTranslationBaselines.TryGetValue(englishTitle, out var baselines))
-            return;
-        foreach (var baseline in baselines)
+        if (_document is not null)
+            return _document;
+
+        var assembly = typeof(SampleDataSeeder).Assembly;
+        using var stream = assembly.GetManifestResourceStream("Kumunita.Core.sample-data.json")
+            ?? throw new InvalidOperationException(
+                "The embedded sample-data resource 'Kumunita.Core.sample-data.json' is missing " +
+                "from the Kumunita.Core assembly — check the EmbeddedResource item in Kumunita.Core.csproj.");
+
+        // The JSON is camelCase; the POCOs are PascalCase — bind case-insensitively. Inlined
+        // (not a static field) so this method is fully self-contained and correct regardless
+        // of the static-field initialization order of its callers (e.g. SampleAccountEmails).
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var doc = JsonSerializer.Deserialize<SampleDataDocument>(stream, options)
+            ?? throw new InvalidOperationException("The embedded sample-data document failed to deserialize.");
+
+        // Fail-fast on an unknown elevated role (a typo in the JSON is a loud error, not a
+        // silently-created bogus EF role). Inlined set — same reason as the options above.
+        var knownElevated = new[] { Roles.GlobalAdmin, Roles.Moderator, Roles.Translator };
+        foreach (var account in doc.Accounts)
         {
-            session.Store(new EventTranslation
-            {
-                Id = Id(),
-                EventId = eventId,
-                LanguageCode = baseline.Code,
-                Title = baseline.Title,
-                Body = baseline.Body,
-                AuthorId = authorId,
-                Created = created,
-            });
+            if (account.Role is not null && !knownElevated.Contains(account.Role))
+                throw new InvalidOperationException(
+                    $"sample-data.json: account '{account.Email}' has an unknown elevated role " +
+                    $"'{account.Role}' (expected one of GlobalAdmin, Moderator, Translator, or none).");
         }
+        _document = doc;
+        return doc;
     }
 
     /// <summary>
-    /// The (language → title / body) baseline for one sample event — the code-owned
-    /// de / fr / da text the sample neighborhood ships as
-    /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0059), seeded by
-    /// <see cref="SeedAsync"/> and re-applied, create-if-missing, by
-    /// <see cref="BackfillEventTranslationsAsync"/> (ADR 0060).
+    /// The (language → title / body) baseline for one sample event — the de / fr / da
+    /// text the sample neighborhood ships as <see cref="Kumunita.Core.Events.EventTranslation"/>
+    /// rows (ADR 0059), seeded by <see cref="SeedAsync"/> and re-applied, create-if-missing,
+    /// by <see cref="BackfillEventTranslationsAsync"/> (ADR 0060).
     /// </summary>
     public readonly record struct EventTranslationBaseline(string Code, string? Title, string Body);
 
     /// <summary>
-    /// The code-owned de / fr / da translation baselines for the sample events, keyed
-    /// by the event's **English title** (the seeder's stable, human-readable key —
-    /// within the sample, events are identified by their content, not by id).
+    /// The de / fr / da translation baselines for the sample events, keyed by the event's
+    /// **English title** (the seeder's stable, human-readable key — within the sample,
+    /// events are identified by their content, not by id). Sourced from each event's
+    /// <c>translations</c> in the embedded sample-data document (ADR 0129);
     /// <see cref="SeedAsync"/> and <see cref="BackfillEventTranslationsAsync"/> read the
     /// **same** set, so a fresh instance and a backfilled one carry identical de / fr / da
-    /// rows (the ADR 0042 D1 / ADR 0047 D2 "one registry, two lanes" shape — ADR 0060 D1).
+    /// rows (the ADR 0060 D1 "one registry, two lanes" shape).
     /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<EventTranslationBaseline>> EventTranslationBaselines { get; }
-        = new Dictionary<string, IReadOnlyList<EventTranslationBaseline>>
-    {
-        ["Community Cleanup Day"] =
-        [
-            new("de", "Gemeinschaftlicher Aufräumtag", "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum."),
-            new("fr", "Journée de nettoyage communautaire", "Gants et sacs fournis. Rendez-vous à la porte à **09:30**, terminé pour **12:00**.\n\nCafé et pâtisseries ensuite dans la salle communautaire."),
-            new("da", "Fælles ryddedag", "Handsker og poser leveres. Møde ved porten **09:30**, færdig kl. **12:00**.\n\nBagefter kaffe og kage i fælleslokalet."),
-        ],
-        ["Potluck in the Green"] =
-        [
-            new("de", "Potluck auf dem Grün", "Ein Gericht pro Person, kommt ab **14:00**. Bringt einen Stuhl mit, wenn ihr einen habt."),
-            new("fr", "Repas partagé sur la pelouse", "Un plat chacun, arrivez à partir de **14:00**. Apportez une chaise si vous en avez."),
-            new("da", "Fællesspisning på græsset", "En ret hver, ankom fra **14:00**. Tag en stol med, hvis du har en."),
-        ],
-        ["Tool Library Launch"] =
-        [
-            new("de", "Eröffnung der Werkzeugbibliothek", "Bohrer, Leitern, Hochdruckreiniger — leihen statt kaufen. Treffen im Gemeinschaftsraum, um das Regal aufzubauen."),
-            new("fr", "Lancement de la bibliothèque d'outils", "Perceuses, échelles, nettoyeurs haute pression — empruntez au lieu d'acheter. Rendez-vous dans la salle communautaire pour installer l'étagère."),
-            new("da", "Åbning af værktøjbiblioteket", "Bor, stiger, trykrenser — lån i stedet for at købe. Møde i fælleslokalet for at sætte hylden op."),
-        ],
-        ["Neighborhood Walk"] =
-        [
-            new("de", "Nachbarschaftsspaziergang", "Eine gemächliche Runde durch den Kiez, danach Kaffee. Kinderwagen willkommen — die Strecke ist flach."),
-            new("fr", "Bal de quartier", "Une boucle tranquille du quartier, café à la fin. Poussettes bienvenues — c'est plat tout du long."),
-            new("da", "Naboregang", "En rolig tur rundt om blokken, kaffe bagefter. Børnevogne er velkomne — det er fladt hele vejen."),
-        ],
-    };
+        = LoadDocument().Events
+            .Where(e => e.Translations.Count > 0)
+            .ToDictionary(
+                e => e.Title,
+                e => (IReadOnlyList<EventTranslationBaseline>)e.Translations
+                    .Select(t => new EventTranslationBaseline(t.LanguageCode, t.Title, t.Body))
+                    .ToList());
 
     /// <summary>
     /// Runs the sample-data steps. Called once by <c>Program.cs</c> on a pristine DB,
     /// only when <c>SampleData__Enabled</c> is set (ADR 0056). In the Development
     /// environment it takes the weak-credential posture; otherwise (a deployed demo
     /// site) it takes the deploy posture — random passwords + a credentials e-mail to
-    /// the seed admin.
+    /// the seed admin. The neighborhood's content is read from the embedded sample-data
+    /// document (ADR 0129).
     /// </summary>
     public static async Task SeedAsync(
         AppDbContext identity,
@@ -185,6 +186,8 @@ public static class SampleDataSeeder
         ILogger logger = default!,
         CancellationToken ct = default)
     {
+        var doc = LoadDocument();
+
         // Two postures, one seeder (ADR 0056):
         //  · Development (mailer == null) — the documented weak demo credentials
         //    (README table), printed to the log; the seed admin also gets a weak demo
@@ -192,892 +195,483 @@ public static class SampleDataSeeder
         //  · Deploy (mailer != null) — the seed admin stays on its <c>SeedAdmin__</c>
         //    setup-token lane (no weak password), the other demo accounts get random
         //    high-entropy passwords, and a single credentials summary is staged to the
-        //    seed admin's e-mail through the durable outbox (below) — no weak
-        //    credential is stored on a public instance.
+        //    seed admin's e-mail through the durable outbox (below).
         bool deployPosture = mailer is not null;
         string adminAccountEmail = (deployPosture && adminEmail is not null) ? adminEmail : AdminEmail;
-        string? adminPw      = deployPosture ? null : AdminPassword;
-        string? moderatorPw  = deployPosture ? RandomPassword() : ModeratorPassword;
-        string? translatorPw = deployPosture ? RandomPassword() : TranslatorPassword;
-        string? annaPw       = deployPosture ? RandomPassword() : ResidentPassword;
-        string? benPw        = deployPosture ? RandomPassword() : ResidentPassword;
-        string? carlaPw      = deployPosture ? RandomPassword() : ResidentPassword;
-        string? davidPw      = deployPosture ? RandomPassword() : ResidentPassword;
 
         logger.LogInformation(
             deployPosture
                 ? "Sample data: seeding the mock neighborhood (deploy posture, pristine DB)."
                 : "Development sample data: seeding the mock neighborhood (Development-only, pristine DB).");
 
-        // ── 1. Accounts ────────────────────────────────────────────────────────────────
+        // ── 1. Accounts (the EF / identity side + the base mt Profile) ──────────────────
         // The seeded admin (FirstBootSeeder) already exists with a setup token but no
         // password — in Development EnsureUserAsync adds the demo password; in the deploy
         // posture a null password is a no-op, so the account keeps its token lane (no weak
-        // credential). The other demo accounts are created fresh. All are verified
-        // residents (Member standing is implicit).
-        var admin   = await EnsureUserAsync(userManager, roleManager, mt,
-            adminAccountEmail, adminPw, "Alex Admin",
-            elevatedRole: Roles.GlobalAdmin, logger: logger, ct: ct);
+        // credential). Every other demo account is created fresh. All are verified
+        // residents (Member standing is implicit). Cross-references throughout the rest
+        // of the seed key off the document's e-mail (stable business key), so the admin is
+        // keyed by its *document* e-mail even when its real e-mail differs (deploy).
+        var usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
+        var deployCredentials = new List<(string Email, string Password)>();
+        foreach (var account in doc.Accounts)
+        {
+            bool isAdmin = account.Role == Roles.GlobalAdmin;
+            string email = (isAdmin && deployPosture) ? adminAccountEmail : account.Email;
+            string? password =
+                deployPosture
+                    ? (isAdmin ? null : RandomPassword())
+                    : (isAdmin ? AdminPassword
+                      : account.Role == Roles.Moderator ? ModeratorPassword
+                      : account.Role == Roles.Translator ? TranslatorPassword
+                      : ResidentPassword);
+            if (!isAdmin && deployPosture && password is not null)
+                deployCredentials.Add((account.Email, password));
 
-        var maria   = await EnsureUserAsync(userManager, roleManager, mt,
-            ModeratorEmail, moderatorPw, "Maria Moderator",
-            elevatedRole: Roles.Moderator, logger: logger, ct: ct);
+            var user = await EnsureUserAsync(
+                userManager, roleManager, mt,
+                email, password, account.Name,
+                contactVisibility: account.ContactVisibility,
+                timeZone: account.TimeZone,
+                dateFormat: account.DateFormat,
+                elevatedRole: account.Role,
+                logger: logger, ct: ct);
+            usersByEmail[account.Email] = user;
+        }
 
-        var sophie    = await EnsureUserAsync(userManager, roleManager, mt,
-            TranslatorEmail, translatorPw, "Sophie Translate",
-            elevatedRole: Roles.Translator, logger: logger, ct: ct);
-
-        var anna    = await EnsureUserAsync(userManager, roleManager, mt,
-            "anna@examplium.com", annaPw, "Anna Kowalska",
-            contactVisibility: true, timeZone: "Europe/Warsaw", logger: logger, ct: ct);
-
-        var ben     = await EnsureUserAsync(userManager, roleManager, mt,
-            "ben@examplium.com", benPw, "Ben Nowak", logger: logger, ct: ct);
-
-        var carla   = await EnsureUserAsync(userManager, roleManager, mt,
-            "carla@examplium.com", carlaPw, "Carla Kubiak",
-            contactVisibility: true, logger: logger, ct: ct);
-
-        var david   = await EnsureUserAsync(userManager, roleManager, mt,
-            "david@examplium.com", davidPw, "David Lis",
-            timeZone: "Europe/Prague", logger: logger, ct: ct);
+        var admin = usersByEmail[doc.Accounts.Single(a => a.Role == Roles.GlobalAdmin).Email];
+        // The established translation-lane author (default author for every translation).
+        var translator = doc.Accounts.FirstOrDefault(a => a.Role == Roles.Translator);
+        string translationAuthorId = translator is not null ? usersByEmail[translator.Email].Id : string.Empty;
 
         // ── 2. Components are mandatory (ADR 0012) — every verified resident is a member
-        //    of every board, so the flat `Community = true` posts below are visible to all.
+        //    of every board, so the flat `Community = true` posts are visible to all.
         //    Rides the sanctioned write lane (own session + audit row). ───────────────
-        foreach (var componentId in new[] { "safety", "maintenance", "social", "governance" })
+        foreach (var componentId in doc.MandatoryComponents)
         {
             await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
         }
 
-        // Maria's component standing (ADR 0003) — the `Moderator` EF role is already on her
-        // account (above); the assignment rows are what mint her `moderator:{id}` claims at
-        // sign-in (IdentityService.GetBySubjectAsync). Stored directly (bootstrap writer,
-        // the FirstBootSeeder posture) in the single content session below.
-
         // ── 3. All `mt`-side sample content — one session, one commit (invariant C3). ──
         var now = DateTimeOffset.UtcNow;
+        string TranslateAuthorId(string? authorEmail)
+            => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
+
         await using var session = mt.OpenSession(new SessionOptions());
 
-        // Groups (a private family group + a public street group) + memberships.
-        var family = new Group
+        // ── Tags (+ per-language display names) — labels, never gates (C-TG·1). ─────────
+        // Tags come first: posts, profiles, and events all reference them by slug.
+        var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tag in doc.Tags)
         {
-            Id = Id(), Name = "Kowalski Family",
-            Description = "Anna and Ben's household — a private organizing group (ADR 0010).",
-            IsPrivate = true, OwnerId = anna.Id, Created = now.AddDays(-40)
-        };
-        var green = new Group
-        {
-            Id = Id(), Name = "Street Green",
-            Description = "Neighbors working on the shared green by the playground.",
-            IsPrivate = false, OwnerId = carla.Id, Created = now.AddDays(-35)
-        };
-        session.Store(family);
-        session.Store(green);
-        session.Store(new GroupMembership { Id = Id(), GroupId = family.Id, UserId = anna.Id, AddedBy = anna.Id, At = now.AddDays(-40) });
-        session.Store(new GroupMembership { Id = Id(), GroupId = family.Id, UserId = ben.Id, AddedBy = anna.Id, At = now.AddDays(-40) });
-        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = carla.Id, AddedBy = carla.Id, At = now.AddDays(-35) });
-        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = anna.Id, AddedBy = carla.Id, At = now.AddDays(-34) });
-        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = david.Id, AddedBy = carla.Id, At = now.AddDays(-33) });
-
-        // Maria's moderator scope (safety + social) — what her `moderator:{id}` claims are
-        // minted from at sign-in (she holds the `Moderator` EF role).
-        session.Store(new ModeratorAssignment { Id = Id(), UserId = maria.Id, ComponentId = "safety", GrantedBy = admin.Id, At = now.AddDays(-30) });
-        session.Store(new ModeratorAssignment { Id = Id(), UserId = maria.Id, ComponentId = "social", GrantedBy = admin.Id, At = now.AddDays(-30) });
-
-        // ── Tags (+ a couple of translations) — labels, never gates (C-TG·1). ───────────
-        var tagCleanup  = new Tag { Id = Id(), Slug = "cleanup", Name = "Cleanup", LanguageCode = "en", CreatedBy = anna.Id, Created = now.AddDays(-30) };
-        var tagNotice   = new Tag { Id = Id(), Slug = "notice", Name = "Notice", LanguageCode = "en", CreatedBy = admin.Id, Created = now.AddDays(-30) };
-        var tagRecipe   = new Tag { Id = Id(), Slug = "recipe", Name = "Recipe", LanguageCode = "en", CreatedBy = carla.Id, Created = now.AddDays(-20) };
-        session.Store(tagCleanup);
-        session.Store(tagNotice);
-        session.Store(tagRecipe);
-        session.Store(new TagTranslation { Id = Id(), TagId = tagCleanup.Id, LanguageCode = "de", Name = "Säuberung", AuthorId = admin.Id, Created = now.AddDays(-28) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagRecipe.Id, LanguageCode = "fr", Name = "Recette", AuthorId = admin.Id, Created = now.AddDays(-18) });
-
-        // ── Announcements (Public pinned / Community flat / Community targeted) ─────────
-        var welcome = new Announcement
-        {
-            Id = Id(), AuthorId = admin.Id,
-            Title = "Welcome to the neighborhood board",
-            Body = "This is a demo instance of **Kumunita**, a self-hosted platform for one\n\nneighborhood. Everything you see here is sample data — free to edit, hide, or delete while you explore.",
-            Scope = AnnouncementScope.Public, CommunityId = null, Pinned = true,
-            LanguageCode = "en", Created = now.AddDays(-14)
-        };
-        var volunteers = new Announcement
-        {
-            Id = Id(), AuthorId = maria.Id,
-            Title = "Volunteers needed for the Saturday cleanup",
-            Body = "We're clearing the back lane on **Saturday**. Bring gloves; we supply the bags.",
-            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
-            LanguageCode = "en", Created = now.AddDays(-3)
-        };
-        var alarm = new Announcement
-        {
-            Id = Id(), AuthorId = admin.Id,
-            Title = "Fire-alarm test this week",
-            Body = "Expect the building alarm to sound on **Thursday 09:00–09:30**. It is a test — please do not use the fire stairs unless they are actually in use.",
-            Scope = AnnouncementScope.Community, CommunityId = "safety", Pinned = false,
-            LanguageCode = "en", Created = now.AddDays(-1)
-        };
-        // A leading pinned, admin-authored test-platform notice (the most visible
-        // thing on a demo instance — it tells visitors this is not real and to keep
-        // private data off it). Pinned like `welcome`, Public scope (everyone), newest
-        // so it sorts to the top of the pinned set.
-        var testPlatform = new Announcement
-        {
-            Id = Id(), AuthorId = admin.Id,
-            Title = "Test Platform",
-            Body = "This is a test platform - not intended for real use.\n\nServices may stop working at any time, data may be deleted at any time, and changes may happen at any time.\n\nThis test platform is currently open for new users to sign-up, so anyone can try it out, so don't share any real or private information here.",
-            Scope = AnnouncementScope.Public, CommunityId = null, Pinned = true,
-            LanguageCode = "en", Created = now
-        };
-        session.Store(welcome);
-        session.Store(testPlatform);
-        session.Store(volunteers);
-        session.Store(alarm);
-        // Translation lane demos (ADR 0029 — a `GlobalAdmin`/`Translator` standing).
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = welcome.Id, LanguageCode = "de",
-            Title = "Willkommen im Nachbarschaftsbrett",
-            Body = "Dies ist eine Demo-Instanz von **Kumunita**. Alle Inhalte hier sind Beispieldaten — frei zum Bearbeiten, Verbergen oder Löschen.",
-            AuthorId = sophie.Id, Created = now.AddDays(-13)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = alarm.Id, LanguageCode = "fr",
-            Title = "Essai des alarmes incendie cette semaine",
-            Body = "Le système d'alarme doit retentir **jeudi de 09:00 à 09:30**. C'est un essai — n'utilisez les escaliers de secours que s'ils sont réellement en usage.",
-            AuthorId = sophie.Id, Created = now
-        });
-
-        // ── Community posts (+ replies + a tag + a translation) ─────────────────────────
-        var communityAudience = () => new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { Community = true };
-
-        var postRecycling = new Post
-        {
-            Id = Id(), ComponentId = "safety", AuthorId = anna.Id,
-            Title = "New recycling schedule from next month",
-            Body = "The city is moving glass to **Tuesdays** and paper to **Fridays** starting the 1st.\n\nDoes anyone have the new leaflet? I can print copies for the lobby.",
-            Audience = communityAudience(),
-            Created = now.AddDays(-5), Modified = now.AddDays(-4),
-            LanguageCode = "en", TagIds = [tagNotice.Id]
-        };
-        var postPotluck = new Post
-        {
-            Id = Id(), ComponentId = "social", AuthorId = carla.Id,
-            Title = "Potluck in the green this weekend?",
-            Body = "Anyone up for a simple potluck under the tree on **Sunday**? No pressure — one dish each, drinks on the house (mine).",
-            Audience = communityAudience(),
-            Created = now.AddDays(-2), LanguageCode = "en", TagIds = [tagRecipe.Id]
-        };
-        var postMinutes = new Post
-        {
-            Id = Id(), ComponentId = "governance", AuthorId = david.Id,
-            Title = "Monthly meeting minutes (draft for comment)",
-            Body = "Summary of last week's building meeting:\n\n- Approved the garden-bed plan\n- Deferred the fence repaint to next season\n- Collected 3 € for the shared toolbox\n\nFlag anything you disagree with before it is finalized.",
-            Audience = communityAudience(),
-            Created = now.AddDays(-1), LanguageCode = "en", TagIds = [tagNotice.Id]
-        };
-        session.Store(postRecycling);
-        session.Store(postPotluck);
-        session.Store(postMinutes);
-
-        var reply1 = new PostReply
-        {
-            Id = Id(), PostId = postRecycling.Id, AuthorId = ben.Id,
-            Body = "I have the leaflet — it's on the notice board, page 2. Glass *and* the bottle bank both moved.",
-            Created = now.AddDays(-4), LanguageCode = "en"
-        };
-        var reply2 = new PostReply
-        {
-            Id = Id(), PostId = postRecycling.Id, AuthorId = anna.Id,
-            Body = "Perfect, thanks Ben — I'll grab it and print the copies today.",
-            Created = now.AddDays(-4).AddHours(1), LanguageCode = "en"
-        };
-        var reply3 = new PostReply
-        {
-            Id = Id(), PostId = postPotluck.Id, AuthorId = david.Id,
-            Body = "In! I'll bring a big salad. What about 14:00?",
-            Created = now.AddDays(-1), LanguageCode = "en"
-        };
-        session.Store(reply1);
-        session.Store(reply2);
-        session.Store(reply3);
-
-        // A post + reply translation (ADR 0022 — user-added, not machine-translated).
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postRecycling.Id, LanguageCode = "de",
-            Title = "Neue Recyclingsch abende ab nächstem Monat",
-            Body = "Die Stadt verschiebt Glas auf **Dienstag** und Papier auf **Freitag**, ab dem 1.\n\nHat jemand das neue Faltblatt? Ich drucke gerne Kopien für die Lobby.",
-            AuthorId = sophie.Id, Created = now.AddDays(-4)
-        });
-        session.Store(new ReplyTranslation
-        {
-            Id = Id(), ReplyId = reply1.Id, LanguageCode = "de",
-            Body = "Ich habe das Faltblatt — es ist am Schwarzen Brett, Seite 2. Glas *und* die Flaschensammlung wurden beide verlegt.",
-            AuthorId = sophie.Id, Created = now.AddDays(-4)
-        });
-
-        // ── A group post (the GP lane — GroupId set, ComponentId empty, empty audience) ─
-        var groupPost = new Post
-        {
-            Id = Id(), ComponentId = string.Empty, GroupId = green.Id, AuthorId = carla.Id,
-            Title = "Green-plot plan for spring",
-            Body = "Rough plan for the shared beds:\n\n- North bed: herbs (basil, parsley)\n- South bed: tomatoes\n\nVote in the thread and I'll finalize the seed list.",
-            Audience = new Audience(),   // group-lane post: owner ∪ member, no audience grants
-            Created = now.AddDays(-2), LanguageCode = "en"
-        };
-        session.Store(groupPost);
-        var groupReply = new PostReply
-        {
-            Id = Id(), PostId = groupPost.Id, AuthorId = anna.Id,
-            Body = "Herbs in the north bed sounds right — it's shadier. I can bring basil starts.",
-            Created = now.AddDays(-2).AddHours(3), LanguageCode = "en"
-        };
-        session.Store(groupReply);
-
-        // A group name translation (ADR 0026 — a `GlobalAdmin`/`Translator` standing).
-        session.Store(new GroupTranslation
-        {
-            Id = Id(), GroupId = green.Id, LanguageCode = "de",
-            Name = "Straßengrün", Description = "Nachbarn, die das gemeinsame Grün neben dem Spielplatz pflegen.",
-            AuthorId = sophie.Id, Created = now.AddDays(-30)
-        });
-
-        // ── Published events (+ RSVPs) — IsDraft=false so they appear in the feed ───────
-        var eventAudience = () => new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true };
-
-        var cleanup = new Event
-        {
-            Id = Id(), Title = "Community Cleanup Day",
-            Body = "Gloves and bags provided. Meet at the gate **09:30**, done by **12:00**.\n\nCoffee and pastries afterwards at the community room.",
-            ComponentId = "safety", AuthorId = maria.Id,
-            Start = now.AddDays(5), End = now.AddDays(5).AddHours(3),
-            Location = "Back lane, near the gate", Capacity = 20, Color = "#3b82a0",
-            Audience = eventAudience(),
-            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
-            LanguageCode = "en", TagIds = [tagCleanup.Id],
-            Created = now.AddDays(-2), Modified = now
-        };
-        var potluck = new Event
-        {
-            Id = Id(), Title = "Potluck in the Green",
-            Body = "One dish each, arrive from **14:00**. Bring a chair if you have one.",
-            ComponentId = "social", AuthorId = carla.Id,
-            Start = now.AddDays(12), End = now.AddDays(12).AddHours(3),
-            Location = "The shared green, under the tree", Capacity = null, Color = "#d98a4f",
-            Audience = eventAudience(),
-            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
-            LanguageCode = "en", Created = now.AddDays(-1)
-        };
-        session.Store(cleanup);
-        session.Store(potluck);
-
-        // User-added event translations (ADR 0059 — author ∪ GlobalAdmin ∪ Translator
-        // standing, not machine-translated): the de / fr / da rows for both seeded
-        // events, so the ADR 0027 chip-swap + ADR 0051 feed display have something to
-        // exercise on the Detail page. The text comes from the one baseline registry
-        // (ADR 0060 D1) that the warm-boot BackfillEventTranslationsAsync also reads,
-        // so a fresh and a backfilled instance agree on the de / fr / da rows.
-        StoreEventTranslations(session, cleanup.Id, cleanup.Title, sophie.Id, now.AddDays(-3));
-        StoreEventTranslations(session, potluck.Id, potluck.Title, sophie.Id, now.AddDays(-3));
-
-        // RSVPs — one row per (event, resident); a mix of Going / Maybe / No.
-        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddDays(-1) });
-        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = ben.Id, Status = RsvpStatus.Going, At = now.AddDays(-1).AddHours(2) });
-        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = carla.Id, Status = RsvpStatus.Maybe, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = david.Id, Status = RsvpStatus.No, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = carla.Id, Status = RsvpStatus.Going, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddHours(1) });
-        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = ben.Id, Status = RsvpStatus.Maybe, At = now.AddHours(2) });
-
-        // ── A resident blog (PageKind.User) — the /blog feed surface (ADR 0040) ─────────
-        // Root page = Kind=User, ParentId=null, AuthorId=anna (GetBlogRootAsync shape).
-        var blogRoot = new Page
-        {
-            Id = Id(), ParentId = null, Slug = "my-corner",
-            Title = "Anna's corner of the street",
-            Body = "A little space for notes about the block — the kind of thing you'd otherwise post on the group chat and then no one finds again.",
-            Audience = null,           // public (world-readable) — a blog page may be public
-            AuthorId = anna.Id, Kind = PageKind.User,
-            ComponentId = null, LanguageCode = "en",
-            Created = now.AddDays(-6), Modified = now.AddDays(-6),
-            IsDraft = false, IsDeleted = false
-        };
-        var blogPost = new Page
-        {
-            Id = Id(), ParentId = blogRoot.Id, Slug = "the-bench-by-the-gate",
-            Title = "The bench by the gate",
-            Body = "There's a bench most of us have stopped noticing. It gets the sun first in the morning and the pigeons claim it by nine.\n\nI keep meaning to wipe it down for the people who use it to read. Small thing, but it's ours.",
-            Audience = null,
-            AuthorId = anna.Id, Kind = PageKind.User,
-            ComponentId = null, LanguageCode = "en", TagIds = [tagRecipe.Id],
-            Created = now.AddDays(-3), Modified = now.AddDays(-3),
-            IsDraft = false, IsDeleted = false
-        };
-        session.Store(blogRoot);
-        session.Store(blogPost);
-        // A page translation (ADR 0039 lane — a `GlobalAdmin`/`Translator` standing).
-        session.Store(new PageTranslation
-        {
-            Id = Id(), PageId = blogRoot.Id, LanguageCode = "de",
-            Title = "Annas Ecke der Straße",
-            Body = "Ein kleiner Raum für Notizen über den Block — genau die Dinge, die man sonst in den Gruppenchat schreibt und dann niemand wieder findet.",
-            AuthorId = sophie.Id, Created = now.AddDays(-5)
-        });
-
-        // ── Sample-content expansion (doubling the neighborhood) ─────────────────────
-
-        // Enable every catalog language for the demo. Danish ships DISABLED
-        // (FirstBootSeeder seeds it awaiting an admin's enable); the sample wants
-        // the full selector, so flip it on here. Dev-only: this session only ever
-        // runs under the Development ∧ first-boot gate, so a real deployment's
-        // catalog is left to its own admin. Load-then-Store (idempotent shape).
-        var danish = await session.LoadAsync<LanguageCatalog>("da", ct);
-        if (danish is not null && !danish.Enabled)
-        {
-            danish.Enabled = true;
-            session.Store(danish);
+            var id = Id();
+            session.Store(new Tag
+            {
+                Id = id,
+                Slug = tag.Slug,
+                Name = tag.Name,
+                LanguageCode = "en",
+                CreatedBy = usersByEmail[tag.CreatedByEmail].Id,
+                Created = now.AddDays(-tag.DaysAgo),
+            });
+            tagsBySlug[tag.Slug] = id;
+            foreach (var tr in tag.Translations)
+            {
+                session.Store(new TagTranslation
+                {
+                    Id = Id(),
+                    TagId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Name = tr.Name ?? string.Empty,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
         }
 
-        // Three more tags — each with a full de/fr/da translation matrix so the
-        // now-enabled Danish lane is visibly exercised in the demo.
-        var tagRepair   = new Tag { Id = Id(), Slug = "repair",   Name = "Repair",   LanguageCode = "en", CreatedBy = ben.Id,   Created = now.AddDays(-25) };
-        var tagQuestion = new Tag { Id = Id(), Slug = "question", Name = "Question", LanguageCode = "en", CreatedBy = david.Id, Created = now.AddDays(-25) };
-        var tagGarden   = new Tag { Id = Id(), Slug = "garden",   Name = "Garden",   LanguageCode = "en", CreatedBy = carla.Id, Created = now.AddDays(-25) };
-        session.Store(tagRepair);
-        session.Store(tagQuestion);
-        session.Store(tagGarden);
-        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "de", Name = "Reparatur", AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "fr", Name = "Réparation", AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "da", Name = "Reparation", AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "de", Name = "Frage",     AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "fr", Name = "Question",  AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "da", Name = "Spørgsmål", AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "de", Name = "Garten",    AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "fr", Name = "Jardin",    AuthorId = sophie.Id, Created = now.AddDays(-24) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "da", Name = "Have",      AuthorId = sophie.Id, Created = now.AddDays(-24) });
-
-        // ── M23 — Extended profiles (a resident bio + free author-set tags) ──────────
-        // The profile's *author-set* tags (ADR 0123 D1) are the same frozen ADR 0044
-        // Tag doc the posts above already reference — so `tagRepair` (assigned to Ben
-        // below) is genuinely shared across a post and a profile (the "third
-        // referencer, not a second tag type" pin), while the six skill/interest tags
-        // are new. Each carries the seeder's established de/fr/da matrix (Sophie is
-        // the author, like the other translation lanes). The bios are rich content
-        // (ADR 0025 shape — Markdown, rendered read-only by the single
-        // MarkdownRenderer on the directory detail).
-        //
-        // ADR 0123 D2: the bio + tags ride the profile's *Visibility* audience (the
-        // M2 "audience for the detailed non-contact fields" shape M23 is that moment
-        // for) — independent of the ContactVisibility gate that hides e-mail/phone.
-        // An empty `new Audience()` would deny everyone (the C1 empty-audience-denies
-        // invariant), so to make the demo profiles *discoverable* ("find neighbours
-        // with something in common") each resident's Visibility is opened to every
-        // signed-in resident via the AllResidents flag (the branch-4.5 "all
-        // residents" shape, the same resident-only standing the contact block uses).
-        var ptagBaking      = new Tag { Id = Id(), Slug = "baking",      Name = "Baking",      LanguageCode = "en", CreatedBy = anna.Id,   Created = now.AddDays(-12) };
-        var ptagGardening   = new Tag { Id = Id(), Slug = "gardening",   Name = "Gardening",   LanguageCode = "en", CreatedBy = carla.Id,  Created = now.AddDays(-12) };
-        var ptagPhotography = new Tag { Id = Id(), Slug = "photography", Name = "Photography", LanguageCode = "en", CreatedBy = david.Id,  Created = now.AddDays(-12) };
-        var ptagFirstaid    = new Tag { Id = Id(), Slug = "firstaid",    Name = "First aid",   LanguageCode = "en", CreatedBy = maria.Id,  Created = now.AddDays(-12) };
-        var ptagTranslation = new Tag { Id = Id(), Slug = "translation", Name = "Translation", LanguageCode = "en", CreatedBy = sophie.Id, Created = now.AddDays(-12) };
-        var ptagCycling     = new Tag { Id = Id(), Slug = "cycling",     Name = "Cycling",     LanguageCode = "en", CreatedBy = ben.Id,    Created = now.AddDays(-12) };
-        var ptagHistory     = new Tag { Id = Id(), Slug = "history",     Name = "History",     LanguageCode = "en", CreatedBy = david.Id,  Created = now.AddDays(-12) };
-        session.Store(ptagBaking);
-        session.Store(ptagGardening);
-        session.Store(ptagPhotography);
-        session.Store(ptagFirstaid);
-        session.Store(ptagTranslation);
-        session.Store(ptagCycling);
-        session.Store(ptagHistory);
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "de", Name = "Backen",       AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "fr", Name = "Boulangerie",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagBaking.Id,      LanguageCode = "da", Name = "Bagning",      AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "de", Name = "Gartenarbeit", AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "fr", Name = "Jardinage",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagGardening.Id,   LanguageCode = "da", Name = "Havearbejde",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "de", Name = "Fotografie",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "fr", Name = "Photographie", AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagPhotography.Id, LanguageCode = "da", Name = "Fotografi",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "de", Name = "Erste Hilfe",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "fr", Name = "Premiers secours", AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagFirstaid.Id,    LanguageCode = "da", Name = "Første hjælp", AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "de", Name = "Übersetzung",  AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "fr", Name = "Traduction",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagTranslation.Id, LanguageCode = "da", Name = "Oversættelse", AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "de", Name = "Radfahren",    AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "fr", Name = "Cyclisme",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagCycling.Id,     LanguageCode = "da", Name = "Cykling",      AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "de", Name = "Geschichte",   AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "fr", Name = "Histoire",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
-        session.Store(new TagTranslation { Id = Id(), TagId = ptagHistory.Id,     LanguageCode = "da", Name = "Historie",     AuthorId = sophie.Id, Created = now.AddDays(-11) });
-
-        // Apply the extended profile to a resident already created in step 1: set the
-        // bio + author-set tags, and open the *Visibility* audience to every signed-in
-        // resident (the demo audience) so the bio/tags render on the directory detail.
-        // Runs in the single content session (invariant C3 — commits once, below).
-        async Task ApplyExtendedProfileAsync(string subjectId, string bio, params string[] tagIds)
+        // ── Groups (+ memberships + name/description translations) ──────────────────────
+        var groupsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in doc.Groups)
         {
+            var id = Id();
+            var owner = usersByEmail[group.OwnerEmail];
+            var groupCreated = now.AddDays(-group.DaysAgo);
+            session.Store(new Group
+            {
+                Id = id,
+                Name = group.Name,
+                Description = group.Description,
+                IsPrivate = group.IsPrivate,
+                OwnerId = owner.Id,
+                Created = groupCreated,
+            });
+            groupsBySlug[group.Slug] = id;
+            foreach (var memberEmail in group.MemberEmails)
+            {
+                var member = usersByEmail[memberEmail];
+                session.Store(new GroupMembership
+                {
+                    Id = Id(),
+                    GroupId = id,
+                    UserId = member.Id,
+                    AddedBy = owner.Id,
+                    At = groupCreated,
+                });
+            }
+            foreach (var tr in group.Translations)
+            {
+                session.Store(new GroupTranslation
+                {
+                    Id = Id(),
+                    GroupId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Name = tr.Name,
+                    Description = tr.Description,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+        }
+
+        // ── The scoped moderator's governing scope (ADR 0003) — the rows that mint the
+        //    `moderator:{id}` claims at sign-in (bootstrap writer posture). ─────────────
+        foreach (var assignment in doc.ModeratorAssignments)
+        {
+            var moderator = usersByEmail[assignment.UserEmail];
+            var grantedBy = assignment.GrantedByEmail is not null
+                ? usersByEmail[assignment.GrantedByEmail].Id
+                : admin.Id;
+            session.Store(new ModeratorAssignment
+            {
+                Id = Id(),
+                UserId = moderator.Id,
+                ComponentId = assignment.ComponentId,
+                GrantedBy = grantedBy,
+                At = now.AddDays(-assignment.DaysAgo),
+            });
+        }
+
+        // ── Extended profiles (bio + author-set tags + resident-visible audience, ADR
+        //    0123) — loaded in this session over the base profile EnsureUserAsync stored.
+        foreach (var account in doc.Accounts)
+        {
+            var subjectId = usersByEmail[account.Email].Id;
             var profile = await session.LoadAsync<Profile>(subjectId, ct);
-            if (profile is null) return; // pristine gate means all 7 exist; be safe.
-            profile.Bio = bio;
-            profile.TagIds = [.. tagIds];
+            if (profile is null)
+                continue; // pristine gate means all accounts exist; be safe.
+            if (account.Bio is not null)
+                profile.Bio = account.Bio;
+            if (account.TagSlugs.Count > 0)
+                profile.TagIds = [.. account.TagSlugs.Select(slug => tagsBySlug[slug])];
+            // Open the *Visibility* audience to every signed-in resident so the
+            // bio/tags are discoverable on the directory detail (the M23 demo shape —
+            // independent of the ContactVisibility gate).
             profile.Visibility = new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true };
             session.Store(profile);
         }
 
-        await ApplyExtendedProfileAsync(
-            admin.Id,
-            "Setting up the board and keeping it running — ping me when something misbehaves; half the time the answer is in the OPS notes, the other half I'll work it out. Happy to help get your profile or your group sorted.",
-            ptagFirstaid.Id, ptagTranslation.Id);
-        await ApplyExtendedProfileAsync(
-            maria.Id,
-            "I look after the **safety** and **social** boards. Trained in first aid — if it's an emergency, call the local number first, then reach out. I'm happy to settle the small stuff before it grows.",
-            ptagFirstaid.Id, ptagGardening.Id);
-        await ApplyExtendedProfileAsync(
-            sophie.Id,
-            "Neighbours from everywhere — so I translate whatever needs it. If a post or announcement is still only in English, drop me a line and I'll find the words. I also do most of the weekend **baking**.",
-            ptagTranslation.Id, ptagBaking.Id);
-        await ApplyExtendedProfileAsync(
-            anna.Id,
-            "Mum of two, on the block since 2019. I do the neighbourhood **baking** (the sourdough never lasts) and we've coaxed a little **garden** into the back yard. Always up for a potluck or a ride on the canal.",
-            ptagBaking.Id, ptagGardening.Id, ptagCycling.Id);
-        await ApplyExtendedProfileAsync(
-            ben.Id,
-            "Handy around the house — happy to help with a wobbly shelf or a fuse that keeps tripping. I **cycle** everywhere I can, and I photograph a lot of the little things going on around the block.",
-            ptagCycling.Id, ptagPhotography.Id, tagRepair.Id);
-        await ApplyExtendedProfileAsync(
-            carla.Id,
-            "The one who runs the green and the seedling corner. **Gardening** is my happy place, and I bake whatever the garden gives me. Come along to a Saturday tidy-up.",
-            ptagGardening.Id, ptagBaking.Id);
-        await ApplyExtendedProfileAsync(
-            david.Id,
-            "Long-time resident and a bit of a local-history nerd — I like to know why the street has its name. I also enjoy **photography**, especially the light at the river bend. Ask me for the good spots.",
-            ptagHistory.Id, ptagPhotography.Id);
+        // ── Announcements (+ translations) ───────────────────────────────────────────────
+        foreach (var announcement in doc.Announcements)
+        {
+            var id = Id();
+            session.Store(new Announcement
+            {
+                Id = id,
+                AuthorId = usersByEmail[announcement.AuthorEmail].Id,
+                Title = announcement.Title,
+                Body = announcement.Body,
+                Scope = ParseScope(announcement.Scope),
+                CommunityId = announcement.ComponentId,
+                Pinned = announcement.Pinned,
+                LanguageCode = "en",
+                Created = now.AddDays(-announcement.DaysAgo),
+            });
+            foreach (var tr in announcement.Translations)
+            {
+                session.Store(new AnnouncementTranslation
+                {
+                    Id = Id(),
+                    AnnouncementId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+        }
 
-        // Three more announcements — the first carries a full de/fr/da translation
-        // set so every enabled language shows up in the demo, not just de/fr.
-        var waterDrop = new Announcement
+        // ── Community + group posts (+ replies + translations) ──────────────────────────
+        foreach (var samplePost in doc.Posts)
         {
-            Id = Id(), AuthorId = ben.Id,
-            Title = "Water pressure drop on Friday morning",
-            Body = "The supply will be interrupted **Friday 07:00–11:00** for main-line work. Keep a jug of water on hand.",
-            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
-            LanguageCode = "en", Created = now.AddDays(-2)
-        };
-        var roomHours = new Announcement
-        {
-            Id = Id(), AuthorId = admin.Id,
-            Title = "Community room now open evenings",
-            Body = "From next week the room is open **weekdays 18:00–22:00** for anyone who wants a quiet place to work or read.",
-            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
-            LanguageCode = "en", Created = now.AddDays(-1)
-        };
-        var umbrella = new Announcement
-        {
-            Id = Id(), AuthorId = carla.Id,
-            Title = "Lost & found — a black umbrella",
-            Body = "Someone left a black umbrella by the notice board. It's safe with me — claim it at the green.",
-            Scope = AnnouncementScope.Community, CommunityId = "social", Pinned = false,
-            LanguageCode = "en", Created = now
-        };
-        session.Store(waterDrop);
-        session.Store(roomHours);
-        session.Store(umbrella);
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "de",
-            Title = "Wasserausfall am Freitagmorgen",
-            Body = "Die Wasserversorgung wird **freitags von 07:00 bis 11:00** wegen Arbeiten an der Hauptleitung unterbrochen. Halten Sie eine Flasche Wasser bereit.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "fr",
-            Title = "Baisse de pression le vendredi matin",
-            Body = "La distribution sera interrompue **vendredi de 07:00 à 11:00** pour des travaux sur la conduite principale. Gardez une bouteille d'eau à portée de main.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "da",
-            Title = "Vandafspærring fredag morgen",
-            Body = "Vandforsyningen er afbrudt **fredag kl. 07:00–11:00** pga. hovedledningsarbejde. Hold en flaske vand klar.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "de",
-            Title = "Gemeinschaftsraum jetzt auch abends offen",
-            Body = "Ab nächster Woche ist der Raum **werktags von 18:00 bis 22:00** für alle offen, die einen ruhigen Ort zum Arbeiten oder Lesen suchen.",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "fr",
-            Title = "La salle communautaire ouverte en soirée",
-            Body = "À partir de la semaine prochaine, la salle est ouverte **en semaine de 18:00 à 22:00** pour quiconque cherche un endroit calme pour travailler ou lire.",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "de",
-            Title = "Fundsachen — ein schwarzer Schirm",
-            Body = "Jemand hat einen schwarzen Schirm neben dem Schwarzen Brett liegen gelassen. Er ist bei mir sicher — hol ihn am Grün ab.",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "fr",
-            Title = "Objets trouvés — un parapluie noir",
-            Body = "Quelqu'un a laissé un parapluie noir près du panneau d'affichage. Il est en sécurité chez moi — venez le récupérer au jardin.",
-            AuthorId = sophie.Id, Created = now
-        });
+            var id = Id();
+            bool groupLane = samplePost.GroupSlug is not null;
+            session.Store(new Post
+            {
+                Id = id,
+                ComponentId = groupLane ? string.Empty : (samplePost.ComponentId ?? string.Empty),
+                GroupId = groupLane ? groupsBySlug[samplePost.GroupSlug!] : string.Empty,
+                AuthorId = usersByEmail[samplePost.AuthorEmail].Id,
+                Title = samplePost.Title,
+                Body = samplePost.Body,
+                Audience = ParsePostAudience(samplePost.Audience),
+                Created = now.AddDays(-samplePost.DaysAgo),
+                Modified = samplePost.ModifiedDaysAgo.HasValue ? now.AddDays(-samplePost.ModifiedDaysAgo.Value) : null,
+                LanguageCode = "en",
+                TagIds = [.. samplePost.TagSlugs.Select(slug => tagsBySlug[slug])],
+            });
+            foreach (var reply in samplePost.Replies)
+            {
+                var replyId = Id();
+                session.Store(new PostReply
+                {
+                    Id = replyId,
+                    PostId = id,
+                    AuthorId = usersByEmail[reply.AuthorEmail].Id,
+                    Body = reply.Body,
+                    Created = now.AddDays(-(reply.DaysAgo ?? 0)).AddHours(reply.HoursAfter ?? 0),
+                    LanguageCode = "en",
+                });
+                foreach (var tr in reply.Translations)
+                {
+                    session.Store(new ReplyTranslation
+                    {
+                        Id = Id(),
+                        ReplyId = replyId,
+                        LanguageCode = tr.LanguageCode,
+                        Body = tr.Body,
+                        AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                        Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                    });
+                }
+            }
+            foreach (var tr in samplePost.Translations)
+            {
+                session.Store(new PostTranslation
+                {
+                    Id = Id(),
+                    PostId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+        }
 
-        // Three more community posts (+ replies) across the boards.
-        var postElectrician = new Post
+        // ── Published events (+ RSVPs + the ADR 0060 de/fr/da baselines) ─────────────────
+        foreach (var sampleEvent in doc.Events)
         {
-            Id = Id(), ComponentId = "maintenance", AuthorId = ben.Id,
-            Title = "Know a good local electrician?",
-            Body = "Our kitchen fuse keeps tripping. If anyone has used a local electrician this year, I'd be grateful for a recommendation.",
-            Audience = communityAudience(),
-            Created = now.AddDays(-3), LanguageCode = "en", TagIds = [tagRepair.Id, tagQuestion.Id]
-        };
-        var postSeedlings = new Post
-        {
-            Id = Id(), ComponentId = "maintenance", AuthorId = carla.Id,
-            Title = "Free seedlings in the recycling corner",
-            Body = "I've got a tray of tomato and basil seedlings on the shelf by the bins — first come, first served.",
-            Audience = communityAudience(),
-            Created = now.AddDays(-1), LanguageCode = "en", TagIds = [tagGarden.Id]
-        };
-        var postStreetName = new Post
-        {
-            Id = Id(), ComponentId = "governance", AuthorId = david.Id,
-            Title = "Where does the street name come from?",
-            Body = "Half the block calls it one thing, the map says another. Does anyone know the story behind it?",
-            Audience = communityAudience(),
-            Created = now, LanguageCode = "en", TagIds = [tagQuestion.Id]
-        };
-        session.Store(postElectrician);
-        session.Store(postSeedlings);
-        session.Store(postStreetName);
-        session.Store(new PostReply { Id = Id(), PostId = postElectrician.Id, AuthorId = anna.Id, Body = "The one on the corner — he fixed my boiler last spring, fair price.", Created = now.AddDays(-2), LanguageCode = "en" });
-        session.Store(new PostReply { Id = Id(), PostId = postSeedlings.Id, AuthorId = david.Id, Body = "Just took two! Thanks Carla.", Created = now.AddHours(-6), LanguageCode = "en" });
-        session.Store(new PostReply { Id = Id(), PostId = postStreetName.Id, AuthorId = carla.Id, Body = "It's named after the old mill at the river bend, I'm fairly sure.", Created = now.AddHours(-3), LanguageCode = "en" });
-        session.Store(new PostReply { Id = Id(), PostId = postStreetName.Id, AuthorId = anna.Id, Body = "That matches the plaque at the gate — nice.", Created = now.AddHours(-1), LanguageCode = "en" });
+            var id = Id();
+            var start = now.AddDays(sampleEvent.StartDaysAhead);
+            session.Store(new Event
+            {
+                Id = id,
+                Title = sampleEvent.Title,
+                Body = sampleEvent.Body,
+                ComponentId = sampleEvent.ComponentId,
+                AuthorId = usersByEmail[sampleEvent.AuthorEmail].Id,
+                Start = start,
+                End = start.AddHours(sampleEvent.EndHoursAfterStart),
+                Location = sampleEvent.Location,
+                Capacity = sampleEvent.Capacity,
+                Color = sampleEvent.Color,
+                Audience = new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true },
+                ReminderEnabled = sampleEvent.ReminderEnabled,
+                IsDraft = false,
+                IsDeleted = false,
+                LanguageCode = "en",
+                TagIds = [.. sampleEvent.TagSlugs.Select(slug => tagsBySlug[slug])],
+                Created = sampleEvent.DaysAgo.HasValue ? now.AddDays(-sampleEvent.DaysAgo.Value) : now,
+                Modified = sampleEvent.ModifiedNow ? now : null,
+            });
+            foreach (var rsvp in sampleEvent.Rsvps)
+            {
+                session.Store(new EventRsvp
+                {
+                    Id = Id(),
+                    EventId = id,
+                    UserId = usersByEmail[rsvp.UserEmail].Id,
+                    Status = ParseRsvpStatus(rsvp.Status),
+                    At = now.AddDays(-(rsvp.DaysAgo ?? 0)).AddHours(rsvp.HoursAfter ?? 0),
+                });
+            }
+            foreach (var tr in sampleEvent.Translations)
+            {
+                session.Store(new EventTranslation
+                {
+                    Id = Id(),
+                    EventId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+        }
 
-        // A post + reply translation so the extra posts carry a non-English view too.
-        session.Store(new PostTranslation
+        // ── A resident blog (PageKind.User) — the /blog feed surface (ADR 0040) ──────────
+        var pagesBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var page in doc.Pages)
         {
-            Id = Id(), PostId = postElectrician.Id, LanguageCode = "de",
-            Title = "Kennt ihr einen guten lokalen Elektriker?",
-            Body = "Unsere Küchen-Sicherung springt ständig raus. Wenn jemand dieses Jahr einen Elektriker in der Nähe genutzt hat, wäre ich für eine Empfehlung dankbar.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
+            var id = Id();
+            var parent = page.ParentSlug is not null ? pagesBySlug[page.ParentSlug] : null;
+            var created = now.AddDays(-page.DaysAgo);
+            session.Store(new Page
+            {
+                Id = id,
+                ParentId = parent,
+                Slug = page.Slug,
+                Title = page.Title,
+                Body = page.Body,
+                Audience = null, // public (world-readable) — a blog page may be public
+                Kind = ParsePageKind(page.Kind),
+                AuthorId = usersByEmail[page.AuthorEmail].Id,
+                ComponentId = null,
+                LanguageCode = "en",
+                Created = created,
+                Modified = created,
+                IsDraft = false,
+                IsDeleted = false,
+                TagIds = [.. page.TagSlugs.Select(slug => tagsBySlug[slug])],
+            });
+            pagesBySlug[page.Slug] = id;
+            foreach (var tr in page.Translations)
+            {
+                session.Store(new PageTranslation
+                {
+                    Id = Id(),
+                    PageId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+        }
 
-        // A second group post (the GP lane) under Street Green + a reply.
-        var groupPostCompost = new Post
+        // ── Goals → Projects → To-dos (the `PL` lane, ADR 0086; to-dos ADR 0067) ─────────
+        // Materialized in this same session (invariant C3) so a single commit covers the
+        // whole corpus. Cross-references resolve by the entities' stable keys — a goal is
+        // keyed by its <c>Title</c> (the "events keyed by English title" precedent); a
+        // project references its goal by <c>goalTitle</c>; to-dos are nested under their
+        // project, so there is no cross-document id to resolve beyond goal → project.
+        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var goal in doc.Goals)
         {
-            Id = Id(), ComponentId = string.Empty, GroupId = green.Id, AuthorId = david.Id,
-            Title = "Compost bin — who's on this week?",
-            Body = "The bin is ready to swap. Can anyone take a turn turning it this week? It's due on Monday.",
-            Audience = new Audience(),   // group-lane post: owner ∪ member, no audience grants
-            Created = now.AddDays(-1), LanguageCode = "en"
-        };
-        session.Store(groupPostCompost);
-        session.Store(new PostReply { Id = Id(), PostId = groupPostCompost.Id, AuthorId = carla.Id, Body = "I'll do the turn on Monday morning.", Created = now, LanguageCode = "en" });
+            var id = Id();
+            session.Store(new ProjectGoal
+            {
+                Id = id,
+                Title = goal.Title,
+                Description = goal.Description,
+                ComponentId = goal.ComponentId,
+                AuthorId = usersByEmail[goal.AuthorEmail].Id,
+                Audience = null, // public (a goal is world-readable in the demo — the `Audience = null` shape)
+                IsDeleted = false,
+                LanguageCode = "en",
+                Created = now.AddDays(-goal.DaysAgo),
+            });
+            goalsByTitle[goal.Title] = id;
+        }
 
-        // Two more published events (+ RSVPs) so the calendar has a fuller arc.
-        var toolLibrary = new Event
+        foreach (var sampleProject in doc.Projects)
         {
-            Id = Id(), Title = "Tool Library Launch",
-            Body = "Drills, ladders, pressure washers — borrow instead of buying. Meet in the community room to set up the shelf.",
-            ComponentId = "maintenance", AuthorId = maria.Id,
-            Start = now.AddDays(9), End = now.AddDays(9).AddHours(2),
-            Location = "Community room", Capacity = 15, Color = "#7c5cad",
-            Audience = eventAudience(),
-            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
-            LanguageCode = "en", TagIds = [tagRepair.Id],
-            Created = now.AddDays(-1), Modified = now
-        };
-        var walk = new Event
-        {
-            Id = Id(), Title = "Neighborhood Walk",
-            Body = "A slow loop of the block, coffee at the end. Strollers welcome — it's flat the whole way.",
-            ComponentId = "social", AuthorId = carla.Id,
-            Start = now.AddDays(18), End = now.AddDays(18).AddHours(1),
-            Location = "Meeting at the green", Capacity = null, Color = "#4f8f84",
-            Audience = eventAudience(),
-            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
-            LanguageCode = "en", Created = now
-        };
-        session.Store(toolLibrary);
-        session.Store(walk);
-        // The two later events carry the same de / fr / da baseline set (ADR 0059 /
-        // ADR 0060 D1) so every seeded event exercises the translation lane.
-        StoreEventTranslations(session, toolLibrary.Id, toolLibrary.Title, sophie.Id, now);
-        StoreEventTranslations(session, walk.Id, walk.Title, sophie.Id, now);
-        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = ben.Id,   Status = RsvpStatus.Going, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = anna.Id,  Status = RsvpStatus.Going, At = now.AddHours(1) });
-        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = david.Id, Status = RsvpStatus.Maybe, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = anna.Id,  Status = RsvpStatus.Going, At = now });
-        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = carla.Id, Status = RsvpStatus.Going, At = now.AddHours(1) });
-        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = maria.Id, Status = RsvpStatus.Maybe, At = now.AddHours(2) });
+            var id = Id();
+            var goalId = sampleProject.GoalTitle is not null && goalsByTitle.TryGetValue(sampleProject.GoalTitle, out var g)
+                ? g
+                : null;
+            var created = now.AddDays(-sampleProject.DaysAgo);
+            session.Store(new Project
+            {
+                Id = id,
+                Title = sampleProject.Title,
+                Description = sampleProject.Description,
+                GoalId = goalId,
+                Status = sampleProject.Status,
+                StartAt = sampleProject.StartDaysAgo.HasValue ? now.AddDays(-sampleProject.StartDaysAgo.Value) : null,
+                DueAt = sampleProject.DueInDays.HasValue ? now.AddDays(sampleProject.DueInDays.Value) : null,
+                ComponentId = sampleProject.ComponentId,
+                AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
+                Audience = null, // public (world-readable — the `Audience = null` shape)
+                IsDeleted = false,
+                LanguageCode = "en",
+                Created = created,
+                Modified = created,
+            });
+            // Project title/description translations (ADR 0088). The current corpus is
+            // English-only (empty), so this is a no-op loop when absent — declared for
+            // generality, mirroring the post/announcement/event/page translation lanes.
+            foreach (var tr in sampleProject.Translations)
+            {
+                session.Store(new ProjectTranslation
+                {
+                    Id = Id(),
+                    ProjectId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+            // Nested to-dos (ADR 0067 D1) — the unit of *managed* work under the project.
+            foreach (var todo in sampleProject.Todos)
+            {
+                session.Store(new TodoItem
+                {
+                    Id = Id(),
+                    Title = todo.Title,
+                    Body = todo.Body,
+                    ComponentId = sampleProject.ComponentId,
+                    ProjectId = id,
+                    AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
+                    AssigneeId = todo.AssigneeEmail is not null ? usersByEmail[todo.AssigneeEmail].Id : null,
+                    Status = todo.Status,
+                    StartAt = null,
+                    DueAt = todo.DueInDays.HasValue ? now.AddDays(todo.DueInDays.Value) : null,
+                    Audience = null, // public (world-readable — the `Audience = null` shape)
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    TagIds = [],
+                    ImageIds = [],
+                    AttachmentIds = [],
+                    Created = now.AddDays(-todo.DaysAgo),
+                    Modified = null,
+                });
+            }
+        }
 
-        // A second resident blog post (+ a German translation) under Anna's root.
-        var blogPost2 = new Page
+        // ── Community (board) name/description translations (ADR 0026) ──────────────────
+        foreach (var community in doc.CommunityTranslations)
         {
-            Id = Id(), ParentId = blogRoot.Id, Slug = "the-corner-shops-bell",
-            Title = "The corner shop's old bell",
-            Body = "The little bell above the old corner shop still rings when someone opens the door. No one runs it now, but the sound has stayed — a small reminder the street used to be busier.",
-            Audience = null,
-            AuthorId = anna.Id, Kind = PageKind.User,
-            ComponentId = null, LanguageCode = "en",
-            Created = now.AddDays(-1), Modified = now.AddDays(-1),
-            IsDraft = false, IsDeleted = false
-        };
-        session.Store(blogPost2);
-        session.Store(new PageTranslation
-        {
-            Id = Id(), PageId = blogPost2.Id, LanguageCode = "de",
-            Title = "Die alte Glocke des Eckladens",
-            Body = "Die kleine Glocke über dem alten Eckladen klingelt immer noch, wenn jemand die Tür öffnet. Niemand führt den Laden mehr, aber der Klang ist geblieben — eine kleine Erinnerung daran, dass die Straße einmal geschäftiger war.",
-            AuthorId = sophie.Id, Created = now
-        });
+            session.Store(new CommunityTranslation
+            {
+                Id = Id(),
+                ComponentId = community.ComponentId,
+                LanguageCode = community.LanguageCode,
+                Name = community.Name,
+                AuthorId = translationAuthorId,
+                Created = now.AddDays(-(community.DaysAgo ?? 0)),
+            });
+        }
 
-        // ── Danish coverage pass (a GlobalAdmin/Translator standing — the user-added
-        //    translation lanes, ADR 0022 posts/replies, 0026 group, 0029 announcements,
-        //    0039 pages, and the tags lane, mirroring the de/fr rows above). The
-        //    expansion items already carry `da`; the rest of the neighborhood now does
-        //    too, so the demo is translatable into all four enabled languages
-        //    (en/de/fr/da) instead of falling back to English on nearly every `da` view.
-        // ── Communities (ADR 0026 — GlobalAdmin/Translator standing) ─────────────────
-        // Four default components — de/fr/da matrix so the sidebar reads natively.
-        session.Store(new CommunityTranslation
+        // ── Enable every catalog language for the demo (ADR 0005) ────────────────────────
+        // Danish ships DISABLED (FirstBootSeeder seeds it awaiting an admin's enable);
+        // the sample wants the full selector, so flip it on here. Dev-only: this session
+        // only ever runs under the Development ∧ first-boot gate. Load-then-Store (idempotent).
+        if (doc.EnableDanish)
         {
-            Id = Id(), ComponentId = "safety", LanguageCode = "de",
-            Name = "Sicherheit", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "safety", LanguageCode = "fr",
-            Name = "Sécurité", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "safety", LanguageCode = "da",
-            Name = "Sikkerhed", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "maintenance", LanguageCode = "de",
-            Name = "Wartung", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "maintenance", LanguageCode = "fr",
-            Name = "Entretien", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "maintenance", LanguageCode = "da",
-            Name = "Vedligeholdelse", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "social", LanguageCode = "de",
-            Name = "Soziales", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "social", LanguageCode = "fr",
-            Name = "Social", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "social", LanguageCode = "da",
-            Name = "Socialt", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "governance", LanguageCode = "de",
-            Name = "Gemeinschaftsführung", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "governance", LanguageCode = "fr",
-            Name = "Gouvernance", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        session.Store(new CommunityTranslation
-        {
-            Id = Id(), ComponentId = "governance", LanguageCode = "da",
-            Name = "Forvaltning", AuthorId = sophie.Id, Created = now.AddDays(-38)
-        });
-        // ── Tags ─────────────────────────────────────────────────────────────────────
-        session.Store(new TagTranslation { Id = Id(), TagId = tagCleanup.Id, LanguageCode = "da", Name = "Rengøring",  AuthorId = sophie.Id, Created = now.AddDays(-27) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagNotice.Id,  LanguageCode = "da", Name = "Meddelelse", AuthorId = sophie.Id, Created = now.AddDays(-27) });
-        session.Store(new TagTranslation { Id = Id(), TagId = tagRecipe.Id,  LanguageCode = "da", Name = "Opskrift",   AuthorId = sophie.Id, Created = now.AddDays(-17) });
-
-        // ── Announcements ────────────────────────────────────────────────────────────
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = welcome.Id, LanguageCode = "da",
-            Title = "Velkommen til naboskabet",
-            Body = "Dette er en demo-instans af **Kumunita**, en selvhostet platform til ét nabolag.\n\nAlt, hvad du ser her, er eksempeldata — fri til at redigere, skjule eller slette, mens du udforsker.",
-            AuthorId = sophie.Id, Created = now.AddDays(-13)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = volunteers.Id, LanguageCode = "da",
-            Title = "Frivillige søges til oprydning lørdag",
-            Body = "Vi rydder bagvejen på **lørdag**. Tag handsker med — vi stiller med poser.",
-            AuthorId = sophie.Id, Created = now.AddDays(-3)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = alarm.Id, LanguageCode = "da",
-            Title = "Test af brandalarmer denne uge",
-            Body = "Bygningens alarm vil lyde **torsdag 09:00–09:30**. Det er en test — brug venligst ikke evakueringsstigerne, medmindre de faktisk er i brug.",
-            AuthorId = sophie.Id, Created = now.AddDays(-1)
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = testPlatform.Id, LanguageCode = "da",
-            Title = "Testplatform",
-            Body = "Dette er en testplatform — ikke beregnet til reel brug.\n\nTjenester kan holde op med at virke når som helst, data kan slettes når som helst, og der kan ske ændringer når som helst.\n\nDenne testplatform er i øjeblikket åben for, at nye brugere kan tilmelde sig, så alle kan prøve den — del derfor ikke nogen reel eller privat information her.",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "da",
-            Title = "Fælleslokalet åbent om aftenen",
-            Body = "Fra næste uge er lokalet åbent **ukedage 18:00–22:00** for alle, der vil have et stille sted at arbejde eller læse.",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new AnnouncementTranslation
-        {
-            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "da",
-            Title = "Fundne genstande — en sort paraply",
-            Body = "Noen har efterladt en sort paraply ved opslagstavlen. Den er i god behold hos mig — hent den på den fælles grønflade.",
-            AuthorId = sophie.Id, Created = now
-        });
-
-        // ── Community posts + replies ────────────────────────────────────────────────
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postRecycling.Id, LanguageCode = "da",
-            Title = "Nyt genbrugsprogram fra næste måned",
-            Body = "Byen flytter glas til **tirsdage** og papir til **fredage**, fra den 1.\n\nHar nogen det nye foldeseddel? Jeg kan trykke eksemplarer til entréen.",
-            AuthorId = sophie.Id, Created = now.AddDays(-4)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postPotluck.Id, LanguageCode = "da",
-            Title = "Fællesmåltid på grønfladen i weekenden?",
-            Body = "Har nogen lyst til en simpel fællesmad under træet **søndag**? Ingen pres — en ret hver, drikkevarer på huset (mine).",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postMinutes.Id, LanguageCode = "da",
-            Title = "Notater fra månedsmøde (udkast til kommentar)",
-            Body = "Opsummering af bygningsmødet sidste uge:\n\n- Godkendte plan for havebedene\n- Udsatte ommalet af hegn til næste sæson\n- Indsamlet 3 € til fælleværktøjskassen\n\nMeld dig, hvis du er uenig i noget, inden det afsluttes.",
-            AuthorId = sophie.Id, Created = now.AddDays(-1)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postElectrician.Id, LanguageCode = "da",
-            Title = "Kender I en god lokal elektriker?",
-            Body = "Vores køkkensikring slår fra konstant. Hvis nogen har brugt en lokal elektriker i år, vil jeg sætte pris på en anbefaling.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postSeedlings.Id, LanguageCode = "da",
-            Title = "Gratis frøplanter i genbrugshjørnet",
-            Body = "Jeg har en bakke med tomat- og basilikumfrøplanter på hylden ved sønderboksene — de første får, de første tager.",
-            AuthorId = sophie.Id, Created = now.AddDays(-1)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = postStreetName.Id, LanguageCode = "da",
-            Title = "Hvor kommer gadenavnet fra?",
-            Body = "Halvdelen af kvarteret kalder det for ét, kortet siger noget andet. Veder nogen historien bagved det?",
-            AuthorId = sophie.Id, Created = now
-        });
-        session.Store(new ReplyTranslation
-        {
-            Id = Id(), ReplyId = reply1.Id, LanguageCode = "da",
-            Body = "Jeg har foldesedlen — den er på opslagstavlen, side 2. Både glas *og* flaskeopsamlingen er flyttet.",
-            AuthorId = sophie.Id, Created = now.AddDays(-4)
-        });
-        session.Store(new ReplyTranslation
-        {
-            Id = Id(), ReplyId = reply2.Id, LanguageCode = "da",
-            Body = "Perfekt, tak Ben — jeg henter den og trykker eksemplarerne i dag.",
-            AuthorId = sophie.Id, Created = now.AddDays(-4)
-        });
-        session.Store(new ReplyTranslation
-        {
-            Id = Id(), ReplyId = reply3.Id, LanguageCode = "da",
-            Body = "Jeg er med! Jeg tager en stor salat med. Hvad med 14:00?",
-            AuthorId = sophie.Id, Created = now.AddDays(-1)
-        });
-
-        // ── Group posts + group name/description ─────────────────────────────────────
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = groupPost.Id, LanguageCode = "da",
-            Title = "Plan for grønfladen til foråret",
-            Body = "Udkast til de fælles bed:\n\n- Nordbed: urter (basilikum, persille)\n- Syd­bed: tomater\n\nStem i tråden, så afslutter jeg frølisten.",
-            AuthorId = sophie.Id, Created = now.AddDays(-2)
-        });
-        session.Store(new PostTranslation
-        {
-            Id = Id(), PostId = groupPostCompost.Id, LanguageCode = "da",
-            Title = "Kompostkassen — hvem er på denne uge?",
-            Body = "Kassen er klar til at skiftes. Kan nogen tage en tur ved at vende den denne uge? Den forfalder mandag.",
-            AuthorId = sophie.Id, Created = now.AddDays(-1)
-        });
-        session.Store(new GroupTranslation
-        {
-            Id = Id(), GroupId = green.Id, LanguageCode = "da",
-            Name = "Gadegrønt", Description = "Naboer, der arbejder på den fælles grønflade ved legepladsen.",
-            AuthorId = sophie.Id, Created = now.AddDays(-30)
-        });
-        session.Store(new GroupTranslation
-        {
-            Id = Id(), GroupId = family.Id, LanguageCode = "da",
-            Name = "Familien Kowalski", Description = "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
-            AuthorId = sophie.Id, Created = now.AddDays(-40)
-        });
-
-        // ── Resident blog ────────────────────────────────────────────────────────────
-        session.Store(new PageTranslation
-        {
-            Id = Id(), PageId = blogRoot.Id, LanguageCode = "da",
-            Title = "Annas hjørne af gaden",
-            Body = "Et lille sted til noter om kvarteret — den slags, man ellers poster i gruppechat, og som ingen finder igen.",
-            AuthorId = sophie.Id, Created = now.AddDays(-5)
-        });
-        session.Store(new PageTranslation
-        {
-            Id = Id(), PageId = blogPost.Id, LanguageCode = "da",
-            Title = "Bænken ved porten",
-            Body = "Der er en bænk, som de fleste af os er gået glip af. Den får solen først om morgenen, og duerne har erobret den ved ni.\n\nJeg bliver ved med at skulle pudse den for folk, der bruger den til at læse. Lille ting, men den er vores.",
-            AuthorId = sophie.Id, Created = now.AddDays(-3)
-        });
-        session.Store(new PageTranslation
-        {
-            Id = Id(), PageId = blogPost2.Id, LanguageCode = "da",
-            Title = "Hjørnebutikkens gamle klokke",
-            Body = "Den lille klokke over hjørnebutikken klinger stadig, når nogen åbner døren. Ingen driver butikken længere, men lyden er geblevet — en lille påmindelse om, at gaden engang var mere travl.",
-            AuthorId = sophie.Id, Created = now
-        });
+            var danish = await session.LoadAsync<LanguageCatalog>("da", ct);
+            if (danish is not null && !danish.Enabled)
+            {
+                danish.Enabled = true;
+                session.Store(danish);
+            }
+        }
 
         await session.SaveChangesAsync();
 
@@ -1091,7 +685,7 @@ public static class SampleDataSeeder
                 idempotencyKey: $"sampledata:{admin.Id}",
                 recipient: adminAccountEmail,
                 subject: "Kumunita: demo-instance credentials",
-                body: SampleDataCredentialsBody(moderatorPw, translatorPw, annaPw, benPw, carlaPw, davidPw),
+                body: SampleDataCredentialsBody(deployCredentials),
                 ct: ct);
             await emailSession.SaveChangesAsync();
             logger.LogInformation(
@@ -1109,20 +703,47 @@ public static class SampleDataSeeder
         else
         {
             logger.LogInformation(
-                "Development sample data: complete. Accounts — {Admin} ({AdminPassword}), {Mod} ({ModPassword}), {Trans} ({TransPassword}), " +
-                "anna/ben/carla/david@examplium.com (all {ResPassword}).",
-                AdminEmail, AdminPassword, ModeratorEmail, ModeratorPassword, TranslatorEmail, TranslatorPassword, ResidentPassword);
+                "Development sample data: complete. Demo accounts use the documented weak " +
+                "credentials (admin {AdminPassword}, moderator {ModPassword}, translator {TransPassword}, " +
+                "residents {ResPassword}).",
+                AdminPassword, ModeratorPassword, TranslatorPassword, ResidentPassword);
         }
     }
+
+    // ── Shape parsers (string → domain enum / audience) ─────────────────────────────────
+    private static AnnouncementScope ParseScope(string scope)
+        => scope.Equals("public", StringComparison.OrdinalIgnoreCase)
+            ? AnnouncementScope.Public
+            : AnnouncementScope.Community;
+
+    private static Audience ParsePostAudience(string audience)
+    {
+        var grants = Array.Empty<AudienceGrant>();
+        if (audience.Equals("allResidents", StringComparison.OrdinalIgnoreCase))
+            return new Audience(AudienceMode.Any, grants) { AllResidents = true };
+        if (audience.Equals("empty", StringComparison.OrdinalIgnoreCase))
+            return new Audience(); // group-lane post: owner ∪ member, no audience grants
+        return new Audience(AudienceMode.Any, grants) { Community = true }; // "community" (default)
+    }
+
+    private static PageKind ParsePageKind(string kind)
+        => kind.Equals("user", StringComparison.OrdinalIgnoreCase) ? PageKind.User : PageKind.System;
+
+    private static RsvpStatus ParseRsvpStatus(string status)
+        => status switch
+        {
+            "Maybe" => RsvpStatus.Maybe,
+            "No" => RsvpStatus.No,
+            _ => RsvpStatus.Going,
+        };
 
     /// <summary>
     /// **Warm-boot backfill** of the sample events' de / fr / da
     /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0060). An instance whose
-    /// first boot predates the sample event translations has the four sample events
-    /// (authored in <c>en</c>) but no de / fr / da rows, so a German / French / Danish-speaking
-    /// resident sees only the English variant on the events feed and detail. This lane closes
-    /// that gap the same way ADR 0047 D2 / ADR 0052 do for the canonical pages and the
-    /// UI-string catalog.
+    /// first boot predates the sample event translations has the sample events (authored in
+    /// <c>en</c>) but no de / fr / da rows, so a German / French / Danish-speaking resident
+    /// sees only the English variant on the events feed and detail. This lane closes that gap
+    /// the same way ADR 0047 D2 / ADR 0052 do for the canonical pages and the UI-string catalog.
     /// <para>
     /// **Create-if-missing only** (the ADR 0042 D1 invariant): an existing
     /// <c>(EventId, LanguageCode)</c> row is skipped, never refreshed — the Translator's
@@ -1185,6 +806,694 @@ public static class SampleDataSeeder
         }
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// **Warm-boot backfill of the whole sample corpus** (ADR 0130 — the ADR 0060
+    /// event-translation lane generalized to every sample surface). A sample instance
+    /// whose first boot predates a later growth of the embedded <c>sample-data.json</c>
+    /// (ADR 0129) has the *old* corpus but not the entries added since; this method adds
+    /// the **missing** ones on every warm boot so a live demo instance catches up to the
+    /// current file **without a destructive wipe**.
+    /// <para>
+    /// **Create-if-missing, never clobber (the ADR 0042 D1 invariant, carried verbatim
+    /// from the ADR 0060 lane).** Every sample entity is matched by a stable natural key
+    /// (Option A — no new column, no schema change, ADR 0086 / 0067 surface already
+    /// registered): accounts by **e-mail**, tags by **slug**, groups / announcements /
+    /// events / goals / projects by **title**, pages by **(parent, slug)**, posts by
+    /// **(title, lane)** — the lane being <c>GroupId</c> for a group-lane post and
+    /// <c>ComponentId</c> for a community post. Child rows (translations, RSVPs,
+    /// memberships, nested to-dos) are matched by their parent id + their own natural
+    /// key. A match is **skipped**; a miss is **created** with exactly the same field
+    /// values <see cref="SeedAsync"/> would have used, so a fresh instance and a
+    /// backfilled one converge to the same corpus.
+    /// </para>
+    /// <para>
+    /// **Never touches a real neighborhood.** It runs only when <c>SampleData__Enabled</c>
+    /// is set (the caller's gate, ADR 0056) and only creates rows for entities whose
+    /// natural key is in the embedded document; on a real neighborhood — which never
+    /// carries the flag, and even if it did, whose content has different titles — this is
+    /// a no-op. Idempotent: a second boot finds every row the first created and skips.
+    /// </para>
+    /// <para>
+    /// **Scope / caveat (the ADR 0130 D3 pin).** Natural keys are display strings, not
+    /// DB-enforced business keys (the content entities carry no unique index — only the
+    /// child/translation tables do). For the hand-authored hero content this is exact;
+    /// for the generated bulk corpus, a *renamed* title reads as a new entry (it will be
+    /// added, not matched) and a *title collision* with a non-sample row reads as
+    /// "present" (it will be skipped). Both are acceptable on a closed demo corpus, and
+    /// neither overwrites — the create-if-missing invariant holds in every case.
+    /// </para>
+    /// </summary>
+    public static async Task BackfillSampleCorpusAsync(
+        AppDbContext identity,
+        IDocumentStore mt,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IUserInfoService userInfo,
+        IMailerStage? mailer = null,
+        string? adminEmail = null,
+        ILogger logger = default!,
+        CancellationToken ct = default)
+    {
+        var doc = LoadDocument();
+        var now = DateTimeOffset.UtcNow;
+
+        // ── 1. Accounts (create-if-missing, keyed by e-mail) ──────────────────────────
+        // EnsureUserAsync is idempotent (FindByEmailAsync) and only adds a password to
+        // an account that has none — so a warm re-run never overwrites an existing
+        // credential, and it creates a *new* account only if the corpus grew past first
+        // boot. The two postures (ADR 0056) mirror SeedAsync exactly: in Development a
+        // newly-added account gets the documented weak demo password; in the deploy
+        // posture the seed admin stays on its setup-token lane (a null password is a
+        // no-op, so NO weak credential is ever written) and a newly-added non-admin
+        // account gets a random high-entropy password.
+        bool deployPosture = mailer is not null;
+        var usersByEmail = new Dictionary<string, User>(StringComparer.OrdinalIgnoreCase);
+        foreach (var account in doc.Accounts)
+        {
+            bool isAdmin = account.Role == Roles.GlobalAdmin;
+            string email = (isAdmin && deployPosture && adminEmail is not null) ? adminEmail : account.Email;
+            string? password =
+                deployPosture
+                    ? (isAdmin ? null : RandomPassword())
+                    : (isAdmin ? AdminPassword
+                      : account.Role == Roles.Moderator ? ModeratorPassword
+                      : account.Role == Roles.Translator ? TranslatorPassword
+                      : ResidentPassword);
+            var user = await EnsureUserAsync(
+                userManager, roleManager, mt,
+                email, password, account.Name,
+                contactVisibility: account.ContactVisibility,
+                timeZone: account.TimeZone,
+                dateFormat: account.DateFormat,
+                elevatedRole: account.Role,
+                logger: logger, ct: ct);
+            usersByEmail[account.Email] = user;
+        }
+        var admin = usersByEmail[doc.Accounts.Single(a => a.Role == Roles.GlobalAdmin).Email];
+        var translator = doc.Accounts.FirstOrDefault(a => a.Role == Roles.Translator);
+        string translationAuthorId = translator is not null ? usersByEmail[translator.Email].Id : string.Empty;
+        string TranslateAuthorId(string? authorEmail)
+            => authorEmail is not null ? usersByEmail[authorEmail].Id : translationAuthorId;
+
+        // ── 2. Components mandatory (idempotent write lane; load-then-store) ───────────
+        // SetCommunityMandatoryAsync is the sanctioned writer and is itself
+        // create-if-missing / no-op-on-no-change, so re-asserting it on a warm boot is
+        // safe (the pristine gate normally keeps SeedAsync off a warm DB; here we want
+        // the warm path to be self-sufficient).
+        foreach (var componentId in doc.MandatoryComponents)
+        {
+            await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
+        }
+
+        // ── 3. All `mt`-side sample content — one session, one commit (invariant C3) ───
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        // Preload the current corpus once per type (the create-if-missing match set).
+        var existingTags     = await session.Query<Tag>().ToListAsync(ct);
+        var existingGroups   = await session.Query<Group>().ToListAsync(ct);
+        var existingGroupsBy = await session.Query<GroupMembership>().ToListAsync(ct);
+        var existingAnn      = await session.Query<Announcement>().ToListAsync(ct);
+        var existingPosts    = await session.Query<Post>().ToListAsync(ct);
+        var existingReplies  = await session.Query<PostReply>().ToListAsync(ct);
+        var existingEvents   = await session.Query<Event>().ToListAsync(ct);
+        var existingRsvps    = await session.Query<EventRsvp>().ToListAsync(ct);
+        var existingPages    = await session.Query<Page>().ToListAsync(ct);
+        var existingGoals    = await session.Query<ProjectGoal>().ToListAsync(ct);
+        var existingProjects = await session.Query<Project>().ToListAsync(ct);
+        var existingTodos    = await session.Query<TodoItem>().ToListAsync(ct);
+        var existingTagTrans  = await session.Query<TagTranslation>().ToListAsync(ct);
+        var existingGrpTrans  = await session.Query<GroupTranslation>().ToListAsync(ct);
+        var existingAnnTrans  = await session.Query<AnnouncementTranslation>().ToListAsync(ct);
+        var existingPostTrans = await session.Query<PostTranslation>().ToListAsync(ct);
+        var existingReplTrans = await session.Query<ReplyTranslation>().ToListAsync(ct);
+        var existingEvtTrans  = await session.Query<EventTranslation>().ToListAsync(ct);
+        var existingPageTrans = await session.Query<PageTranslation>().ToListAsync(ct);
+        var existingPrjTrans  = await session.Query<ProjectTranslation>().ToListAsync(ct);
+        var existingCommTrans = await session.Query<CommunityTranslation>().ToListAsync(ct);
+
+        // ── Tags (by slug) + per-language display names ────────────────────────────────
+        var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingTags) tagsBySlug[existing.Slug] = existing.Id;
+        foreach (var tag in doc.Tags)
+        {
+            string id;
+            if (!tagsBySlug.TryGetValue(tag.Slug, out id))
+            {
+                id = Id();
+                session.Store(new Tag
+                {
+                    Id = id,
+                    Slug = tag.Slug,
+                    Name = tag.Name,
+                    LanguageCode = "en",
+                    CreatedBy = usersByEmail[tag.CreatedByEmail].Id,
+                    Created = now.AddDays(-tag.DaysAgo),
+                });
+                tagsBySlug[tag.Slug] = id;
+            }
+            // Top-up the tag's translation rows (create-if-missing by (tagId, lang)).
+            var haveTagTrans = existingTagTrans
+                .Where(t => t.TagId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in tag.Translations)
+            {
+                if (haveTagTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new TagTranslation
+                {
+                    Id = Id(),
+                    TagId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Name = tr.Name ?? string.Empty,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                haveTagTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Groups (by title) + memberships + name/description translations ────────────
+        var groupsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingGroups) groupsByTitle[existing.Name] = existing.Id;
+        foreach (var group in doc.Groups)
+        {
+            string id;
+            if (!groupsByTitle.TryGetValue(group.Name, out id))
+            {
+                id = Id();
+                var seedOwner = usersByEmail[group.OwnerEmail];
+                var seedCreated = now.AddDays(-group.DaysAgo);
+                session.Store(new Group
+                {
+                    Id = id,
+                    Name = group.Name,
+                    Description = group.Description,
+                    IsPrivate = group.IsPrivate,
+                    OwnerId = seedOwner.Id,
+                    Created = seedCreated,
+                });
+                groupsByTitle[group.Name] = id;
+            }
+            // Memberships — one row per (group, user) unique index; skip existing.
+            // (GroupMembership has no IsDeleted — removal is a hard delete, ADR 0008.)
+            var haveMembers = existingGroupsBy
+                .Where(m => m.GroupId == id)
+                .Select(m => m.UserId)
+                .ToHashSet();
+            var owner = usersByEmail[group.OwnerEmail];
+            var groupCreated = now.AddDays(-group.DaysAgo);
+            foreach (var memberEmail in group.MemberEmails)
+            {
+                var member = usersByEmail[memberEmail];
+                if (haveMembers.Contains(member.Id)) continue;
+                session.Store(new GroupMembership
+                {
+                    Id = Id(),
+                    GroupId = id,
+                    UserId = member.Id,
+                    AddedBy = owner.Id,
+                    At = groupCreated,
+                });
+                haveMembers.Add(member.Id);
+            }
+            // Group translations — top-up by (groupId, lang).
+            var haveGrpTrans = existingGrpTrans
+                .Where(t => t.GroupId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in group.Translations)
+            {
+                if (haveGrpTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new GroupTranslation
+                {
+                    Id = Id(),
+                    GroupId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Name = tr.Name,
+                    Description = tr.Description,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                haveGrpTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Moderator assignments (ADR 0003) — the rows that mint `moderator:{id}` ─────
+        // There is no natural-key unique index on (UserId, ComponentId); match the pair
+        // in memory. A missing pair is created; an existing one is skipped.
+        var existingModAssign = await session.Query<ModeratorAssignment>().ToListAsync(ct);
+        foreach (var assignment in doc.ModeratorAssignments)
+        {
+            var moderator = usersByEmail[assignment.UserEmail];
+            var grantedBy = assignment.GrantedByEmail is not null
+                ? usersByEmail[assignment.GrantedByEmail].Id
+                : admin.Id;
+            bool have = existingModAssign.Any(m =>
+                m.UserId == moderator.Id && m.ComponentId == assignment.ComponentId);
+            if (have) continue;
+            session.Store(new ModeratorAssignment
+            {
+                Id = Id(),
+                UserId = moderator.Id,
+                ComponentId = assignment.ComponentId,
+                GrantedBy = grantedBy,
+                At = now.AddDays(-assignment.DaysAgo),
+            });
+        }
+
+        // ── Announcements (by title, component-scoped) + translations ──────────────────
+        var announcementsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingAnn)
+        {
+            // Composite key: title + component (null = platform-wide) + scope, so two
+            // announcements with the same title in different scopes are distinct.
+            announcementsByTitle[existing.Title + "|" + (existing.CommunityId ?? "_")] = existing.Id;
+        }
+        foreach (var announcement in doc.Announcements)
+        {
+            var key = announcement.Title + "|" + (announcement.ComponentId ?? "_");
+            string id;
+            if (!announcementsByTitle.TryGetValue(key, out id))
+            {
+                id = Id();
+                session.Store(new Announcement
+                {
+                    Id = id,
+                    AuthorId = usersByEmail[announcement.AuthorEmail].Id,
+                    Title = announcement.Title,
+                    Body = announcement.Body,
+                    Scope = ParseScope(announcement.Scope),
+                    CommunityId = announcement.ComponentId,
+                    Pinned = announcement.Pinned,
+                    LanguageCode = "en",
+                    Created = now.AddDays(-announcement.DaysAgo),
+                });
+                announcementsByTitle[key] = id;
+            }
+            // Top-up the announcement's translation rows.
+            var haveAnnTrans = existingAnnTrans
+                .Where(t => t.AnnouncementId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in announcement.Translations)
+            {
+                if (haveAnnTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new AnnouncementTranslation
+                {
+                    Id = Id(),
+                    AnnouncementId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                haveAnnTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Posts (by title + lane) + replies + translations ───────────────────────────
+        // The lane is `GroupId` for a group-lane post, `ComponentId` for a community
+        // post (the ADR 0013 lane exclusivity). The composite key encodes which lane.
+        // The Group entity carries no slug (the ADR 0010 shape), so the sample
+        // document's slug → group-id mapping is derived once (matching the
+        // document's group names against the groups created/seeded above) — posts
+        // reference their group by slug, so this is the lookup they need.
+        var docGroupSlugToId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sampleGroup in doc.Groups)
+            if (groupsByTitle.TryGetValue(sampleGroup.Name, out var sampleGroupId))
+                docGroupSlugToId[sampleGroup.Slug] = sampleGroupId;
+        var postsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingPosts)
+        {
+            var lane = string.IsNullOrEmpty(existing.GroupId) ? "C:" + (existing.ComponentId ?? "_")
+                                                               : "G:" + existing.GroupId;
+            postsByTitle[existing.Title + "|" + lane] = existing.Id;
+        }
+        foreach (var samplePost in doc.Posts)
+        {
+            bool groupLane = samplePost.GroupSlug is not null;
+            var groupPostId = groupLane && docGroupSlugToId.TryGetValue(samplePost.GroupSlug!, out var g) ? g : string.Empty;
+            var lane = groupLane ? "G:" + groupPostId
+                                 : "C:" + (samplePost.ComponentId ?? "_");
+            var key = samplePost.Title + "|" + lane;
+            string id;
+            if (!postsByTitle.TryGetValue(key, out id))
+            {
+                id = Id();
+                session.Store(new Post
+                {
+                    Id = id,
+                    ComponentId = groupLane ? string.Empty : (samplePost.ComponentId ?? string.Empty),
+                    GroupId = groupPostId,
+                    AuthorId = usersByEmail[samplePost.AuthorEmail].Id,
+                    Title = samplePost.Title,
+                    Body = samplePost.Body,
+                    Audience = ParsePostAudience(samplePost.Audience),
+                    Created = now.AddDays(-samplePost.DaysAgo),
+                    Modified = samplePost.ModifiedDaysAgo.HasValue ? now.AddDays(-samplePost.ModifiedDaysAgo.Value) : null,
+                    LanguageCode = "en",
+                    TagIds = [.. samplePost.TagSlugs.Select(slug => tagsBySlug[slug])],
+                });
+                postsByTitle[key] = id;
+            }
+            // Replies — there is no natural-key unique index on (PostId, Body); match
+            // in-memory by (PostId, Body) and skip an existing one (create-if-missing).
+            var haveReplies = existingReplies
+                .Where(r => r.PostId == id)
+                .Select(r => r.Body)
+                .ToHashSet();
+            foreach (var reply in samplePost.Replies)
+            {
+                if (haveReplies.Contains(reply.Body)) continue;
+                var replyId = Id();
+                session.Store(new PostReply
+                {
+                    Id = replyId,
+                    PostId = id,
+                    AuthorId = usersByEmail[reply.AuthorEmail].Id,
+                    Body = reply.Body,
+                    Created = now.AddDays(-(reply.DaysAgo ?? 0)).AddHours(reply.HoursAfter ?? 0),
+                    LanguageCode = "en",
+                });
+                haveReplies.Add(reply.Body);
+                // Top-up the reply's translation rows.
+                var haveReplTrans = existingReplTrans
+                    .Where(t => t.ReplyId == replyId)
+                    .Select(t => t.LanguageCode)
+                    .ToHashSet();
+                foreach (var tr in reply.Translations)
+                {
+                    if (haveReplTrans.Contains(tr.LanguageCode)) continue;
+                    session.Store(new ReplyTranslation
+                    {
+                        Id = Id(),
+                        ReplyId = replyId,
+                        LanguageCode = tr.LanguageCode,
+                        Body = tr.Body,
+                        AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                        Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                    });
+                    haveReplTrans.Add(tr.LanguageCode);
+                }
+            }
+            // Top-up the post's translation rows.
+            var havePostTrans = existingPostTrans
+                .Where(t => t.PostId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in samplePost.Translations)
+            {
+                if (havePostTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new PostTranslation
+                {
+                    Id = Id(),
+                    PostId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                havePostTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Events (by title) + RSVPs + translations ───────────────────────────────────
+        var eventsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingEvents) eventsByTitle[existing.Title] = existing.Id;
+        foreach (var sampleEvent in doc.Events)
+        {
+            string id;
+            if (!eventsByTitle.TryGetValue(sampleEvent.Title, out id))
+            {
+                id = Id();
+                var start = now.AddDays(sampleEvent.StartDaysAhead);
+                session.Store(new Event
+                {
+                    Id = id,
+                    Title = sampleEvent.Title,
+                    Body = sampleEvent.Body,
+                    ComponentId = sampleEvent.ComponentId,
+                    AuthorId = usersByEmail[sampleEvent.AuthorEmail].Id,
+                    Start = start,
+                    End = start.AddHours(sampleEvent.EndHoursAfterStart),
+                    Location = sampleEvent.Location,
+                    Capacity = sampleEvent.Capacity,
+                    Color = sampleEvent.Color,
+                    Audience = new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true },
+                    ReminderEnabled = sampleEvent.ReminderEnabled,
+                    IsDraft = false,
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    TagIds = [.. sampleEvent.TagSlugs.Select(slug => tagsBySlug[slug])],
+                    Created = sampleEvent.DaysAgo.HasValue ? now.AddDays(-sampleEvent.DaysAgo.Value) : now,
+                    Modified = sampleEvent.ModifiedNow ? now : null,
+                });
+                eventsByTitle[sampleEvent.Title] = id;
+            }
+            // RSVPs — (EventId, UserId) unique index; skip existing.
+            var haveRsvps = existingRsvps
+                .Where(r => r.EventId == id)
+                .Select(r => r.UserId)
+                .ToHashSet();
+            foreach (var rsvp in sampleEvent.Rsvps)
+            {
+                var userId = usersByEmail[rsvp.UserEmail].Id;
+                if (haveRsvps.Contains(userId)) continue;
+                session.Store(new EventRsvp
+                {
+                    Id = Id(),
+                    EventId = id,
+                    UserId = userId,
+                    Status = ParseRsvpStatus(rsvp.Status),
+                    At = now.AddDays(-(rsvp.DaysAgo ?? 0)).AddHours(rsvp.HoursAfter ?? 0),
+                });
+                haveRsvps.Add(userId);
+            }
+            // Top-up the event's translation rows.
+            var haveEvtTrans = existingEvtTrans
+                .Where(t => t.EventId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in sampleEvent.Translations)
+            {
+                if (haveEvtTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new EventTranslation
+                {
+                    Id = Id(),
+                    EventId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                haveEvtTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Pages (by slug — globally unique in the sample corpus) + translations ──────
+        // The ADR 0040 blog lane: parents are always listed before their sub-pages, and
+        // the slug is the stable cross-reference key (SeedAsync keys off it the same way).
+        var pagesBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingPages)
+            pagesBySlug[existing.Slug] = existing.Id;
+        foreach (var page in doc.Pages)
+        {
+            string id;
+            if (!pagesBySlug.TryGetValue(page.Slug, out id))
+            {
+                id = Id();
+                var parent = page.ParentSlug is not null ? pagesBySlug[page.ParentSlug] : null;
+                var created = now.AddDays(-page.DaysAgo);
+                session.Store(new Page
+                {
+                    Id = id,
+                    ParentId = parent,
+                    Slug = page.Slug,
+                    Title = page.Title,
+                    Body = page.Body,
+                    Audience = null, // public (world-readable) — a blog page may be public
+                    Kind = ParsePageKind(page.Kind),
+                    AuthorId = usersByEmail[page.AuthorEmail].Id,
+                    ComponentId = null,
+                    LanguageCode = "en",
+                    Created = created,
+                    Modified = created,
+                    IsDraft = false,
+                    IsDeleted = false,
+                    TagIds = [.. page.TagSlugs.Select(slug => tagsBySlug[slug])],
+                });
+                pagesBySlug[page.Slug] = id;
+            }
+            // Top-up the page's translation rows (create-if-missing by (pageId, lang)).
+            var havePageTrans = existingPageTrans
+                .Where(t => t.PageId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in page.Translations)
+            {
+                if (havePageTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new PageTranslation
+                {
+                    Id = Id(),
+                    PageId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title ?? string.Empty,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                havePageTrans.Add(tr.LanguageCode);
+            }
+        }
+
+        // ── Goals (by title) — the PL lane, ADR 0086 D2 ────────────────────────────────
+        var goalsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var existing in existingGoals) goalsByTitle[existing.Title] = existing.Id;
+        foreach (var goal in doc.Goals)
+        {
+            if (goalsByTitle.TryGetValue(goal.Title, out var existingGoalId))
+            {
+                goalsByTitle[goal.Title] = existingGoalId;
+                continue;
+            }
+            var id = Id();
+            session.Store(new ProjectGoal
+            {
+                Id = id,
+                Title = goal.Title,
+                Description = goal.Description,
+                ComponentId = goal.ComponentId,
+                AuthorId = usersByEmail[goal.AuthorEmail].Id,
+                Audience = null,
+                IsDeleted = false,
+                LanguageCode = "en",
+                Created = now.AddDays(-goal.DaysAgo),
+            });
+            goalsByTitle[goal.Title] = id;
+        }
+
+        // ── Projects (by title) + translations + nested to-dos ─────────────────────────
+        foreach (var sampleProject in doc.Projects)
+        {
+            string id;
+            if (!existingProjects.Any(p => p.Title == sampleProject.Title))
+            {
+                id = Id();
+                var goalId = sampleProject.GoalTitle is not null && goalsByTitle.TryGetValue(sampleProject.GoalTitle, out var g)
+                    ? g
+                    : null;
+                var created = now.AddDays(-sampleProject.DaysAgo);
+                session.Store(new Project
+                {
+                    Id = id,
+                    Title = sampleProject.Title,
+                    Description = sampleProject.Description,
+                    GoalId = goalId,
+                    Status = sampleProject.Status,
+                    StartAt = sampleProject.StartDaysAgo.HasValue ? now.AddDays(-sampleProject.StartDaysAgo.Value) : null,
+                    DueAt = sampleProject.DueInDays.HasValue ? now.AddDays(sampleProject.DueInDays.Value) : null,
+                    ComponentId = sampleProject.ComponentId,
+                    AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
+                    Audience = null,
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    Created = created,
+                    Modified = created,
+                });
+            }
+            else
+            {
+                // Resolve the existing id (we matched by title above).
+                id = existingProjects.Single(p => p.Title == sampleProject.Title).Id;
+            }
+            // Top-up the project's translation rows.
+            var havePrjTrans = existingPrjTrans
+                .Where(t => t.ProjectId == id)
+                .Select(t => t.LanguageCode)
+                .ToHashSet();
+            foreach (var tr in sampleProject.Translations)
+            {
+                if (havePrjTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new ProjectTranslation
+                {
+                    Id = Id(),
+                    ProjectId = id,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                havePrjTrans.Add(tr.LanguageCode);
+            }
+            // Nested to-dos — match by (ProjectId, Title); create if missing.
+            var haveTodos = existingTodos
+                .Where(t => t.ProjectId == id && !t.IsDeleted)
+                .Select(t => t.Title)
+                .ToHashSet();
+            foreach (var todo in sampleProject.Todos)
+            {
+                if (haveTodos.Contains(todo.Title)) continue;
+                session.Store(new TodoItem
+                {
+                    Id = Id(),
+                    Title = todo.Title,
+                    Body = todo.Body,
+                    ComponentId = sampleProject.ComponentId,
+                    ProjectId = id,
+                    AuthorId = usersByEmail[sampleProject.AuthorEmail].Id,
+                    AssigneeId = todo.AssigneeEmail is not null ? usersByEmail[todo.AssigneeEmail].Id : null,
+                    Status = todo.Status,
+                    StartAt = null,
+                    DueAt = todo.DueInDays.HasValue ? now.AddDays(todo.DueInDays.Value) : null,
+                    Audience = null,
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    TagIds = [],
+                    ImageIds = [],
+                    AttachmentIds = [],
+                    Created = now.AddDays(-todo.DaysAgo),
+                    Modified = null,
+                });
+                haveTodos.Add(todo.Title);
+            }
+        }
+
+        // ── Community (board) name/description translations (ADR 0026) ─────────────────
+        // Match by (ComponentId, LanguageCode).
+        var haveCommTrans = existingCommTrans
+            .Select(t => (t.ComponentId, t.LanguageCode))
+            .ToHashSet();
+        foreach (var community in doc.CommunityTranslations)
+        {
+            var key = (community.ComponentId, community.LanguageCode);
+            if (haveCommTrans.Contains(key)) continue;
+            session.Store(new CommunityTranslation
+            {
+                Id = Id(),
+                ComponentId = community.ComponentId,
+                LanguageCode = community.LanguageCode,
+                Name = community.Name,
+                Description = community.Description,
+                AuthorId = translationAuthorId,
+                Created = now.AddDays(-(community.DaysAgo ?? 0)),
+            });
+            haveCommTrans.Add(key);
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Warm-boot: backfilled the sample corpus (create-if-missing, idempotent). " +
+            "Accounts: {Accounts}, Tags: {Tags}, Groups: {Groups}, Announcements: {Ann}, " +
+            "Posts: {Posts}, Events: {Events}, Pages: {Pages}, Goals: {Goals}, Projects: {Projects}.",
+            doc.Accounts.Count, doc.Tags.Count, doc.Groups.Count, doc.Announcements.Count,
+            doc.Posts.Count, doc.Events.Count, doc.Pages.Count, doc.Goals.Count, doc.Projects.Count);
     }
 
     /// <summary>
@@ -1253,7 +1562,8 @@ public static class SampleDataSeeder
         }
 
         // The mt-side Profile — verified resident, self-only visibility default, optional
-        // opt-in contact block + tz/format overrides.
+        // opt-in contact block + tz/format overrides. (The extended bio/tags/visibility
+        // are applied later, in the single content session — ADR 0123.)
         await using var session = mt.OpenSession(new SessionOptions());
         var profile = await session.LoadAsync<Profile>(existing.Id, ct);
         profile ??= new Profile { SubjectId = existing.Id };
@@ -1314,32 +1624,28 @@ public static class SampleDataSeeder
 
     /// <summary>
     /// The deploy-posture credentials e-mail body (ADR 0056): the demo accounts' e-mail +
-    /// generated password, one per line, plus the note that the seed-admin account keeps
-    /// its <c>SeedAdmin__</c> setup-token lane (its own credential is the one-time token
-    /// from the first-boot setup e-mail). Staged once through the durable outbox to the
-    /// seed admin; the operator is told to delete it once captured.
+    /// generated password, one per line (sourced from the sample-data document), plus the
+    /// note that the seed-admin account keeps its <c>SeedAdmin__</c> setup-token lane.
+    /// Staged once through the durable outbox to the seed admin; the operator is told to
+    /// delete it once captured.
     /// </summary>
-    private static string SampleDataCredentialsBody(
-        string? moderatorPw, string? translatorPw,
-        string? annaPw, string? benPw, string? carlaPw, string? davidPw)
+    private static string SampleDataCredentialsBody(IEnumerable<(string Email, string Password)> credentials)
     {
         var lines = new List<string>
         {
             "A Kumunita instance has seeded a demo neighborhood (sample data).",
             "Demo account credentials (e-mail → password):",
             "",
-            $"{ModeratorEmail}  →  {moderatorPw}",
-            $"{TranslatorEmail}  →  {translatorPw}",
-            $"anna@examplium.com  →  {annaPw}",
-            $"ben@examplium.com  →  {benPw}",
-            $"carla@examplium.com  →  {carlaPw}",
-            $"david@examplium.com  →  {davidPw}",
+        };
+        lines.AddRange(credentials.Select(c => $"{c.Email}  →  {c.Password}"));
+        lines.AddRange(new[]
+        {
             "",
             "Your own admin account keeps its one-time setup-token lane; use the setup link " +
             "from the first-boot setup e-mail to set your admin password.",
             "",
-            "Treat this e-mail as sensitive and delete it once you have the credentials."
-        };
+            "Treat this e-mail as sensitive and delete it once you have the credentials.",
+        });
         return string.Join("\n", lines);
     }
 }

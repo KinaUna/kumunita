@@ -1,0 +1,4788 @@
+{
+  "version": 1,
+  "enableDanish": true,
+  "mandatoryComponents": [
+    "safety",
+    "maintenance",
+    "social",
+    "governance"
+  ],
+  "accounts": [
+    {
+      "email": "admin@examplium.com",
+      "name": "Alex Admin",
+      "role": "GlobalAdmin",
+      "bio": "Setting up the board and keeping it running — ping me when something misbehaves; half the time the answer is in the OPS notes, the other half I'll work it out. Happy to help get your profile or your group sorted.",
+      "tagSlugs": [
+        "firstaid",
+        "translation"
+      ]
+    },
+    {
+      "email": "moderator@examplium.com",
+      "name": "Maria Moderator",
+      "role": "Moderator",
+      "bio": "I look after the **safety** and **social** boards. Trained in first aid — if it's an emergency, call the local number first, then reach out. I'm happy to settle the small stuff before it grows.",
+      "tagSlugs": [
+        "firstaid",
+        "gardening"
+      ]
+    },
+    {
+      "email": "translator@examplium.com",
+      "name": "Sophie Translate",
+      "role": "Translator",
+      "bio": "Neighbours from everywhere — so I translate whatever needs it. If a post or announcement is still only in English, drop me a line and I'll find the words. I also do most of the weekend **baking**.",
+      "tagSlugs": [
+        "translation",
+        "baking"
+      ]
+    },
+    {
+      "email": "anna@examplium.com",
+      "name": "Anna Kowalska",
+      "contactVisibility": true,
+      "timeZone": "Europe/Warsaw",
+      "bio": "Mum of two, on the block since 2019. I do the neighbourhood **baking** (the sourdough never lasts) and we've coaxed a little **garden** into the back yard. Always up for a potluck or a ride on the canal.",
+      "tagSlugs": [
+        "baking",
+        "gardening",
+        "cycling"
+      ]
+    },
+    {
+      "email": "ben@examplium.com",
+      "name": "Ben Nowak",
+      "bio": "Handy around the house — happy to help with a wobbly shelf or a fuse that keeps tripping. I **cycle** everywhere I can, and I photograph a lot of the little things going on around the block.",
+      "tagSlugs": [
+        "cycling",
+        "photography",
+        "repair"
+      ]
+    },
+    {
+      "email": "carla@examplium.com",
+      "name": "Carla Kubiak",
+      "contactVisibility": true,
+      "bio": "The one who runs the green and the seedling corner. **Gardening** is my happy place, and I bake whatever the garden gives me. Come along to a Saturday tidy-up.",
+      "tagSlugs": [
+        "gardening",
+        "baking"
+      ]
+    },
+    {
+      "email": "david@examplium.com",
+      "name": "David Lis",
+      "timeZone": "Europe/Prague",
+      "bio": "Long-time resident and a bit of a local-history nerd — I like to know why the street has its name. I also enjoy **photography**, especially the light at the river bend. Ask me for the good spots.",
+      "tagSlugs": [
+        "history",
+        "photography"
+      ]
+    }
+  ],
+  "moderatorAssignments": [
+    {
+      "userEmail": "moderator@examplium.com",
+      "componentId": "safety",
+      "daysAgo": 30
+    },
+    {
+      "userEmail": "moderator@examplium.com",
+      "componentId": "social",
+      "daysAgo": 30
+    }
+  ],
+  "groups": [
+    {
+      "slug": "kowalski-family",
+      "name": "Kowalski Family",
+      "description": "Anna and Ben's household — a private organizing group (ADR 0010).",
+      "isPrivate": true,
+      "ownerEmail": "anna@examplium.com",
+      "memberEmails": [
+        "anna@examplium.com",
+        "ben@examplium.com"
+      ],
+      "daysAgo": 40,
+      "translations": [
+        {
+          "languageCode": "da",
+          "name": "Familien Kowalski",
+          "description": "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
+          "daysAgo": 40
+        }
+      ]
+    },
+    {
+      "slug": "street-green",
+      "name": "Street Green",
+      "description": "Neighbors working on the shared green by the playground.",
+      "isPrivate": false,
+      "ownerEmail": "carla@examplium.com",
+      "memberEmails": [
+        "carla@examplium.com",
+        "anna@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 35,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Straßengrün",
+          "description": "Nachbarn, die das gemeinsame Grün neben dem Spielplatz pflegen.",
+          "daysAgo": 30
+        },
+        {
+          "languageCode": "da",
+          "name": "Gadegrønt",
+          "description": "Naboer, der arbejder på den fælles grønflade ved legepladsen.",
+          "daysAgo": 30
+        }
+      ]
+    },
+    {
+      "slug": "back-lane-cleaning",
+      "name": "Back Lane Cleanup Crew",
+      "description": "The small team that keeps the back lane picked up — two of us with a rake, one with the coffee.",
+      "isPrivate": false,
+      "ownerEmail": "anna@examplium.com",
+      "memberEmails": [
+        "anna@examplium.com",
+        "ben@examplium.com",
+        "carla@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 54,
+      "translations": []
+    },
+    {
+      "slug": "book-club",
+      "name": "The Block's Book Club",
+      "description": "A slow read, a coffee, and one or two who actually finish the book.",
+      "isPrivate": false,
+      "ownerEmail": "david@examplium.com",
+      "memberEmails": [
+        "david@examplium.com",
+        "anna@examplium.com",
+        "carla@examplium.com"
+      ],
+      "daysAgo": 32,
+      "translations": []
+    },
+    {
+      "slug": "bike-repair-crew",
+      "name": "Bike Repair Crew",
+      "description": "Pump, tube, basic tools. If your bike is flat, come by the store room.",
+      "isPrivate": false,
+      "ownerEmail": "ben@examplium.com",
+      "memberEmails": [
+        "ben@examplium.com",
+        "david@examplium.com",
+        "anna@examplium.com"
+      ],
+      "daysAgo": 51,
+      "translations": []
+    },
+    {
+      "slug": "garden-club",
+      "name": "The Green's Garden Club",
+      "description": "The beds, the seedlings, and the slow story of what came up this season.",
+      "isPrivate": false,
+      "ownerEmail": "carla@examplium.com",
+      "memberEmails": [
+        "carla@examplium.com",
+        "anna@examplium.com",
+        "ben@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 34,
+      "translations": []
+    },
+    {
+      "slug": "kitchen-table",
+      "name": "The Kitchen Table",
+      "description": "What's been in the oven around here, and the two or three who'll take the last slice.",
+      "isPrivate": false,
+      "ownerEmail": "anna@examplium.com",
+      "memberEmails": [
+        "anna@examplium.com",
+        "carla@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 19,
+      "translations": []
+    },
+    {
+      "slug": "photo-corner",
+      "name": "The Photo Corner",
+      "description": "A small walk with a camera, a slow review, and one or two prints for the lobby.",
+      "isPrivate": false,
+      "ownerEmail": "david@examplium.com",
+      "memberEmails": [
+        "david@examplium.com",
+        "ben@examplium.com",
+        "anna@examplium.com"
+      ],
+      "daysAgo": 55,
+      "translations": []
+    },
+    {
+      "slug": "quiet-hours",
+      "name": "The Quiet Hours",
+      "description": "The small group that keeps the block's evenings calm — the two or three who hear the first guitar.",
+      "isPrivate": true,
+      "ownerEmail": "moderator@examplium.com",
+      "memberEmails": [
+        "moderator@examplium.com",
+        "anna@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 33,
+      "translations": []
+    },
+    {
+      "slug": "front-desk",
+      "name": "The Front Desk",
+      "description": "The two or three who keep the register, the book-swap, and the 'is anyone home' board in order.",
+      "isPrivate": true,
+      "ownerEmail": "admin@examplium.com",
+      "memberEmails": [
+        "admin@examplium.com",
+        "moderator@examplium.com",
+        "carla@examplium.com"
+      ],
+      "daysAgo": 16,
+      "translations": []
+    },
+    {
+      "slug": "walking-group",
+      "name": "The Walking Group",
+      "description": "A flat loop, a coffee, and the slow talk of the week. Anyone's pace is fine.",
+      "isPrivate": false,
+      "ownerEmail": "ben@examplium.com",
+      "memberEmails": [
+        "ben@examplium.com",
+        "anna@examplium.com",
+        "carla@examplium.com",
+        "david@examplium.com"
+      ],
+      "daysAgo": 22,
+      "translations": []
+    },
+    {
+      "slug": "board-game-night",
+      "name": "Board Game Night",
+      "description": "Cards, tiles, dice — the weekly Friday where the community room turns into a game table.",
+      "isPrivate": false,
+      "ownerEmail": "carla@examplium.com",
+      "memberEmails": [
+        "carla@examplium.com",
+        "david@examplium.com",
+        "anna@examplium.com"
+      ],
+      "daysAgo": 30,
+      "translations": []
+    }
+  ],
+  "tags": [
+    {
+      "slug": "cleanup",
+      "name": "Cleanup",
+      "createdByEmail": "anna@examplium.com",
+      "daysAgo": 30,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Säuberung",
+          "daysAgo": 28
+        },
+        {
+          "languageCode": "da",
+          "name": "Rengøring",
+          "daysAgo": 27
+        }
+      ]
+    },
+    {
+      "slug": "notice",
+      "name": "Notice",
+      "createdByEmail": "admin@examplium.com",
+      "daysAgo": 30,
+      "translations": [
+        {
+          "languageCode": "da",
+          "name": "Meddelelse",
+          "daysAgo": 27
+        }
+      ]
+    },
+    {
+      "slug": "recipe",
+      "name": "Recipe",
+      "createdByEmail": "carla@examplium.com",
+      "daysAgo": 20,
+      "translations": [
+        {
+          "languageCode": "fr",
+          "name": "Recette",
+          "daysAgo": 18
+        },
+        {
+          "languageCode": "da",
+          "name": "Opskrift",
+          "daysAgo": 17
+        }
+      ]
+    },
+    {
+      "slug": "repair",
+      "name": "Repair",
+      "createdByEmail": "ben@examplium.com",
+      "daysAgo": 25,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Reparatur",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "name": "Réparation",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "da",
+          "name": "Reparation",
+          "daysAgo": 24
+        }
+      ]
+    },
+    {
+      "slug": "question",
+      "name": "Question",
+      "createdByEmail": "david@examplium.com",
+      "daysAgo": 25,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Frage",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "name": "Question",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "da",
+          "name": "Spørgsmål",
+          "daysAgo": 24
+        }
+      ]
+    },
+    {
+      "slug": "garden",
+      "name": "Garden",
+      "createdByEmail": "carla@examplium.com",
+      "daysAgo": 25,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Garten",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "name": "Jardin",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "da",
+          "name": "Have",
+          "daysAgo": 24
+        }
+      ]
+    },
+    {
+      "slug": "baking",
+      "name": "Baking",
+      "createdByEmail": "anna@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Backen",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Boulangerie",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Bagning",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "gardening",
+      "name": "Gardening",
+      "createdByEmail": "carla@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Gartenarbeit",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Jardinage",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Havearbejde",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "photography",
+      "name": "Photography",
+      "createdByEmail": "david@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Fotografie",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Photographie",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Fotografi",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "firstaid",
+      "name": "First aid",
+      "createdByEmail": "moderator@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Erste Hilfe",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Premiers secours",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Første hjælp",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "translation",
+      "name": "Translation",
+      "createdByEmail": "translator@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Übersetzung",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Traduction",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Oversættelse",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "cycling",
+      "name": "Cycling",
+      "createdByEmail": "ben@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Radfahren",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Cyclisme",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Cykling",
+          "daysAgo": 11
+        }
+      ]
+    },
+    {
+      "slug": "history",
+      "name": "History",
+      "createdByEmail": "david@examplium.com",
+      "daysAgo": 12,
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Geschichte",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "name": "Histoire",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "da",
+          "name": "Historie",
+          "daysAgo": 11
+        }
+      ]
+    }
+  ],
+  "announcements": [
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Welcome to the neighborhood board",
+      "body": "This is a demo instance of **Kumunita**, a self-hosted platform for one\n\nneighborhood. Everything you see here is sample data — free to edit, hide, or delete while you explore.",
+      "scope": "public",
+      "pinned": true,
+      "daysAgo": 14,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Willkommen im Nachbarschaftsbrett",
+          "body": "Dies ist eine Demo-Instanz von **Kumunita**. Alle Inhalte hier sind Beispieldaten — frei zum Bearbeiten, Verbergen oder Löschen.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "da",
+          "title": "Velkommen til naboskabet",
+          "body": "Dette er en demo-instans af **Kumunita**, en selvhostet platform til ét nabolag.\n\nAlt, hvad du ser her, er eksempeldata — fri til at redigere, skjule eller slette, mens du udforsker.",
+          "daysAgo": 13
+        }
+      ]
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Test Platform",
+      "body": "This is a test platform - not intended for real use.\n\nServices may stop working at any time, data may be deleted at any time, and changes may happen at any time.\n\nThis test platform is currently open for new users to sign-up, so anyone can try it out, so don't share any real or private information here.",
+      "scope": "public",
+      "pinned": true,
+      "daysAgo": 0,
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Testplatform",
+          "body": "Dette er en testplatform — ikke beregnet til reel brug.\n\nTjenester kan holde op med at virke når som helst, data kan slettes når som helst, og der kan ske ændringer når som helst.\n\nDenne testplatform er i øjeblikket åben for, at nye brugere kan tilmelde sig, så alle kan prøve den — del derfor ikke nogen reel eller privat information her."
+        }
+      ]
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Volunteers needed for the Saturday cleanup",
+      "body": "We're clearing the back lane on **Saturday**. Bring gloves; we supply the bags.",
+      "scope": "community",
+      "daysAgo": 3,
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Frivillige søges til oprydning lørdag",
+          "body": "Vi rydder bagvejen på **lørdag**. Tag handsker med — vi stiller med poser.",
+          "daysAgo": 3
+        }
+      ]
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Fire-alarm test this week",
+      "body": "Expect the building alarm to sound on **Thursday 09:00–09:30**. It is a test — please do not use the fire stairs unless they are actually in use.",
+      "scope": "community",
+      "componentId": "safety",
+      "daysAgo": 1,
+      "translations": [
+        {
+          "languageCode": "fr",
+          "title": "Essai des alarmes incendie cette semaine",
+          "body": "Le système d'alarme doit retentir **jeudi de 09:00 à 09:30**. C'est un essai — n'utilisez les escaliers de secours que s'ils sont réellement en usage."
+        },
+        {
+          "languageCode": "da",
+          "title": "Test af brandalarmer denne uge",
+          "body": "Bygningens alarm vil lyde **torsdag 09:00–09:30**. Det er en test — brug venligst ikke evakueringsstigerne, medmindre de faktisk er i brug.",
+          "daysAgo": 1
+        }
+      ]
+    },
+    {
+      "authorEmail": "ben@examplium.com",
+      "title": "Water pressure drop on Friday morning",
+      "body": "The supply will be interrupted **Friday 07:00–11:00** for main-line work. Keep a jug of water on hand.",
+      "scope": "community",
+      "daysAgo": 2,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Wasserausfall am Freitagmorgen",
+          "body": "Die Wasserversorgung wird **freitags von 07:00 bis 11:00** wegen Arbeiten an der Hauptleitung unterbrochen. Halten Sie eine Flasche Wasser bereit.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Baisse de pression le vendredi matin",
+          "body": "La distribution sera interrompue **vendredi de 07:00 à 11:00** pour des travaux sur la conduite principale. Gardez une bouteille d'eau à portée de main.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "da",
+          "title": "Vandafspærring fredag morgen",
+          "body": "Vandforsyningen er afbrudt **fredag kl. 07:00–11:00** pga. hovedledningsarbejde. Hold en flaske vand klar.",
+          "daysAgo": 2
+        }
+      ]
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Community room now open evenings",
+      "body": "From next week the room is open **weekdays 18:00–22:00** for anyone who wants a quiet place to work or read.",
+      "scope": "community",
+      "daysAgo": 1,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinschaftsraum jetzt auch abends offen",
+          "body": "Ab nächster Woche ist der Raum **werktags von 18:00 bis 22:00** für alle offen, die einen ruhigen Ort zum Arbeiten oder Lesen suchen."
+        },
+        {
+          "languageCode": "fr",
+          "title": "La salle communautaire ouverte en soirée",
+          "body": "À partir de la semaine prochaine, la salle est ouverte **en semaine de 18:00 à 22:00** pour quiconque cherche un endroit calme pour travailler ou lire."
+        },
+        {
+          "languageCode": "da",
+          "title": "Fælleslokalet åbent om aftenen",
+          "body": "Fra næste uge er lokalet åbent **ukedage 18:00–22:00** for alle, der vil have et stille sted at arbejde eller læse."
+        }
+      ]
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Lost & found — a black umbrella",
+      "body": "Someone left a black umbrella by the notice board. It's safe with me — claim it at the green.",
+      "scope": "community",
+      "componentId": "social",
+      "daysAgo": 0,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fundsachen — ein schwarzer Schirm",
+          "body": "Jemand hat einen schwarzen Schirm neben dem Schwarzen Brett liegen gelassen. Er ist bei mir sicher — hol ihn am Grün ab."
+        },
+        {
+          "languageCode": "fr",
+          "title": "Objets trouvés — un parapluie noir",
+          "body": "Quelqu'un a laissé un parapluie noir près du panneau d'affichage. Il est en sécurité chez moi — venez le récupérer au jardin."
+        },
+        {
+          "languageCode": "da",
+          "title": "Fundne genstande — en sort paraply",
+          "body": "Noen har efterladt en sort paraply ved opslagstavlen. Den er i god behold hos mig — hent den på den fælles grønflade."
+        }
+      ]
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Smoke-detector check this month",
+      "body": "Building policy asks every unit to test its smoke detector. It takes a minute — do it this week.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Winter lighting on the path",
+      "body": "The path lights will be swapped to the longer-burn lamps. Expect a flicker for one evening as they're re-wired.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "authorEmail": "anna@examplium.com",
+      "title": "Report a broken handrail",
+      "body": "If you spot a loose or bent handrail on any stairwell, tell the front desk so we can book the fix.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 13,
+      "translations": []
+    },
+    {
+      "authorEmail": "ben@examplium.com",
+      "title": "First-aid kit restocked",
+      "body": "The first-aid kit by the front door has been restocked — new bandages, new gloves, new expiration dates on the plasters.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Winter parking reminder",
+      "body": "With the first snow expected this week, remember to leave space on the back lane so the snow-plow can turn around.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 8,
+      "translations": []
+    },
+    {
+      "authorEmail": "david@examplium.com",
+      "title": "Evacuation route signs",
+      "body": "We're replacing a few faded evacuation-route signs this month. If a sign is missing or torn, tell us.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 20,
+      "translations": []
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Coat check at the gate",
+      "body": "A coat rack will be out by the gate this winter. Bring your gloves too — there's a small shared bench by the door.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 3,
+      "translations": []
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Garden-hose storage for winter",
+      "body": "Please coil and store garden hoses before the first frost so the outdoor taps can be drained.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 23,
+      "translations": []
+    },
+    {
+      "authorEmail": "ben@examplium.com",
+      "title": "Next fire-drill date",
+      "body": "The next scheduled fire drill is the second Thursday of the month. Expect a brief all-clear at the usual time.",
+      "scope": "community",
+      "componentId": "safety",
+      "pinned": false,
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Roof gutter cleaning",
+      "body": "The roof gutter will be cleaned this month. Ladders may be out on the north side for an afternoon.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 12,
+      "translations": []
+    },
+    {
+      "authorEmail": "anna@examplium.com",
+      "title": "Fence repaint deferred",
+      "body": "The fence repaint is deferred to spring — budgeting is tighter this quarter, and the current coat is still holding.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 20,
+      "translations": []
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Shared toolbox now open",
+      "body": "The shared toolbox in the store room is open to everyone. Sign the little sheet on the door before you borrow.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 27,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Water-meter readings",
+      "body": "This month's water-meter readings are due at the end of the month. Photos work fine — no need to hand the meter in.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 24,
+      "translations": []
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Elevator maintenance",
+      "body": "The elevator will be out of service for a full day for its annual service. Use the stairs that day, please.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 6,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Lobby door closer",
+      "body": "The lobby door closer is being adjusted — it may feel a little 'heavy' for a day or two while it's re-tensioned.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 27,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Recycling bins swap",
+      "body": "The recycling bins by the back gate will be swapped for the larger ones next week. The green one is now for glass.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Bike repair stand",
+      "body": "A small bike-repair stand is up in the store room — pump, tube, basic tools. Free to use; leave it as you found it.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 11,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "New notice-board layout",
+      "body": "The notice board has a new layout: safety on the left, social on the right. The old papers have been taken down.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 3,
+      "translations": []
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Shared umbrella rack",
+      "body": "An umbrella rack is now by the front door for rainy days. If yours is still in there in a week, we'll box it up.",
+      "scope": "community",
+      "componentId": "maintenance",
+      "pinned": false,
+      "daysAgo": 25,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Newcomers' coffee — first of the month",
+      "body": "If you're new to the block, the first of the month is a good time to come by the community room — coffee and pastries, no agenda.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 14,
+      "translations": []
+    },
+    {
+      "authorEmail": "moderator@examplium.com",
+      "title": "Book-swap shelf restocked",
+      "body": "The book-swap shelf by the lobby has a few new titles — a couple of cookbooks and a local-history volume.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 4,
+      "translations": []
+    },
+    {
+      "authorEmail": "anna@examplium.com",
+      "title": "Board-game night this Friday",
+      "body": "Board-game night is back Friday 19:00. Bring a game or play ours — cards, tiles, all in.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 28,
+      "translations": []
+    },
+    {
+      "authorEmail": "admin@examplium.com",
+      "title": "Quiet hours reminder",
+      "body": "As the evenings get shorter, a gentle reminder about quiet hours after 22:00. Music off, dogs inside, drills done.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 22,
+      "translations": []
+    },
+    {
+      "authorEmail": "carla@examplium.com",
+      "title": "Neighbours' dinner — save the date",
+      "body": "The autumn neighbours' dinner is the end of the month, 18:00. The sign-up sheet is out this week.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 19,
+      "translations": []
+    },
+    {
+      "authorEmail": "ben@examplium.com",
+      "title": "Community-room hours updated",
+      "body": "The community room is open weekdays 09:00–21:00 from this month. The key code is on the notice board.",
+      "scope": "community",
+      "componentId": "social",
+      "pinned": false,
+      "daysAgo": 17,
+      "translations": []
+    }
+  ],
+  "posts": [
+    {
+      "componentId": "safety",
+      "authorEmail": "anna@examplium.com",
+      "title": "New recycling schedule from next month",
+      "body": "The city is moving glass to **Tuesdays** and paper to **Fridays** starting the 1st.\n\nDoes anyone have the new leaflet? I can print copies for the lobby.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 5,
+      "modifiedDaysAgo": 4,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I have the leaflet — it's on the notice board, page 2. Glass *and* the bottle bank both moved.",
+          "daysAgo": 4,
+          "translations": [
+            {
+              "languageCode": "de",
+              "body": "Ich habe das Faltblatt — es ist am Schwarzen Brett, Seite 2. Glas *und* die Flaschensammlung wurden beide verlegt.",
+              "daysAgo": 4
+            },
+            {
+              "languageCode": "da",
+              "body": "Jeg har foldesedlen — den er på opslagstavlen, side 2. Både glas *og* flaskeopsamlingen er flyttet.",
+              "daysAgo": 4
+            }
+          ]
+        },
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Perfect, thanks Ben — I'll grab it and print the copies today.",
+          "daysAgo": 4,
+          "hoursAfter": 1,
+          "translations": [
+            {
+              "languageCode": "da",
+              "body": "Perfekt, tak Ben — jeg henter den og trykker eksemplarerne i dag.",
+              "daysAgo": 4
+            }
+          ]
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Neue Recyclingsch abende ab nächstem Monat",
+          "body": "Die Stadt verschiebt Glas auf **Dienstag** und Papier auf **Freitag**, ab dem 1.\n\nHat jemand das neue Faltblatt? Ich drucke gerne Kopien für die Lobby.",
+          "daysAgo": 4
+        },
+        {
+          "languageCode": "da",
+          "title": "Nyt genbrugsprogram fra næste måned",
+          "body": "Byen flytter glas til **tirsdage** og papir til **fredage**, fra den 1.\n\nHar nogen det nye foldeseddel? Jeg kan trykke eksemplarer til entréen.",
+          "daysAgo": 4
+        }
+      ]
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "title": "Potluck in the green this weekend?",
+      "body": "Anyone up for a simple potluck under the tree on **Sunday**? No pressure — one dish each, drinks on the house (mine).",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe"
+      ],
+      "daysAgo": 2,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "In! I'll bring a big salad. What about 14:00?",
+          "daysAgo": 1,
+          "translations": [
+            {
+              "languageCode": "da",
+              "body": "Jeg er med! Jeg tager en stor salat med. Hvad med 14:00?",
+              "daysAgo": 1
+            }
+          ]
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Fællesmåltid på grønfladen i weekenden?",
+          "body": "Har nogen lyst til en simpel fællesmad under træet **søndag**? Ingen pres — en ret hver, drikkevarer på huset (mine).",
+          "daysAgo": 2
+        }
+      ]
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "david@examplium.com",
+      "title": "Monthly meeting minutes (draft for comment)",
+      "body": "Summary of last week's building meeting:\n\n- Approved the garden-bed plan\n- Deferred the fence repaint to next season\n- Collected 3 € for the shared toolbox\n\nFlag anything you disagree with before it is finalized.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 1,
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Notater fra månedsmøde (udkast til kommentar)",
+          "body": "Opsummering af bygningsmødet sidste uge:\n\n- Godkendte plan for havebedene\n- Udsatte ommalet af hegn til næste sæson\n- Indsamlet 3 € til fælleværktøjskassen\n\nMeld dig, hvis du er uenig i noget, inden det afsluttes.",
+          "daysAgo": 1
+        }
+      ]
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "title": "Know a good local electrician?",
+      "body": "Our kitchen fuse keeps tripping. If anyone has used a local electrician this year, I'd be grateful for a recommendation.",
+      "audience": "community",
+      "tagSlugs": [
+        "repair",
+        "question"
+      ],
+      "daysAgo": 3,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "The one on the corner — he fixed my boiler last spring, fair price.",
+          "daysAgo": 2
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kennt ihr einen guten lokalen Elektriker?",
+          "body": "Unsere Küchen-Sicherung springt ständig raus. Wenn jemand dieses Jahr einen Elektriker in der Nähe genutzt hat, wäre ich für eine Empfehlung dankbar.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "da",
+          "title": "Kender I en god lokal elektriker?",
+          "body": "Vores køkkensikring slår fra konstant. Hvis nogen har brugt en lokal elektriker i år, vil jeg sætte pris på en anbefaling.",
+          "daysAgo": 2
+        }
+      ]
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "carla@examplium.com",
+      "title": "Free seedlings in the recycling corner",
+      "body": "I've got a tray of tomato and basil seedlings on the shelf by the bins — first come, first served.",
+      "audience": "community",
+      "tagSlugs": [
+        "garden"
+      ],
+      "daysAgo": 1,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Just took two! Thanks Carla.",
+          "hoursAfter": -6
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Gratis frøplanter i genbrugshjørnet",
+          "body": "Jeg har en bakke med tomat- og basilikumfrøplanter på hylden ved sønderboksene — de første får, de første tager.",
+          "daysAgo": 1
+        }
+      ]
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "david@examplium.com",
+      "title": "Where does the street name come from?",
+      "body": "Half the block calls it one thing, the map says another. Does anyone know the story behind it?",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 0,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "It's named after the old mill at the river bend, I'm fairly sure.",
+          "hoursAfter": -3
+        },
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "That matches the plaque at the gate — nice.",
+          "hoursAfter": -1
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Hvor kommer gadenavnet fra?",
+          "body": "Halvdelen af kvarteret kalder det for ét, kortet siger noget andet. Veder nogen historien bagved det?"
+        }
+      ]
+    },
+    {
+      "groupSlug": "street-green",
+      "authorEmail": "carla@examplium.com",
+      "title": "Green-plot plan for spring",
+      "body": "Rough plan for the shared beds:\n\n- North bed: herbs (basil, parsley)\n- South bed: tomatoes\n\nVote in the thread and I'll finalize the seed list.",
+      "audience": "empty",
+      "daysAgo": 2,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Herbs in the north bed sounds right — it's shadier. I can bring basil starts.",
+          "daysAgo": 2,
+          "hoursAfter": 3
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Plan for grønfladen til foråret",
+          "body": "Udkast til de fælles bed:\n\n- Nordbed: urter (basilikum, persille)\n- Syd­bed: tomater\n\nStem i tråden, så afslutter jeg frølisten.",
+          "daysAgo": 2
+        }
+      ]
+    },
+    {
+      "groupSlug": "street-green",
+      "authorEmail": "david@examplium.com",
+      "title": "Compost bin — who's on this week?",
+      "body": "The bin is ready to swap. Can anyone take a turn turning it this week? It's due on Monday.",
+      "audience": "empty",
+      "daysAgo": 1,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "I'll do the turn on Monday morning."
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Kompostkassen — hvem er på denne uge?",
+          "body": "Kassen er klar til at skiftes. Kan nogen tage en tur ved at vende den denne uge? Den forfalder mandag.",
+          "daysAgo": 1
+        }
+      ]
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "david@examplium.com",
+      "title": "Anyone seen a grey cat near the gate?",
+      "body": "A small grey cat has been hanging around the back gate since last night. Not mine, but it looks lost. Anybody recognise it?",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 4,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 2
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "ben@examplium.com",
+      "title": "Suggestion: a bench by the bike rack",
+      "body": "There's a good spot by the bike rack where a small bench would fit. Anyone want to champion it at the next meeting?",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "notice"
+      ],
+      "daysAgo": 12,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 11
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "david@examplium.com",
+      "title": "Lost a set of keys — small black case",
+      "body": "I may have left a set of keys in a small black case near the notice board. If you spot them, the front desk is the best place to drop them.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 8,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 7
+        },
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "ben@examplium.com",
+      "title": "Winter boots for sale (barely used)",
+      "body": "A pair of size 42 winter boots, worn twice. Happy to drop them at the store room if anyone wants them at a fair price.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 1,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 0
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "ben@examplium.com",
+      "title": "Found: a folded umbrella",
+      "body": "A folded blue umbrella was left on the lobby bench. If it's yours, it's with me at the front desk.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 21,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 19
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 20
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "admin@examplium.com",
+      "title": "Recommend a plumber?",
+      "body": "The kitchen tap is dripping and I'd like a local recommendation. Preferably someone who can be out this month.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "repair"
+      ],
+      "daysAgo": 9,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Who's on for the gutter sweep?",
+      "body": "The gutters are due a sweep this month. Two of us with a ladder and an afternoon — who's in?",
+      "audience": "community",
+      "tagSlugs": [
+        "cleanup",
+        "repair"
+      ],
+      "daysAgo": 9,
+      "replies": [],
+      "translations": [],
+      "modifiedDaysAgo": 6
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "carla@examplium.com",
+      "title": "Borrow a step ladder?",
+      "body": "A step ladder for a morning — repainting the little gate. I'll bring coffee in return.",
+      "audience": "community",
+      "tagSlugs": [
+        "repair",
+        "question"
+      ],
+      "daysAgo": 12,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "title": "Found: a garden trowel",
+      "body": "A garden trowel was left by the seedling shelf. If it's yours, it's with me at the green.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 14,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 13
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 12
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "title": "Suggestion: a small compost log",
+      "body": "The compost bin has been turning fast — a little log of who's done the turn would make the next one easier to pick.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 29,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 28
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Anyone know a good local painter?",
+      "body": "A room needs repainting over a weekend. I've got paint, just need a steady hand. Who's been doing this sort of thing?",
+      "audience": "community",
+      "tagSlugs": [
+        "repair",
+        "question"
+      ],
+      "daysAgo": 22,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 20
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 20
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Suggestion: a shared rain barrel",
+      "body": "A single rain barrel by the green would take a lot off the garden's water bill. Two of us could do the plumbing if the board approves.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "garden"
+      ],
+      "daysAgo": 19,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 17
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "title": "Free: a bag of good soil",
+      "body": "I've got about a 20L bag of decent soil. If a planter wants it, it's on the shelf by the bins until the weekend.",
+      "audience": "community",
+      "tagSlugs": [
+        "garden",
+        "notice"
+      ],
+      "daysAgo": 16,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 14
+        },
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 14
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "title": "Potluck ideas for the autumn?",
+      "body": "For the neighbours' dinner at the end of the month, what are you thinking of bringing? I'll do a big salad and a bread.",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe"
+      ],
+      "daysAgo": 17,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 16
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Looking for a book to read this month",
+      "body": "Finished the stack — what's the one book you'd recommend? A novel or a non-fiction, either works.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 30,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 29
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 27
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "title": "Anyone up for a Friday film night?",
+      "body": "A projector, a sheet, and a sofa — that's the kit. If a film night sounds like a plan, I'll sort the rest.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 29,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 27
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "admin@examplium.com",
+      "title": "Sourdough starter to share",
+      "body": "I have a healthy sourdough starter and I'd like to hand a cup to someone on the block. First come, first served.",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe",
+        "notice"
+      ],
+      "daysAgo": 17,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 15
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 15
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "admin@examplium.com",
+      "title": "Photography walk — anyone in?",
+      "body": "A slow two-hour walk around the block with a camera. No pressure to shoot, no pressure to talk. Saturday morning.",
+      "audience": "community",
+      "tagSlugs": [
+        "photography",
+        "question"
+      ],
+      "daysAgo": 1,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Kids' bike-ride group?",
+      "body": "A few of the kids on the block ride on Saturday afternoons. If your child is interested, come by the green.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "cycling"
+      ],
+      "daysAgo": 24,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 22
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 22
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Suggestion: a quiet corner for reading",
+      "body": "A small quiet corner with two chairs and a lamp — that's the whole idea. Two of us could put it together.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 29,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "title": "Bread and coffee on Sunday?",
+      "body": "I'm baking a loaf on Sunday. If you're in for coffee on the balcony at 10, the door is open.",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe",
+        "notice"
+      ],
+      "daysAgo": 28,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 27
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "title": "Board-game night — who's playing Catan?",
+      "body": "If you play Catan, the board is out and the dice are ready. First person who can spare an evening, you're hosting.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 8,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 7
+        },
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 7
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Anyone keep chickens?",
+      "body": "I'm thinking of adding two to the green's edge. Anybody on the block keep poultry already? Advice welcome.",
+      "audience": "community",
+      "tagSlugs": [
+        "garden",
+        "question"
+      ],
+      "daysAgo": 2,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "title": "A small photo corner for the lobby?",
+      "body": "A framed print of the green in spring. If the lobby wants a wall with something on it, I can do the framing.",
+      "audience": "community",
+      "tagSlugs": [
+        "photography",
+        "notice"
+      ],
+      "daysAgo": 25,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 24
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 24
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "title": "Suggestion: a seedling swap every month",
+      "body": "A standing monthly seedling swap by the green. Bring a pot, leave a pot. Two of us could keep the little table.",
+      "audience": "community",
+      "tagSlugs": [
+        "garden",
+        "question"
+      ],
+      "daysAgo": 27,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 26
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 25
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Idea: a resident newsletter (monthly)",
+      "body": "A one-page monthly — what happened, what's coming, who to thank. If you'd like to contribute a line, tell me.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 11,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 9
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 9
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Idea: a small shared fund for the green",
+      "body": "A standing small fund for the green's upkeep, say five euros per household a quarter. What does the block think?",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 3,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 1
+        },
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 2
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 1
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "david@examplium.com",
+      "title": "Feedback wanted: the new bin layout",
+      "body": "Two weeks in with the new bin layout — is it working? One line of feedback, please, before we lock it in.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "cleanup"
+      ],
+      "daysAgo": 28,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "ben@examplium.com",
+      "title": "Who's on the winter-lighting rota?",
+      "body": "The path-light rota needs two more names for the dark months. Tell me and I'll add you.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice",
+        "question"
+      ],
+      "daysAgo": 10,
+      "replies": [],
+      "translations": [],
+      "modifiedDaysAgo": 9
+    },
+    {
+      "componentId": "governance",
+      "authorEmail": "carla@examplium.com",
+      "title": "Suggestion: a shared 'who's home' board",
+      "body": "A little cardboard board in the lobby — an 'I'm home until X' style. Useful for the kids and the older residents.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 18,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "admin@examplium.com",
+      "title": "Anyone seen a grey cat near the gate? 2",
+      "body": "A small grey cat has been hanging around the back gate since last night. Not mine, but it looks lost. Anybody recognise it?",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 26,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 25
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "ben@examplium.com",
+      "title": "Suggestion: a bench by the bike rack 2",
+      "body": "There's a good spot by the bike rack where a small bench would fit. Anyone want to champion it at the next meeting?",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "notice"
+      ],
+      "daysAgo": 25,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 24
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "david@examplium.com",
+      "title": "Lost a set of keys — small black case 2",
+      "body": "I may have left a set of keys in a small black case near the notice board. If you spot them, the front desk is the best place to drop them.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 16,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 15
+        },
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 15
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 15
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Winter boots for sale (barely used) 2",
+      "body": "A pair of size 42 winter boots, worn twice. Happy to drop them at the store room if anyone wants them at a fair price.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 21,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 20
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 18
+    },
+    {
+      "componentId": "safety",
+      "authorEmail": "anna@examplium.com",
+      "title": "Found: a folded umbrella 2",
+      "body": "A folded blue umbrella was left on the lobby bench. If it's yours, it's with me at the front desk.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 6,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 4
+        },
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 5
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 3
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "title": "Recommend a plumber? 2",
+      "body": "The kitchen tap is dripping and I'd like a local recommendation. Preferably someone who can be out this month.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "repair"
+      ],
+      "daysAgo": 24,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 22
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 22
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "title": "Who's on for the gutter sweep? 2",
+      "body": "The gutters are due a sweep this month. Two of us with a ladder and an afternoon — who's in?",
+      "audience": "community",
+      "tagSlugs": [
+        "cleanup",
+        "repair"
+      ],
+      "daysAgo": 17,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "title": "Borrow a step ladder? 2",
+      "body": "A step ladder for a morning — repainting the little gate. I'll bring coffee in return.",
+      "audience": "community",
+      "tagSlugs": [
+        "repair",
+        "question"
+      ],
+      "daysAgo": 2,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 1
+        },
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 0
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 0
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "title": "Found: a garden trowel 2",
+      "body": "A garden trowel was left by the seedling shelf. If it's yours, it's with me at the green.",
+      "audience": "community",
+      "tagSlugs": [
+        "notice"
+      ],
+      "daysAgo": 5,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 3
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "title": "Suggestion: a small compost log 2",
+      "body": "The compost bin has been turning fast — a little log of who's done the turn would make the next one easier to pick.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 14,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "title": "Anyone know a good local painter? 2",
+      "body": "A room needs repainting over a weekend. I've got paint, just need a steady hand. Who's been doing this sort of thing?",
+      "audience": "community",
+      "tagSlugs": [
+        "repair",
+        "question"
+      ],
+      "daysAgo": 24,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 22
+        },
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 22
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 23
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "title": "Suggestion: a shared rain barrel 2",
+      "body": "A single rain barrel by the green would take a lot off the garden's water bill. Two of us could do the plumbing if the board approves.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "garden"
+      ],
+      "daysAgo": 8,
+      "replies": [],
+      "translations": [],
+      "modifiedDaysAgo": 6
+    },
+    {
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Free: a bag of good soil 2",
+      "body": "I've got about a 20L bag of decent soil. If a planter wants it, it's on the shelf by the bins until the weekend.",
+      "audience": "community",
+      "tagSlugs": [
+        "garden",
+        "notice"
+      ],
+      "daysAgo": 24,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Good idea — I'll bring it to the next meeting.",
+          "daysAgo": 22
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "title": "Potluck ideas for the autumn? 2",
+      "body": "For the neighbours' dinner at the end of the month, what are you thinking of bringing? I'll do a big salad and a bread.",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe"
+      ],
+      "daysAgo": 13,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 11
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "title": "Looking for a book to read this month 2",
+      "body": "Finished the stack — what's the one book you'd recommend? A novel or a non-fiction, either works.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 14,
+      "replies": [
+        {
+          "authorEmail": "ben@examplium.com",
+          "body": "I've got one of those — happy to lend it.",
+          "daysAgo": 12
+        }
+      ],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Anyone up for a Friday film night? 2",
+      "body": "A projector, a sheet, and a sofa — that's the kit. If a film night sounds like a plan, I'll sort the rest.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 3,
+      "replies": [
+        {
+          "authorEmail": "david@examplium.com",
+          "body": "Not sure, but I'll ask the front desk.",
+          "daysAgo": 1
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 1
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Sourdough starter to share 2",
+      "body": "I have a healthy sourdough starter and I'd like to hand a cup to someone on the block. First come, first served.",
+      "audience": "community",
+      "tagSlugs": [
+        "recipe",
+        "notice"
+      ],
+      "daysAgo": 12,
+      "replies": [
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Can you share the details in the community room?",
+          "daysAgo": 11
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 9
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "title": "Photography walk — anyone in? 2",
+      "body": "A slow two-hour walk around the block with a camera. No pressure to shoot, no pressure to talk. Saturday morning.",
+      "audience": "community",
+      "tagSlugs": [
+        "photography",
+        "question"
+      ],
+      "daysAgo": 8,
+      "replies": [
+        {
+          "authorEmail": "anna@examplium.com",
+          "body": "I'll take a look this week.",
+          "daysAgo": 7
+        },
+        {
+          "authorEmail": "carla@examplium.com",
+          "body": "Yes, I can do that — ping me.",
+          "daysAgo": 6
+        }
+      ],
+      "translations": [],
+      "modifiedDaysAgo": 7
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Kids' bike-ride group? 2",
+      "body": "A few of the kids on the block ride on Saturday afternoons. If your child is interested, come by the green.",
+      "audience": "community",
+      "tagSlugs": [
+        "question",
+        "cycling"
+      ],
+      "daysAgo": 19,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "title": "Suggestion: a quiet corner for reading 2",
+      "body": "A small quiet corner with two chairs and a lamp — that's the whole idea. Two of us could put it together.",
+      "audience": "community",
+      "tagSlugs": [
+        "question"
+      ],
+      "daysAgo": 13,
+      "replies": [],
+      "translations": [],
+      "modifiedDaysAgo": 10
+    },
+    {
+      "groupSlug": "kowalski-family",
+      "authorEmail": "anna@examplium.com",
+      "title": "Who's on this weekend? — kowalski-family",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "street-green",
+      "authorEmail": "carla@examplium.com",
+      "title": "A small update — street-green",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 17,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "back-lane-cleaning",
+      "authorEmail": "anna@examplium.com",
+      "title": "One idea for the next meeting — back-lane-cleaning",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 16,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "book-club",
+      "authorEmail": "david@examplium.com",
+      "title": "Anyone up for a coffee? — book-club",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 4,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "bike-repair-crew",
+      "authorEmail": "ben@examplium.com",
+      "title": "The small win of the week — bike-repair-crew",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 13,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "garden-club",
+      "authorEmail": "carla@examplium.com",
+      "title": "The plan for the green — garden-club",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "kitchen-table",
+      "authorEmail": "anna@examplium.com",
+      "title": "Who's on this weekend? — kitchen-table",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 20,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "photo-corner",
+      "authorEmail": "david@examplium.com",
+      "title": "A small update — photo-corner",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 11,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "quiet-hours",
+      "authorEmail": "moderator@examplium.com",
+      "title": "One idea for the next meeting — quiet-hours",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 13,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "front-desk",
+      "authorEmail": "admin@examplium.com",
+      "title": "Anyone up for a coffee? — front-desk",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "walking-group",
+      "authorEmail": "ben@examplium.com",
+      "title": "The small win of the week — walking-group",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "board-game-night",
+      "authorEmail": "carla@examplium.com",
+      "title": "The plan for the green — board-game-night",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 12,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "kowalski-family",
+      "authorEmail": "anna@examplium.com",
+      "title": "Who's on this weekend? — kowalski-family",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 10,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "street-green",
+      "authorEmail": "carla@examplium.com",
+      "title": "A small update — street-green",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 20,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "back-lane-cleaning",
+      "authorEmail": "anna@examplium.com",
+      "title": "One idea for the next meeting — back-lane-cleaning",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "book-club",
+      "authorEmail": "david@examplium.com",
+      "title": "Anyone up for a coffee? — book-club",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "bike-repair-crew",
+      "authorEmail": "ben@examplium.com",
+      "title": "The small win of the week — bike-repair-crew",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "garden-club",
+      "authorEmail": "carla@examplium.com",
+      "title": "The plan for the green — garden-club",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 14,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "kitchen-table",
+      "authorEmail": "anna@examplium.com",
+      "title": "Who's on this weekend? — kitchen-table",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 16,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "photo-corner",
+      "authorEmail": "david@examplium.com",
+      "title": "A small update — photo-corner",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 19,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "quiet-hours",
+      "authorEmail": "moderator@examplium.com",
+      "title": "One idea for the next meeting — quiet-hours",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 16,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "front-desk",
+      "authorEmail": "admin@examplium.com",
+      "title": "Anyone up for a coffee? — front-desk",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 20,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "walking-group",
+      "authorEmail": "ben@examplium.com",
+      "title": "The small win of the week — walking-group",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "board-game-night",
+      "authorEmail": "carla@examplium.com",
+      "title": "The plan for the green — board-game-night",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "replies": [],
+      "translations": []
+    },
+    {
+      "groupSlug": "kowalski-family",
+      "authorEmail": "anna@examplium.com",
+      "title": "Who's on this weekend? — kowalski-family",
+      "body": "A note from the group — the small thing we're working on this week, and the one we'd like to tackle next.",
+      "audience": "empty",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "replies": [],
+      "translations": []
+    }
+  ],
+  "events": [
+    {
+      "title": "Community Cleanup Day",
+      "body": "Gloves and bags provided. Meet at the gate **09:30**, done by **12:00**.\n\nCoffee and pastries afterwards at the community room.",
+      "componentId": "safety",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 5,
+      "endHoursAfterStart": 3,
+      "location": "Back lane, near the gate",
+      "capacity": 20,
+      "color": "#3b82a0",
+      "tagSlugs": [
+        "cleanup"
+      ],
+      "daysAgo": 2,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 1,
+          "hoursAfter": 2
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe"
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "No"
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinschaftlicher Aufräumtag",
+          "body": "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Journée de nettoyage communautaire",
+          "body": "Gants et sacs fournis. Rendez-vous à la porte à **09:30**, terminé pour **12:00**.\n\nCafé et pâtisseries ensuite dans la salle communautaire.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "da",
+          "title": "Fælles ryddedag",
+          "body": "Handsker og poser leveres. Møde ved porten **09:30**, færdig kl. **12:00**.\n\nBagefter kaffe og kage i fælleslokalet.",
+          "daysAgo": 3
+        }
+      ]
+    },
+    {
+      "title": "Potluck in the Green",
+      "body": "One dish each, arrive from **14:00**. Bring a chair if you have one.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "startDaysAhead": 12,
+      "endHoursAfterStart": 3,
+      "location": "The shared green, under the tree",
+      "color": "#d98a4f",
+      "daysAgo": 1,
+      "rsvps": [
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going"
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "hoursAfter": 1
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Maybe",
+          "hoursAfter": 2
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Potluck auf dem Grün",
+          "body": "Ein Gericht pro Person, kommt ab **14:00**. Bringt einen Stuhl mit, wenn ihr einen habt.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Repas partagé sur la pelouse",
+          "body": "Un plat chacun, arrivez à partir de **14:00**. Apportez une chaise si vous en avez.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "da",
+          "title": "Fællesspisning på græsset",
+          "body": "En ret hver, ankom fra **14:00**. Tag en stol med, hvis du har en.",
+          "daysAgo": 3
+        }
+      ]
+    },
+    {
+      "title": "Tool Library Launch",
+      "body": "Drills, ladders, pressure washers — borrow instead of buying. Meet in the community room to set up the shelf.",
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 9,
+      "endHoursAfterStart": 2,
+      "location": "Community room",
+      "capacity": 15,
+      "color": "#7c5cad",
+      "tagSlugs": [
+        "repair"
+      ],
+      "daysAgo": 1,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going"
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "hoursAfter": 1
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Maybe"
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Eröffnung der Werkzeugbibliothek",
+          "body": "Bohrer, Leitern, Hochdruckreiniger — leihen statt kaufen. Treffen im Gemeinschaftsraum, um das Regal aufzubauen."
+        },
+        {
+          "languageCode": "fr",
+          "title": "Lancement de la bibliothèque d'outils",
+          "body": "Perceuses, échelles, nettoyeurs haute pression — empruntez au lieu d'acheter. Rendez-vous dans la salle communautaire pour installer l'étagère."
+        },
+        {
+          "languageCode": "da",
+          "title": "Åbning af værktøjbiblioteket",
+          "body": "Bor, stiger, trykrenser — lån i stedet for at købe. Møde i fælleslokalet for at sætte hylden op."
+        }
+      ]
+    },
+    {
+      "title": "Neighborhood Walk",
+      "body": "A slow loop of the block, coffee at the end. Strollers welcome — it's flat the whole way.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "startDaysAhead": 18,
+      "endHoursAfterStart": 1,
+      "location": "Meeting at the green",
+      "color": "#4f8f84",
+      "daysAgo": 0,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going"
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "hoursAfter": 1
+        },
+        {
+          "userEmail": "moderator@examplium.com",
+          "status": "Maybe",
+          "hoursAfter": 2
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Nachbarschaftsspaziergang",
+          "body": "Eine gemächliche Runde durch den Kiez, danach Kaffee. Kinderwagen willkommen — die Strecke ist flach."
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bal de quartier",
+          "body": "Une boucle tranquille du quartier, café à la fin. Poussettes bienvenues — c'est plat tout le long."
+        },
+        {
+          "languageCode": "da",
+          "title": "Naboregang",
+          "body": "En rolig tur rundt om blokken, kaffe bagefter. Børnevogne er velkomne — det er fladt hele vejen."
+        }
+      ]
+    },
+    {
+      "title": "Autumn Film Night",
+      "body": "A projector, a white sheet, and a sofa. Bring a blanket; we do the film.",
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "startDaysAhead": 15,
+      "endHoursAfterStart": 4,
+      "location": "Community room",
+      "capacity": 20,
+      "color": "#4f8f84",
+      "tagSlugs": [],
+      "daysAgo": 3,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 2
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 3
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 3
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Board Game Afternoon",
+      "body": "Cards, tiles, dice — bring a game or play ours. Snacks from the community fridge.",
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "startDaysAhead": 8,
+      "endHoursAfterStart": 4,
+      "location": "Community room",
+      "capacity": 16,
+      "color": "#7c5cad",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "No",
+          "daysAgo": 5
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Bike Maintenance Morning",
+      "body": "Pump, tube, basic tools in the store room. Bring a bike; leave a working one.",
+      "componentId": "maintenance",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 4,
+      "endHoursAfterStart": 2,
+      "location": "Store room",
+      "capacity": 10,
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Neighbours' Dinner",
+      "body": "One dish each, arrive from 18:00. Drinks and desserts are on the house.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "startDaysAhead": 3,
+      "endHoursAfterStart": 2,
+      "location": "Community room",
+      "capacity": 25,
+      "color": "#d98a4f",
+      "tagSlugs": [],
+      "daysAgo": 10,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 10
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 10
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 10
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 9
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Seed-Saving Workshop",
+      "body": "Two hours of learning to save from tomato, basil, and bean. Seeds to take home.",
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "startDaysAhead": 20,
+      "endHoursAfterStart": 1,
+      "location": "The shared green",
+      "color": "#4f8f84",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "No",
+          "daysAgo": 5
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Photography Walk",
+      "body": "A slow two-hour walk around the block. No pressure to shoot, no pressure to talk.",
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 5,
+      "endHoursAfterStart": 3,
+      "location": "Meeting at the green",
+      "color": "#7c5cad",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 0
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "No",
+          "daysAgo": 1
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Compost 101",
+      "body": "How to turn a bin so it doesn't smell. Two of us will demo the turn.",
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "startDaysAhead": 24,
+      "endHoursAfterStart": 3,
+      "location": "The compost corner",
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 2
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 1
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Coffee and Bread on the Balcony",
+      "body": "A loaf and a pot of coffee on the front balcony. Come by, stay a while.",
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "startDaysAhead": 15,
+      "endHoursAfterStart": 4,
+      "location": "The front balcony",
+      "color": "#d98a4f",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "No",
+          "daysAgo": 5
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 4
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 5
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "No",
+          "daysAgo": 5
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "First-Aid Refresher",
+      "body": "A ninety-minute refresher with the local red-cross. Bring nothing; we have the kit.",
+      "componentId": "safety",
+      "authorEmail": "admin@examplium.com",
+      "startDaysAhead": 14,
+      "endHoursAfterStart": 3,
+      "location": "Community room",
+      "capacity": 12,
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 0
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 0
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Book Swap Launch",
+      "body": "Bring a book, leave a book. A small shelf by the lobby is the start of it.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "startDaysAhead": 19,
+      "endHoursAfterStart": 2,
+      "location": "Lobby",
+      "color": "#7c5cad",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "david@examplium.com",
+          "status": "No",
+          "daysAgo": 5
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 4
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Tool-Sharing Demo",
+      "body": "What's in the shared toolbox, how to book it, and what to do with a broken drill bit.",
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "startDaysAhead": 5,
+      "endHoursAfterStart": 2,
+      "location": "Store room",
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 4
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 4
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Kids' Art Morning",
+      "body": "Paper, crayons, one pot of glue. Parents welcome in the corner with a coffee.",
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "startDaysAhead": 29,
+      "endHoursAfterStart": 3,
+      "location": "Community room",
+      "color": "#d98a4f",
+      "tagSlugs": [],
+      "daysAgo": 3,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 3
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 3
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 2
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Open-Month Meeting",
+      "body": "The monthly open meeting — budget, green, and the two open questions from the register.",
+      "componentId": "governance",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 12,
+      "endHoursAfterStart": 1,
+      "location": "Community room",
+      "capacity": 30,
+      "color": "#7c5cad",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "david@examplium.com",
+          "status": "No",
+          "daysAgo": 7
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "No",
+          "daysAgo": 7
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Walking Group (Saturday)",
+      "body": "A flat forty-minute loop, coffee at the end. Strollers and slow walkers welcome.",
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "startDaysAhead": 30,
+      "endHoursAfterStart": 2,
+      "location": "Meeting at the green",
+      "color": "#4f8f84",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 5
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Gutter Sweep — All Hands",
+      "body": "Ladders out by 10. Two people per side, an hour and done.",
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "startDaysAhead": 23,
+      "endHoursAfterStart": 1,
+      "location": "The north roofline",
+      "capacity": 8,
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 3,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 3
+        },
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 3
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Cooking Circle",
+      "body": "One recipe each, ninety minutes of swapping. I'll do the bread.",
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "startDaysAhead": 20,
+      "endHoursAfterStart": 2,
+      "location": "The shared green, under the tree",
+      "color": "#d98a4f",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 1
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "No",
+          "daysAgo": 2
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "New-Resident Welcome",
+      "body": "A thirty-minute walk-round and a coffee. If you're new to the block, this is your first stop.",
+      "componentId": "governance",
+      "authorEmail": "david@examplium.com",
+      "startDaysAhead": 25,
+      "endHoursAfterStart": 3,
+      "location": "Lobby",
+      "color": "#4f8f84",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "modifiedNow": true,
+      "rsvps": [
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 7
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Winter-Knitting Circle",
+      "body": "Bring your needles; we have the yarn. A lamp and a chair are provided.",
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "startDaysAhead": 3,
+      "endHoursAfterStart": 4,
+      "location": "Community room",
+      "color": "#7c5cad",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 6
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 7
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 7
+        },
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "No",
+          "daysAgo": 6
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Stargazing on the Green",
+      "body": "A flat, dark stretch of the green. Bring a blanket and a warm drink; we point at the constellations.",
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "startDaysAhead": 9,
+      "endHoursAfterStart": 2,
+      "location": "The shared green",
+      "color": "#4f8f84",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "ben@examplium.com",
+          "status": "Going",
+          "daysAgo": 8
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 7
+        }
+      ],
+      "translations": []
+    },
+    {
+      "title": "Small-Repairs Clinic",
+      "body": "A wobbly shelf, a stuck drawer, a loose hinge — bring the problem, leave with a fix.",
+      "componentId": "maintenance",
+      "authorEmail": "carla@examplium.com",
+      "startDaysAhead": 11,
+      "endHoursAfterStart": 3,
+      "location": "Store room",
+      "capacity": 10,
+      "color": "#3b82a0",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "modifiedNow": false,
+      "rsvps": [
+        {
+          "userEmail": "anna@examplium.com",
+          "status": "Maybe",
+          "daysAgo": 8
+        },
+        {
+          "userEmail": "david@examplium.com",
+          "status": "Going",
+          "daysAgo": 7
+        },
+        {
+          "userEmail": "carla@examplium.com",
+          "status": "Going",
+          "daysAgo": 8
+        }
+      ],
+      "translations": []
+    }
+  ],
+  "pages": [
+    {
+      "slug": "my-corner",
+      "parentSlug": null,
+      "title": "Anna's corner of the street",
+      "body": "A little space for notes about the block — the kind of thing you'd otherwise post on the group chat and then no one finds again.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 6,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Annas Ecke der Straße",
+          "body": "Ein kleiner Raum für Notizen über den Block — genau die Dinge, die man sonst in den Gruppenchat schreibt und dann niemand wieder findet.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "da",
+          "title": "Annas hjørne af gaden",
+          "body": "Et lille sted til noter om kvarteret — den slags, man ellers poster i gruppechat, og som ingen finder igen.",
+          "daysAgo": 5
+        }
+      ]
+    },
+    {
+      "slug": "the-bench-by-the-gate",
+      "parentSlug": "my-corner",
+      "title": "The bench by the gate",
+      "body": "There's a bench most of us have stopped noticing. It gets the sun first in the morning and the pigeons claim it by nine.\n\nI keep meaning to wipe it down for the people who use it to read. Small thing, but it's ours.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [
+        "recipe"
+      ],
+      "daysAgo": 3,
+      "translations": [
+        {
+          "languageCode": "da",
+          "title": "Bænken ved porten",
+          "body": "Der er en bænk, som de fleste af os er gået glip af. Den får solen først om morgenen, og duerne har erobret den ved ni.\n\nJeg bliver ved med at skulle pudse den for folk, der bruger den til at læse. Lille ting, men den er vores.",
+          "daysAgo": 3
+        }
+      ]
+    },
+    {
+      "slug": "the-corner-shops-bell",
+      "parentSlug": "my-corner",
+      "title": "The corner shop's old bell",
+      "body": "The little bell above the old corner shop still rings when someone opens the door. No one runs it now, but the sound has stayed — a small reminder the street used to be busier.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 1,
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die alte Glocke des Eckladens",
+          "body": "Die kleine Glocke über dem alten Eckladen klingelt immer noch, wenn jemand die Tür öffnet. Niemand führt den Laden mehr, aber der Klang ist geblieben — eine kleine Erinnerung daran, dass die Straße einmal geschäftiger war."
+        },
+        {
+          "languageCode": "da",
+          "title": "Hjørnebutikkens gamle klokke",
+          "body": "Den lille klokke over hjørnebutikken klinger stadig, når nogen åbner døren. Ingen driver butikken længere, men lyden er geblevet — en lille påmindelse om, at gaden engang var mere travl."
+        }
+      ]
+    },
+    {
+      "slug": "notes-from-the-green",
+      "parentSlug": null,
+      "title": "Notes from the green",
+      "body": "Little notes about the shared green — the seeds that came up, the ones that didn't, and the slow story of the two benches.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 3,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-the-morning-light",
+      "parentSlug": "notes-from-the-green",
+      "title": "the morning light",
+      "body": "A note on the morning light — the hour when the street is still and the coffee is just right.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-the-quiet-hours",
+      "parentSlug": "notes-from-the-green",
+      "title": "the quiet hours",
+      "body": "A note on the quiet hours — when the block is at its stillest, and what that sounds like.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-the-sound-of-the-street",
+      "parentSlug": "notes-from-the-green",
+      "title": "the sound of the street",
+      "body": "A note on the sound of the street — the particular quiet of the block, and what breaks it.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-the-bench-and-the-pigeons",
+      "parentSlug": "notes-from-the-green",
+      "title": "the bench and the pigeons",
+      "body": "A note on the bench and the pigeons — the small routine of the morning, and the people it brings together.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-the-first-seedlings",
+      "parentSlug": "notes-from-the-green",
+      "title": "the first seedlings",
+      "body": "A note on the first seedlings of the season — which ones made it, which ones didn't, and what I'd try next year.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-what-s-in-the-oven",
+      "parentSlug": "notes-from-the-green",
+      "title": "what's in the oven",
+      "body": "A note on what's been in the oven — the breads, the pies, the occasional catastrophe.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-a-small-win",
+      "parentSlug": "notes-from-the-green",
+      "title": "a small win",
+      "body": "A note on a small win from the month — the sort of thing that's easy to forget and good to remember.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "notes-from-the-green-a-word-about-the-weather",
+      "parentSlug": "notes-from-the-green",
+      "title": "a word about the weather",
+      "body": "A word about the weather — the small way it shapes the whole block's day.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins",
+      "parentSlug": null,
+      "title": "The block's small wins",
+      "body": "The small things that went right this month — the tap that stopped dripping, the handrail that got re-tightened, the first pot of basil.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 10,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-a-word-about-the-weather",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "a word about the weather",
+      "body": "A word about the weather — the small way it shapes the whole block's day.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 9,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-the-quiet-hours",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "the quiet hours",
+      "body": "A note on the quiet hours — when the block is at its stillest, and what that sounds like.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 9,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-what-s-in-the-oven",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "what's in the oven",
+      "body": "A note on what's been in the oven — the breads, the pies, the occasional catastrophe.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-a-small-win",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "a small win",
+      "body": "A note on a small win from the month — the sort of thing that's easy to forget and good to remember.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-the-sound-of-the-street",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "the sound of the street",
+      "body": "A note on the sound of the street — the particular quiet of the block, and what breaks it.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 9,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-the-first-seedlings",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "the first seedlings",
+      "body": "A note on the first seedlings of the season — which ones made it, which ones didn't, and what I'd try next year.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 9,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-the-bench-and-the-pigeons",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "the bench and the pigeons",
+      "body": "A note on the bench and the pigeons — the small routine of the morning, and the people it brings together.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "translations": []
+    },
+    {
+      "slug": "the-block-s-small-wins-the-morning-light",
+      "parentSlug": "the-block-s-small-wins",
+      "title": "the morning light",
+      "body": "A note on the morning light — the hour when the street is still and the coffee is just right.",
+      "kind": "user",
+      "authorEmail": "david@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 9,
+      "translations": []
+    },
+    {
+      "slug": "kitchens-of-the-block",
+      "parentSlug": null,
+      "title": "Kitchens of the block",
+      "body": "What's been in the oven around here — the breads, the pies, the one time the soufflé landed and the one time it didn't.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "translations": []
+    },
+    {
+      "slug": "kitchens-of-the-block-what-s-in-the-oven",
+      "parentSlug": "kitchens-of-the-block",
+      "title": "what's in the oven",
+      "body": "A note on what's been in the oven — the breads, the pies, the occasional catastrophe.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "translations": []
+    },
+    {
+      "slug": "kitchens-of-the-block-the-bench-and-the-pigeons",
+      "parentSlug": "kitchens-of-the-block",
+      "title": "the bench and the pigeons",
+      "body": "A note on the bench and the pigeons — the small routine of the morning, and the people it brings together.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 5,
+      "translations": []
+    },
+    {
+      "slug": "kitchens-of-the-block-a-small-win",
+      "parentSlug": "kitchens-of-the-block",
+      "title": "a small win",
+      "body": "A note on a small win from the month — the sort of thing that's easy to forget and good to remember.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "translations": []
+    },
+    {
+      "slug": "kitchens-of-the-block-the-first-seedlings",
+      "parentSlug": "kitchens-of-the-block",
+      "title": "the first seedlings",
+      "body": "A note on the first seedlings of the season — which ones made it, which ones didn't, and what I'd try next year.",
+      "kind": "user",
+      "authorEmail": "anna@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 6,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons",
+      "parentSlug": null,
+      "title": "The river bend in seasons",
+      "body": "What the river bend looks like from the park bench, month by month — the light, the herons, the first frost.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 3,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-the-sound-of-the-street",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "the sound of the street",
+      "body": "A note on the sound of the street — the particular quiet of the block, and what breaks it.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-the-bench-and-the-pigeons",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "the bench and the pigeons",
+      "body": "A note on the bench and the pigeons — the small routine of the morning, and the people it brings together.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 2,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-the-quiet-hours",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "the quiet hours",
+      "body": "A note on the quiet hours — when the block is at its stillest, and what that sounds like.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-a-word-about-the-weather",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "a word about the weather",
+      "body": "A word about the weather — the small way it shapes the whole block's day.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-the-morning-light",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "the morning light",
+      "body": "A note on the morning light — the hour when the street is still and the coffee is just right.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-a-small-win",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "a small win",
+      "body": "A note on a small win from the month — the sort of thing that's easy to forget and good to remember.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "the-river-bend-in-seasons-the-first-seedlings",
+      "parentSlug": "the-river-bend-in-seasons",
+      "title": "the first seedlings",
+      "body": "A note on the first seedlings of the season — which ones made it, which ones didn't, and what I'd try next year.",
+      "kind": "user",
+      "authorEmail": "ben@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 1,
+      "translations": []
+    },
+    {
+      "slug": "what-the-green-grows",
+      "parentSlug": null,
+      "title": "What the green grows",
+      "body": "A running log of what's been planted in the shared beds this season, what came up, and what I'd try next.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 10,
+      "translations": []
+    },
+    {
+      "slug": "what-the-green-grows-the-morning-light",
+      "parentSlug": "what-the-green-grows",
+      "title": "the morning light",
+      "body": "A note on the morning light — the hour when the street is still and the coffee is just right.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 7,
+      "translations": []
+    },
+    {
+      "slug": "what-the-green-grows-a-word-about-the-weather",
+      "parentSlug": "what-the-green-grows",
+      "title": "a word about the weather",
+      "body": "A word about the weather — the small way it shapes the whole block's day.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "translations": []
+    },
+    {
+      "slug": "what-the-green-grows-a-small-win",
+      "parentSlug": "what-the-green-grows",
+      "title": "a small win",
+      "body": "A note on a small win from the month — the sort of thing that's easy to forget and good to remember.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "translations": []
+    },
+    {
+      "slug": "what-the-green-grows-the-first-seedlings",
+      "parentSlug": "what-the-green-grows",
+      "title": "the first seedlings",
+      "body": "A note on the first seedlings of the season — which ones made it, which ones didn't, and what I'd try next year.",
+      "kind": "user",
+      "authorEmail": "carla@examplium.com",
+      "tagSlugs": [],
+      "daysAgo": 8,
+      "translations": []
+    }
+  ],
+  "communityTranslations": [
+    {
+      "componentId": "safety",
+      "languageCode": "de",
+      "name": "Sicherheit",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "safety",
+      "languageCode": "fr",
+      "name": "Sécurité",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "safety",
+      "languageCode": "da",
+      "name": "Sikkerhed",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "maintenance",
+      "languageCode": "de",
+      "name": "Wartung",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "maintenance",
+      "languageCode": "fr",
+      "name": "Entretien",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "maintenance",
+      "languageCode": "da",
+      "name": "Vedligeholdelse",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "social",
+      "languageCode": "de",
+      "name": "Soziales",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "social",
+      "languageCode": "fr",
+      "name": "Social",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "social",
+      "languageCode": "da",
+      "name": "Socialt",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "governance",
+      "languageCode": "de",
+      "name": "Gemeinschaftsführung",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "governance",
+      "languageCode": "fr",
+      "name": "Gouvernance",
+      "daysAgo": 38
+    },
+    {
+      "componentId": "governance",
+      "languageCode": "da",
+      "name": "Forvaltning",
+      "daysAgo": 38
+    }
+  ],
+  "goals": [
+    {
+      "title": "A safer, calmer street",
+      "description": "Reduce the small hazards that make the block feel unsafe at night — a clearer path, working lights, and a known neighbour to call.",
+      "componentId": "safety",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 34
+    },
+    {
+      "title": "Shared things that last",
+      "description": "The shared tools, the bins, the bike stand — a small standing fund and a clear rota so they keep working without a new board meeting each time.",
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 29
+    },
+    {
+      "title": "A block that knows itself",
+      "description": "Newcomers know their neighbours, the older residents are never on their own, and there's always something on the calendar this month.",
+      "componentId": "social",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 34
+    },
+    {
+      "title": "A budget that's easy to follow",
+      "description": "One page a quarter — what we spent, what we're planning, and the one or two things we're saying no to — that every resident can read in two minutes.",
+      "componentId": "governance",
+      "authorEmail": "david@examplium.com",
+      "daysAgo": 17
+    },
+    {
+      "title": "The green as a shared living space",
+      "description": "The beds, the bench, the small garden — a shared plan for what we grow and how we keep it, so it's not just one person's project.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "daysAgo": 29
+    }
+  ],
+  "projects": [
+    {
+      "title": "Path-lighting upgrade",
+      "description": "Swap the two dim path lights for longer-burn lamps, re-wire the transformer, and add a small bench by the bike rack.",
+      "goalTitle": "A safer, calmer street",
+      "componentId": "safety",
+      "authorEmail": "anna@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 33,
+      "dueInDays": 14,
+      "daysAgo": 33,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -4,
+          "daysAgo": 33
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 32
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -8,
+          "daysAgo": 29
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 19,
+          "daysAgo": 28
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 4,
+          "daysAgo": 27
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 10,
+          "daysAgo": 30
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 7,
+          "daysAgo": 24
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -5,
+          "daysAgo": 33
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 16,
+          "daysAgo": 24
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 32
+        }
+      ]
+    },
+    {
+      "title": "Bike-rack and bench plan",
+      "description": "A single bike rack with a small bench by it. Budget, location, and the sign-off at the next meeting.",
+      "goalTitle": "A safer, calmer street",
+      "componentId": "safety",
+      "authorEmail": "david@examplium.com",
+      "status": "not-started",
+      "startDaysAgo": 27,
+      "dueInDays": 32,
+      "daysAgo": 27,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "cancelled",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -1,
+          "daysAgo": 25
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "done",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 11,
+          "daysAgo": 20
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -6,
+          "daysAgo": 19
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 1,
+          "daysAgo": 19
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -6,
+          "daysAgo": 20
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 10,
+          "daysAgo": 21
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 16,
+          "daysAgo": 27
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 13,
+          "daysAgo": 20
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 19
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "in-progress",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 9,
+          "daysAgo": 21
+        }
+      ]
+    },
+    {
+      "title": "Shared-toolbox standing fund",
+      "description": "A five-euro per household per quarter fund, a simple sign-up sheet, and a small 'borrowed and back' log.",
+      "goalTitle": "Shared things that last",
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 36,
+      "dueInDays": 12,
+      "daysAgo": 36,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -8,
+          "daysAgo": 31
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 30
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 36
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 10,
+          "daysAgo": 35
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 33
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 6,
+          "daysAgo": 35
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 5,
+          "daysAgo": 32
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -8,
+          "daysAgo": 35
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 7,
+          "daysAgo": 28
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "not-started",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -6,
+          "daysAgo": 34
+        }
+      ]
+    },
+    {
+      "title": "Compost-bin upkeep rota",
+      "description": "A two-person weekly rota for the turn and the swap, with a small log on the door.",
+      "goalTitle": "Shared things that last",
+      "componentId": "maintenance",
+      "authorEmail": "david@examplium.com",
+      "status": "done",
+      "startDaysAgo": 39,
+      "dueInDays": 34,
+      "daysAgo": 39,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "done",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 30
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 13,
+          "daysAgo": 36
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "not-started",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -9,
+          "daysAgo": 31
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 37
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 1,
+          "daysAgo": 36
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 10,
+          "daysAgo": 38
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 8,
+          "daysAgo": 31
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 9,
+          "daysAgo": 37
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "done",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 5,
+          "daysAgo": 38
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 39
+        }
+      ]
+    },
+    {
+      "title": "Newcomers' welcome pack",
+      "description": "A little folder — the register, the quiet hours, the two nearest neighbours, and the first-coffee invitation.",
+      "goalTitle": "A block that knows itself",
+      "componentId": "social",
+      "authorEmail": "admin@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 14,
+      "dueInDays": 32,
+      "daysAgo": 14,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 6
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -10,
+          "daysAgo": 9
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -5,
+          "daysAgo": 14
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -2,
+          "daysAgo": 14
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 11
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "in-progress",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -10,
+          "daysAgo": 11
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "done",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 15,
+          "daysAgo": 13
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 9,
+          "daysAgo": 6
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "not-started",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 5,
+          "daysAgo": 13
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -5,
+          "daysAgo": 7
+        }
+      ]
+    },
+    {
+      "title": "Monthly neighbours' dinner",
+      "description": "A standing monthly dinner at the community room — one dish each, drinks on the house.",
+      "goalTitle": "A block that knows itself",
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 35,
+      "dueInDays": 43,
+      "daysAgo": 35,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 7,
+          "daysAgo": 27
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "in-progress",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 6,
+          "daysAgo": 30
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 0,
+          "daysAgo": 31
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 11,
+          "daysAgo": 35
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "in-progress",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -2,
+          "daysAgo": 30
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 17,
+          "daysAgo": 33
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "cancelled",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 1,
+          "daysAgo": 28
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -9,
+          "daysAgo": 32
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 12,
+          "daysAgo": 34
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 11,
+          "daysAgo": 30
+        }
+      ]
+    },
+    {
+      "title": "Quarterly one-page budget",
+      "description": "One page a quarter — in, out, planned, and the one thing we're saying no to.",
+      "goalTitle": "A budget that's easy to follow",
+      "componentId": "governance",
+      "authorEmail": "ben@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 16,
+      "dueInDays": 36,
+      "daysAgo": 16,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "done",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 8
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 6,
+          "daysAgo": 15
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "not-started",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -3,
+          "daysAgo": 10
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 4,
+          "daysAgo": 12
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 13
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -1,
+          "daysAgo": 13
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 13,
+          "daysAgo": 13
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 10
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 19,
+          "daysAgo": 14
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "done",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 15,
+          "daysAgo": 12
+        }
+      ]
+    },
+    {
+      "title": "Meeting-minutes PDF lane",
+      "description": "A simple PDF of each meeting's minutes, printed in the lobby and kept on the community room shelf.",
+      "goalTitle": "A budget that's easy to follow",
+      "componentId": "governance",
+      "authorEmail": "moderator@examplium.com",
+      "status": "done",
+      "startDaysAgo": 35,
+      "dueInDays": 33,
+      "daysAgo": 35,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 14,
+          "daysAgo": 31
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "not-started",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 31
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -4,
+          "daysAgo": 27
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "done",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 5,
+          "daysAgo": 27
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "cancelled",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 16,
+          "daysAgo": 30
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 7,
+          "daysAgo": 35
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 14,
+          "daysAgo": 31
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 18,
+          "daysAgo": 35
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "cancelled",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -9,
+          "daysAgo": 27
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "cancelled",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -2,
+          "daysAgo": 33
+        }
+      ]
+    },
+    {
+      "title": "Spring green-bed plan",
+      "description": "A two-bed plan — north for herbs, south for the tomatoes — with a small seed list and a two-person rota.",
+      "goalTitle": "The green as a shared living space",
+      "componentId": "social",
+      "authorEmail": "david@examplium.com",
+      "status": "in-progress",
+      "startDaysAgo": 21,
+      "dueInDays": 22,
+      "daysAgo": 21,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 3,
+          "daysAgo": 21
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -5,
+          "daysAgo": 18
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 4,
+          "daysAgo": 20
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "not-started",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 20
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "done",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 19,
+          "daysAgo": 12
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 4,
+          "daysAgo": 17
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "in-progress",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 12,
+          "daysAgo": 14
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "not-started",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 16,
+          "daysAgo": 13
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 15,
+          "daysAgo": 15
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "cancelled",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": 6,
+          "daysAgo": 17
+        }
+      ]
+    },
+    {
+      "title": "Bench and planter for the gate",
+      "description": "One bench and two planters by the gate, with the planter on a small drip line so it's not one person's job.",
+      "goalTitle": "The green as a shared living space",
+      "componentId": "social",
+      "authorEmail": "moderator@examplium.com",
+      "status": "not-started",
+      "startDaysAgo": 25,
+      "dueInDays": 27,
+      "daysAgo": 25,
+      "translations": [],
+      "todos": [
+        {
+          "title": "Draft the sign-off sheet",
+          "body": "A one-line-per-person sheet for the next meeting. Two minutes to fill, one minute to collect.",
+          "status": "cancelled",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": 9,
+          "daysAgo": 19
+        },
+        {
+          "title": "Collect the budget numbers",
+          "body": "The two numbers that matter this month — what we're in, what we're out. Two minutes each.",
+          "status": "done",
+          "assigneeEmail": "ben@examplium.com",
+          "dueInDays": 13,
+          "daysAgo": 25
+        },
+        {
+          "title": "Book the community room",
+          "body": "A two-hour slot for the next event. The sheet on the wall is the booking system.",
+          "status": "done",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 16,
+          "daysAgo": 16
+        },
+        {
+          "title": "Print the one-pager",
+          "body": "One page, two sides. The community room printer is the one to use.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 0,
+          "daysAgo": 18
+        },
+        {
+          "title": "Buy the two lamps",
+          "body": "The longer-burn lamps for the path. The front-desk sheet has the two model numbers.",
+          "status": "cancelled",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 3,
+          "daysAgo": 21
+        },
+        {
+          "title": "Re-wire the transformer",
+          "body": "The small box by the gate — a two-hour job for two people with a drill.",
+          "status": "not-started",
+          "assigneeEmail": "anna@examplium.com",
+          "dueInDays": -6,
+          "daysAgo": 25
+        },
+        {
+          "title": "Add the bench",
+          "body": "One bench, two bolts. The store room has the drill and the coffee.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 2,
+          "daysAgo": 23
+        },
+        {
+          "title": "Sign up the first two",
+          "body": "Two names on the rota is enough to start. The sheet is on the green's wall.",
+          "status": "in-progress",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": -7,
+          "daysAgo": 25
+        },
+        {
+          "title": "Put up the small notice",
+          "body": "One A5, two lines. The notice board has a corner for it.",
+          "status": "in-progress",
+          "assigneeEmail": "david@examplium.com",
+          "dueInDays": -9,
+          "daysAgo": 17
+        },
+        {
+          "title": "Check the two numbers",
+          "body": "The in and the out. A two-minute check at the front desk.",
+          "status": "cancelled",
+          "assigneeEmail": "carla@examplium.com",
+          "dueInDays": 5,
+          "daysAgo": 19
+        }
+      ]
+    }
+  ]
+}

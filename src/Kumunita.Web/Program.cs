@@ -685,22 +685,35 @@ if (sampleDataOpts.Enabled && firstBoot)
 }
 else if (sampleDataOpts.Enabled && !firstBoot)
 {
-    // Warm-boot backfill (ADR 0060): an instance whose first boot predates the
-    // sample events' de / fr / da translations has the four sample events (authored
-    // in en) but no translation rows, so a German / French / Danish-speaking
-    // resident sees only the English variant. Fill in the missing rows —
-    // create-if-missing only (never clobbers a Translator's in-app edit, the
-    // ADR 0042 D1 invariant), idempotent (a second boot finds every row and
-    // skips). Sample-data-specific, so — unlike the platform-wide canonical-page
-    // backfills SchemaBootstrap runs — it is gated on the SampleData__Enabled flag
-    // and is a no-op on a real neighborhood (which never carries the flag).
+    // Warm-boot backfill of the WHOLE sample corpus (ADR 0130 — the ADR 0060
+    // event-translation lane generalized). An instance whose first boot predates a
+    // later growth of the embedded sample-data.json (ADR 0129) carries the *old*
+    // corpus but not the entries added since (new announcements/posts/events/pages/goals/
+    // projects, new translations, new RSVPs/memberships). Reconcile on every warm boot:
+    // add the missing rows, matched by a stable natural key (Option A — no schema
+    // change), create-if-missing only (a match is skipped, never clobbered — the
+    // ADR 0042 D1 invariant), idempotent (a second boot finds every row the first
+    // created and skips). Sample-data-specific, so — like the ADR 0060 lane it
+    // supersedes — it is gated on the SampleData__Enabled flag and is a no-op on a
+    // real neighborhood (which never carries the flag). The same two postures as the
+    // first-boot seed (ADR 0056): a newly-added deploy account gets a random
+    // password, and the seed admin is never given a weak credential (its null password
+    // is a no-op, so it keeps its setup-token lane).
+    bool deployPosture = !app.Environment.IsDevelopment()
+                         && !string.IsNullOrWhiteSpace(seedAdminOpts.Email);
     await using var backfillScope = app.Services.CreateAsyncScope();
     var backfillSp = backfillScope.ServiceProvider;
-    var backfillStore = backfillSp.GetRequiredService<IDocumentStore>();
-    await using var backfillSession = backfillStore.OpenSession(new Marten.Services.SessionOptions());
-    await SampleDataSeeder.BackfillEventTranslationsAsync(backfillSession, default);
-    backfillSp.GetRequiredService<ILogger>().LogInformation(
-        "Warm-boot: backfilled missing de/fr/da translations for the sample events (create-if-missing, idempotent).");
+    await SampleDataSeeder.BackfillSampleCorpusAsync(
+        backfillSp.GetRequiredService<AppDbContext>(),
+        backfillSp.GetRequiredService<IDocumentStore>(),
+        backfillSp.GetRequiredService<UserManager<User>>(),
+        backfillSp.GetRequiredService<RoleManager<IdentityRole>>(),
+        backfillSp.GetRequiredService<Kumunita.Core.UserInfo.IUserInfoService>(),
+        deployPosture
+            ? backfillSp.GetRequiredService<IMailerStage>()
+            : null,
+        deployPosture ? seedAdminOpts.Email : null,
+        backfillSp.GetRequiredService<ILogger>());
 }
 
 // Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
