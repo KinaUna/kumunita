@@ -1369,6 +1369,179 @@ public static class FirstBootSeeder
              "a post — see " +
              "[Language](/pages/system/help/language) and " +
              "[Translators](/pages/system/help/translator).\n"),
+            ("announcements", "Announcements",
+             "## Announcements\n\n" +
+             "Announcements are notices that the platform shows on their own — " +
+             "separate from the community feed — for things the whole " +
+             "neighborhood should know: a maintenance window, a water cut, a " +
+             "road work day.\n\n" +
+             "**Where to find them.** The **Announcements** link in the top " +
+             "bar opens the announcements list. Pinned announcements also " +
+             "appear at the top of every page.\n\n" +
+             "**Who can see one.** A **public** announcement is seen by " +
+             "everyone, including visitors who aren't signed in. A **resident** " +
+             "announcement is seen only by signed-in residents — for notices " +
+             "that are about the neighborhood but not for the world. You can " +
+             "also send a resident announcement to a specific community.\n\n" +
+             "**Who writes one.** A global admin (or, where granted, a " +
+             "moderator) writes an announcement. A resident can't publish one, " +
+             "but they can follow the platform to get a notification when one " +
+             "is made — see [notifications](notifications).\n\n" +
+             "**A pinned announcement.** A pinned announcement shows at the " +
+             "top of every page until the admin unpins it. The pin is for the " +
+             "notices you want the whole neighborhood to see — not for every " +
+             "announcement.\n\n" +
+             "**A resident's comment.** If the platform allows it, a " +
+             "signed-in resident can leave a comment on a resident " +
+             "announcement. A comment is a question or a note, not an " +
+             "argument — the admin can remove one that doesn't fit.\n"),
+            ("directory", "Directory",
+             "## Directory\n\n" +
+             "The directory is the list of everyone on the platform — every " +
+             "resident in the neighborhood — and the details each of them has " +
+             "chosen to share.\n\n" +
+             "**What a resident sees.** Everyone in the neighborhood sees the " +
+             "directory. Each entry shows the resident's display name, and " +
+             "any contact details (address, email, phone) they have chosen to " +
+             "show — the contact details are opt-in, per field.\n\n" +
+             "**What the directory is not.** It is not a feed. It doesn't show " +
+             "posts, groups, or anything a resident has written. The only " +
+             "thing it shows is the name and the contact details the resident " +
+             "has chosen to make visible.\n\n" +
+             "**To find a specific resident.** Open the directory and search " +
+             "for the name. A resident you can't see is either not on the " +
+             "platform, or has chosen not to be in the directory — either way, " +
+             "that's their choice.\n\n" +
+             "**To reach a resident.** If the directory shows a contact " +
+             "detail, you can use it. If it doesn't, the resident hasn't " +
+             "chosen to share one — the platform doesn't hide the directory, " +
+             "but it does respect the choice to be off it.\n"),
+            ("people", "People",
+             "## People\n\n" +
+             "The **People** page is a find — a way to find residents who have " +
+             "something in common, by a tag or by a word in their profile.\n\n" +
+             "**To find by tag.** Open **People**, pick **Find by tag**, and " +
+             "choose a tag. The page lists the residents whose profile carries " +
+             "that tag — the tag is the resident's own pick, not an " +
+             "assignment.\n\n" +
+             "**To find by profile.** Pick **Find by profile** and type a " +
+             "word or phrase. The page lists the residents whose profile " +
+             "mentions it.\n\n" +
+             "**What you see.** Each entry shows the resident's name and the " +
+             "tag or the matching word in their profile. A profile the viewer " +
+             "can't see never surfaces — the find respects the audience the " +
+             "profile carries, the same way the feed does.\n\n" +
+             "**What People is not.** It is not a directory. The " +
+             "[directory](directory) shows the residents on the platform and " +
+             "their opt-in contact details. People shows a match — a tag or a " +
+             "word — the platform's own organizer, not a listing.\n"),
+            ("inventory", "Inventory",
+             "## Inventory\n\n" +
+             "Inventory is the neighborhood's shared shelf — the list of " +
+             "things the neighborhood keeps that a neighbor might borrow or " +
+             "lend: the ladder, the drill, the spare chair.\n\n" +
+             "**What a kind means.** Each item carries a **kind**:\n" +
+             "- **Shared** — the neighborhood's, for anyone in the " +
+             "neighborhood to use.\n" +
+             "- **Community** — a specific community's, for the community's " +
+             "members to use.\n" +
+             "- **Private** — one resident's, for that resident to offer to a " +
+             "neighbor.\n\n" +
+             "**To add one.** Open **Inventory** and pick **New item**. Give " +
+             "it a name and a description, pick a kind, and click **Create " +
+             "item**. The item is on the shelf.\n\n" +
+             "**To check one out.** Open the item and click **Check out**. " +
+             "The item is now \"with\" you — the history records when you took " +
+             "it. Click **Check in** when you're done, and the item is back " +
+             "on the shelf.\n\n" +
+             "**The usage history.** Every check-out and check-in is written " +
+             "to the item's history. The history is the neighborhood's record " +
+             "of who had the thing and when — a useful thing when the drill " +
+             "goes missing.\n\n" +
+             "**To remove one.** The item's owner (or a global admin) can " +
+             "delete an item. A deleted item is gone from the shelf; its " +
+             "history stays.\n"),
+            ("bookmarks", "Bookmarks",
+             "## Bookmarks\n\n" +
+             "A bookmark is a mark you put on something so you can find it " +
+             "again — a post, an event, a to-do, an announcement, a page.\n\n" +
+             "**To bookmark one.** Open the thing and click **Bookmark**. The " +
+             "thing is on your list. Click the same button again (now showing " +
+             "\"Bookmarked\") to remove it.\n\n" +
+             "**To find your bookmarks.** Open **Bookmarks** in the top bar. " +
+             "Your list shows the things you've bookmarked, grouped by kind — " +
+             "posts, events, to-dos, announcements, pages.\n\n" +
+             "**A bookmark is yours.** No one else can see your bookmarks. A " +
+             "bookmark is a mark on your side — the platform doesn't show " +
+             "\"N people bookmarked this\" or anything like it.\n\n" +
+             "**A bookmark that goes away.** If the thing you bookmarked is " +
+             "removed, your bookmark stays — it shows as \"no longer " +
+             "available\" in your list. You can remove it with a click.\n"),
+            ("documents", "Documents",
+             "## Documents\n\n" +
+             "Documents is the neighborhood's file shelf — the place for " +
+             "files that are about the neighborhood, not a post's attachment: " +
+             "the meeting notes, the budget, the bylaws.\n\n" +
+             "**To upload one.** Open **Documents** and pick **Upload a " +
+             "document**. Choose the file, write a one-line description if " +
+             "you want, and pick who can see it. Click **Upload document**.\n\n" +
+             "**Who can see it.** A document carries an audience, the same way " +
+             "a post does. The audience is the people who can see the file — " +
+             "the neighborhood, a community, a group, or a single person. See " +
+             "[audience](audience).\n\n" +
+             "**To download one.** Open the document and click **Download**. " +
+             "The file is yours — the platform doesn't watermark it, track the " +
+             "download, or hold it.\n\n" +
+             "**To update one.** The document's uploader (or a global admin) " +
+             "can replace the file or edit the description. A new file " +
+             "replaces the old one — the old one is gone.\n\n" +
+             "**A document is not a post's attachment.** A post's attachment " +
+             "is part of the post — it lives with the post and carries the " +
+             "post's audience. A document is a file on its own, with its own " +
+             "audience and its own shelf.\n"),
+            ("pages", "Pages",
+             "## Pages\n\n" +
+             "Pages is the platform's own set of documents — the terms, the " +
+             "help guides, the privacy note, the code of conduct — and the " +
+             "community's own pages: the building's rules, the garden's " +
+             "schedule, the neighborhood's bylaws.\n\n" +
+             "**Where to find them.** The **Pages** link in the top bar " +
+             "opens the pages tree. The **Platform pages** section holds the " +
+             "platform's own (the terms, the help guides, and the rest); the " +
+             "**Community pages** section holds the neighborhood's.\n\n" +
+             "**To read one.** Click the page. The page shows its body, and " +
+             "any child pages under it.\n\n" +
+             "**To write one.** A global admin (or, where granted, a " +
+             "moderator) writes a community page. A resident can't write one " +
+             "— pages are the neighborhood's shared documents, not a " +
+             "resident's note.\n\n" +
+             "**To translate one.** A **Translator** can add a language " +
+             "version of a page, the same way they add one for a group or a " +
+             "community — see [Translators](translator).\n\n" +
+             "**The platform's own pages.** The terms, the help guides, the " +
+             "privacy note, and the code of conduct are the platform's own " +
+             "pages. A global admin can edit them, and reset a page back to " +
+             "its shipped text when they want the latest wording — see " +
+             "[Admins](admins).\n"),
+            ("tags", "Tags",
+             "## Tags\n\n" +
+             "A tag is a short word you put on a post, a reply, a group, or a " +
+             "profile — a way to say \"this is about that.\"\n\n" +
+             "**To find by tag.** Open **Tags** in the top bar and pick a " +
+             "tag. The page shows the posts, replies, groups, and profiles " +
+             "that carry the tag, and — if the tag has a description — the " +
+             "tag's description.\n\n" +
+             "**To use a tag.** When you write a post, reply, group, or " +
+             "profile, you can add a tag. A tag is a word, not a sentence — " +
+             "\"sanitation\", \"budget\", \"maple-street\" — the kind of word " +
+             "that organizes a feed, not a label.\n\n" +
+             "**A tag is not an audience.** A tag doesn't decide who can see " +
+             "a post. The audience does — see [audience](audience). A tag is " +
+             "a finder, not a gate.\n\n" +
+             "**A tag's description.** A tag can carry a one-line description " +
+             "— a note about what the tag is for. The description is visible " +
+             "to everyone who can see the tag, and is editable by the tag's " +
+             "creator or a global admin.\n"),
         ];
     }
 
@@ -1750,6 +1923,208 @@ public static class FirstBootSeeder
              "übersetzen darf, folgt denselben Regeln wie ein Beitrag — sie " +
              "sehen unter [Sprache](/pages/system/help/language) und " +
              "[Übersetzer](/pages/system/help/translator).\n"),
+            ("announcements", "Ankündigungen",
+             "## Ankündigungen\n\n" +
+             "Ankündigungen sind Hinweise, die die Plattform auf ihrer eigenen " +
+             "Seite zeigt — getrennt vom Gemeinschafts-Feed — für Dinge, die " +
+             "das ganze Viertel wissen sollte: ein Wartungsfenster, eine " +
+             "Wassersperre, ein Straßentag.\n\n" +
+             "**Wo sie sind.** Der Link **Ankündigungen** in der oberen Leiste " +
+             "öffnet die Ankündigungsliste. Angepinnte Ankündigungen erscheinen " +
+             "auch oben auf jeder Seite.\n\n" +
+             "**Wer sie sehen darf.** Eine **öffentliche** Ankündigung wird von " +
+             "jeder gesehen — auch von Besucher:innen, die nicht angemeldet " +
+             "sind. Eine **Bewohner-Ankündigung** wird nur von angemeldeten " +
+             "Bewohner:innen gesehen — für Hinweise, die das Viertel betreffen, " +
+             "aber nicht die Welt. Du kannst sie auch an eine bestimmte " +
+             "Gemeinschaft senden.\n\n" +
+             "**Wer sie schreibt.** Ein globaler Admin (oder, wo zugewiesen, ein " +
+             "Moderator) schreibt die Ankündigung. Ein:e Bewohner:in kann " +
+             "keine veröffentlichen, kann aber die Plattform folgen, um bei " +
+             "neuen Ankündigungen eine Benachrichtigung zu bekommen — siehe " +
+             "[Benachrichtigungen](/pages/system/help/notifications).\n\n" +
+             "**Eine angepinnte Ankündigung.** Eine angepinnte Ankündigung " +
+             "bleibt oben auf jeder Seite, bis der Admin sie löst. Die Pinnung " +
+             "ist für Hinweise, die das ganze Viertel sehen soll — nicht für " +
+             "jede Ankündigung.\n\n" +
+             "**Ein Kommentar einer Bewohnerin oder eines Bewohners.** Wenn die " +
+             "Plattform es erlaubt, kann eine:r angemeldete:r Bewohner:in einen " +
+             "Kommentar zu einer Bewohner-Ankündigung hinterlassen. Ein " +
+             "Kommentar ist eine Frage oder ein Hinweis, keine Debatte — der " +
+             "Admin kann einen entfernen, der nicht passt.\n"),
+            ("directory", "Verzeichnis",
+             "## Verzeichnis\n\n" +
+             "Das Verzeichnis ist die Liste aller auf der Plattform — jeder " +
+             "Bewohner im Viertel — und die Angaben, die jeder von ihnen " +
+             "teilen möchte.\n\n" +
+             "**Was eine:r Bewohner:in sieht.** Alle im Viertel sehen das " +
+             "Verzeichnis. Jeder Eintrag zeigt den Anzeigenamen und — falls " +
+             "gewählt — die Kontaktangaben (Adresse, E-Mail, Telefon). Die " +
+             "Kontaktangaben sind einzeln wählbar.\n\n" +
+             "**Was das Verzeichnis nicht ist.** Es ist kein Feed. Es zeigt " +
+             "keine Beiträge, Gruppen oder etwas, das eine:r Bewohner:in " +
+             "geschrieben hat. Es zeigt nur den Namen und die Angaben, die " +
+             "eine:r Bewohner:in sichtbar machen möchte.\n\n" +
+             "**Eine:n bestimmte:n Bewohner:in finden.** Öffne das Verzeichnis " +
+             "und suche nach dem Namen. Eine:n Bewohner:in, die du nicht " +
+             "siehst, ist entweder nicht auf der Plattform oder hat " +
+             "entschieden, nicht im Verzeichnis zu sein — beides eine " +
+             "entsprechende Entscheidung.\n\n" +
+             "**Eine:n Bewohner:in erreichen.** Wenn das Verzeichnis eine " +
+             "Kontaktangabe zeigt, kannst du sie nutzen. Wenn nicht, hat die " +
+             "Person sie nicht teilen wollen — die Plattform versteckt das " +
+             "Verzeichnis nicht, respektiert aber die Entscheidung, dort " +
+             "nicht zu sein.\n"),
+            ("people", "Menschen",
+             "## Menschen\n\n" +
+             "Die Seite **Menschen** ist eine Suche — ein Weg, Bewohner:innen " +
+             "mit etwas gemeinsamem zu finden, nach einem Tag oder nach einem " +
+             "Wort in ihrem Profil.\n\n" +
+             "**Nach Tag suchen.** Öffne **Menschen**, wähle **Nach Tag " +
+             "suchen** und einen Tag. Die Seite listet die Bewohner:innen, " +
+             "deren Profil diesen Tag trägt — der Tag ist die eigene Wahl der " +
+             "Person, keine Zuteilung.\n\n" +
+             "**Nach Profil suchen.** Wähle **Nach Profil suchen** und gib " +
+             "ein Wort oder einen Satz ein. Die Seite listet die " +
+             "Bewohner:innen, deren Profil es nennt.\n\n" +
+             "**Was du siehst.** Jeder Eintrag zeigt den Namen und den Tag " +
+             "oder das passende Wort im Profil. Ein Profil, das der " +
+             "Betrachter nicht sehen darf, taucht nicht auf — die Suche " +
+             "respektiert die Zielgruppe des Profils, so wie der Feed.\n\n" +
+             "**Was Menschen nicht ist.** Es ist kein Verzeichnis. Das " +
+             "[Verzeichnis](/pages/system/help/directory) zeigt die " +
+             "Bewohner:innen auf der Plattform und ihre gewählten " +
+             "Kontaktangaben. Menschen zeigt eine Trefferliste — einen Tag " +
+             "oder ein Wort — die eigene Ordnung der Plattform, keine " +
+             "Aufzählung.\n"),
+            ("inventory", "Inventar",
+             "## Inventar\n\n" +
+             "Inventar ist die gemeinsame Ablage des Viertels — die Liste der " +
+             "Dinge, die das Viertel aufhebt und die eine Nachbarin oder ein " +
+             "Nachbar ausleihen oder verleihen könnte: die Leiter, der " +
+             "Bohrer, der Ersatzstuhl.\n\n" +
+             "**Was eine Art heißt.** Jeder Gegenstand trägt eine **Art**:\n" +
+             "- **Gemeinsam** — das Eigentum des Viertels, für alle im " +
+             "Viertel zur Nutzung.\n" +
+             "- **Gemeinschaft** — das Eigentum einer bestimmten " +
+             "Gemeinschaft, für deren Mitglieder zur Nutzung.\n" +
+             "- **Privat** — das Eigentum einer Bewohnerin oder eines " +
+             "Bewohners, für deren Angebot an Nachbar:innen.\n\n" +
+             "**Einen hinzufügen.** Öffne **Inventar** und wähle **Neuer " +
+             "Gegenstand**. Gib ihm einen Namen und eine Beschreibung, wähle " +
+             "eine Art und klicke auf **Gegenstand anlegen**. Der Gegenstand " +
+             "ist auf dem Regal.\n\n" +
+             "**Einen ausleihen.** Öffne den Gegenstand und klicke auf " +
+             "**Ausleihen**. Der Gegenstand ist nun „bei dir\u201C — die " +
+             "Historie dokumentiert, wann du ihn geholt hast. Klicke auf " +
+             "**Zurückgeben**, wenn du fertig bist, und der Gegenstand ist " +
+             "wieder auf dem Regal.\n\n" +
+             "**Die Nutzungshistorie.** Jedes Ausleihen und Zurückgeben wird " +
+             "in die Historie des Gegenstands geschrieben. Die Historie ist " +
+             "die Aufzeichnung des Viertels, wer wann das Ding hatte — " +
+             "nützlich, wenn der Bohrer verschwindet.\n\n" +
+             "**Einen entfernen.** Der Besitzer oder ein globaler Admin " +
+             "kann einen Gegenstand löschen. Ein gelöschter Gegenstand ist " +
+             "vom Regal weg; seine Historie bleibt.\n"),
+            ("bookmarks", "Lesezeichen",
+             "## Lesezeichen\n\n" +
+             "Ein Lesezeichen ist eine Markierung, die du auf etwas setzt, " +
+             "damit du es wiederfinden kannst — ein Beitrag, eine " +
+             "Veranstaltung, eine Aufgabe, eine Ankündigung, eine Seite.\n\n" +
+             "**Eines setzen.** Öffne die Sache und klicke auf **Merken**. " +
+             "Die Sache ist auf deiner Liste. Klicke erneut auf dieselbe " +
+             "Taste (jetzt „Gemerkt\u201C) zum Entfernen.\n\n" +
+             "**Deine Lesezeichen finden.** Öffne **Lesezeichen** in der " +
+             "oberen Leiste. Deine Liste zeigt die gemerkten Dinge, gruppiert " +
+             "nach Art — Beiträge, Veranstaltungen, Aufgaben, Ankündigungen, " +
+             "Seiten.\n\n" +
+             "**Ein Lesezeichen ist deins.** Niemand anderes kann deine " +
+             "Lesezeichen sehen. Ein Lesezeichen ist eine Markierung auf " +
+             "deiner Seite — die Plattform zeigt nicht „N Personen haben " +
+             "dieses gemerkt\u201C oder Ähnliches.\n\n" +
+             "**Ein Lesezeichen, das weggeht.** Wenn die gemerkte Sache " +
+             "entfernt wird, bleibt dein Lesezeichen — es wird in deiner " +
+             "Liste als „nicht mehr verfügbar\u201C angezeigt. Du kannst es mit " +
+             "einem Klick entfernen.\n"),
+            ("documents", "Dokumente",
+             "## Dokumente\n\n" +
+             "Dokumente ist die gemeinsame Ablage für Dateien — der Ort für " +
+             "Dateien, die das Viertel betreffen, nicht ein " +
+             "Beitragsanhang: die Meeting-Notizen, das Budget, die " +
+             "Gemeinschaftsordnung.\n\n" +
+             "**Eine hochladen.** Öffne **Dokumente** und wähle **Dokument " +
+             "hochladen**. Wähle die Datei, schreibe bei Bedarf eine " +
+             "einzeilige Beschreibung und wähle, wer sie sehen darf. Klicke " +
+             "auf **Dokument hochladen**.\n\n" +
+             "**Wer sie sehen darf.** Ein Dokument trägt eine Zielgruppe, " +
+             "genauso wie ein Beitrag. Die Zielgruppe ist die Person, die " +
+             "die Datei sehen darf — das Viertel, eine Gemeinschaft, eine " +
+             "Gruppe oder eine einzelne Person. Siehe [Zielgruppe](/pages/system/help/audience).\n\n" +
+             "**Eine herunterladen.** Öffne das Dokument und klicke auf " +
+             "**Herunterladen**. Die Datei ist deine — die Plattform " +
+             "wasserzeichenst nicht, verfolgt den Download nicht und hält " +
+             "ihn nicht zurück.\n\n" +
+             "**Eine aktualisieren.** Der Uploader des Dokuments (oder eine " +
+             "globaler Admin) kann die Datei ersetzen oder die " +
+             "Beschreibung bearbeiten. Eine neue Datei ersetzt die alte — " +
+             "die alte ist weg.\n\n" +
+             "**Ein Dokument ist kein Beitragsanhang.** Ein Beitragsanhang " +
+             "gehört zum Beitrag — er lebt mit dem Beitrag und trägt die " +
+             "Zielgruppe des Beitrags. Ein Dokument ist eine Datei für sich, " +
+             "mit ihrer eigenen Zielgruppe und ihrem eigenen Regal.\n"),
+            ("pages", "Seiten",
+             "## Seiten\n\n" +
+             "Seiten sind die eigenen Dokumente der Plattform — die " +
+             "Nutzungsbedingungen, die Hilfe-Anleitungen, die " +
+             "Datenschutzhinweise, der Verhaltenskodex — und die eigenen " +
+             "Seiten der Gemeinschaft: die Regeln des Gebäudes, der " +
+             "Gartenplan, die Gemeinschaftsordnung.\n\n" +
+             "**Wo sie sind.** Der Link **Seiten** in der oberen Leiste " +
+             "öffnet den Seitenbaum. Die Sektion **Plattformseiten** " +
+             "enthält die eigenen (die Nutzungsbedingungen, die " +
+             "Hilfe-Anleitungen, und den Rest); die Sektion " +
+             "**Gemeinschaftsseiten** enthält die des Viertels.\n\n" +
+             "**Eine lesen.** Klicke auf die Seite. Die Seite zeigt ihren " +
+             "Inhalt und, falls vorhanden, die Unterseiten darunter.\n\n" +
+             "**Eine schreiben.** Ein globaler Admin (oder, wo zugewiesen, " +
+             "ein Moderator) schreibt eine Gemeinschaftsseite. Ein:e " +
+             "Bewohner:in kann keine schreiben — Seiten sind die " +
+             "gemeinsamen Dokumente des Viertels, nicht eine Notiz der " +
+             "Person.\n\n" +
+             "**Eine übersetzen.** Ein **Übersetzer** kann eine " +
+             "Sprachversion einer Seite hinzufügen, genauso wie für eine " +
+             "Gruppe oder eine Gemeinschaft — siehe " +
+             "[Übersetzer](/pages/system/help/translator).\n\n" +
+             "**Die eigenen Seiten der Plattform.** Die " +
+             "Nutzungsbedingungen, die Hilfe-Anleitungen, die " +
+             "Datenschutzhinweise und der Verhaltenskodex sind die eigenen " +
+             "Seiten der Plattform. Ein globaler Admin kann sie bearbeiten " +
+             "und eine Seite auf den auslieferungstext zurücksetzen, wenn " +
+             "er den neuesten Wortlaut möchte — siehe " +
+             "[Administratoren](/pages/system/help/admins).\n"),
+            ("tags", "Tags",
+             "## Tags\n\n" +
+             "Ein Tag ist ein kurzes Wort, das du auf einen Beitrag, eine " +
+             "Antwort, eine Gruppe oder ein Profil setzt — eine Art zu " +
+             "sagen, „das geht um das\u201C.\n\n" +
+             "**Nach Tag suchen.** Öffne **Tags** in der oberen Leiste und " +
+             "wähle einen Tag. Die Seite zeigt die Beiträge, Antworten, " +
+             "Gruppen und Profile, die den Tag tragen, und — wenn der Tag " +
+             "eine Beschreibung hat — die Beschreibung des Tags.\n\n" +
+             "**Einen verwenden.** Wenn du einen Beitrag, eine Antwort, eine " +
+             "Gruppe oder ein Profil schreibst, kannst du einen Tag " +
+             "hinzufügen. Ein Tag ist ein Wort, kein Satz — „sanitation\u201C, " +
+             "„budget\u201C, „maple-street\u201C — die Art von Wort, die einen Feed " +
+             "organisiert, nicht eine Beschriftung.\n\n" +
+             "**Ein Tag ist keine Zielgruppe.** Ein Tag entscheidet nicht, " +
+             "wer einen Beitrag sehen darf. Die Zielgruppe entscheidet — " +
+             "siehe [Zielgruppe](/pages/system/help/audience). Ein Tag ist " +
+             "ein Finder, kein Tor.\n\n" +
+             "**Die Beschreibung eines Tags.** Ein Tag kann eine " +
+             "einzeilige Beschreibung tragen — einen Hinweis, wofür der Tag " +
+             "ist. Die Beschreibung ist für alle sichtbar, die den Tag " +
+             "sehen können, und von der Schöpferin oder dem Schöpfer des " +
+             "Tags oder einem globalen Admin editierbar.\n"),
         ];
     }
 
@@ -2117,6 +2492,206 @@ public static class FirstBootSeeder
              "mêmes règles qu'un message — voir " +
              "[Langue](/pages/system/help/language) et " +
              "[Traducteurs](/pages/system/help/translator).\n"),
+            ("announcements", "Annonces",
+             "## Annonces\n\n" +
+             "Les annonces sont des notes que la plateforme affiche sur sa " +
+             "propre page — séparée du fil communautaire — pour les choses " +
+             "que tout le quartier doit savoir : une fenêtre de maintenance, " +
+             "une coupure d'eau, un jour de travaux sur la rue.\n\n" +
+             "**Où les trouver.** Le lien **Annonces** dans la barre du haut " +
+             "ouvre la liste des annonces. Les annonces épinglées " +
+             "apparaissent aussi en haut de chaque page.\n\n" +
+             "**Qui peut voir une annonce.** Une annonce **publique** est vue " +
+             "par tout le monde, y compris les visiteurs non connectés. Une " +
+             "annonce **résident** n'est vue que par les résidents " +
+             "connectés — pour les notes qui concernent le quartier mais pas " +
+             "le monde. Tu peux aussi envoyer une annonce résident à une " +
+             "communauté spécifique.\n\n" +
+             "**Qui en écrit.** Un administrateur global (et, si c'est " +
+             "concédé, un modérateur) écrit l'annonce. Un résident ne peut " +
+             "pas en publier, mais peut suivre la plateforme pour recevoir " +
+             "une notification quand une annonce est faite — voir " +
+             "[Notifications](/pages/system/help/notifications).\n\n" +
+             "**Une annonce épinglée.** Une annonce épinglée reste en haut de " +
+             "chaque page jusqu'à ce que l'admin la dé-épingue. L'épinglage " +
+             "est pour les notes que tout le quartier doit voir — pas pour " +
+             "chaque annonce.\n\n" +
+             "**Un commentaire d'un résident.** Si la plateforme le permet, " +
+             "un résident connecté peut laisser un commentaire sur une " +
+             "annonce résident. Un commentaire est une question ou une " +
+             "note, pas une discussion — l'admin peut en retirer un qui ne " +
+             "convient pas.\n"),
+            ("directory", "Annuaire",
+             "## Annuaire\n\n" +
+             "L'annuaire est la liste de tout le monde sur la plateforme — " +
+             "tous les résidents du quartier — et les détails que chacun a " +
+             "choisi de partager.\n\n" +
+             "**Ce qu'un résident voit.** Tout le monde dans le quartier voit " +
+             "l'annuaire. Chaque entrée montre le nom d'affichage et — si " +
+             "choisi — les coordonnées (adresse, e-mail, téléphone). Les " +
+             "coordonnées sont opt-in, champ par champ.\n\n" +
+             "**Ce que l'annuaire n'est pas.** Ce n'est pas un fil. Il ne " +
+             "montre pas les messages, les groupes ou ce qu'un résident a " +
+             "écrit. Il ne montre que le nom et les coordonnées que le " +
+             "résident a choisi de rendre visibles.\n\n" +
+             "**Trouver un résident en particulier.** Ouvre l'annuaire et " +
+             "recherche le nom. Un résident que tu ne vois pas n'est soit " +
+             "pas sur la plateforme, soit a choisi de ne pas être dans " +
+             "l'annuaire — dans les deux cas, c'est son choix.\n\n" +
+             "**Contacter un résident.** Si l'annuaire montre une " +
+             "coordonnée, tu peux l'utiliser. Si non, le résident n'a pas " +
+             "choisi d'en partager — la plateforme ne cache pas l'annuaire, " +
+             "mais respecte le choix d'y être absent.\n"),
+            ("people", "Personnes",
+             "## Personnes\n\n" +
+             "La page **Personnes** est une recherche — un moyen de trouver " +
+             "des résidents qui ont quelque chose en commun, par un tag ou " +
+             "par un mot dans leur profil.\n\n" +
+             "**Rechercher par tag.** Ouvre **Personnes**, choisis " +
+             "**Rechercher par tag** et un tag. La page liste les résidents " +
+             "dont le profil porte ce tag — le tag est le choix de la " +
+             "personne, pas une affectation.\n\n" +
+             "**Rechercher par profil.** Choisis **Rechercher par profil** " +
+             "et tape un mot ou une phrase. La page liste les résidents dont " +
+             "le profil le mentionne.\n\n" +
+             "**Ce que tu vois.** Chaque entrée montre le nom et le tag ou " +
+             "le mot correspondant dans le profil. Un profil que le " +
+             "lecteur ne peut pas voir n'apparaît pas — la recherche " +
+             "respecte l'audience du profil, comme le fil.\n\n" +
+             "**Ce que Personnes n'est pas.** Ce n'est pas un annuaire. " +
+             "L'[annuaire](/pages/system/help/directory) montre les " +
+             "résidents sur la plateforme et leurs coordonnées opt-in. " +
+             "Personnes montre une correspondance — un tag ou un mot — " +
+             "l'ordre propre à la plateforme, pas une liste.\n"),
+            ("inventory", "Inventaire",
+             "## Inventaire\n\n" +
+             "L'inventaire est l'étagère partagée du quartier — la liste des " +
+             "choses que le quartier garde et qu'un voisin pourrait " +
+             "emprunter ou prêter : l'échelle, la perceuse, la chaise de " +
+             "rechange.\n\n" +
+             "**Ce qu'une sorte signifie.** Chaque article porte une " +
+             "**sorte** :\n" +
+             "- **Partagé** — l'étagère du quartier, pour tout le monde " +
+             "dans le quartier.\n" +
+             "- **Communauté** — l'étagère d'une communauté " +
+             "spécifique, pour ses membres.\n" +
+             "- **Privé** — l'étagère d'un résident, pour proposer aux " +
+             "voisins.\n\n" +
+             "**En ajouter un.** Ouvre **Inventaire** et choisis " +
+             "**Nouvel article**. Donne-lui un nom et une description, " +
+             "choisis une sorte et clique sur **Créer l'article**. " +
+             "L'article est sur l'étagère.\n\n" +
+             "**L'emprunter.** Ouvre l'article et clique sur **Emprunter**. " +
+             "L'article est maintenant « chez toi » — l'historique enregistre " +
+             "quand tu l'as pris. Clique sur **Retourner** quand tu as fini, " +
+             "et l'article est de retour sur l'étagère.\n\n" +
+             "**L'historique d'utilisation.** Chaque emprunt et retour est " +
+             "écrit dans l'historique de l'article. L'historique est la " +
+             "mémorisation du quartier de qui avait la chose et quand — " +
+             "utile quand la perceuse disparaît.\n\n" +
+             "**L'enlever.** Le propriétaire (ou un administrateur global) " +
+             "peut supprimer un article. Un article supprimé n'est plus sur " +
+             "l'étagère ; son historique reste.\n"),
+            ("bookmarks", "Signets",
+             "## Signets\n\n" +
+             "Un signet est une marque que tu poses sur quelque chose pour " +
+             "le retrouver — un message, un événement, une tâche, une " +
+             "annonce, une page.\n\n" +
+             "**En poser un.** Ouvre la chose et clique sur **Signeter**. La " +
+             "chose est sur ta liste. Clique à nouveau sur le même bouton " +
+             "(qui affiche maintenant « Signeté ») pour le retirer.\n\n" +
+             "**Trouver tes signets.** Ouvre **Signets** dans la barre du " +
+             "haut. Ta liste montre les choses que tu as signetées, " +
+             "regroupées par type — messages, événements, tâches, annonces, " +
+             "pages.\n\n" +
+             "**Un signet est le tien.** Personne d'autre ne peut voir tes " +
+             "signets. Un signet est une marque sur ton côté — la plateforme " +
+             "ne montre pas « N personnes ont signeté ceci » ou quoi que " +
+             "ce soit de similaire.\n\n" +
+             "**Un signet qui disparaît.** Si la chose que tu as signetée " +
+             "est supprimée, ton signet reste — il apparaît dans ta liste " +
+             "comme « non plus disponible ». Tu peux le retirer d'un clic.\n"),
+            ("documents", "Documents",
+             "## Documents\n\n" +
+             "Les documents sont l'étagère de fichiers du quartier — la " +
+             "place pour les fichiers qui concernent le quartier, pas " +
+             "l'annexe d'un message : les notes de réunion, le budget, les " +
+             "règlements de la communauté.\n\n" +
+             "**En téléverser un.** Ouvre **Documents** et choisis " +
+             "**Téléverser un document**. Choisis le fichier, rédige une " +
+             "description en une ligne si tu veux, et choisis qui peut le " +
+             "voir. Clique sur **Téléverser le document**.\n\n" +
+             "**Qui peut le voir.** Un document porte une audience, comme un " +
+             "message. L'audience est les personnes qui peuvent voir le " +
+             "fichier — le quartier, une communauté, un groupe, ou une " +
+             "seule personne. Voir [Audience](/pages/system/help/audience).\n\n" +
+             "**Le télécharger.** Ouvre le document et clique sur " +
+             "**Télécharger**. Le fichier est le tien — la plateforme ne " +
+             "l'appose pas d'un filigrane, ne suit pas le téléchargement, " +
+             "ne le retient pas.\n\n" +
+             "**Le mettre à jour.** L'émetteur du document (ou un " +
+             "administrateur global) peut remplacer le fichier ou modifier " +
+             "la description. Un nouveau fichier remplace l'ancien — " +
+             "l'ancien n'est plus là.\n\n" +
+             "**Un document n'est pas l'annexe d'un message.** " +
+             "L'annexe d'un message fait partie du message — elle vit avec " +
+             "le message et porte l'audience du message. Un document est " +
+             "un fichier à part, avec son audience et sa propre étagère.\n"),
+            ("pages", "Pages",
+             "## Pages\n\n" +
+             "Les pages sont les documents de la plateforme elle-même — les " +
+             "conditions, les guides d'aide, la note de confidentialité, le " +
+             "code de conduite — et les pages de la communauté : les règles " +
+             "de l'immeuble, l'horaire du jardin, les règlements du " +
+             "quartier.\n\n" +
+             "**Où les trouver.** Le lien **Pages** dans la barre du haut " +
+             "ouvre l'arborescence des pages. La section **Pages de " +
+             "plateforme** contient les propres (les conditions, les " +
+             "guides d'aide, et le reste) ; la section **Pages de " +
+             "communauté** contient celles du quartier.\n\n" +
+             "**En lire une.** Clique sur la page. La page montre son " +
+             "corps, et — s'il y en a — les pages enfant sous elle.\n\n" +
+             "**En écrire une.** Un administrateur global (et, si c'est " +
+             "concédé, un modérateur) écrit une page de communauté. Un " +
+             "résident ne peut pas en écrire — les pages sont les " +
+             "documents partagés du quartier, pas la note d'une " +
+             "personne.\n\n" +
+             "**En traduire une.** Un **Traducteur** peut ajouter une " +
+             "version d'une langue d'une page, de la même manière qu'il " +
+             "en ajoute une pour un groupe ou une communauté — voir " +
+             "[Traducteurs](/pages/system/help/translator).\n\n" +
+             "**Les pages de la plateforme elle-même.** Les conditions, " +
+             "les guides d'aide, la note de confidentialité et le code de " +
+             "conduite sont les pages de la plateforme. Un " +
+             "administrateur global peut les modifier et remettre une page " +
+             "à son texte d'origine quand il veut la formulation la plus " +
+             "récente — voir " +
+             "[Administrateurs](/pages/system/help/admins).\n"),
+            ("tags", "Étiquettes",
+             "## Étiquettes\n\n" +
+             "Une étiquette est un mot court que tu poses sur un message, " +
+             "une réponse, un groupe ou un profil — une manière de dire " +
+             "« cela porte sur cela ».\n\n" +
+             "**Trouver par étiquette.** Ouvre **Étiquettes** dans la barre " +
+             "du haut et choisis une étiquette. La page montre les " +
+             "messages, réponses, groupes et profils qui portent " +
+             "l'étiquette, et — si l'étiquette a une description — la " +
+             "description de l'étiquette.\n\n" +
+             "**En utiliser une.** Quand tu écris un message, une réponse, " +
+             "un groupe ou un profil, tu peux ajouter une étiquette. Une " +
+             "étiquette est un mot, pas une phrase — « salubrité », " +
+             "« budget », « rue-érable » — la sorte de mot qui organise un " +
+             "fil, pas une étiquette.\n\n" +
+             "**Une étiquette n'est pas une audience.** Une étiquette ne " +
+             "décide pas qui peut voir un message. L'audience décide — " +
+             "voir [Audience](/pages/system/help/audience). Une étiquette " +
+             "est un organisateur, pas une porte.\n\n" +
+             "**La description d'une étiquette.** Une étiquette peut " +
+             "porter une description en une ligne — une note sur " +
+             "l'objet de l'étiquette. La description est visible à " +
+             "tout le monde qui peut voir l'étiquette, et peut être " +
+             "modifiée par le créateur de l'étiquette ou un " +
+             "administrateur global.\n"),
         ];
     }
 
@@ -2458,6 +3033,209 @@ public static class FirstBootSeeder
              "regler som et indlæg — se " +
              "[Sprog](/pages/system/help/language) og " +
              "[Oversættere](/pages/system/help/translator).\n"),
+            ("announcements", "Bekendtgørelser",
+             "## Bekendtgørelser\n\n" +
+             "Bekendtgørelser er notitser, som platformen viser på sin egen " +
+             "side — adskilt fra det fælles feed — for de ting, hele " +
+             "nabolaget skal vide: en vedligeholdelsesvindue, en " +
+             "vandspærring, en vejarbejdsdag.\n\n" +
+             "**Hvor du finder dem.** Linket **Bekendtgørelser** i bjælken " +
+             "øverst åbner listen over bekendtgørelser. Fastgjorte " +
+             "bekendtgørelser vises også øverst på alle sider.\n\n" +
+             "**Hvem der kan se en.** En **offentlig** bekendtgørelse ses af " +
+             "alle, også besøgende, der ikke er logget ind. En " +
+             "**beboerbekendtgørelse** ses kun af loggede beboere — for " +
+             "notitser, der vedrører nabolaget, men ikke verden. Du kan " +
+             "også sende en beboerbekendtgørelse til et bestemt " +
+             "fællesskab.\n\n" +
+             "**Hvem der skriver en.** En global admin (og, hvor " +
+             "tildelt, en moderator) skriver bekendtgørelsen. En " +
+             "beboer kan ikke udgive en, men kan følge platformen for at " +
+             "modtage en besked, når en bliver skrevet — se " +
+             "[Beskeder](/pages/system/help/notifications).\n\n" +
+             "**En fastgjort bekendtgørelse.** En fastgjort " +
+             "bekendtgørelse forbliver øverst på alle sider, indtil " +
+             "adminen fjerner fastgørelsen. Fastgørelsen er til " +
+             "notitser, som hele nabolaget skal se — ikke til hver " +
+             "bekendtgørelse.\n\n" +
+             "**En beboerkommentar.** Hvis platformen tillader det, kan " +
+             "en logget beboer skrive en kommentar til en " +
+             "beboerbekendtgørelse. En kommentar er et spørgsmål eller en " +
+             "note, ikke en diskussion — adminen kan fjerne en, der ikke " +
+             "passer.\n"),
+            ("directory", "Kontaktliste",
+             "## Kontaktliste\n\n" +
+             "Kontaktlisten er listen over alle på platformen — alle " +
+             "beboere i nabolaget — og de oplysninger, hver af dem har " +
+             "valgt at dele.\n\n" +
+             "**Hvad en beboer ser.** Alle i nabolaget ser kontaktlisten. " +
+             "Hvert punkt viser beboerens visningsnavn og — hvis valgt — " +
+             "kontaktoplysningerne (adresse, e-mail, telefon). " +
+             "Kontaktoplysningerne er valgfri, felt for felt.\n\n" +
+             "**Hvad kontaktlisten ikke er.** Den er ikke et feed. Den " +
+             "viser ikke indlæg, grupper eller det, en beboer har skrevet. " +
+             "Den viser kun navnet og de oplysninger, beboeren har valgt " +
+             "at gøre synlige.\n\n" +
+             "**At finde en bestemt beboer.** Åbn kontaktlisten og søg " +
+             "efter navnet. En beboer, du ikke ser, er enten ikke på " +
+             "platformen eller har valgt ikke at være i kontaktlisten — " +
+             "i begge tilfælde er det deres valg.\n\n" +
+             "**At kontakte en beboer.** Hvis kontaktlisten viser en " +
+             "kontaktoplysning, kan du bruge den. Hvis den ikke gør, har " +
+             "beboeren ikke valgt at dele en — platformen skjuler ikke " +
+             "kontaktlisten, men respekterer valget om at være uden for " +
+             "den.\n"),
+            ("people", "Personer",
+             "## Personer\n\n" +
+             "Siden **Personer** er en søgning — en måde at finde " +
+             "beboere, der har noget til fælles, efter en tag eller et " +
+             "ord i deres profil.\n\n" +
+             "**Søg efter tag.** Åbn **Personer**, vælg **Søg efter tag** " +
+             "og en tag. Siden lister de beboere, hvis profil bærer den " +
+             "tag — tagen er personens eget valg, ikke en " +
+             "tildelelse.\n\n" +
+             "**Søg efter profil.** Vælg **Søg efter profil** og skriv et " +
+             "ord eller en sætning. Siden lister de beboere, hvis profil " +
+             "nævner det.\n\n" +
+             "**Hvad du ser.** Hvert punkt viser navnet og tagen eller " +
+             "det tilsvarende ord i profilen. En profil, som den, der " +
+             "ser, ikke må se, dukker ikke op — søgningen respekterer " +
+             "profilens modtagerkreds, som feedet.\n\n" +
+             "**Hvad Personer ikke er.** Det er ikke en kontaktliste. " +
+             "[Kontaktlisten](/pages/system/help/directory) viser " +
+             "beboerne på platformen og deres valgte " +
+             "kontaktoplysninger. Personer viser en match — en tag eller " +
+             "et ord — platformens egen ordning, ikke en " +
+             "opregning.\n"),
+            ("inventory", "Inventar",
+             "## Inventar\n\n" +
+             "Inventar er nabolagets fælles hylde — listen over de " +
+             "ting, nabolaget opbevarer, som en nabo måske vil låne " +
+             "ud eller låne: trappen, boremaskinen, den " +
+             "reservestol.\n\n" +
+             "**Hvad en type betyder.** Hvert element bærer en **type**:\n" +
+             "- **Fælles** — nabolagets, til rådighed for alle i " +
+             "nabolaget.\n" +
+             "- **Fællesskab** — et bestemt fællesskabs, til rådighed " +
+             "for dets medlemmer.\n" +
+             "- **Privat** — én beboers, til rådighed for denne at " +
+             "tilbyde naboer.\n\n" +
+             "**At tilføje et.** Åbn **Inventar** og vælg **Nyt " +
+             "element**. Giv det et navn og en beskrivelse, vælg en " +
+             "type og klik på **Opret element**. Elementet er på " +
+             "hylden.\n\n" +
+             "**At låne et.** Åbn elementet og klik på **Lån ud**. " +
+             "Elementet er nu „hos dig\u201C — historikken registrerer, " +
+             "hvornår du tog det. Klik på **Aflæg**, når du er færdig, " +
+             "og elementet er tilbage på hylden.\n\n" +
+             "**Brugshistorikken.** Hver udlån og aflæg skives til " +
+             "elementets historik. Historikken er nabolagets optegnelse " +
+             "af, hvem der havde tinget og hvornår — nyttigt, når " +
+             "boremaskinen forsvinder.\n\n" +
+             "**At fjerne et.** Ejer (eller en global admin) kan " +
+             "slette et element. Et slettet element er væk fra hylden; " +
+             "dens historik forbliver.\n"),
+            ("bookmarks", "Bogmærker",
+             "## Bogmærker\n\n" +
+             "Et bogmærke er en markering, du sætter på noget, så du " +
+             "kan finde det igen — et indlæg, en begivenhed, en opgave, " +
+             "en bekendtgørelse, en side.\n\n" +
+             "**At bogmærke.** Åbn tinget og klik på **Bogmærk**. " +
+             "Tinget er på din liste. Klik igen på samme knap (der " +
+             "nu viser „Bogmærket\u201C) for at fjerne det.\n\n" +
+             "**At finde dine bogmærker.** Åbn **Bogmærker** i bjælken " +
+             "øverst. Din liste viser tingene, du har bogmærket, " +
+             "grupperet efter type — indlæg, begivenheder, opgaver, " +
+             "bekendtgørelser, sider.\n\n" +
+             "**Et bogmærke er dit.** Ingen andre kan se dine " +
+             "bogmærker. Et bogmærke er en markering på din side — " +
+             "platformen viser ikke „N personer har bogmærket dette\u201C " +
+             "eller lignende.\n\n" +
+             "**Et bogmærke, der forsvinder.** Hvis det, du har " +
+             "bogmærket, fjernes, forbliver dit bogmærke — det vises " +
+             "på din liste som „Ikke længere tilgængelig\u201C. Du kan " +
+             "fjerne det med et klik.\n"),
+            ("documents", "Dokumenter",
+             "## Dokumenter\n\n" +
+             "Dokumenter er nabolagets filhylde — pladsen til filer, " +
+             "der vedrører nabolaget, ikke et indlægs bilag: " +
+             "mødetnotater, budget, fællesskabets regler.\n\n" +
+             "**At uploade et.** Åbn **Dokumenter** og vælg **Upload " +
+             "et dokument**. Vælg filen, skriv en kort beskrivelse, " +
+             "hvis du vil, og vælg, hvem der kan se den. Klik på " +
+             "**Upload dokument**.\n\n" +
+             "**Hvem der kan se det.** Et dokument bærer en " +
+             "modtagerkreds, ligesom et indlæg. Modtagerkredsen er " +
+             "de personer, der kan se filen — nabolaget, et " +
+             "fællesskab, en gruppe eller én person. Se " +
+             "[Modtagerkreds](/pages/system/help/audience).\n\n" +
+             "**At hente et.** Åbn dokumentet og klik på " +
+             "**Download**. Filen er din — platformen vandmærker " +
+             "den ikke, sporer ikke download, og holder den " +
+             "ikke.\n\n" +
+             "**At opdatere et.** Uploaderen (eller en global " +
+             "admin) kan udskifte filen eller redigere " +
+             "beskrivelsen. En ny fil udskifter den gamle — den " +
+             "gamle er væk.\n\n" +
+             "**Et dokument er ikke et indlægs bilag.** Et " +
+             "indlægs bilag er en del af indlægget — det lever " +
+             "med indlægget og bærer indlæggets modtagerkreds. " +
+             "Et dokument er en fil for sig selv, med sin egen " +
+             "modtagerkreds og sin egen hylde.\n"),
+            ("pages", "Sider",
+             "## Sider\n\n" +
+             "Sider er platformens egne dokumenter — betingelserne, " +
+             "hjælpvejledninger, privatlivspolitikken og " +
+             "adfærdskodeksen — og fællesskabets egne sider: " +
+             "bygningens regler, haveplan, nabolagets " +
+             "fællesregler.\n\n" +
+             "**Hvor du finder dem.** Linket **Sider** i bjælken " +
+             "øverst åbner trækarten. Sektionen **Platformsider** " +
+             "indeholder de egne (betingelserne, " +
+             "hjælpvejledninger og resten); sektionen " +
+             "**Fællesskabssider** indeholder nabolagets.\n\n" +
+             "**At læse en.** Klik på siden. Siden viser sit indhold " +
+             "og, hvis der er nogen, undersider under den.\n\n" +
+             "**At skrive en.** En global admin (og, hvor " +
+             "tildelt, en moderator) skriver en fællesskabsside. " +
+             "En beboer kan ikke skrive en — sider er " +
+             "nabolagets fælles dokumenter, ikke en " +
+             "persons note.\n\n" +
+             "**At oversætte en.** En **Oversætter** kan tilføje " +
+             "en sprogversion af en side, på samme måde som en " +
+             "gruppe eller et fællesskab — se " +
+             "[Oversættere](/pages/system/help/translator).\n\n" +
+             "**Platformens egne sider.** Betingelserne, " +
+             "hjælpvejledninger, privatlivspolitikken og " +
+             "adfærdskodeksen er platformens egne sider. En " +
+             "global admin kan redigere dem og nulstille en " +
+             "side til sin oprindelige tekst, når de vil " +
+             "have den seneste formulering — se " +
+             "[Administrerende](/pages/system/help/admins).\n"),
+            ("tags", "Tags",
+             "## Tags\n\n" +
+             "En tag er et kort ord, du sætter på et indlæg, et " +
+             "svar, en gruppe eller en profil — en måde at sige " +
+             "„dette drejer sig om det\u201C.\n\n" +
+             "**At søge efter tag.** Åbn **Tags** i bjælken øverst " +
+             "og vælg en tag. Siden viser indlæg, svar, grupper " +
+             "og profiler, der bærer tagen, og — hvis tagen har " +
+             "en beskrivelse — tagens beskrivelse.\n\n" +
+             "**At bruge en.** Når du skriver et indlæg, et " +
+             "svar, en gruppe eller en profil, kan du tilføje en " +
+             "tag. En tag er et ord, ikke en sætning — " +
+             "„renhold\u201C, „budget\u201C, „maplestreet\u201C — den type " +
+             "ord, der organiserer et feed, ikke en etiket.\n\n" +
+             "**En tag er ikke en modtagerkreds.** En tag afgør " +
+             "ikke, hvem der kan se et indlæg. Modtagerkredsen " +
+             "afgør det — se " +
+             "[Modtagerkreds](/pages/system/help/audience). En tag " +
+             "er en finder, ikke en port.\n\n" +
+             "**En tags beskrivelse.** En tag kan bære en " +
+             "énlinjet beskrivelse — en note om, hvad tagen er " +
+             "til. Beskrivelsen er synlig for alle, der kan se " +
+             "tagen, og kan redigeres af tagens " +
+             "opretter eller en global admin.\n"),
         ];
     }
 
@@ -2522,7 +3300,16 @@ public static class FirstBootSeeder
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
              "- [Admins](/pages/system/help/admins) — what a global admin does, and what keeps it in check\n" +
              "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n" +
-             "- [Projects](/pages/system/help/projects) — to-dos, assignments, boards, and the neighborhood's shared work\n\n" +
+             "- [Projects](/pages/system/help/projects) — to-dos, assignments, boards, and the neighborhood's shared work\n" +
+             "- [Announcements](/pages/system/help/announcements) — pinned notes, public or resident-scoped\n" +
+             "- [Directory](/pages/system/help/directory) — the residents on the platform and what they share\n" +
+             "- [People](/pages/system/help/people) — finding people by tag or bio\n" +
+             "- [Inventory](/pages/system/help/inventory) — shared and private items, check out and in\n" +
+             "- [Bookmarks](/pages/system/help/bookmarks) — the things you've saved\n" +
+             "- [Documents](/pages/system/help/documents) — shared files the community can open\n" +
+             "- [Pages](/pages/system/help/pages) — community and platform pages\n" +
+             "- [Tags](/pages/system/help/tags) — short labels that connect things\n" +
+             "- [Notifications](/pages/system/help/notifications) — what pings you, and how to quiet it\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -2619,7 +3406,16 @@ public static class FirstBootSeeder
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
              "- [Administratoren](/pages/system/help/admins) — Was ein globaler Admin macht, und was die Rolle bremst\n" +
              "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n" +
-             "- [Projekte](/pages/system/help/projects) — Aufgaben, Zuweisungen, Boards und die gemeinsame Arbeit des Viertels\n\n" +
+             "- [Projekte](/pages/system/help/projects) — Aufgaben, Zuweisungen, Boards und die gemeinsame Arbeit des Viertels\n" +
+             "- [Ankündigungen](/pages/system/help/announcements) — Wichtige Hinweise, öffentlich oder nur für Bewohner\n" +
+             "- [Verzeichnis](/pages/system/help/directory) — Die Bewohner der Plattform und was sie teilen\n" +
+             "- [Menschen](/pages/system/help/people) — Menschen nach Tag oder Biografie finden\n" +
+             "- [Inventar](/pages/system/help/inventory) — Geteilte und private Gegenstände, ausleihen und zurückgeben\n" +
+             "- [Lesezeichen](/pages/system/help/bookmarks) — Was du gespeichert hast\n" +
+             "- [Dokumente](/pages/system/help/documents) — Gemeinsame Dateien, die die Gemeinde öffnen kann\n" +
+             "- [Seiten](/pages/system/help/pages) — Community- und Plattformseiten\n" +
+             "- [Tags](/pages/system/help/tags) — Kurze Beschriftungen, die Dinge verbinden\n" +
+             "- [Benachrichtigungen](/pages/system/help/notifications) — Worüber du informiert wirst und wie du es stumm stellst\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -2721,7 +3517,16 @@ public static class FirstBootSeeder
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
              "- [Administrateurs](/pages/system/help/admins) — Ce qu'un administrateur global fait, et ce qui freine le rôle\n" +
              "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n" +
-             "- [Projets](/pages/system/help/projects) — les tâches, les attributions, les tableaux et le travail partagé du quartier\n\n" +
+             "- [Projets](/pages/system/help/projects) — les tâches, les attributions, les tableaux et le travail partagé du quartier\n" +
+             "- [Annonces](/pages/system/help/announcements) — Les notes épinglées, publiques ou réservées aux résidents\n" +
+             "- [Annuaire](/pages/system/help/directory) — Les résidents de la plateforme et ce qu'ils partagent\n" +
+             "- [Personnes](/pages/system/help/people) — Trouver des personnes par tag ou par bio\n" +
+             "- [Inventaire](/pages/system/help/inventory) — Les objets partagés et privés, prêter et rendre\n" +
+             "- [Signets](/pages/system/help/bookmarks) — Ce que tu as sauvegardé\n" +
+             "- [Documents](/pages/system/help/documents) — Les fichiers partagés que la communauté peut ouvrir\n" +
+             "- [Pages](/pages/system/help/pages) — Les pages communautaires et les pages de la plateforme\n" +
+             "- [Étiquettes](/pages/system/help/tags) — Les mots courts qui relient les choses\n" +
+             "- [Notifications](/pages/system/help/notifications) — Ce qui t'alerte et comment le rendre silencieux\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -2820,7 +3625,16 @@ public static class FirstBootSeeder
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +
              "- [Administrerende](/pages/system/help/admins) — Hvad en global admin gør, og hvad der holder rollen i skak\n" +
              "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n" +
-             "- [Projekter](/pages/system/help/projects) — opgaver, tildelelser, brætter og nabolagets fælles arbejde\n\n" +
+             "- [Projekter](/pages/system/help/projects) — opgaver, tildelelser, brætter og nabolagets fælles arbejde\n" +
+             "- [Bekendtgørelser](/pages/system/help/announcements) — Vigtige meddelelser, offentlige eller kun for beboerne\n" +
+             "- [Kontaktliste](/pages/system/help/directory) — Platformens beboere og hvad de deler\n" +
+             "- [Personer](/pages/system/help/people) — Find personer efter tag eller bio\n" +
+             "- [Inventar](/pages/system/help/inventory) — Fælles og private genstande, lån og giv tilbage\n" +
+             "- [Bogmærker](/pages/system/help/bookmarks) — Det du har gemt\n" +
+             "- [Dokumenter](/pages/system/help/documents) — Fælles filer, som fællesskabet kan åbne\n" +
+             "- [Sider](/pages/system/help/pages) — Fællesskabssider og platformssider\n" +
+             "- [Tags](/pages/system/help/tags) — Korte ord, der forbinder ting\n" +
+             "- [Beskeder](/pages/system/help/notifications) — Hvad der giver dig en besked, og hvordan du stiller det stille\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",
