@@ -94,11 +94,12 @@ public sealed class TagByTagViewModel
 
     /// <summary>The U8c reword surface (ADR 0044 D4, C-TG·5): the tag's
     /// per-language display name, pre-filled with the current translation
-    /// (or the base name) and editable only when <c>CanTranslate</c> is
+    /// (or the base name). The <c>ByTag</c> view renders the Translations
+    /// card **only** when <see cref="TagTranslationForm.CanTranslate"/> is
     /// true (the tag's <see cref="Kumunita.Core.Tags.Tag.CreatedBy"/> ∪
-    /// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher sees
-    /// the form rendered **disabled** and a POST to
-    /// <c>POST /tags/{slug}/translate</c> is a 403 from the service's
+    /// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher
+    /// never sees the section at all, and a <c>POST</c> to
+    /// <c>/tags/{slug}/translate</c> is a 403 from the service's
     /// standing re-check, C3). The register's U8c "no new seam" pin holds
     /// (the seam is exactly what U5's <c>AddTagTranslationAsync</c> already
     /// froze; this is a web-wiring unit, not a seam change). <c>null</c>
@@ -157,7 +158,8 @@ public sealed class TagSuggestViewModel
 /// the ADR 0005 preference order, the display fallback when no translation
 /// is set). The row is a **form seed** (a dumb shape carrier); the standing
 /// decision is the <see cref="Kumunita.Core.Tags.ITagService
-/// .CanTranslateTag"/> probe (a display pin, the ADR 0009 / 0026 "the name
+/// .CanTranslateTag"/> probe (the render gate — the by-tag view shows the
+/// section only to the creator ∪ GlobalAdmin, the ADR 0009 / 0026 "the name
 /// is the creator's artifact" rule carried to tags) and the real deny is
 /// the <see cref="Kumunita.Core.Tags.ITagService
 /// .AddTagTranslationAsync"/> standing re-check (C-TG·5, C3).
@@ -190,13 +192,13 @@ public sealed class TagTranslationRow
 /// <summary>
 /// The U8c reword surface's form state (ADR 0044 D4, C-TG·5): the tag's
 /// display name per enabled language, pre-filled with the current translation
-/// (or the base name) and editable **only** when
+/// (or the base name). The Translations card on the <c>ByTag</c> view
+/// (<c>Views/Tag/ByTag.cshtml</c>) renders **only** when
 /// <see cref="CanTranslate"/> is true (the tag's <c>CreatedBy</c> ∪
-/// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher sees the
-/// form rendered **disabled** and a <c>POST</c> to the translate route is a
-/// 403 from the service's standing re-check). The form is rendered on the
-/// <c>ByTag</c> view (<c>Views/Tag/ByTag.cshtml</c>), one row per enabled
-/// <see cref="LanguageCatalog"/> (the instance catalog, the ADR 0005 B
+/// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher never
+/// sees the section at all, and a <c>POST</c> to the translate route is a
+/// 403 from the service's standing re-check). The card lists one row per
+/// enabled <see cref="LanguageCatalog"/> (the instance catalog, the ADR 0005 B
 /// shape — the U7/U8 read lane already resolves the display name through
 /// this same catalog, so no new catalog surface is opened). The POST lane is
 /// <c>POST /tags/{slug}/translate</c> (the <see cref="Kumunita
@@ -223,13 +225,15 @@ public sealed class TagTranslationForm
 
     /// <summary>The standing probe (C-TG·5, D4 — creator ∪ GlobalAdmin).
     /// <see langword="true"/> when the actor is the tag's <c>CreatedBy</c> or
-    /// a GlobalAdmin (the form is rendered editable); <see langword="false"/>
-    /// for a non-creator attacher (the form is rendered **disabled** — the
-    /// view's affordance pin; the real deny is the POST lane's standing
-    /// re-check, the <see cref="Kumunita.Core.Tags.ITagService
+    /// a GlobalAdmin — the <c>ByTag</c> view renders the Translations card
+    /// editable for them; <see langword="false"/> for a non-creator attacher,
+    /// in which case the view hides the section entirely (the render gate —
+    /// the real deny is the POST lane's standing re-check, the
+    /// <see cref="Kumunita.Core.Tags.ITagService
     /// .AddTagTranslationAsync"/> <c>UnauthorizedAccessException</c> →
-    /// <c>403</c>). A display pin (the ADR 0009 / 0026 "the name is the
-    /// creator's artifact" rule carried to tags), not a gate.</summary>
+    /// <c>403</c>). A render gate (the ADR 0009 / 0026 "the name is the
+    /// creator's artifact" rule carried to tags), backed by the same
+    /// standing decision as the write lane.</summary>
     public bool CanTranslate { get; set; }
 
     /// <summary>The per-language rows (one per enabled

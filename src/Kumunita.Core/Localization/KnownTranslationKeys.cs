@@ -1403,7 +1403,6 @@ public static class KnownTranslationKeys
                 "No matching tags — keep typing or start a new one.",
             ["tag.translate.heading"] = "Translations",
             ["tag.translate.save"] = "Save",
-            ["tag.translate.disabled"] = "Only the tag's creator or a GlobalAdmin can reword it.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -3170,7 +3169,6 @@ public static class KnownTranslationKeys
                 "Keine passenden Tags — weiter tippen oder ein neues starten.",
             ["tag.translate.heading"] = "Übersetzungen",
             ["tag.translate.save"] = "Speichern",
-            ["tag.translate.disabled"] = "Nur der Ersteller oder ein GlobalAdmin kann den Text ändern.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -4899,7 +4897,6 @@ public static class KnownTranslationKeys
                 "Aucune étiquette correspondante — continue à écrire ou crée-en une.",
             ["tag.translate.heading"] = "Traductions",
             ["tag.translate.save"] = "Enregistrer",
-            ["tag.translate.disabled"] = "Seul le créateur ou un GlobalAdmin peut la reformuler.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
@@ -6620,7 +6617,6 @@ public static class KnownTranslationKeys
                 "Ingen matchende tags — fortsæt med at skrive eller start et nyt.",
             ["tag.translate.heading"] = "Oversættelser",
             ["tag.translate.save"] = "Gem",
-            ["tag.translate.disabled"] = "Kun tags' opretter eller en GlobalAdmin kan omformulere den.",
 
             // ── platform (scope + the FIG philosophy, home/about) ───────────
             ["platform.scope_home"] =
