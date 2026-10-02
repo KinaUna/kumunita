@@ -94,12 +94,45 @@
                 </div>
             </div>
 
-            <div class="card mb-4">
+            <div class="card mb-4 audience-editor">
                 <div class="card-body">
                     <h6 class="card-title" style="font-weight:600;">
                         <kw-l key="documents.upload_audience">Who can see this document</kw-l>
                     </h6>
 
+                    @* ADR 0057 — "Everyone on the platform" (the AllResidents
+                       flag) is rendered FIRST, above the granular block, exactly
+                       like the Profile _AudienceEditor's "contact details" card:
+                       when checked, the "Match mode" radios + "Who to grant to"
+                       picker are hidden via data-audience-toggle +
+                       client/lib/audience-toggle.js (loaded in _Layout). The
+                       AllResidents branch grants every signed-in resident BEFORE
+                       the grant-match branch, so the hidden mode/grants are moot
+                       while it's on — and the hidden <c>Audience.Grants</c>
+                       textarea inside _GrantPickers stays the only form-bound
+                       grant field regardless of visibility. *@
+                    <div class="form-check" style="margin-left:0.5rem;">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.AllResidentsVisible"
+                               id="doc-aud-all-residents"
+                               data-audience-toggle
+                               value="true" @(editor.AllResidentsVisible ? "checked" : null) />
+                        <label class="form-check-label" for="doc-aud-all-residents">
+                            <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
+                        </label>
+                    </div>
+                    <div class="text-muted small" style="margin-left:1rem; margin-bottom:0.75rem;">
+                        <kw-l key="profile.audience_all_residents_hint">New residents can see this automatically — no need to re-edit when someone joins.</kw-l>
+                    </div>
+
+                    @* The granular block (the "Match mode" radios + the "Who to
+                       grant to" picker) is hidden while "Everyone on the
+                       platform" is checked: the checkbox above drives the
+                       show/hide via client/lib/audience-toggle.js. The initial
+                       d-none is server-rendered from
+                       editor.AllResidentsVisible (authoritative on load); the
+                       script only reacts to user changes afterwards. *@
+                    <div data-audience-panel class="audience-restricted @(editor.AllResidentsVisible ? "d-none" : null)">
                     <div class="form-label mt-2" style="font-weight:600;">
                         <kw-l key="profile.audience_match_mode">Match mode</kw-l>
                     </div>
@@ -127,16 +160,6 @@
                         </div>
                     }
 
-                    <div class="form-check" style="margin-left:0.5rem; margin-top:0.75rem;">
-                        <input class="form-check-input" type="checkbox"
-                               name="Audience.AllResidentsVisible"
-                               id="doc-aud-all-residents"
-                               value="true" @(editor.AllResidentsVisible ? "checked" : null) />
-                        <label class="form-check-label" for="doc-aud-all-residents">
-                            <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
-                        </label>
-                    </div>
-
                     @* The shared "Who to grant to" picker (the M2 / M3 / M4
                        idiom): the hidden <c>Audience.Grants</c> textarea the
                        partial renders is the only form-bound grant field;
@@ -149,6 +172,7 @@
                         Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
                         Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
                     })" />
+                    </div><!-- /data-audience-panel -->
                 </div>
             </div>
 
