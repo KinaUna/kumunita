@@ -19,6 +19,14 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.24.0", "2026-10-03", new List<string>
+        {
+            "Messaging, as a conversation — a 1:1 thread now reads as a chat: messages run oldest-to-newest, your own on the right and the other person's on the left, each with the sender's avatar; a \"Load earlier\" button pulls in older messages; and a message you send confirms with the other person's name (\"Sent to …\").",
+        }),
+        new("0.23.0", "2026-10-03", new List<string>
+        {
+            "Guides for every surface — every resident surface in the top navigation now has a how-to guide (announcements, directory, finding people, inventory, bookmarks, documents, pages, and tags, alongside the earlier guides), and the Help page now links all of them so it is the one place to start (ADR 0127).",
+        }),
         new("0.22.0", "2026-10-03", new List<string>
         {
             "Attachment preview — the browser-displayable attachments (images, PDFs, plain text, and CSV) now open in a new tab and preview in your browser instead of forcing a download; Office files and zip archives still download. The preview is a separate tab — never embedded in the page — and every serve keeps the same stored type, the same nosniff lock, and the same one-row audit trail as a download (ADR 0126).",
