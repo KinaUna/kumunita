@@ -294,6 +294,8 @@ public class ContentImageUploadTests
             new ClaimsIdentity(
                 new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, actor) },
                 authenticationType: "test"));
+        httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
+            new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 });
 
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return (controller, media);

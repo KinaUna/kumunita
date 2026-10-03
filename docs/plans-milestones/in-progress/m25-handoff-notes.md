@@ -501,3 +501,97 @@ lane adoption** — the enforcement wiring: avatar / content-image / attachment 
 document) — **not started.** U8 is the `413` producer + the guard-before-write
 wiring; it must **not** touch this resident self-view, the admin surface
 (U5/U6), or the `IStorageSettingsService` read seams (reuse them).
+
+---
+
+## U8 — gate + four-lane wiring (done 2026-09-13)
+
+**(a) The `IUploadGate` shape + DI registration.** Created
+`src/Kumunita.Web/Security/UploadGate.cs` — the Web-only gate (C-UP·3 / C-UP·7):
+the **single** place a `413` is produced. Interface:
+`Task<ActionResult?> CheckUpload(long incomingBytes, string subjectId,
+CommunityStorageSettings settings, long envMaxBytes)`; impl `UploadGate(IStorageSettingsService)`
+reads the subject's usage via the **async** C-SM·7 seam
+(`GetPerUserUsageBytesAsync`), runs the **pure** Core `StorageLimits.Decide`
+(size-first, C-UP·2), and maps `Oversize`/`OverQuota` → a `413` `StatusCodeResult`,
+`Allowed` → `null`. **Async reconciliation (design §2.1 drift):** §2.1 pins a
+*sync* `ActionResult? CheckUpload(...)`, but the gate must await the *async*
+usage seam, so the signature is `Task<ActionResult?>` — the decision stays the
+pure sync `Decide`; only the usage read is async. **DI:** registered in
+`Program.cs` as `AddScoped<IUploadGate>` resolving `IStorageSettingsService`
+from the request scope (it's transient, so singleton would be a captive
+dependency). Reused U4's `IStorageSettingsService` + `StorageLimits.Decide` —
+**no re-implementation**. Core stayed HTTP-free (ADR 0006-D): the gate is in
+`Kumunita.Web`, and no `IActionResult` type leaks into Core.
+
+**(b) The four call-sites replaced (+ the L213 decision).** In each lane the
+inline `if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
+return 413;` was swapped for the adoption block (get-or-create settings →
+`uploadGate.CheckUpload(...)` → `if (reject is not null) return reject;`),
+placed **before** `PutAsync` (guards-before-write, C-UP·2) and **between** the
+empty→400 (before) and the allowlist→415 (after) checks:
+
+| Lane | File | Action | old inline-413 line |
+|------|------|--------|---------------------|
+| avatar | `Controllers/ProfileController.cs` | `AvatarUpload` | L413 |
+| content-image | `Controllers/ContentImageController.cs` | `Upload` | L162 |
+| attachment | `Controllers/AttachmentController.cs` | `Upload` | L69 |
+| document (upload) | `Controllers/DocumentController.cs` | `Upload` | L302 |
+
+**`DocumentController.Edit` (old L213) — explicit decision: ADOPT.** The design
+§2.4 pin lists only the four `*Upload` lanes, but the edit action also calls
+`media.PutAsync` (a genuine re-upload); leaving its inline 413 would create a
+*second* 413 producer, violating C-UP·3 ("single place a `413` is produced").
+So the edit lane adopts the gate over `form.File.Length` too (its
+optional-file `form.File is not null && form.File.Length > 0` wrapper and the
+allowlist→415 are untouched). This is a §2.6 drift-guard event: the §2.4
+test list pins `DocumentUpload_*` only, so the edit-lane adoption is a
+justified extension, not a pin violation.
+
+**(c) Allowlist + empty-file checks: untouched, same positions.** Verified in
+all four `Upload` actions: the `file is null || file.Length == 0` → 400 stays
+*before* the gate; the `IsAllowed`/`IsAttachmentAllowed`/`IsDocumentAllowed`
+→ 415 stays *after* the gate. A grep for `Status413RequestEntityTooLarge` /
+the inline `MaxBytes` guard across `Controllers/` returns **zero** — the gate
+is now the **only** 413 producer (C-UP·3).
+
+**(d) The distinct oversize/over-quota messages — DEFERRED TO U9 (drift).**
+Design §2.1 asks for a *distinct* message on F2 (oversize) vs F3 (over-quota),
+but **.NET 10's `StatusCodeResult` carries no message body** (only
+`StatusCode` + `ContentType`), and the existing per-lane tests pin the **exact**
+type via `Assert.IsType<StatusCodeResult>` + `status.StatusCode == 413` (they
+assert **no** message). So U8 returns a bare `new StatusCodeResult(413)` for
+both F2 and F3 — build-green, regression-suite-green, single 413 producer.
+The F2 ≠ F3 message distinction is a **U9 design decision** (U9 item 19,
+`UploadGate_OversizeAndOverQuota_HaveDistinctMessages`, drives the gate
+directly and must pick the carrier — e.g. a distinct body/content-type —
+without breaking the exact-`StatusCodeResult` type the per-lane tests assert).
+The F2/F3 *distinction itself* already exists in the Core `StorageDecision`
+enum + the M24 metric; only the *413 body* was the design question.
+
+**(e) Harness wiring (regression maintenance, NOT new tests).** The 5 existing
+per-lane harnesses built a bare `DefaultHttpContext` (whose
+`RequestServices` is **`null`**), which would NRE on the new gate resolution.
+`UploadGateTestSupport.ServicesWith(...)` (a test-infrastructure helper, adds
+no test case) wires a provider into `RequestServices` carrying the stub
+`IStorageSettingsService` + the **real** `UploadGate`, registered into
+`ProfileAvatarUploadTests` / `ContentImageUploadTests` / `AttachmentUploadTests`
+/ `DocumentControllerTests` (the latter via its shared `PrincipalHttpContext`).
+**Probe-verified mechanism (why the provider also needs two MVC stubs):**
+`DefaultHttpContext.RequestServices` defaults to **null**, and MVC's
+`ControllerBase.get_Url()`/`get_TempData()` are guarded with
+`if (RequestServices is not null)` — so the baseline *skipped* the
+`IUrlHelperFactory`/`ITempDataDictionaryFactory` lookups and `RedirectToAction`
+/ `View(...)` succeeded. Giving the harness a *non-null* provider flips that
+into `GetRequiredService` that **throws** unless satisfied. The provider
+therefore also registers no-op `IUrlHelperFactory` + `ITempDataDictionaryFactory`
+(NSubstitute, mirroring the baseline's `NullUrlHelper`/`NullTempDataDictionary`).
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` **green**; all four `Upload`
+lanes + the `Edit` re-upload call the gate **before** `PutAsync`; Web suite
+**Total 773, Errors 0, Failed 0, Skipped 0** (run via the reliable
+`dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+path). **No new test** in U8 (U9 adds the per-lane enforcement tests).
+
+**Next unit:** `m25-u09.md` (the **per-lane enforcement Web tests** — oversize +
+over-quota on all four lanes, + the distinct-message test). **Not started.**

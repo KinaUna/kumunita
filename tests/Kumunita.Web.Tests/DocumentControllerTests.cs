@@ -964,6 +964,15 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
             new ClaimsIdentity(claims, authenticationType: "test"));
+        // M25 (U8) — the upload + edit lanes adopted the Web-only IUploadGate,
+        // which the action resolves from HttpContext.RequestServices. Wire a
+        // minimal provider (stub IStorageSettingsService + the real UploadGate)
+        // here so every harness in this class — which all funnel through this
+        // helper — keeps running against the gate (MaxFileBytes = null → the
+        // harness MediaOptions.MaxBytes is the env fallback; PerUserQuotaBytes
+        // = 0 → quota disabled, the C-UP·5 sentinel).
+        httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
+            new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 });
         return httpContext;
     }
 

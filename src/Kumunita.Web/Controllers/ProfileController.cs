@@ -7,6 +7,7 @@ using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
@@ -404,16 +405,25 @@ public sealed class ProfileController(
         if (subject is null)
             return Unauthorized(); // §2.4 U7a defensive (the class [Authorize] already gates)
 
-        // The three guards run BEFORE any Put (a Put with a disallowed type
-        // or an oversize payload would write a volume file that must not
-        // exist: C-MED·5 / MediaOptions.MaxBytes; the codes are the pinned
-        // §2.5 U7a/b/c seam U9 locks):
+        // The guards run BEFORE any Put (a Put with a disallowed type or an
+        // oversize payload would write a volume file that must not exist:
+        // C-MED·5 / guards-before-write C-UP·2):
         if (file is null || file.Length == 0)
-            return BadRequest("Choose an image.");                          // §2.4 U7c empty
-        if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
-            return StatusCode(StatusCodes.Status413RequestEntityTooLarge);  // §2.4 U7b
+            return BadRequest("Choose an image.");                          // empty → 400 (untouched)
+        // M25 (U8) — the size/over-quota guard is now the Web-only
+        // IUploadGate (C-UP·3): the single 413 producer, reading the admin
+        // doc (get-or-created) + the subject's usage (the gate's C-SM·7 seam)
+        // and running the pure Core StorageLimits.Decide. The gate runs
+        // BEFORE PutAsync, so a reject writes no byte (C-UP·2). The allowlist
+        // + empty-file checks are untouched and keep their positions.
+        var requestServices = HttpContext.RequestServices;
+        var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
+        var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
+        var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
+        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes);
+        if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
         if (!mediaOpts.Value.IsAllowed(file.ContentType))
-            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // §2.4 U7c type (incl. SVG)
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type (incl. SVG) → 415 (untouched)
 
         // C-MED·6: the IFormFile never crosses into Core — copy to bytes, then
         // store-first, profile-second (orphan-safe order, C-MED·7):

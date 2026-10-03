@@ -234,6 +234,19 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// M25 (U8) — the Web-only upload gate (C-UP·3): the single 413-producing
+// call-site the four upload lanes + the document edit-lane re-upload adopt
+// before IMediaStore.PutAsync. Web-layer (it returns an IActionResult — the
+// 413 + the distinct oversize/over-quota message live here); its one
+// dependency is the U4 IStorageSettingsService (registered by AddKumunitaCore
+// above) for the C-SM·7 usage read. Core stays HTTP-free (ADR 0006-D).
+// Scoped — a per-request concern resolved from the request scope, and its
+// dependency (IStorageSettingsService) is transient, so singleton would be a
+// captive dependency.
+builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
+    new Kumunita.Web.Security.UploadGate(
+        sp.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>()));
+
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
 // a config POCO bound per-instance, not improvised). AddOptions<T>() here the

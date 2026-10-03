@@ -6,6 +6,7 @@ using Kumunita.Web.Security;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
@@ -210,8 +211,17 @@ public sealed class DocumentController(
 
         if (form.File is not null && form.File.Length > 0)
         {
-            if (mediaOpts.Value.MaxBytes > 0 && form.File.Length > mediaOpts.Value.MaxBytes)
-                return StatusCode(StatusCodes.Status413RequestEntityTooLarge);
+            // M25 (U8) — the edit lane calls media.PutAsync (a genuine upload), so it
+            // adopts the same Web-only IUploadGate as the Upload lane (C-UP·3: a
+            // single 413 producer; a second inline guard here would be the second).
+            // Runs BEFORE PutAsync → a reject writes no byte (C-UP·2). The
+            // optional-file wrapper (above) and the allowlist (below) are untouched.
+            var requestServices = HttpContext.RequestServices;
+            var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
+            var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
+            var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
+            var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes);
+            if (reject is not null) return reject;
 
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
                 return StatusCode(StatusCodes.Status415UnsupportedMediaType);
@@ -298,11 +308,20 @@ public sealed class DocumentController(
         // **no file written on any guard**.
         var file = form.File;
         if (string.IsNullOrWhiteSpace(form.Title)) return BadRequest("A title is required.");
-        if (file is null || file.Length == 0) return BadRequest("Choose a file.");
-        if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
-            return StatusCode(StatusCodes.Status413RequestEntityTooLarge);
+        if (file is null || file.Length == 0) return BadRequest("Choose a file.");   // empty → 400 (untouched)
+        // M25 (U8) — the size/over-quota guard is now the Web-only
+        // IUploadGate (C-UP·3): the single 413 producer, running the pure Core
+        // StorageLimits.Decide over the admin doc + the subject's usage. Runs
+        // BEFORE PutAsync, so a reject writes no byte (C-UP·2). Allowlist +
+        // empty-file checks untouched, same positions.
+        var requestServices = HttpContext.RequestServices;
+        var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
+        var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
+        var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
+        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes);
+        if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
         if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))
-            return StatusCode(StatusCodes.Status415UnsupportedMediaType);
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type → 415 (untouched)
 
         // D3 — store-first (orphan-safe, C-MED·7): the bytes land on the frozen
         // ADR 0011 volume before the catalog row references them.
