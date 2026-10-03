@@ -454,3 +454,59 @@ The following are **frozen**; any mismatch is a `## U<m> — Drift pause`
   read is re-pointed *away* from it, that is a drift-guard event — it is the
   one cross-milestone seam M25 depends on, and it is **named here** so a later
   unit cannot silently re-implement it.
+
+---
+
+## M25 — Closed (recorded)
+
+**Recorded:** 2026-10-03 (U12 close unit). M25 is **shipped**; the close
+satisfies the C-UP·6 single-in-progress contract and unblocks **M26 (Sorting)**
+(M25 `StatusDone` / M26 `StatusNext`).
+
+- **The four named non-decisions** (pinned in `### What M25 does *not* do`
+  above): (1) **Not a new store or a new doc for the bytes** — the
+  `MediaObject` catalog and the `IMediaStore` byte path are untouched (ADR
+  0011 C-MED·4/6 hold). (2) **Not per-resident quota overrides** — the quota is
+  one community-wide number the admin sets; per-resident overrides are a later,
+  out-of-scope lane. (3) **Not the admin *metrics* tables** — the per-user /
+  total usage *dashboard* is M24's surface; M25 reuses the same `Σ SizeBytes
+  WHERE CreatedById` read but does not add the admin-facing metrics view. (4)
+  **Not serve-time enforcement** — a file already stored is still served; M25
+  only gates *new* uploads at the write boundary.
+
+- **The M24 seam reuse (C-SM·7 + C-SM·2).** The per-user usage read is the M24
+  C-SM·7 seam — `IStorageMetricsService.
+  GetPerUserUsageBytesAsync(string subjectId, CancellationToken)`,
+  `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId` — **re-pointed to,
+  not re-implemented**; `IStorageSettingsService.GetPerUserUsageBytesAsync`
+  delegates to it. The admin view's community-total figure reuses M24's
+  C-SM·2 seam (`IStorageMetricsService.GetSnapshotAsync`). M25 is the
+  *enforcement* half; ADR 0134 (M24) is the *metrics* half.
+
+- **The test count (honest "Closed" basis, U10).** Core
+  `Kumunita.Core.Tests`: **Total 1153, Errors 0, Failed 0, Skipped 0**
+  (including the U10 three-test acceptance gate — closed loop, handoff,
+  part-vs-whole — driven against the shipped `StorageSettingsService` +
+  `StorageLimits.Decide` + a live Marten store over the `PostgresFixture`
+  harness). Web `Kumunita.Web.Tests`: **Total 782, Errors 0, Failed 0,
+  Skipped 0** (including U9's nine per-lane enforcement tests + U7's two
+  resident self-view tests). **Both suites green.**
+
+- **The ADR pointer.** `docs/adr/0135-upload-limits.md` — the decision record
+  for this lane. (ADR **0134** is M24's storage-metrics ADR — it is correctly
+  named in the body wherever the M24 *seam* being reused is cited, and is not
+  M25's own pointer.)
+
+- **The `Milestones.cs` flip (U12).** M25 `StatusNext` → `StatusDone`; M26
+  `StatusPlanned` → `StatusNext`; the order is **unchanged** (`…"M23","M22",
+  "M24","M25","M26","M27","M28"` — the "named lane, not a renumber"
+  precedent). `MilestonesTests.cs` is re-pinned to match: M25 added to
+  `Shipped_Milestones_Are_Marked_Done`, and the single-in-progress test is
+  re-pointed to **M26** (`M26_Is_The_Single_InProgress_Milestone`).
+
+- **The M26 handoff (C-UP·6) — a closed-loop artifact.** M26 (Sorting) starts
+  **only after** M25 `StatusDone` **and** M26 `StatusNext`. The M25 lane is a
+  *settings + enforcement* surface over the existing byte store; M26 is a
+  *read-order* surface over the existing content lanes — the two do not
+  collide on the seams named above. The C-SM·7 / C-SM·2 seams stay frozen for
+  any M26 surface that wants the per-user or community-total figures.
