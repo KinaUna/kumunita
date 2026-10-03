@@ -660,4 +660,63 @@ gate, never from a leftover inline check.
 **Exit:** build green + the 9 enforcement tests pass + full suite green
 (**782**). U9 does **not** start U10.
 
-**Next unit:** `m25-u10.md`. **Not started.**
+## U10 — acceptance gate + FACES (done 2026-10-03)
+
+**Outcome: U10 complete — the acceptance gate (design §2.5) landed as three
+named end-to-end tests + the FACES coverage confirmed; both suites green.**
+Test-only unit: **no production code changed** (Core stays HTTP-free, C-UP·3;
+the 413 mapping is the Web gate's — these tests assert the pure `StorageDecision`
+the gate delegates to, exactly the level U9 chose for F2 ≠ F3).
+
+**(a) The three acceptance test names (all passed)** —
+`tests/Kumunita.Core.Tests/Usage/StorageLimitsAcceptanceTests.cs` (new, driven
+against the **shipped** `StorageSettingsService` + `StorageLimits.Decide` + a
+live Marten store over the `PostgresFixture` harness):
+
+1. `M25_Acceptance_ClosedLoop_AdminSetsQuota_ResidentUploads_UsageReflected`
+   — the **closed loop** (§2.5 gate 1): admin `SetAsync` a quota → a resident
+   uploads within it → `Decide` = `Allowed` (the gate proceeds, F1) **and** the
+   resident's self-view (`GetPerUserUsageBytesAsync`, the C-SM·7 seam) reflects
+   the new usage (F1 "success + usage reflected").
+2. `M25_Acceptance_Handoff_NextUploadOverQuota_Rejects_StrongConsistency_LiveDoc`
+   — the **handoff** (§2.5 gate 2): the *next* upload that would exceed the
+   quota → `Decide` = `OverQuota` (F3; the Web gate maps this to the 413 the
+   per-lane suite pins) — **strong consistency, live doc** (F4): the doc the
+   decision reads is the live admin doc (reread through the same seam returns
+   the same values + the admin's `ModifiedById`).
+3. `M25_Acceptance_PartVsWhole_ClosedLoopAndHandoff_DecisionsConsistentTogether`
+   — the **part-vs-whole** (§2.5 gate 3): the two parts (closed-loop input →
+   `Allowed`, handoff input → `OverQuota`) run **together** on the **same**
+   live settings doc produce the same distinct decision shapes — the Core-side
+   witness of F10's four-lane consistency (the Web-side witness is U9's per-lane
+   suite, all four lanes through the same gate).
+
+**(b) FACES covered + the lane that pins F9.** F1 / F3 / F4 are **witnessed** by
+the three tests above; F5 (`Decide_QuotaZero_Unlimited`) + F6
+(`EffectiveMaxFileBytes_UnsetFallsBackToEnv`) are already pinned in
+`StorageLimitsTests` — **confirmed, not re-added**. **F9 (no byte written on
+reject) is already pinned in all four lanes in U9** (each of items 11–18 asserts
+`DidNotReceiveWithAnyArgs().PutAsync`); the lane cited as the representative
+witness is **attachment** — `AttachmentUpload_OverQuota_413` in
+`AttachmentUploadTests.cs` (F9 asserted alongside the 413). Not re-duplicated
+here: Core has no byte write on its own, so the Web gate's F9 contract is the
+right home.
+
+**(c) The strong-consistency (live-doc) assertion (F4).** The handoff test reads
+the settings doc **twice** through the same `GetOrCreateAsync` seam — before and
+after the `Decide` — and pins that both reads return the admin's tightened
+`PerUserQuotaBytes` / `MaxFileBytes` **and** the admin's `ModifiedById`
+(`admin-acceptance`). The decision is driven off that **live** doc, so a reject
+the resident's first upload did not get now does — one community doc, one source
+of truth (C-UP·1), no cached / env-only value (F4).
+
+**(d) Total M25-relevant tests now passing.** Core suite: **Total 1153, Errors
+0, Failed 0** (up from 1150 in U8 — the +3 are the U10 acceptance tests). Web
+suite: **Total 782, Errors 0, Failed 0** (unchanged — U10 added no Web tests; F9
+already pinned in U9). **Both suites green.**
+
+**Exit:** build green + the three acceptance tests pass + both suites green
+(Core **1153** / Web **782**). U10 does **not** start U11 (the milestone flip
+is U12's job).
+
+**Next unit:** `m25-u11.md`. **Not started.**
