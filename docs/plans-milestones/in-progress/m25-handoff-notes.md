@@ -7,71 +7,57 @@
 > pinned test names). This file is created by U1 and moved to `done/m25/` by
 > the close unit (U12).
 
-## U1 — Drift pause (BLOCKED — C-UP·6 precondition failed; re-run 2026-10-03)
+## U1 — design doc Part 1 (authored 2026-10-03, after M24 close)
 
-**Outcome: BLOCKED — the design doc was NOT authored (2nd attempt, 2026-10-03
-re-run).** U1 was re-run after M24's close was expected to have landed. Step 0's
-C-UP·6 precondition check against `src/Kumunita.Web/Milestones.cs` **still
-fails** — M24 has *not* been promoted to `StatusDone` and M25 *not* to
-`StatusNext` (the exact same state as the 1st attempt, so the blocker is
-unchanged). Per the unit's own rule ("STOP and report BLOCKED … **do not**
-author the design doc") and the operator instruction, U1 stops here without
-writing `docs/design/m25-upload-limits-design.md`.
+**Outcome: U1 complete — Part 1 authored.** M24's close unit landed (M24 →
+`StatusDone`, M25 → `StatusNext` in `Milestones.cs`), so Step 0's C-UP·6
+precondition **passes** — this replaces the earlier `## U1 — Drift pause`
+section (the BLOCKED record above; the blocker no longer holds). Authored
+`docs/design/m25-upload-limits-design.md` Part 1: Context (what/why + the
+named non-decisions), Scope (in/out), the **7 invariants** C-UP·1–7 (GlobalAdmin
+single-doc settings + env fallback · guards-before-write · Core stays HTTP-free ·
+content-addressed usage `Σ SizeBytes WHERE CreatedById` · sentinel `0`=unlimited ·
+C-UP·6 single-in-progress contract · no new authorization surface), and the **10
+FACES** F1–F10 (each bound to its invariant). No code, no build.
 
-**Exact current statuses (read verbatim from `Milestones.cs` on this 2026-10-03 re-run):**
-- **M24** ("Storage metrics — an admin view of storage…") = **`StatusNext`**
-  (rendered "In progress")
-- **M25** ("Upload limits — admin-set per-file size limit and per-user total
-  content quota…") = **`StatusPlanned`** (rendered "Planned")
+**C-UP·6 precondition outcome:** M24 `StatusDone` / M25 `StatusNext` confirmed
+(read verbatim from `src/Kumunita.Web/Milestones.cs`, lines 66–67).
 
-**Why this is a blocker, not a fixable detail:** the C-UP·6 invariant (the
-single-in-progress milestone contract, `MilestonesTests.cs`) requires **M24 to
-be `StatusDone`** before M25 may begin, and U1's Step 0 expects M24 to already
-have been promoted to `StatusDone` and M25 promoted to `StatusNext` by M24's
-close unit. Neither is true: **M24 is still `StatusNext` (not `StatusDone`)**
-and **M25 is still `StatusPlanned` (not `StatusNext`)**. M24 has therefore not
-closed, and this unit is explicitly told *not* to "fix" the milestones itself.
+**Next unit:** `m25-u02.md` (Seams & contracts, design doc Part 2).
 
-**Nothing was written for the design doc:** no
-`docs/design/m25-upload-limits-design.md` was created; the 7 invariants
-(C-UP·1–7) and 10 FACES (F1–F10) were **not** authored/frozen. This pause is
-recorded *instead of* the normal `## U1 — design doc Part 1` section.
+## U2 — design doc Part 2 (authored 2026-10-03)
 
-**Unblocked by:** M24's close unit promoting M24 → `StatusDone` **and**
-M25 → `StatusNext` in `src/Kumunita.Web/Milestones.cs` (kept in step with
-`README.md` + `tests/Kumunita.Web.Tests/MilestonesTests.cs`). Once that holds,
-re-run U1: Step 0 will pass and U1 authors the design doc Part 1
-(Context / Scope / Invariants C-UP·1–7 / FACES F1–F10) and replaces this Drift
-pause with the normal `## U1 — design doc Part 1` section.
+**Outcome: U2 complete — Part 2 appended** to
+`docs/design/m25-upload-limits-design.md` as `## Seams & contracts (Part 2,
+written by U2)` with §2.1–§2.6. Builds on U1's Part 1 (reuses the frozen
+C-UP·1–7 / F1–F10; no re-derivation). No code, no build.
 
-**Next unit:** `m25-u02.md` (Seams & contracts, design doc Part 2) — **do not
-start it**; it depends on U1's design doc Part 1 existing.
+- **(a) Sealed Core seams:** `CommunityStorageSettings` (Marten doc, `Id =
+  "community"`, `MaxFileBytes?` / `PerUserQuotaBytes` / `Modified` /
+  `ModifiedById`); `IStorageSettingsService` 4 methods —
+  `GetOrCreateAsync`, `SetAsync`, `GetPerUserUsageBytesAsync`, `Decide`;
+  `StorageLimits.Decide` (size-first, pure); `StorageSettingsDocTypes.Configure`.
+- **(b) `IUploadGate`** (Web-only): `CheckUpload` → `ActionResult?`, distinct
+  oversize/over-quota 413.
+- **(c) 23 pinned test names by id:** Core §2.3 (1–10,
+  `tests/Kumunita.Core.Tests/Usage/StorageLimitsTests.cs`); Web §2.4 (11–23,
+  per-lane + `UploadGateTests` / `AdminStorageControllerTests` /
+  `ResidentUsageViewTests`).
+- **(d) Four-lane adoption rule** (§2.2) — the 4 pinned call-sites:
+  `ProfileController.AvatarUpload` (L413), `ContentImageController.Upload`
+  (L162), `AttachmentController.Upload` (L69), `DocumentController.Upload`
+  (L302).
+- **(e) C-UP·6 contract** (§2.6 drift-guard): M24 `StatusDone` / M25
+  `StatusNext` at start; M25 `StatusDone` + M26 `StatusNext` at close.
 
-## U2 — Drift pause (BLOCKED — C-UP·6 precondition regressed; 2026-10-03)
-
-**Outcome: BLOCKED — Part 2 was NOT authored.** U2's guardrail requires U1's
-design doc Part 1 to exist in
-`docs/design/m25-upload-limits-design.md` **and** the C-UP·6 single-in-progress
-contract to hold (M24 `StatusDone` / M25 `StatusNext`). **Both fail**, exactly
-as U1's Drift pause above recorded:
-- **Design doc:** `docs/design/m25-upload-limits-design.md` **does not exist**
-  (file + folder search returned nothing) — Part 1 was never authored, so the
-  frozen ids (C-UP·1–7, F1–F10) this unit is told not to re-derive have no
-  canonical source.
-- **C-UP·6 (read verbatim from `src/Kumunita.Web/Milestones.cs` on 2026-10-03):**
-  **M24 = `StatusNext`** (rendered "In progress") and **M25 = `StatusPlanned`**
-  (rendered "Planned") — M24 is not `StatusDone`, M25 is not `StatusNext`.
-
-Per U2's own guardrail ("STOP and report BLOCKED — record `## U2 — Drift
-pause` in the handoff note; do not author Part 2"), this unit stopped with
-**no files touched beyond this section**: no design doc Part 2, no seam
-signatures transcribed, no test names pinned anywhere.
-
-**Unblocked by:** the same two things as U1 — M24's close unit must land
-(promote M24 → `StatusDone` **and** M25 → `StatusNext` in
-`src/Kumunita.Web/Milestones.cs`, kept in step with `README.md` +
-`tests/Kumunita.Web.Tests/MilestonesTests.cs`), **then re-run U1** (authores
-Part 1 and replaces its Drift pause), **then re-run U2**.
+**Drift flags recorded in §2.2/§2.6 (for U3+, not blockers now):**
+- M24's `IStorageMetricsService.GetPerUserUsageBytesAsync` (the C-SM·7 handoff
+  seam) **already exists** — M25's `IStorageSettingsService.
+  GetPerUserUsageBytesAsync` **reuses/re-points to** it (named in the §2.6
+  drift-guard); do not re-implement.
+- `DocumentController` has a **second** inline size guard on the **edit** lane
+  (L213, `form.File`) that is *not* in the pinned test list — U8 must decide
+  explicitly whether it adopts the gate (else an F10 / test-list drift event).
 
 **Next unit:** `m25-u03.md` (Core doc + doc-surface + boot-path wiring) —
-**do not start it**; it depends on U2's Part 2 seams.
+**do not start it** unless instructed.
