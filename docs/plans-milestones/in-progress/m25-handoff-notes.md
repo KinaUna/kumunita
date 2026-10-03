@@ -130,3 +130,57 @@ service, no test added (U4 does that); `IMediaStore` / `MediaObject` /
 
 **Next unit:** `m25-u04.md` (`IStorageSettingsService` + pure
 `StorageLimits.Decide` + the 10 pinned Core tests) — **not started.**
+
+## U4 — service + decision + Core tests (authored 2026-10-03)
+
+**Outcome: U4 complete — build green + the 10 Core tests pass.** Executed the
+(now-corrected) unit — **3 Core files + 1 test file + 1 DI line**, mirroring the
+M24 `IStorageMetricsService` / `StorageMetricsService` pair exactly. Core stays
+HTTP-free (C-UP·3 / ADR 0006-D): no `IFormFile` / `Stream` / `ActionResult` in
+any new file. `IMediaStore` / `MediaObject` / `MediaOptions` untouched. No Web
+gate or Web test added (U8 does that).
+
+- **(a) The 10 Core test names (by id) that passed** (design §2.3, items 1–10,
+  all in `tests/Kumunita.Core.Tests/Usage/StorageLimitsTests.cs`):
+  `Decide_Oversize_Rejects` (F2) · `Decide_OverQuota_Rejects` (F3) ·
+  `Decide_WithinBoth_Allows` (F1) · `Decide_QuotaZero_Unlimited` (F5) ·
+  `EffectiveMaxFileBytes_AdminOverrideBeatsEnv` (F4) ·
+  `EffectiveMaxFileBytes_UnsetFallsBackToEnv` (F6) ·
+  `GetPerUserUsage_SumsCreatedByIdOnly` (F7/F8) ·
+  `GetPerUserUsage_OtherUsersExcluded` (F8) ·
+  `SetAsync_PersistsInCallerSession` (C-UP·1) ·
+  `Decide_SizeCheckedBeforeQuota` (C-UP·2 ordering). The pure `Decide` /
+  `EffectiveMaxFileBytes` tests (1–6, 10) are no-DB; the 3 service tests
+  (7–9) use the `PostgresFixture` + `MediaDocTypes` +
+  `StorageSettingsDocTypes` scratch-schema harness (the `StorageMetricsTests`
+  shape). Whole Core suite: **Total 1150, Errors 0, Failed 0, Skipped 0**.
+- **(b) `GetPerUserUsageBytesAsync` read shape (the `Where` / `Sum`):** the
+  service **reuses** the M24 C-SM·7 seam —
+  `IStorageMetricsService.GetPerUserUsageBytesAsync` →
+  `session.Query<MediaObject>().Where(o => o.CreatedById == subjectId)`
+  then `rows.Sum(o => o.SizeBytes)` — not a second copy of the query
+  (design §2.6 drift-guard). The service ctor takes the `IDocumentStore` + the
+  `IStorageMetricsService`; `GetOrCreateAsync` is read-then-create-if-missing
+  (sentinel defaults `MaxFileBytes = null` / `PerUserQuotaBytes = 0`);
+  `SetAsync` is one in-caller-session `Store` + `SaveChanges`.
+- **(c) `Decide` ordering (size-before-quota confirmed):**
+  `effectiveMax = settings.MaxFileBytes ?? envMaxBytes`;
+  `if (effectiveMax > 0 && incoming > effectiveMax) → Oversize;` **then**
+  `if (PerUserQuotaBytes > 0 && currentUsage + incoming > PerUserQuotaBytes)
+  → OverQuota;` else `Allowed` — `Decide_SizeCheckedBeforeQuota` (test 10)
+  proves an input over **both** reports `Oversize`, not `OverQuota`.
+- **(d) the DI registration line** (in
+  `src/Kumunita.Core/DependencyInjection.cs`, directly after the M24
+  `IStorageMetricsService` line):
+  `services.AddTransient<Usage.IStorageSettingsService>(sp => new
+  Usage.StorageSettingsService(sp.GetRequiredService<Marten.IDocumentStore>(),
+  sp.GetRequiredService<Usage.IStorageMetricsService>()));` — the C-SM·7 seam
+  reuse (design §2.1 registration shape).
+
+**Build:** `dotnet build Kumunita.slnx -c Debug` **succeeded** (5 warnings, all
+pre-existing; none in the new files). Tests run via the reliable path —
+`dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+(**not** `dotnet test`).
+
+**Next unit:** `m25-u05.md` (GlobalAdmin `GET /admin/storage` view + nav link;
+the set lane is U6) — **not started.**

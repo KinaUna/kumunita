@@ -65,6 +65,18 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IMediaFileStore>()));
 
+        // M25 (design §2.1, U4): the storage-settings seam — the Usage
+        // context's admin write lane + pure decision (C-UP·1/3/4). Composes the
+        // host-registered Marten IDocumentStore (the CommunityStorageSettings
+        // read / single admin write) + the M24 IStorageMetricsService (the
+        // C-SM·7 per-user-usage read seam it reuses — design §2.6 drift-guard:
+        // not a second copy of the query). Core stays HTTP-free (C-UP·3 /
+        // ADR 0006-D): the Web gate (U8) is the only place a 413 is produced.
+        // Same "AddTransient with the store injected" shape as the M24 line above.
+        services.AddTransient<Usage.IStorageSettingsService>(sp => new Usage.StorageSettingsService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Usage.IStorageMetricsService>()));   // C-SM·7 seam reuse
+
         // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
         // seam (the account.signup / account.verified admin-lane emitters) is
         // resolved automatically by the container from the registered
