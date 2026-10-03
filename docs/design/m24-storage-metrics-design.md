@@ -547,3 +547,73 @@ three-test acceptance gate, the drift-guard). Authored by U2 (this unit),
 this content). Part 1 remains the primary Context/Scope/Invariants/FACES
 tier; Part 2 pins the how. Next: U3 (`m24-u03.md`) implements the two
 `IMediaFileStore` ADDs + the `LocalVolumeFileStore` fallback.*
+
+### Run result (M24 acceptance gate — 2026-10-03)
+
+**Executed by U7 (record-only; no new test code, no build).** The U6/U4
+guardrail held at entry: after a clean `dotnet build Kumunita.slnx -c Debug`
+(0 errors), the 15 pinned tests — the 10 Core
+(`Kumunita.Core.Tests.Usage.StorageMetricsTests`) + the 5 Web
+(`Kumunita.Web.Tests.AdminStorageMetricsControllerTests`) — were re-run in
+the in-process xunit.v3 runner (the reliable path per AGENTS.md) and all
+green:
+
+| Assembly | Class | Total | Errors | Failed | Skipped | Not Run |
+|---|---|---|---|---|---|---|
+| `Kumunita.Core.Tests` | `Usage.StorageMetricsTests` | 10 | 0 | 0 | 0 | 0 |
+| `Kumunita.Web.Tests` | `AdminStorageMetricsControllerTests` | 5 | 0 | 0 | 0 | 0 |
+
+The **15-test list** (§2.4 + §2.5) is the **whole** of the gate; the two
+behavior shapes below are its **parts**, and all must pass together.
+
+- **(a) Closed loop — PASS.** A `GlobalAdmin` signs in → `/admin/storage`
+  renders the four metrics (total used, available, user-content used, as-of)
+  + the per-user table, paged + sorted by bytes desc. Satisfied verbatim by
+  the green U6 pins `AdminStorage_GlobalAdmin_Allowed` (the
+  `[Authorize(Roles = GlobalAdmin)]` gate + a 200 `ViewResult`),
+  `AdminStorage_FourMetrics_Render` (the four headline metrics + the 2-row
+  per-user table), and `AdminStorage_PerUserTable_RendersWithHasMore` (the
+  M7 `HasMore`-gated pager over a 30-row/3-user page at size 25).
+- **(b) Handoff — PASS.** The `/admin` hub shows the new "Storage" nav row
+  (U5, `Views/Admin/Index.cshtml`) → a non-`GlobalAdmin` is **403** from
+  `/admin/storage` (the C-SM·6 gate). Satisfied verbatim by the green U6 pin
+  `AdminStorage_NonGlobalAdmin_Forbidden` (the role set does not contain
+  `Member`).
+- **(c) Part-vs-whole — PASS.** The 15-test list (10 Core + 5 Web) passes
+  **together** — both classes green in the same in-process run above
+  (`10 + 5 = 15`, Errors: 0, Failed: 0). Every part green ⇒ the whole green.
+
+**e2e (M13 three-test shape) — AUTHORED-SPEC, NOT RUN.** The browser-level
+e2e (a `GlobalAdmin` signs in through the form → `/admin/storage` renders
+the four metrics + per-user table; a non-`GlobalAdmin` is 403; the 15-test
+list passes together) requires the Playwright runtime (a `webServer` /
+`globalSetup` booting Postgres + the token-channel sign-in helper) that the
+Web test suite does not yet carry — the 5 U6 Web tests are
+`DefaultHttpContext` + NSubstitute **direct-construction**, not a full
+`WebApplication` host (the M2 U13 precedent: the spec is authored but the
+bounded runtime deferred). Per this unit's no-code rule the e2e spec is
+therefore **recorded, not run** here; the next unit who lands the runtime
+(Playwright package + Postgres-boot + token-channel) runs it and records the
+pass count. The gate above is nonetheless fully satisfied by the 15 green
+C# tests — the e2e re-verifies the same behaviors through the browser.
+
+**Drift-guard (§2.7) — no still-open drift.** There is **no**
+`## U<m> — Drift pause` section in the handoff note. The two `⚠ Drift note`
+items are explicitly *not* Drift pauses (internal-impl corrections to
+non-frozen lines only; the frozen seams/DTOs/invariants/FACES/15-test-names
+are unchanged) — each **resolved**:
+- **U3** — §2.2 wrote the Windows volume call as
+  `DriveInfo.GetDriveFromPath(RootPath)`; `System.IO.DriveInfo` has no such
+  static in .NET 10 (build CS0117 proved it). U3 used the faithful BCL
+  equivalent (the `DriveInfo` root ctor over the path root) — same
+  `TotalSize`/`AvailableFreeSpace`, same `RootPath` volume. The two frozen
+  ADD signatures (C-SM·1/2) are unchanged.
+- **U4** — §2.3 wrote the per-user aggregation as a server-side
+  `GroupBy`/`Select` LINQ; U4 used the codebase's proven Marten fallback
+  (one `ToListAsync()` over the row set, then client-side group/sum) —
+  identical deterministic results, and the pins assert the results, not the
+  SQL emitted. The frozen seam signatures + DTO shapes (§2.1) are unchanged.
+
+**Next:** U8 (`m24-u08.md`) closes M24 — the `Milestones.cs` +
+`MilestonesTests.cs` status flip + the ADR + the OPS/README sync + the
+design-doc close section + the handoff close + the move to `done/m24/`.
