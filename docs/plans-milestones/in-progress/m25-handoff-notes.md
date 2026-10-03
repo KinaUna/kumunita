@@ -7,15 +7,18 @@
 > pinned test names). This file is created by U1 and moved to `done/m25/` by
 > the close unit (U12).
 
-## U1 — Drift pause (BLOCKED — C-UP·6 precondition failed)
+## U1 — Drift pause (BLOCKED — C-UP·6 precondition failed; re-run 2026-10-03)
 
-**Outcome: BLOCKED — the design doc was NOT authored.** Step 0's C-UP·6
-precondition check against `src/Kumunita.Web/Milestones.cs` failed, so per the
-unit's own rule ("STOP and report BLOCKED … **do not** author the design doc")
-and the operator instruction, U1 stops here without writing
-`docs/design/m25-upload-limits-design.md`.
+**Outcome: BLOCKED — the design doc was NOT authored (2nd attempt, 2026-10-03
+re-run).** U1 was re-run after M24's close was expected to have landed. Step 0's
+C-UP·6 precondition check against `src/Kumunita.Web/Milestones.cs` **still
+fails** — M24 has *not* been promoted to `StatusDone` and M25 *not* to
+`StatusNext` (the exact same state as the 1st attempt, so the blocker is
+unchanged). Per the unit's own rule ("STOP and report BLOCKED … **do not**
+author the design doc") and the operator instruction, U1 stops here without
+writing `docs/design/m25-upload-limits-design.md`.
 
-**Exact current statuses (read verbatim from `Milestones.cs` at this run):**
+**Exact current statuses (read verbatim from `Milestones.cs` on this 2026-10-03 re-run):**
 - **M24** ("Storage metrics — an admin view of storage…") = **`StatusNext`**
   (rendered "In progress")
 - **M25** ("Upload limits — admin-set per-file size limit and per-user total
