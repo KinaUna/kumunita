@@ -125,6 +125,21 @@
             </div>
         </a>
     </div>
+    @* M25 (upload limits) — the storage SETTINGS surface: the per-file size
+       cap, the per-user quota, and community usage. Distinct from the M24
+       "Storage" metrics card above (a different route, /admin/storage/settings,
+       so the two coexist). The GlobalAdmin gate is on the
+       /admin/storage/settings controller (C-UP·1); the hub is itself
+       GlobalAdmin-gated, so the card renders unconditionally like the others.
+       Read-only in this milestone (the set-lane form lands in U6). *@
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/storage/settings">
+            <div class="card-body">
+                <div class="fw-semibold">Storage settings</div>
+                <small class="text-muted">The community's upload limits — per-file size cap, per-user content quota, and total usage.</small>
+            </div>
+        </a>
+    </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/announcements/comments">
             <div class="card-body">

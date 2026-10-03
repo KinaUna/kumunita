@@ -252,3 +252,105 @@ the routing decision above is resolved (A vs B) and `m25-u05.md`/`m25-u06.md` +
 the design §Scope route are corrected to match. **Do not start U6** — it
 inherits the same `/admin/storage` premise and will hit the identical
 ambiguity on its `POST /admin/storage/limits`.
+
+## U5 — admin GET surface (authored 2026-10-03, routing resolved → option A)
+
+**Outcome: U5 complete — build green + live-rendered under a GlobalAdmin session.**
+The `## U5 — Drift pause`'s **open decision (A vs B) is resolved: option A
+(distinct route, keeps M24 untouched)** was executed. The prior U5 drift was a
+plan↔reality contradiction on the *route* (M24's ADR'd metrics surface already
+owns `GET /admin/storage`); this run chose a **different** route so the two
+coexist, leaving M24's `AdminStorageMetricsController` + `StorageMetrics.cshtml`
+**byte-for-byte untouched**. `IMediaStore` / `MediaObject` / `MediaOptions`
+unchanged; Core stays HTTP-free (C-UP·3 / ADR 0006-D) — all changes are Web-only.
+
+**The routing decision (A) + why, recorded for U6 to inherit:**
+- **M25's settings surface = `GET /admin/storage/settings`** (new
+  `AdminStorageController`); U6's set-lane becomes **`POST /admin/storage/settings`**
+  (not the `POST /admin/storage/limits` that `m25-u06.md` currently names —
+  **U6 must re-target to `/admin/storage/settings`** to keep one controller, one
+  route, one view, and to stay off M24's `admin/storage` template).
+- **Why A over B:** (a) it honors the design §Scope non-decision "M24's metrics
+  are out of scope (retained)" — B would reshape M24's shipped controller/view;
+  (b) it is the option `done/m24/m24-u05.md` (L38–44) explicitly deferred to the
+  M25 agent and recommended as the route that keeps M24's ADR 0134 surface intact;
+  (c) the `/admin` hub's "Storage" card (L121) already points at M24's metrics
+  page, so A adds a *new* "Storage settings" card rather than repurposing the
+  existing one (B would have made the two cards both mean "metrics").
+- **Route collision is genuinely avoided (not just assumed):** two attribute-route
+  `GET` actions on one template throw `Ambiguous match found` at startup; here the
+  templates differ (`admin/storage` vs `admin/storage/settings`) and the app
+  **boots cleanly** with both registered — verified by `docker compose up -d app`
+  reaching a 200 on `/`.
+
+**(a) Route + view model shape:** `AdminStorageController` at
+`[Route("admin/storage/settings")]` + `[Authorize(Roles = GlobalAdmin)]` (C-UP·1).
+Single `GET Index` (read-only — no form/POST, the set-lane is U6) loads the
+settings (`IStorageSettingsService.GetOrCreateAsync(CancellationToken.None)`, the
+create-if-missing sentinel shape) + the community total, and renders
+`Views/Admin/Storage.cshtml`. `AdminStorageViewModel`
+(`src/Kumunita.Web/Models/AdminStorageViewModel.cs`) fields: `MaxFileBytes?`
+(admin override, `null` = env fallback), `PerUserQuotaBytes` (`0` = unlimited),
+`TotalUsedBytes`, `AsOf`, `EnvMaxFileBytes` (the `MediaOptions.MaxBytes` 5 MiB
+default — the same cap the four upload-lane guards use), `EffectiveMaxFileBytes`
+(`StorageLimits.EffectiveMaxFileBytes(settings, env)` = `MaxFileBytes ?? env`,
+`0` = unlimited), `QuotaUnlimited` (`PerUserQuotaBytes == 0`).
+
+**(b) Nav link added:** `Views/Admin/Index.cshtml` **L136** (the card; the label
+at **L138**) — a new "Storage settings" card → `href="/admin/storage/settings"`,
+inserted directly **after** the existing M24 "Storage" (metrics) card (L121–127),
+mirroring the hub's section-card idiom and its "Storage"/"Announcement
+comments"/"Direct messaging" neighbours. A back-link from the settings view to
+`/admin/storage` makes the metrics↔settings relationship explicit.
+
+**(c) Community-total read (drift-guard):** it **reuses M24's
+`IStorageMetricsService.GetSnapshotAsync`** C-SM·2 seam — the same
+`StorageMetricsSnapshot.TotalUsedBytes` (`Σ SizeBytes`) + `AsOf` shape M24's
+controller reads — **not** a fresh `Query<MediaObject>().Sum(…)` (the U4/U5
+"reuse the same seam" rule). The settings read and the snapshot read are started
+concurrently and awaited explicitly (the `AdminStorageMetricsController.Index`
+pattern; `Task.WhenAll` isn't usable across the two distinct result types).
+
+**Exit evidence:** `dotnet build Kumunita.slnx -c Debug` **succeeded** (all
+warnings pre-existing — `SmtpSender` / `SampleDataSeeder` / test-file `xUnit1051`;
+none in the new files). Live-verified via `docker compose build app &&
+docker compose up -d app`, signed in as the sample GlobalAdmin
+(`admin@examplium.com`) in the integrated browser: **`GET /admin/storage/settings`
+rendered** with effective per-file = **5.24 MiB**, admin override = **"Not set
+(using platform default)"**, platform default (env) = **5.24 MiB**, per-user
+quota = **"Unlimited"**, total used = **0 B**, and an as-of (UTC) timestamp —
+matching the sentinel settings (`MaxFileBytes = null` ⇒ env `MediaOptions.MaxBytes`
+5 MiB in force; `PerUserQuotaBytes = 0` ⇒ unlimited) and the seeded (empty) media
+catalog. **No new test** (U6's `AdminStorageControllerTests` are the first
+admin-surface tests). The `.tmp\verify-u5.ps1` scratch probe was used only to
+isolate the defect below and is a gitignored throwaway.
+
+**⚠ Pre-existing M24 defect found (NOT a U5 change — flagged for the plan
+author, out of U5's scope):** the volume-stat read `LocalVolumeFileStore.Statvfs`
+(`src/Kumunita.Core/Media/LocalVolumeFileStore.cs` L93–110) **crashes the whole
+process** with a `System.AccessViolationException` (read/write protected memory)
+on this Linux-in-Docker environment. It is **intermittent** (the settings page
+rendered once, a later request crashed) and lives in **M24's shipped code** — the
+**unmodified M24 metrics page `GET /admin/storage` reproduces the identical
+crash** (`docker logs`: `System.AccessViolationException … at
+Kumunita.Core.Media.LocalVolumeFileStore.Statvfs`), so it is not introduced by
+U5. U5 only reaches it because the U4/U5 spec mandates reusing `GetSnapshotAsync`
+(which calls `GetTotalSpaceBytesAsync`/`GetFreeSpaceBytesAsync` → `statvfs`).
+Suspect root cause: the `[DllImport("libc", SetLastError = true)]` `statvfs`
+P/Invoke with `[StructLayout(LayoutKind.Sequential)]` `statvfs_t` (10 × `ulong`)
+— on the target glibc, `f_flag` is a 16-bit `unsigned short` followed by a 16-bit
+`f_spare[2]` before `f_namemax`, so the struct is **not** 8 fields of 8 bytes and
+the 80-byte buffer is mis-mapped (the `out` buffer is written with the wrong
+size/alignment → AV). It is Linux-only (Windows uses `DriveInfo`), so it is
+invisible in a pure-Windows `dotnet test` run — the `StorageMetricsTests` Core
+harness likely stubs/avoids the real volume read. **Recommendation (a separate
+lane, not U5):** fix the `statvfs_t` layout for the target glibc (add the `f_flag`
++ `f_spare` sizing) or, more portably, replace the `statvfs` P/Invoke with
+`System.IO.OperatingSystem`-aware / `DriveInfo`-equivalent disk-usage reads that
+work on both the Linux container and Windows. U5's own surface is otherwise
+complete and correct; it is gated only by this M24 defect for full runtime
+stability.
+
+**Next unit:** `m25-u06.md` (the `POST /admin/storage/settings` set-lane + form +
+the 2 pinned admin Web tests) — **adopt the option-A route recorded above
+(`/admin/storage/settings`, not `/admin/storage/limits`)**. Not started.
