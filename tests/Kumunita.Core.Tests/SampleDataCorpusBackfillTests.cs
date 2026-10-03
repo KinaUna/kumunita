@@ -94,6 +94,7 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
             M5DocTypes.Configure(opts);
             M6DocTypes.Configure(opts);
             M9DocTypes.Configure(opts);
+            M16DocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);

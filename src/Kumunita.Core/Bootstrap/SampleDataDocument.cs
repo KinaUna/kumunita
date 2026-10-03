@@ -57,6 +57,27 @@ internal sealed class SampleDataDocument
     /// goal id) and carries its to-dos inline (each a nested <see cref="SampleTodo"/>).</summary>
     public IReadOnlyList<SampleProject> Projects { get; set; } = [];
 
+    /// <summary>The <see cref="Kumunita.Core.Projects.KanbanBoard"/> boards (ADR 0067 D1 /
+    /// ADR 0031 WYSIWYG-board lane) + their nested <see cref="Kumunita.Core.Projects.KanbanLane"/>
+    /// lanes (columns) and the <see cref="Kumunita.Core.Projects.TodoItem"/> cards placed on
+    /// them (the <see cref="Kumunita.Core.Projects.BoardItemPlacement"/> rows). Each board keys
+    /// its lanes by title and its cards by the to-do's stable <c>(projectTitle, todoTitle)</c>
+    /// cross-reference (the "projects keyed by English title" precedent, extended to the
+    /// to-do it sits on) so <see cref="SampleDataSeeder"/> resolves them to ids without a
+    /// generated id. Authored in English; a board's title/description translations (the
+    /// <see cref="Kumunita.Core.Projects.BoardTranslation"/> lane, ADR 0088) ride
+    /// <see cref="SampleKanbanBoard.Translations"/>.</summary>
+    public IReadOnlyList<SampleKanbanBoard> Boards { get; set; } = [];
+
+    /// <summary>The <see cref="Kumunita.Core.Inventory.InventoryItem"/> inventory (ADR 0117)
+    /// + its nested <see cref="Kumunita.Core.Inventory.InventoryCheckout"/> usage records
+    /// (the append-only check-out / check-in history). Each item keys its checkouts by the
+    /// borrower's <c>e-mail</c> + the checkout's <c>note</c> (create-if-missing on warm boot),
+    /// and <see cref="SampleDataSeeder"/> resolves the borrower to a user id. The
+    /// <see cref="SampleInventoryItem.CurrentHolderEmail"/> (the in-flight holder, the F1
+    /// state) is set to the latest open checkout's borrower when present.</summary>
+    public IReadOnlyList<SampleInventoryItem> InventoryItems { get; set; } = [];
+
     /// <summary>When <c>true</c>, the seeder enables the <c>LanguageCatalog</c> "da" (Danish)
     /// entry (it ships DISABLED, awaiting an admin's enable) so the demo's language selector
     /// carries the full en/de/fr/da set. Dev-only — this document only ever materializes under
@@ -401,4 +422,149 @@ internal sealed class SampleTodo
 
     /// <summary>Days back from seed time the to-do was created.</summary>
     public int DaysAgo { get; set; }
+}
+
+/// <summary>A <see cref="Kumunita.Core.Projects.KanbanBoard"/> (ADR 0067 D1) + its nested
+/// <see cref="SampleKanbanLane"/> columns (the <see cref="Kumunita.Core.Projects.KanbanLane"/>
+/// rows) and the to-dos placed on it (the <see cref="Kumunita.Core.Projects.BoardItemPlacement"/>
+/// rows, each a nested <see cref="SampleBoardCard"/>). A board is a container with its own
+/// standing owner (<see cref="AuthorEmail"/>, the C-M5·6 shape) and a feed filter
+/// (<see cref="ComponentId"/> — a filter, never a gate). Authored in English; the
+/// <see cref="Kumunita.Core.Projects.BoardTranslation"/> title/description translations (the
+/// ADR 0088 lane) ride <see cref="Translations"/> (the <see cref="SampleContentTranslation"/>
+/// shape, body-optional — boards are title-usable without a body).</summary>
+internal sealed class SampleKanbanBoard
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+
+    /// <summary>The community board (a feed filter, never a gate); null = all communities.</summary>
+    public string? ComponentId { get; set; }
+
+    /// <summary>The project this board is associated with (a feed filter, never a gate — the
+    /// ADR 0086 D4 <c>projectId</c> shape), named by its <c>SampleProject.Title</c>. Null = a
+    /// standalone board (no project).</summary>
+    public string? ProjectTitle { get; set; }
+
+    public string AuthorEmail { get; set; } = string.Empty;
+    public int DaysAgo { get; set; }
+
+    /// <summary>The board's columns (the <c>KanbanLane</c> rows) — each a nested
+    /// <see cref="SampleKanbanLane"/>, ordered by <see cref="SampleKanbanLane.Order"/>.</summary>
+    public IReadOnlyList<SampleKanbanLane> Lanes { get; set; } = [];
+
+    /// <summary>The to-dos placed on this board (the <c>BoardItemPlacement</c> rows) — each a
+    /// nested <see cref="SampleBoardCard"/> carrying the to-do's <c>(projectTitle, todoTitle)</c>
+    /// key + its lane title + its position within that lane.</summary>
+    public IReadOnlyList<SampleBoardCard> Cards { get; set; } = [];
+
+    /// <summary>The board's title/description translations (the ADR 0088 lane). The current
+    /// sample corpus is English-only, so this is empty — declared for generality (a no-op loop
+    /// when absent), mirroring the post/announcement/event/page/project translation lanes.</summary>
+    public IReadOnlyList<SampleContentTranslation> Translations { get; set; } = [];
+}
+
+/// <summary>A column (lane) on a <see cref="SampleKanbanBoard"/> (the
+/// <see cref="Kumunita.Core.Projects.KanbanLane"/> row). <see cref="Status"/> is the status a
+/// to-do moved into the lane imparts (the <see cref="Kumunita.Core.Projects.KanbanStatuses"/>
+/// vocabulary, <c>null</c> = imparts none — a plain string, never an enum);
+/// <see cref="MaxItems"/> is an advisory capacity (<c>null</c> = no limit); <see cref="Order"/>
+/// is the column's 0-based position within the board.</summary>
+internal sealed class SampleKanbanLane
+{
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>The status the lane imparts (<c>not-started</c> / <c>in-progress</c> /
+    /// <c>done</c> / <c>cancelled</c>); null / empty = imparts none.</summary>
+    public string? Status { get; set; }
+
+    /// <summary>The lane's advisory capacity; null = no limit (refused not dropped, C-M5·5).</summary>
+    public int? MaxItems { get; set; }
+
+    /// <summary>The lane's 0-based column order within the board.</summary>
+    public int Order { get; set; }
+}
+
+/// <summary>The placement of a <see cref="Kumunita.Core.Projects.TodoItem"/> on a
+/// <see cref="SampleKanbanBoard"/> lane (the <see cref="Kumunita.Core.Projects.BoardItemPlacement"/>
+/// row). The card is keyed by the to-do's stable <c>(ProjectTitle, TodoTitle)</c> cross-reference
+/// (resolved to a <c>TodoItem</c> id at seed time) and its lane by <see cref="LaneTitle"/>
+/// (matched against the board's <see cref="SampleKanbanLane"/> titles). A to-do may appear on a
+/// board at most once (the <c>(TodoItemId, BoardId)</c> unique index) and sits at
+/// <see cref="Order"/> within its lane.</summary>
+internal sealed class SampleBoardCard
+{
+    /// <summary>The project the to-do belongs to (a <see cref="SampleProject.Title"/> — the
+    /// to-do's <c>ProjectId</c> is inherited from its project).</summary>
+    public string ProjectTitle { get; set; } = string.Empty;
+
+    /// <summary>The to-do's title (a <see cref="SampleTodo.Title"/> within that project).</summary>
+    public string TodoTitle { get; set; } = string.Empty;
+
+    /// <summary>The lane title the card sits in (a <see cref="SampleKanbanLane.Title"/> on this
+    /// board).</summary>
+    public string LaneTitle { get; set; } = string.Empty;
+
+    /// <summary>The card's 0-based order within its lane.</summary>
+    public int Order { get; set; }
+}
+
+/// <summary>A <see cref="Kumunita.Core.Inventory.InventoryItem"/> (ADR 0117 D1) + its nested
+/// <see cref="SampleInventoryCheckout"/> usage records (the append-only
+/// <see cref="Kumunita.Core.Inventory.InventoryCheckout"/> set, the M16 "usage history"). The
+/// item is the thing that can be checked out: a <see cref="Name"/>, an <see cref="OwnerKind"/>
+/// (<c>shared</c> / <c>community</c> / <c>private</c> — a UI grouping + write-standing breadth,
+/// never a read gate), an optional description, and its standing owner
+/// (<see cref="AuthorEmail"/>). Authored in English (the M16 translation lane is deferred);
+/// <see cref="CurrentHolderEmail"/> is the in-flight holder (the F1 state) — set to the latest
+/// open checkout's borrower when one exists, otherwise the item is in the pool.</summary>
+internal sealed class SampleInventoryItem
+{
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The ownership kind: <c>shared</c> / <c>community</c> / <c>private</c> (ADR 0117
+    /// D3 — a string label, a filter + standing-breadth, never a read gate).</summary>
+    public string OwnerKind { get; set; } = "community";
+
+    public string? Description { get; set; }
+
+    /// <summary>The community board (a feed filter, never a gate — the Post.ComponentId shape);
+    /// null = all communities.</summary>
+    public string? ComponentId { get; set; }
+
+    public string AuthorEmail { get; set; } = string.Empty;
+
+    /// <summary>The in-flight holder (a SubjectId — the F1 state); null = in the pool / at
+    /// home. Resolved to a user id by e-mail at seed time. When omitted, the seeder infers it
+    /// from the latest open checkout (if any).</summary>
+    public string? CurrentHolderEmail { get; set; }
+
+    public int DaysAgo { get; set; }
+
+    /// <summary>The usage records (the <c>InventoryCheckout</c> rows) — each a nested
+    /// <see cref="SampleInventoryCheckout"/>; the append-only check-out / check-in history.</summary>
+    public IReadOnlyList<SampleInventoryCheckout> Checkouts { get; set; } = [];
+}
+
+/// <summary>One <see cref="Kumunita.Core.Inventory.InventoryCheckout"/> usage record nested
+/// under a <see cref="SampleInventoryItem"/> (ADR 0117 D4). The record says which borrower
+/// (<see cref="BorrowerEmail"/>, resolved to a user id), when it went out
+/// (<see cref="CheckedOutDaysAgo"/> back from seed time), and — when closed — when it came back
+/// (<see cref="CheckedInDaysAgo"/> back; null = still open, the F1 witness). At most one open
+/// record per item (the unique partial index on <c>(ItemId)</c> where <c>CheckedInAt IS NULL</c>),
+/// so the sample item's records must carry at most one open row.</summary>
+internal sealed class SampleInventoryCheckout
+{
+    /// <summary>The borrower (a <see cref="SampleAccount.Email"/> — display + standing, never a
+    /// gate). Resolved to a user id at seed time.</summary>
+    public string BorrowerEmail { get; set; } = string.Empty;
+
+    /// <summary>Days back from seed time the item went out.</summary>
+    public int CheckedOutDaysAgo { get; set; }
+
+    /// <summary>Days back from seed time the item came back; null = still open (the F1 witness).</summary>
+    public int? CheckedInDaysAgo { get; set; }
+
+    /// <summary>An optional free-text note on the checkout.</summary>
+    public string? Note { get; set; }
 }

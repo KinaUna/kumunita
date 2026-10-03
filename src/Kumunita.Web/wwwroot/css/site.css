@@ -572,6 +572,29 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .btn-close {
     filter: invert(1) grayscale(100%) brightness(200%) !important;
   }
+  /* .link-light is a "light text on a dark/colored surface" utility (the
+     whats-new toast link on the primary-green toast). The dark token flip
+     re-points --bs-light-rgb to a dark green (#182720), so the link would
+     render dark-on-green — lower contrast than the surrounding near-white
+     toast text. Pin it to white so it keeps its light-on-dark meaning and
+     reads as a link against the primary surface. */
+  html:not([data-kmb-theme='light']) .link-light,
+  html:not([data-kmb-theme='light']) .link-light:hover,
+  html:not([data-kmb-theme='light']) .link-light:focus {
+    color: #fff !important;
+    -webkit-text-decoration-color: #fff !important;
+    text-decoration-color: #fff !important;
+  }
+  /* Off-position form switches: the unchecked track falls back to the dark
+     body-bg (#0f1a14) with a near-black knob — nearly invisible on the canvas.
+     Give the off track a visible dark-green fill + edge and a light knob so
+     the "off" state reads clearly (mirrors Bootstrap's own data-bs-theme=dark
+     switch patch, which this app never triggers since it keys on kmb-theme). */
+  html:not([data-kmb-theme='light']) .form-switch .form-check-input:not(:checked):not(:focus) {
+    --bs-form-check-bg: #2a3a30;
+    border-color: #3d4a42;
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
+  }
 }
 
 /* ---- Forest dark patches (explicit-dark scope) ----------------------------
@@ -729,6 +752,25 @@ html[data-kmb-theme='dark'] .dropdown-item:focus {
    toasts. Invert it to light (Bootstrap's .btn-close-white technique). */
 html[data-kmb-theme='dark'] .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%) !important;
+}
+/* .link-light — the "light text on a dark/colored surface" link utility (the
+   whats-new toast link on the primary-green toast). The dark token flip
+   re-points --bs-light-rgb to a dark green, so pin it to white to keep its
+   light-on-dark meaning and read as a link against the primary surface. */
+html[data-kmb-theme='dark'] .link-light,
+html[data-kmb-theme='dark'] .link-light:hover,
+html[data-kmb-theme='dark'] .link-light:focus {
+  color: #fff !important;
+  -webkit-text-decoration-color: #fff !important;
+  text-decoration-color: #fff !important;
+}
+/* Off-position form switches: a visible dark-green track + light knob so the
+   "off" state reads clearly (Bootstrap's own data-bs-theme=dark switch patch,
+   which this app never triggers since it keys on data-kmb-theme). */
+html[data-kmb-theme='dark'] .form-switch .form-check-input:not(:checked):not(:focus) {
+  --bs-form-check-bg: #2a3a30;
+  border-color: #3d4a42;
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
 }
 
 /* --- Base ----------------------------------------------------------------- */

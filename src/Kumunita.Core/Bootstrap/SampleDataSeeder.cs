@@ -3,6 +3,7 @@ using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
@@ -578,6 +579,10 @@ public static class SampleDataSeeder
             goalsByTitle[goal.Title] = id;
         }
 
+        // Project / to-do id maps for the board placements below (the boards key their
+        // cards by (projectTitle, todoTitle) — resolved against these).
+        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sampleProject in doc.Projects)
         {
             var id = Id();
@@ -602,6 +607,7 @@ public static class SampleDataSeeder
                 Created = created,
                 Modified = created,
             });
+            projectsByTitle[sampleProject.Title] = id;
             // Project title/description translations (ADR 0088). The current corpus is
             // English-only (empty), so this is a no-op loop when absent — declared for
             // generality, mirroring the post/announcement/event/page translation lanes.
@@ -621,9 +627,10 @@ public static class SampleDataSeeder
             // Nested to-dos (ADR 0067 D1) — the unit of *managed* work under the project.
             foreach (var todo in sampleProject.Todos)
             {
+                var todoId = Id();
                 session.Store(new TodoItem
                 {
-                    Id = Id(),
+                    Id = todoId,
                     Title = todo.Title,
                     Body = todo.Body,
                     ComponentId = sampleProject.ComponentId,
@@ -641,6 +648,144 @@ public static class SampleDataSeeder
                     AttachmentIds = [],
                     Created = now.AddDays(-todo.DaysAgo),
                     Modified = null,
+                });
+                todosByKey[sampleProject.Title + "|" + todo.Title] = todoId;
+            }
+        }
+
+        // ── Kanban boards (ADR 0067 D1) + lanes + to-do placements ──────────────────────
+        // Boards are a container with their own standing owner + feed filter; their lanes
+        // (columns) impart a status, and their cards are the BoardItemPlacement rows that
+        // place an existing to-do on a lane. Cross-references resolve by stable keys: a
+        // lane by its title, a card by (projectTitle, todoTitle) — the projectsByTitle /
+        // todosByKey maps built above. A card naming an unknown to-do or lane is a loud
+        // error (the D3 fail-fast), never a silently-orphaned placement.
+        foreach (var sampleBoard in doc.Boards)
+        {
+            var boardId = Id();
+            var projectId = sampleBoard.ProjectTitle is not null && projectsByTitle.TryGetValue(sampleBoard.ProjectTitle, out var pid)
+                ? pid
+                : null;
+            var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
+            session.Store(new KanbanBoard
+            {
+                Id = boardId,
+                Title = sampleBoard.Title,
+                Description = sampleBoard.Description,
+                ComponentId = sampleBoard.ComponentId,
+                ProjectId = projectId,
+                AuthorId = usersByEmail[sampleBoard.AuthorEmail].Id,
+                Audience = null, // public (world-readable — the `Audience = null` shape)
+                IsDeleted = false,
+                LanguageCode = "en",
+                Created = boardCreated,
+                Modified = boardCreated,
+            });
+            // Lanes (columns) — ordered; a lane's visibility is the board's (C-M5·3).
+            var lanesByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var lane in sampleBoard.Lanes)
+            {
+                var laneId = Id();
+                session.Store(new KanbanLane
+                {
+                    Id = laneId,
+                    BoardId = boardId,
+                    Title = lane.Title,
+                    Status = lane.Status,
+                    MaxItems = lane.MaxItems,
+                    Order = lane.Order,
+                    Created = boardCreated,
+                    Modified = boardCreated,
+                });
+                lanesByTitle[lane.Title] = laneId;
+            }
+            // Board title/description translations (ADR 0088) — a no-op loop when the
+            // corpus is English-only (the current shape), declared for generality.
+            foreach (var tr in sampleBoard.Translations)
+            {
+                session.Store(new BoardTranslation
+                {
+                    Id = Id(),
+                    BoardId = boardId,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+            }
+            // Cards — the to-do → lane placements (the BoardItemPlacement rows).
+            foreach (var card in sampleBoard.Cards)
+            {
+                var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
+                if (!todosByKey.TryGetValue(cardKey, out var todoItemId))
+                    throw new InvalidOperationException(
+                        $"sample-data.json: board '{sampleBoard.Title}' card " +
+                        $"({cardKey}) names a to-do that is not seeded under the project " +
+                        $"'{card.ProjectTitle}'.");
+                if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId))
+                    throw new InvalidOperationException(
+                        $"sample-data.json: board '{sampleBoard.Title}' card " +
+                        $"({cardKey}) names an unknown lane '{card.LaneTitle}'.");
+                session.Store(new BoardItemPlacement
+                {
+                    Id = Id(),
+                    TodoItemId = todoItemId,
+                    BoardId = boardId,
+                    LaneId = laneId,
+                    Order = card.Order,
+                    Created = boardCreated,
+                    Modified = boardCreated,
+                });
+            }
+        }
+
+        // ── Inventory (ADR 0117) + check-out / check-in usage records ───────────────────
+        // An item is the check-out-able thing (name + ownership kind + standing owner); its
+        // usage history is the append-only InventoryCheckout record set (never a field on the
+        // item). The item's CurrentHolderId (the F1 in-flight state) is the borrower of its
+        // latest open checkout (CheckedInAt null), else null = in the pool. A record naming
+        // an unknown borrower is a loud error (the D3 fail-fast), never an orphaned row.
+        foreach (var sampleItem in doc.InventoryItems)
+        {
+            var itemId = Id();
+            var itemCreated = now.AddDays(-sampleItem.DaysAgo);
+            // Resolve the in-flight holder: the latest open checkout's borrower, or the
+            // explicit override (the item is 'at home' when neither is present).
+            string? currentHolder =
+                sampleItem.CurrentHolderEmail is not null
+                    ? usersByEmail[sampleItem.CurrentHolderEmail].Id
+                    : sampleItem.Checkouts
+                        .Where(c => c.CheckedInDaysAgo is null)
+                        .OrderByDescending(c => c.CheckedOutDaysAgo)
+                        .Select(c => usersByEmail[c.BorrowerEmail].Id)
+                        .FirstOrDefault();
+            session.Store(new InventoryItem
+            {
+                Id = itemId,
+                Name = sampleItem.Name,
+                OwnerKind = sampleItem.OwnerKind,
+                Description = sampleItem.Description,
+                ComponentId = sampleItem.ComponentId,
+                AuthorId = usersByEmail[sampleItem.AuthorEmail].Id,
+                Audience = null, // public (world-readable — the `Audience = null` shape)
+                CurrentHolderId = currentHolder,
+                IsDeleted = false,
+                LanguageCode = "en",
+                Created = itemCreated,
+                Modified = itemCreated,
+            });
+            // The usage records (the append-only InventoryCheckout set).
+            foreach (var co in sampleItem.Checkouts)
+            {
+                session.Store(new InventoryCheckout
+                {
+                    Id = Id(),
+                    ItemId = itemId,
+                    BorrowerId = usersByEmail[co.BorrowerEmail].Id,
+                    CheckedOutAt = now.AddDays(-co.CheckedOutDaysAgo),
+                    CheckedInAt = co.CheckedInDaysAgo.HasValue ? now.AddDays(-co.CheckedInDaysAgo.Value) : null,
+                    Note = co.Note,
                 });
             }
         }
@@ -932,6 +1077,12 @@ public static class SampleDataSeeder
         var existingPageTrans = await session.Query<PageTranslation>().ToListAsync(ct);
         var existingPrjTrans  = await session.Query<ProjectTranslation>().ToListAsync(ct);
         var existingCommTrans = await session.Query<CommunityTranslation>().ToListAsync(ct);
+        var existingBoards    = await session.Query<KanbanBoard>().ToListAsync(ct);
+        var existingLanes     = await session.Query<KanbanLane>().ToListAsync(ct);
+        var existingPlacements = await session.Query<BoardItemPlacement>().ToListAsync(ct);
+        var existingBoardTrans = await session.Query<BoardTranslation>().ToListAsync(ct);
+        var existingInventory = await session.Query<InventoryItem>().ToListAsync(ct);
+        var existingCheckouts = await session.Query<InventoryCheckout>().ToListAsync(ct);
 
         // ── Tags (by slug) + per-language display names ────────────────────────────────
         var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1132,6 +1283,13 @@ public static class SampleDataSeeder
                                                                : "G:" + existing.GroupId;
             postsByTitle[existing.Title + "|" + lane] = existing.Id;
         }
+        // Same-title posts collapse to one (PostId, lane) row (ADR 0130 D5). When
+        // two or more sample posts share a title within the same lane, the
+        // translation top-up runs once per sample post against the *same* PostId.
+        // Track the languages already stored for each PostId *this run* so the
+        // second/third duplicate doesn't re-store the same (PostId, LanguageCode)
+        // and trip the PostTranslation unique constraint.
+        var postTransLangsThisRun = new Dictionary<string, HashSet<string>>();
         foreach (var samplePost in doc.Posts)
         {
             bool groupLane = samplePost.GroupSlug is not null;
@@ -1204,6 +1362,12 @@ public static class SampleDataSeeder
                 .Where(t => t.PostId == id)
                 .Select(t => t.LanguageCode)
                 .ToHashSet();
+            // A same-title duplicate stored translations for this PostId earlier in
+            // this run; those aren't in the pre-run snapshot, so fold them in.
+            if (postTransLangsThisRun.TryGetValue(id, out var alreadyAdded))
+                havePostTrans.UnionWith(alreadyAdded);
+            if (!postTransLangsThisRun.TryGetValue(id, out var addedThisRun))
+                postTransLangsThisRun[id] = addedThisRun = new HashSet<string>();
             foreach (var tr in samplePost.Translations)
             {
                 if (havePostTrans.Contains(tr.LanguageCode)) continue;
@@ -1218,6 +1382,7 @@ public static class SampleDataSeeder
                     Created = now.AddDays(-(tr.DaysAgo ?? 0)),
                 });
                 havePostTrans.Add(tr.LanguageCode);
+                addedThisRun.Add(tr.LanguageCode);
             }
         }
 
@@ -1378,6 +1543,17 @@ public static class SampleDataSeeder
         }
 
         // ── Projects (by title) + translations + nested to-dos ─────────────────────────
+        // Board-card resolution maps (the boards key their cards by (projectTitle,
+        // todoTitle)): project title → id, and (projectTitle|todoTitle) → to-do id, both
+        // seeded from the existing corpus; to-dos newly created in this run register their
+        // id as the loop runs so the boards loop (below) can resolve them.
+        var projectsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in existingProjects) projectsByTitle[p.Title] = p.Id;
+        var projIdToTitle = existingProjects.ToDictionary(p => p.Id, p => p.Title);
+        var todosByKey = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in existingTodos)
+            if (t.ProjectId is not null && !t.IsDeleted && projIdToTitle.TryGetValue(t.ProjectId, out var pt))
+                todosByKey[pt + "|" + t.Title] = t.Id;
         foreach (var sampleProject in doc.Projects)
         {
             string id;
@@ -1439,9 +1615,10 @@ public static class SampleDataSeeder
             foreach (var todo in sampleProject.Todos)
             {
                 if (haveTodos.Contains(todo.Title)) continue;
+                var todoId = Id();
                 session.Store(new TodoItem
                 {
-                    Id = Id(),
+                    Id = todoId,
                     Title = todo.Title,
                     Body = todo.Body,
                     ComponentId = sampleProject.ComponentId,
@@ -1461,6 +1638,172 @@ public static class SampleDataSeeder
                     Modified = null,
                 });
                 haveTodos.Add(todo.Title);
+                // Register for the board-card resolution below (boards key cards by
+                // (projectTitle, todoTitle)).
+                todosByKey[sampleProject.Title + "|" + todo.Title] = todoId;
+            }
+        }
+
+        // ── Kanban boards (ADR 0067 D1) + lanes + placements (create-if-missing) ────────
+        // A board is matched by title (the closed sample corpus — the ADR 0130 D3 caveat
+        // about display-string keys applies); its lanes by (boardId, order) and its card
+        // placements by (todoId, boardId) — both unique-index-backed. A card naming a to-do
+        // or a lane absent on a warm DB is skipped (create-if-missing) — the D3 fail-fast is
+        // the pristine SeedAsync path only.
+        var boardsByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var b in existingBoards) boardsByTitle[b.Title] = b.Id;
+        foreach (var sampleBoard in doc.Boards)
+        {
+            string boardId;
+            if (!boardsByTitle.TryGetValue(sampleBoard.Title, out boardId))
+            {
+                boardId = Id();
+                var projectId = sampleBoard.ProjectTitle is not null
+                    && projectsByTitle.TryGetValue(sampleBoard.ProjectTitle, out var pid) ? pid : null;
+                var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
+                session.Store(new KanbanBoard
+                {
+                    Id = boardId,
+                    Title = sampleBoard.Title,
+                    Description = sampleBoard.Description,
+                    ComponentId = sampleBoard.ComponentId,
+                    ProjectId = projectId,
+                    AuthorId = usersByEmail[sampleBoard.AuthorEmail].Id,
+                    Audience = null,
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    Created = boardCreated,
+                    Modified = boardCreated,
+                });
+                boardsByTitle[sampleBoard.Title] = boardId;
+            }
+            // Lanes — (boardId, order) unique; skip an existing one by (boardId, order).
+            var existingLaneOrders = existingLanes.Where(l => l.BoardId == boardId).Select(l => l.Order).ToHashSet();
+            var lanesByTitle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var existingLane in existingLanes.Where(l => l.BoardId == boardId))
+                lanesByTitle[existingLane.Title] = existingLane.Id;
+            foreach (var lane in sampleBoard.Lanes)
+            {
+                string laneId;
+                if (existingLaneOrders.Contains(lane.Order))
+                    laneId = existingLanes.Single(l => l.BoardId == boardId && l.Order == lane.Order).Id;
+                else
+                {
+                    laneId = Id();
+                    var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
+                    session.Store(new KanbanLane
+                    {
+                        Id = laneId,
+                        BoardId = boardId,
+                        Title = lane.Title,
+                        Status = lane.Status,
+                        MaxItems = lane.MaxItems,
+                        Order = lane.Order,
+                        Created = boardCreated,
+                        Modified = boardCreated,
+                    });
+                    existingLaneOrders.Add(lane.Order);
+                }
+                lanesByTitle[lane.Title] = laneId;
+            }
+            // Board title/description translations (ADR 0088) — top-up by (boardId, lang).
+            var haveBoardTrans = existingBoardTrans.Where(t => t.BoardId == boardId)
+                .Select(t => t.LanguageCode).ToHashSet();
+            foreach (var tr in sampleBoard.Translations)
+            {
+                if (haveBoardTrans.Contains(tr.LanguageCode)) continue;
+                session.Store(new BoardTranslation
+                {
+                    Id = Id(),
+                    BoardId = boardId,
+                    LanguageCode = tr.LanguageCode,
+                    Title = tr.Title,
+                    Body = tr.Body,
+                    AuthorId = TranslateAuthorId(tr.AuthorEmail),
+                    Created = now.AddDays(-(tr.DaysAgo ?? 0)),
+                });
+                haveBoardTrans.Add(tr.LanguageCode);
+            }
+            // Cards — (todoId, boardId) unique; skip an existing one by todo id.
+            var existingCardTodoIds = existingPlacements.Where(pl => pl.BoardId == boardId)
+                .Select(pl => pl.TodoItemId).ToHashSet();
+            foreach (var card in sampleBoard.Cards)
+            {
+                var cardKey = card.ProjectTitle + "|" + card.TodoTitle;
+                if (!todosByKey.TryGetValue(cardKey, out var todoItemId)) continue; // to-do absent — skip.
+                if (existingCardTodoIds.Contains(todoItemId)) continue;            // already placed.
+                if (!lanesByTitle.TryGetValue(card.LaneTitle, out var laneId)) continue; // lane absent — skip.
+                var boardCreated = now.AddDays(-sampleBoard.DaysAgo);
+                session.Store(new BoardItemPlacement
+                {
+                    Id = Id(),
+                    TodoItemId = todoItemId,
+                    BoardId = boardId,
+                    LaneId = laneId,
+                    Order = card.Order,
+                    Created = boardCreated,
+                    Modified = boardCreated,
+                });
+                existingCardTodoIds.Add(todoItemId);
+            }
+        }
+
+        // ── Inventory (ADR 0117) + usage records (create-if-missing) ────────────────────
+        // An item is matched by name (the closed sample corpus); its usage records by
+        // (itemId, borrowerId, note). A record naming an unknown borrower is impossible on a
+        // real neighborhood (unreachable by the SampleData__Enabled gate) and is skipped
+        // here (create-if-missing) rather than the D3 fail-fast (the pristine path only).
+        var inventoryByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var i in existingInventory) inventoryByName[i.Name] = i.Id;
+        foreach (var sampleItem in doc.InventoryItems)
+        {
+            string itemId;
+            if (!inventoryByName.TryGetValue(sampleItem.Name, out itemId))
+            {
+                itemId = Id();
+                var itemCreated = now.AddDays(-sampleItem.DaysAgo);
+                string? currentHolder =
+                    sampleItem.CurrentHolderEmail is not null
+                        ? usersByEmail[sampleItem.CurrentHolderEmail].Id
+                        : sampleItem.Checkouts
+                            .Where(c => c.CheckedInDaysAgo is null)
+                            .OrderByDescending(c => c.CheckedOutDaysAgo)
+                            .Select(c => usersByEmail[c.BorrowerEmail].Id)
+                            .FirstOrDefault();
+                session.Store(new InventoryItem
+                {
+                    Id = itemId,
+                    Name = sampleItem.Name,
+                    OwnerKind = sampleItem.OwnerKind,
+                    Description = sampleItem.Description,
+                    ComponentId = sampleItem.ComponentId,
+                    AuthorId = usersByEmail[sampleItem.AuthorEmail].Id,
+                    Audience = null,
+                    CurrentHolderId = currentHolder,
+                    IsDeleted = false,
+                    LanguageCode = "en",
+                    Created = itemCreated,
+                    Modified = itemCreated,
+                });
+                inventoryByName[sampleItem.Name] = itemId;
+            }
+            // Usage records — (itemId, borrowerId, note) match; skip an existing one.
+            var haveCheckouts = existingCheckouts.Where(c => c.ItemId == itemId)
+                .Select(c => (c.BorrowerId, c.Note)).ToHashSet();
+            foreach (var co in sampleItem.Checkouts)
+            {
+                var borrowerId = usersByEmail[co.BorrowerEmail].Id;
+                if (haveCheckouts.Contains((borrowerId, co.Note))) continue;
+                session.Store(new InventoryCheckout
+                {
+                    Id = Id(),
+                    ItemId = itemId,
+                    BorrowerId = borrowerId,
+                    CheckedOutAt = now.AddDays(-co.CheckedOutDaysAgo),
+                    CheckedInAt = co.CheckedInDaysAgo.HasValue ? now.AddDays(-co.CheckedInDaysAgo.Value) : null,
+                    Note = co.Note,
+                });
+                haveCheckouts.Add((borrowerId, co.Note));
             }
         }
 
