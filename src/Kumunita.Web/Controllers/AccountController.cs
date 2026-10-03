@@ -38,6 +38,67 @@ public sealed class AccountController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
+    // ── My storage (M25 U7 — the self-only resident usage read) ────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/storage</c> — the resident's **own** storage usage (M25
+    /// U7, C-UP·4/F7): their own usage bytes, the community per-user quota (or
+    /// "unlimited"), and how much of it remains. **Self-only** — the subject is
+    /// the signed-in principal (<see cref="SubjectId(System.Security.Claims.ClaimsPrincipal)"/>),
+    /// minted server-side and never taken from a route param, so a resident can
+    /// never read another resident's numbers.
+    /// <para>
+    /// <b>Read-only</b> — no write lane here (the admin settings surface, U5/U6,
+    /// is the only writer), and it emits **no** <c>AccessAudit</c> row
+    /// (C-UP·7: a resident's own usage is not an audience-restricted read).
+    /// The seam (<see cref="Kumunita.Core.Usage.IStorageSettingsService"/>) is
+    /// resolved from the request scope — the <see cref="Verify(string)"/> idiom —
+    /// so the controller constructor is unchanged. The usage read
+    /// (<c>GetPerUserUsageBytesAsync</c>) reuses the M24 C-SM·7
+    /// <c>Σ SizeBytes WHERE CreatedById</c> seam (U4); the quota comes from
+    /// <c>GetOrCreateAsync</c> (the create-if-missing sentinel). Sentinel
+    /// (C-UP·5): a quota of <c>0</c> ⇒ **unlimited** — rendered as "Unlimited",
+    /// not <c>0</c> remaining and not an error.
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Storage()
+    {
+        // Self-only (C-UP·4/F7): the subject is the signed-in principal —
+        // never a path param.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Resolve the read seam from the request scope (the Verify idiom) — keeps
+        // the controller constructor untouched for the existing harnesses.
+        var settings = HttpContext.RequestServices
+            .GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
+
+        // Two independent reads (quota doc + own usage): start both, then await
+        // each for its value (the AdminStorageController.Index shape).
+        var quotaTask  = settings.GetOrCreateAsync(CancellationToken.None);
+        var usageTask  = settings.GetPerUserUsageBytesAsync(subject, CancellationToken.None);
+        var quota      = await quotaTask;
+        long usage      = await usageTask;
+
+        bool unlimited = quota.PerUserQuotaBytes == 0;      // C-UP·5 sentinel
+        var remaining  = unlimited ? (long?)null
+                                   : Math.Max(0, quota.PerUserQuotaBytes - usage);
+
+        return View(new ResidentStorageViewModel
+        {
+            MyUsageBytes      = usage,
+            PerUserQuotaBytes = quota.PerUserQuotaBytes,
+            RemainingBytes    = remaining,                  // null ⇒ unlimited
+            QuotaUnlimited    = unlimited,
+            MyUsageHuman      = ResidentStorageViewModel.FormatBytes(usage),
+            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(quota.PerUserQuotaBytes),
+            RemainingHuman    = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(remaining!.Value)
+        });
+    }
+
     // ── Signup ──────────────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]

@@ -434,3 +434,70 @@ quota / remaining + the 2 resident Web tests `ResidentUsageView_SelfOnly` /
 `ResidentUsageView_QuotaZeroShowsUnlimited`) — **not started.** U7 adopts the
 same `/admin/storage` family route decision (its resident surface is
 `AccountController` / `ProfileController`, self-only, C-UP·4/F7).
+
+## U7 — resident self-view (authored 2026-10-03)
+
+**Outcome: U7 complete — build green + the 2 pinned resident Web tests pass**
+(§2.4 items 22–23). This is the **resident** surface (not the admin one U5/U6
+shipped) — the option-A `/admin/storage/settings` route does **not** apply.
+Reused U4's `IStorageSettingsService` read seams (`GetPerUserUsageBytesAsync`
++ `GetOrCreateAsync`) — **no re-implementation**; the usage read is the M24
+C-SM·7 `Σ SizeBytes WHERE CreatedById` seam re-exposed by U4. Core untouched
+(HTTP-free, C-UP·3); admin surface (U5/U6) + the four-lane wiring (U8) untouched.
+
+- **(a) Route + view-model shape:** `GET /account/storage` on the **default
+  `AccountController`** surface (the unit's chosen default) — a single
+  **read-only** `Storage()` action (no form / no POST). It loads **the
+  subject's own** usage (`GetPerUserUsageBytesAsync(subject)`) + the community
+  quota (`GetOrCreateAsync()`), computes remaining (`quota − usage`, clamped ≥ 0)
+  and renders `Views/Account/Storage.cshtml`. `ResidentStorageViewModel`
+  (`src/Kumunita.Web/Models/ResidentStorageViewModel.cs`): `MyUsageBytes`,
+  `PerUserQuotaBytes`, `RemainingBytes` (**`null` ⇒ unlimited**),
+  `QuotaUnlimited` (`PerUserQuotaBytes == 0`), + the human-readable sizes
+  (`MyUsageHuman` / `QuotaHuman` / `RemainingHuman`; the compact IEC `Bytes`
+  formatter lives as a static `FormatBytes` on the model, matching the admin
+  view's helper).
+- **(b) 2 test names that passed** (in
+  `tests/Kumunita.Web.Tests/ResidentUsageViewTests.cs`):
+  **`ResidentUsageView_SelfOnly`** (item 22 — the `GetPerUserUsageBytesAsync`
+  read is driven by the signed-in subject exactly, and a *different* resident's
+  numbers — stubbed to a distinct figure — are provably never read; the view
+  carries the resident's own usage / quota / remaining) and
+  **`ResidentUsageView_QuotaZeroShowsUnlimited`** (item 23 — quota `0` renders
+  "Unlimited": `RemainingBytes` = `null`, `QuotaHuman`/`RemainingHuman` =
+  "Unlimited", and the action returns a `ViewResult`, not an error). **Whole
+  Web suite: Total 773, Errors 0, Failed 0, Skipped 0** (run via the reliable
+  path — `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.
+  Tests.dll`, **not** `dotnet test`; suite was 771 → 773, the 2 new tests).
+- **(c) Self-only pin (subject = signed-in principal):** the action's subject
+  is the signed-in principal via `AccountController`'s own private
+  `SubjectId(User)` helper (reads `ClaimTypes.Subject` = `"Kumunita.Sub"`) —
+  **never a route/path param**; an anonymous principal `Challenge`s. So a
+  resident can never read another resident's numbers (C-UP·4/F7). Read-only,
+  **no** `AccessAudit` row (C-UP·7).
+- **(d) The "unlimited" rendering (quota `0`):** the C-UP·5 sentinel — a
+  `PerUserQuotaBytes` of `0` ⇒ `RemainingBytes = null` and the view shows
+  "Unlimited" for the quota *and* the remaining figure (not `0` remaining, not
+  an error); a concrete quota ⇒ `RemainingBytes = max(0, quota − usage)` with a
+  human-readable size.
+- **Harness / seam-resolution choice (recorded for U8+):** to keep the two
+  existing `AccountController` direct-construction harnesses
+  (`AccountControllerSignupGateTests`, `LoginErrorCodeMappingTests`) compiling,
+  `Storage()` resolves `IStorageSettingsService` from
+  `HttpContext.RequestServices` — the exact `AccountController.Verify` idiom
+  (the `KumunitaClaimsPrincipalFactory` resolution at `Verify` L161) — rather
+  than adding a constructor dependency. The test harness mirrors the
+  `AdminStorageControllerTests` / `BlockedAccountMiddlewareTests` direct-
+  construction shape: NSubstitute `IStorageSettingsService` registered in
+  `context.RequestServices`, a `ClaimsPrincipal` carrying the
+  `ClaimTypes.Subject` claim, and `controller.TempData` set directly to a
+  `TempDataDictionary` + no-op `ITempDataProvider` (the `Controller.View(model)`
+  getter otherwise looks up `ITempDataDictionaryFactory` from
+  `RequestServices`, which a minimal provider lacks — the same NRE class the
+  admin U6 harness sidesteps).
+
+**Next unit:** `m25-u08.md` (the **Web gate** `IUploadGate` + the **four-upload-
+lane adoption** — the enforcement wiring: avatar / content-image / attachment /
+document) — **not started.** U8 is the `413` producer + the guard-before-write
+wiring; it must **not** touch this resident self-view, the admin surface
+(U5/U6), or the `IStorageSettingsService` read seams (reuse them).
