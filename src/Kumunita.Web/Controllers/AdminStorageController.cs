@@ -1,6 +1,8 @@
 using Kumunita.Core.Media;
 using Kumunita.Core.Usage;
 using Kumunita.Web.Models;
+using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -41,8 +43,12 @@ namespace Kumunita.Web.Controllers;
 public sealed class AdminStorageController(
     IStorageSettingsService settings,
     IStorageMetricsService metrics,
-    IOptions<MediaOptions> mediaOpts) : Controller
+    IOptions<MediaOptions> mediaOpts,
+    IDocumentStore store) : Controller
 {
+    private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
+        KumunitaPrincipal.SubjectId(user);
+
     /// <summary>
     /// <c>GET /admin/storage/settings</c> — the effective per-file limit, the
     /// per-user quota (or "unlimited"), and the community total used. A read
@@ -81,7 +87,77 @@ public sealed class AdminStorageController(
             AsOf                  = snap.AsOf,
             EnvMaxFileBytes       = envMax,
             EffectiveMaxFileBytes = effectiveMax,
-            QuotaUnlimited        = s.PerUserQuotaBytes == 0
+            QuotaUnlimited        = s.PerUserQuotaBytes == 0,
+            MaxFileBytesInput     = s.MaxFileBytes?.ToString(),
+            PerUserQuotaBytesInput = s.PerUserQuotaBytes == 0 ? string.Empty : s.PerUserQuotaBytes.ToString()
         });
+    }
+
+    /// <summary>
+    /// <c>POST /admin/storage/settings</c> — the single admin write lane
+    /// (C-UP·1), on the option-A route that shares U5's one controller / one
+    /// route / one view (not the <c>POST /admin/storage/limits</c> name the unit
+    /// plan originally carried). Reads the two admin values and delegates to
+    /// <see cref="IStorageSettingsService.SetAsync"/> — **one in-caller-session
+    /// write**: the controller owns the
+    /// <see cref="IDocumentStore.LightweightSession"/> (the C3 same-transaction
+    /// lane) and passes it to the service, so the settings doc commits atomically
+    /// in the caller's session.
+    /// <para>
+    /// <b>Value semantics (C-UP·5):</b> a <b>blank</b> per-file limit ⇒
+    /// <c>null</c> (the env <c>MediaOptions.MaxBytes</c> fallback is in force) —
+    /// blank is <b>not</b> coerced to <c>0</c>; a <c>0</c> per-user quota ⇒
+    /// <b>unlimited</b> (the sentinel). The subject is minted server-side from
+    /// the signed-in principal (never a path param).
+    /// </para>
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Save(string? maxFileBytesInput, string? perUserQuotaBytesInput)
+    {
+        var actor = ActorId(User) ?? string.Empty;
+
+        // Per-file limit (C-UP·5): blank ⇒ null (env fallback) — do NOT coerce
+        // blank → 0; a non-blank value (including an explicit "0" = unlimited
+        // file size) is the admin override.
+        long? maxFileBytes;
+        if (string.IsNullOrWhiteSpace(maxFileBytesInput))
+        {
+            maxFileBytes = null;
+        }
+        else if (!long.TryParse(maxFileBytesInput, out var parsedMax) || parsedMax < 0)
+        {
+            TempData["error"] = "The per-file limit must be a whole number of bytes, or left blank for the platform default.";
+            return RedirectToAction(nameof(Index));
+        }
+        else
+        {
+            maxFileBytes = parsedMax;
+        }
+
+        // Per-user quota (C-UP·5): blank or 0 ⇒ unlimited (the sentinel);
+        // otherwise the concrete cap in bytes.
+        long quota;
+        if (string.IsNullOrWhiteSpace(perUserQuotaBytesInput) || perUserQuotaBytesInput == "0")
+        {
+            quota = 0;
+        }
+        else if (!long.TryParse(perUserQuotaBytesInput, out var parsedQuota) || parsedQuota < 0)
+        {
+            TempData["error"] = "The per-user quota must be a whole number of bytes (0 for unlimited).";
+            return RedirectToAction(nameof(Index));
+        }
+        else
+        {
+            quota = parsedQuota;
+        }
+
+        // Session shape (C3): the controller owns the LightweightSession; the
+        // service's SaveChanges is the single in-caller-session write (C-UP·1).
+        await using var session = store.LightweightSession();
+        await settings.SetAsync(maxFileBytes, quota, actor, session);
+
+        TempData["info"] = "Upload limits saved.";
+        return RedirectToAction(nameof(Index));
     }
 }

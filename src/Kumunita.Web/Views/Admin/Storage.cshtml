@@ -24,9 +24,32 @@
 <h1>Storage settings</h1>
 <p class="text-muted">
     The community's upload limits: the per-file size cap and the per-user content
-    quota, and how much resident content is in use. Read-only for now — the
-    form to change these limits lands next.
+    quota, and how much resident content is in use.
 </p>
+
+@* The set-lane form (U6, C-UP·1) — the single admin write on the option-A
+   route (one controller / one route / one view, sharing the GET above; not the
+   /admin/storage/limits name the plan originally carried). Blank per-file = no
+   override (platform default); 0 quota = unlimited (C-UP·5). *@
+<h2 class="h5">Set upload limits</h2>
+<form method="post" action="/admin/storage/settings" class="row g-3 mb-4">
+    @Html.AntiForgeryToken()
+    <div class="col-sm-8 col-md-6">
+        <label for="maxFileBytes" class="form-label">Per-file size limit (bytes)</label>
+        <input type="number" min="0" step="1" class="form-control" id="maxFileBytes"
+               name="maxFileBytesInput" value="@(Model.MaxFileBytesInput ?? "")" />
+        <div class="form-text">Leave blank to use the platform default; 0 = unlimited file size.</div>
+    </div>
+    <div class="col-sm-8 col-md-6">
+        <label for="perUserQuotaBytes" class="form-label">Per-user content quota (bytes)</label>
+        <input type="number" min="0" step="1" class="form-control" id="perUserQuotaBytes"
+               name="perUserQuotaBytesInput" value="@(Model.PerUserQuotaBytesInput ?? "")" />
+        <div class="form-text">0 = unlimited; otherwise each resident's total content cap.</div>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save upload limits</button>
+    </div>
+</form>
 
 @* The effective per-file limit (C-UP·5). The admin override wins over the env
    default; when there is no override the figure shown is the env default, and

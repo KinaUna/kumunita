@@ -354,3 +354,83 @@ stability.
 **Next unit:** `m25-u06.md` (the `POST /admin/storage/settings` set-lane + form +
 the 2 pinned admin Web tests) — **adopt the option-A route recorded above
 (`/admin/storage/settings`, not `/admin/storage/limits`)**. Not started.
+
+## U6 — admin POST set-lane (authored 2026-10-03)
+
+**Outcome: U6 complete — build green + the 2 pinned admin Web tests pass.**
+Executed the unit on the **inherited option-A route** (the routing decision
+resolved in the `## U5` section above). Reused U4's `IStorageSettingsService.
+SetAsync` seam (no re-implementation); Core stays HTTP-free (C-UP·3 / ADR
+0006-D) — all changes are Web-only + the test file. `Decide` / the four-lane
+wiring untouched; M24's metrics surface (`AdminStorageMetricsController` @
+`GET /admin/storage`) untouched.
+
+- **(a) Route adopted (option A):** the set-lane is **`POST /admin/storage/
+  settings`** — **not** the `POST /admin/storage/limits` that `m25-u06.md` still
+  names. It shares U5's one controller (`AdminStorageController`,
+  `[Route("admin/storage/settings")]`), one route, and one view
+  (`Views/Admin/Storage.cshtml`), so the GET display and the POST set-lane
+  live on the same surface (the option-A "one controller / one route / one
+  view" shape recorded in `## U5`). The `Decide` / four-lane wiring is
+  unchanged (C-UP·1 set-lane only).
+- **(b) `POST` action + `SetAsync` call-site:** `AdminStorageController.Save(
+  string? maxFileBytesInput, string? perUserQuotaBytesInput)`,
+  `[HttpPost]` + `[ValidateAntiForgeryToken]`, added beside U5's `GET Index`
+  (one new ctor dep: `Marten.IDocumentStore store` — the C3 session-owner,
+  mirroring `CommunityController` / `TagController`). Value parsing (C-UP·5):
+  blank per-file ⇒ **`null`** (env fallback — **not** coerced to `0`; a
+  non-blank value incl. explicit `"0"` = unlimited file size is the override);
+  blank-or-`"0"` quota ⇒ `0` (unlimited). The **`SetAsync` call-site**
+  (`AdminStorageController.cs` L161):
+  `await using var session = store.LightweightSession();` → `await
+  settings.SetAsync(maxFileBytes, quota, actor, session);` — **one
+  in-caller-session write** (C-UP·1 / C3 same-transaction lane; the controller
+  owns the session, the service's `SaveChanges` is the single write). The
+  subject `actor = KumunitaPrincipal.SubjectId(User)` (server-side, never a
+  path param).
+- **(c) 2 test names that passed** (design §2.4, items 20–21, in
+  `tests/Kumunita.Web.Tests/AdminStorageControllerTests.cs`):
+  **`AdminStorage_SetLimits_Persists`** (item 20 — a GlobalAdmin POST sets both
+  values; the `SetAsync` seam is called with `SetAsync(12345, 67890, Admin,
+  session)` — the right values, the server-minted actor, and the
+  **caller's** session — and the action returns a
+  `RedirectToActionResult` to `Index`; a supporting sentinel-branch pin
+  `AdminStorage_SetLimits_BlankPerFile_IsNull` also passes, nailing the
+  blank-per-file ⇒ `null` + quota-`0` ⇒ unlimited arm on the same seam) and
+  **`AdminStorage_NonGlobalAdmin_Forbidden`** (item 21 — the
+  `[Authorize(Roles = GlobalAdmin)]` role gate is asserted exactly, and a
+  Member principal is shown not to carry `GlobalAdmin`). **Whole Web suite:
+  Total 771, Errors 0, Failed 0, Skipped 0** (run via the reliable path —
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.
+  dll`, **not** `dotnet test`).
+- **(d) Redirect target:** `RedirectToAction(nameof(Index))` — back to
+  `GET /admin/storage/settings` (the U5 read view; the
+  `AdminMessagingController.Save` / `AdminTimezoneController.Save`
+  redirect-after-save shape). On success `TempData["info"] = "Upload limits
+  saved."`.
+- **(e) Blank-per-file ⇒ `null` handling:** in `Save`,
+  `string.IsNullOrWhiteSpace(maxFileBytesInput)` ⇒ `maxFileBytes = null`
+  (the env `MediaOptions.MaxBytes` 5 MiB fallback is in force — **not**
+  coerced to `0`, which would mean "unlimited file size"); a non-blank value
+  is `long.TryParse`'d (negative / non-numeric ⇒ `TempData["error"]` +
+  redirect, no write). The `GET` re-seeds the form (`MaxFileBytesInput =
+  MaxFileBytes?.ToString()` → blank when no override;
+  `PerUserQuotaBytesInput = PerUserQuotaBytes == 0 ? "" : "…"` → blank when
+  unlimited).
+
+**View / model:** `Views/Admin/Storage.cshtml` now carries the **form** (two
+`type="number"` inputs — per-file limit [optional, blank = platform default] +
+per-user quota — posting to `POST /admin/storage/settings`,
+`@Html.AntiForgeryToken()`, the `AdminTimezone`/`AdminMessaging` form idiom)
+above U5's read-only display (kept intact). `AdminStorageViewModel` extended
+with `MaxFileBytesInput` / `PerUserQuotaBytesInput` (raw-string form fields,
+`{ get; set; }` — the display-only U5 fields stay `init`). The test harness
+follows the `AdminDateFormatControllerTests` save-lane idiom (a directly
+constructed controller needs a `TempDataDictionary` + a no-op
+`ITempDataProvider`, or the `Save` lane's `TempData["info"]` write NREs).
+
+**Next unit:** `m25-u07.md` (the **resident self-usage view** — own usage /
+quota / remaining + the 2 resident Web tests `ResidentUsageView_SelfOnly` /
+`ResidentUsageView_QuotaZeroShowsUnlimited`) — **not started.** U7 adopts the
+same `/admin/storage` family route decision (its resident surface is
+`AccountController` / `ProfileController`, self-only, C-UP·4/F7).

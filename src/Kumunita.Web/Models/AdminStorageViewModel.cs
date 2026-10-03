@@ -51,4 +51,16 @@ public class AdminStorageViewModel
     /// <summary>True when the per-user quota is <c>0</c> (unlimited, C-UP·5) —
     /// drives the view's "unlimited" label vs. a concrete quota figure.</summary>
     public bool QuotaUnlimited { get; init; }
+
+    /// <summary>Form input for the per-file limit (raw string, bound from the
+    /// <c>POST /admin/storage/settings</c> set-lane — U6). Blank = no override
+    /// (the env fallback is in force); a value = the override in bytes
+    /// (C-UP·5). Pre-seeded from <see cref="MaxFileBytes"/> on the <c>GET</c>.</summary>
+    public string? MaxFileBytesInput { get; set; }
+
+    /// <summary>Form input for the per-user quota (raw string, bound from the
+    /// <c>POST /admin/storage/settings</c> set-lane — U6). Blank or <c>0</c> =
+    /// unlimited (C-UP·5). Pre-seeded from <see cref="PerUserQuotaBytes"/> on
+    /// the <c>GET</c> (blank when unlimited).</summary>
+    public string? PerUserQuotaBytesInput { get; set; }
 }
