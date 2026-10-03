@@ -2006,7 +2006,13 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 .message-thread .message-body {
   white-space: pre-wrap;
-  word-break: break-word;
+  /* A very long unbroken token (a URL, an id, a single long word) must wrap
+     instead of spilling past the bubble: `overflow-wrap: anywhere` is the
+     standard that reliably breaks it inside the flex `.msg-bundle`, where the
+     legacy `word-break: break-word` did not (the same fix the site already uses
+     for long overflow — e.g. the directory-card / group-name rules above).
+     `white-space: pre-wrap` is kept so intentional newlines still render. */
+  overflow-wrap: anywhere;
 }
 /* The unread marker — a left-edge accent, kept distinct from the bubble. */
 .msg-row.other.unread .msg-avatar .avatar,
