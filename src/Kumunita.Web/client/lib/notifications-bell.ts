@@ -34,11 +34,17 @@
  *    of its `<li>` with the per-row read-toggle `<form>` (ADR 0096)
  *    removed — a bare `textContent` would leak the inline
  *    "Mark as read"/"Mark as unread" button copy into the label — and
- *    each item deep-links to `/notifications#notif-{id}` (the row's
- *    anchor, rendered by the inbox view) so a click navigates to the
- *    inbox, scrolls that row into view, highlights it, and marks it
- *    read (that behavior is `notification-open.js`). Items without a
- *    row anchor fall back to the plain inbox.
+ *    each item deep-links: a <c>message.new</c> row (whose stored
+ *    <c>LinkPath</c> is the thread, rendered by the inbox view as a
+ *    "View" link) links <b>to the thread</b> — the click marks the
+ *    notification row read (the same POST <c>notification-open.js</c>
+ *    fires from the inbox anchor) and navigates to
+ *    <c>/messages/{id}</c>, whose entry marks the conversation read
+ *    (D8) — and every other row deep-links to
+ *    <c>/notifications#notif-{id}</c> (the row's anchor) so a click
+ *    navigates to the inbox, scrolls that row into view, highlights it,
+ *    and marks it read (that behavior is <c>notification-open.js</c>).
+ *    Items without a row anchor fall back to the plain inbox.
  *    **No `kw-l` resolution client-side** — the server-rendered HTML
  *    already carries the localized text.
  *
@@ -136,19 +142,53 @@
         clone.querySelectorAll('form').forEach((f) => f.remove());
         const label = (clone.textContent ?? '').trim();
 
-        // The deep link: each rendered row carries id="notif-{id}" (ADR 0103,
-        // Views/Notifications/Index.cshtml) — link to the inbox anchored at
-        // that row so notification-open.js scrolls / highlights / marks it
-        // read. Fall back to the plain inbox when a row lacks the anchor
-        // (defensive — every rendered row carries one).
-        const href = item.id.startsWith('notif-')
-          ? `${INBOX_PATH}#${item.id}`
-          : INBOX_PATH;
+        // The deep link — the row's target link when it is the thread:
+        // the inbox renders the stored LinkPath
+        // (a same-origin relative path, e.g. /messages/{conversationId}) as
+        // a "View" <a> inside the row. When it exists, the dropdown links
+        // *there* instead of to the inbox anchor: for a message.new row
+        // that is the thread page, whose entry lane marks both the thread
+        // (D8) and the notification row read (the POST the inbox anchor
+        // used to trigger). The target is same-origin by construction
+        // (server-stored) — never a cross-site href from parsed HTML.
+        const rowLink = item.querySelector<HTMLAnchorElement>('a[href]');
+        const targetHref =
+          rowLink !== null && rowLink.href.startsWith(window.location.origin)
+            ? new URL(rowLink.href).pathname
+            : null;
+        const href =
+          targetHref !== null && targetHref.startsWith('/messages/') && targetHref.length > '/messages/'.length
+            ? targetHref
+            : item.id.startsWith('notif-')
+              ? `${INBOX_PATH}#${item.id}`
+              : INBOX_PATH;
 
         const a = document.createElement('a');
         a.href = href;
         a.className = 'dropdown-item text-dark notifications-dropdown-item';
         a.textContent = label;
+
+        // The message-thread lane: a click opens the thread (whose entry
+        // marks the conversation read, D8) AND marks the notification row
+        // read (the POST notification-open.js used to fire from the inbox
+        // anchor). Awaited before the navigation so the commit lands —
+        // a failed mark (stale row, 404) never blocks the hop (the lean
+        // shape: no retry, no alert).
+        const notifId = item.id.startsWith('notif-')
+          ? item.id.slice('notif-'.length)
+          : null;
+        if (targetHref !== null && targetHref.startsWith('/messages/')) {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            void (async () => {
+              if (notifId !== null) {
+                await markNotificationRead(notifId);
+              }
+              closeDropdown();
+              window.location.assign(href);
+            })();
+          });
+        }
         dropdownEl.appendChild(a);
       }
       // The "View all" footer (the account dropdown's
@@ -204,6 +244,37 @@
     },
     { passive: true },
   );
+
+  // ── The notification-row mark-read (the message-thread deep link) ─────
+  //
+  // The same lane notification-open.ts runs from the inbox anchor, but
+  // fired from the dropdown item's click: POST /notifications/{id}/mark-read
+  // with the anti-forgery header (api.ts / ADR 0096's route,
+  // [ValidateAntiForgeryToken] is the gate). Tolerates failure — a stale
+  // row (404) or a rejected token never blocks the thread navigation (the
+  // lean shape: no retry, no alert, the console.warn is the record).
+  async function markNotificationRead(notifId: string): Promise<void> {
+    const tokenMeta = document.querySelector<HTMLMetaElement>(
+      'meta[name="anti-forgery-token"]',
+    );
+    const headers = new Headers({ Accept: 'text/html' });
+    if (tokenMeta?.content) {
+      headers.set('RequestVerificationToken', tokenMeta.content);
+    }
+    let res: Response;
+    try {
+      res = await fetch(
+        `/notifications/${encodeURIComponent(notifId)}/mark-read`,
+        { method: 'POST', headers, credentials: 'same-origin' },
+      );
+    } catch (err) {
+      console.warn('notifications-bell: mark-read failed', err);
+      return;
+    }
+    if (!res.ok) {
+      console.warn(`notifications-bell: mark-read ${res.status}`);
+    }
+  }
 
   // ── Teardown (the client/lib no-leak precedent) ──────────────────────
   window.addEventListener(
