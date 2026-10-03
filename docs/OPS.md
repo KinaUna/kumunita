@@ -49,6 +49,16 @@ Connection string example:
 **Config is state too.** The env set defines an instance's identity — back it up (encrypted)
 alongside the database, or a rebuilt VPS won't know who it is.
 
+**Storage metrics (M24, ADR 0134).** A `GlobalAdmin` can read the media byte
+store at **`GET /admin/storage`** — total used space, available space,
+user-content used space, and a paged per-user table. It adds **no env var** and
+**no new surface to provision**: it reads `Media__RootPath` (the configured
+volume) via two read-only `statvfs`/`DriveInfo` calls and the `MediaObject`
+catalog (`Σ SizeBytes` per `CreatedById`). It is a **read** — a page view emits
+**no `AccessAudit` row** (the M13 "read = no row" discipline; there is no
+`/admin/storage/export` route in v1), so there is nothing to audit, back up, or
+rotate for it. Non-`GlobalAdmin`s get **403**.
+
 ## Instance inventory
 
 Keep one row per neighborhood. This is your map.

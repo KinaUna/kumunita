@@ -617,3 +617,39 @@ are unchanged) — each **resolved**:
 **Next:** U8 (`m24-u08.md`) closes M24 — the `Milestones.cs` +
 `MilestonesTests.cs` status flip + the ADR + the OPS/README sync + the
 design-doc close section + the handoff close + the move to `done/m24/`.
+
+---
+
+## M24 — Closed (recorded)
+
+**Recorded:** 2026-10-03 (U8 close unit). M24 is **shipped**; the close
+satisfies the C-SM·7 single-in-progress contract and unblocks **M25 U1/U2**
+(both were `BLOCKED` on the C-UP·6 precondition — M24 `StatusDone` / M25
+`StatusNext`).
+
+- **The three-test acceptance gate (U7, 2026-10-03) — recorded green.** The
+  gate above (the 15-test list: **10** Core `Usage.StorageMetricsTests` +
+  **5** Web `AdminStorageMetricsControllerTests`, Errors: 0, Failed: 0) and its
+  three behavior shapes — **(a) Closed loop**, **(b) Handoff**, **(c)
+  Part-vs-whole** — all PASS. Re-confirmed in the U8 close run (full
+  `Kumunita.Web.Tests` 768/768, full `Kumunita.Core.Tests` 1140/1140, Errors:
+  0, Failed: 0), so the 15 storage-metrics tests are still green after the
+  flip.
+- **The `Milestones.cs` flip (U8).** M24 `StatusNext` → `StatusDone`; M25
+  `StatusPlanned` → `StatusNext`; the order is **unchanged** (`…"M23","M22",
+  "M24","M25","M26","M27","M28"` — the "named lane, not a renumber"
+  precedent). `MilestonesTests.cs` is re-pinned to match: M24 added to
+  `Shipped_Milestones_Are_Marked_Done`, and the single-in-progress test is
+  re-pointed to **M25** (`MilestonesTests` reports 4 tests, 4 green).
+- **ADR 0134.** `docs/adr/0134-storage-metrics.md` — the Context / Decision /
+  Consequences for the lane, the seven invariants (C-SM·1–7), the ten FACES
+  (F1–F10), and the named non-decisions (M25 the surface + enforcement; the CSV
+  export lane; the time-series lane; the M26 sort-lane hook).
+- **The M25 handoff (C-SM·7) — a closed-loop artifact.** The
+  **`GetPerUserUsageBytesAsync`** seam (D6 / F10) is frozen by name:
+  `Task<long> GetPerUserUsageBytesAsync(string subjectId, CancellationToken ct
+  = default)` — `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId`.
+  **M25's** U4 (`IStorageSettingsService.GetPerUserUsageBytesAsync`)
+  **delegates** to it (or re-points to it) rather than re-deriving the
+  per-user usage computation. A M25 agent finds it by this name in ADR 0134 +
+  this section + the handoff `## Summary`.

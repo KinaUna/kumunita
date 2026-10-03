@@ -197,3 +197,35 @@ view + nav row, GlobalAdmin-gated, read-only).
 ## U7 — gate recorded (2026-10-03)
 
 **(a) The three gate tests — all PASS** (record-only, no code, no build; the 15 U6+U4 tests re-run green in the in-process xunit.v3 runner after a clean `dotnet build Kumunita.slnx -c Debug`): **closed loop** (via the green U6 `AdminStorage_GlobalAdmin_Allowed` + `AdminStorage_FourMetrics_Render` + `AdminStorage_PerUserTable_RendersWithHasMore`) · **handoff** (via the green U6 `AdminStorage_NonGlobalAdmin_Forbidden`) · **part-vs-whole** (the 15-test list — Core `Total: 10, Failed: 0` + Web `Total: 5, Failed: 0` — passes together). **(b) e2e (M13 three-test shape) — AUTHORED-SPEC, NOT RUN:** the browser e2e needs the Playwright runtime (Postgres-boot + token-channel) the Web suite does not yet carry (the 5 U6 Web tests are `DefaultHttpContext` + NSubstitute direct-construction, not a full `WebApplication` host — the M2 U13 precedent); the next unit who lands the runtime records the pass count. **(c) Drift-guard (§2.7):** no still-open `## U<m> — Drift pause`; the two `⚠ Drift note` items (U3 `DriveInfo` internal impl; U4 Marten client-side aggregation) are both **resolved** (explicitly *not* Drift pauses — the frozen seams/DTOs/invariants/FACES/15-test-names are unchanged). **Gate section appended to `docs/design/m24-storage-metrics-design.md`.** **Next unit:** `m24-u08.md` (close M24) — **do not start it**.
+
+
+---
+
+## Summary
+
+M24 is **closed** (U8, 2026-10-03). The table below is the shipped-unit log;
+the last `## U#` section this note gets is this one.
+
+| Unit | Goal (one line) | Tests | Deviations |
+|------|-----------------|-------|-----------|
+| U1 | design doc Part 1 — Context / Scope / Invariants C-SM·1–7 / FACES F1–F10 (Step 0 C-SM·7 precondition passed) | — (record) | — |
+| U2 | design doc Part 2 — the exact C# seams + the two `IMediaFileStore` ADDs + the 15 pinned test names + the 3-test gate + the drift-guard | — (record) | — |
+| U3 | the two `IMediaFileStore` read-only ADDs (`GetTotalSpaceBytesAsync` / `GetFreeSpaceBytesAsync`) + the `LocalVolumeFileStore` impl | (in Core suite) | ⚠ Drift note (not a pause): §2.2's `DriveInfo.GetDriveFromPath` doesn't exist in .NET 10 — used the faithful `DriveInfo` root-ctor equivalent; frozen ADD signatures unchanged |
+| U4 | `IStorageMetricsService` + `StorageMetricsService` + the 3 DTOs + DI; Core tests | 10 Core green (full Core 1140) | ⚠ Drift note (not a pause): server-side `GroupBy` realized as the in-repo Marten client-side fallback; frozen seams/DTOs unchanged |
+| U5 | `AdminStorageMetricsController` + view model + `Views/Admin/StorageMetrics.cshtml` + the "Storage" nav card; build green | (build green) | — |
+| U6 | the 5 pinned Web tests (`AdminStorageMetricsControllerTests`) | 5/5 green (full Web 768) | — |
+| U7 | the M24 acceptance gate recorded (2026-10-03) | 15 green (10 Core + 5 Web) | e2e authored-spec, not run (no Playwright runtime yet); no Drift pauses |
+| U8 | close M24 — `Milestones.cs` + `MilestonesTests.cs` flip + ADR 0134 + README/STATUS/OPS sync + design-doc close section + this `## Summary` + move to `done/m24/` | build green + `MilestonesTests` 4/4 + the 15 still green (Web 768/768, Core 1140/1140) | — |
+
+**The M25 handoff (C-SM·7) — a closed-loop artifact.** The **`GetPerUserUsageBytesAsync`**
+seam (`Task<long> GetPerUserUsageBytesAsync(string subjectId, CancellationToken ct =
+default)` — `Σ MediaObject.SizeBytes WHERE CreatedById == subjectId`) is the frozen by-name
+artifact **M25's** U4 (`IStorageSettingsService.GetPerUserUsageBytesAsync`) **delegates** to
+(or re-points to) rather than re-deriving. A M25 agent finds it by this name in ADR 0134 (D6 /
+F10), the design doc's `## M24 — Closed (recorded)` section, and this `## Summary`.
+
+**This is the last handoff entry the M24 note gets.** Closing M24 (M24 `StatusDone`, M25
+`StatusNext`) **resolves the M25 U1 Drift pause** — `in-progress/m25-u01.md` may now be
+re-run (its Step 0 C-UP·6 precondition — M24 `StatusDone` / M25 `StatusNext` — now holds).
+**Do not start M25 here**; it is its own milestone with its own register
+(`docs/plans-milestones/in-progress/m25-*.md`).
