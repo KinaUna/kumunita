@@ -1977,12 +1977,10 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   align-items: flex-start;
   gap: 0.65rem;
 }
-/* Mine = right-aligned; other = left-aligned. */
+/* Mine = row pushed to the right (row-reverse keeps avatar + bundle on the
+   right side); the text within each card stays left-aligned for reading. */
 .msg-row.mine {
   flex-direction: row-reverse;
-}
-.msg-row.mine .msg-bundle {
-  text-align: right;
 }
 .msg-bundle {
   max-width: 78%;
