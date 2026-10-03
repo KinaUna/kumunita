@@ -61,3 +61,44 @@ C-UP·1–7 / F1–F10; no re-derivation). No code, no build.
 
 **Next unit:** `m25-u03.md` (Core doc + doc-surface + boot-path wiring) —
 **do not start it** unless instructed.
+
+## U3 — Drift pause (2026-10-03)
+
+**Outcome: U3 NOT executed — Drift pause recorded; no code authored, no build run.**
+The guardrail's *named* BLOCKED triggers are **not** met: Part 2 exists (U2
+appended §2.1–§2.6) and the C-UP·6 precondition holds (M24 `StatusDone` /
+M25 `StatusNext`). But the unit's **deliverable #3 contradicts the codebase**,
+so per the unit rule ("if reality contradicts the plan, record `## U3 — Drift
+pause` and stop") U3 stops here rather than guessing around it.
+
+- **Deliverable #3's premise is false.** `m25-u03.md` (entry read #3 +
+  deliverable #3) says `SchemaBootstrap.cs` is "where the existing
+  `*.Configure(opts)` doc-surface calls live (add the new one next to them)."
+  The **entire** `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (164 lines)
+  contains **no** `*.Configure(opts)` doc-surface call — it only calls
+  `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`. Its own
+  doc-comment says "Document-shape auto-creation remains the dev-only loop in
+  `Program.cs` (ADR 0004)." It is a generic applier, not a registration site.
+- **Reality: doc-surface registration lives only in `Program.cs`.** All 13
+  existing surfaces — M1 (L107), M3 (L113), Media (L119), Page (L125), Tag
+  (L131), M4 (L140), M5 (L149), M6 (L158), M9 (L168), M16 (L180), M17 (L190),
+  `UsageDocTypes` (L198), `DocumentDocTypes` (L208) — are registered inside
+  `builder.Services.AddMarten(opts => { … })` in `src/Kumunita.Web/Program.cs`.
+  Corroborated by the tags / M13 / M21 handoff notes ("1 line in `Program.cs`;
+  `SchemaBootstrap.cs` **not** modified").
+- **Consequence:** U3's Exit expects "the two boot-path lines added (file +
+  line numbers)," but only **one** is addable (`Program.cs`). The correct
+  single location is unambiguous (13 precedents + 3 handoff notes), yet the
+  plan as written names an infeasible second site — a plan↔reality
+  contradiction on a stated deliverable.
+- **Fix before U3 proceeds (one-line plan edit, then re-run U3):** re-target
+  deliverable #3 (and entry read #3) to **`Program.cs` only** — add
+  `StorageSettingsDocTypes.Configure(opts);` next to
+  `DocumentDocTypes.Configure(opts);` (L208) — and change the Exit's "two
+  boot-path lines" to "one." Then U3 = 2 Core files
+  (`Usage/CommunityStorageSettings.cs` + `Usage/StorageSettingsDocTypes.cs`)
+  + 1 `Program.cs` line + build green, mirroring M13 (`UsageDocTypes`) / M21
+  (`DocumentDocTypes`) exactly.
+
+**Next unit (after the plan fix):** `m25-u04.md` (`IStorageSettingsService` +
+pure `StorageLimits.Decide` + 10 pinned Core tests) — **not started.**
