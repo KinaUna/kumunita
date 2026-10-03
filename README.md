@@ -27,7 +27,8 @@ document management (a shared repository for official documents, contracts, etc.
 **M23 is done** — extended user profiles (a biography + free author-set tags for skills, interests, knowledge, and expertise, to make it easier to find people with something in common; ADR 0123).
 **M22 is done** — onboarding (a guided walk-through that walks a new user through account setup; ADR 0132).
 **M24 is done** — storage metrics (an admin view of storage: total used space, available space, user-content used space, and space used per user; ADR 0134).
-**M25 is next** — upload limits (admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains)
+**M25 is done** — upload limits (admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains; ADR 0135).
+**M26 is next** — sorting (feeds, lists & search results are sortable by various properties in increasing or decreasing order)
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -267,8 +268,8 @@ stays trivial and the authorization rules can grow freely.
 - **M23** — Extended user profiles: a resident biography + free author-set tags (skills, interests, knowledge, and expertise) to make it easier to find people with something in common. **Done** (ADR 0123).
 - **M22** — Onboarding: a guided walk-through that walks a new user through account setup on first sign-in. **Done** (ADR 0132).
 - **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Done.** (ADR 0134)
-- **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **In progress.** (ADR 0135)
-- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Planned.**
+- **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Done.** (ADR 0135)
+- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **In progress.**
 - **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Planned.**
 - **M28** — Guardian time limits: for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week. A child-scoped schedule on the GU guardian-controls lane (ADR 0028), distinct from the per-resident M20 notification quiet times (these gate the child's whole platform access, not just notifications). **Planned.**
 

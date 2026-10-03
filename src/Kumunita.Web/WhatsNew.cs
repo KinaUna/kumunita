@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.28.0", "2026-10-03", new List<string>
+        {
+            "Upload limits — admin-set per-file size limit and per-user total content quota; residents see how much space they are using and how much of their quota remains (ADR 0135).",
+        }),
         new("0.27.0", "2026-10-03", new List<string>
         {
             "Storage metrics — a GlobalAdmin view of the byte store at `/admin/storage`: how full the volume is, how much is left, how much is resident content, and who is storing the most (per user). It is a read-only snapshot — it writes nothing and audits nothing — and the per-user figures are the seam the upload-limits lane builds on (ADR 0134).",
