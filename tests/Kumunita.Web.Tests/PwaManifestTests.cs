@@ -333,13 +333,21 @@ public class PwaManifestTests
         Assert.True(motionBlocks.Count == 1,
             $"Expected exactly 1 '@media (prefers-reduced-motion: reduce)' block; found {motionBlocks.Count}.");
 
-        // The total @media count is six (four + one collapsed + one motion) —
-        // the "no new boundary without a record" witness (the design doc
-        // §drift-guard frozen pin #7: "a count change without a recorded entry
-        // is a breach").
+        // The two prefers-color-scheme: dark blocks (ADR 0133 — the Forest
+        // dark theme: the auto-scope token block + the auto-scope patch
+        // group). The explicit html[data-kmb-theme='dark'] scope is an
+        // attribute selector, not @media, so it is not counted here.
+        var darkBlocks = Regex.Matches(css, @"@media\s*\(\s*prefers-color-scheme:\s*dark\)");
+        Assert.True(darkBlocks.Count == 2,
+            $"Expected exactly 2 '@media (prefers-color-scheme: dark)' blocks (ADR 0133 Forest theme); found {darkBlocks.Count}.");
+
+        // The total @media count is eight (4 width + 1 collapsed + 1 motion +
+        // 2 dark) — the "no new boundary without a record" witness (the design
+        // doc §drift-guard frozen pin #7: "a count change without a recorded
+        // entry is a breach").
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 6,
-            $"Expected exactly 6 '@media' occurrences total (4 width + 1 collapsed + 1 reduced-motion); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 8,
+            $"Expected exactly 8 '@media' occurrences total (4 width + 1 collapsed + 1 reduced-motion + 2 dark / ADR 0133); found {allMedia.Count}.");
     }
 
     // ── shared helper ───────────────────────────────────────────────────────

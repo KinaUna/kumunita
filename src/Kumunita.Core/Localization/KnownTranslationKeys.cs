@@ -127,6 +127,14 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Top row",
             ["nav_variant.rail"]  = "Icon rail",
 
+            // ADR 0133 — the appearance (theme) picker: the resident chooses
+            // auto (follow the OS) / light / dark (Forest) from the account
+            // menu (theme.* are the picker labels, the active one marked ✓).
+            ["theme.label"]      = "Appearance",
+            ["theme.auto"]       = "Auto (match device)",
+            ["theme.light"]      = "Light",
+            ["theme.dark"]       = "Dark",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
             ["events.created"]    = "Created",
@@ -1984,6 +1992,12 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Obere Reihe",
             ["nav_variant.rail"]  = "Icon-Leiste",
 
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Erscheinungsbild",
+            ["theme.auto"]       = "Automatisch (wie das Gerät)",
+            ["theme.light"]      = "Hell",
+            ["theme.dark"]       = "Dunkel",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
             ["events.created"]    = "Erstellt",
@@ -3734,6 +3748,12 @@ public static class KnownTranslationKeys
             ["nav_variant.label"] = "Navigation",
             ["nav_variant.row"]   = "Barre supérieure",
             ["nav_variant.rail"]  = "Barre d’icônes",
+
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Apparence",
+            ["theme.auto"]       = "Automatique (comme l’appareil)",
+            ["theme.light"]      = "Clair",
+            ["theme.dark"]       = "Sombre",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
@@ -5486,6 +5506,12 @@ public static class KnownTranslationKeys
             ["nav_variant.label"] = "Navigation",
             ["nav_variant.row"]   = "Øverste række",
             ["nav_variant.rail"]  = "Ikonrail",
+
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Visning",
+            ["theme.auto"]       = "Automatisk (som enheden)",
+            ["theme.light"]      = "Lys",
+            ["theme.dark"]       = "Mørk",
 
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",

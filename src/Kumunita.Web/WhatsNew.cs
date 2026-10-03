@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.26.0", "2026-10-03", new List<string>
+        {
+            "Appearance — read the platform in a dark room: a dark theme (\"Forest\") now follows your device's appearance by default, and you can pin light or dark instead. The choice lives in the account menu (Appearance) and sticks per browser — a preference, not an account claim; pure CSS, so no first-paint flash and nothing the site's content-security policy would forbid (ADR 0133).",
+        }),
         new("0.25.0", "2026-10-02", new List<string>
         {
             "Onboarding — a guided walk-through for your first sign-in: one page walks you through display name, avatar, interface language, time zone, date & time format, email & notification language, and contact details, each step linking into the setting that already owns it, and a dismissible reminder banner nudges you until you finish or skip (ADR 0132).",

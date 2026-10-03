@@ -50,10 +50,10 @@
                 @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
                    set: a community post is the same "post" vocabulary as a group post).
                    D2 / C-M17·2 pin: the label is static per render — this view does not
-                   load the owner's bookmark list to decide it. Placed at the top-right
-                   of the main card. *@
+                   load the owner's bookmark list to decide it. Placed on the right of the
+                   title row, beside the ⋮ actions dropdown (rendered inside the title row
+                   below, not on its own row). *@
                 @{ var _bm = ("post", Model.Post.Id, $"/posts/{Model.Post.Id}"); }
-                <partial name="_BookmarkButton" model="@_bm" />
                 @* Author-only edit + delete entry points (both lanes are
                    author-only at the Web layer — the non-author never sees the
                    buttons, so there is no 403 surface to reach from the
@@ -82,171 +82,205 @@
                         </div>
                     }
                 }
-                @* ADR 0082 — the post's action surface: one ⋮ dropdown (the
-                   ADR 0069 / 0071 todo/board idiom). Edit is a link; Report
-                   opens a Bootstrap modal; translation add / edit each open
-                   a modal; translation remove is a confirm form in the menu;
-                   Delete is a confirm form in the menu. The Report is always
-                   available (resident-facing intake, C-M3b·1) — it is not
-                   gated on IsAuthor. The service's write-lane re-check at
-                   POST is the real gate. The dropdown itself is rendered
-                   unconditionally so a non-author can still file a report. *@
-                <div class="d-flex justify-content-end mb-2">
-                        <div class="dropdown">
-                            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                                    data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                @if (Model.Post.DeletedAt is null)
+                {
+                    @* TD (ADR 0027) — every language variant is rendered
+                       server-side; the chip row is the selector. The post's toggle
+                       scope is this group wrapper. The title and body are split
+                       into SEPARATE .td-variant containers (title on the title row,
+                       body below it) — the swap JS (translation-swap.ts) shows
+                       every .td-variant whose data-td-variant matches the picked
+                       code and hides the rest, so title + body switch in lockstep
+                       per language. The authored-in title carries
+                       td-variant-shared and doubles as the fallback heading for a
+                       translation that has no title of its own (its dedicated
+                       title, marked td-variant-title, shows instead). The ⋮
+                       dropdown + bookmark sit on the title row (not .td-variant,
+                       so they stay put). *@
+                    <div data-td-group="post">
+                        @* Title row — the title (variant-aware) on the left; the ⋮
+                           actions dropdown (ADR 0082) and the bookmark toggle (M17 /
+                           ADR 0118) on the right, on the same line. *@
+                        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                            <div class="min-w-0">
+                                @* Authored-in title — the SHARED FALLBACK heading
+                                   (td-variant-shared). Default-visible unless ADR 0049
+                                   auto-selects a translation of it into the viewer's
+                                   language (originalHidden); it also stays the heading
+                                   for any translation that has no title of its own.
+                                   The swap + return path (ADR 0027) are unchanged
+                                   either way. *@
+                                <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
+                                     @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                                    <h4 class="mb-0">
+                                        @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                                            ? Model.Post.Title
+                                            : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
+                                    </h4>
+                                </div>
+                                @* One dedicated title per user-added translation
+                                   (only when it has one) — td-variant-title, shown
+                                   in place of the shared heading for that language; the
+                                   matching one shows first if ADR 0049 selects it over
+                                   the original. A translation with no title has NO
+                                   dedicated container — the shared heading stays. *@
+                                @foreach (var t in Model.PostTranslations)
                                 {
-                                    <li>
-                                        <a class="dropdown-item text-dark" href="@($"/posts/{postId}/edit")">
-                                            <kw-l key="posts.detail_edit">Edit</kw-l>
-                                        </a>
-                                    </li>
+                                    if (!string.IsNullOrWhiteSpace(t.Title))
+                                    {
+                                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                                        <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
+                                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                            <h4 class="mb-0">@t.Title</h4>
+                                        </div>
+                                    }
                                 }
-                                <li>
-                                    <button type="button" class="dropdown-item text-dark"
-                                            data-bs-toggle="modal" data-bs-target="#report-modal">
-                                        <kw-l key="posts.report_button">Report this post</kw-l>
-                                    </button>
-                                </li>
+                            </div>
 
-                                @if (Model.CanTranslate)
-                                {
-                                    <li><hr class="dropdown-divider" /></li>
-                                    @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
-                                    {
-                                        <li>
-                                            <button type="button" class="dropdown-item text-dark"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="@($"#post-trans-edit-{existing.LanguageCode}")">
-                                                <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                            </button>
-                                        </li>
-                                    }
-                                    @foreach (var lang in missingLanguages)
-                                    {
-                                        <li>
-                                            <button type="button" class="dropdown-item text-dark"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="@($"#post-trans-add-{lang.Code}")">
-                                                <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                            </button>
-                                        </li>
-                                    }
-                                    @if (Model.PostTranslations.Count > 0)
-                                    {
-                                        <li><hr class="dropdown-divider" /></li>
-                                        @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                            @* ADR 0082 — the post's action surface: one ⋮ dropdown (the
+                               ADR 0069 / 0071 todo/board idiom). Edit is a link; Report
+                               opens a Bootstrap modal; translation add / edit each open a
+                               modal; translation remove is a confirm form in the menu;
+                               Delete is a confirm form in the menu. The Report is always
+                               available (resident-facing intake, C-M3b·1) — not gated on
+                               IsAuthor. The service's write-lane re-check at POST is the
+                               real gate. The dropdown renders unconditionally so a
+                               non-author can still file a report. *@
+                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                            data-bs-toggle="dropdown" aria-expanded="false"
+                                            aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        @if (Model.IsAuthor && Model.Post.DeletedAt is null)
                                         {
                                             <li>
-                                                <form method="post" action="@($"/posts/{postId}/translations/remove")"
-                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                <a class="dropdown-item text-dark" href="@($"/posts/{postId}/edit")">
+                                                    <kw-l key="posts.detail_edit">Edit</kw-l>
+                                                </a>
+                                            </li>
+                                        }
+                                        <li>
+                                            <button type="button" class="dropdown-item text-dark"
+                                                    data-bs-toggle="modal" data-bs-target="#report-modal">
+                                                <kw-l key="posts.report_button">Report this post</kw-l>
+                                            </button>
+                                        </li>
+
+                                        @if (Model.CanTranslate)
+                                        {
+                                            <li><hr class="dropdown-divider" /></li>
+                                            @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                            {
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-dark"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="@($"#post-trans-edit-{existing.LanguageCode}")">
+                                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                    </button>
+                                                </li>
+                                            }
+                                            @foreach (var lang in missingLanguages)
+                                            {
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-dark"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="@($"#post-trans-add-{lang.Code}")">
+                                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                                    </button>
+                                                </li>
+                                            }
+                                            @if (Model.PostTranslations.Count > 0)
+                                            {
+                                                <li><hr class="dropdown-divider" /></li>
+                                                @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                                {
+                                                    <li>
+                                                        <form method="post" action="@($"/posts/{postId}/translations/remove")"
+                                                              data-confirm="Remove this translation?" style="margin:0;">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                            <button type="submit" class="dropdown-item text-danger">
+                                                                <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                }
+                                            }
+                                        }
+
+                                        @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                                        {
+                                            <li><hr class="dropdown-divider" /></li>
+                                            <li>
+                                                <form method="post" action="@($"/posts/{postId}/delete")"
+                                                      data-confirm="Delete this post? Your replies will remain visible." style="margin:0;">
                                                     @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                        <kw-l key="posts.delete">Delete</kw-l>
                                                     </button>
                                                 </form>
                                             </li>
                                         }
-                                    }
-                                }
+                                    </ul>
+                                </div>
 
-                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
-                                {
-                                    <li><hr class="dropdown-divider" /></li>
-                                    <li>
-                                        <form method="post" action="@($"/posts/{postId}/delete")"
-                                              data-confirm="Delete this post? Your replies will remain visible." style="margin:0;">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="dropdown-item text-danger">
-                                                <kw-l key="posts.delete">Delete</kw-l>
-                                            </button>
-                                        </form>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
-                    </div>
-                @if (Model.Post.DeletedAt is null)
-                {
-                    <div class="d-flex align-items-center gap-2 text-muted small mb-3">
-                        <span class="d-inline-flex align-items-center">
-                            <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                                 data-avatar-fallback>
-                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
-                        </span>
-                        <span>
-                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
-                            @if (Model.Post.Modified is not null)
-                            {
-                                <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
-                            }
-                        </span>
-                    </div>
-
-                    @* ADR 0044 (TG lane) — the post's tags (display names in the
-                       viewer's language, resolved by the controller from the
-                       access-scoped read seam). A label, never a gate (C-TG·1):
-                       each badge links to the by-tag view (/tags/{slug}); a
-                       broken reference is dropped upstream, never an error. *@
-                    @if (Model.Tags.Count > 0)
-                    {
-                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                            @foreach (var tag in Model.Tags)
-                            {
-                                <a class="badge rounded-pill text-bg-light text-decoration-none border"
-                                   href="/tags/@tag.Slug">@tag.DisplayedName</a>
-                            }
-                        </div>
-                    }
-
-                    @* TD (ADR 0027) — the authored-in language is the first,
-                       default-visible variant; each added translation is a
-                       hidden variant; the chip row is a selector that swaps
-                       them. This group wrapper is the post's toggle scope. *@
-                    <div data-td-group="post">
-                        @* Original variant — default-visible unless ADR 0049
-                           auto-selects a translation of it into the viewer's
-                           language (originalHidden); the swap + return path
-                           (ADR 0027) are unchanged either way. *@
-                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
-                             @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                            <h4>
-                                @(!string.IsNullOrWhiteSpace(Model.Post.Title)
-                                    ? Model.Post.Title
-                                    : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
-                            </h4>
-
-                            <div class="mb-3 rc-body">
-                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                                @* M17 (ADR 0118) — the bookmark toggle, on the right of
+                                   the title row, beside the ⋮ dropdown (D2 / C-M17·2:
+                                   static label per render; the partial carries its own
+                                   form + wrapper). *@
+                                <span class="d-inline-flex">
+                                    <partial name="_BookmarkButton" model="@_bm" />
+                                </span>
                             </div>
                         </div>
 
-                        @* One variant per user-added translation — hidden by
-                           default, EXCEPT the one matching the viewer's current
-                           language, which ADR 0049 shows first (in place of the
-                           original); the rest stay hidden behind their chip. *@
+                        @* Body — the original variant's body (default-visible unless
+                           originalHidden), then one body per added translation. *@
+                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                             @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                            <div class="rc-body">
+                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                            </div>
+                        </div>
                         @foreach (var t in Model.PostTranslations)
                         {
                             bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                            // A translation with no title of its own has NO dedicated
+                            // title container above — the authored-in shared heading
+                            // (td-variant-shared) stays the heading for it; the swap JS
+                            // keeps the shared one visible unless the picked code has a
+                            // dedicated td-variant-title of its own.
                             <div class="td-variant" data-td-variant="@t.LanguageCode"
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                @if (!string.IsNullOrWhiteSpace(t.Title))
-                                {
-                                    <h4>@t.Title</h4>
-                                }
-                                <div class="mb-3 rc-body">
+                                <div class="rc-body">
                                     @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
                                 </div>
                             </div>
                         }
 
+                        @* ADR 0044 (TG lane) — the post's tags (display names in the
+                           viewer's language, resolved by the controller from the
+                           access-scoped read seam). A label, never a gate (C-TG·1):
+                           each badge links to the by-tag view (/tags/{slug}); a
+                           broken reference is dropped upstream, never an error.
+                           Not a .td-variant, so it stays visible on every swap. *@
+                        @if (Model.Tags.Count > 0)
+                        {
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                @foreach (var tag in Model.Tags)
+                                {
+                                    <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                                       href="/tags/@tag.Slug">@tag.DisplayedName</a>
+                                }
+                            </div>
+                        }
+
                         @* The chip row — a selector. The original chip is always
                            present (TD·1); one chip per added translation (TD·2).
-                           No "None yet" (TD1). *@
+                           No "None yet" (TD1). The translation add / edit / remove
+                           lanes live in the ⋮ dropdown above; this row is the
+                           *selector* and stays. *@
                         <div class="mb-3 border-top pt-3">
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="text-muted small fw-semibold">
@@ -266,11 +300,6 @@
                                     </button>
                                 }
                             </div>
-
-                            @* ADR 0082 — the translation add / edit / remove lanes
-                               are now in the ⋮ dropdown above (modals for add/edit,
-                               confirm form for remove). The chip row above is the
-                               *selector* — it stays. *@
                         </div>
                     </div>
                 }
@@ -293,6 +322,26 @@
                 <div class="text-muted small mb-0">
                     <kw-l key="posts.detail_why">You can see this post because you matched its audience (a grant of yours, or you are the author — the "owner branch" of the C1 empty-audience deny rule).</kw-l>
                 </div>
+            </div>
+
+            @* Author footer band (the Announcement Detail pattern): the author sits
+               at the BOTTOM of the section, below the body + tags + translations,
+               as its own card band — avatar links the audited serving lane
+               (GET /profile/avatar/{subjectId}), monogram sibling on its
+               fail-closed 404. *@
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                </span>
+                <span>
+                    @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                    @if (Model.Post.Modified is not null)
+                    {
+                        <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
+                    }
+                </span>
             </div>
         </div>
 

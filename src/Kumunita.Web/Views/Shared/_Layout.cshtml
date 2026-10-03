@@ -2,8 +2,15 @@
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    // ADR 0133 — the theme preference (the kumunita.theme cookie): auto (default,
+    // follow the OS prefers-color-scheme) | light | dark (the Forest theme).
+    // auto is resolved entirely in site.css (@media prefers-color-scheme), so
+    // the attribute is only emitted for an explicit override — no JS, no flash.
+    var themeMode = ThemeCookie.Read(Context.Request);
+}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-kmb-theme="@(themeMode == ThemeCookie.Light ? ThemeCookie.Light : (themeMode == ThemeCookie.Dark ? ThemeCookie.Dark : null))">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

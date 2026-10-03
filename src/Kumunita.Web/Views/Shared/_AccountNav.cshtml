@@ -271,6 +271,43 @@
                         }
                     </ul>
                 </li>
+                @* ADR 0133 — the appearance (theme) picker: the resident chooses
+                   between auto (default — follow the OS prefers-color-scheme,
+                   resolved in CSS with no JS), light, and dark (the Forest theme).
+                   The active choice is marked with a ✓. Picking a mode POSTs to
+                   /theme (the public, CSRF-protected endpoint) and redirects back
+                   — the new theme renders on the return trip, which doubles as
+                   the confirmation. The same picker shape as the nav-variant
+                   picker above (a preference, never a claim — thin-token rule,
+                   ADR 0001-B). *@
+                @{ var currentTheme = httpReq is null ? ThemeCookie.Auto : ThemeCookie.Read(httpReq); }
+                <li><hr class="dropdown-divider" /></li>
+                <li class="px-3 pt-2 pb-1 small text-secondary">
+                    <kw-l key="theme.label">Appearance</kw-l>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var (modeId, modeKey) in new[] {
+                            (ThemeCookie.Auto, "theme.auto"),
+                            (ThemeCookie.Light, "theme.light"),
+                            (ThemeCookie.Dark, "theme.dark"),
+                        })
+                        {
+                            var isActive = currentTheme == modeId;
+                            <li class="px-3">
+                                <form method="post" action="/theme" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="mode" value="@modeId" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(isActive ? "fw-semibold" : "")">
+                                        <kw-l key="@modeKey"></kw-l>
+                                        @(isActive ? " ✓" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
             </ul>
         </li>
     }

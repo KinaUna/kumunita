@@ -5,8 +5,10 @@
 
 @* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
    page — the strip sits just under the navbar (the kmb-tab-under-navbar
-   treatment, site.css). *@
-@await Html.PartialAsync("_AdminNav.cshtml")
+   treatment, site.css). The partial lives in Views/Admin (the shared admin
+   nav), so it is referenced by absolute path — the same convention as
+   AdminAnalytics/Index.cshtml, since this view sits in Views/AdminHelp. *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
 
 <h1>Help pages</h1>
 <p class="text-muted">

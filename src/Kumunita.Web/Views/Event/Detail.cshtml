@@ -114,223 +114,169 @@
                     </form>
                 }
             }
-            @* ADR 0082 — the event's action surface: one ⋮ dropdown (the
-               ADR 0069 / 0071 todo/board idiom). Edit is a plain link; Delete
-               is a confirm form in the menu; translation add / edit each open
-               a Bootstrap modal (the ADR 0071 "Add subtask" shape); translation
-               remove is a confirm form in the menu. The service's write-lane
-               re-check at POST is the real gate. *@
-            @if (Model.CanEdit || Model.CanDelete || Model.CanTranslate)
-            {
-                <div class="dropdown ms-auto">
-                    <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                            data-bs-toggle="dropdown" aria-expanded="false"
-                            aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Event.Title) ? "event" : Model.Event.Title)}")">⋮</button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        @if (Model.CanEdit)
-                        {
-                            <li>
-                                <a class="dropdown-item text-dark" href="/events/@Model.Event.Id/edit">
-                                    <kw-l key="events.edit">Edit</kw-l>
-                                </a>
-                            </li>
-                        }
 
-                        @if (Model.CanTranslate)
-                        {
-                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
-                            {
-                                <li>
-                                    <button type="button" class="dropdown-item text-dark"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="@($"#event-trans-edit-{existing.LanguageCode}")">
-                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                    </button>
-                                </li>
-                            }
-                            @foreach (var lang in missingLanguages)
-                            {
-                                <li>
-                                    <button type="button" class="dropdown-item text-dark"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="@($"#event-trans-add-{lang.Code}")">
-                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                    </button>
-                                </li>
-                            }
-                            @if (Model.Translations.Count > 0)
-                            {
-                                <li><hr class="dropdown-divider" /></li>
-                                @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
-                                {
-                                    <li>
-                                        <form method="post" action="@($"/events/{Model.Event.Id}/translations/remove")"
-                                              data-confirm="Remove this translation?" style="margin:0;">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                            <button type="submit" class="dropdown-item text-danger">
-                                                <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                            </button>
-                                        </form>
-                                    </li>
-                                }
-                            }
-                        }
-
-                        @if (Model.CanDelete)
-                        {
-                            <li><hr class="dropdown-divider" /></li>
-                            <li>
-                                <form method="post" action="/events/@Model.Event.Id/delete"
-                                      data-confirm="Delete this event? This cannot be undone." style="margin:0;">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="dropdown-item text-danger">
-                                        <kw-l key="events.delete">Delete</kw-l>
-                                    </button>
-                                </form>
-                            </li>
-                        }
-                    </ul>
-                </div>
-
-                @* ADR 0071 modal shape — one modal per language the
-                   standing-holder may edit or add. The rich editor is
-                   self-wired at module load (class-based, no dependency on
-                   the containing element) so it works inside a modal. *@
-                @if (Model.CanTranslate)
-                {
-                    @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
-                    {
-                        <div class="modal fade" id="@($"event-trans-edit-{existing.LanguageCode}")" tabindex="-1"
-                             aria-labelledby="@($"event-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
-                                    <form method="post" action="@($"/events/{Model.Event.Id}/translations/update")" id="@($"event-trans-edit-form-{existing.LanguageCode}")">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="@($"event-trans-edit-label-{existing.LanguageCode}")">
-                                                <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                            </h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
-                                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                                </label>
-                                                <input class="form-control" type="text" name="title" value="@existing.Title" />
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                </label>
-                                                <textarea class="form-control" name="body" rows="4" required>@existing.Body</textarea>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                                <kw-l key="common.cancel">Cancel</kw-l>
-                                            </button>
-                                            <button type="submit" class="btn btn-primary" form="@($"event-trans-edit-form-{existing.LanguageCode}")">
-                                                <kw-l key="posts.translation_save">Save translation</kw-l>
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    }
-
-                    @foreach (var lang in missingLanguages)
-                    {
-                        <div class="modal fade" id="@($"event-trans-add-{lang.Code}")" tabindex="-1"
-                             aria-labelledby="@($"event-trans-add-label-{lang.Code}")" aria-hidden="true">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content">
-                                    <form method="post" action="@($"/events/{Model.Event.Id}/translations")" id="@($"event-trans-add-form-{lang.Code}")">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@lang.Code" />
-                                        <div class="modal-header">
-                                            <h5 class="modal-title" id="@($"event-trans-add-label-{lang.Code}")">
-                                                <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                            </h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
-                                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                                </label>
-                                                <input class="form-control" type="text" name="title" value="@Model.Event.Title" />
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                </label>
-                                                <div class="rc-editor">
-                                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                                        <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
-                                                        <partial name="_RichEditorToggle" />
-                                                    </div>
-                                                    <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
-                                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                                <kw-l key="common.cancel">Cancel</kw-l>
-                                            </button>
-                                            <button type="submit" class="btn btn-primary" form="@($"event-trans-add-form-{lang.Code}")">
-                                                <kw-l key="posts.translation_save">Save translation</kw-l>
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
-            }
+            @* ADR 0082 — the event's action surface (one ⋮ dropdown: Edit, the
+               translation add / edit / remove lanes, Delete) now sits on the RIGHT
+               of the card's title row, beside the bookmark toggle (the posts-detail
+               layout, the requested "event details similar to posts") — rendered
+               there in the card below. The series chip / skip / restore lanes above
+               stay here in the metadata row. *@
         </div>
 
         <div class="card mb-4">
             <div class="card-body">
-                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                   set: "event"). D2 / C-M17·2 pin: the label is static per render —
-                   this view does not load the owner's bookmark list to decide it.
-                   Placed at the top-right of the main card. *@
-                @{ var _bm = ("event", Model.Event.Id, $"/events/{Model.Event.Id}"); }
-                <partial name="_BookmarkButton" model="@_bm" />
+                @* ADR 0027 chip-swap scope — the whole variant surface (title row,
+                   body, chip row) lives inside this one group wrapper; the
+                   swap JS scopes by `chip.closest('[data-td-group]')`. The
+                   add-to-calendar row is a plain element (not a .td-variant), so
+                   it sits inside too, visible in every language. *@
+                <div data-td-group="event">
+                @* Title row (the posts-detail layout) — the title (variant-aware)
+                   on the left; the ⋮ actions dropdown (ADR 0082) and the bookmark
+                   toggle (M17 / ADR 0118) on the right, on the same line. *@
+                <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                    <div class="min-w-0">
+                        @* Authored-in title — the SHARED FALLBACK heading
+                           (td-variant-shared). Default-visible unless ADR 0049
+                           auto-selects a translation of it into the viewer's
+                           language (originalHidden); it also stays the heading for
+                           any translation that has no title of its own. The swap +
+                           return path (ADR 0027) are unchanged either way. *@
+                        <div class="td-variant td-variant-shared" data-td-variant="@originalCode"
+                             @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                            <h1 class="mb-0">
+                                @if (string.IsNullOrWhiteSpace(Model.Event.Title))
+                                {
+                                    <span class="text-body-tertiary"><kw-l key="events.untitled">Untitled event</kw-l></span>
+                                }
+                                else
+                                {
+                                    @Model.Event.Title
+                                }
+                            </h1>
+                        </div>
+                        @* One dedicated title per user-added translation (only when
+                           it has one) — td-variant-title, shown in place of the
+                           shared heading for that language; the matching one shows
+                           first if ADR 0049 selects it over the original. A
+                           translation with no title has NO dedicated container —
+                           the shared heading stays. *@
+                        @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                        {
+                            if (!string.IsNullOrWhiteSpace(t.Title))
+                            {
+                                bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                                <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
+                                     @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                    <h1 class="mb-0">@t.Title</h1>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        @* ADR 0082 — the event's action surface: one ⋮ dropdown (the
+                           ADR 0069 / 0071 todo/board idiom). Edit is a plain link;
+                           Delete is a confirm form in the menu; translation add /
+                           edit each open a Bootstrap modal (the ADR 0071 "Add
+                           subtask" shape); translation remove is a confirm form in
+                           the menu. The service's write-lane re-check at POST is the
+                           real gate. Rendered unconditionally so a non-author can
+                           still see the surface. *@
+                        <div class="dropdown">
+                            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Event.Title) ? "event" : Model.Event.Title)}")">⋮</button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                @if (Model.CanEdit)
+                                {
+                                    <li>
+                                        <a class="dropdown-item text-dark" href="/events/@Model.Event.Id/edit">
+                                            <kw-l key="events.edit">Edit</kw-l>
+                                        </a>
+                                    </li>
+                                }
+
+                                @if (Model.CanTranslate)
+                                {
+                                    @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <button type="button" class="dropdown-item text-dark"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="@($"#event-trans-edit-{existing.LanguageCode}")">
+                                                <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                            </button>
+                                        </li>
+                                    }
+                                    @foreach (var lang in missingLanguages)
+                                    {
+                                        <li>
+                                            <button type="button" class="dropdown-item text-dark"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="@($"#event-trans-add-{lang.Code}")">
+                                                <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                            </button>
+                                        </li>
+                                    }
+                                    @if (Model.Translations.Count > 0)
+                                    {
+                                        <li><hr class="dropdown-divider" /></li>
+                                        @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <li>
+                                                <form method="post" action="@($"/events/{Model.Event.Id}/translations/remove")"
+                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        }
+                                    }
+                                }
+
+                                @if (Model.CanDelete)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li>
+                                        <form method="post" action="/events/@Model.Event.Id/delete"
+                                              data-confirm="Delete this event? This cannot be undone." style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <kw-l key="events.delete">Delete</kw-l>
+                                            </button>
+                                        </form>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+
+                        @* M17 (ADR 0118) — the bookmark toggle, on the right of the
+                           title row, beside the ⋮ dropdown (D2 / C-M17·2: static
+                           label per render; the partial carries its own form +
+                           wrapper). *@
+                        <span class="d-inline-flex">
+                            @{ var _bm = ("event", Model.Event.Id, $"/events/{Model.Event.Id}"); }
+                            <partial name="_BookmarkButton" model="@_bm" />
+                        </span>
+                    </div>
+                </div>
+
                 @* M12 (ADR 0112, U04) — the "Add to calendar" affordance: a
                    plain link to the lane-1 file (GET /events/{id}.ics, U02).
-                   Gated on nothing extra — this page only renders for an
-                   event the caller passed GetAsync's Read decision (the
-                   C-M12·6 "quiet" pin). The d-inline-flex wrapper keeps it on
-                   the metadata's line and lets it wrap below at 360 px
-                   (M10 phone-width re-check — no CSS change needed). *@
+                   Gated on nothing extra — this page only renders for an event the
+                   caller passed GetAsync's Read decision (the C-M12·6 "quiet" pin).
+                   The d-inline-flex wrapper keeps it on the metadata's line and
+                   lets it wrap below at 360 px (M10 phone-width re-check). *@
                 <div class="text-muted mb-3 d-inline-flex gap-2 align-items-center flex-wrap">
                     <span>
-                        @Model.AuthorDisplayName —
                         <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
                         <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
                     </span>
-                    @if (string.IsNullOrWhiteSpace(Model.Event.Location))
-                    {
-                        <!-- no location -->
-                    }
-                    else
+                    @if (!string.IsNullOrWhiteSpace(Model.Event.Location))
                     {
                         <span class="ms-2">· @Model.Event.Location</span>
                     }
@@ -339,46 +285,28 @@
                     </a>
                 </div>
 
-                @* ADR 0059 (ADR 0027 chip-swap) — the authored-in language is the
-                   first, default-visible variant; each added translation is a
-                   hidden variant; the chip row is a selector that swaps them.
+                @* ADR 0059 (ADR 0027 chip-swap) — the body is its own
+                   .td-variant set (title on the title row above, body here, chip
+                   row below); the chip row is a selector that swaps them.
                    ADR 0049 auto-selects the viewer's current-language variant as
-                   default-visible when one exists (originalHidden). This group
-                   wrapper is the event's toggle scope. *@
-                <div data-td-group="event">
-                    @* Original variant — default-visible unless ADR 0049
-                       auto-selects a translation of it into the viewer's
-                       language (originalHidden); the swap + return path (ADR
-                       0027) are unchanged either way. *@
+                   default-visible when one exists (originalHidden). The group
+                   wrapper opens before the title row and closes after the chip
+                   row — everything in between is one toggle scope. *@
+                    @* Body — the original variant's body (default-visible unless
+                       originalHidden), then one body per added translation. A
+                       translation with no title of its own keeps the shared heading
+                       (td-variant-shared) from the title row above. *@
                     <div class="td-variant" data-td-variant="@originalCode"
                          @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                        <h1 class="mb-1">
-                            @if (string.IsNullOrWhiteSpace(Model.Event.Title))
-                            {
-                                <span class="text-body-tertiary"><kw-l key="events.untitled">Untitled event</kw-l></span>
-                            }
-                            else
-                            {
-                                @Model.Event.Title
-                            }
-                        </h1>
                         @* The full body — rendered through the one MarkdownRenderer (R·1). *@
                         <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
                     </div>
 
-                    @* One variant per user-added translation — hidden by default,
-                       EXCEPT the one matching the viewer's current language, which
-                       ADR 0049 shows first (in place of the original); the rest
-                       stay hidden behind their chip. *@
                     @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                     {
                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                         <div class="td-variant" data-td-variant="@t.LanguageCode"
                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                            @if (!string.IsNullOrWhiteSpace(t.Title))
-                            {
-                                <h1 class="mb-1">@t.Title</h1>
-                            }
                             <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
                         </div>
                     }
@@ -408,22 +336,156 @@
 
                     </div>
                 </div>
+            </div>
 
-                @* Created / edited — the remaining Event timestamps (ADR 0019 /
-                   0020), rendered by the one <kw-dt> TagHelper (the per-request
-                   timezone + format resolver). Mirrors the Announcement Detail
-                   footer (a value → text, an unset Modified renders nothing). *@
-                <div class="text-muted small mt-3">
-                    <kw-l key="events.created">Created</kw-l>
-                    <kw-dt dt="@Model.Event.Created" format="g"></kw-dt>
+            @* Author footer band (the Announcement Detail pattern, matching the
+               posts detail): the author sits at the BOTTOM of the section, below
+               the body + translations, as its own card band — avatar links the
+               audited serving lane (GET /profile/avatar/{subjectId}), monogram
+               sibling on its fail-closed 404. *@
+            @{
+                string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+                    ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
+            }
+            @* Author footer band — the avatar's src is the same audited lane
+               every other avatar in the app uses (GET /profile/avatar/{subjectId});
+               the author's subject id is the Event's AuthorId (the domain's
+               owner branch — the same field the service checks against in
+               CheckEditStanding / CanAddTranslation). *@
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.Event.AuthorId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                </span>
+                <span>
+                    @Model.AuthorDisplayName
+                    @* Created / edited — the remaining Event timestamps (ADR 0019 /
+                       0020), rendered by the one <kw-dt> TagHelper (the per-request
+                       timezone + format resolver). An unset Modified renders
+                       nothing. *@
+                    · <kw-l key="events.created">Created</kw-l> <kw-dt dt="@Model.Event.Created" format="g"></kw-dt>
                     @if (Model.Event.Modified is not null)
                     {
-                        <span> · <kw-l key="events.edited">edited</kw-l>
+                        <span> — <kw-l key="events.edited">edited</kw-l>
                             <kw-dt dt="@Model.Event.Modified.Value" format="g"></kw-dt></span>
                     }
-                </div>
+                </span>
             </div>
         </div>
+
+        @* ADR 0071 modal shape — one modal per language the standing-holder may
+           edit or add. The rich editor is self-wired at module load (class-based,
+           no dependency on the containing element) so it works inside a modal.
+           These back the ⋮ dropdown's translation Edit / Add items in the title
+           row above (the same ids it targets: #event-trans-edit-* /
+           #event-trans-add-*). *@
+        @if (Model.CanTranslate)
+        {
+            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+            {
+                <div class="modal fade" id="@($"event-trans-edit-{existing.LanguageCode}")" tabindex="-1"
+                     aria-labelledby="@($"event-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/events/{Model.Event.Id}/translations/update")" id="@($"event-trans-edit-form-{existing.LanguageCode}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"event-trans-edit-label-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control" type="text" name="title" value="@existing.Title" />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <textarea class="form-control" name="body" rows="4" required>@existing.Body</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"event-trans-edit-form-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @foreach (var lang in missingLanguages)
+            {
+                <div class="modal fade" id="@($"event-trans-add-{lang.Code}")" tabindex="-1"
+                     aria-labelledby="@($"event-trans-add-label-{lang.Code}")" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/events/{Model.Event.Id}/translations")" id="@($"event-trans-add-form-{lang.Code}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"event-trans-add-label-{lang.Code}")">
+                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control" type="text" name="title" value="@Model.Event.Title" />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <div class="rc-editor">
+                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                <partial name="_RichEditorToggle" />
+                                            </div>
+                                            <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
+                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"event-trans-add-form-{lang.Code}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
 
         @* The RSVP surface (ADR 0054 §3.2): the owner-only list (the author
            sees their own event's RSVPs; a non-author sees only their own
