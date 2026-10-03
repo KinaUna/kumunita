@@ -206,6 +206,14 @@ var marten = builder.Services.AddMarten(opts =>
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
     DocumentDocTypes.Configure(opts);
+
+    // M25 (ADR 0004 §B.1): the community storage-settings doc
+    // (CommunityStorageSettings, ADR 0004 §B.1 — a parallel surface to
+    // UsageDocTypes / MediaDocTypes, not additive on an existing one:
+    // it uses the conventional string Id, so no non-default convention or
+    // business-key index is pinned). Without this call the doc is invisible
+    // to Marten (the M3/Media/Usage/Document precedent).
+    StorageSettingsDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

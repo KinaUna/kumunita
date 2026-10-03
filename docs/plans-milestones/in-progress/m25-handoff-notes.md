@@ -102,3 +102,31 @@ pause` and stop") U3 stops here rather than guessing around it.
 
 **Next unit (after the plan fix):** `m25-u04.md` (`IStorageSettingsService` +
 pure `StorageLimits.Decide` + 10 pinned Core tests) — **not started.**
+
+## U3 — doc + registration surface + boot (authored 2026-10-03, after the plan fix)
+
+**Outcome: U3 complete — build green.** Step 0 applied first: `m25-u03.md`'s
+deliverable #3 + entry read #3 re-targeted to **`Program.cs` only** (the single
+doc-surface registration site), and the Exit's "two boot-path lines" → "one".
+Then the (now-corrected) unit was executed — **2 Core files + 1 `Program.cs`
+line, mirroring M13 (`UsageDocTypes`) / M21 (`DocumentDocTypes`) exactly.** No
+service, no test added (U4 does that); `IMediaStore` / `MediaObject` /
+`MediaOptions` untouched.
+
+- **(a) `StorageSettingsDocTypes` line:** `opts.Schema.For<CommunityStorageSettings>();`
+  (`src/Kumunita.Core/Usage/StorageSettingsDocTypes.cs`; POCO at
+  `src/Kumunita.Core/Usage/CommunityStorageSettings.cs`, both
+  `namespace Kumunita.Core.Usage`, exact §2.1 shape: `Id = "community"`,
+  `long? MaxFileBytes`, `long PerUserQuotaBytes`, `DateTimeOffset Modified`,
+  `string? ModifiedById`).
+- **(b) the single boot-path line added:**
+  `src/Kumunita.Web/Program.cs` **L216** `StorageSettingsDocTypes.Configure(opts);`,
+  directly after `DocumentDocTypes.Configure(opts);` (L208), inside
+  `AddMarten(opts => { … })` — the 14th surface.
+- **(c) compile warnings on the new POCO:** **none** — `dotnet build` on
+  `Kumunita.Core` (9 pre-existing warnings, all in `SmtpSender.cs` /
+  `SampleDataSeeder.cs`, none on the new files) + `Kumunita.Web` both
+  **succeeded**.
+
+**Next unit:** `m25-u04.md` (`IStorageSettingsService` + pure
+`StorageLimits.Decide` + the 10 pinned Core tests) — **not started.**
