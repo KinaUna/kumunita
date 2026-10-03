@@ -184,3 +184,71 @@ pre-existing; none in the new files). Tests run via the reliable path —
 
 **Next unit:** `m25-u05.md` (GlobalAdmin `GET /admin/storage` view + nav link;
 the set lane is U6) — **not started.**
+
+## U5 — Drift pause (2026-10-03)
+
+**Outcome: U5 NOT executed — Drift pause recorded; no code authored, no build
+run.** The unit's guardrail BLOCKED triggers are **not** met (U4's
+`IStorageSettingsService` + the build are green, the design seam is present),
+but **deliverable #1's route is already owned by a shipped, distinct, ADR'd
+surface** — a plan↔reality contradiction on a stated deliverable, so per the
+unit rule ("if reality contradicts the plan, record `## U5 — Drift pause` and
+stop") U5 stops rather than guessing around it. **No `AdminStorageController.cs`,
+no `AdminStorageViewModel.cs`, no `Storage.cshtml`, no nav edit, no build** were
+made. `IMediaStore` / `MediaObject` / `MediaOptions` / M24's metrics surface all
+untouched.
+
+- **The route `/admin/storage` is already taken by M24 (metrics, not
+  settings).** `src/Kumunita.Web/Controllers/AdminStorageMetricsController.cs`
+  **L31** is `[Route("admin/storage")]` + a `GET Index` action rendering
+  `Views/Admin/StorageMetrics.cshtml` — M24's `StatusDone`, ADR 0134,
+  *read-only metrics* surface (total used / available / per-user table). U5's
+  deliverable #1 is a **new** `AdminStorageController` at the **same**
+  `GET /admin/storage` for a *different* thing (the settings display). Two
+  attribute-route `GET` actions on one template throw `Ambiguous match found`
+  at startup, so U5's own exit ("build green + `GET /admin/storage` renders")
+  is unsatisfiable as written.
+- **The nav card U5 would add already exists.**
+  `src/Kumunita.Web/Views/Admin/Index.cshtml` **L121** already carries a
+  "Storage" card → `href="/admin/storage"` (commented "M24 (storage metrics)").
+  Deliverable #4 ("add the Storage nav link row") would create a **duplicate**
+  pointing at M24's metrics page.
+- **M24 anticipated this and deferred the decision to M25; M25 never resolved
+  it.** `done/m24/m24-u05.md` L38–44 states the two surfaces are distinct
+  (M24 = *metrics*, M25 = *settings*) and leaves routing to the M25 agent
+  ("coexist on the same route **if M25's U5 extends M24's view**, or a distinct
+  route like `/admin/storage/settings` — the M25 agent's call, not M24's"). The
+  M25 design doc (§Scope) names `/admin/storage` for the *settings* surface as
+  though the route were free, yet lists M24's metrics tables as **Out of scope
+  (retained)** — so the route cannot be reassigned to M25.
+- **U6's plan corroborates the false premise.** `m25-u06.md` names the POST
+  lane `POST /admin/storage/limits` — a *sub-route of M24's template*. The whole
+  M25 admin-surface plan (U5+U6) presupposes M24 is **not** on `admin/storage`;
+  in reality it is. (This is the same "reuse, don't re-implement" drift class as
+  the M24 `IStorageMetricsService` seam the user's carry-forward flag named —
+  except here the *route* is the reused artifact.)
+
+**The open decision (for the plan author / next agent, not a U5 guess):**
+- **(A) Distinct route — recommended, keeps M24 untouched.** Retarget U5/U6 to
+  `GET/POST /admin/storage/settings` (or `/admin/storage-limits`): new
+  `AdminStorageController`, `AdminStorageViewModel`, `Views/Admin/Storage.cshtml`,
+  and a *new* "Storage settings" nav card (the existing "Storage" card stays the
+  M24 metrics link). U6's `POST` then becomes `POST /admin/storage/settings`.
+  This is the only option that keeps M24's ADR'd surface intact (M25 design
+  §Scope lists it as retained).
+- **(B) Coexist by extending M24's surface.** Fold the settings display + form
+  into `AdminStorageMetricsController` + `StorageMetrics.cshtml` (the
+  `done/m24/m24-u05.md` "extend M24's view" option). But this reshapes M24's
+  shipped controller/view and contradicts M25's "M24's surface is out of scope"
+  non-decision — a larger, less defensible change.
+
+Either way it is an **architectural routing decision the plan never made**;
+neither matches U5's literal deliverables (a fresh controller + fresh nav card
+at the same already-claimed route). Per the unit rule, U5 records the drift and
+stops.
+
+**Next unit:** **none started.** `m25-u06.md` is the *next* unit **only after**
+the routing decision above is resolved (A vs B) and `m25-u05.md`/`m25-u06.md` +
+the design §Scope route are corrected to match. **Do not start U6** — it
+inherits the same `/admin/storage` premise and will hit the identical
+ambiguity on its `POST /admin/storage/limits`.
