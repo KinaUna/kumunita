@@ -44,3 +44,63 @@ not stale. No BLOCKED state.
 **Next unit:** `m24-u02.md` (Seams & contracts, design doc Part 2) — **do not
 start it**; it appends to `docs/design/m24-storage-metrics-design.md` and
 depends on U1's Part 1 existing.
+
+## U2 — design doc Part 2 (seams, contracts, test list, gate, drift-guard)
+
+**Outcome: design doc Part 2 authored.** Appended
+`## Seams & contracts (Part 2, written by U2)` to
+`docs/design/m24-storage-metrics-design.md` — the exact C# shapes transcribed
+from `m24-u02.md` into the house style (the design doc is the primary tier, so
+the shapes live here, not only in the register). **No code, no build** in this
+unit.
+
+**(a) Sealed seam signatures:** `IStorageMetricsService` = 3 methods —
+`GetSnapshotAsync(CancellationToken)` → `StorageMetricsSnapshot`,
+`GetPerUserListAsync(int page, int pageSize = 25, CancellationToken)` →
+`PerUserStoragePage`, `GetPerUserUsageBytesAsync(string subjectId,
+CancellationToken)` → `long`; DTOs `StorageMetricsSnapshot` /
+`PerUserStorageRow` / `PerUserStoragePage`; impl
+`StorageMetricsService(IDocumentStore, IMediaFileStore)`. The **two
+`IMediaFileStore` read-only ADDs** (the only interface delta, C-SM·1/2):
+`GetTotalSpaceBytesAsync(CancellationToken)` +
+`GetFreeSpaceBytesAsync(CancellationToken)` → `LocalVolumeFileStore` impl (U3,
+`DriveInfo` / `statvfs` fallback).
+
+**(b) 15 test names by id:** Core (U4,
+`tests/Kumunita.Core.Tests/Usage/StorageMetricsTests.cs`) 1–10:
+`GetSnapshot_TotalUsed_SumsAllMediaObjects`,
+`GetSnapshot_UserContentUsed_Equals_TotalUsed`,
+`GetSnapshot_VolumeTotals_AreNotInQuerySession`,
+`GetPerUserList_PagesAndSortsByBytesDesc`, `PerUser_UnknownBucketGrouped`,
+`PerUser_ZeroSizeRowsExcluded`, `GetPerUserUsage_ReturnsOnlySubjectBytes`,
+`GetPerUserUsage_ReturnsZeroForUnknownSubject`,
+`GetSnapshot_ZeroRows_ReturnsZeroMetrics`,
+`GetPerUserList_UnknownBucketIsOneRow`. Web (U6,
+`tests/Kumunita.Web.Tests/AdminStorageMetricsControllerTests.cs`) 11–15:
+`AdminStorage_GlobalAdmin_Allowed`, `AdminStorage_NonGlobalAdmin_Forbidden`,
+`AdminStorage_NoAccessAuditRow`, `AdminStorage_PerUserTable_RendersWithHasMore`,
+`AdminStorage_FourMetrics_Render`.
+
+**(c) Three-test acceptance gate (by name):** **closed loop** (GlobalAdmin →
+`/admin/storage` four metrics → paged per-user table, bytes desc) · **handoff**
+(`/admin` hub "Storage" nav row → non-GlobalAdmin 403) · **part-vs-whole** (the
+15-test list is the whole; closed-loop + handoff are the parts; all pass
+together).
+
+**(d) M25 handoff seam (C-SM·7):**
+`IStorageMetricsService.GetPerUserUsageBytesAsync(string subjectId, …)` —
+`Σ SizeBytes WHERE CreatedById == subjectId` — the exact shape M25's U4
+(`IStorageSettingsService.GetPerUserUsageBytesAsync`) delegates to or
+duplicates; the drift-guard (§2.7) names it.
+
+**Drift-guard (frozen):** the 7 invariants (C-SM·1–7), the 10 FACES (F1–F10),
+the 3-method seam surface + the 3 DTO shapes, the two ADDs, the
+`GetPerUserUsageBytesAsync` seam, the `SizeBytes == 0` exclusion + the
+null/empty `CreatedById` "unknown" bucket (C-SM·5), the 15 test names, and the
+C-SM·7 milestone contract (M24 `StatusNext` at start → `StatusDone` + M25
+`StatusNext` at close). Any mismatch is a `## U<m> — Drift pause` (unit-series
+rule §6).
+
+**Next unit:** `m24-u03.md` (the two `IMediaFileStore` read-only ADDs + the
+`LocalVolumeFileStore` `DriveInfo` / `statvfs` fallback) — **do not start
+it**.

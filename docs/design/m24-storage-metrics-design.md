@@ -264,3 +264,286 @@ single in-progress milestone), M25 `StatusPlanned` — confirmed against
 the exact C# shapes, the two `IMediaFileStore` ADDs, the pinned test names,
 the three-test acceptance gate, the drift-guard) is authored by U2
 (`m24-u02.md`).*
+
+---
+
+## Seams & contracts (Part 2, written by U2)
+
+Part 1 froze *what/why* (the 7 invariants C-SM·1–7, the 10 FACES F1–F10,
+scope). This section pins *how*: the exact C# seams each later unit
+implements (U3–U6), the two `IMediaFileStore` read-only ADDs (C-SM·2) + their
+`LocalVolumeFileStore` impl, the single-`QuerySession` shapes (C-SM·4), the
+10 pinned Core test names + the 5 pinned Web test names, the three-test
+acceptance gate (U7), and the drift-guard (frozen once written). The design
+doc is the primary tier, so these exact shapes live here, not only in the
+register (`docs/plans-milestones/plan-m24-storage-metrics.md`).
+
+### 2.1 New Core-owned types (exact C#) — `Kumunita.Core.Usage`
+
+The service + DTOs live in the **existing** `Kumunita.Core.Usage` context
+(the M13 `IUsageAnalyticsService` home — mirror its `IDocumentStore` ctor +
+its `QuerySession` read shape), so C-SM·3 holds: plain DTOs, no `IFormFile`
+/ `ActionResult` / `HttpContext` anywhere on the seam.
+
+`IStorageMetricsService` — the **three** read-only seams:
+
+```csharp
+namespace Kumunita.Core.Usage;
+
+/// <summary>
+/// The M24 storage-metrics read seam (C-SM·2/3/4). Read-only, zero writes
+/// (C-SM·2): every method opens at most one <c>QuerySession</c> and calls the
+/// two <c>IMediaFileStore</c> volume-stat reads; it emits zero
+/// <c>AccessAudit</c> rows and zero new documents. Returns plain DTOs (C-SM·3).
+/// </summary>
+public interface IStorageMetricsService
+{
+    /// <summary>
+    /// The four headline metrics (total used, available, user-content used) +
+    /// the per-user aggregate counts (C-SM·2/4). **One** <c>QuerySession</c> +
+    /// **two** <c>MediaObject</c> catalog queries + **two** volume reads
+    /// (<c>GetTotalSpaceBytesAsync</c> / <c>GetFreeSpaceBytesAsync</c>), the
+    /// latter two **not** in the session (C-SM·4).
+    /// </summary>
+    Task<StorageMetricsSnapshot> GetSnapshotAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// The **paged** per-user table (the M24 title's "space used per user",
+    /// F3/F4). Default sort **descending by bytes used** (C-SM·4); the M7
+    /// <c>HasMore</c> discipline (C-SM·4/7). <paramref name="pageSize"/>
+    /// defaults to 25.
+    /// </summary>
+    Task<PerUserStoragePage> GetPerUserListAsync(int page, int pageSize = 25,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The **C-SM·7 handoff seam** M25 reuses (or re-points to):
+    /// <c>Σ SizeBytes WHERE CreatedById == subjectId</c>. This is the exact
+    /// shape M25's U4 (<c>IStorageSettingsService.GetPerUserUsageBytesAsync</c>)
+    /// delegates to or duplicates — the drift-guard (§2.7) names it.
+    /// </summary>
+    Task<long> GetPerUserUsageBytesAsync(string subjectId,
+        CancellationToken ct = default);
+}
+```
+
+The impl:
+
+```csharp
+/// <summary>The <see cref="IStorageMetricsService"/> impl (U4).</summary>
+public sealed class StorageMetricsService : IStorageMetricsService
+{
+    private readonly IDocumentStore _store;
+    private readonly IMediaFileStore _volume;
+
+    public StorageMetricsService(IDocumentStore store, IMediaFileStore volume)
+    {
+        _store  = store  ?? throw new ArgumentNullException(nameof(store));
+        _volume = volume ?? throw new ArgumentNullException(nameof(volume));
+    }
+    // the three seams: §2.3
+}
+```
+
+The three DTOs (plain records — C-SM·3):
+
+```csharp
+/// <summary>
+/// The four headline metrics (F1). <see cref="UserContentUsedBytes"/> ==
+/// <see cref="TotalUsedBytes"/> **by design** (C-SM·2/4); the "orphan file"
+/// caveat is a named non-decision.
+/// </summary>
+public sealed record StorageMetricsSnapshot(
+    long TotalUsedBytes,
+    long TotalVolumeBytes,
+    long FreeVolumeBytes,
+    long UserContentUsedBytes,
+    int TotalUniqueFiles,
+    int TotalDistinctUsers,
+    DateTimeOffset AsOf);
+
+/// <summary>
+/// One per-user row (F5/F6). <see cref="CreatedById"/> == <c>null</c> /
+/// <c>""</c> is the single **"unknown / not captured"** bucket (C-SM·5).
+/// </summary>
+public sealed record PerUserStorageRow(string? CreatedById, long Bytes, int FileCount);
+
+/// <summary>
+/// The paged per-user table (F3) — the M7 <see cref="HasMore"/> discipline
+/// (C-SM·4). <see cref="TotalUsers"/> counts distinct rows **including** the
+/// one "unknown" bucket row when present (C-SM·5).
+/// </summary>
+public sealed record PerUserStoragePage(
+    IReadOnlyList<PerUserStorageRow> Items,
+    int TotalUsers,
+    int Page,
+    bool HasMore);
+```
+
+`IMediaFileStore` — **two read-only ADDs** (C-SM·2; the ADR 0006-E lane).
+These are the **only** interface change (C-SM·1) — **no** other
+`IMediaFileStore` member is touched:
+
+```csharp
+// IMediaFileStore (the existing interface, unchanged except the two ADDs):
+/// <summary>The disk-partition total (a <c>DriveInfo</c>/<c>statvfs</c> read; **not** a <c>QuerySession</c>) — C-SM·2/4.</summary>
+Task<long> GetTotalSpaceBytesAsync(CancellationToken ct = default);
+
+/// <summary>The disk-partition free (a <c>DriveInfo</c>/<c>statvfs</c> read; **not** a <c>QuerySession</c>) — C-SM·2/4.</summary>
+Task<long> GetFreeSpaceBytesAsync(CancellationToken ct = default);
+```
+
+### 2.2 The two `IMediaFileStore` ADDs — the exact impl (U3)
+
+`LocalVolumeFileStore` (the `IMediaFileStore` impl, `Kumunita.Core.Media`)
+extends with exactly these two read-only methods. The impl is **read-only +
+no I/O side-effect beyond the `statvfs` / `DriveInfo` call** (C-SM·2):
+
+- `GetTotalSpaceBytesAsync` — on **Windows**:
+  `DriveInfo.GetDriveFromPath(RootPath).TotalSize`; on **Linux** (containers):
+  `statvfs(RootPath).f_blocks * statvfs(RootPath).f_frsize`. The unit that
+  lands this (U3) documents the platform fallback + the test that pins it —
+  **`GetTotalSpaceBytes_ReturnsPositive`**.
+- `GetFreeSpaceBytesAsync` — on **Windows**:
+  `DriveInfo.GetDriveFromPath(RootPath).AvailableFreeSpace`; on **Linux**:
+  `statvfs(RootPath).f_bavail * statvfs(RootPath).f_frsize`.
+
+Both read the configured `RootPath`'s volume only; neither opens a
+`QuerySession` (F7) and neither writes (C-SM·2).
+
+### 2.3 The single `QuerySession` shape (C-SM·4) (U4)
+
+`GetSnapshotAsync` — **one** `QuerySession`, two `MediaObject` catalog
+queries, two volume reads **outside** the session (C-SM·4):
+
+```csharp
+await using var session = _store.QuerySession();
+var totalUsed = await session.Query<MediaObject>().Sum(o => o.SizeBytes);
+var totalFiles = await session.Query<MediaObject>().Count();
+var perUser = await session.Query<MediaObject>()
+    .Where(o => o.SizeBytes > 0 && (o.CreatedById != null && o.CreatedById != ""))
+    .GroupBy(o => o.CreatedById)
+    .Select(g => (CreatedById: g.Key, Bytes: g.Sum(x => x.SizeBytes), Files: g.Count()))
+    .ToListAsync();
+var unknown = await session.Query<MediaObject>()
+    .Where(o => o.SizeBytes > 0 && (o.CreatedById == null || o.CreatedById == ""))
+    .Sum(o => o.SizeBytes);
+var totalVolume = await _volume.GetTotalSpaceBytesAsync(ct);
+var freeVolume = await _volume.GetFreeSpaceBytesAsync(ct);
+return new StorageMetricsSnapshot(totalUsed, totalVolume, freeVolume,
+    totalUsed, totalFiles, perUser.Count + (unknown > 0 ? 1 : 0),
+    DateTimeOffset.UtcNow);
+```
+
+The **M25 handoff** is `GetPerUserUsageBytesAsync` — the exact shape (C-SM·7):
+
+```csharp
+await using var session = _store.QuerySession();
+return await session.Query<MediaObject>()
+    .Where(o => o.CreatedById == subjectId)
+    .Sum(o => o.SizeBytes);
+```
+
+**This is the seam M25's U4 (`IStorageSettingsService.GetPerUserUsageBytesAsync`)
+will delegate to or duplicate** — the drift-guard (§2.7) names it.
+
+`GetPerUserListAsync` — the same `GroupBy` + `Where`, with **paging** +
+**sort** (the M7 `HasMore` discipline):
+
+```csharp
+var all = await session.Query<MediaObject>()
+    .Where(o => o.SizeBytes > 0)
+    .GroupBy(o => o.CreatedById)
+    .Select(g => new PerUserStorageRow(g.Key, g.Sum(x => x.SizeBytes), g.Count()))
+    .ToListAsync();
+// The "unknown" bucket (C-SM·5):
+var unknownBytes = all.Where(r => r.CreatedById == null || r.CreatedById == "").Sum(r => r.Bytes);
+var unknownFiles = all.Where(r => r.CreatedById == null || r.CreatedById == "").Sum(r => r.FileCount);
+var distinct = all.Where(r => r.CreatedById != null && r.CreatedById != "").ToList();
+if (unknownBytes > 0)
+    distinct.Add(new PerUserStorageRow(null, unknownBytes, unknownFiles)); // the "unknown" bucket
+distinct = distinct.OrderByDescending(r => r.Bytes).ToList(); // the default sort (C-SM·4)
+var pageItems = distinct.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+return new PerUserStoragePage(pageItems, distinct.Count, page,
+    distinct.Count > page * pageSize);
+```
+
+The **"unknown" bucket** (C-SM·5) is **one row** on the per-user table (the
+`CreatedById == null` / `""` bucket); the **`SizeBytes == 0` rows** are
+**excluded** (the `Where(o => o.SizeBytes > 0)` clause; C-SM·5).
+
+### 2.4 Pinned Core tests (exact names) — `tests/Kumunita.Core.Tests/Usage/StorageMetricsTests.cs`
+
+The 10 pinned Core tests (U4), each bound to its invariant:
+
+1. `GetSnapshot_TotalUsed_SumsAllMediaObjects` (C-SM·2/4)
+2. `GetSnapshot_UserContentUsed_Equals_TotalUsed` (C-SM·2/4)
+3. `GetSnapshot_VolumeTotals_AreNotInQuerySession` (C-SM·4/7)
+4. `GetPerUserList_PagesAndSortsByBytesDesc` (C-SM·4)
+5. `PerUser_UnknownBucketGrouped` (C-SM·5)
+6. `PerUser_ZeroSizeRowsExcluded` (C-SM·5)
+7. `GetPerUserUsage_ReturnsOnlySubjectBytes` (C-SM·7 — the M25 handoff seam)
+8. `GetPerUserUsage_ReturnsZeroForUnknownSubject` (C-SM·7)
+9. `GetSnapshot_ZeroRows_ReturnsZeroMetrics` (C-SM·2)
+10. `GetPerUserList_UnknownBucketIsOneRow` (C-SM·5)
+
+### 2.5 Pinned Web tests (exact names) — `tests/Kumunita.Web.Tests/AdminStorageMetricsControllerTests.cs`
+
+The 5 pinned Web tests (U6), the `/admin/storage` surface bound to its
+invariant:
+
+11. `AdminStorage_GlobalAdmin_Allowed` (C-SM·6)
+12. `AdminStorage_NonGlobalAdmin_Forbidden` (C-SM·6)
+13. `AdminStorage_NoAccessAuditRow` (C-SM·6)
+14. `AdminStorage_PerUserTable_RendersWithHasMore` (C-SM·4)
+15. `AdminStorage_FourMetrics_Render` (C-SM·2/4)
+
+### 2.6 Acceptance gate (U7 records) — the three-test shape
+
+The gate is three shapes, recorded by U7 (the register's close-adjacent unit);
+all must pass together:
+
+- **closed loop:** a GlobalAdmin signs in → `/admin/storage` renders the four
+  metrics (total used, available, user-content used, per-user table) → the
+  per-user table is paged + sorted by bytes desc.
+- **handoff:** the `/admin` hub shows the new "Storage" nav row → a
+  non-GlobalAdmin is **403** from `/admin/storage` (the C-SM·6 gate).
+- **part-vs-whole:** the 15-test list (10 Core + 5 Web) is the whole;
+  closed-loop + handoff are the parts; all must pass together.
+
+### 2.7 Drift-guard (frozen once written)
+
+The following are **frozen** by this unit and re-pinned by the close unit
+(U8). Any mismatch — a renamed invariant or FACES id, a reshaped seam
+signature or DTO, a dropped or renamed pinned test, or a re-pointed handoff
+seam — is a `## U<m> — Drift pause` (unit-series rule §6), not a silent fix:
+
+- the **7 invariants** (C-SM·1–7) and the **10 FACES** (F1–F10);
+- the **`IStorageMetricsService` 3-method surface** (the exact C# shapes in
+  §2.1);
+- the **`StorageMetricsSnapshot` / `PerUserStorageRow` / `PerUserStoragePage`**
+  DTO shapes;
+- the **two `IMediaFileStore` ADDs** (`GetTotalSpaceBytesAsync` +
+  `GetFreeSpaceBytesAsync`);
+- the **`GetPerUserUsageBytesAsync` seam** (the M25 handoff — **C-SM·7**);
+- the **`SizeBytes == 0` exclusion** + the **`CreatedById == null` / `""`
+  "unknown" bucket** (C-SM·5);
+- the **10 Core test names** + the **5 Web test names**;
+- the **C-SM·7 milestone contract** (M24 `StatusNext` at start; M24
+  `StatusDone` + M25 `StatusNext` at close).
+
+The canonical example the drift-guard pins: M25's U4
+`IStorageSettingsService.GetPerUserUsageBytesAsync` **should** delegate to
+M24's `IStorageMetricsService.GetPerUserUsageBytesAsync` — the drift-guard
+names the exact seam M24 ships; a re-implementation that diverges from the
+`Σ SizeBytes WHERE CreatedById == subjectId` shape is a Drift pause.
+
+---
+
+*Part 2 — Seams & contracts (the exact C# shapes, the two `IMediaFileStore`
+ADDs, the single-`QuerySession` shapes, the 15 pinned test names, the
+three-test acceptance gate, the drift-guard). Authored by U2 (this unit),
+2026-10-03, per `m24-u02.md` (the sealed-unit instruction; the authority for
+this content). Part 1 remains the primary Context/Scope/Invariants/FACES
+tier; Part 2 pins the how. Next: U3 (`m24-u03.md`) implements the two
+`IMediaFileStore` ADDs + the `LocalVolumeFileStore` fallback.*
