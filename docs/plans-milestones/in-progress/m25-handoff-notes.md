@@ -46,3 +46,32 @@ pause with the normal `## U1 — design doc Part 1` section.
 
 **Next unit:** `m25-u02.md` (Seams & contracts, design doc Part 2) — **do not
 start it**; it depends on U1's design doc Part 1 existing.
+
+## U2 — Drift pause (BLOCKED — C-UP·6 precondition regressed; 2026-10-03)
+
+**Outcome: BLOCKED — Part 2 was NOT authored.** U2's guardrail requires U1's
+design doc Part 1 to exist in
+`docs/design/m25-upload-limits-design.md` **and** the C-UP·6 single-in-progress
+contract to hold (M24 `StatusDone` / M25 `StatusNext`). **Both fail**, exactly
+as U1's Drift pause above recorded:
+- **Design doc:** `docs/design/m25-upload-limits-design.md` **does not exist**
+  (file + folder search returned nothing) — Part 1 was never authored, so the
+  frozen ids (C-UP·1–7, F1–F10) this unit is told not to re-derive have no
+  canonical source.
+- **C-UP·6 (read verbatim from `src/Kumunita.Web/Milestones.cs` on 2026-10-03):**
+  **M24 = `StatusNext`** (rendered "In progress") and **M25 = `StatusPlanned`**
+  (rendered "Planned") — M24 is not `StatusDone`, M25 is not `StatusNext`.
+
+Per U2's own guardrail ("STOP and report BLOCKED — record `## U2 — Drift
+pause` in the handoff note; do not author Part 2"), this unit stopped with
+**no files touched beyond this section**: no design doc Part 2, no seam
+signatures transcribed, no test names pinned anywhere.
+
+**Unblocked by:** the same two things as U1 — M24's close unit must land
+(promote M24 → `StatusDone` **and** M25 → `StatusNext` in
+`src/Kumunita.Web/Milestones.cs`, kept in step with `README.md` +
+`tests/Kumunita.Web.Tests/MilestonesTests.cs`), **then re-run U1** (authores
+Part 1 and replaces its Drift pause), **then re-run U2**.
+
+**Next unit:** `m25-u03.md` (Core doc + doc-surface + boot-path wiring) —
+**do not start it**; it depends on U2's Part 2 seams.
