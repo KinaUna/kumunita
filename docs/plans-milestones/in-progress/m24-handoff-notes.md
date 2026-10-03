@@ -136,3 +136,50 @@ corrected.
 
 **Next unit:** `m24-u04.md` (the `IStorageMetricsService` + `StorageMetricsService`
 + the 10 pinned Core tests) — **do not start it**.
+
+## U4 — service + Core tests
+
+**Outcome: build green + the 10 Core tests pass.** The `IStorageMetricsService`
+3-method seam + `StorageMetricsService` impl + the 3 DTOs + the DI registration
+landed in `Kumunita.Core.Usage`; the U3 two-ADD guardrail held (both
+`IMediaFileStore` ADDs present + `LocalVolumeFileStore` implements both, build
+green at entry). **(a) The 10 Core test names (by id, all passed):**
+`GetSnapshot_TotalUsed_SumsAllMediaObjects`,
+`GetSnapshot_UserContentUsed_Equals_TotalUsed`,
+`GetSnapshot_VolumeTotals_AreNotInQuerySession`,
+`GetPerUserList_PagesAndSortsByBytesDesc`, `PerUser_UnknownBucketGrouped`,
+`PerUser_ZeroSizeRowsExcluded`, `GetPerUserUsage_ReturnsOnlySubjectBytes`,
+`GetPerUserUsage_ReturnsZeroForUnknownSubject`,
+`GetSnapshot_ZeroRows_ReturnsZeroMetrics`,
+`GetPerUserList_UnknownBucketIsOneRow` — `Total: 10, Failed: 0` (and the full
+Core suite `Total: 1140, Failed: 0`). **(b) `GetSnapshotAsync` read shape:**
+**one** `QuerySession` (C-SM·4) over the `MediaObject` catalog — community total
+(`Σ SizeBytes`, the "two catalog queries" of §2.3 derived from the one row set:
+total + per-user map) — plus **two volume reads**
+(`GetTotalSpaceBytesAsync` / `GetFreeSpaceBytesAsync`) **outside** the session
+(a `DriveInfo`/`statvfs` BCL stat, not a Postgres query — C-SM·4/F7);
+`UserContentUsedBytes == TotalUsedBytes` by design (C-SM·2/4); zero writes,
+zero `AccessAudit` rows, zero new docs (C-SM·2/6).
+**(c) `GetPerUserUsageBytesAsync` seam shape (the C-SM·7 M25 handoff, F10):**
+`Σ SizeBytes WHERE CreatedById == subjectId` — the exact shape M25's U4
+(`IStorageSettingsService.GetPerUserUsageBytesAsync`) delegates to or duplicates.
+**(d) Sentinel semantics (C-SM·5):** `SizeBytes == 0` rows excluded (the
+`Where(o => o.SizeBytes > 0)` clause); `CreatedById == null` / `""` fold into a
+**single** "unknown / not captured" bucket row (never one row per null); default
+sort descending by bytes used (C-SM·4/F4).
+**(e) DI registration line** (in `DependencyInjection.cs`, after
+`IUsageAnalyticsService`):
+`services.AddTransient<Usage.IStorageMetricsService>(sp => new
+Usage.StorageMetricsService(sp.GetRequiredService<Marten.IDocumentStore>(),
+sp.GetRequiredService<IMediaFileStore>()));`
+**⚠ Drift note (not a Drift pause):** the design doc §2.3 wrote the per-user
+aggregation as a server-side `GroupBy`/`Select` LINQ. The impl instead uses the
+codebase's established, proven Marten fallback (the documented
+`UsageAnalyticsService` pattern: one `ToListAsync()` over the row set, then
+client-side group/sum) — the deterministic **results** are identical to §2.3,
+and the pins assert the results, not the SQL emitted (D7). The **frozen seam
+signatures + DTO shapes (§2.1) are unchanged**; only the non-portable
+server-side-grouping query shape was realized via the in-repo fallback.
+
+**Next unit:** `m24-u05.md` (the `AdminStorageMetricsController` + view model +
+view + nav row, GlobalAdmin-gated, read-only) — **do not start it**.

@@ -54,6 +54,17 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Usage.IUsageAnalyticsService>(sp => new Usage.UsageAnalyticsService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M24 (ADR 0134, plan U4): the storage-metrics read seam — the Usage
+        // context's operator-plane read service (C-SM·2/3/4). It composes the
+        // host-registered Marten IDocumentStore (the MediaObject catalog read)
+        // + the IMediaFileStore volume seam (the two volume-stat reads, U3).
+        // Read-only, zero writes (C-SM·2); no new authorization surface
+        // (C-SM·6). Same "AddTransient with the store injected" shape as
+        // IUsageAnalyticsService above.
+        services.AddTransient<Usage.IStorageMetricsService>(sp => new Usage.StorageMetricsService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IMediaFileStore>()));
+
         // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
         // seam (the account.signup / account.verified admin-lane emitters) is
         // resolved automatically by the container from the registered
