@@ -21,5 +21,11 @@ public interface IMediaFileStore
     /// <summary>Delete the payload file (not the document). Fails closed if the file is missing.</summary>
     Task DeleteFileAsync(string contentId, CancellationToken ct = default);
 
+    /// <summary>The disk-partition total bytes (a `DriveInfo` / `statvfs` read; not a `QuerySession`). M24, ADR 0134 C-SM·2.</summary>
+    Task<long> GetTotalSpaceBytesAsync(CancellationToken ct = default);
+
+    /// <summary>The disk-partition free bytes (a `DriveInfo` / `statvfs` read; not a `QuerySession`). M24, ADR 0134 C-SM·2.</summary>
+    Task<long> GetFreeSpaceBytesAsync(CancellationToken ct = default);
+
     string RootPath { get; }
 }

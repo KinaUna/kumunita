@@ -104,3 +104,35 @@ rule §6).
 **Next unit:** `m24-u03.md` (the two `IMediaFileStore` read-only ADDs + the
 `LocalVolumeFileStore` `DriveInfo` / `statvfs` fallback) — **do not start
 it**.
+
+## U3 — volume-stat ADDs
+
+**Outcome: build green — the two `IMediaFileStore` read-only ADDs + the
+`LocalVolumeFileStore` impl landed.** **(a) The two ADDs (exact C#, unchanged
+from §2.1):** on `IMediaFileStore`, `Task<long> GetTotalSpaceBytesAsync(
+CancellationToken ct = default)` + `Task<long> GetFreeSpaceBytesAsync(
+CancellationToken ct = default)` — read-only, zero writes, `RootPath`-scoped;
+**`IMediaStore` is untouched** (C-SM·1 confirmed — `LocalVolumeFileStore` is
+the only `IMediaFileStore` implementer, so no test double needed).
+**(b) Impl:** branches on `OperatingSystem.IsWindows()` — Windows uses the BCL
+`new DriveInfo(Path.GetPathRoot(RootPath)!).TotalSize` / `.AvailableFreeSpace`;
+Linux uses a single `statvfs` P/Invoke (`[DllImport("libc", SetLastError = true)]`
+`int statvfs(string, out statvfs_t)`, 10 × 8-byte `ulong` struct) →
+`(long)(buf.f_blocks * buf.f_frsize)` / `(long)(buf.f_bavail * buf.f_frsize)`.
+**No `QuerySession`, no write, no side-effect beyond the stat** (C-SM·2/4/F7).
+**(c) The `IMediaStore` interface is untouched** (C-SM·1 confirmed).
+**(d) Compile warnings:** none introduced — the two initial `CS8604`
+(nullability) on `Path.GetPathRoot` were silenced with the `!` operator (the
+existing `PutAsync` `Path.GetDirectoryName(final)!` style); all 9 remaining
+warnings are pre-existing.
+**⚠ Drift note (for the drift-guard, not a Drift pause):** the design doc §2.2
+wrote the Windows call as `DriveInfo.GetDriveFromPath(RootPath)` — but
+`System.IO.DriveInfo` has **no** `GetDriveFromPath` static method in .NET 10
+(build CS0117 proved it). U3 used the faithful BCL equivalent (`DriveInfo`
+root ctor over the path root) — same `TotalSize`/`AvailableFreeSpace`, same
+`RootPath` volume, same read-only semantics. The two **frozen ADD signatures
+(C-SM·1/2) are unchanged**; only the non-compiling internal impl line was
+corrected.
+
+**Next unit:** `m24-u04.md` (the `IStorageMetricsService` + `StorageMetricsService`
++ the 10 pinned Core tests) — **do not start it**.

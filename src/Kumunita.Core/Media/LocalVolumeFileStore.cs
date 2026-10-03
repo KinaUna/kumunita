@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
@@ -61,4 +62,49 @@ public sealed class LocalVolumeFileStore : IMediaFileStore
         File.Move(tmp, final, overwrite: true); // atomic replace on both Win/POSIX
         return Task.CompletedTask;
     }
+
+    // ── M24 volume-stat reads (ADR 0134 C-SM·2) ─────────────────────────────
+    // Read-only, zero writes (C-SM·2): a filesystem stat of the configured
+    // RootPath's partition — NOT a Postgres query, so it stays out of any
+    // QuerySession (C-SM·4 / F7). No I/O side-effect beyond the stat call.
+
+    public Task<long> GetTotalSpaceBytesAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (OperatingSystem.IsWindows())
+            return Task.FromResult(new DriveInfo(Path.GetPathRoot(RootPath)!).TotalSize);
+        var buf = Statvfs(RootPath); // Linux: one statvfs syscall (C-SM·2)
+        return Task.FromResult((long)(buf.f_blocks * buf.f_frsize));
+    }
+
+    public Task<long> GetFreeSpaceBytesAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (OperatingSystem.IsWindows())
+            return Task.FromResult(new DriveInfo(Path.GetPathRoot(RootPath)!).AvailableFreeSpace);
+        var buf = Statvfs(RootPath); // Linux: one statvfs syscall (C-SM·2)
+        return Task.FromResult((long)(buf.f_bavail * buf.f_frsize));
+    }
+
+    /// <summary>
+    /// Linux <c>statvfs</c> for <paramref name="path"/> (Windows uses
+    /// <see cref="DriveInfo"/>). Throws <see cref="IOException"/> on failure.
+    /// </summary>
+    private static statvfs_t Statvfs(string path)
+    {
+        if (statvfs(path, out var buf) != 0)
+            throw new IOException($"statvfs failed for '{path}' (errno {Marshal.GetLastPInvokeError()})");
+        return buf;
+    }
+
+    /// <summary>The <c>struct statvfs</c> layout (64-bit): 10 × 8-byte fields.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct statvfs_t
+    {
+        public ulong f_bsize, f_frsize, f_blocks, f_bfree, f_bavail,
+                     f_files, f_ffree, f_favail, f_flag, f_namemax;
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int statvfs(string path, out statvfs_t buf);
 }
