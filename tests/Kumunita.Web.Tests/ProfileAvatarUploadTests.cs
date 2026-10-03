@@ -131,6 +131,68 @@ public class ProfileAvatarUploadTests
         await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
     }
 
+    /// <summary>
+    /// M25 U9 (item 11, F2) — the **oversize** reject on the avatar lane,
+    /// driven through U8's <see cref="Kumunita.Web.Security.IUploadGate"/>. A
+    /// small <see cref="CommunityStorageSettings.MaxFileBytes"/> + a large
+    /// quota makes the reject purely oversize (not over-quota). The 413 is
+    /// the gate's exact <see cref="StatusCodeResult"/> (the regression-suite
+    /// pin), and <see cref="IMediaStore.PutAsync"/> is <em>never</em> called
+    /// (guards-before-write, C-UP·2 — no byte written, F9).
+    /// </summary>
+    [Fact]
+    public async Task AvatarUpload_Oversize_413()
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
+        var media = Substitute.For<IMediaStore>();
+        // Oversize: small per-file cap (32-byte payload > 16) + a large quota
+        // (so the reject is oversize, not over-quota).
+        var controller = Build(userInfo, authz, media, new MediaOptions(), Owner,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = 16, PerUserQuotaBytes = long.MaxValue });
+
+        var result = await controller.AvatarUpload(
+            TestFile("big.png", "image/png", new byte[32]));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// M25 U9 (item 12, F3) — the **over-quota** reject on the avatar lane.
+    /// Pre-seed the subject's usage (a positive <see cref
+    /// "IStorageSettingsService.GetPerUserUsageBytesAsync"/> value) + a small
+    /// <see cref="CommunityStorageSettings.PerUserQuotaBytes"/> so
+    /// <c>usage + incoming &gt; quota</c>, while <see
+    /// cref="CommunityStorageSettings.MaxFileBytes"/> is large so the file is
+    /// <em>not</em> oversize — the reject is over-quota, not oversize. 413 +
+    /// no byte written (C-UP·2 / F9).
+    /// </summary>
+    [Fact]
+    public async Task AvatarUpload_OverQuota_413()
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
+        var media = Substitute.For<IMediaStore>();
+        // Over-quota: large per-file cap (not oversize) + a small quota the
+        // pre-seeded usage already exhausts (usage 100 + 12-byte payload > 50).
+        var controller = Build(userInfo, authz, media, new MediaOptions(), Owner,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 50 },
+            currentUsageBytes: 100);
+
+        var result = await controller.AvatarUpload(
+            TestFile("pixel.png", "image/png", Png));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>());
+    }
+
     /// <summary>U7a defensive — empty upload: 400, and no file written.</summary>
     [Fact]
     public async Task Upload_Empty_Returns400()
@@ -232,7 +294,9 @@ public class ProfileAvatarUploadTests
         Kumunita.Core.Authorization.IAuthorizationService authz,
         IMediaStore media,
         MediaOptions mediaOptions,
-        string principalSubjectId)
+        string principalSubjectId,
+        Kumunita.Core.Usage.CommunityStorageSettings? settings = null,
+        long currentUsageBytes = 0)
     {
         var controller = new ProfileController(
             userInfo,
@@ -245,8 +309,16 @@ public class ProfileAvatarUploadTests
             new ClaimsIdentity(
                 new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, principalSubjectId) },
                 authenticationType: "test"));
+        // M25 U9 — the two new enforcement tests pass an explicit settings doc
+        // (small MaxFileBytes / small PerUserQuotaBytes) + a pre-seeded usage;
+        // the pre-existing tests keep the U8 default (null → env fallback, 0 →
+        // quota disabled). The U8 default settings doc is preserved as the
+        // "no override" baseline so the existing oversize/success/415/400
+        // assertions are unchanged.
+        var gateSettings = settings
+            ?? new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
         httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
-            new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 });
+            gateSettings, currentUsageBytes);
 
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return controller;

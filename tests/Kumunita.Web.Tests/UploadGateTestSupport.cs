@@ -64,8 +64,15 @@ internal static class UploadGateTestSupport
     /// (default: <c>MaxFileBytes = null</c> → the lane's
     /// <c>MediaOptions.MaxBytes</c> is the env fallback;
     /// <c>PerUserQuotaBytes = 0</c> → quota disabled, the C-UP·5 sentinel).</param>
+    /// <param name="currentUsageBytes">The subject's pre-existing usage in
+    /// bytes (the C-SM·7 read <see cref
+    /// "IStorageSettingsService.GetPerUserUsageBytesAsync"/> returns). Default
+    /// <c>0</c> (no prior usage) — the U8 baseline. The U9 over-quota fixture
+    /// passes a positive value so <c>usage + incoming &gt; PerUserQuotaBytes</c>
+    /// (F3) while <c>MaxFileBytes</c> stays large (not oversize).</param>
     public static IServiceProvider ServicesWith(
-        CommunityStorageSettings? settings = null)
+        CommunityStorageSettings? settings = null,
+        long currentUsageBytes = 0)
     {
         settings ??= new CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
 
@@ -73,7 +80,7 @@ internal static class UploadGateTestSupport
         settingsSvc.GetOrCreateAsync(Arg.Any<CancellationToken>())
             .Returns(settings);
         settingsSvc.GetPerUserUsageBytesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(0L);
+            .Returns(currentUsageBytes);
 
         return new ServiceCollection()
             .AddSingleton<IStorageSettingsService>(settingsSvc)

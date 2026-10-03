@@ -140,6 +140,54 @@ public class AttachmentUploadTests
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
+    // ── M25 U9 — per-lane enforcement (items 15–16) ───────────────────────
+    //
+    // The two enforcement rejects on this lane, driven through U8's gate. The
+    // existing <see cref="AttachUpload_F6_Oversize413"/> (C-ATT·6) already pins
+    // the oversize 413; these add the named pins (15) + the over-quota reject
+    // (16), each asserting the 413 status and that <see cref="IMediaStore
+    // .PutAsync"/> was never called (C-UP·2 / F9).
+
+    /// <summary>
+    /// M25 U9 (item 15, F2) — the **oversize** reject on the attachment lane.
+    /// A small <see cref="CommunityStorageSettings.MaxFileBytes"/> + a large
+    /// quota makes the reject purely oversize. 413 + no byte written.
+    /// </summary>
+    [Fact]
+    public async Task AttachmentUpload_Oversize_413()
+    {
+        var (controller, media) = Build(mediaOptions: new MediaOptions(), actor: Actor,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = 16, PerUserQuotaBytes = long.MaxValue });
+
+        var result = await controller.Upload(TestFile("big.pdf", "application/pdf", new byte[32]));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// M25 U9 (item 16, F3) — the **over-quota** reject on the attachment
+    /// lane. Pre-seeded usage + a small quota (so <c>usage + incoming &gt;
+    /// quota</c>) with a large per-file cap (so the file is not oversize).
+    /// 413 + no byte written.
+    /// </summary>
+    [Fact]
+    public async Task AttachmentUpload_OverQuota_413()
+    {
+        var (controller, media) = Build(mediaOptions: new MediaOptions(), actor: Actor,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 50 },
+            currentUsageBytes: 100);
+
+        var result = await controller.Upload(TestFile("report.pdf", "application/pdf", Pdf));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
     // ── Support (NOT one of the 10 pinned names) ───────────────────────────
     //
     // A small valid PDF under the cap, on the attachment allowlist → the
@@ -252,7 +300,9 @@ public class AttachmentUploadTests
     /// reads.
     /// </summary>
     private static (AttachmentController Controller, IMediaStore Media) Build(
-        MediaOptions mediaOptions, string actor)
+        MediaOptions mediaOptions, string actor,
+        Kumunita.Core.Usage.CommunityStorageSettings? settings = null,
+        long currentUsageBytes = 0)
     {
         // The PostService ctor null-checks its three arguments (no DB work in
         // the ctor); the Upload action never calls it, so substitutes suffice
@@ -276,8 +326,13 @@ public class AttachmentUploadTests
             new ClaimsIdentity(
                 new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, actor) },
                 authenticationType: "test"));
+        // M25 U9 — the two enforcement tests pass an explicit settings doc +
+        // pre-seeded usage; the pre-existing tests keep the U8 default (null →
+        // env fallback, 0 → quota disabled), so their assertions are unchanged.
+        var gateSettings = settings
+            ?? new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
         httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
-            new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 });
+            gateSettings, currentUsageBytes);
 
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return (controller, media);

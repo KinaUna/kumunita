@@ -595,3 +595,69 @@ path). **No new test** in U8 (U9 adds the per-lane enforcement tests).
 
 **Next unit:** `m25-u09.md` (the **per-lane enforcement Web tests** — oversize +
 over-quota on all four lanes, + the distinct-message test). **Not started.**
+
+## U9 — per-lane enforcement tests (done 2026-09-13)
+
+**Outcome: U9 complete — 9 enforcement tests added, Web suite green.**
+**Total 782, Errors 0, Failed 0, Skipped 0** (up from U8's 773 — exactly the
+9 new tests; run via the reliable
+`dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+path). Test-only unit: **no production code changed**.
+
+**(a) The 9 test names, by lane.**
+
+| # | Lane | File | Test |
+|---|------|------|------|
+| 11 | avatar | `ProfileAvatarUploadTests.cs` | `AvatarUpload_Oversize_413` |
+| 12 | avatar | `ProfileAvatarUploadTests.cs` | `AvatarUpload_OverQuota_413` |
+| 13 | content-image | `ContentImageUploadTests.cs` | `ContentImageUpload_Oversize_413` |
+| 14 | content-image | `ContentImageUploadTests.cs` | `ContentImageUpload_OverQuota_413` |
+| 15 | attachment | `AttachmentUploadTests.cs` | `AttachmentUpload_Oversize_413` |
+| 16 | attachment | `AttachmentUploadTests.cs` | `AttachmentUpload_OverQuota_413` |
+| 17 | document (upload) | `DocumentControllerTests.cs` | `DocumentUpload_Oversize_413` |
+| 18 | document (upload) | `DocumentControllerTests.cs` | `DocumentUpload_OverQuota_413` |
+| 19 | gate (isolated) | `UploadGateTests.cs` *(new file)* | `UploadGate_OversizeAndOverQuota_HaveDistinctMessages` |
+
+Each of items 11–18 drives the real lane action (via that lane's existing
+harness + `TestFormFile`) and asserts the reject is the **exact** `413`
+`StatusCodeResult` the per-lane suite already pins — `Assert.IsType<
+StatusCodeResult>(...)` + `StatusCode == 413` — **and** that `PutAsync` was
+**not** called (F9, no byte written).
+
+**(b) The distinct oversize / over-quota assertion mechanism (the decision U8
+deferred to U9).** Chosen: **assert F2 ≠ F3 at the *decision* level, not on a
+413 body.** U8 returns a bare `new StatusCodeResult(413)` for *both* reject
+reasons — .NET 10's `StatusCodeResult` has no message body (only `StatusCode` +
+`ContentType`), and the per-lane tests pin the *exact* type. So `UploadGate_
+OversizeAndOverQuota_HaveDistinctMessages` drives the gate **directly** with one
+oversize input and one over-quota input, asserts **both** resolve to the exact
+`413` `StatusCodeResult` (preserving the per-lane pin), and then runs the same
+two inputs through the **pure** `StorageLimits.Decide` (size-first, C-UP·2) to
+pin `StorageDecision.Oversize` vs `StorageDecision.OverQuota` +
+`Assert.NotEqual`. That is the distinguishability — the *reason* is distinct in
+Core's decision; the *HTTP carrier* is deliberately identical. This keeps the
+single-413-producer invariant (C-UP·3) and the exact-type pins intact.
+
+**(c) The over-quota fixture shape.** A `CommunityStorageSettings` with
+**`MaxFileBytes = long.MaxValue`** (so the payload is *not* oversize) + a **small
+`PerUserQuotaBytes` (50)**, combined with a **pre-seeded usage read** that the
+incoming payload pushes over (`GetPerUserUsageBytesAsync` → 100, so `100 + 12 > 50`).
+The pre-seeded usage is a **new `currentUsageBytes` parameter** threaded through
+`UploadGateTestSupport.ServicesWith(..., long currentUsageBytes = 0)` (the stub
+usage read now `.Returns(currentUsageBytes)` instead of a hardcoded `0L`) and
+each lane's `Build(...)` / `PrincipalHttpContext(...)`. The **oversize** fixture
+is the mirror: **`MaxFileBytes = 16`** + `PerUserQuotaBytes = long.MaxValue` +
+a 100-byte payload (oversize, *not* over-quota). This asymmetry (which bound is
+the `long.MaxValue` sentinel vs the small real cap) is what isolates F2 from F3.
+
+**(d) Guard order — confirmed against U8's call-sites.** All four `Upload`
+actions + `DocumentController.Edit` adopt the gate in the **same** order U8
+wired: empty→400 **before**, gate→413 **middle**, allowlist→415 **after**, all
+**before** `PutAsync` (guards-before-write, C-UP·2). **No lane had a divergent
+guard order** — the enforcement tests' 413 therefore always arrives from the
+gate, never from a leftover inline check.
+
+**Exit:** build green + the 9 enforcement tests pass + full suite green
+(**782**). U9 does **not** start U10.
+
+**Next unit:** `m25-u10.md`. **Not started.**
