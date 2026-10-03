@@ -112,6 +112,19 @@
             </div>
         </a>
     </div>
+    @* M24 (storage metrics) — the read-only byte-store overview: total used,
+       available, user content, and the per-user table. The GlobalAdmin gate
+       is on the /admin/storage controller (C-SM·6); the hub is itself
+       GlobalAdmin-gated, so the card renders unconditionally like the other
+       core sections above it. *@
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/storage">
+            <div class="card-body">
+                <div class="fw-semibold">Storage</div>
+                <small class="text-muted">How full the byte store is, how much is resident content, and the space used per user. Read-only.</small>
+            </div>
+        </a>
+    </div>
     <div class="col-md-6 col-lg-4">
         <a class="card text-decoration-none" href="/admin/announcements/comments">
             <div class="card-body">

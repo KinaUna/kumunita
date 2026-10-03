@@ -1,0 +1,134 @@
+@model Kumunita.Web.Models.AdminStorageMetricsViewModel
+@{
+    ViewData["Title"] = "Admin — Storage";
+}
+@functions {
+    @* A compact human byte formatter (IEC units) shared by the metric cards
+       and the per-user table. A plain C# helper — no kw-l dependency. *@
+    static string Bytes(long v)
+    {
+        string[] u = { "B", "KiB", "MiB", "GiB", "TiB", "PiB" };
+        double n = v;
+        int i = 0;
+        while (n >= 1024 && i < u.Length - 1) { n /= 1024; i++; }
+        return i == 0 ? $"{n:0} {u[i]}" : $"{n:0.##} {u[i]}";
+    }
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): this view lives in
+   Views/Admin/ (the AdminController's own section folder), so the shared
+   partial resolves relatively — the same shape as Index.cshtml in this folder. *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+<h1>Storage</h1>
+<p class="text-muted">
+    A read-only view of the media byte store: how full the volume is, how much is
+    resident content, and the space used per user. A point-in-time snapshot — no
+    history, and no export in this version. Read-only: this page writes nothing.
+</p>
+
+@* The copy throughout is plain English: the admin shell's local convention
+   (the /admin hub + Platform are mostly non-kw-l English), which keeps this
+   view within M24's Web-only scope — no KnownTranslationKeys registration. *@
+
+@* The four headline metrics (F1): total used, available, user-content used,
+   as-of. Rendered as cards — the /admin hub's overview-card idiom. *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Bytes(Model.TotalUsedBytes)</div>
+                <div class="text-muted small">total used</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Bytes(Model.AvailableBytes)</div>
+                <div class="text-muted small">available</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Bytes(Model.UserContentUsedBytes)</div>
+                <div class="text-muted small">user content</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@(Model.AsOf.ToString("u"))</div>
+                <div class="text-muted small">as of (UTC)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* The aggregate counts (C-SM·2/4) — the context for the per-user table below.
+   The single "unknown" bucket (files whose author was never captured) is a
+   named row in that table (C-SM·5 / F5). *@
+<p class="text-muted small mb-3">
+    @Model.TotalUniqueFiles unique files across @Model.TotalDistinctUsers user(s).
+    The per-user table below includes one "unknown / not captured" row for files
+    whose author was never recorded.
+</p>
+
+@* The per-user table (F3/F4/F5) — paged, sorted descending by bytes used (the
+   service orders it), one "unknown / not captured" bucket row when present.
+   The created-by id is rendered raw: this is the operator's admin surface (the
+   M13 analytics view likewise shows raw ids). *@
+<h2 class="h5">Space used per user</h2>
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th class="text-end">Bytes</th>
+                <th class="text-end">Files</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="3" class="text-muted">No user content captured yet.</td></tr>
+            }
+            @foreach (var r in Model.Items)
+            {
+                <tr>
+                    <td class="text-break">
+                        @if (string.IsNullOrEmpty(r.CreatedById))
+                        {
+                            <span class="text-muted fst-italic">unknown / not captured</span>
+                        }
+                        else
+                        {
+                            @r.CreatedById
+                        }
+                    </td>
+                    <td class="text-end">@Bytes(r.Bytes)</td>
+                    <td class="text-end">@r.FileCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* The M7 HasMore pager (C-SM·4 / F3). Only link to pages that exist: Prev when
+   page &gt; 1, Next when HasMore is true. Plain interpolated hrefs with simple
+   page arithmetic — no taghelper inside the attribute (the Razor attribute
+   trap) and no @Model.X leaking literally. *@
+<nav class="d-flex align-items-center gap-2 mt-2">
+    <span class="text-muted small">Page @Model.Page</span>
+    @if (Model.Page > 1)
+    {
+        <a class="btn btn-outline-primary btn-sm" href="/admin/storage?page=@(Model.Page - 1)">&larr; Prev</a>
+    }
+    @if (Model.HasMore)
+    {
+        <a class="btn btn-outline-primary btn-sm" href="/admin/storage?page=@(Model.Page + 1)">Next &rarr;</a>
+    }
+</nav>
