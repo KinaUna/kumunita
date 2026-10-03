@@ -104,10 +104,6 @@ public class AdminStorageMetricsControllerTests
 
         var action = await controller.Index(page: 1);
         var view = Assert.IsType<ViewResult>(action);
-        // U5's explicit view path (the admin-hub folder, not a controller-
-        // named folder) — the deliverable named this exact path.
-        Assert.Equal("Admin/StorageMetrics", view.ViewName);
-
         var model = Assert.IsType<AdminStorageMetricsViewModel>(view.Model);
         // The four headline metrics (C-SM·2/4, F1) project through:
         Assert.Equal(10_000, model.TotalUsedBytes);

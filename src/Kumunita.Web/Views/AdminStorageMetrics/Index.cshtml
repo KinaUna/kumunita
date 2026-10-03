@@ -15,10 +15,11 @@
     }
 }
 
-@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): this view lives in
-   Views/Admin/ (the AdminController's own section folder), so the shared
-   partial resolves relatively — the same shape as Index.cshtml in this folder. *@
-@await Html.PartialAsync("_AdminNav.cshtml")
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom). This view sits in
+   Views/AdminStorageMetrics/, so the shared partial — which lives in
+   Views/Admin/ (the AdminController's own section) — must be referenced
+   absolutely, the same shape as AdminAnalytics/Index.cshtml. *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
 
 <h1>Storage</h1>
 <p class="text-muted">

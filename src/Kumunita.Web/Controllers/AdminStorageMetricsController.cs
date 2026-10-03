@@ -20,7 +20,8 @@ namespace Kumunita.Web.Controllers;
 /// <see cref="Index"/> action) loads the <see cref="StorageMetricsSnapshot"/>
 /// (<see cref="IStorageMetricsService.GetSnapshotAsync"/>) + the paged
 /// per-user table (<see cref="IStorageMetricsService.GetPerUserListAsync"/>)
-/// and renders <c>Views/Admin/StorageMetrics.cshtml</c>.
+/// and renders <c>Views/AdminStorageMetrics/Index.cshtml</c> (the admin-section
+/// convention: <c>AdminXyzController</c> → <c>Views/AdminXyz/Index.cshtml</c>).
 /// <para>
 /// <b>No form, no write, no POST action</b> — the set-lane (per-file limit +
 /// per-user quota) is M25's U5/U6; this unit is metrics only. The gate is the
@@ -56,7 +57,7 @@ public sealed class AdminStorageMetricsController(IStorageMetricsService metrics
         var snapshot = await snapshotTask;
         var perUser  = await perUserTask;
 
-        return View("Admin/StorageMetrics", new AdminStorageMetricsViewModel
+        return View(new AdminStorageMetricsViewModel
         {
             TotalUsedBytes       = snapshot.TotalUsedBytes,
             AvailableBytes       = snapshot.FreeVolumeBytes,

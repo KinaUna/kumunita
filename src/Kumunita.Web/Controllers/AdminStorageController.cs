@@ -27,7 +27,8 @@ namespace Kumunita.Web.Controllers;
 /// <see cref="IStorageMetricsService.GetSnapshotAsync"/> C-SM·2 seam M24's
 /// controller reads — reusing the <c>TotalUsedBytes</c> <c>Σ SizeBytes</c>
 /// shape, not a fresh <c>Query&lt;MediaObject&gt;().Sum(…)</c>) and renders
-/// <c>Views/Admin/Storage.cshtml</c>. There is **no form and no POST** in this
+/// <c>Views/AdminStorage/Index.cshtml</c> (the admin-section convention:
+/// <c>AdminXyzController</c> → <c>Views/AdminXyz/Index.cshtml</c>). There is **no form and no POST** in this
 /// unit — the set-lane (<c>POST /admin/storage/settings</c>) is U6.
 /// </para>
 /// <para>
