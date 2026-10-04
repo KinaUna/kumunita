@@ -1,7 +1,20 @@
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
 @{
     ViewData["Title"] = "Choose your language";
+    // The reset form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmReset = "Reset your language preference to the instance default?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmReset = await Translation.GetAsync("locale.reset_confirm", effLang);
+    }
 }
 
 <h1><kw-l key="locale.public_title">Choose your language</kw-l></h1>
@@ -45,7 +58,7 @@
 </form>
 
 <form method="post" action="/language" class="mt-3"
-      data-confirm="Reset your language preference to the instance default?">
+      data-confirm="@confirmReset">
     @Html.AntiForgeryToken()
     <input type="hidden" name="clear" value="1" />
     <button type="submit" class="btn btn-outline-secondary"><kw-l key="locale.reset">Reset to instance default</kw-l></button>

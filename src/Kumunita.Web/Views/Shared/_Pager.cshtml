@@ -1,5 +1,9 @@
 @model Kumunita.Web.Models.PagedViewModel
 @using System.Text
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @functions {
     // D7 — the pager's links carry the *current* filter values as query
     // pairs, so prev/next don't drop the filter (the F3 pin). `page`
@@ -21,7 +25,17 @@
 }
 @if (Model.HasPrevious || Model.HasNext)
 {
-    <nav aria-label="pagination" class="mt-3">
+    // The pager's accessible name is server-resolved (the kw-l TagHelper can't
+    // wrap an attribute); the a11y.* floor is the closed set. A null provider
+    // (a non-HTTP render) degrades to the en floor.
+    string ariaPagination = "Pagination";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        ariaPagination = await Translation.GetAsync("a11y.pagination", effLang);
+    }
+
+    <nav aria-label="@ariaPagination" class="mt-3">
         <ul class="pagination">
             <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
                 <a class="page-link"

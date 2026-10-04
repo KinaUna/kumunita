@@ -247,6 +247,30 @@ public sealed class Profile
     /// no re-seed, no EF migration.
     /// </summary>
     public bool MessagingRestricted { get; set; } = false;
+
+    /// <summary>
+    /// The <b>guardian's community block</b> over a supervised child — the set of
+    /// community (component) ids a guardian has <b>blocked access to and hidden</b>
+    /// for the child. A <b>ceiling</b>, like <see cref="MessagingRestricted"/> (the
+    /// parental-restriction model), but per-community rather than a single flag:
+    /// an id in this list is excluded from the child's effective community set on
+    /// every access surface (the community directory/sidebar, the community feed,
+    /// the posting gate, and the audience visibility of community-scoped posts) —
+    /// which is exactly why it works for a <b>mandatory</b> community, whose
+    /// membership is implicit and cannot be removed (ADR 0012: the removal lanes
+    /// refuse / skip it, so "removing the child" is impossible there). Removing an
+    /// id restores full access (the child's own membership — explicit or mandatory —
+    /// stands again). Written only by the
+    /// <see cref="IUserInfoService.SetChildCommunityBlockAsync"/> lane (a guardian
+    /// with an active <see cref="GuardianLink"/> — the
+    /// <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/> precedent:
+    /// a guardian action over the child, one active-link standing gate, one audit
+    /// row). For an unsupervised resident this stays empty (no guardian to set it),
+    /// so the effective set reduces to the ordinary membership. An *additive* field
+    /// (ADR 0004 §B.1), like <see cref="MessagingRestricted"/> / <see cref="TagIds"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public IReadOnlyList<string> BlockedCommunityIds { get; set; } = [];
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

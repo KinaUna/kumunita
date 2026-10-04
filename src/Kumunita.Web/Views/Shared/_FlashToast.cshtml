@@ -23,14 +23,29 @@
     — the data API does not read data-bs-autohide / data-bs-delay (a
     Bootstrap upstream limitation), so the config is passed in JS.
 *@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     string? info = TempData["info"]   as string;
     string? err  = TempData["error"]  as string;
+    // The toast's accessible names are server-resolved (the kw-l TagHelper
+    // can't wrap an attribute); the a11y.* floor is the closed set. A null
+    // provider (a non-HTTP render) degrades to the en floor.
+    string ariaNotifications = "Notifications";
+    string ariaClose         = "Close";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        ariaNotifications = await Translation.GetAsync("a11y.notifications", effLang);
+        ariaClose         = await Translation.GetAsync("a11y.close", effLang);
+    }
 }
 @if (info is not null || err is not null)
 {
     <div class="toast-container position-fixed top-0 end-0 p-3 kmb-flash-toast"
-         id="flash-toast-container" aria-label="Notifications">
+         id="flash-toast-container" aria-label="@ariaNotifications">
         @if (info is not null)
         {
             <div class="toast align-items-center text-bg-success border-0 show"
@@ -38,7 +53,7 @@
                 <div class="d-flex">
                     <div class="toast-body">@info</div>
                     <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                            data-bs-dismiss="toast" aria-label="Close"></button>
+                            data-bs-dismiss="toast" aria-label="@ariaClose"></button>
                 </div>
             </div>
         }
@@ -49,7 +64,7 @@
                 <div class="d-flex">
                     <div class="toast-body">@err</div>
                     <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                            data-bs-dismiss="toast" aria-label="Close"></button>
+                            data-bs-dismiss="toast" aria-label="@ariaClose"></button>
                 </div>
             </div>
         }

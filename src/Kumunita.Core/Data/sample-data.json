@@ -126,7 +126,7 @@
     {
       "slug": "kowalski-family",
       "name": "Kowalski Family",
-      "description": "Anna and Ben's household — a private organizing group (ADR 0010).",
+      "description": "Anna and Ben's household — a private organizing group.",
       "isPrivate": true,
       "ownerEmail": "anna@examplium.com",
       "memberEmails": [
@@ -138,19 +138,19 @@
         {
           "languageCode": "da",
           "name": "Familien Kowalski",
-          "description": "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
+          "description": "Anna og Bens husholdning — en privat organiseringsgruppe.",
           "daysAgo": 40
         },
         {
           "languageCode": "de",
-          "title": "Familie Kowalski",
-          "body": "Der Haushalt von Anna und Ben — eine private Organisationsgruppe (ADR 0010).",
+          "name": "Familie Kowalski",
+          "description": "Der Haushalt von Anna und Ben — eine private Organisationsgruppe.",
           "daysAgo": 40
         },
         {
           "languageCode": "fr",
-          "title": "Famille Kowalski",
-          "body": "Le ménage d’Anna et de Ben — un groupe d’organisation privé (ADR 0010).",
+          "name": "Famille Kowalski",
+          "description": "Le ménage d’Anna et de Ben — un groupe d’organisation privé.",
           "daysAgo": 40
         }
       ]
@@ -182,8 +182,8 @@
         },
         {
           "languageCode": "fr",
-          "title": "Square de la rue",
-          "body": "Des voisins qui travaillent sur le square partagé près de l’aire de jeux.",
+          "name": "Square de la rue",
+          "description": "Des voisins qui travaillent sur le square partagé près de l’aire de jeux.",
           "daysAgo": 35
         }
       ]

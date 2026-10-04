@@ -55,6 +55,13 @@
 (() => {
   'use strict';
 
+  // Localized UI strings (P0-6, the #kumunita-strings bundle).
+  const S: Record<string, string> = (() => {
+    const el = document.getElementById('kumunita-strings');
+    try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
+  })();
+  const L = (key: string, fallback: string): string => S[key] || fallback;
+
   const POLL_INTERVAL_MS = 30_000; // C-M6·10 — the lean poller shape
   const DROPDOWN_ITEM_CAP = 5; // the "most recent five" shape
   const BELL_ID = 'notifications-bell'; // U06's frozen pin
@@ -196,7 +203,7 @@
       // label is the inbox's own page title — taken from the response
       // (server-rendered), never re-resolved client-side.
       const inboxLabel =
-        tpl.content.querySelector('title')?.textContent?.trim() || 'Notifications';
+        tpl.content.querySelector('title')?.textContent?.trim() || L('notif.fallback', 'Notifications');
       const hrLi = document.createElement('li');
       const hr = document.createElement('hr');
       hr.className = 'dropdown-divider';

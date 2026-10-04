@@ -17,6 +17,9 @@
     // M23 (U04) — the tags input's placeholder (one of the seven U04 kw-l
     // keys), resolved in the same effective language as the field labels.
     var tagsPlaceholder = await Translation.GetAsync("profile.edit.tags.placeholder", kwlLang);
+    // The avatar file input's aria-label (server-resolved; the kw-l TagHelper
+    // can't wrap an attribute) — the a11y.avatar closed-set key.
+    var ariaAvatar = await Translation.GetAsync("a11y.avatar", kwlLang);
 }
 
 <div class="row justify-content-center">
@@ -75,7 +78,7 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <input type="file" name="file" required
                            accept="image/jpeg,image/png,image/webp,image/gif"
-                           aria-label="Avatar image"
+                           aria-label="@ariaAvatar"
                            class="form-control form-control-sm">
                     <button type="submit" class="btn btn-primary" disabled><kw-l key="profile.save_avatar">Save avatar</kw-l></button>
                 </div>

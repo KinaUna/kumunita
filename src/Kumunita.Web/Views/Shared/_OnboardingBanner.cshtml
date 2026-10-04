@@ -27,6 +27,9 @@
 @using Kumunita.Core.UserInfo
 @using Kumunita.Web.Security
 @inject IUserInfoService UserInfo
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     // Signed-in resident only: an unauthenticated request has no subject →
     // no profile read, no banner (the null-safe idiom, D5/D6).
@@ -43,17 +46,24 @@
 }
 @if (bannerEligible)
 {
+    // The banner's accessible names are server-resolved (the kw-l TagHelper
+    // can't wrap an attribute); the a11y.* floor is the closed set.
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaRegion   = await Translation.GetAsync("a11y.onboarding_region", effLang);
+    string ariaAction   = await Translation.GetAsync("a11y.onboarding_action", effLang);
+    string ariaDismiss  = await Translation.GetAsync("a11y.onboarding_dismiss", effLang);
+
     <div class="kumunita-onboarding-banner alert alert-secondary alert-dismissible fade show mb-3"
-         role="region" aria-label="Account setup">
+         role="region" aria-label="@ariaRegion">
         <div class="container-fluid py-2 d-flex align-items-center gap-2">
             <span class="me-auto me-2">
                 <kw-l key="onboarding.banner.text">Finish setting up your account?</kw-l>
             </span>
             <a class="btn btn-sm btn-primary text-nowrap" href="/onboarding"
-               aria-label="Start setup"><kw-l key="onboarding.banner.action">Start setup</kw-l></a>
+               aria-label="@ariaAction"><kw-l key="onboarding.banner.action">Start setup</kw-l></a>
             <button type="button" class="btn-close"
                     data-dismiss-key="kumunita-onboarding-banner-dismissed"
-                    aria-label="Dismiss this banner"></button>
+                    aria-label="@ariaDismiss"></button>
         </div>
     </div>
 

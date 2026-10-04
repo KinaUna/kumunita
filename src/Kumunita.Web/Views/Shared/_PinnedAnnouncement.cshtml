@@ -31,8 +31,15 @@
             ? "text-bg-secondary"
             : "text-bg-primary";
 
+        // The banner's accessible names are server-resolved (the kw-l TagHelper
+        // can't wrap an attribute); the a11y.* floor is the closed set.
+        string ariaPinnedRegion  = await Translation.GetAsync("a11y.pinned_announcement", effLang);
+        string ariaReadMore      = await Translation.GetAsync("a11y.banner_read_more", effLang);
+        string ariaSeeAll        = await Translation.GetAsync("a11y.banner_all", effLang);
+        string ariaDismiss       = await Translation.GetAsync("a11y.banner_dismiss", effLang);
+
         <div class="kumunita-pinned-announcement alert alert-info alert-dismissible fade show mb-3"
-             role="region" aria-label="Pinned announcement" data-pinned-id="@pinned.Id">
+             role="region" aria-label="@ariaPinnedRegion" data-pinned-id="@pinned.Id">
             <div class="container-fluid py-2">
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge @badgeClass">
@@ -57,13 +64,13 @@
                     </span>
                     <a class="btn btn-sm btn-link text-nowrap p-0"
                        href="/announcements/@pinned.Id"
-                       aria-label="Read this announcement in full"><kw-l key="announcements.banner_read_more">Read more</kw-l></a>
+                       aria-label="@ariaReadMore"><kw-l key="announcements.banner_read_more">Read more</kw-l></a>
                     <a class="btn btn-sm btn-link text-nowrap p-0" href="/announcements"
-                       aria-label="See all announcements"><kw-l key="announcements.banner_all">All announcements</kw-l></a>
+                       aria-label="@ariaSeeAll"><kw-l key="announcements.banner_all">All announcements</kw-l></a>
                     <button type="button" class="btn-close"
                             data-bs-dismiss="alert"
                             data-dismiss-key="@dismissKey"
-                            aria-label="Dismiss this pinned announcement"></button>
+                            aria-label="@ariaDismiss"></button>
                 </div>
             </div>
         </div>

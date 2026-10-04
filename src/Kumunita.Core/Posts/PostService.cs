@@ -322,8 +322,14 @@ public sealed class PostService
 
         if (!hasGlobalAdmin && !hasComponentModerator)
         {
+            // The EFFECTIVE community set (the GetEffectiveCommunityIdsAsync
+            // seam) — raw membership MINUS the guardian's per-community block.
+            // A supervised child whose guardian blocked this community (a
+            // mandatory one included — ADR 0012's "cannot remove" is bypassed
+            // by "block") is denied the posting right, even though their
+            // implicit/explicit membership still shows in the raw read.
             var communities = await _userInfo
-                .GetCommunityIdsAsync(actorId)
+                .GetEffectiveCommunityIdsAsync(actorId)
                 .ConfigureAwait(false);
             if (communities is null || !communities.Contains(draft.ComponentId))
             {

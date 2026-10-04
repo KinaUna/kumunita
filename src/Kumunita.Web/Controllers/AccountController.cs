@@ -38,6 +38,32 @@ public sealed class AccountController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
+    // P1-5 (translation audit) — localize the four Account forms' DataAnnotations
+    // messages. The platform's closed translation surface is the KnownTranslationKeys
+    // registry (ADR 0015); the four account.err.* keys live there (en/de/fr/da).
+    // Resolved from the request scope (the Storage() idiom) so the constructor is
+    // unchanged for the existing harnesses. A no-op on a non-HTTP render (null
+    // provider) or an unmapped attribute.
+    private async Task LocalizeValidationAsync(object model)
+    {
+        // In unit tests (and any non-HTTP host) RequestServices is absent —
+        // skip localization rather than throw on a null provider.
+        var services = HttpContext?.RequestServices;
+        var request = HttpContext?.Request;
+        if (services is null)
+        {
+            return;
+        }
+        var localization = services.GetService<Kumunita.Core.Localization.ILocalizationService>();
+        var provider = services.GetService<Kumunita.Core.Localization.ITranslationProvider>();
+        if (provider is null)
+        {
+            return;
+        }
+        await Kumunita.Web.Localization.AccountValidationLocalizer.ApplyAsync(
+            model, ModelState, request, localization, provider);
+    }
+
     // ── My storage (M25 U7 — the self-only resident usage read) ────────────────────────
 
     /// <summary>
@@ -159,7 +185,10 @@ public sealed class AccountController(
             return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
 
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         // Verify the current password (the self-serve lane proves it is really
         // this resident changing their own credential — not a blind set). A
@@ -235,7 +264,10 @@ public sealed class AccountController(
             return View("SignupClosed", new SignupClosedViewModel());
 
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         try
         {
@@ -270,7 +302,10 @@ public sealed class AccountController(
     public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
     {
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         await identity.ResendVerificationEmailAsync(model.Email);
         // M1 — uniform response: whether or not an account exists for this email
@@ -396,7 +431,10 @@ public sealed class AccountController(
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         var user = await userManager.FindByNameAsync(model.Email)
                  ?? await userManager.FindByEmailAsync(model.Email);

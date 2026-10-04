@@ -1,6 +1,21 @@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.FeedViewModel
 @{
     ViewData["Title"] = $"{Model.ComponentName}";
+    // The leave form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en). The {0} slot carries the
+    // community's name (the kw-l TagHelper can't substitute either).
+    string confirmLeave = "Leave {0}?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmLeave = await Translation.GetAsync("community.confirm_leave", effLang);
+    }
 }
 
 <div class="row justify-content-center">
@@ -72,7 +87,7 @@
                 {
                     <form method="post"
                           action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
-                          data-confirm="Leave @Model.ComponentName?">
+                          data-confirm="@confirmLeave.Replace("{0}", Model.ComponentName)">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-outline-danger">Leave</button>
                     </form>

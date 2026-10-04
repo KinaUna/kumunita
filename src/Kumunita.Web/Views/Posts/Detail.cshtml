@@ -11,6 +11,27 @@
     // placeholder="..." attribute — resolve server-side, the _GrantPickers / Profile/Edit
     // pattern). Same chain the <kw-l> TagHelper uses (M·5/M·8, ADR 0049).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+
+    // The delete post / reply + remove-translation forms' data-confirms (the
+    // ADR 0072 attribute idiom — the confirm.js seam reads the attribute
+    // verbatim; the kw-l TagHelper can't wrap an attribute). The en floor is
+    // the server fallback (a null provider — a non-HTTP render — degrades to
+    // en).
+    string confirmDeletePost    = "Delete this post? Your replies will remain visible.";
+    string confirmDeleteReply   = "Delete this reply? It will be replaced by a note. The record is kept.";
+    string confirmRemoveTrans   = "Remove this translation?";
+    // The actions menus' accessible names are a template with a {0} slot (the
+    // item's title / author) — server-resolved (the kw-l TagHelper can't wrap
+    // an attribute, and can't substitute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        confirmDeletePost  = await Translation.GetAsync("posts.delete_confirm", _kwL);
+        confirmDeleteReply = await Translation.GetAsync("posts.reply_delete_confirm", _kwL);
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
+    }
     var reportReasonPlaceholder = await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
     // Author avatar monogram fallback (the Directory pattern — avatar.ts hides
     // the <img> on the 404 the serving lane fails closed to; see site.css).
@@ -150,7 +171,7 @@
                                 <div class="dropdown">
                                     <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                             data-bs-toggle="dropdown" aria-expanded="false"
-                                            aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
+                                            aria-label="@(ariaActionsFor.Replace("{0}", Model.Post.Title ?? "post"))">⋮</button>
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         @if (Model.IsAuthor && Model.Post.DeletedAt is null)
                                         {
@@ -197,7 +218,7 @@
                                                 {
                                                     <li>
                                                         <form method="post" action="@($"/posts/{postId}/translations/remove")"
-                                                              data-confirm="Remove this translation?" style="margin:0;">
+                                                              data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                             <button type="submit" class="dropdown-item text-danger">
@@ -214,7 +235,7 @@
                                             <li><hr class="dropdown-divider" /></li>
                                             <li>
                                                 <form method="post" action="@($"/posts/{postId}/delete")"
-                                                      data-confirm="Delete this post? Your replies will remain visible." style="margin:0;">
+                                                      data-confirm="@confirmDeletePost" style="margin:0;">
                                                     @Html.AntiForgeryToken()
                                                     <button type="submit" class="dropdown-item text-danger">
                                                         <kw-l key="posts.delete">Delete</kw-l>
@@ -623,7 +644,7 @@
                                     <div class="dropdown d-inline-block">
                                         <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                                 data-bs-toggle="dropdown" aria-expanded="false"
-                                                aria-label="@($"Actions for reply by {r.AuthorDisplayName}")">⋮</button>
+                                                aria-label="@(ariaActionsFor.Replace("{0}", $"reply by {r.AuthorDisplayName}"))">⋮</button>
                                         <ul class="dropdown-menu dropdown-menu-end">
                                             @if (r.IsAuthor && r.DeletedAt is null)
                                             {
@@ -673,7 +694,7 @@
                                                     {
                                                         <li>
                                                             <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/remove")"
-                                                                  data-confirm="Remove this translation?" style="margin:0;">
+                                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                                 @Html.AntiForgeryToken()
                                                                 <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                                 <button type="submit" class="dropdown-item text-danger">
@@ -690,7 +711,7 @@
                                                 <li><hr class="dropdown-divider" /></li>
                                                 <li>
                                                     <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/delete")"
-                                                          data-confirm="Delete this reply? It will be replaced by a note. The record is kept." style="margin:0;">
+                                                          data-confirm="@confirmDeleteReply" style="margin:0;">
                                                         @Html.AntiForgeryToken()
                                                         <button type="submit" class="dropdown-item text-danger">
                                                             <kw-l key="posts.reply_delete">Delete</kw-l>
@@ -965,7 +986,7 @@
                         </div>
                     </div>
                     <div class="text-muted small mb-3">
-                        <kw-l key="posts.reply_audience_note">Replies have no own audience — they are visible under this post's single audience decision (the C-M3·1 "reply-inherits" rule). You are replying only where the post itself is visible.</kw-l>
+                        <kw-l key="posts.reply_audience_note">Replies have no own audience — they are visible under this post's single audience decision. You are replying only where the post itself is visible.</kw-l>
                     </div>
                     <button type="submit" class="btn btn-primary"><kw-l key="posts.reply_submit">Reply</kw-l></button>
                 </form>

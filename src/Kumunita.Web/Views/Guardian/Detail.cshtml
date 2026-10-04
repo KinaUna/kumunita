@@ -1,12 +1,32 @@
 @model Kumunita.Web.Models.MembershipEditorModel
 @using Kumunita.Web.Security
-@inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Manage a child account";
-    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    var groupIdPlaceholder     = await Translation.GetAsync("guardian.group_id_label", _kwL);
-    var communityIdPlaceholder = await Translation.GetAsync("guardian.community_id_label", _kwL);
+    // The messaging allow / restrict + hand-over forms' data-confirms (the ADR
+    // 0072 attribute idiom — resolved through the provider; the kw-l TagHelper
+    // can't wrap an attribute). The en floor is the server fallback (a null
+    // provider, a non-HTTP render, degrades to en).
+    string confirmAllow    = "Allow messaging for this child? They will be able to send and receive direct messages (their own opt-in must also be on).";
+    string confirmRestrict = "Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.";
+    string confirmHandover = "Hand over this account to the child? This dissolves your guardianship over it.";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmAllow    = await Translation.GetAsync("guardian.messaging.allow_confirm", effLang);
+        confirmRestrict = await Translation.GetAsync("guardian.messaging.restrict_confirm", effLang);
+        confirmHandover = await Translation.GetAsync("guardian.handover_confirm", effLang);
+    }
+    @*
+        The child's per-community block set (the guardian's block-and-hide
+        ceiling — Detail's ViewData["BlockedCommunityIds"], the M9
+        MessagingRestricted precedent; the MembershipEditorModel is a pinned
+        5-field record so the block state rides ViewData). Used by the
+        community section's block/unblock toggle.
+    *@
+    var _blockedCommunities = ((IReadOnlyCollection<string>?)ViewData["BlockedCommunityIds"]) ?? [];
 }
 
 <div class="row justify-content-center">
@@ -74,15 +94,25 @@
                 }
             </ul>
         }
-        <form method="post" action="@Url.Action("CurateGroup", "Guardian", new { childId = Model.ChildId })"
-              class="input-group justify-content-start">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="add" value="true" />
-            <input type="text" name="groupId" class="form-control" style="max-width: 260px;" placeholder="@groupIdPlaceholder" required />
-            <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
-        </form>
+        @* No "add a group" form: joining a group is decided by its owner (an
+           invitation) or a platform admin — a guardian does not mint group
+           membership for their child. The pending-invitations section below is
+           the guardian's gate on invitations. *@
 
         <h2 class="mt-4"><kw-l key="guardian.community_memberships">Community memberships</kw-l></h2>
+        @*
+            Communities are decided by admins (the mandatory communities are
+            implicit for everyone, so there is nothing for a guardian to "add"),
+            and — because a mandatory community's membership cannot be removed
+            (ADR 0012) — the guardian's control here is to BLOCK ACCESS AND HIDE
+            the community from the child, not to remove them from it. Each row
+            toggles the child's Profile.BlockedCommunityIds entry (the
+            SetChildCommunityBlock lane); a blocked community is hidden from the
+            child's directory, feed, posting gate and community posts. The list
+            itself is the RAW membership read (Model.CommunityIds) so a mandatory
+            community still shows up for the guardian to block.
+        *@
+        <p class="text-muted"><kw-l key="guardian.community_block_note">Choose which communities this child can access. Blocking a community hides it from them — including its posts — even if it is one of the mandatory communities everyone belongs to. This is the guardian's control: you decide who joins a community by inviting them or through an admin, but you can hide one you don't want this child to see.</kw-l></p>
         @if (Model.CommunityIds.Count == 0)
         {
             <p class="text-muted"><kw-l key="guardian.no_communities">No community memberships.</kw-l></p>
@@ -92,25 +122,31 @@
             <ul class="list-group mb-2">
                 @foreach (var communityId in Model.CommunityIds)
                 {
+                    var isBlocked = _blockedCommunities.Contains(communityId, StringComparer.OrdinalIgnoreCase);
                     <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
-                        <code>@communityId</code>
-                        <form method="post" action="@Url.Action("CurateCommunity", "Guardian", new { childId = Model.ChildId })">
+                        <div>
+                            <code>@communityId</code>
+                            @if (isBlocked)
+                            {
+                                <span class="badge text-bg-warning ms-2"><kw-l key="guardian.community_blocked">Blocked &amp; hidden</kw-l></span>
+                            }
+                        </div>
+                        <form method="post" action="@Url.Action("SetChildCommunityBlock", "Guardian", new { childId = Model.ChildId, communityId })">
                             @Html.AntiForgeryToken()
-                            <input type="hidden" name="communityId" value="@communityId" />
-                            <input type="hidden" name="add" value="false" />
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            <input type="hidden" name="blocked" value="@(isBlocked ? "false" : "true")" />
+                            @if (isBlocked)
+                            {
+                                <button type="submit" class="btn btn-sm btn-outline-primary"><kw-l key="guardian.community_unblock">Unblock &amp; show</kw-l></button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.community_block">Block access &amp; hide</kw-l></button>
+                            }
                         </form>
                     </li>
                 }
             </ul>
         }
-        <form method="post" action="@Url.Action("CurateCommunity", "Guardian", new { childId = Model.ChildId })"
-              class="input-group justify-content-start">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="add" value="true" />
-            <input type="text" name="communityId" class="form-control" style="max-width: 260px;" placeholder="@communityIdPlaceholder" required />
-            <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
-        </form>
 
         <h2 class="mt-4"><kw-l key="guardian.pending_invitations">Pending group invitations</kw-l></h2>
         @if (Model.PendingInvitations.Count == 0)
@@ -193,7 +229,7 @@
             @if (_messagingRestricted)
             {
                 <form method="post" action="@Url.Action("SetChildMessaging", "Guardian", new { childId = Model.ChildId })"
-                      data-confirm="Allow messaging for this child? They will be able to send and receive direct messages (their own opt-in must also be on).">
+                      data-confirm="@confirmAllow">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="restricted" value="false" />
                     <button type="submit" class="btn btn-outline-primary">
@@ -204,7 +240,7 @@
             else
             {
                 <form method="post" action="@Url.Action("SetChildMessaging", "Guardian", new { childId = Model.ChildId })"
-                      data-confirm="Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.">
+                      data-confirm="@confirmRestrict">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="restricted" value="true" />
                     <button type="submit" class="btn btn-outline-danger">
@@ -224,7 +260,7 @@
         <h2 class="mt-4"><kw-l key="guardian.handover">Hand over the account</kw-l></h2>
         <p class="text-muted"><kw-l key="guardian.handover_hint">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</kw-l></p>
         <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
-              data-confirm="Hand over this account to the child? This dissolves your guardianship over it.">
+              data-confirm="@confirmHandover">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
         </form>

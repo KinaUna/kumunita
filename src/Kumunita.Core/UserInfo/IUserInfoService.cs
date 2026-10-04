@@ -549,6 +549,67 @@ public interface IUserInfoService
     Task<IReadOnlyCollection<string>> GetCommunityIdsAsync(string userId);
 
     /// <summary>
+    /// The actor's <b>effective</b> community set: the raw
+    /// <see cref="GetCommunityIdsAsync"/> membership <b>minus</b> the
+    /// actor's <see cref="Profile.BlockedCommunityIds"/> (a guardian's
+    /// per-community block-and-hide ceiling over a supervised child, the
+    /// <see cref="Profile.MessagingRestricted"/> precedent carried to
+    /// communities). This is the seam the <b>child's own access surfaces</b>
+    /// read through — the community directory/sidebar, the community feed
+    /// gate, the composer's posting gate, and the
+    /// <see cref="Authorization.AuthorizationService"/> community branch of
+    /// <c>Decide</c> (audience visibility of community-scoped posts). It is
+    /// why a <b>mandatory</b> community can be hidden for a child: mandatory
+    /// membership is implicit and the removal lanes refuse / skip it
+    /// (ADR 0012), so "removing the child" is impossible there, but
+    /// <em>blocking</em> it is — the id simply drops out of this set.
+    /// <para>
+    /// Strong consistency (invariant C4): a
+    /// <see cref="SetChildCommunityBlockAsync"/> write is live on the very
+    /// next call. Like <see cref="GetCommunityIdsAsync"/>, this is a
+    /// candidate read — no <see cref="Authorization.AccessAudit"/> row is
+    /// appended here (the access decision + its audit live in the caller).
+    /// The <b>raw</b> <see cref="GetCommunityIdsAsync"/> stays available to
+    /// the surfaces that reason about the child's *actual* memberships
+    /// regardless of a guardian's restriction — the guardian's own curation
+    /// view (so the guardian sees the child's mandatory memberships and can
+    /// toggle the block on each) and the /admin per-account community diff.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetEffectiveCommunityIdsAsync(string userId);
+
+    /// <summary>
+    /// A guardian's <b>block access + hide</b> of one community for a
+    /// supervised child (the <see cref="SetChildMessagingRestrictionAsync"/>
+    /// guardian-ceiling precedent, per-community rather than a single flag):
+    /// <paramref name="blocked"/> = <c>true</c> adds
+    /// <paramref name="communityId"/> to the child's
+    /// <see cref="Profile.BlockedCommunityIds"/> (the community is hidden
+    /// from the child's effective set on every access surface — including a
+    /// <b>mandatory</b> community, whose implicit membership cannot be
+    /// removed); <paramref name="blocked"/> = <c>false</c> removes it (full
+    /// access restored — the child's own membership stands again). One
+    /// <c>SaveChangesAsync</c>. The standing gate is an <b>active</b>
+    /// <see cref="GuardianLink"/> for the exact (guardian, child) pair
+    /// (G·2/G·3 deny-by-default). The component must exist (a block on a
+    /// missing community is a data bug — <see cref="InvalidOperationException"/>).
+    /// The audit row is <c>guardian.community_block</c> when blocking,
+    /// <c>guardian.community_unblock</c> when lifting; <c>TargetKind</c>
+    /// "community", <c>TargetId</c> the component id,
+    /// <see cref="Authorization.AccessVia.Guardian"/> (the
+    /// <c>guardian.suspend</c> / <c>guardian.messaging_restrict</c> shape).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/>,
+    /// <paramref name="communityId"/> or <paramref name="guardianId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No component with that id
+    /// exists, or no profile for the child (bad state, not a no-op).</exception>
+    Task SetChildCommunityBlockAsync(string childId, string communityId, bool blocked, string guardianId);
+
+    /// <summary>
     /// Add a membership row (or refresh an existing one) so that
     /// <paramref name="userId"/> may post to <paramref name="componentId"/>.
     /// Idempotent on the <c>(componentId, userId)</c> pair: an existing row is

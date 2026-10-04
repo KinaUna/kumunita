@@ -256,7 +256,7 @@
                                        name="Audience.Mode" id="@($"aud-mode-{m}")"
                                        value="@m" @checkedMark required />
                                 <label class="form-check-label" for="@($"aud-mode-{m}")">
-                                    @m
+                                    <kw-l key="@(m == "Any" ? "profile.audience_mode_any_word" : "profile.audience_mode_all_word")">@(m == "Any" ? "Any" : "All")</kw-l>
                                     @if (m == "Any")
                                     {
                                         @(" — ")<kw-l key="events.audience_mode_any">a viewer matches if they're on any of the picks</kw-l>

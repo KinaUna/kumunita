@@ -11,6 +11,11 @@
     // Groups/Detail pattern; M·5/M·8).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var placeholder = await Translation.GetAsync("search.placeholder", _kwL);
+    // The search box + scope select accessible names are server-resolved (the
+    // kw-l TagHelper can't wrap an attribute); the a11y.* floor is the closed
+    // set.
+    var ariaSearch = await Translation.GetAsync("a11y.search", _kwL);
+    var ariaScope  = await Translation.GetAsync("a11y.scope", _kwL);
     var scopeWire = Model.Scope == SearchScope.Groups ? "groups" : "community";
     bool hasHits = Model.Sections.Values.Any(h => h.Count > 0);
 
@@ -34,12 +39,12 @@
         <form class="row g-2 mb-4" action="/search" method="get" role="search">
             <div class="col-12 @(isSignedIn ? "col-md-8" : "col-md-11")">
                 <input class="form-control" type="search" name="q" value="@Model.Q"
-                       placeholder="@placeholder" aria-label="Search" required />
+                       placeholder="@placeholder" aria-label="@ariaSearch" required />
             </div>
             @if (isSignedIn)
             {
                 <div class="col-6 col-md-3">
-                    <select class="form-select" name="scope" aria-label="Scope">
+                    <select class="form-select" name="scope" aria-label="@ariaScope">
                         <option value="community" selected="@(scopeWire == "community" ? "selected" : null)">
                             <kw-l key="search.scope.community">Community</kw-l>
                         </option>
@@ -50,14 +55,14 @@
                 </div>
             }
             <div class="col-6 col-md-1 d-grid">
-                <button class="btn btn-primary" type="submit" aria-label="Search"><span aria-hidden="true">&#128269;</span></button>
+                <button class="btn btn-primary" type="submit" aria-label="@ariaSearch"><span aria-hidden="true">&#128269;</span></button>
             </div>
         </form>
 
         @if (string.IsNullOrWhiteSpace(Model.Q))
         {
             <div class="p-4 text-muted">
-                <kw-l key="search.empty.hint">Find posts, events, pages and announcements by text.</kw-l>
+                <kw-l key="search.empty.hint">Find posts, events, pages, announcements, projects, boards, to-dos, inventory, documents and people by text or tag — the results only show content you can already read.</kw-l>
             </div>
         }
         else if (!hasHits)

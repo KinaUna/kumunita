@@ -1,10 +1,25 @@
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.ManageCommunityViewModel
 @{
     ViewData["Title"] = $"{Model.Name} — manage";
 
     // ADR 0053 — the ADR 0026 translation surface moved off this page to the
     // dedicated /community/translations/{id} page (linked from the header).
+
+    // The per-member remove form's data-confirm (the ADR 0072 attribute
+    // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
+    // TagHelper can't wrap an attribute, and can't substitute {0}/{1}
+    // either). The en floor is the server fallback (a null provider — a
+    // non-HTTP render — degrades to en).
+    string confirmRemoveMemberTemplate = "Remove {0} from {1}?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmRemoveMemberTemplate = await Translation.GetAsync("community.confirm_remove_member", effLang);
+    }
 }
 
 <div class="row justify-content-center">
@@ -101,7 +116,7 @@
                             <form method="post"
                                   action="@Url.Action("RemoveMember", "Community", new { componentId = Model.ComponentId })"
                                   class="d-inline"
-                                  data-confirm="Remove @removeLabel from @Model.Name?">
+                                  data-confirm="@confirmRemoveMemberTemplate.Replace("{0}", removeLabel).Replace("{1}", Model.Name)">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="UserId" value="@m.SubjectId" />
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="community.manage_remove">Remove</kw-l></button>

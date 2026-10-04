@@ -24,6 +24,42 @@
     // untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     bool originalHidden = Model.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+
+    // RsvpStatus → display label (the enum value must not render verbatim).
+    // The three keys are server-resolved (the kw-l TagHelper cannot be used
+    // for a switch value; the effective-language chain is the same seam).
+    var rsvpStatusLabels = new Dictionary<string, string>();
+    if (Translation is not null)
+    {
+        rsvpStatusLabels[RsvpStatus.Going.ToString()]  = await Translation.GetAsync("events.rsvp_status_going",  defaultVariant);
+        rsvpStatusLabels[RsvpStatus.Maybe.ToString()]  = await Translation.GetAsync("events.rsvp_status_maybe", defaultVariant);
+        rsvpStatusLabels[RsvpStatus.No.ToString()]     = await Translation.GetAsync("events.rsvp_status_no",    defaultVariant);
+    }
+    string RsvpLabel(RsvpStatus s) =>
+        rsvpStatusLabels.TryGetValue(s.ToString(), out var lbl) && !string.IsNullOrWhiteSpace(lbl) && lbl != s.ToString()
+            ? lbl
+            : s.ToString();
+
+    // The skip-occurrence + remove-translation + delete-event forms'
+    // data-confirms (the ADR 0072 attribute idiom — the confirm.js seam reads
+    // the attribute verbatim; the kw-l TagHelper can't wrap an attribute).
+    // The en floor is the server fallback (a null provider — a non-HTTP render
+    // — degrades to en).
+    string confirmSkip       = "Skip this occurrence? You can restore it later.";
+    string confirmRemoveTrans = "Remove this translation?";
+    string confirmDeleteEvent = "Delete this event? This cannot be undone.";
+    // The actions menu's accessible name is a template with a {0} slot (the
+    // item's title) — server-resolved (the kw-l TagHelper can't wrap an
+    // attribute, and can't substitute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        confirmSkip        = await Translation.GetAsync("events.skip_occurrence_confirm", defaultVariant);
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", defaultVariant);
+        confirmDeleteEvent = await Translation.GetAsync("events.delete_confirm", defaultVariant);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", defaultVariant);
+    }
 }
 
 <div class="row justify-content-center">
@@ -106,7 +142,7 @@
                 else
                 {
                     <form class="d-inline" method="post" action="/events/@Model.Event.Id/skip"
-                          data-confirm="Skip this occurrence? You can restore it later.">
+                          data-confirm="@confirmSkip">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-sm btn-outline-secondary">
                             <kw-l key="events.series.skip">Skip this occurrence</kw-l>
@@ -186,7 +222,7 @@
                         <div class="dropdown">
                             <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Event.Title) ? "event" : Model.Event.Title)}")">⋮</button>
+                                    aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Event.Title) ? "event" : Model.Event.Title))">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 @if (Model.CanEdit)
                                 {
@@ -226,7 +262,7 @@
                                         {
                                             <li>
                                                 <form method="post" action="@($"/events/{Model.Event.Id}/translations/remove")"
-                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                      data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -243,7 +279,7 @@
                                     <li><hr class="dropdown-divider" /></li>
                                     <li>
                                         <form method="post" action="/events/@Model.Event.Id/delete"
-                                              data-confirm="Delete this event? This cannot be undone." style="margin:0;">
+                                              data-confirm="@confirmDeleteEvent" style="margin:0;">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="dropdown-item text-danger">
                                                 <kw-l key="events.delete">Delete</kw-l>
@@ -499,14 +535,14 @@
                     @if (Model.MyRsvp is not null)
                     {
                         <span class="text-muted small me-2"><kw-l key="events.rsvp_you">You're going to:</kw-l>
-                            <b>@Model.MyRsvp.Status</b></span>
+                            <b>@RsvpLabel(Model.MyRsvp.Status)</b></span>
                     }
                     @foreach (var status in new[] { RsvpStatus.Going, RsvpStatus.Maybe, RsvpStatus.No })
                     {
                         var checkedMark = Model.MyRsvp is not null && Model.MyRsvp.Status == status ? "checked" : null;
                         <input class="btn-check" type="radio" name="status" id="@($"rsvp-{status}")"
                                value="@status" @checkedMark autocomplete="off" />
-                        <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@status</label>
+                        <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@RsvpLabel(status)</label>
                     }
                     <button type="submit" class="btn btn-primary btn-sm"><kw-l key="events.rsvp_update">Update</kw-l></button>
                 </form>
@@ -534,7 +570,7 @@
                                 </span>
                                 <span>
                                     <span class="badge @(rsvp.Rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
-                                        @rsvp.Rsvp.Status
+                                        @RsvpLabel(rsvp.Rsvp.Status)
                                     </span>
                                     <span class="text-muted small ms-2"><kw-dt dt="@rsvp.Rsvp.At" format="g"></kw-dt></span>
                                 </span>

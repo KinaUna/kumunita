@@ -1152,8 +1152,8 @@ public static class FirstBootSeeder
              "person. Whatever you pick becomes the post's audience, and nothing " +
              "else.\n\n" +
              "**A reply doesn't have its own audience.** It is visible under the " +
-             "post's single audience choice — that's the \"reply-inherits\" rule, " +
-             "and it keeps a thread readable for the people already in the room.\n\n" +
+             "post's single audience choice, and it keeps a thread readable for " +
+             "the people already in the room.\n\n" +
              "**You can't change the audience of a post after you've published it.** " +
              "To share it with more people, start a new post with the wider " +
              "audience — the original stays with the people you first chose.\n"),

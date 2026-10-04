@@ -1,7 +1,24 @@
 @model Kumunita.Web.Models.BoardIndexViewModel
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Boards";
+
+    // The add-project modal's close button + the board row's action menu
+    // carry accessible names the kw-l TagHelper can't wrap (an attribute) —
+    // server-resolved, same idiom (the a11y.* closed set is the floor). The
+    // en floor is the server fallback (a null provider — a non-HTTP render
+    // — degrades to en).
+    string ariaClose      = "Close";
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        ariaClose      = await Translation.GetAsync("a11y.close", effLang);
+        ariaActionsFor = await Translation.GetAsync("a11y.actions_for", effLang);
+    }
 }
 
 <div class="row justify-content-center">
@@ -76,7 +93,7 @@
                     <div class="dropdown">
                         <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                 data-bs-toggle="dropdown" aria-expanded="false"
-                                aria-label="Actions for @row.Title">⋮</button>
+                                aria-label="@(ariaActionsFor.Replace("{0}", row.Title))">⋮</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             @if (Model.Projects is { Count: > 0 })
                             {
@@ -127,7 +144,7 @@
                                                 <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
                                             </h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                    aria-label="@("Close")"></button>
+                                                    aria-label="@ariaClose"></button>
                                         </div>
                                         <div class="modal-body">
                                             <label class="form-label" for="@($"add-project-select-{row.Id}")">

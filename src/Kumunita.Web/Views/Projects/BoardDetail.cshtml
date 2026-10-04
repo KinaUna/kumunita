@@ -8,6 +8,27 @@
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Board.Title) ? "Board" : Model.Board.Title;
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+
+    // The remove-translation form's data-confirm (the ADR 0072 attribute
+    // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
+    // TagHelper can't wrap an attribute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string confirmRemoveTrans = "Remove this translation?";
+    // The board's modal close buttons + lane action menus carry accessible
+    // names the kw-l TagHelper can't wrap (an attribute) — server-resolved,
+    // same idiom (the a11y.* closed set is the floor).
+    string ariaClose       = "Close";
+    string ariaActionsFor  = "Actions for {0}";
+    string ariaSetLimit    = "Set limit on {0}";
+    string ariaBoardActions = "Board actions";
+    if (Translation is not null)
+    {
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
+        ariaClose          = await Translation.GetAsync("a11y.close", _kwL);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
+        ariaSetLimit       = await Translation.GetAsync("a11y.set_limit", _kwL);
+        ariaBoardActions   = await Translation.GetAsync("a11y.board_actions", _kwL);
+    }
     // ADR 0088 — the board's **default-visible** translation variant is the
     // viewer's current language (_kwL) when a translation exists in it, else
     // the authored-in language (the ADR 0027 floor) — the ADR 0049
@@ -221,7 +242,7 @@
                     <div class="dropdown">
                         <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                 data-bs-toggle="dropdown" aria-expanded="false"
-                                aria-label="Board actions">⋮</button>
+                                aria-label="@ariaBoardActions">⋮</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             @if (Model.CanEdit)
                             {
@@ -290,7 +311,7 @@
                                     {
                                         <li>
                                             <form method="post" action="@($"/projects/boards/{Model.Board.Id}/translations/remove")"
-                                                  data-confirm="Remove this translation?" style="margin:0;">
+                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                 <button type="submit" class="dropdown-item text-danger">
@@ -340,7 +361,7 @@
                                     <h5 class="modal-title" id="@($"board-trans-edit-label-{existing.LanguageCode}")">
                                         <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
@@ -386,7 +407,7 @@
                                     <h5 class="modal-title" id="@($"board-trans-add-label-{lang.Code}")">
                                         <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
                                     </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@("Close")"></button>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div class="mb-3">
@@ -528,7 +549,7 @@
                         <div class="dropdown kanban-lane-menu ms-auto" data-detach>
                             <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@("Actions for lane " + lane.Title)">⋮</button>
+                                    aria-label="@(ariaActionsFor.Replace("{0}", lane.Title))">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
                                 @* ADR 0071 (amendment) — the lane Rename row is a
                                    button opening a Bootstrap modal (the inline
@@ -557,7 +578,7 @@
                                                        id="lane-limit-@lane.LaneId"
                                                        min="1" value="@lane.MaxItems" />
                                                 <button type="submit" class="kanban-arrow-submit"
-                                                        aria-label="@("Set limit on lane " + lane.Title)" title="@("Set limit on lane " + lane.Title)">
+                                                        aria-label="@(ariaSetLimit.Replace("{0}", lane.Title))" title="@(ariaSetLimit.Replace("{0}", lane.Title))">
                                                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                                                 </button>
                                             </div>
@@ -661,7 +682,7 @@
                                             <kw-l key="projects.board.lane.rename">Rename</kw-l> lane
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                aria-label="@("Close")"></button>
+                                                aria-label="@ariaClose"></button>
                                     </div>
                                     <div class="modal-body">
                                         <label class="form-label" for="@($"rename-lane-input-{lane.LaneId}")">
@@ -1051,7 +1072,7 @@
                                                             <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
                                                         </h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                                aria-label="@("Close")"></button>
+                                                                aria-label="@ariaClose"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         <div class="mb-3">
@@ -1155,7 +1176,7 @@
                                                             <span class="text-body-secondary">· @card.Title</span>
                                                         </h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                                aria-label="@("Close")"></button>
+                                                                aria-label="@ariaClose"></button>
                                                     </div>
                                                     <div class="modal-body">
                                                         @* The current assignee (the names the controller resolved —
@@ -1343,7 +1364,7 @@
                                 <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                    aria-label="@("Close")"></button>
+                                    aria-label="@ariaClose"></button>
                         </div>
                         <div class="modal-body">
                             <label class="form-label" for="add-project-select">

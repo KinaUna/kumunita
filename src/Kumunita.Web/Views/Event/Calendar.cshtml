@@ -6,6 +6,8 @@
 @{
     var _ncKwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor?.HttpContext?.Request, Localization, Translation);
     var _ncOptionalPlaceholder = await Translation.GetAsync("common.optional", _ncKwL);
+    // The view-toggle group's aria-label (server-resolved) — the a11y.calendar_view key.
+    var ariaCalendarView = await Translation.GetAsync("a11y.calendar_view", _ncKwL);
 }
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
@@ -153,7 +155,7 @@
                          Labels through the 3 events.calendar.view.* kw-l
                          keys (U05 — registered in all four languages, the
                          inline text is the en floor, C-DWM·9). -->
-                    <div class="btn-group btn-group-sm events-view-toggle" role="group" aria-label="Calendar view">
+                    <div class="btn-group btn-group-sm events-view-toggle" role="group" aria-label="@ariaCalendarView">
                         <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")"><kw-l key="events.calendar.view.day">Day</kw-l></a>
                         <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
                         <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>

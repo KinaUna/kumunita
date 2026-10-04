@@ -440,6 +440,13 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
+            // M1DocTypes registers Profile — the AuthorizationService decision
+            // (ResolveActorAsync) reads the actor's Profile for the guardian's
+            // per-community block (GetEffectiveCommunityIdsAsync) on every
+            // community-scoped read, so this surface needs Profile registered,
+            // the same as the PostServiceTests / ProjectServiceTests harness
+            // (the M16DocTypes + M1DocTypes composition).
+            M1DocTypes.Configure(opts);
             M16DocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

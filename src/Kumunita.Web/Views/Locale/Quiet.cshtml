@@ -1,7 +1,20 @@
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
 @{
     ViewData["Title"] = "Settings — Quiet hours";
+    // The clear form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmClear = "Clear your quiet hours? All notification emails will be sent immediately again.";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmClear = await Translation.GetAsync("settings.quiet.clear_confirm", effLang);
+    }
 }
 
 @* M20 (ADR 0121, D7) — the resident's quiet-hours section (the 5th /settings
@@ -105,10 +118,11 @@
 
 @* The clear lane (the ADR 0019 "reset to platform default" affordance shape) —
    a separate form posting clear=1; the controller maps this to a null schedule
-   (the "never quiet" floor, C-M20·3). The data-confirm is hardcoded copy (the
-   ADR 0015 / settings-view precedent — a confirm() dialog stays hardcoded). *@
+   (the "never quiet" floor, C-M20·3). The data-confirm is server-resolved
+   through the provider (the ADR 0072 attribute idiom — the confirm.js seam
+   reads the attribute verbatim; the kw-l TagHelper can't wrap an attribute). *@
 <form method="post" action="/settings/quiet" class="mt-3"
-      data-confirm="Clear your quiet hours? All notification emails will be sent immediately again.">
+      data-confirm="@confirmClear">
     @Html.AntiForgeryToken()
     <input type="hidden" name="clear" value="1" />
     <button type="submit" class="btn btn-outline-secondary">

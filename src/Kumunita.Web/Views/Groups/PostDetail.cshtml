@@ -28,6 +28,27 @@
     // return path are untouched — only *which* variant shows first changes.
     var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     bool originalHidden = Model.PostTranslations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+
+    // The delete post / reply + remove-translation forms' data-confirms (the
+    // ADR 0072 attribute idiom — the confirm.js seam reads the attribute
+    // verbatim; the kw-l TagHelper can't wrap an attribute). The en floor is
+    // the server fallback (a null provider — a non-HTTP render — degrades to
+    // en).
+    string confirmDeletePost  = "Delete this post? Your replies will remain visible.";
+    string confirmDeleteReply = "Delete this reply? It will be replaced by a note. The record is kept.";
+    string confirmRemoveTrans = "Remove this translation?";
+    // The actions menu's accessible name is a template with a {0} slot (the
+    // item's title) — server-resolved (the kw-l TagHelper can't wrap an
+    // attribute, and can't substitute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        confirmDeletePost  = await Translation.GetAsync("posts.delete_confirm", defaultVariant);
+        confirmDeleteReply = await Translation.GetAsync("posts.reply_delete_confirm", defaultVariant);
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", defaultVariant);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", defaultVariant);
+    }
 }
 
 <div class="row justify-content-center">
@@ -88,7 +109,7 @@
                         <div class="dropdown">
                             <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Post.Title) ? "post" : Model.Post.Title)}")">⋮</button>
+                                    aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Post.Title) ? "post" : Model.Post.Title))">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 @if (Model.IsAuthor && Model.Post.DeletedAt is null)
                                 {
@@ -128,7 +149,7 @@
                                         {
                                             <li>
                                                 <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/translations/remove")"
-                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                      data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -145,7 +166,7 @@
                                     <li><hr class="dropdown-divider" /></li>
                                     <li>
                                         <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/delete")"
-                                              data-confirm="Delete this post? Your replies will remain visible." style="margin:0;">
+                                              data-confirm="@confirmDeletePost" style="margin:0;">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="dropdown-item text-danger">
                                                 <kw-l key="posts.delete">Delete</kw-l>
@@ -482,7 +503,7 @@
                                                         </button>
                                                     </form>
                                                     <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations/remove")"
-                                                          class="mt-2" data-confirm="Remove this translation?">
+                                                          class="mt-2" data-confirm="@confirmRemoveTrans">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                         <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -595,7 +616,7 @@
                                         </details>
                                         <form class="d-inline" method="post"
                                               action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/delete")"
-                                              data-confirm="Delete this reply? It will be replaced by a note. The record is kept.">
+                                              data-confirm="@confirmDeleteReply">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">Delete</button>
                                         </form>
@@ -683,9 +704,8 @@
                     </div>
                     <div class="text-muted small mb-3">
                         Replies have no own audience — they are visible under
-                        this post's single group-membership decision (the
-                        "reply-inherits" rule, G·7). You are replying only
-                        where the post itself is visible.
+                        this post's single group-membership decision. You are
+                        replying only where the post itself is visible.
                     </div>
                     <button type="submit" class="btn btn-primary">Reply</button>
                 </form>

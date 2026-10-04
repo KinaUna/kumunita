@@ -1,10 +1,16 @@
 @model Kumunita.Web.Models.AdminAccountManageViewModel
 @using Kumunita.Core.Identity
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaBreadcrumb = await Translation.GetAsync("a11y.breadcrumb", effLang);
 }
 
-<nav aria-label="breadcrumb">
+<nav aria-label="@ariaBreadcrumb">
     <ol class="breadcrumb small">
         <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
         <li class="breadcrumb-item active" aria-current="page">
@@ -81,7 +87,7 @@
             <fieldset class="mb-3">
                 <legend class="h6"><kw-l key="admin.roles_heading">Roles</kw-l></legend>
                 <p class="text-muted small mb-2">
-                    <kw-l key="admin.roles_independent_hint">Independent — a resident may hold any combination (ADR 0030). Nothing checked = a plain Member.</kw-l>
+                    <kw-l key="admin.roles_independent_hint">Independent — a resident may hold any combination. Nothing checked = a plain Member.</kw-l>
                 </p>
                 <div class="d-flex gap-3 flex-wrap">
                     <div class="form-check">

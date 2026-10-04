@@ -1,7 +1,12 @@
 @model Kumunita.Web.Models.EventIndexViewModel
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Events";
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaTimeRange = await Translation.GetAsync("a11y.event_time_range", effLang);
 }
 
 <div class="row justify-content-center">
@@ -45,7 +50,7 @@
                 return href;
             }
         }
-        <div class="btn-group btn-group-sm mb-4 events-feed-toggle" role="group" aria-label="Event time range">
+        <div class="btn-group btn-group-sm mb-4 events-feed-toggle" role="group" aria-label="@ariaTimeRange">
             <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><kw-l key="events.upcoming">Upcoming</kw-l></a>
             <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><kw-l key="events.past">Past</kw-l></a>
         </div>

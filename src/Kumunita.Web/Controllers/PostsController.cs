@@ -140,6 +140,22 @@ public sealed class PostsController(
             // own access decision.
             return NotFound();
 
+        // A guardian-blocked community is invisible to the child — the same
+        // 404 shape as a missing/disabled one (the MessagingRestricted "hide
+        // the surface" precedent). This works for a MANDATORY community too:
+        // the child's effective set (GetEffectiveCommunityIdsAsync) excludes
+        // it even though their implicit membership cannot be removed (ADR 0012).
+        // Admin/moderator standing is unaffected (they still manage it) — the
+        // block is the child's personal ceiling, read from the child's profile.
+        if (actor is not null
+            && !KumunitaPrincipal.IsGlobalAdmin(User)
+            && !KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId)))
+        {
+            var effective = await userInfo.GetEffectiveCommunityIdsAsync(actor);
+            if (effective is null || !effective.Contains(componentId))
+                return NotFound();
+        }
+
         var feed = await posts.ListFeedAsync(componentId, actor, page: page);
 
         // Whether the current viewer holds a posting right on *this* community —
@@ -620,7 +636,13 @@ public sealed class PostsController(
         var accessible = new HashSet<string>();
         var subject = SubjectId(user);
         if (!string.IsNullOrEmpty(subject))
-            accessible.UnionWith(await userInfo.GetCommunityIdsAsync(subject));
+            // The EFFECTIVE community set — raw membership MINUS the guardian's
+            // per-community block (Profile.BlockedCommunityIds). This is the
+            // child's own posting reach + the sidebar community directory, so a
+            // guardian-blocked community (a mandatory one included — ADR 0012's
+            // "cannot remove" is bypassed by "block") is hidden from both. A
+            // non-child reads the identical set to the raw read.
+            accessible.UnionWith(await userInfo.GetEffectiveCommunityIdsAsync(subject));
 
         // Per-component Moderator scope grants a posting right on top of
         // explicit membership rows (the same claim set the POST gate reads).

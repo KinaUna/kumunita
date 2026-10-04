@@ -118,6 +118,16 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         ViewData["MessagingRestricted"] = childProfile?.MessagingRestricted ?? false;
         ViewData["ChildMessagingOptIn"] = childProfile?.MessagingOptIn ?? false;
 
+        // The child's per-community block set (the guardian's block-and-hide
+        // ceiling, Profile.BlockedCommunityIds) — exposed on ViewData, the
+        // MessagingRestricted precedent (the MembershipEditorModel is a pinned
+        // 5-field record; the U07 pin forbids adding a field). The Detail view
+        // renders a block/unblock toggle per community against this set. The
+        // model's CommunityIds stays the RAW membership read (so a mandatory
+        // community still appears here for the guardian to block) — only the
+        // child's OWN access surfaces read through GetEffectiveCommunityIdsAsync.
+        ViewData["BlockedCommunityIds"] = childProfile?.BlockedCommunityIds ?? [];
+
         // The Detail header's child identity (name + email) — the same
         // profile read; the MembershipEditorModel is a pinned 5-field
         // record (the U07 GuardianViewModelsTests pin forbids adding a
@@ -281,29 +291,47 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         return RedirectToAction(nameof(Detail), new { childId });
     }
 
-    /// <summary>Curate a child's <b>community</b> membership (add or remove). The
-    /// U05 guardian branch bypasses the GlobalAdmin/moderator gate (a guardian holds
-    /// neither) and records <c>Via: Guardian</c> — the controller passes the actor
-    /// + their role set (the community lanes' signature carries
-    /// <c>actorRoles</c>). A non-guardian → 404.</summary>
-    [HttpPost("{childId}/memberships/community")]
+    /// <summary>
+    /// <b>Block / unblock a community</b> for a supervised child (POST
+    /// <c>me/children/{childId}/communities/{communityId}</c>) — the guardian's
+    /// block-and-hide control, replacing the old "remove the child from a
+    /// community" lane (which was a silent no-op for a <b>mandatory</b>
+    /// community — ADR 0012's membership is implicit and the removal lanes
+    /// refuse / skip it). The <see cref="IUserInfoService
+    /// .SetChildCommunityBlockAsync"/> seam flips the child's
+    /// <c>Profile.BlockedCommunityIds</c> entry, which the child's own access
+    /// surfaces (directory, feed, posting gate, audience visibility) read
+    /// through <c>GetEffectiveCommunityIdsAsync</c> and exclude — a ceiling that
+    /// works even for a mandatory community, whose membership cannot be removed.
+    /// <para>
+    /// <b>Standing gate:</b> the actor must hold an <b>active</b>
+    /// <see cref="GuardianLink"/> over this child (the same
+    /// <see cref="ActiveLinkAsync"/> standing the Detail GET uses — Core re-gates
+    /// it too). A non-guardian (or a dissolved link) is a <c>404</c> — the
+    /// ADR 0028 deny-by-default shape. A missing community or profile is a
+    /// user-presentable <c>TempData["error"]</c>, never a 500.
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/communities/{communityId}")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CurateCommunity(string childId, [FromForm] string communityId, [FromForm] bool add)
+    public async Task<IActionResult> SetChildCommunityBlock(string childId, string communityId, bool blocked)
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(communityId))
             return NotFound();
 
-        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        // Standing gate first (the Detail GET's ActiveLinkAsync check — a
+        // non-guardian / dissolved link is a 404, the ADR 0028 shape).
+        var link = await ActiveLinkAsync(subject, childId);
+        if (link is null)
+            return NotFound();
+
         try
         {
-            if (add)
-                await userInfo.AddCommunityMemberAsync(communityId, childId, subject, actorRoles);
-            else
-                await userInfo.RemoveCommunityMemberAsync(communityId, childId, subject, actorRoles);
-            TempData["info"] = add
-                ? $"Added to community {communityId}."
-                : $"Removed from community {communityId}.";
+            await userInfo.SetChildCommunityBlockAsync(childId, communityId, blocked, subject);
+            TempData["info"] = blocked
+                ? $"Community {communityId} is now blocked and hidden for this child."
+                : $"Access to community {communityId} is restored for this child.";
         }
         catch (UnauthorizedAccessException)
         {

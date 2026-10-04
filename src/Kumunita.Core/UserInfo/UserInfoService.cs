@@ -1933,6 +1933,79 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetChildCommunityBlockAsync(string childId, string communityId, bool blocked, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(communityId))
+            throw new ArgumentException("Community id is required.", nameof(communityId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // A guardian's per-community block-and-hide over a supervised child —
+        // the SetChildMessagingRestrictionAsync guardian-ceiling shape,
+        // per-community rather than a single flag: standing gate first
+        // (G·2/G·3), then the list write, then one audit row — all in one
+        // session / one SaveChangesAsync (C3). The block works even for a
+        // MANDATORY community (ADR 0012's "cannot remove" — the membership is
+        // implicit and the removal lanes refuse it) because it does not touch
+        // the membership at all: it writes Profile.BlockedCommunityIds, which
+        // the child's access surfaces (GetEffectiveCommunityIdsAsync) exclude.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // The component must exist (a block on a missing community is a data
+        // bug, not a no-op — the ClearCommunityMembershipAsync pin).
+        var component = await session.LoadAsync<Component>(communityId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {communityId}");
+
+        // Load the child's profile (missing → bad state, not a no-op — the
+        // SetChildMessagingRestrictionAsync pin).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Toggle the id in the block list (idempotent — a re-block / re-unblock
+        // never duplicates or mis-removes).
+        var current = profile.BlockedCommunityIds is null
+            ? new List<string>()
+            : profile.BlockedCommunityIds.ToList();
+        if (blocked)
+        {
+            if (!current.Contains(communityId))
+                current.Add(communityId);
+        }
+        else
+        {
+            current.RemoveAll(c => c == communityId);
+        }
+        profile.BlockedCommunityIds = current;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = blocked ? "guardian.community_block" : "guardian.community_unblock",
+            TargetKind = "community",
+            TargetId = communityId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,
@@ -2202,6 +2275,36 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         var union = new HashSet<string>(explicitMembership);
         union.UnionWith(mandatory);
         return union;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<string>> GetEffectiveCommunityIdsAsync(string userId)
+    {
+        // The child's own access surface reads through this: the raw
+        // membership (explicit ∪ enabled ∩ mandatory) MINUS the guardian's
+        // per-community block (Profile.BlockedCommunityIds). A mandatory
+        // community that a guardian has blocked is still an implicit member in
+        // GetCommunityIdsAsync (the curation/admin raw read), but drops out of
+        // THIS effective set — which is exactly what hides it from the child's
+        // directory, feed, posting gate, and audience visibility (ADR 0012's
+        // "cannot remove" is bypassed by "block", the MessagingRestricted
+        // ceiling precedent carried to communities).
+        if (string.IsNullOrWhiteSpace(userId))
+            return System.Array.Empty<string>();
+
+        var effective = new HashSet<string>(await GetCommunityIdsAsync(userId).ConfigureAwait(false), StringComparer.Ordinal);
+
+        // A missing profile degrades to the raw membership (the floor) — the
+        // MessagingRestricted null-safe shape.
+        await using var session = store.QuerySession();
+        var profile = await session.LoadAsync<Profile>(userId).ConfigureAwait(false);
+        if (profile is not null && profile.BlockedCommunityIds is { Count: > 0 })
+        {
+            foreach (var blockedId in profile.BlockedCommunityIds)
+                effective.Remove(blockedId);
+        }
+
+        return effective;
     }
 
     /// <inheritdoc />

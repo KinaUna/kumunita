@@ -1,13 +1,99 @@
 @using Kumunita.Web.Security
+@using System.Text.Json
+@using System.Text.Json.Serialization
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     // ADR 0133 — the theme preference (the kumunita.theme cookie): auto (default,
     // follow the OS prefers-color-scheme) | light | dark (the Forest theme).
     // auto is resolved entirely in site.css (@media prefers-color-scheme), so
     // the attribute is only emitted for an explicit override — no JS, no flash.
     var themeMode = ThemeCookie.Read(Context.Request);
+
+    // P0-6 (translation audit) — the client-JS strings bundle: the effective
+    // language (the ADR 0049 chain, same seam as the Home page) is resolved
+    // once per request and the client-facing keys are batch-resolved in ONE
+    // query (the GetManyAsync convention), then serialized to JSON. The
+    // client modules (rich-editor / image-editor / tag-suggest /
+    // notifications-bell) read #kumunita-strings and fall back to the en
+    // floor if it is absent. The key list is closed here (mirrored by the
+    // L(key, fallback) calls in the TS); HtmlEncoding at the emission point
+    // keeps a value containing `</script>` from ever terminating the tag.
+    string[] ClientJsStringKeys =
+    {
+        "common.close",
+        "common.cancel",
+        "rc.editor.error_generic",
+        "rc.editor.link.title",
+        "rc.editor.link.url",
+        "rc.editor.link.confirm",
+        "rc.editor.link.busy",
+        "rc.editor.link.err_empty",
+        "rc.editor.link.err_invalid",
+        "rc.editor.image.title",
+        "rc.editor.image.err_rejected",
+        "rc.editor.image.err_upload",
+        "rc.editor.attach.title",
+        "rc.editor.attach.file",
+        "rc.editor.attach.link_text",
+        "rc.editor.attach.default_label",
+        "rc.editor.attach.confirm",
+        "rc.editor.attach.busy",
+        "rc.editor.attach.err_no_file",
+        "img.edit.close",
+        "img.edit.crop_area",
+        "img.edit.width",
+        "img.edit.output",
+        "img.edit.reset_crop",
+        "img.edit.use_original",
+        "img.edit.apply",
+        "img.edit.title",
+        "img.edit.err_edit",
+        "img.edit.err_could",
+        "img.edit.err_load",
+        "img.edit.err_export",
+        "tag.suggest.remove_prefix",
+        "notif.fallback",
+    };
+    string clientStringsJson = "{}";
+    if (Translation is not null)
+    {
+        try
+        {
+            string effLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            var resolved = await Translation.GetManyAsync(ClientJsStringKeys, effLang);
+            clientStringsJson = JsonSerializer.Serialize(resolved,
+                new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+        }
+        catch
+        {
+            // The bundle is a display enhancement — a resolution failure must
+            // never break the page (the TS side carries the en fallbacks).
+        }
+    }
+
+    // The navbar toggles + rail's accessible names are server-resolved (the
+    // kw-l TagHelper can't wrap an attribute); the a11y.* floor is the closed
+    // set. A null provider (a non-HTTP render) degrades to the en floor.
+    string _a11yToggleNav = "Toggle navigation";
+    string _a11yPrimary   = "Primary";
+    if (Translation is not null)
+    {
+        try
+        {
+            string a11yLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            _a11yToggleNav = await Translation.GetAsync("a11y.toggle_nav", a11yLang);
+            _a11yPrimary   = await Translation.GetAsync("a11y.primary_nav", a11yLang);
+        }
+        catch
+        {
+            // Keep the en floor on a resolution failure — the label must never break.
+        }
+    }
 }
 <!DOCTYPE html>
 <html lang="en" data-kmb-theme="@(themeMode == ThemeCookie.Light ? ThemeCookie.Light : (themeMode == ThemeCookie.Dark ? ThemeCookie.Dark : null))">
@@ -103,7 +189,7 @@
                         <img src="~/images/logo/kumunita_k_logo_52x52.png" alt="Kumunita" />
                     </a>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                            aria-expanded="false" aria-label="Toggle navigation">
+                            aria-expanded="false" aria-label="@_a11yToggleNav">
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
@@ -190,7 +276,7 @@
                a#accountMenu / a#notifications-bell / a#languageMenu pins all
                resolve here. The rail is purely section icons (no _AccountNav
                duplication). *@
-            <nav class="kmb-rail" aria-label="Primary">
+            <nav class="kmb-rail" aria-label="@_a11yPrimary">
                     <a class="kmb-rail-brand" asp-area="" asp-controller="Home" asp-action="Index">
                         <img src="~/images/logo/kumunita_k_logo_52x52.png" alt="Kumunita" />
                     </a>
@@ -279,7 +365,7 @@
                 <nav class="navbar navbar-expand-sm kmb-topbar navbar-light bg-white border-bottom">
                     <div class="container-fluid kmb-topbar-inner">
                         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".kmb-topbar-collapse"
-                                aria-expanded="false" aria-label="Toggle navigation">
+                                aria-expanded="false" aria-label="@_a11yToggleNav">
                             <span class="navbar-toggler-icon"></span>
                         </button>
                         <div class="kmb-topbar-collapse collapse d-sm-inline-flex flex-grow-1 align-items-center gap-2">
@@ -321,17 +407,17 @@
                     <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita <kw-l key="footer.copyright">· self-hosted by your community</kw-l></p>
                 </div>
                 <div class="col-6 col-md-4 col-lg-2">
-                    <h3>Community</h3>
+                    <h3><kw-l key="nav.community">Community</kw-l></h3>
                     <ul class="list-unstyled d-grid gap-2">
-                        <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
+                        <li><a asp-area="" asp-controller="Home" asp-action="Index"><kw-l key="nav.home">Home</kw-l></a></li>
                         @* ADR 0039 §3.8 — the mount-point resolver (footer/community slot):
                            the page mounted here renders as a link; an unmounted slot
                            renders nothing. Display, not access — the Show action is
                            the Read decision. *@
                         @{ ViewData["MountSlot"] = "footer/community"; }
                         <partial name="_MountSlot" />
-                        <li><a href="/announcements">Announcements</a></li>
-                        <li><a asp-controller="Posts" asp-action="AllSections">The feed</a></li>
+                        <li><a href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a></li>
+                        <li><a asp-controller="Posts" asp-action="AllSections"><kw-l key="footer.feed">The feed</kw-l></a></li>
                     </ul>
                 </div>
                 @* SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
@@ -442,6 +528,13 @@
          (no-op) in variant C, signed-out, and where the data-nav-* hooks are
          absent, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/nav-more-fold.js"></script>
+    @* P0-6 (translation audit) — the client-JS strings bundle: the closed
+       KnownTranslationKeys set resolved in the effective language, serialized
+       to JSON. The client modules (rich-editor / image-editor / tag-suggest /
+       notifications-bell) read this once and localize their modals, labels
+       and alerts (with the en floor as the in-code fallback). HtmlEncoded so
+       a value containing `</script>` can never terminate the element. *@
+    <script type="application/json" id="kumunita-strings">@System.Web.HttpUtility.HtmlEncode(clientStringsJson)</script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

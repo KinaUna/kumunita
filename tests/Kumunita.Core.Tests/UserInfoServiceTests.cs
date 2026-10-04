@@ -1234,6 +1234,112 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.DoesNotContain(rows, r => r.UserId == "u-x");
     }
 
+    // ── Guardian community block-and-hide (the per-child ceiling, the
+    //    MessagingRestricted precedent carried to communities) ─────────────
+
+    [Fact]
+    public async Task GetEffectiveCommunityIds_ExcludesGuardianBlockedCommunity()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-block-excl";
+        const string child = "u-block-child";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-block-excl", ComponentId = comp, UserId = child });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = [comp]
+        });
+
+        // The RAW read still carries the child's actual membership (the
+        // guardian's own curation + the /admin diff read through this).
+        Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
+
+        // But the EFFECTIVE set (the child's own access surface) excludes it.
+        var effective = await svc.GetEffectiveCommunityIdsAsync(child);
+        Assert.DoesNotContain(comp, effective);
+    }
+
+    [Fact]
+    public async Task GetEffectiveCommunityIds_HidesMandatoryCommunityForBlockedChild()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string mand = "c-block-mand";
+        const string child = "u-block-mand-child";
+        await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = [mand]
+        });
+
+        // ADR 0012 — the mandatory community is an implicit member in the RAW
+        // read (it cannot be removed), and the removal lane would refuse / skip.
+        Assert.Contains(mand, await svc.GetCommunityIdsAsync(child));
+
+        // But "block" bypasses "cannot remove": the mandatory community drops
+        // out of the child's effective (access) set.
+        var effective = await svc.GetEffectiveCommunityIdsAsync(child);
+        Assert.DoesNotContain(mand, effective);
+    }
+
+    [Fact]
+    public async Task SetChildCommunityBlock_TogglesEffectiveSet_AndAuditsViaGuardian()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-block-toggle";
+        const string child = "u-block-toggle-child";
+        const string guardian = "u-block-toggle-guardian";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-block-toggle", ComponentId = comp, UserId = child });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = []
+        });
+        await svc.CreateGuardianLinkAsync(child, guardian);
+
+        // Block — the community leaves the effective set, the raw read keeps it.
+        await svc.SetChildCommunityBlockAsync(child, comp, true, guardian);
+        Assert.DoesNotContain(comp, await svc.GetEffectiveCommunityIdsAsync(child));
+        Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
+        Assert.True((await svc.GetProfileAsync(child))!.BlockedCommunityIds.Contains(comp));
+        var blockRow = (await AuditsFor(store, guardian, "guardian.community_block")).Single(a => a.TargetId == comp);
+        Assert.Equal(AccessVia.Guardian, blockRow.Via);
+        Assert.Equal(guardian, blockRow.ActorId);
+
+        // Unblock — the effective set is restored (full access again).
+        await svc.SetChildCommunityBlockAsync(child, comp, false, guardian);
+        Assert.Contains(comp, await svc.GetEffectiveCommunityIdsAsync(child));
+        Assert.False((await svc.GetProfileAsync(child))!.BlockedCommunityIds.Contains(comp));
+        var unblockRow = (await AuditsFor(store, guardian, "guardian.community_unblock")).Single(a => a.TargetId == comp);
+        Assert.Equal(AccessVia.Guardian, unblockRow.Via);
+    }
+
+    [Fact]
+    public async Task SetChildCommunityBlock_NonGuardian_Unauthorized()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-block-nonguardian";
+        const string child = "u-block-nonguardian-child";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new Profile
+        {
+            SubjectId = child, DisplayName = "Child", Verified = true, Blocked = false,
+            Visibility = new Audience(), BlockedCommunityIds = []
+        });
+
+        // No active guardian link for (guardian, child) → the standing gate
+        // fires (the GU deny-by-default shape). The write never happens.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetChildCommunityBlockAsync(child, comp, true, "u-stranger"));
+        Assert.Empty((await svc.GetProfileAsync(child))!.BlockedCommunityIds);
+    }
+
     // ── Shared helpers for the membership tests ──────────────────
 
     private static async Task Plant(IDocumentStore store, object document)

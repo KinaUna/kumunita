@@ -1,6 +1,16 @@
 @model Kumunita.Web.Models.FindPeopleIndexViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "People";
+
+    // The form aria-labels are server-resolved (the kw-l TagHelper can't wrap
+    // an attribute) — the a11y.find_* closed set.
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaFindTag = await Translation.GetAsync("a11y.find_tag", effLang);
+    string ariaFindBio = await Translation.GetAsync("a11y.find_bio", effLang);
 }
 
 <div class="row justify-content-center">
@@ -23,7 +33,7 @@
                canonical ByTag route (the results URL + paging link target). *@
             <div class="col-md-6">
                 <form method="get" action="/people" class="d-flex flex-column gap-2"
-                      role="search" aria-label="Find by tag">
+                      role="search" aria-label="@ariaFindTag">
                     <label class="form-label" for="find-tag-slug">
                         <kw-l key="profile.find.by_tag">Find by tag</kw-l>
                     </label>
@@ -39,7 +49,7 @@
                submit. GETs /people?bio={q}. *@
             <div class="col-md-6">
                 <form method="get" action="/people" class="d-flex flex-column gap-2"
-                      role="search" aria-label="Find by bio">
+                      role="search" aria-label="@ariaFindBio">
                     <label class="form-label" for="find-bio-q">
                         <kw-l key="profile.find.by_bio">Find by bio</kw-l>
                     </label>

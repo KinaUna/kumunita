@@ -11,6 +11,16 @@
     string action = isEdit ? $"/pages/{Model.PageId}/edit" : "/pages/new";
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+
+    // The reset form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmReset = "Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.";
+    if (Translation is not null)
+    {
+        confirmReset = await Translation.GetAsync("pages.reset_confirm", _kwL);
+    }
     var tagsExample = await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
@@ -81,7 +91,7 @@
                         <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                     </div>
                     <div class="text-muted small mt-1">
-                        Optional — a folder node may have no body. Written in Markdown via the WYSIWYG editor (the same one posts and announcements use).
+                        <kw-l key="pages.form.body_hint">Optional — a folder node may have no body. Written in Markdown via the visual editor (the same one posts and announcements use).</kw-l>
                     </div>
                 </div>
             </div>
@@ -260,7 +270,7 @@
         {
             <form class="d-inline mt-2" method="post"
                   action="/pages/@Model.PageId/reset-seeded"
-                  data-confirm="Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.">
+                  data-confirm="@confirmReset">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="btn btn-outline-danger">
                     <kw-l key="pages.resetSeeded">Reset to seeded text</kw-l>

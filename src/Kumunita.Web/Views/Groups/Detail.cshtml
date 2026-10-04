@@ -10,6 +10,24 @@
     // Profile/Edit pattern; M·5/M·8, ADR 0049).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var descPlaceholder = await Translation.GetAsync("groups.desc_placeholder", _kwL);
+
+    // The delete-group + remove-translation forms' data-confirms (the ADR 0072
+    // attribute idiom — the confirm.js seam reads the attribute verbatim; the
+    // kw-l TagHelper can't wrap an attribute). The en floor is the server
+    // fallback (a null provider — a non-HTTP render — degrades to en).
+    string confirmDeleteGroup   = "Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone.";
+    string confirmRemoveTrans   = "Remove this translation?";
+    // The actions menu's accessible name is a template with a {0} slot (the
+    // group's name) — server-resolved (the kw-l TagHelper can't wrap an
+    // attribute, and can't substitute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        confirmDeleteGroup = await Translation.GetAsync("groups.confirm_delete", _kwL);
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
+    }
     var filterNamePlaceholder = await Translation.GetAsync("common.filter_name", _kwL);
 
     // The add / remove member routes each carry the same [FromForm] subjectId —
@@ -122,7 +140,7 @@
                 <div class="dropdown">
                     <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                             data-bs-toggle="dropdown" aria-expanded="false"
-                            aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Name) ? "group" : Model.Name)}")">⋮</button>
+                            aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Name) ? "group" : Model.Name))">⋮</button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         @foreach (var existing in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
                         {
@@ -151,7 +169,7 @@
                             {
                                 <li>
                                     <form method="post" action="@($"/groups/{Model.GroupId}/translations/remove")"
-                                          data-confirm="Remove this translation?" style="margin:0;">
+                                          data-confirm="@confirmRemoveTrans" style="margin:0;">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                         <button type="submit" class="dropdown-item text-danger">
@@ -727,7 +745,7 @@
                             <kw-l key="groups.danger_delete_hint">Deleting the group removes it, its members, and any pending invitations. This cannot be undone.</kw-l>
                         </p>
                         <form method="post" action="@Url.Action("DeleteGroup", "Groups", new { id = Model.GroupId })"
-                              data-confirm="Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone."
+                              data-confirm="@confirmDeleteGroup"
                               style="display:inline;">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-outline-danger">
