@@ -99,6 +99,110 @@ public sealed class AccountController(
         });
     }
 
+    // ── Change password (self-serve; ADR 0138) ───────────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/password</c> — the resident's self-serve change-password
+    /// form (ADR 0138). The subject is the signed-in principal (never a path
+    /// param). When the instance has opted in to the sample-account lock
+    /// (<see cref="IIdentityService.IsChangePasswordLockedForAsync"/> — a
+    /// <c>SampleData__Enabled</c> instance, the admin lock on, and this account
+    /// a non-admin sample account), the form is replaced by the static
+    /// <c>ChangePasswordLocked</c> notice (the same "surface replaced by a
+    /// notice" shape as the ADR 0050 <c>SignupClosed</c> lane). Otherwise the
+    /// change-password form is returned.
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> ChangePassword()
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0138 — the lock (the single decision seam, so the GET and the
+        // POST agree): a locked, non-admin sample account gets the static
+        // notice instead of the form.
+        if (await identity.IsChangePasswordLockedForAsync(subject))
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+
+        return View(new ChangePasswordViewModel());
+    }
+
+    /// <summary>
+    /// <c>POST /account/password</c> — the self-serve write lane (ADR 0138).
+    /// <b>The guard is authoritative on the write path too</b> (the ADR 0050
+    /// gate shape): a locked account is denied before any write, even if the
+    /// form were crafted by hand. Otherwise the <b>current</b> password is
+    /// verified against the account (the self-serve lane confirms it is really
+    /// this resident), and the new password is written through
+    /// <see cref="IIdentityService.ChangePasswordAsync"/> (the single audited
+    /// write lane, <c>via: Owner</c>; it rotates the security stamp). On
+    /// success the resident is signed out (the credential just changed —
+    /// confirm the new one on the next sign-in) and returned to the login
+    /// surface with a <c>info</c> flash.
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0138 — the lock, authoritative on the write path (defense in
+        // depth over the Core guard inside ChangePasswordAsync): a locked,
+        // non-admin sample account is denied with the static notice — no
+        // current-password check, no write.
+        if (await identity.IsChangePasswordLockedForAsync(subject))
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident changing their own credential — not a blind set). A
+        // wrong current password is a form error (the account is untouched).
+        var user = await userManager.FindByIdAsync(subject);
+        if (user is null)
+        {
+            ModelState.AddModelError(nameof(model.CurrentPassword),
+                "We could not find that account — sign in again.");
+            return View(model);
+        }
+
+        var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
+        if (!currentOk)
+        {
+            ModelState.AddModelError(nameof(model.CurrentPassword),
+                "Your current password is incorrect.");
+            return View(model);
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner; rotates the security
+            // stamp, so this account's existing sessions are invalidated).
+            await identity.ChangePasswordAsync(subject, model.NewPassword, byAdmin: false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core guard (IsChangePasswordLockedForAsync) refused the write
+            // — surface the locked notice (defense in depth: the GET/POST lock
+            // check above normally catches this first).
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+        }
+
+        // The credential just changed: sign this session out so the new
+        // password is confirmed on the next sign-in (the ChangePasswordAsync
+        // security-stamp rotation already invalidates this account's other
+        // sessions).
+        await signInManager.SignOutAsync();
+        TempData["info"] = "Your password was changed. Sign in again with the new password.";
+        return RedirectToAction(nameof(Login));
+    }
+
     // ── Signup ──────────────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]

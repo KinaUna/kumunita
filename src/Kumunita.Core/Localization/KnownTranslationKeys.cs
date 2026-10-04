@@ -617,6 +617,37 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Sign up",
             ["account.signup_submit"] = "Sign up",
             ["account.signup_has_account"] = "Already have an account?",
+
+            // ── ADR 0138 — the resident self-serve change-password surface
+            //    (/account/password: the form + the locked notice), the
+            //    account-menu link (nav.change_password), and the
+            //    GlobalAdmin /admin/sample toggle (admin.sample.*) ──
+            ["account.change_password_title"] = "Change password",
+            ["account.change_password_lede"] =
+                "Pick a new password for your account. After saving you'll be " +
+                "signed out and asked to sign in again with the new password.",
+            ["account.change_password_current"] = "Current password",
+            ["account.change_password_new"] = "New password",
+            ["account.change_password_confirm_new"] = "Confirm new password",
+            ["account.change_password_submit"] = "Change password",
+            ["account.change_password_locked_title"] = "Password changes are locked",
+            ["account.change_password_locked_body"] =
+                "This is a demo account and password changes are locked by the " +
+                "administrator so everyone can keep using the shared credentials. " +
+                "You can still use every other feature of the platform.",
+            ["account.change_password_back"] = "Back to your profile",
+
+            ["nav.change_password"] = "Change password",
+
+            ["admin.sample_title"] = "Sample data",
+            ["admin.sample_lede"] =
+                "This instance runs the demo neighborhood (sample data). Lock the " +
+                "sample accounts out of changing their own password so visitors can " +
+                "test features without breaking the shared credentials — the demo " +
+                "admin keeps its own password lane.",
+            ["admin.sample_lock_label"] = "Sample account password changes",
+            ["admin.sample_lock_on"] = "Locked — sample accounts can't change their own password",
+            ["admin.sample_lock_off"] = "Unlocked — sample accounts can change their own password",
             ["account.login.error.blocked"] =
                 "Your account has been temporarily suspended. Contact an administrator.",
             ["account.login.error.removed"] =
@@ -2485,6 +2516,35 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Registrieren",
             ["account.signup_submit"] = "Registrieren",
             ["account.signup_has_account"] = "Du hast schon ein Konto?",
+
+            // ── ADR 0138 — das Passwort-Wechseln (de) ──
+            ["account.change_password_title"] = "Passwort ändern",
+            ["account.change_password_lede"] =
+                "Wähle ein neues Passwort für dein Konto. Nach dem Speichern wirst du " +
+                "abgemeldet und musst dich mit dem neuen Passwort erneut anmelden.",
+            ["account.change_password_current"] = "Aktuelles Passwort",
+            ["account.change_password_new"] = "Neues Passwort",
+            ["account.change_password_confirm_new"] = "Neues Passwort bestätigen",
+            ["account.change_password_submit"] = "Passwort ändern",
+            ["account.change_password_locked_title"] = "Passwortänderungen sind gesperrt",
+            ["account.change_password_locked_body"] =
+                "Dies ist ein Demo-Konto und Passwortänderungen sind vom " +
+                "Administrator gesperrt, damit alle die gemeinsamen Zugangsdaten " +
+                "weiter nutzen können. Alle anderen Funktionen der Plattform kannst du " +
+                "weiterhin verwenden.",
+            ["account.change_password_back"] = "Zurück zu deinem Profil",
+
+            ["nav.change_password"] = "Passwort ändern",
+
+            ["admin.sample_title"] = "Beispieldaten",
+            ["admin.sample_lede"] =
+                "Diese Instanz führt die Demo-Nachbarschaft (Beispieldaten) aus. " +
+                "Sperre die Beispielkonten, um ihr eigenes Passwort zu ändern, damit " +
+                "Besucher Funktionen testen können, ohne die gemeinsamen Zugangsdaten " +
+                "zu brechen — das Demo-Admin behält seinen eigenen Passwort-Zugang.",
+            ["admin.sample_lock_label"] = "Passwortänderungen der Beispielkonten",
+            ["admin.sample_lock_on"] = "Gesperrt — Beispielkonten können ihr Passwort nicht ändern",
+            ["admin.sample_lock_off"] = "Nicht gesperrt — Beispielkonten können ihr Passwort ändern",
             ["account.login.error.blocked"] =
                 "Ihr Konto wurde vorübergehend gesperrt. Wenden Sie sich an einen Administrator.",
             ["account.login.error.removed"] =
@@ -4259,6 +4319,36 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "S'inscrire",
             ["account.signup_submit"] = "S'inscrire",
             ["account.signup_has_account"] = "Tu as déjà un compte ?",
+
+            // ── ADR 0138 — le changement de mot de passe (fr) ──
+            ["account.change_password_title"] = "Changer le mot de passe",
+            ["account.change_password_lede"] =
+                "Choisis un nouveau mot de passe pour ton compte. Après l'enregistrement, " +
+                "tu seras déconnecté·e et demandé·e de te reconnecter avec le nouveau mot de passe.",
+            ["account.change_password_current"] = "Mot de passe actuel",
+            ["account.change_password_new"] = "Nouveau mot de passe",
+            ["account.change_password_confirm_new"] = "Confirmer le nouveau mot de passe",
+            ["account.change_password_submit"] = "Changer le mot de passe",
+            ["account.change_password_locked_title"] = "Les changements de mot de passe sont verrouillés",
+            ["account.change_password_locked_body"] =
+                "Ceci est un compte de démonstration et les changements de mot de passe " +
+                "sont verrouillés par l'administrateur, afin que tout le monde puisse " +
+                "continuer à utiliser les identifiants partagés. Tu peux continuer à " +
+                "utiliser toutes les autres fonctionnalités de la plateforme.",
+            ["account.change_password_back"] = "Retour à ton profil",
+
+            ["nav.change_password"] = "Changer le mot de passe",
+
+            ["admin.sample_title"] = "Données d'exemple",
+            ["admin.sample_lede"] =
+                "Cette instance exécute le quartier de démonstration (données d'exemple). " +
+                "Verrouille les comptes d'exemple pour qu'ils ne puissent pas changer " +
+                "leur propre mot de passe, afin que les visiteurs puissent tester les " +
+                "fonctionnalités sans casser les identifiants partagés — l'administrateur " +
+                "de démonstration conserve sa propre voie de mot de passe.",
+            ["admin.sample_lock_label"] = "Changements de mot de passe des comptes d'exemple",
+            ["admin.sample_lock_on"] = "Verrouillé — les comptes d'exemple ne peuvent pas changer leur mot de passe",
+            ["admin.sample_lock_off"] = "Déverrouillé — les comptes d'exemple peuvent changer leur mot de passe",
             ["account.login.error.blocked"] =
                 "Votre compte a été suspendu temporairement. Contactez un administrateur.",
             ["account.login.error.removed"] =
@@ -6034,6 +6124,36 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Opret konto",
             ["account.signup_submit"] = "Opret konto",
             ["account.signup_has_account"] = "Har du allerede en konto?",
+
+            // ── ADR 0138 — adgangskodeændring (da) ──
+            ["account.change_password_title"] = "Skift adgangskode",
+            ["account.change_password_lede"] =
+                "Vælg en ny adgangskode til din konto. Efter gemme bliver du " +
+                "logget ud og beder om at logge ind igen med den nye adgangskode.",
+            ["account.change_password_current"] = "Aktuel adgangskode",
+            ["account.change_password_new"] = "Ny adgangskode",
+            ["account.change_password_confirm_new"] = "Bekræft ny adgangskode",
+            ["account.change_password_submit"] = "Skift adgangskode",
+            ["account.change_password_locked_title"] = "Adgangskodeændringer er låst",
+            ["account.change_password_locked_body"] =
+                "Dette er en demo-konto, og adgangskodeændringer er låst af " +
+                "administratoren, så alle kan fortsætte med at bruge de delte " +
+                "login-oplysninger. Du kan fortsat bruge alle de andre " +
+                "funktionaliteter på platformen.",
+            ["account.change_password_back"] = "Tilbage til din profil",
+
+            ["nav.change_password"] = "Skift adgangskode",
+
+            ["admin.sample_title"] = "Eksempeldata",
+            ["admin.sample_lede"] =
+                "Denne instans kører det demonstrerende nabolag (eksempeldata). " +
+                "Lås eksempelkontoerne, så de ikke kan ændre deres egen " +
+                "adgangskode, så besøgende kan teste funktionaliteter uden at " +
+                "brænde de delte login-oplysninger — demo-administratoren " +
+                "beholder sin egen adgangskodevej.",
+            ["admin.sample_lock_label"] = "Eksempelkontos adgangskodeændringer",
+            ["admin.sample_lock_on"] = "Låst — eksempelkonti kan ikke ændre deres egen adgangskode",
+            ["admin.sample_lock_off"] = "Ulåst — eksempelkonti kan ændre deres egen adgangskode",
             ["account.login.error.blocked"] =
                 "Din konto er midlertidigt suspenderet. Kontakt en administrator.",
             ["account.login.error.removed"] =

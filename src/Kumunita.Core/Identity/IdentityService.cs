@@ -41,7 +41,13 @@ public sealed class IdentityService(
     IOptions<VerificationOptions> verificationOptions,
     Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
-    NotificationService? notifications = null) : IIdentityService
+    NotificationService? notifications = null,
+    // ADR 0138 — the SampleData__Enabled flag (config; the seeder's gate).
+    // Placed last (optional, default null) so no existing positional caller
+    // breaks: a null reader resolves as "not a sample-data instance" (the
+    // <c>false</c> floor — the lock is unreachable by construction, the
+    // ADR 0056 shape). DI always supplies the live value.
+    IOptions<SampleDataOptions>? sampleDataOptions = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -393,6 +399,131 @@ public sealed class IdentityService(
         });
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ── Sample-data change-password lock (ADR 0138) ────────────────────────
+
+    /// <inheritdoc />
+    public Task<bool> IsSampleDataEnabledAsync()
+    {
+        // ADR 0138 read seam: the SampleData__Enabled flag (config, the seeder's
+        // own gate — ADR 0056). A missing reader (the test-construction floor)
+        // or an unset flag both yield `false`: the sample-data surfaces are
+        // unreachable by construction on a real instance (the "unreachable by
+        // construction" shape). A pure config read — no audit row, no DB.
+        return Task.FromResult(sampleDataOptions?.Value.Enabled ?? false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsSamplePasswordChangeLockedAsync()
+    {
+        // ADR 0138 read seam: the instance gate (LocaleSettings.
+        // SamplePasswordChangeLocked) with the `false` floor — a missing
+        // singleton or an unset value both yield `false`, so a fresh or real
+        // instance never blocks a password change (the deliberate inverse of
+        // IsSignupOpenAsync's `true` floor; the MessagingEnabled shape). A read
+        // (no audit row); the SampleData__Enabled flag is NOT consulted here —
+        // the lock is a pure instance value, and IsChangePasswordLockedForAsync
+        // combines it with the sample-account membership.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `false` floor: a null settings row (never seen — but defensively)
+        // keeps the change open; only an explicit `true` locks sample accounts.
+        // `false` floor: a null settings row keeps the change open; only an
+        // explicit `true` locks sample accounts.
+        return settings is not null && settings.SamplePasswordChangeLocked;
+    }
+
+    /// <inheritdoc />
+    public async Task SetSamplePasswordChangeLockedAsync(bool locked, string adminSubjectId)
+    {
+        // ADR 0138 write seam: the admin-settled instance gate (LocaleSettings
+        // singleton, the same doc the signup / notify / timezone / date-format
+        // lanes read and write) + exactly one audit row (via: Admin, action
+        // "sample.set-password-lock", target "sample") in the same session (C3
+        // — no silent, unaudited access). The same single-target
+        // singleton-toggle shape as SetSignupOpenAsync (the timezone.set-default
+        // / dateformat.set-default precedent). `locked` is the authoritative new
+        // value.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetSignupOpenAsync shape) and set the
+        // gate; the other singleton fields are untouched — this is the sample
+        // password lock only.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { SamplePasswordChangeLocked = locked };
+        }
+        else
+        {
+            settings.SamplePasswordChangeLocked = locked;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "sample.set-password-lock",
+            TargetKind = "sample",
+            TargetId = "sample",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsChangePasswordLockedForAsync(string subjectId)
+    {
+        // ADR 0138 decision seam: the single place the "is this account locked
+        // out of changing its own password?" rule lives, so the resident
+        // /account/password surface and the ChangePasswordAsync enforcement
+        // guard below agree. Four conjuncts:
+        //   (1) the instance carries the closed set (SampleData__Enabled);
+        //   (2) the admin opted the instance in (the locale gate);
+        //   (3) the subject is a sample account (a member of the closed
+        //       SampleAccountEmails set, by its profile e-mail);
+        //   (4) the subject is NOT a GlobalAdmin (the sample admin is exempt).
+        // Any real (non-sample) account, or the sample admin, is never locked
+        // (short-circuit on (3)/(4)) — only a non-admin sample account on an
+        // opted-in demo instance is.
+        if (!await IsSampleDataEnabledAsync())
+            return false;
+        if (!await IsSamplePasswordChangeLockedAsync())
+            return false;
+
+        // (3) sample-account membership by profile e-mail (the ADR 0078 closed
+        // set the notification-suppression gate compares against — the same
+        // single source of truth, so the lock and the suppression cannot drift).
+        var profile = await userInfo.GetProfileAsync(subjectId);
+        var email = profile?.Email;
+        if (string.IsNullOrWhiteSpace(email)
+            || !Kumunita.Core.Bootstrap.SampleDataSeeder.SampleAccountEmails.Contains(email.Trim()))
+            return false;
+
+        // (4) the sample admin is exempt — a sample account holding GlobalAdmin
+        // (the seed admin) may still change its own password, by construction.
+        var user = await userManager.FindByIdAsync(subjectId);
+        if (user is null)
+            return false;   // no account → not a lockable sample account
+        var roles = await userManager.GetRolesAsync(user);
+        if (roles.Contains(Roles.GlobalAdmin))
+            return false;
+
+        return true;
     }
 
     // ── Admin account notifications (ADR 0077 — the account.signup /
@@ -792,6 +923,22 @@ public sealed class IdentityService(
     /// <inheritdoc />
     public async Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin)
     {
+        // ADR 0138 — the enforcement guard (the single place the lock bites,
+        // so the resident /account/password surface and this write path can
+        // never disagree). It applies to the self-serve lane only (byAdmin
+        // false): an admin's reset of a sample account is always allowed (an
+        // admin must be able to recover a demo credential they set), so the
+        // guard is a no-op for the byAdmin path. A locked, non-admin sample
+        // account is denied *before* any write (no audit row for the blocked
+        // attempt — the RemoveLanguageAsync / M·7 fail-closed pin) and before
+        // any security-stamp rotation (so the account stays usable).
+        if (!byAdmin && await IsChangePasswordLockedForAsync(subjectId))
+        {
+            throw new UnauthorizedAccessException(
+                "This is a demo (sample) account and password changes are locked by the " +
+                "administrator. Use a different account if you need to test a password change.");
+        }
+
         var user = await userManager.FindByIdAsync(subjectId)
             ?? throw new InvalidOperationException($"No account '{subjectId}'.");
 

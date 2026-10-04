@@ -157,6 +157,18 @@ public interface IIdentityService
     /// Change password (self-serve, or a GlobalAdmin reset): rotates the security stamp
     /// so the account's existing sessions invalidate. Appends an audit row
     /// <c>(via: Owner | Admin)</c>.
+    /// <para>
+    /// <b>ADR 0138 — the sample-account guard.</b> The self-serve lane
+    /// (<c>byAdmin: false</c>) is additionally subject to
+    /// <see cref="IsChangePasswordLockedForAsync"/>: when a
+    /// <c>SampleData__Enabled</c> instance has opted in to the lock (an admin
+    /// flipped <see cref="SetSamplePasswordChangeLockedAsync"/>) and the subject
+    /// is a non-admin sample account, this throws
+    /// <see cref="UnauthorizedAccessException"/> <b>before</b> any write (no
+    /// audit row for the blocked attempt — the fail-closed pin). The admin
+    /// reset lane (<c>byAdmin: true</c>) is always allowed — an admin must be
+    /// able to recover a demo credential they set.
+    /// </para>
     /// </summary>
     Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin);
 
@@ -185,6 +197,70 @@ public interface IIdentityService
     /// this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetSignupOpenAsync(bool open, string adminSubjectId);
+
+    // ── Sample-data change-password lock (ADR 0138) ────────────────────────
+    // A demo-instance guard: when the SampleData__Enabled instance is opted in
+    // (an admin flips the LocaleSettings.SamplePasswordChangeLocked gate at
+    // /admin/sample), a non-admin sample account (the closed
+    // SampleDataSeeder.SampleAccountEmails set) is denied the self-serve
+    // password change — so a visitor testing the demo can't break the shared
+    // credentials. The sample GlobalAdmin and every real account are exempt.
+
+    /// <summary>
+    /// Whether the <c>SampleData__Enabled</c> flag is set on this instance
+    /// (ADR 0138) — the gate that decides whether the sample-data surfaces
+    /// (the <c>/admin/sample</c> change-password lock and the locked-account
+    /// notice) exist at all. A read (no audit row); a real deployment never
+    /// carries the flag, so this is <c>false</c> there and the surfaces are
+    /// unreachable by construction (the ADR 0056 "unreachable by construction"
+    /// shape).
+    /// </summary>
+    Task<bool> IsSampleDataEnabledAsync();
+
+    /// <summary>
+    /// Whether sample accounts are currently <b>locked out of changing their
+    /// own password</b> (ADR 0138). The <c>false</c> floor — a missing
+    /// singleton or an unset value both yield <c>false</c>, so a fresh or real
+    /// instance never blocks a password change (the deliberate inverse of the
+    /// codebase <c>true</c>-floor convention, the <see
+    /// cref="Localization.LocaleSettings.MessagingEnabled"/> shape). A read
+    /// (no audit row); the <see cref="IsSampleDataEnabledAsync"/> flag is NOT
+    /// consulted here — the lock is a pure instance value, and the
+    /// <see cref="IsChangePasswordLockedForAsync"/> decision combines it with
+    /// the sample-account membership.
+    /// </summary>
+    Task<bool> IsSamplePasswordChangeLockedAsync();
+
+    /// <summary>
+    /// Set whether sample accounts are locked out of changing their own
+    /// password (ADR 0138): a GlobalAdmin flips the instance-wide gate at
+    /// <c>/admin/sample</c> — <c>true</c> locks the non-admin sample accounts
+    /// (so a demo visitor can't break the shared credentials), <c>false</c>
+    /// unlocks them. Writes the
+    /// <see cref="Localization.LocaleSettings.SamplePasswordChangeLocked"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"sample.set-password-lock"</c>, target
+    /// "sample") in the same session (C3 — no silent, unaudited access). Only
+    /// a GlobalAdmin may call this; the Web's <c>AdminSampleDataController</c>
+    /// enforces the gate (and 404s when <c>SampleData__Enabled</c> is unset).
+    /// </summary>
+    Task SetSamplePasswordChangeLockedAsync(bool locked, string adminSubjectId);
+
+    /// <summary>
+    /// Whether the given <paramref name="subjectId"/>'s self-serve password
+    /// change is currently <b>locked</b> (ADR 0138). Combines the three
+    /// conditions into one decision (the single place the rule lives, so the
+    /// resident <c>/account/password</c> surface and the
+    /// <see cref="ChangePasswordAsync"/> enforcement guard agree):
+    /// <see cref="IsSampleDataEnabledAsync"/> (the instance carries the closed
+    /// set) <b>AND</b> <see cref="IsSamplePasswordChangeLockedAsync"/> (the
+    /// admin opted in) <b>AND</b> the subject is a member of
+    /// <see cref="Bootstrap.SampleDataSeeder.SampleAccountEmails"/> (a sample
+    /// account) <b>AND NOT</b> a <c>GlobalAdmin</c> (the sample admin is
+    /// exempt). Returns <c>false</c> for every real account and for the sample
+    /// admin regardless of the gate.
+    /// </summary>
+    Task<bool> IsChangePasswordLockedForAsync(string subjectId);
 
     // ── Admin account notifications (ADR 0077 — the admin-lane signup/verify
     //    notify gate) ──

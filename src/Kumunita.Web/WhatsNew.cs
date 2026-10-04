@@ -19,6 +19,11 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.30.0", "2026-10-04", new List<string>
+        {
+            "Change password — you can now change your own account password (current → new → confirm) from your account menu. After saving you're signed out and asked to sign in again with the new password (ADR 0138).",
+            "Sample-data demo — on a demo instance (sample data enabled), the admin can lock the demo accounts out of changing their own password, so visitors can test features without breaking the shared credentials — the demo admin keeps its own password lane (ADR 0138).",
+        }),
         new("0.29.0", "2026-10-04", new List<string>
         {
             "Platform storage limit — an operator can cap how much resident content the platform may hold (Media__MaxPlatformBytes, 0 = unlimited). When set, the GlobalAdmin's /admin/storage \"available\" figure is capped to the remaining budget, and all new uploads are blocked once that budget is spent or the volume's free space drops below 100 MiB (ADR 0136).",

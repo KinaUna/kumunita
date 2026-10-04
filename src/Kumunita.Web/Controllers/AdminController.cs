@@ -182,9 +182,17 @@ public sealed class AdminController(
     public async Task<IActionResult> Platform()
     {
         var platformPages = await BuildPlatformPagesAsync(pages);
+        // ADR 0138 — surface the sample-data link (the /admin/sample
+        // change-password lock) only on a SampleData__Enabled instance (the
+        // "unreachable by construction" shape, ADR 0056 — a real deployment
+        // never carries the flag, so the link is absent there). The identity
+        // dependency is already in this controller's ctor (the block /
+        // role / verify lanes use it), so no test-pinned ctor change is needed.
+        bool sampleDataEnabled = await identity.IsSampleDataEnabledAsync();
         return View(new AdminPlatformViewModel
         {
-            PlatformPages = platformPages
+            PlatformPages  = platformPages,
+            ShowSampleData = sampleDataEnabled
         });
     }
 

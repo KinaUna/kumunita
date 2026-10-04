@@ -139,4 +139,26 @@ public sealed class LocaleSettings
     /// resolved in the Core read seam, not here.
     /// </summary>
     public int QuietCheckMinutes { get; set; } = 60;
+
+    /// <summary>
+    /// Whether <b>sample accounts</b> (the closed
+    /// <see cref="Kumunita.Core.Bootstrap.SampleDataSeeder.SampleAccountEmails"/>
+    /// set, except the sample <c>GlobalAdmin</c>) are <b>locked out of changing
+    /// their own password</b> (ADR 0138). The resident
+    /// <see cref="Kumunita.Core.Identity.IIdentityService.ChangePasswordAsync"/>
+    /// lane is the one that enforces this: when <c>true</c> (and the
+    /// <c>SampleData__Enabled</c> instance carries the closed set), a
+    /// non-admin sample account is denied the self-serve password change so a
+    /// visitor testing the demo can't break the shared credentials for the
+    /// everyone else who signs in with them; the sample <c>GlobalAdmin</c> and
+    /// every real (non-sample) account are unaffected. A *deliberate*
+    /// <b>inverse</b> of the codebase <c>true</c>-floor convention, like
+    /// <see cref="MessagingEnabled"/>: the default is <c>false</c> (locked-out
+    /// is <b>off</b> — a fresh or real instance never blocks a password
+    /// change), so a missing settings row reads as <b>not locked</b> (the
+    /// <c>false</c> floor, ADR 0138 D1). A GlobalAdmin opts a demo instance
+    /// into the lock at <c>/admin/sample</c> (which itself is surfaced only
+    /// when <c>SampleData__Enabled</c> is set).
+    /// </summary>
+    public bool SamplePasswordChangeLocked { get; set; } = false;
 }

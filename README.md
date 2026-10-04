@@ -358,6 +358,19 @@ next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps 
 ever re-running its content on a warm database — the only warm-boot write is the
 create-if-missing sample-event translation backfill, ADR 0060).
 
+**Locking sample-account password changes (ADR 0138).** A demo site's sample accounts are
+*shared* credentials — anyone who signs in as "Anna" signs in as the *same* account — so a
+visitor testing the demo could change one of those passwords and break the credential for the
+everyone else who uses it. On a `SampleData__Enabled` instance (and **only** there — a real
+deployment never carries the flag, so this surface is unreachable by construction), a
+`GlobalAdmin` can turn on a **change-password lock** at `/admin/platform` → **Sample data**
+→ `/admin/sample`: the demo accounts (the closed sample set) are then locked out of the
+resident self-serve "Change password" surface, **except the sample `GlobalAdmin`**, whose
+own credential the admin must still be able to set/recover. Real (non-sample) accounts are
+never affected. The lock is a `GlobalAdmin`-settled instance value (audited,
+`sample.set-password-lock`) and a plain read decision (`IsChangePasswordLockedForAsync`), so
+the resident form, the locked notice, and the write-path guard agree by construction.
+
 *Dev (no app container):* `docker compose up -d db`,
 `npm run build` in `src/Kumunita.Web/`, copy
 `src/Kumunita.Web/appsettings.Development.Local.json.example` to
