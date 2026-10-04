@@ -118,6 +118,16 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         ViewData["MessagingRestricted"] = childProfile?.MessagingRestricted ?? false;
         ViewData["ChildMessagingOptIn"] = childProfile?.MessagingOptIn ?? false;
 
+        // The Detail header's child identity (name + email) — the same
+        // profile read; the MembershipEditorModel is a pinned 5-field
+        // record (the U07 GuardianViewModelsTests pin forbids adding a
+        // field), so the view data goes on ViewData (the M9
+        // MessagingRestricted / _AudienceEditor precedent). Null-safe —
+        // a missing profile degrades to the child id (the view's
+        // fallback).
+        ViewData["ChildDisplayName"] = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? null : childProfile!.DisplayName;
+        ViewData["ChildEmail"] = string.IsNullOrWhiteSpace(childProfile?.Email) ? null : childProfile!.Email;
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),

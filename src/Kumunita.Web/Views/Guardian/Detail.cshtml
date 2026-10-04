@@ -14,7 +14,33 @@
         <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; <kw-l key="guardian.back">Back to your children</kw-l></a></p>
 
         <h1><kw-l key="guardian.manage_title">Manage a child account</kw-l></h1>
-        <p class="text-muted"><kw-l key="guardian.account_label">Account</kw-l>: <code>@Model.ChildId</code></p>
+        @*
+            The child's identity — name + email (the Detail action's
+            ViewData["ChildDisplayName"] / ["ChildEmail"], the M9
+            ViewData precedent — the MembershipEditorModel is a pinned
+            5-field record). The raw child id only shows when the
+            profile has no name (the fail-safe the Index list already
+            uses).
+        *@
+        @{
+            var _childName = (string?)ViewData["ChildDisplayName"];
+            var _childEmail = (string?)ViewData["ChildEmail"];
+        }
+        <p class="text-muted">
+            <kw-l key="guardian.account_label">Account</kw-l>:
+            @if (!string.IsNullOrEmpty(_childName))
+            {
+                <span>@_childName</span>
+                @if (!string.IsNullOrEmpty(_childEmail))
+                {
+                    <span> (@_childEmail)</span>
+                }
+            }
+            else
+            {
+                <code>@Model.ChildId</code>
+            }
+        </p>
 
         @*
             GU (ADR 0028) — the per-child curation surface. Every section is
