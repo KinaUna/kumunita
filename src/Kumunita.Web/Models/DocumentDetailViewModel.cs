@@ -20,4 +20,25 @@ public sealed record DocumentDetailViewModel(
     bool CanDownload,
     string DownloadUrl,
     bool CanEdit,
-    string EditUrl);
+    string EditUrl,
+    // ── Organization (the "documents organization" lane) ─────────────────────
+    // The document's tags resolved to (slug, display-name) rows (the
+    // PostsController's tag-rows shape — the display-name is resolved to the
+    // viewer's language through the ITagService read seam; a label, never a
+    // gate — C-TG·1). Empty when the document carries no tags (the M3/M7
+    // default-empty idiom).
+    System.Collections.Generic.IReadOnlyList<DocumentTagRow> Tags,
+    // The document's folder name (the display label, never a gate). <c>null</c>
+    // = "Unfiled" (the root).
+    string? FolderName,
+    // The document's folder id (used by the view to link to the folder).
+    string? FolderId);
+
+/// <summary>
+/// A tag row on a document's detail view (the "documents organization" lane):
+/// the tag's <see cref="Slug"/> (the business key — the <c>/tags/{slug}</c>
+/// route link target) and the <see cref="DisplayedName"/> (the label resolved
+/// to the viewer's language through the <c>ITagService</c> read seam — the
+/// ADR 0005 preference order, D5).
+/// </summary>
+public sealed record DocumentTagRow(string Slug, string DisplayedName);

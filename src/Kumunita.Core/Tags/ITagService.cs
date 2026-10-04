@@ -44,6 +44,19 @@ public interface ITagService
         string actorId, IReadOnlySet<string> roles, IDocumentSession session);
 
     /// <summary>
+    /// Same shape for a <see cref="Kumunita.Core.Documents.Document"/>
+    /// (the M21 documents lane — the owner ∪ GlobalAdmin standing, the
+    /// ADR 0125 owner-reading carried to tags: the uploader
+    /// <c>Document.OwnerId</c> may attach/detach tags, plus the
+    /// <c>GlobalAdmin</c> elevated standing the ADR 0044 translate lane
+    /// carries to attach). A <c>Document</c> with no owner set (a
+    /// shape violation) is refused (<c>ArgumentException</c>).
+    /// </summary>
+    Task<IReadOnlyList<Tag>> AttachToDocumentAsync(
+        string documentId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session);
+
+    /// <summary>
     /// Add / overwrite the <paramref name="languageCode"/> translation row of
     /// tag <paramref name="tagId"/> (the <c>(TagId, LanguageCode)</c>
     /// business key — overwrites on conflict). Standing: the tag's
@@ -119,6 +132,16 @@ public interface ITagService
     /// <see cref="AttachToPostAsync"/> standing re-check.
     /// </summary>
     bool CanAttachToPost(Post post, string actorId, IReadOnlySet<string> roles);
+
+    /// <summary>
+    /// True if the actor is the document's <c>OwnerId</c> (the uploader) or a
+    /// GlobalAdmin (the ADR 0125 owner-reading ∪ the ADR 0044 elevated
+    /// standing). A display pin (the Web renders the affordance); the real
+    /// deny is the <see cref="AttachToDocumentAsync"/> standing re-check.
+    /// </summary>
+    bool CanAttachToDocument(
+        Kumunita.Core.Documents.Document document,
+        string actorId, IReadOnlySet<string> roles);
 
     /// <summary>
     /// False for a <c>PageKind.System</c> page (C-TG·6, D6). Otherwise true

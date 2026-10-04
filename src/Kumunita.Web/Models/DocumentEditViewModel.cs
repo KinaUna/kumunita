@@ -53,4 +53,40 @@ public sealed class DocumentEditViewModel
     /// via <see cref="AudienceEditorModel.BuildAudience"/> at <c>POST</c>.
     /// </summary>
     public AudienceEditorModel Audience { get; set; } = new();
+
+    // ── Organization (the "documents organization" lane) ─────────────────────
+    /// <summary>
+    /// The folder this document is being moved to (the ADR 0039 Pages
+    /// <c>ParentId</c> forest carried to Documents). An empty value =
+    /// "Unfiled" (the root). The controller resolves it to a validated
+    /// folder id (a shape-violating folder is a form error — the M3 "a form
+    /// is a shape" precedent) before the Core write lane sees it.
+    /// </summary>
+    public string? FolderId { get; set; }
+
+    /// <summary>
+    /// The TG-lane tag labels the owner typed (the client
+    /// <c>client/lib/tag-suggest.ts</c> posts a JSON array of label strings,
+    /// e.g. <c>["bylaws", "budget"]</c>, into this one field; the server
+    /// parses + normalizes via <see cref="TagSlugs.Parse"/>). <c>null</c>
+    /// (the form did not post the field — the U8b "leave existing" shape)
+    /// leaves the document's existing tags; a present value (even an empty
+    /// <c>[]</c> when the owner removed every chip) is authoritative ⇒
+    /// empty detaches all, non-empty attaches. The Core write lane resolves
+    /// them to <c>Tag</c> ids through
+    /// <see cref="Kumunita.Core.Tags.ITagService.AttachToDocumentAsync"/>
+    /// (the <c>AttachToPostAsync</c> / <c>AttachToPageAsync</c> precedent).
+    /// </summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>
+    /// The tag **slugs** the tag-suggest input's starting chips (the
+    /// edit-form pre-seed, the <c>PostsController.SeedExistingTagSlugsAsync</c>
+    /// idiom). <c>[BindNever]</c> — never bound from the form; the controller
+    /// populates it on the <c>GET</c> edit form (and re-populates it on a
+    /// re-render so a failed POST does not silently drop the author's tags
+    /// under the U8b empty-set-detach semantics).
+    /// </summary>
+    [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
+    public System.Collections.Generic.IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
 }

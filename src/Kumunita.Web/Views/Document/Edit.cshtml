@@ -3,9 +3,12 @@
 @using Kumunita.Web.Models
 @using Kumunita.Core.Authorization
 @inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit a document";
     string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     // ADR 0125 (U03) — the owner-only edit form. The audience editor is
     // pre-filled from the stored Document.Audience (ADR 0036 single source,
     // AudienceEditorModel.FromAudience — the controller did that on GET); the
@@ -169,6 +172,50 @@
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="folder" style="font-weight:600;">
+                        <kw-l key="documents.folder">Folder</kw-l>
+                    </label>
+                    <select class="form-control" id="folder" name="FolderId">
+                        <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
+                    </select>
+                    <div class="text-muted small mt-1">
+                        <kw-l key="documents.folder_hint">File this document into a folder to keep the repository organized.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="tags" style="font-weight:600;">
+                        <kw-l key="documents.tags">Tags</kw-l>
+                    </label>
+                    @* The "documents organization" lane (TG) — the composer tag
+                       input (a free-text field + autocomplete dropdown). The
+                       `data-tag-suggest` self-wire selector (the
+                       Posts/New.cshtml + Posts/Edit.cshtml idiom) drives the
+                       client/lib/tag-suggest.ts module to create the chips,
+                       the dropdown, and the hidden TagIds submission field
+                       around this input. The filter (starts_with(displayName)
+                       OR starts_with(slug), ≤ 10) is server-side via
+                       POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 /
+                       C-TG·4). The data-tag-suggest-initial JSON array
+                       (the ExistingTagSlugs field, the
+                       PostsController.SeedExistingTagSlugsAsync idiom)
+                       pre-seeds the starting chips. A "[]" ⇒ no chips (new/
+                       untagged document behaves as before). *@
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           data-tag-suggest-initial='@System.Text.Json.JsonSerializer.Serialize(Model?.ExistingTagSlugs ?? [])'
+                           maxlength="64"
+                           placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="documents.edit.submit">Save changes</kw-l></button>
                 <a href="@($"/documents/{docId}")" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
@@ -176,3 +223,42 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    @* The "documents organization" lane (TG) — the composer tag-input
+       autocomplete (client/lib/tag-suggest.ts, tsc-built, no editor
+       dependency — the RE·3 idiom). Self-wires any input[data-tag-suggest]
+       (the Tags field above); the filter + ≤ 10 cap are server-side via
+       POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 / C-TG·4; the
+       privacy-pin holds because the server returns only the actor-readable
+       set). *@
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
+
+    @* The folder picker — a small client-side script that fetches the
+       folder tree from /documents/folders and populates the <select>
+       (the PostController / PageController "seed the picker" idiom — the
+       folder tree is dynamic, so a server-rendered <select> would be
+       stale). The folder picker is a plain HTML <select> (the
+       PostController's <select> shape — the ADR 0039 Pages "folder" is a
+       pure organizational aid, not a navigation tree). *@
+    <script type="module">
+        (async () => {
+            const select = document.getElementById('folder');
+            if (!select) return;
+            const current = select.value;
+            try {
+                const res = await fetch('/documents/folders', { credentials: 'same-origin' });
+                if (!res.ok) return;
+                const { folders } = await res.json();
+                for (const f of folders) {
+                    const opt = document.createElement('option');
+                    opt.value = f.Id;
+                    const depth = f.ParentId ? '  ' : '';
+                    opt.textContent = depth + f.Name;
+                    select.appendChild(opt);
+                }
+                select.value = current;
+            } catch { /* leave the "Unfiled" option only */ }
+        })();
+    </script>
+}

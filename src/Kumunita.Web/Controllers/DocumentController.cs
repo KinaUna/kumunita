@@ -106,6 +106,40 @@ public sealed class DocumentController(
         // leaked; the edit route returns 404 for a non-owner, not a 403).
         var isOwner = string.Equals(result.Document.OwnerId, actorId, StringComparison.Ordinal);
 
+        // ── Organization (the "documents organization" lane) ────────────────
+        // Resolve the document's tags to (slug, display-name) rows (the
+        // PostsController's tag-rows shape — the display-name is resolved to
+        // the viewer's language through the ITagService read seam; a label,
+        // never a gate — C-TG·1). A null ITagService (a test-construction
+        // site) ⇒ empty list (no-op). The read is plain (no AccessAudit row —
+        // the C-TG·8 shape: the tag lane is a plain read; the content's own
+        // Read decision already ran in GetAsync above).
+        var tagRows = new List<DocumentTagRow>();
+        if (result.Document.TagIds.Count > 0)
+        {
+            var postTagIds = result.Document.TagIds.ToHashSet(StringComparer.Ordinal);
+            await using var q = store.QuerySession();
+            var tagDocs = await q.Query<Kumunita.Core.Tags.Tag>()
+                .Where(t => postTagIds.Contains(t.Id))
+                .ToListAsync();
+            tagRows = tagDocs
+                .Select(t => new DocumentTagRow(t.Slug, t.Name))
+                .Where(t => !string.IsNullOrEmpty(t.Slug))
+                .OrderBy(t => t.DisplayedName, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        // Resolve the document's folder name (the display label, never a gate;
+        // null = "Unfiled" the root). A plain read (no AccessAudit row — the
+        // folder is a label, the C-TG·8 shape).
+        string? folderName = null;
+        if (result.Document.FolderId is not null)
+        {
+            await using var q2 = store.QuerySession();
+            var folder = await q2.LoadAsync<Kumunita.Core.Documents.DocumentFolder>(result.Document.FolderId);
+            folderName = folder?.Name;
+        }
+
         var vm = new DocumentDetailViewModel(
             Document: result.Document,
             // The GetAsync decision allowed — the download re-runs the same Read
@@ -114,7 +148,11 @@ public sealed class DocumentController(
             DownloadUrl: $"/documents/{id}/download",
             // ADR 0125 — the owner-only edit affordance (U04).
             CanEdit: isOwner,
-            EditUrl: $"/documents/{id}/edit");
+            EditUrl: $"/documents/{id}/edit",
+            // Organization (the "documents organization" lane).
+            Tags: tagRows,
+            FolderName: folderName,
+            FolderId: result.Document.FolderId);
         return View("Detail", vm);
     }
 
@@ -134,7 +172,7 @@ public sealed class DocumentController(
     [Authorize]
     public async Task<IActionResult> Edit(string id)
     {
-        var subject = KumunitaPrincipal.SubjectId(User);
+        var subject = Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User);
         if (subject is null) return Unauthorized();
         if (!IsValidDocId(id))
             return BadRequest("A document id is required.");
@@ -160,7 +198,13 @@ public sealed class DocumentController(
             DocumentId = id,
             Title = doc.Title,
             Summary = doc.Summary,
-            Audience = AudienceEditorModel.FromAudience(doc.Audience)
+            FolderId = doc.FolderId,
+            // The "documents organization" lane (TG) — pre-seed the tag
+            // slugs the tag-suggest input starts with (the
+            // PostsController.SeedExistingTagSlugsAsync idiom). A null
+            // ITagService (a test-construction site) ⇒ empty list (no-op).
+            ExistingTagSlugs = await SeedExistingTagSlugsAsync(doc),
+            Audience = AudienceEditorModel.FromAudience(doc.Audience),
         };
 
         return View("Edit", vm);
@@ -246,7 +290,16 @@ public sealed class DocumentController(
             ContentType: contentType,
             SizeBytes: sizeBytes,
             Audience: form.Audience.BuildAudience(),
-            FileReplaced: fileReplaced);
+            FileReplaced: fileReplaced,
+            // ── Organization (the "documents organization" lane) ────────────
+            FolderId: form.FolderId is { Length: > 0 } ? form.FolderId : null,
+            // The TG-lane slugs (the client posts a JSON array of label strings;
+            // the server parses + normalizes). <c>null</c> (the form did not
+            // post the field — the U8b "leave existing" shape) leaves the
+            // document's existing tags; a present value (even an empty
+            // <c>[]</c>) is authoritative ⇒ empty detaches all, non-empty
+            // attaches.
+            TagSlugs: form.TagIds is null ? null : TagSlugs.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         try
@@ -343,7 +396,13 @@ public sealed class DocumentController(
             Filename: file.FileName,
             ContentType: file.ContentType,
             SizeBytes: file.Length,
-            Audience: form.Audience.BuildAudience());
+            Audience: form.Audience.BuildAudience(),
+            // ── Organization (the "documents organization" lane) ────────────
+            FolderId: form.FolderId is { Length: > 0 } ? form.FolderId : null,
+            // The TG-lane slugs (the client posts a JSON array of label strings;
+            // the server parses + normalizes). A blank / absent value is the
+            // "no tags" state (the M3/M7 default-empty idiom).
+            TagSlugs: form.TagIds is null ? Array.Empty<string>() : TagSlugs.Parse(form.TagIds));
 
         await using var session = store.LightweightSession();
         var doc = await documents.UploadAsync(draft, subject, session);
@@ -433,5 +492,33 @@ public sealed class DocumentController(
             return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// The "documents organization" lane (TG) — the edit form's pre-seeded
+    /// tag **slugs** (the tag-suggest input's starting chips, the
+    /// <c>PostsController.SeedExistingTagSlugsAsync</c> idiom). A null
+    /// <see cref="Kumunita.Core.Tags.ITagService"/> (a test-construction
+    /// site) ⇒ empty list (no-op). The read is plain (no <c>AccessAudit</c>
+    /// row — the C-TG·8 shape: the tag lane is a plain read; the content's
+    /// own <c>Read</c> decision already ran in the controller's
+    /// <c>GetAsync</c> above).
+    /// </summary>
+    private async Task<IReadOnlyList<string>> SeedExistingTagSlugsAsync(Kumunita.Core.Documents.Document? doc)
+    {
+        if (doc is null || doc.TagIds.Count == 0)
+            return [];
+
+        await using var session = store.QuerySession();
+        var postTagIds = doc.TagIds.ToHashSet(StringComparer.Ordinal);
+        var tagDocs = await session.Query<Kumunita.Core.Tags.Tag>()
+            .Where(t => postTagIds.Contains(t.Id))
+            .ToListAsync();
+
+        return tagDocs
+            .Select(t => t.Slug)
+            .Where(s => !string.IsNullOrEmpty(s))
+            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 }

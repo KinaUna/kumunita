@@ -147,6 +147,24 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Documents.DocumentService>(sp => new Documents.DocumentService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // The "documents organization" lane (the TG attach seam — the
+            // PostService.CreatePostAsync tag-attach precedent). Optional on
+            // DocumentService (CS1736 — the existing DocumentServiceTests
+            // call sites construct it positionally and keep compiling);
+            // the DI registration passes the live ITagService so the
+            // UploadAsync / UpdateAsync lanes resolve typed slugs to Tag
+            // ids in production (the M3/M7 tag-attach idiom carried to
+            // Documents).
+            sp.GetRequiredService<Tags.ITagService>()));
+
+        // The "documents organization" lane (the folder CRUD + document-move
+        // seams — the ADR 0039 Pages ParentId forest carried to Documents).
+        // A store-composing service (the same "AddTransient with the store
+        // injected" shape as the Documents.DocumentService registration
+        // above); the standing probes are pure, the write lanes take the
+        // caller's IDocumentSession (C3).
+        services.AddTransient<Documents.DocumentFolderService>(sp => new Documents.DocumentFolderService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
         // M3b (the "platform announcements" lane, bounded context

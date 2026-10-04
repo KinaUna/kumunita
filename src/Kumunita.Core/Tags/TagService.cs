@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Documents;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
@@ -265,6 +266,106 @@ public sealed class TagService : ITagService
             Action = "tag.attach",
             TargetKind = "page",
             TargetId = pageId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow,
+        };
+        session.Store(attachAudit);
+
+        await session.SaveChangesAsync();
+        return resolvedTags;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Tag>> AttachToDocumentAsync(
+        string documentId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(documentId))
+            throw new ArgumentException("A document id is required.", nameof(documentId));
+        if (slugs is null) throw new ArgumentNullException(nameof(slugs));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var doc = await session.LoadAsync<Document>(documentId);
+        if (doc is null)
+            throw new KeyNotFoundException(
+                $"Document '{documentId}' was not found in the session; nothing to attach.");
+
+        // A shape violation — a document without an owner cannot carry tags
+        // (the ADR 0125 owner-reading has no anchor to attach to).
+        if (string.IsNullOrEmpty(doc.OwnerId))
+            throw new ArgumentException(
+                "A document without an owner cannot carry tags.", nameof(documentId));
+
+        // Standing check (owner ∪ GlobalAdmin — the ADR 0125 owner-reading ∪
+        // the ADR 0044 elevated standing):
+        if (!CanAttachToDocument(doc, actorId, roles))
+            throw new UnauthorizedAccessException(
+                "Only the document's owner or a GlobalAdmin may attach tags to it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var via = ResolveAttachVia(doc.OwnerId, actorId, roles);
+        var resolvedTags = new List<Tag>(slugs.Count);
+        var tagIds = new List<string>(slugs.Count);
+
+        foreach (var slug in slugs)
+        {
+            var derivedSlug = DeriveSlug(slug);
+
+            var existing = await session.Query<Tag>()
+                .Where(t => t.Slug == derivedSlug)
+                .FirstOrDefaultAsync();
+
+            if (existing is not null)
+            {
+                resolvedTags.Add(existing);
+                tagIds.Add(existing.Id);
+            }
+            else
+            {
+                var tag = new Tag
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Slug = derivedSlug,
+                    Name = derivedSlug,
+                    LanguageCode = "en", // documents carry no authored-in LanguageCode
+                    CreatedBy = actorId,
+                    Created = now,
+                };
+
+                var createAudit = new Authorization.AccessAudit
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    At = now,
+                    ActorId = actorId,
+                    EffectivePrincipalId = actorId,
+                    Action = "tag.create",
+                    TargetKind = "tag",
+                    TargetId = tag.Id,
+                    Via = via,
+                    Outcome = Authorization.AccessOutcome.Allow,
+                };
+
+                session.Store(tag);
+                session.Store(createAudit);
+                resolvedTags.Add(tag);
+                tagIds.Add(tag.Id);
+            }
+        }
+
+        doc.TagIds = tagIds;
+
+        var attachAudit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "tag.attach",
+            TargetKind = "document",
+            TargetId = documentId,
             Via = via,
             Outcome = Authorization.AccessOutcome.Allow,
         };
@@ -631,6 +732,16 @@ public sealed class TagService : ITagService
         if (page.Kind == PageKind.System)
             return false;
         return string.Equals(page.AuthorId, actorId, StringComparison.Ordinal)
+               || roles.Contains(Roles.GlobalAdmin);
+    }
+
+    /// <inheritdoc />
+    public bool CanAttachToDocument(
+        Document document, string actorId, IReadOnlySet<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(roles);
+        return string.Equals(document.OwnerId, actorId, StringComparison.Ordinal)
                || roles.Contains(Roles.GlobalAdmin);
     }
 

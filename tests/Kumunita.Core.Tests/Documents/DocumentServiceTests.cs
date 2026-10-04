@@ -244,7 +244,9 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             Filename: "minutes-q3.pdf",
             ContentType: "application/pdf",
             SizeBytes: 128,
-            Audience: Audience(GrantKind.User, actor));
+            Audience: Audience(GrantKind.User, actor),
+            FolderId: null,           // the "documents organization" lane — the test's upload is unfiled (the root).
+            TagSlugs: Array.Empty<string>()); // the "documents organization" lane — the test's upload carries no tags.
 
         var doc = await RunInSession(store, s => svc.UploadAsync(draft, actor, s));
 
@@ -304,7 +306,9 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             ContentType: "application/pdf",
             SizeBytes: 999,
             Audience: Audience(GrantKind.User, owner),
-            FileReplaced: true);
+            FileReplaced: true,
+            FolderId: null,                 // the "documents organization" lane — the test's edit is unfiled (the root).
+            TagSlugs: null);                // the "documents organization" lane — the test's edit leaves the document's existing tags (the U8b "leave existing" shape).
 
         var updated = await RunInSession(store, s => svc.UpdateAsync(docId, edit, owner, s));
 
@@ -358,7 +362,9 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             MediaId: "sha-media-keep", Filename: "charter.pdf",
             ContentType: "application/pdf", SizeBytes: 77,
             Audience: Audience(GrantKind.User, owner),
-            FileReplaced: false);
+            FileReplaced: false,
+            FolderId: null,    // the "documents organization" lane — the test's edit is unfiled (the root).
+            TagSlugs: null);   // the "documents organization" lane — the test's edit leaves the document's existing tags.
 
         var updated = await RunInSession(store, s => svc.UpdateAsync(docId, edit, owner, s));
 
@@ -394,7 +400,9 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             MediaId: "sha-media-nn", Filename: "restricted.pdf",
             ContentType: "application/pdf", SizeBytes: 10,
             Audience: Audience(GrantKind.User, other),
-            FileReplaced: false);
+            FileReplaced: false,
+            FolderId: null,    // the "documents organization" lane — the test's edit is unfiled (the root).
+            TagSlugs: null);   // the "documents organization" lane — the test's edit leaves the document's existing tags.
 
         // ADR 0125 D1 — a non-owner is refused at the Core level (a hard gate):
         // the Web boundary maps this to a 404 (the ADR 0122 D7 posture).

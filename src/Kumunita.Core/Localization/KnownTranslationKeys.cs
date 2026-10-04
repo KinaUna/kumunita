@@ -1903,6 +1903,24 @@ public static class KnownTranslationKeys
             ["documents.edit.submit"]       = "Save changes",
             ["documents.flash_edited"]      = "Document updated.",
 
+            // The "documents organization" lane (tags + folders) — the
+            // documents.folder_* / documents.tags.* keys + the flash keys for
+            // the DocumentFolderController routes (create / rename / move /
+            // delete / document-move).
+            ["documents.folder"]              = "Folder",
+            ["documents.folder_unfiled"]      = "Unfiled",
+            ["documents.folder_hint"]         = "File this document into a folder to keep the repository organized.",
+            ["documents.folder_new"]          = "New folder",
+            ["documents.folder_create"]       = "Create",
+            ["documents.folder_name_placeholder"] = "Folder name",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Type to search existing tags, or start a new one.",
+            ["documents.flash_moved"]         = "Document moved.",
+            ["documents.folder_flash_created"] = "Folder created.",
+            ["documents.folder_flash_renamed"] = "Folder renamed.",
+            ["documents.folder_flash_moved"]   = "Folder moved.",
+            ["documents.folder_flash_deleted"] = "Folder deleted.",
+
             // ── M22 (ADR 0132) — onboarding: the /onboarding guided
             // walk-through (D4) + the dismissible home/nav banner (D5) + the
             // finish/skip flash (D2/D4). U03 authors the COMPLETE closed set;
@@ -3659,6 +3677,24 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Wer darf dieses Dokument sehen",
             ["documents.edit.submit"]       = "Änderungen speichern",
             ["documents.flash_edited"]      = "Dokument aktualisiert.",
+
+            // Die "Dokumente organisieren"-Lane (Tags + Ordner) — die
+            // documents.folder_* / documents.tags.*-Keys + die Flash-Keys der
+            // DocumentFolderController-Routen (create / rename / move / delete /
+            // document-move).
+            ["documents.folder"]              = "Ordner",
+            ["documents.folder_unfiled"]      = "Nicht abgelegt",
+            ["documents.folder_hint"]         = "Lege dieses Dokument in einen Ordner ab, um das Archiv organisiert zu halten.",
+            ["documents.folder_new"]          = "Neuer Ordner",
+            ["documents.folder_create"]       = "Erstellen",
+            ["documents.folder_name_placeholder"] = "Ordnername",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Tippe, um bestehende Tags zu finden, oder starte ein neues.",
+            ["documents.flash_moved"]         = "Dokument verschoben.",
+            ["documents.folder_flash_created"] = "Ordner erstellt.",
+            ["documents.folder_flash_renamed"] = "Ordner umbenannt.",
+            ["documents.folder_flash_moved"]   = "Ordner verschoben.",
+            ["documents.folder_flash_deleted"] = "Ordner gelöscht.",
 
             // ── M22 (ADR 0132) — Onboarding: die /onboarding-Führung (D4) +
             // die schließbare Home-/Nav-Anzeige (D5) + der Finish/Skip-Flash
@@ -5419,6 +5455,24 @@ public static class KnownTranslationKeys
             ["documents.edit.submit"]       = "Enregistrer les modifications",
             ["documents.flash_edited"]      = "Document mis à jour.",
 
+            // La lane "organiser les documents" (tags + dossiers) — les clés
+            // documents.folder_* / documents.tags.* + les clés flash des
+            // routes DocumentFolderController (create / rename / move / delete /
+            // document-move).
+            ["documents.folder"]              = "Dossier",
+            ["documents.folder_unfiled"]      = "Non classé",
+            ["documents.folder_hint"]         = "Classez ce document dans un dossier pour garder l'archive organisée.",
+            ["documents.folder_new"]          = "Nouveau dossier",
+            ["documents.folder_create"]       = "Créer",
+            ["documents.folder_name_placeholder"] = "Nom du dossier",
+            ["documents.tags"]                = "Étiquettes",
+            ["documents.tags_hint"]           = "Écris pour chercher des étiquettes existantes, ou en créer une nouvelle.",
+            ["documents.flash_moved"]         = "Document déplacé.",
+            ["documents.folder_flash_created"] = "Dossier créé.",
+            ["documents.folder_flash_renamed"] = "Dossier renommé.",
+            ["documents.folder_flash_moved"]   = "Dossier déplacé.",
+            ["documents.folder_flash_deleted"] = "Dossier supprimé.",
+
             // ── M22 (ADR 0132) — onboarding : le parcours guidé /onboarding
             // (D4) + le bandeau fermable d'accueil/nav (D5) + le flash
             // finish/skip (D2/D4). U03 crée le jeu FERMÉ COMPLET ; U02/U03 le
@@ -7167,6 +7221,24 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Hvem kan se dette dokument",
             ["documents.edit.submit"]       = "Gem ændringer",
             ["documents.flash_edited"]      = "Dokument opdateret.",
+
+            // "Dokumenter organiseret"-lanen (tags + mapper) —
+            // documents.folder_* / documents.tags.* nøgler + flash-nøglerne
+            // for DocumentFolderController-ruterne (create / rename / move /
+            // delete / document-move).
+            ["documents.folder"]              = "Mappe",
+            ["documents.folder_unfiled"]      = "Ikke fileret",
+            ["documents.folder_hint"]         = "Filér dette dokument i en mappe for at holde arkivet organiseret.",
+            ["documents.folder_new"]          = "Ny mappe",
+            ["documents.folder_create"]       = "Opret",
+            ["documents.folder_name_placeholder"] = "Mappens navn",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Skriv for at søge i eksisterende tags, eller start et nyt.",
+            ["documents.flash_moved"]         = "Dokument flyttet.",
+            ["documents.folder_flash_created"] = "Mappe oprettet.",
+            ["documents.folder_flash_renamed"] = "Mappe omdøbt.",
+            ["documents.folder_flash_moved"]   = "Mappe flyttet.",
+            ["documents.folder_flash_deleted"] = "Mappe slettet.",
 
             // ── M22 (ADR 0132) — onboarding: /onboarding-guideturen (D4) +
             // den lukkelige home-/nav-banner (D5) + finish/skip-flaschen

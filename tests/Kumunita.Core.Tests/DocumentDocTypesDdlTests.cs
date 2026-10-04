@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Documents;
@@ -129,6 +130,88 @@ public class DocumentDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<P
         audience.Grants.Add(new AudienceGrant(GrantKind.User, "u-grantee"));
         Assert.Same(audience, adapter.Audience);
         Assert.Contains(new AudienceGrant(GrantKind.User, "u-grantee"), adapter.Audience.Grants);
+    }
+
+    [Fact]
+    public async Task DocumentDocTypes_RegistersDocumentFolder_CatalogRow()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(_connection);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            DocumentDocTypes.Configure(opts);
+        });
+
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        // Store + load a DocumentFolder so mt."mt_doc_documentfolder" exists
+        // (document DDL is applied lazily on first save — the M16/M17 shape).
+        await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            w.Store(new DocumentFolder
+            {
+                Id = "folder-1",
+                ParentId = null,
+                Name = "Contracts",
+                OwnerId = "u-admin",
+                Created = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
+                Modified = null,
+            });
+            await w.SaveChangesAsync(ct);
+        }
+        await using (var q = store.QuerySession())
+        {
+            var folder = (await q.LoadAsync<DocumentFolder>("folder-1", ct))!;
+            Assert.Equal("Contracts", folder.Name);
+            Assert.Null(folder.ParentId);
+            Assert.Equal("u-admin", folder.OwnerId);
+            Assert.Null(folder.Modified);
+        }
+
+        var cols = await QueryColumnsAsync("mt_doc_documentfolder");
+        Assert.True(cols.Count > 0, "mt_doc_documentfolder table not found in mt");
+        Assert.Contains("id", cols);
+        Assert.Contains("data", cols);
+    }
+
+    [Fact]
+    public async Task Document_CarriesTagIdsAndFolderId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(_connection);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            DocumentDocTypes.Configure(opts);
+        });
+
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(new Document
+        {
+            Id = "doc-tags-folders",
+            Title = "Bylaws with organization",
+            MediaId = "deadbeef",
+            ContentType = "application/pdf",
+            SizeBytes = 1,
+            Audience = new Audience(),
+            OwnerId = "u-uploader",
+            Created = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero),
+            TagIds = new List<string> { "t1", "t2" },
+            FolderId = "folder-1",
+        });
+        await w.SaveChangesAsync(ct);
+
+        await using var q = store.QuerySession();
+        var doc = (await q.LoadAsync<Document>("doc-tags-folders", ct))!;
+        Assert.Equal(new[] { "t1", "t2" }, doc.TagIds);
+        Assert.Equal("folder-1", doc.FolderId);
     }
 
     // ── catalog helpers (the M16DocTypesDdlTests / AdminOverrideDdlTests shape) ──
