@@ -232,6 +232,164 @@ public sealed class AccountController(
         return RedirectToAction(nameof(Login));
     }
 
+    // ── Delete account (self-serve; ADR 0142) ─────────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/delete</c> — the resident's self-serve delete-account
+    /// form (ADR 0142). The subject is the signed-in principal (never a path
+    /// param). The form asks for the resident's current password (verified
+    /// server-side on the POST) and an explicit acknowledgment checkbox (the
+    /// dangerous-action guard). The lede text explains the consequences:
+    /// the account is removed, the resident's audit trail is pseudonymized
+    /// (their identity replaced by a tombstone), and their group/community
+    /// memberships are removed — the privacy lane OPS.md §9 / ARCHITECTURE.md
+    /// §5 prescribe.
+    /// <para>
+    /// **ADR 0142 D5 gate (the ADR 0138 "surface-replaced-by-notice"
+    /// shape, generalized):** the self-serve lane is reachable only by a
+    /// <c>GlobalAdmin</c>. A non-GlobalAdmin resident sees the same form
+    /// with the <see cref="DeleteAccountViewModel.SelfDeletionRefused"/>
+    /// flag set, so the view renders a notice that the self-serve lane is
+    /// unavailable for them and that they should contact an administrator
+    /// instead — rather than letting the resident discover the gate only
+    /// on submit. A crafted POST is refused server-side with the same
+    /// message (defense in depth).
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Delete()
+    {
+        // The subject must be the signed-in principal — the [Authorize]
+        // attribute above guarantees that (an unauthenticated request is
+        // redirected to /Account/Login by the cookie handler's
+        // AccessDeniedPath), so this method only runs for an authenticated
+        // resident. A defensive null-check mirrors the Storage() /
+        // ChangePassword() shape.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0142 D5 gate — read the standing (a read, no audit row) and
+        // set the notice flag when the resident is not a GlobalAdmin.
+        // The form is still rendered (so the surface is discoverable), but
+        // the page makes the gate visible (the ADR 0138
+        // ChangePasswordLockedViewModel "notice" shape, generalized).
+        var user = await userManager.FindByIdAsync(subject);
+        var roles = user is null
+            ? new List<string>()
+            : (await userManager.GetRolesAsync(user)).ToList();
+        var refused = !roles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin);
+
+        return View(new DeleteAccountViewModel { SelfDeletionRefused = refused });
+    }
+
+    /// <summary>
+    /// <c>POST /account/delete</c> — the self-serve write lane (ADR 0142).
+    /// <b>The guard is authoritative on the write path too</b> (the ADR 0138
+    /// shape): the resident must have checked the acknowledgment box AND
+    /// provided the correct current password — otherwise the form re-renders
+    /// with the error (the account is untouched). When both pass, the Core
+    /// lane (<see cref="Kumunita.Core.Identity.IIdentityService
+    /// .DeleteAccountAsync"/>) is invoked with the resident as the actor —
+    /// the Core lane still enforces the GlobalAdmin gate (the fail-closed
+    /// pin), so a non-admin self-deletion is refused server-side.
+    /// <para>
+    /// On success the resident is signed out (their credential is gone) and
+    /// redirected to the login page with a confirmation message. The
+    /// login page's "account-removed" error code is NOT used here — that
+    /// code is for the PrivilegedStampMiddleware's "user deleted while
+    /// signed in" path; this is the *intentional* self-deletion lane, so
+    /// the message is the positive "your account was deleted" form.
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(DeleteAccountViewModel model)
+    {
+        // Self-only (the C-UP·4/F7 shape from Storage()): the subject is
+        // the signed-in principal — never a path param.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // The dangerous-action guard: the resident must have checked the
+        // acknowledgment box. A bare [Required] on a bool would accept
+        // false (the bound value is non-null), so the check is explicit.
+        if (!model.Confirmed)
+        {
+            ModelState.AddModelError(
+                nameof(model.Confirmed),
+                "You must confirm that you understand your account will be permanently deleted.");
+        }
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident deleting their own account — not a crafted request).
+        // A wrong password is a form error (the account is untouched).
+        var user = await userManager.FindByIdAsync(subject);
+        if (user is null)
+        {
+            ModelState.AddModelError(nameof(model.Password),
+                "We could not find that account — sign in again.");
+        }
+        else
+        {
+            var currentOk = await userManager.CheckPasswordAsync(user, model.Password);
+            if (!currentOk)
+            {
+                ModelState.AddModelError(nameof(model.Password),
+                    "Your password is incorrect.");
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
+            return View(model);
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner on the self-serve
+            // branch — actor == target). ADR 0142 D5 gate: the Core seam
+            // enforces the GlobalAdmin standing on this branch (a
+            // non-GlobalAdmin's crafted POST is refused server-side, the
+            // fail-closed pin). Pseudonymizes the resident's audit rows,
+            // removes their memberships + profile, and deletes the Identity
+            // account.
+            await identity.DeleteAccountAsync(subject, adminSubjectId: subject);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // ADR 0142 D5 gate (defense in depth — the GET's
+            // SelfDeletionRefused notice is the primary surface, but a
+            // crafted POST reaches the Core seam directly). The resident is
+            // not a GlobalAdmin, so the self-serve lane is unavailable for
+            // them. Surface the notice (the ADR 0138 "locked" shape).
+            ModelState.AddModelError(string.Empty,
+                "The self-serve delete-account lane is only available to a " +
+                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
+                "own account — contact an administrator to remove the account.");
+            return View(new DeleteAccountViewModel { SelfDeletionRefused = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The Core lane refused the write (the last-GlobalAdmin guard —
+            // a lone GlobalAdmin cannot self-delete — or the account no
+            // longer exists, the idempotency pin). Surface the message.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(model);
+        }
+
+        // The account is gone: sign this session out (their credential is
+        // deleted — the cookie is now stale) and redirect to the login page
+        // with a positive confirmation.
+        await signInManager.SignOutAsync();
+        TempData["info"] = "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.";
+        return RedirectToAction(nameof(Login));
+    }
+
     // ── Signup ──────────────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]

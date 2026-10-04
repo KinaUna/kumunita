@@ -1257,4 +1257,78 @@ public interface IUserInfoService
     /// false and <paramref name="actorId"/> is not the row's
     /// <see cref="GuardianLink.GuardianId"/>.</exception>
     Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
+
+    // ── GU community-approval lane (the GU extension — the sibling of the m2b
+    // group-invitation lane, but for communities and with the guardian as the
+    // resolver) ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A **guardian** rejects a **supervised child's** pending group
+    /// invitation — the decline write path (no <see cref="GroupMembership"/>
+    /// row lands) with the **guardian** recorded as <c>ResolvedBy</c> and
+    /// the audit row <c>group.invite.reject</c> <c>Via: Guardian</c>.
+    /// Precondition: an **active** <see cref="GuardianLink"/> for (guardian,
+    /// child) and a <b>Pending</b> invitation on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape, its decline
+    /// sibling).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No group invitation for
+    /// this (group, child) pair, or the row is not <c>Pending</c>.</exception>
+    Task RejectGroupInvitationAsync(string groupId, string childId, string guardianId);
+
+    /// <summary>
+    /// A **guardian** rejects a **supervised child's** pending community
+    /// membership request — the decline write path (no
+    /// <see cref="ComponentMembership"/> row lands) with the **guardian**
+    /// recorded as <c>ResolvedBy</c> and the audit row
+    /// <c>community.membership.decline</c> <c>Via: Guardian</c>. Precondition:
+    /// an **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> request on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No community membership
+    /// request for this (component, child) pair, or the row is not
+    /// <c>Pending</c>.</exception>
+    Task DeclineCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId);
+
+    /// <summary>
+    /// A **guardian** approves a **supervised child's** pending community
+    /// membership request — the approve write path (the
+    /// <see cref="ComponentMembership"/> row lands, the
+    /// <c>GetCommunityIdsAsync</c> union read includes it on the very next
+    /// call — invariant C4) with the **guardian** recorded as
+    /// <c>ResolvedBy</c> and the audit row
+    /// <c>community.membership.approve</c> <c>Via: Guardian</c>. Precondition:
+    /// an **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> request on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No community membership
+    /// request for this (component, child) pair, or the row is not
+    /// <c>Pending</c>, or no component with that id exists.</exception>
+    Task ApproveCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId);
+
+    /// <summary>
+    /// A child's <b>own</b> pending community membership requests (the
+    /// guardian's Detail curation read + the resolve lanes' Web gate
+    /// "in my child's pending list, else 404"). <c>Pending</c> rows only,
+    /// sorted by <see cref="CommunityMembershipRequest.RequestedAt"/>
+    /// descending (newest first). A candidate read: no
+    /// <see cref="Authorization.AccessAudit"/> row. Live rows (invariant C4):
+    /// a resolve on the guardian lane in the same commit is live on the very
+    /// next call.
+    /// </summary>
+    Task<IReadOnlyList<CommunityMembershipRequest>>
+        GetPendingCommunityMembershipRequestsForChildAsync(string childId);
 }

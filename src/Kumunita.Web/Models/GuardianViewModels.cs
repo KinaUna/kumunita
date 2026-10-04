@@ -47,6 +47,22 @@ public sealed record GuardianItem(string SubjectId, string DisplayName);
 public sealed record PendingInvitationItem(string GroupId, string GroupName, string InvitedAt);
 
 /// <summary>
+/// One <b>pending community-membership request row</b> on the child's
+/// <c>Detail</c> curation view (the GU community-approval lane — the sibling
+/// of <see cref="PendingInvitationItem"/>, for a supervised child's pending
+/// <c>CommunityMembershipRequest</c>). <see cref="CommunityId"/> is the
+/// route's <c>{communityId}</c> the approve / reject POSTs post to;
+/// <see cref="CommunityName"/> is the display label (resolved through the
+/// single-component read — a curation fact, not content); <see
+/// cref="RequestedAt"/> is the row's
+/// <see cref="Kumunita.Core.UserInfo.CommunityMembershipRequest.RequestedAt"/>
+/// (ISO-8601). The row's <c>Status</c> / resolution stamps never reach the
+/// model — the list shows only <em>pending</em> rows (G·1).
+/// </summary>
+public sealed record PendingCommunityRequestItem(
+    string CommunityId, string CommunityName, string RequestedAt);
+
+/// <summary>
 /// The <b>per-child curation</b> view model for <c>/me/children/{childId}</c> (GU,
 /// ADR 0028). The three curation sets — <see cref="GroupIds"/> (the child's group
 /// membership ids), <see cref="CommunityIds"/> (the child's community membership
@@ -60,7 +76,8 @@ public sealed record MembershipEditorModel(
     IReadOnlyList<string> GroupIds,
     IReadOnlyList<string> CommunityIds,
     IReadOnlyList<PendingInvitationItem> PendingInvitations,
-    IReadOnlyList<GuardianItem> GuardianItems);
+    IReadOnlyList<GuardianItem> GuardianItems,
+    IReadOnlyList<PendingCommunityRequestItem> PendingCommunityRequests);
 
 /// <summary>
 /// The <b>add-a-child</b> form model (GU, ADR 0028) bound via <c>[FromForm]</c> on

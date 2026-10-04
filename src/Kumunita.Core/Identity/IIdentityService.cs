@@ -314,4 +314,85 @@ public interface IIdentityService
     /// document directly (C-M19·5, D2's *Forbids*).
     /// </summary>
     Task SetGuestAccessAsync(GuestAccess access, string adminSubjectId);
+
+    // ── Account deletion (ADR 0142 — the resident-leave / admin-removal lane) ──
+
+    /// <summary>
+    /// ADR 0142 — <b>delete a resident's account</b> (the privacy lane the
+    /// resident self-serve surface <c>POST /account/delete</c> and the
+    /// GlobalAdmin surface <c>POST /admin/delete</c> both reach). The target
+    /// loses every standing immediately: their
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> rows are
+    /// **pseudonymized** (the actor id replaced by a tombstone), their
+    /// group/community memberships are removed (they leave the group and
+    /// component membership rows), their
+    /// <see cref="Kumunita.Core.UserInfo.Profile"/> row is removed, and the
+    /// underlying ASP.NET Identity account is deleted (their password hash
+    /// and roles are gone). The audit trail itself is preserved: the
+    /// rows that were written *by* the target before this moment remain —
+    /// their <c>ActorId</c> is rewritten to a deterministic
+    /// <c>"deleted:{subjectId}"</c> tombstone, so an operator can prove
+    /// what happened without retaining the identity (OPS.md §9 /
+    /// ARCHITECTURE.md §5 "Deletion-of-account interaction").
+    /// <para>
+    /// **Two branches, one seam (the ADR 0138 self-serve/admin
+    /// distinction):**
+    /// </para>
+    /// <list type="bullet">
+    /// <item><b>Self-deletion</b> — <paramref name="adminSubjectId"/>
+    /// equals <paramref name="targetSubjectId"/>: the resident is deleting
+    /// *their own* account (the Web self-serve surface
+    /// <c>POST /account/delete</c> invokes this shape, after verifying the
+    /// resident's current password). **ADR 0142 D5 gate:** the self-serve
+    /// lane is reachable only by a <c>GlobalAdmin</c> — a non-GlobalAdmin
+    /// invoking this branch throws <c>UnauthorizedAccessException</c>
+    /// (the fail-closed pin, mirroring the admin-initiated branch). The
+    /// Web surface renders the ADR 0138 "surface-replaced-by-notice" shape
+    /// for a non-GlobalAdmin, so the resident sees the gate before
+    /// submitting. The audit row is <c>Via: Owner</c>.</item>
+    /// <item><b>Admin-initiated</b> — <paramref name="adminSubjectId"/>
+    /// differs from <paramref name="targetSubjectId"/>: a GlobalAdmin is
+    /// removing *another* resident (the Web admin surface
+    /// <c>POST /admin/delete</c>). The <c>GlobalAdmin</c> gate applies
+    /// (<see cref="BlockAsync"/> / <see cref="UnblockAsync"/> shape — the
+    /// fail-closed pin); a non-admin invoking this branch throws
+    /// <c>UnauthorizedAccessException</c>. The audit row is
+    /// <c>Via: Admin</c>.</item>
+    /// </list>
+    /// <para>
+    /// **Last-GlobalAdmin guard (the lockout pin, the ADR 0006-E
+    /// precedent):** if the target holds the <c>GlobalAdmin</c> role and
+    /// they are the *only* GlobalAdmin on the instance, the lane throws
+    /// <see cref="InvalidOperationException"/> before any write — a
+    /// single-admin instance cannot self-erase its last admin (the
+    /// OPS.md §9 "Hand over admin" procedure is the recovery path).
+    /// </para>
+    /// <para>
+    /// **Audit:** exactly one <c>AccessAudit</c> row (action
+    /// <c>"account.delete"</c>, <c>TargetKind</c> "account",
+    /// <c>TargetId</c> the subject, <c>Via: Admin</c>) written in the
+    /// *same Marten session* as the pseudonymization + membership removal
+    /// (C3 — no silent, unaudited access). The pseudonymization itself
+    /// is not a per-row audit — the single <c>"account.delete"</c> row
+    /// is the summary row, the way the purge job's
+    /// <c>AuditPurgeSummary</c> summarizes the bulk delete (the same
+    /// "one summary, many rows" shape).
+    /// </para>
+    /// <para>
+    /// **Fail-closed / idempotency:** if the target account does not
+    /// exist (already deleted, or never created), the lane throws
+    /// <see cref="InvalidOperationException"/> before any write. A
+    /// *second* call for the same subject (after a successful first
+    /// call) throws the same <c>InvalidOperationException</c> (the
+    /// Identity row is gone) — the lane is not a silent no-op.
+    /// </para>
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">Either branch was
+    /// invoked by a non-<c>GlobalAdmin</c> (the self-serve lane's ADR 0142
+    /// D5 gate, or the admin-initiated branch's fail-closed pin).</exception>
+    /// <exception cref="InvalidOperationException">The target account does
+    /// not exist, or the target is the last <c>GlobalAdmin</c> on the
+    /// instance (the lockout pin — applies to <i>both</i> branches: a lone
+    /// GlobalAdmin cannot self-delete).</exception>
+    Task DeleteAccountAsync(string targetSubjectId, string adminSubjectId);
 }

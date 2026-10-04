@@ -899,36 +899,71 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             Outcome = Authorization.AccessOutcome.Allow
         });
 
-        // ADR 0083 — notify the invited resident (kind group.invite; the
-        // recipient is <c>userId</c>, not <c>invitedBy</c>). Same shape as
-        // the <c>AddGroupMemberAsync</c> emitter: the emission sits in this
-        // session's transaction, the <c>NotificationService</c> is resolved
-        // lazily from <c>IServiceProvider</c> (see the class doc-comment for
-        // the circular-dependency rationale), and pre-ADR 0083 direct-
+        // ADR 0083 + the GU community-approval lane — the recipient depends
+        // on whether <c>userId</c> is a supervised child AND the inviter
+        // is NOT one of the child's active guardians:
+        //
+        // · Supervised child, non-guardian inviter — one row per ACTIVE
+        //   guardian (kind <c>guardian.group_invite</c>; the LinkPath /
+        //   AcceptPath / DeclinePath all point at
+        //   <c>/me/children/{childId}</c>, the manage-child page where the
+        //   guardian sees the pending list + the approve / reject buttons —
+        //   the GU community-approval lane's shape, the
+        //   <see cref="ApproveGroupInvitationAsync"/> G·2 resolver; the
+        //   child's own self-lane
+        //   <see cref="AcceptGroupInvitationAsync"/> is refused by the GU
+        //   gate, so the child is not a valid recipient). The body is the
+        //   group name + the child's display name (a curation fact the
+        //   parent already sees in their /me/children list — the
+        //   <see cref="ChildAccountItem"/> precedent, not a G·1-hiding
+        //   content read).
+        // · Supervised child, GUARDIAN inviter (a guardian inviting their
+        //   own child — the <see cref="AddGroupMemberAsync"/> precedent,
+        //   <c>Via: Guardian</c>): a self-notification fan-out would be
+        //   noise (the inviter already holds the standing to resolve it),
+        //   so fall through to the child-facing lane (kind
+        //   <c>group.invite</c>, recipient = the child, the self-lane GET
+        //   AcceptPath / DeclinePath). The child's own
+        //   <see cref="AcceptGroupInvitationAsync"/> self-lane is still
+        //   GU-gated (the guardian must resolve via
+        //   <see cref="ApproveGroupInvitationAsync"/> /
+        //   <see cref="RejectGroupInvitationAsync"/>) — the
+        //   self-notification is only the nudge, not the resolve path.
+        // · Non-supervised — the ADR 0083 / ADR 0095 shape unchanged.
+        //
+        // Either way the emission sits in this session's transaction
+        // (invariant C3), the <c>NotificationService</c> is resolved
+        // lazily from <c>IServiceProvider</c> (the circular-dependency
+        // rationale — the class doc-comment), and pre-ADR 0083 direct-
         // construction test harnesses (services = null) silently skip.
-        var ns = services?.GetService<Notifications.NotificationService>();
-        if (ns is not null)
+        var activeGuardians = await ActiveGuardianIdsAsync(session, userId).ConfigureAwait(false);
+        if (activeGuardians.Count > 0 && !activeGuardians.Contains(invitedBy))
         {
-            // ADR 0095 — the group-invite notification now carries the accept /
-            // decline actions: the invitee can act on the email's links (or the
-            // inbox's buttons) without navigating to the group first. The two
-            // same-origin relative paths point at the Web's self-lane GET
-            // actions (GroupsController.AcceptInvitationLink / DeclineInvitationLink,
-            // the same [Authorize] gate as the POST self-lane); the
-            // NotificationService stores them relative and appends them to the
-            // email as BaseUrl-prefixed absolute links (the VerificationOptions.BaseUrl
-            // precedent). The idempotency key / body / kind are unchanged (ADR
-            // 0083's emission shape — this is an additive ADR 0095 lane, not a
-            // re-emission; a re-invite still dedups on the same key).
-            await ns.EmitAsync(
-                session,
-                userId,
-                Notifications.NotificationKinds.GroupInvite,
-                $"notification:{Notifications.NotificationKinds.GroupInvite}:{groupId}:{userId}",
-                group.Name,
-                acceptPath: $"/groups/{groupId}/invitations/accept",
-                declinePath: $"/groups/{groupId}/invitations/decline",
-                ct: CancellationToken.None).ConfigureAwait(false);
+            var childName = await ChildDisplayNameAsync(userId).ConfigureAwait(false);
+            foreach (var guardianId in activeGuardians)
+            {
+                await EmitGuardianNotificationAsync(
+                    session, userId, guardianId,
+                    Notifications.NotificationKinds.GuardianGroupInvite,
+                    groupId,
+                    $"{group.Name} — {childName}").ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            var ns = services?.GetService<Notifications.NotificationService>();
+            if (ns is not null)
+            {
+                await ns.EmitAsync(
+                    session,
+                    userId,
+                    Notifications.NotificationKinds.GroupInvite,
+                    $"notification:{Notifications.NotificationKinds.GroupInvite}:{groupId}:{userId}",
+                    group.Name,
+                    acceptPath: $"/groups/{groupId}/invitations/accept",
+                    declinePath: $"/groups/{groupId}/invitations/decline",
+                    ct: CancellationToken.None).ConfigureAwait(false);
+            }
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -1116,6 +1151,229 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
 
         await session.SaveChangesAsync().ConfigureAwait(false);
         return row;
+    }
+
+    /// <inheritdoc />
+    public async Task RejectGroupInvitationAsync(string groupId, string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new ArgumentException("Group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate (G·2 live / G·3 deny-by-default): an ACTIVE link for
+        // this exact (guardian, child) pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // Precondition: a PENDING invitation on the CHILD (the
+        // ApproveGroupInvitationAsync G·2 shape; the decline sibling).
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No group invitation for {childId} in group {groupId}");
+
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be rejected.");
+
+        // The decline write path (the ApproveGroupInvitationAsync shape
+        // minus the membership write): the row moves Pending → Declined,
+        // ResolvedBy = the guardian. No GroupMembership row is touched.
+        row.Status = InvitationStatus.Declined;
+        row.ResolvedAt = now;
+        row.ResolvedBy = guardianId;
+        session.Store(row);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "group.invite.reject",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    // ── GU community-approval lane — the sibling of the m2b group-invitation
+    // lane, but for communities and with the guardian as the resolver ─────
+
+    /// <inheritdoc />
+    public async Task ApproveCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate (G·2 live / G·3 deny-by-default): an ACTIVE link for
+        // this exact (guardian, child) pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        var row = await session.Query<CommunityMembershipRequest>()
+            .Where(r => r.ComponentId == componentId && r.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No community membership request for {childId} in community {componentId}");
+
+        if (row.Status != CommunityMembershipRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Community membership request {row.Id} is already {row.Status}; only a Pending request can be approved.");
+
+        // The approve write path (the sibling of ApproveGroupInvitationAsync):
+        // the membership row lands exactly as SetCommunityMembershipAsync
+        // writes it (the idempotent business-key upsert); the differences are
+        // the child-keyed row, ResolvedBy = the guardian, and the audit verb.
+        row.Status = CommunityMembershipRequestStatus.Approved;
+        row.ResolvedAt = now;
+        row.ResolvedBy = guardianId;
+        session.Store(row);
+
+        var membership = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            membership = new ComponentMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = componentId,
+                UserId = childId,
+                AddedBy = guardianId,
+                At = now
+            };
+        }
+        else
+        {
+            membership.AddedBy = guardianId;
+            membership.At = now;
+        }
+
+        session.Store(membership);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "community.membership.approve",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task DeclineCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        var row = await session.Query<CommunityMembershipRequest>()
+            .Where(r => r.ComponentId == componentId && r.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No community membership request for {childId} in community {componentId}");
+
+        if (row.Status != CommunityMembershipRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Community membership request {row.Id} is already {row.Status}; only a Pending request can be declined.");
+
+        row.Status = CommunityMembershipRequestStatus.Declined;
+        row.ResolvedAt = now;
+        row.ResolvedBy = guardianId;
+        session.Store(row);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "community.membership.decline",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CommunityMembershipRequest>>
+        GetPendingCommunityMembershipRequestsForChildAsync(string childId)
+    {
+        if (string.IsNullOrEmpty(childId))
+            return Array.Empty<CommunityMembershipRequest>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<CommunityMembershipRequest>()
+            .Where(r => r.UserId == childId && r.Status == CommunityMembershipRequestStatus.Pending)
+            .OrderByDescending(r => r.RequestedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -2327,6 +2585,30 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         if (component is null)
             throw new InvalidOperationException($"Community not found: {componentId}");
 
+        // GU community-approval lane — the supervised-child branch (the
+        // <see cref="AddCommunityMemberAsync"/> / ADR 0094 / m2b
+        // shape): a pending <see cref="CommunityMembershipRequest"/> row
+        // lands (the membership does not), the guardians get the
+        // <c>guardian.community_invite</c> notification, and the
+        // <c>community.membership.request</c> audit row commits in the
+        // same transaction (invariant C3).
+        // GU (ADR 0028) — the guardian's own curation lane (the
+        // <see cref="AddGroupMemberAsync"/> precedent): when the actor is
+        // one of the child's active guardians, the membership lands
+        // immediately with <c>Via: Guardian</c> — no pending request, no
+        // notification fan-out (the actor is a recipient, and a
+        // self-notification would be noise).
+        var activeGuardians = await ActiveGuardianIdsAsync(session, userId).ConfigureAwait(false);
+        var isGuardianSelfCuration = activeGuardians.Contains(actorId);
+        if (activeGuardians.Count > 0 && !isGuardianSelfCuration)
+        {
+            await StoreCommunityRequestForSupervisedChildAsync(
+                session, component, componentId, userId, actorId, now,
+                Authorization.AccessVia.Admin, activeGuardians).ConfigureAwait(false);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+            return;
+        }
+
         // Upsert by business key (component, user); the DB unique index
         // guarantees at most one row per pair, so this is idempotent.
         var existing = await session.Query<ComponentMembership>()
@@ -2729,6 +3011,39 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
         if (component is null)
             throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // GU community-approval lane — the supervised-child branch: when the
+        // add target holds an ACTIVE <see cref="GuardianLink"/>, the
+        // <b>membership does not land</b>. A pending
+        // <see cref="CommunityMembershipRequest"/> row lands instead (the
+        // ADR 0094 / m2b state-machine shape: the membership fact itself
+        // never arrives until the guardian resolves via
+        // <see cref="ApproveCommunityMembershipRequestAsync"/>), and the
+        // guardians get the <c>guardian.community_invite</c> notification
+        // (one row per active guardian; the
+        // <see cref="EmitGuardianNotificationAsync"/> shape with
+        // LinkPath / AcceptPath / DeclinePath all pointing at
+        // <c>/me/children/{childId}</c>, the manage-child page). The
+        // auditor's <c>community.membership.request</c> audit row commits
+        // in the same transaction (invariant C3 — the pending row, the
+        // audit, and the notification inbox rows are atomic).
+        //
+        // GU (ADR 0028) — the guardian's own curation lane (the
+        // <see cref="AddGroupMemberAsync"/> precedent): when the actor is
+        // one of the child's active guardians, the membership lands
+        // immediately with <c>Via: Guardian</c> — no pending request, no
+        // notification fan-out (the actor is a recipient, and a
+        // self-notification would be noise).
+        var activeGuardians = await ActiveGuardianIdsAsync(session, userId).ConfigureAwait(false);
+        var isGuardianSelfCuration = activeGuardians.Contains(actorId);
+        if (activeGuardians.Count > 0 && !isGuardianSelfCuration)
+        {
+            await StoreCommunityRequestForSupervisedChildAsync(
+                session, component, componentId, userId, actorId, now,
+                via, activeGuardians).ConfigureAwait(false);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+            return;
+        }
 
         // Same idempotent business-key upsert as SetCommunityMembershipAsync
         // (the M1DocTypes unique index enforces one row per pair). A row on a
@@ -3252,6 +3567,96 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     /// resolved **live** off <see cref="GuardianLinkStatus"/> (the service is
     /// the resolver — the POCO carries state, not an <c>IsActive</c> boolean).
     /// </summary>
+    /// <summary>
+    /// The <b>child's display name</b> for a GU community-approval lane
+    /// notification body (a curation fact the parent already sees in their
+    /// <c>/me/children</c> list — the <see cref="ChildAccountItem"/>
+    /// precedent — not a G·1-hiding content read): the child's
+    /// <c>Profile.DisplayName</c> when present, else the raw
+    /// <c>SubjectId</c> (the fail-safe the list already uses).
+    /// </summary>
+    private async Task<string> ChildDisplayNameAsync(string childId)
+    {
+        await using var s = store.QuerySession();
+        var profile = await s.LoadAsync<Profile>(childId).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(profile?.DisplayName)
+            ? childId
+            : profile!.DisplayName;
+    }
+
+    /// <summary>
+    /// The child's <b>active</b> guardian id set (the GU community-approval
+    /// lane's notification fan-out): the <c>GuardianId</c>s of every
+    /// <see cref="GuardianLinkStatus.Active"/> row where
+    /// <see cref="GuardianLink.ChildId"/> = <paramref name="childId"/>.
+    /// An unsupervised child (no active row) returns an empty set — the
+    /// caller falls back to the child-facing lane (the ADR 0083
+    /// <c>group.invite</c> / <c>group.added</c> shape).
+    /// </summary>
+    private async Task<IReadOnlyCollection<string>> ActiveGuardianIdsAsync(
+        IDocumentSession session, string childId)
+    {
+        var links = await session.Query<GuardianLink>()
+            .Where(l => l.ChildId == childId && l.Status == GuardianLinkStatus.Active)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        return links.Select(l => l.GuardianId).ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The GU community-approval lane's <b>guardian fan-out</b> emission: for
+    /// every active guardian of <paramref name="childId"/>, store a
+    /// <see cref="Notifications.Notification"/> inbox row + (best-effort)
+    /// staged email with <see cref="Notifications.Notification.LinkPath"/>
+    /// = <c>/me/children/{childId}</c> (the manage-child page, where the
+    /// pending list + approve/reject buttons live) and
+    /// <c>AcceptPath</c>/<c>DeclinePath</c> = the same (the inbox button
+    /// + the email link both deep-link to the page; the child id is
+    /// sufficient — the target pair is in the body / the page's list).
+    /// <para>
+    /// The idempotency key is per-<b>(guardian, target, child)</b> — the
+    /// <see cref="Notifications.NotificationService"/> dedups on
+    /// <c>IdempotencyKey</c>, so a re-invite with the same
+    /// (guardian, child, target) is a no-op. The <c>body</c> is the
+    /// UGC snippet the <see cref="Notifications.NotificationService
+    /// .EmitAsync"/> template appends (the child's display name —
+    /// a curation fact the parent already sees in their <c>/me/children</c>
+    /// list, not content the G·1 rule hides from a parent — the
+    /// <see cref="ChildAccountItem"/> precedent).
+    /// </para>
+    /// <para>
+    /// When <paramref name="notificationService"/> is null
+    /// (the 181 pre-ADR 0083 direct-construction test harnesses
+    /// that build <c>UserInfoService(store)</c> positionally pass
+    /// <c>services = null</c>), the emission is a silent no-op —
+    /// the domain write still commits (C3).
+    /// </para>
+    /// </summary>
+    private async Task EmitGuardianNotificationAsync(
+        IDocumentSession session,
+        string childId,
+        string guardianId,
+        string kind,
+        string targetId,
+        string body)
+    {
+        var ns = services?.GetService<Notifications.NotificationService>();
+        if (ns is null) return;
+
+        var linkPath = $"/me/children/{childId}";
+        await ns.EmitAsync(
+            session,
+            guardianId,
+            kind,
+            $"notification:{kind}:{targetId}:{childId}:{guardianId}",
+            body,
+            linkPath: linkPath,
+            acceptPath: linkPath,
+            declinePath: linkPath,
+            ct: System.Threading.CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
     private static async Task GuardActiveLinkAsync(
         IDocumentSession session, string guardianId, string childId)
     {
@@ -3264,5 +3669,84 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         if (link is null)
             throw new UnauthorizedAccessException(
                 $"No active guardian link for ({guardianId}, {childId}).");
+    }
+
+    /// <summary>
+    /// The GU community-approval lane's shared write for the supervised-child
+    /// branch of <see cref="AddCommunityMemberAsync"/> /
+    /// <see cref="SetCommunityMembershipAsync"/>: a pending
+    /// <see cref="CommunityMembershipRequest"/> row (the
+    /// <see cref="CommunityMembership"/> itself does NOT land — the
+    /// <see cref="ApproveCommunityMembershipRequestAsync"/> approve lane
+    /// writes it, the ADR 0094 / m2b state-machine shape), the
+    /// <c>community.membership.request</c> audit row, and the
+    /// <c>guardian.community_invite</c> notification fan-out (one inbox row
+    /// per active guardian). The caller's transaction commits — one
+    /// <c>SaveChangesAsync</c> (invariant C3: the pending row + the audit
+    /// row + the inbox rows are atomic).
+    /// </summary>
+    private async Task StoreCommunityRequestForSupervisedChildAsync(
+        IDocumentSession session,
+        Component component,
+        string componentId,
+        string childId,
+        string actorId,
+        DateTimeOffset now,
+        Authorization.AccessVia via,
+        IReadOnlyCollection<string> activeGuardians)
+    {
+        var row = await session.Query<CommunityMembershipRequest>()
+            .Where(r => r.ComponentId == componentId && r.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+        {
+            row = new CommunityMembershipRequest
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = componentId,
+                UserId = childId,
+                RequestedBy = actorId,
+                Status = CommunityMembershipRequestStatus.Pending,
+                RequestedAt = now
+            };
+        }
+        else
+        {
+            // Re-request (the m2b C-M2b·3 reset shape): a resolved row (or an
+            // already-Pending re-stamp) resets to the fresh Pending shape —
+            // the two resolve stamps are cleared with it.
+            row.RequestedBy = actorId;
+            row.Status = CommunityMembershipRequestStatus.Pending;
+            row.RequestedAt = now;
+            row.ResolvedAt = null;
+            row.ResolvedBy = null;
+        }
+
+        session.Store(row);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.membership.request",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        var childName = await ChildDisplayNameAsync(childId).ConfigureAwait(false);
+        foreach (var guardianId in activeGuardians)
+        {
+            await EmitGuardianNotificationAsync(
+                session, childId, guardianId,
+                Notifications.NotificationKinds.GuardianCommunityInvite,
+                componentId,
+                $"{component.Name} — {childName}").ConfigureAwait(false);
+        }
     }
 }

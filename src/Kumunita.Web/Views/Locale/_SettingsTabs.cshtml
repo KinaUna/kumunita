@@ -23,11 +23,13 @@
         ("settings.messaging.title", "Messaging",         "/settings/messaging"),
         ("nav.children",             "Children",          "/me/children"),
         ("nav.change_password",      "Change password",   "/account/password"),
+        ("nav.delete_account",       "Delete account",    "/account/delete"),
     };
     var activeLabel = (controller, action) switch
     {
         ("Guardian", _)                   => "Children",
         ("Account",  "ChangePassword")    => "Change password",
+        ("Account",  "Delete")            => "Delete account",
         ("Locale",   "SettingsTimezone")  => "Time zone",
         ("Locale",   "SettingsDateFormat")=> "Date & time format",
         ("Locale",   "SettingsQuiet")     => "Quiet hours",

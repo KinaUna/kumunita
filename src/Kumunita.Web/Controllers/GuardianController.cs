@@ -104,6 +104,35 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                 inv.InvitedAt.ToString("O")));
         }
 
+        // The GU community-approval lane — the child's pending
+        // CommunityMembershipRequest rows (the supervised-child branch of the
+        // admin / moderator add-community lanes; the resolve buttons POST to
+        // ApproveCommunityMembership / RejectCommunityMembership). The
+        // component name is resolved through the single-component read
+        // (a curation fact, not content — the PendingInvitationItem's
+        // GroupName precedent).
+        // The GU community-approval lane — the child's pending
+        // CommunityMembershipRequest rows (the supervised-child branch of the
+        // admin / moderator add-community lanes; the resolve buttons POST to
+        // ApproveCommunityMembership / RejectCommunityMembership). The
+        // component name is resolved against the component list (a curation
+        // fact, not content — the PendingInvitationItem's GroupName
+        // precedent; the GetComponentsAsync read is a single candidate read).
+        var communityRequests = await userInfo
+            .GetPendingCommunityMembershipRequestsForChildAsync(childId);
+        var componentNames = (await userInfo.GetComponentsAsync(enabledOnly: false))
+            .ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
+        var pendingCommunityRequests = new List<PendingCommunityRequestItem>(
+            communityRequests.Count);
+        foreach (var req in communityRequests)
+        {
+            var name = componentNames.TryGetValue(req.ComponentId, out var n)
+                ? n
+                : req.ComponentId;
+            pendingCommunityRequests.Add(new PendingCommunityRequestItem(
+                req.ComponentId, name, req.RequestedAt.ToString("O")));
+        }
+
         var guardianItems = await ActiveGuardiansAsync(childId);
 
         // M9 amendment — the guardian's messaging-restriction ceiling
@@ -143,7 +172,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
             communityIds.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList(),
             invitations,
-            guardianItems));
+            guardianItems,
+            pendingCommunityRequests));
     }
 
     /// <summary>
@@ -376,6 +406,123 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         return RedirectToAction(nameof(Detail), new { childId });
     }
+
+    /// <summary>
+    /// Reject (decline) a <b>child's</b> pending group invitation (the GU
+    /// extension of U06's <see cref="IUserInfoService
+    /// .ApproveGroupInvitationAsync"/>): resolves the child's <c>Pending</c>
+    /// row as <c>Declined</c> (no <c>GroupMembership</c> row lands) with
+    /// <c>ResolvedBy = guardianId</c>, audit <c>group.invite.reject</c>
+    /// <c>Via: Guardian</c>. A non-guardian → 404 (the ADR 0028 G·3
+    /// deny-by-default shape).
+    /// </summary>
+    [HttpPost("{childId}/invitations/{groupId}/reject")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectInvitation(string childId, string groupId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(groupId))
+            return NotFound();
+
+        try
+        {
+            await userInfo.RejectGroupInvitationAsync(groupId, childId, subject);
+            TempData["info"] = $"Rejected the invitation to group {groupId}.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// Approve a <b>child's</b> pending <b>community</b> membership request
+    /// (the GU community-approval lane — the sibling of
+    /// <see cref="ApproveInvitation"/>'s group lane, but the
+    /// <c>ComponentMembership</c> row lands on approval): resolves the
+    /// child's <c>Pending</c> <c>CommunityMembershipRequest</c> row as
+    /// <c>Approved</c> (the membership write + <c>ResolvedBy = guardianId</c>),
+    /// audit <c>community.membership.approve</c> <c>Via: Guardian</c>. A
+    /// non-guardian → 404.
+    /// </summary>
+    [HttpPost("{childId}/communities/{communityId}/approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveCommunityMembership(string childId, string communityId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(communityId))
+            return NotFound();
+
+        try
+        {
+            await userInfo.ApproveCommunityMembershipRequestAsync(communityId, childId, subject);
+            TempData["info"] = $"Approved community {communityId} for this child.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// Reject a <b>child's</b> pending <b>community</b> membership request
+    /// (the GU community-approval lane's decline lane — no
+    /// <c>ComponentMembership</c> row lands): resolves the child's
+    /// <c>Pending</c> <c>CommunityMembershipRequest</c> row as
+    /// <c>Declined</c> (<c>ResolvedBy = guardianId</c>), audit
+    /// <c>community.membership.decline</c> <c>Via: Guardian</c>. A
+    /// non-guardian → 404.
+    /// </summary>
+    [HttpPost("{childId}/communities/{communityId}/reject")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectCommunityMembership(string childId, string communityId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(communityId))
+            return NotFound();
+
+        try
+        {
+            await userInfo.DeclineCommunityMembershipRequestAsync(communityId, childId, subject);
+            TempData["info"] = $"Rejected community {communityId} for this child.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    // ── GET link-clickable resolve actions (the ADR 0095
+    // AcceptInvitationLink / DeclineInvitationLink precedent, applied to the
+    // GU community-approval lane's manage-child page — the notification
+    // AcceptPath / DeclinePath both deep-link at /me/children/{childId}, so
+    // a click from the inbox button or the email lands the guardian on the
+    // pending list; the approve/reject buttons there POST to the
+    // [ValidateAntiForgeryToken] actions above. The GET itself carries the
+    // standing gate (the ActiveLinkAsync check) + a no-op flash — it exists
+    // only as the notification's landing page's redirect target, which is
+    // already the Detail action. These two actions are therefore NOT
+    // registered: the notification's LinkPath / AcceptPath / DeclinePath all
+    // point at the existing <see cref="Detail"/> GET, which is itself
+    // link-clickable and standing-gated (a non-guardian → 404). ─────────────
 
     /// <summary>
     /// <b>Dissolve</b> the (guardian, child) link — the independence lane (the

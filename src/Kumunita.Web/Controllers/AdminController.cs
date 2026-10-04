@@ -727,6 +727,53 @@ public sealed class AdminController(
         return RedirectToAction(nameof(Accounts));
     }
 
+    // ── Delete account — the admin removal lane (ADR 0142) ────────────────
+    // A GlobalAdmin removes another resident's account: their audit rows are
+    // pseudonymized (the actor id replaced by a tombstone), their group /
+    // community memberships are removed, their Profile row is deleted, and
+    // the Identity account is removed. The resident's self-serve lane
+    // (POST /account/delete, ADR 0142) is the self-deletion branch of the
+    // same Core seam (IIdentityService.DeleteAccountAsync); this action is
+    // the admin-initiated branch (actor ≠ target, the GlobalAdmin gate
+    // applies). Self-deletion through this surface is refused up-front
+    // (defense in depth over the Core branch logic): a GlobalAdmin who wants
+    // to leave should use their own /account/delete lane (the self-serve
+    // shape, Via: Owner) — not the admin lane.
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteAccount([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // Self-deletion guard: the admin lane is for removing *other*
+        // residents. A GlobalAdmin deleting their own account goes through
+        // /account/delete (the self-serve lane, the Via: Owner branch).
+        // Refuse before touching the Core lane (the Block self-guard shape).
+        if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
+        {
+            TempData["error"] = "You cannot delete your own account through this surface. Use your own Delete account settings page instead.";
+            return RedirectToAction(nameof(Accounts));
+        }
+
+        try
+        {
+            // The admin-initiated branch (actor ≠ target — the GlobalAdmin
+            // gate is enforced in the Core seam, the fail-closed pin).
+            await identity.DeleteAccountAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to delete this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Accounts));
+    }
+
     // ── /admin/audit — the always-on access-decision log (GlobalAdmin) ────────────────
 
     [HttpGet]

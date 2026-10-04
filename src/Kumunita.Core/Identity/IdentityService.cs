@@ -646,6 +646,200 @@ public sealed class IdentityService(
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // ── ADR 0142 — account deletion (the resident-leave / admin-removal lane) ──
+
+    /// <inheritdoc />
+    public async Task DeleteAccountAsync(string targetSubjectId, string adminSubjectId)
+    {
+        // ADR 0142 — the self-serve vs. admin distinction.
+        //   * Self-deletion (adminSubjectId == targetSubjectId): the resident
+        //     is deleting *their own* account. No GlobalAdmin gate — any
+        //     resident may leave the platform. The audit row is Via: Owner.
+        //   * Admin-initiated (adminSubjectId != targetSubjectId): a
+        //     GlobalAdmin is removing *another* resident. The GlobalAdmin
+        //     gate applies (the RequireGlobalAdminAsync shape — the
+        //     BlockAsync / UnblockAsync precedent; the fail-closed pin). The
+        //     audit row is Via: Admin.
+        var isSelfDeletion = string.Equals(
+            targetSubjectId, adminSubjectId, StringComparison.Ordinal);
+
+        if (isSelfDeletion)
+        {
+            // Self-deletion — the resident acts on their own account.
+            // ADR 0142 D5 gate: the self-serve lane is reachable only by a
+            // GlobalAdmin (a non-GlobalAdmin's crafted POST is refused
+            // server-side, the fail-closed pin). The resident's current
+            // password was already verified by the Web controller before
+            // reaching here, so the lane itself only checks the standing.
+            var self = await userManager.FindByIdAsync(targetSubjectId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
+            var selfRoles = (await userManager.GetRolesAsync(self).ConfigureAwait(false)).ToList();
+            if (!selfRoles.Contains(Roles.GlobalAdmin))
+                throw new UnauthorizedAccessException(
+                    "The self-serve delete-account lane is only available to a " +
+                    "GlobalAdmin. A non-GlobalAdmin resident cannot delete " +
+                    "their own account — contact an administrator to remove " +
+                    "the account.");
+            await DeleteCoreAsync(
+                targetSubjectId, self,
+                actorId: targetSubjectId,
+                via: Authorization.AccessVia.Owner);
+            return;
+        }
+
+        // Admin-initiated deletion of a *different* account.
+        // 1. Admin gate (the RequireGlobalAdminAsync shape).
+        var admin = await RequireGlobalAdminAsync(adminSubjectId).ConfigureAwait(false);
+        _ = admin;
+
+        // 2. The target must exist (the BlockAsync / SetBlockedAsync shape).
+        var target = await userManager.FindByIdAsync(targetSubjectId).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
+
+        await DeleteCoreAsync(
+            targetSubjectId, target,
+            actorId: adminSubjectId,
+            via: Authorization.AccessVia.Admin);
+    }
+
+    /// <summary>
+    /// ADR 0142 — the shared body of <see cref="DeleteAccountAsync"/> for both
+    /// the self-deletion and admin-initiated branches: the last-GlobalAdmin
+    /// guard, the pseudonymization, the membership/profile removal, the audit
+    /// row, and the Identity account deletion. The branch-specific actor +
+    /// <c>Via</c> are passed in (the self-serve row is <c>Via: Owner</c>; the
+    /// admin row is <c>Via: Admin</c>).
+    /// </summary>
+    private async Task DeleteCoreAsync(
+        string targetSubjectId, User target, string actorId, Authorization.AccessVia via)
+    {
+        // Last-GlobalAdmin guard (the lockout pin, the OPS.md §9 "Hand over
+        // admin" precedent). If the target is a GlobalAdmin and they are the
+        // only one on the instance, refuse before any write — this applies to
+        // *both* branches (a lone GlobalAdmin cannot self-delete, and no
+        // admin may delete the last GlobalAdmin). The recovery path is to
+        // promote a second GlobalAdmin first (the "Hand over admin" procedure).
+        var targetRoles = (await userManager.GetRolesAsync(target).ConfigureAwait(false)).ToList();
+        if (targetRoles.Contains(Roles.GlobalAdmin))
+        {
+            var allGAs = (await userManager
+                .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false)).ToList();
+            var otherGAs = allGAs.Where(u => u?.Id is string uid && uid != targetSubjectId).ToList();
+            if (otherGAs.Count == 0)
+                throw new InvalidOperationException(
+                    "This is the last GlobalAdmin on the instance. Promote a " +
+                    "second GlobalAdmin before deleting this account (the " +
+                    "OPS.md §9 'Hand over admin' procedure).");
+        }
+
+        // 4. Open the Marten session for the pseudonymization + membership
+        //    removal + audit row (the C3 single-commit shape — all in one
+        //    SaveChangesAsync).
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+        var now = DateTimeOffset.UtcNow;
+
+        // 5. Pseudonymize the target's audit rows (the OPS.md §9 /
+        //    ARCHITECTURE.md §5 "Deletion-of-account interaction" — the
+        //    rows remain, the actor id is rewritten to a tombstone). The
+        //    summary row (step 9 below) is the audit-of-the-deletion; the
+        //    per-row rewrites are the pseudonymization itself.
+        var tombstone = $"deleted:{targetSubjectId}";
+        var auditRows = await session.Query<Authorization.AccessAudit>()
+            .Where(a => a.ActorId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in auditRows)
+        {
+            row.ActorId = tombstone;
+            if (row.EffectivePrincipalId == targetSubjectId)
+                row.EffectivePrincipalId = tombstone;
+            session.Store(row);
+        }
+
+        // 6. Remove the target's group memberships (they leave every group;
+        //    the strong-consistency C4 invariant means the next
+        //    GetGroupIdsAsync call will not find them). The audit rows for
+        //    the *individual* removals are subsumed by the single
+        //    "account.delete" summary row (step 9) — the same "one summary,
+        //    many rows" shape the purge job's AuditPurgeSummary follows.
+        var groupMemberships = await session.Query<Kumunita.Core.UserInfo.GroupMembership>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var gm in groupMemberships)
+        {
+            session.Delete(gm);
+        }
+
+        // 7. Remove the target's component memberships (posting rights) and
+        //    moderator assignments (governing scope).
+        var compMemberships = await session.Query<Kumunita.Core.UserInfo.ComponentMembership>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var cm in compMemberships)
+        {
+            session.Delete(cm);
+        }
+
+        var modAssignments = await session.Query<Kumunita.Core.UserInfo.ModeratorAssignment>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var ma in modAssignments)
+        {
+            session.Delete(ma);
+        }
+
+        // 8. Remove the target's Profile row (their PII — name, email, phone,
+        //    address, bio, preferences — is gone). The directory's
+        //    non-blocked filter (DirectoryService's `!p.Blocked`) would hide
+        //    a Blocked profile, but deletion is the *stronger* signal: the
+        //    row is simply absent, so every read path (the directory, the
+        //    profile detail, the author-name resolution) falls back to the
+        //    raw subject id (the existing null-safe `profile?.DisplayName ??
+        //    authorId` idiom).
+        var profile = await session.LoadAsync<Kumunita.Core.UserInfo.Profile>(
+            targetSubjectId, ct).ConfigureAwait(false);
+        if (profile is not null)
+        {
+            session.Delete(profile);
+        }
+
+        // 9. Exactly one audit row — the "account.delete" summary (the
+        //    AuditPurgeSummary precedent: one summary row for a bulk
+        //    operation). The actor is the one who performed the deletion
+        //    (the resident themselves on self-deletion, the GlobalAdmin on
+        //    admin-initiated); the target is the deleted account. The
+        //    <c>Via</c> tag carries the branch (Owner / Admin).
+        session.Store(AuditRow(now, actorId, actorId,
+            "account.delete", AccountKind, targetSubjectId,
+            via, Authorization.AccessOutcome.Allow));
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // 10. Delete the Identity account (EF Core, the identity schema).
+        //     This removes the password hash, the role assignments, and the
+        //     user row itself. Done AFTER the Marten commit (the
+        //     "the account exists before its derivative mt rows" ordering
+        //     the class doc's "two stores, one Postgres" paragraph
+        //     describes, inverted: the mt cleanup commits first, then the
+        //     identity row is removed). A rare failure between the two is
+        //     the accepted cross-store window (the same "accepted cross-
+        //     store window" the class doc already acknowledges for the
+        //     register/verify lanes).
+        var result = await userManager.DeleteAsync(target).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                "Failed to delete the identity account: " +
+                string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
+
+        logger.LogInformation(
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed.",
+            actorId, via, targetSubjectId,
+            auditRows.Count, groupMemberships.Count,
+            compMemberships.Count, modAssignments.Count);
+    }
+
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
 
     /// <summary>

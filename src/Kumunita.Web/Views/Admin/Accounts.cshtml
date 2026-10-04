@@ -149,6 +149,23 @@
                                 </form>
                             }
                         }
+
+                        @* Delete account — the admin removal lane (ADR 0142).
+                           Hidden on the admin's own row (self-deletion goes
+                           through /account/delete, the self-serve lane). *@
+                        @if (!_isSelf)
+                        {
+                            <form method="post"
+                                  asp-action="DeleteAccount"
+                                  class="d-inline-flex ms-1"
+                                  data-confirm="Delete this account permanently? Their audit trail is preserved (pseudonymized). This cannot be undone.">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="subjectId" value="@a.SubjectId" />
+                                <button class="btn btn-sm btn-danger" type="submit">
+                                    Delete
+                                </button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }

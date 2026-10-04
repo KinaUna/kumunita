@@ -1,0 +1,68 @@
+@model Kumunita.Web.Models.DeleteAccountViewModel
+@{
+    ViewData["Title"] = "Settings — Delete account";
+}
+
+@* The settings sub-nav (the ADR 0080 idiom, the ADR 0138 "Change password"
+   precedent): the Delete account surface is a settings tab, so the strip
+   renders at the top of the page (the kmb-tab-under-navbar treatment,
+   site.css). The active-tab detection is controller-aware in
+   _SettingsTabs.cshtml (Account + Delete → "Delete account"). *@
+@await Html.PartialAsync("~/Views/Locale/_SettingsTabs.cshtml")
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <h1><kw-l key="account.delete_title">Delete account</kw-l></h1>
+
+        @if (Model.SelfDeletionRefused)
+        {
+            @* ADR 0142 D5 gate — the resident is not a GlobalAdmin. The
+               ADR 0138 "surface-replaced-by-notice" shape: the form is
+               still rendered below (a crafted POST is refused server-side
+               with the same message), but the page makes the gate visible
+               rather than letting the resident discover it only on submit. *@
+            <div class="alert alert-warning">
+                <kw-l key="account.delete_refused">The self-serve delete-account lane is only available to a GlobalAdmin. A non-GlobalAdmin resident cannot delete their own account — contact an administrator to remove the account.</kw-l>
+            </div>
+        }
+
+        <p class="text-muted">
+            <kw-l key="account.delete_lede">Deleting your account removes your sign-in, your profile, and your group and community memberships. Your past actions in the platform's audit trail are preserved with your identity replaced by a placeholder (the platform's privacy policy, OPS.md §9). This cannot be undone.</kw-l>
+        </p>
+
+        @* data-confirm — a plain literal string (the admin Block/Unblock
+           form idiom: a hardcoded client confirm() copy, the repo's
+           "not HTML attributes" kw-l exclusion). The form's checkbox +
+           the lede text (both kw-l-resolved) carry the localized
+           confirmation; this dialog is a second, English-only layer. *@
+        <form asp-action="Delete" method="post"
+              data-confirm="Delete your account permanently? This cannot be undone.">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"><kw-l key="account.delete_password">Password</kw-l></label>
+                <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3 form-check">
+                <input asp-for="Confirmed" class="form-check-input" />
+                <label asp-for="Confirmed" class="form-check-label">
+                    <kw-l key="account.delete_confirm_checkbox">I understand my account will be permanently deleted and this cannot be undone.</kw-l>
+                </label>
+                <span asp-validation-for="Confirmed" class="text-danger d-block"></span>
+            </div>
+
+            <button type="submit" class="btn btn-danger"><kw-l key="account.delete_submit">Delete account</kw-l></button>
+        </form>
+
+        <p class="mt-3 text-muted">
+            <a href="/profile/edit"><kw-l key="account.change_password_back">Back to your profile</kw-l></a>.
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

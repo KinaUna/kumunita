@@ -163,11 +163,64 @@
                             <strong>@inv.GroupName</strong>
                             <div class="text-muted small">Invited @inv.InvitedAt</div>
                         </div>
-                        <form method="post"
-                              action="@Url.Action("ApproveInvitation", "Guardian", new { childId = Model.ChildId, groupId = inv.GroupId })">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-sm btn-primary"><kw-l key="guardian.approve">Approve</kw-l></button>
-                        </form>
+                        <div class="d-flex gap-2">
+                            <form method="post"
+                                  action="@Url.Action("RejectInvitation", "Guardian", new { childId = Model.ChildId, groupId = inv.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <kw-l key="guardian.reject">Reject</kw-l>
+                                </button>
+                            </form>
+                            <form method="post"
+                                  action="@Url.Action("ApproveInvitation", "Guardian", new { childId = Model.ChildId, groupId = inv.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="guardian.approve">Approve</kw-l></button>
+                            </form>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            GU community-approval lane (ADR 0141) — the child's pending
+            community-membership requests (the supervised-child branch of the
+            admin / moderator add-community lanes): one row per pending
+            CommunityMembershipRequest, with the approve / reject POSTs (the
+            ApproveCommunityMembership / RejectCommunityMembership actions).
+            The membership does NOT land until approved (the
+            ApproveCommunityMembershipRequestAsync lane writes it — the ADR
+            0094 / m2b state-machine shape). G·1 held: ids/names only.
+        *@
+        <h2 class="mt-4"><kw-l key="guardian.pending_community_requests">Pending community memberships</kw-l></h2>
+        @if (Model.PendingCommunityRequests.Count == 0)
+        {
+            <p class="text-muted"><kw-l key="guardian.no_community_requests">No pending community memberships.</kw-l></p>
+        }
+        else
+        {
+            <ul class="list-group mb-2">
+                @foreach (var req in Model.PendingCommunityRequests)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <strong>@req.CommunityName</strong>
+                            <div class="text-muted small">Requested @req.RequestedAt</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <form method="post"
+                                  action="@Url.Action("RejectCommunityMembership", "Guardian", new { childId = Model.ChildId, communityId = req.CommunityId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <kw-l key="guardian.reject">Reject</kw-l>
+                                </button>
+                            </form>
+                            <form method="post"
+                                  action="@Url.Action("ApproveCommunityMembership", "Guardian", new { childId = Model.ChildId, communityId = req.CommunityId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="guardian.approve">Approve</kw-l></button>
+                            </form>
+                        </div>
                     </li>
                 }
             </ul>

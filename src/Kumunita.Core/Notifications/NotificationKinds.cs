@@ -129,6 +129,36 @@ public static class NotificationKinds
     /// </summary>
     public const string MessageNew = "message.new";
 
+    // ── GU community-approval lane — the guardian-facing pair ─────────────
+
+    /// <summary>
+    /// GU community-approval lane — a group owner (or GlobalAdmin) invited a
+    /// **supervised child** to join a group. The recipient is the child's
+    /// <b>guardian</b> (one row per active <c>GuardianLink</c>), not the
+    /// child. The notification's <see cref="Kumunita.Core.Notifications
+    /// .Notification.LinkPath"/> points at the child's manage-child page
+    /// (where the guardian sees the pending list + the approve/reject
+    /// buttons); <c>AcceptPath</c> / <c>DeclinePath</c> point at the same
+    /// page (the inbox button + the email link both deep-link there).
+    /// Opt-OUT default (the resident-facing posture, like
+    /// <see cref="GroupInvite"/>).
+    /// </summary>
+    public const string GuardianGroupInvite = "guardian.group_invite";
+
+    /// <summary>
+    /// GU community-approval lane — an admin (or community moderator) added
+    /// a **supervised child** to a community. The recipient is the child's
+    /// <b>guardian</b> (one row per active <c>GuardianLink</c>), not the
+    /// child. The notification's <see cref="Kumunita.Core.Notifications
+    /// .Notification.LinkPath"/> points at the child's manage-child page
+    /// (where the guardian sees the pending community-membership request +
+    /// the approve/reject buttons); <c>AcceptPath</c> / <c>DeclinePath</c>
+    /// point at the same page (the inbox button + the email link both
+    /// deep-link there). Opt-OUT default (the resident-facing posture, like
+    /// <see cref="GroupInvite"/>).
+    /// </summary>
+    public const string GuardianCommunityInvite = "guardian.community_invite";
+
     public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         Announcement, PageChild,
@@ -149,5 +179,6 @@ public static class NotificationKinds
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
+        GuardianGroupInvite, GuardianCommunityInvite,
     ];
 }

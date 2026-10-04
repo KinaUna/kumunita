@@ -706,6 +706,36 @@ public static class KnownTranslationKeys
 
             ["nav.change_password"] = "Change password",
 
+            // ── ADR 0142 — the resident self-serve delete-account surface
+            //    (/account/delete: the form + the ADR 0142 D5 refusal
+            //    notice for a non-GlobalAdmin resident), the settings-tab
+            //    link (nav.delete_account), and the admin-removal surface
+            //    (admin.delete_account.*) ──
+            ["account.delete_title"] = "Delete account",
+            ["account.delete_lede"] =
+                "Deleting your account removes your sign-in, your profile, " +
+                "and your group and community memberships. Your past actions " +
+                "in the platform's audit trail are preserved with your " +
+                "identity replaced by a placeholder (the platform's privacy " +
+                "policy, OPS.md §9). This cannot be undone.",
+            ["account.delete_password"] = "Password",
+            ["account.delete_confirm_checkbox"] =
+                "I understand my account will be permanently deleted and this " +
+                "cannot be undone.",
+            ["account.delete_submit"] = "Delete account",
+            ["account.delete_refused"] =
+                "The self-serve delete-account lane is only available to a " +
+                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
+                "own account — contact an administrator to remove the account.",
+
+            ["nav.delete_account"] = "Delete account",
+
+            ["admin.delete_account_label"] = "Delete account",
+            ["admin.delete_account_confirm"] =
+                "Delete this account permanently? Their audit trail is " +
+                "preserved (pseudonymized); their account, profile, and " +
+                "memberships are removed. This cannot be undone.",
+
             ["admin.sample_title"] = "Sample data",
             ["admin.sample_lede"] =
                 "This instance runs the demo neighborhood (sample data). Lock the " +
@@ -1784,6 +1814,34 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages from other residents",
             ["notification.message.new.subject"] = "A new message",
             ["notification.message.new.body"] = "A resident sent you a message: ",
+
+            // ── GU community-approval lane (ADR 0141) — the guardian-facing
+            // kind + nudge templates (the template ends with ": " — the
+            // emitter appends the UGC snippet, here the group/community name
+            // + the child's display name, after it) ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Group invitation for your child",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "When a group invites your child",
+            ["notification.guardian.group_invite.subject"] =
+                "A group has invited your child",
+            ["notification.guardian.group_invite.body"] =
+                "A group has invited your child: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Community membership for your child",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "When a community adds your child",
+            ["notification.guardian.community_invite.subject"] =
+                "A community has added your child",
+            ["notification.guardian.community_invite.body"] =
+                "A community has added your child: ",
+
+            // ── GU community-approval lane (ADR 0141) — the manage-child
+            // page's new sections ──
+            ["guardian.pending_community_requests"] = "Pending community memberships",
+            ["guardian.no_community_requests"] = "No pending community memberships.",
+            ["guardian.reject"] = "Reject",
+
             // ── M9 (ADR 0105, U04) — the resident surface: nav, list, thread, composer ──
             ["message.nav"] = "Messages",
             ["message.title"] = "Messages",
@@ -2853,6 +2911,36 @@ public static class KnownTranslationKeys
 
             ["nav.change_password"] = "Passwort ändern",
 
+            // ── ADR 0142 — das Konto-Löschen (de) ──
+            ["account.delete_title"] = "Konto löschen",
+            ["account.delete_lede"] =
+                "Wenn du dein Konto löschst, werden deine Anmeldung, dein " +
+                "Profil und deine Gruppen- und Gemeinschaftsmitgliedschaften " +
+                "entfernt. Deine früheren Handlungen im Prüfungsverzeichnis " +
+                "der Plattform bleiben erhalten — mit einer Platzhalter- " +
+                "Kennung anstelle deiner Identität (Datenschutzerklärung der " +
+                "Plattform, OPS.md §9). Das kann nicht rückgängig gemacht " +
+                "werden.",
+            ["account.delete_password"] = "Passwort",
+            ["account.delete_confirm_checkbox"] =
+                "Ich verstehe, dass mein Konto endgültig gelöscht wird und " +
+                "dies nicht rückgängig gemacht werden kann.",
+            ["account.delete_submit"] = "Konto löschen",
+            ["account.delete_refused"] =
+                "Die Selbstlösch-Option steht nur Global-Administratoren " +
+                "zur Verfügung. Ein Bewohner ohne Global-Admin-Stellung kann " +
+                "sein eigenes Konto nicht löschen — wende dich an einen " +
+                "Administrator, um das Konto entfernen zu lassen.",
+
+            ["nav.delete_account"] = "Konto löschen",
+
+            ["admin.delete_account_label"] = "Konto löschen",
+            ["admin.delete_account_confirm"] =
+                "Dieses Konto endgültig löschen? Das Prüfungsverzeichnis wird " +
+                "beibehalten (pseudonymisiert); das Konto, das Profil und die " +
+                "Mitgliedschaften werden entfernt. Das kann nicht rückgängig " +
+                "gemacht werden.",
+
             ["admin.sample_title"] = "Beispieldaten",
             ["admin.sample_lede"] =
                 "Diese Instanz führt die Demo-Nachbarschaft (Beispieldaten) aus. " +
@@ -3851,6 +3939,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Nachrichten von anderen Bewohnern",
             ["notification.message.new.subject"] = "Neue Nachricht",
             ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
+
+            // ── GU community-approval lane (ADR 0141) — die Betreuer-Art ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Gruppen-Einladung für dein Kind",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Wenn eine Gruppe dein Kind einlädt",
+            ["notification.guardian.group_invite.subject"] =
+                "Eine Gruppe hat dein Kind eingeladen",
+            ["notification.guardian.group_invite.body"] =
+                "Eine Gruppe hat dein Kind eingeladen: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Community-Mitgliedschaft für dein Kind",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Wenn eine Community dein Kind hinzufügt",
+            ["notification.guardian.community_invite.subject"] =
+                "Dein Kind wurde einer Community hinzugefügt",
+            ["notification.guardian.community_invite.body"] =
+                "Dein Kind wurde einer Community hinzugefügt: ",
+
+            // ── GU community-approval lane (ADR 0141) — die Kind-Seite ──
+            ["guardian.pending_community_requests"] = "Offene Community-Mitgliedschaften",
+            ["guardian.no_community_requests"] = "Keine offenen Community-Mitgliedschaften.",
+            ["guardian.reject"] = "Ablehnen",
+
             // ── M9 (ADR 0105, U04) — die Bewohner-Fläche: Navigation, Liste, Thread, Composer ──
             ["message.nav"] = "Nachrichten",
             ["message.title"] = "Nachrichten",
@@ -4905,6 +5017,35 @@ public static class KnownTranslationKeys
 
             ["nav.change_password"] = "Changer le mot de passe",
 
+            // ── ADR 0142 — la suppression de compte (fr) ──
+            ["account.delete_title"] = "Supprimer le compte",
+            ["account.delete_lede"] =
+                "Supprimer ton compte supprime ta connexion, ton profil et " +
+                "tes affiliations à des groupes et à des communautés. Tes " +
+                "actions passées dans le journal d'audit de la plateforme " +
+                "sont conservées, ton identité étant remplacée par un " +
+                "identifiant anonyme (politique de confidentialité de la " +
+                "plateforme, OPS.md §9). Cette opération est irréversible.",
+            ["account.delete_password"] = "Mot de passe",
+            ["account.delete_confirm_checkbox"] =
+                "Je comprends que mon compte sera définitivement supprimé et " +
+                "que cette opération est irréversible.",
+            ["account.delete_submit"] = "Supprimer le compte",
+            ["account.delete_refused"] =
+                "La voie d'auto-suppression n'est disponible qu'aux " +
+                "administrateurs globaux. Un résident non-administrateur " +
+                "ne peut pas supprimer son propre compte — contacte un " +
+                "administrateur pour supprimer le compte.",
+
+            ["nav.delete_account"] = "Supprimer le compte",
+
+            ["admin.delete_account_label"] = "Supprimer le compte",
+            ["admin.delete_account_confirm"] =
+                "Supprimer définitivement ce compte ? Son journal d'audit " +
+                "est conservé (pseudonymisé) ; le compte, le profil et les " +
+                "affiliations sont supprimés. Cette opération est " +
+                "irréversible.",
+
             ["admin.sample_title"] = "Données d'exemple",
             ["admin.sample_lede"] =
                 "Cette instance exécute le quartier de démonstration (données d'exemple). " +
@@ -5919,6 +6060,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages d'autres résidents",
             ["notification.message.new.subject"] = "Nouveau message",
             ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
+
+            // ── GU community-approval lane (ADR 0141) — l'art du tuteur ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Invitation à un groupe pour ton enfant",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Quand un groupe invite ton enfant",
+            ["notification.guardian.group_invite.subject"] =
+                "Un groupe a invité ton enfant",
+            ["notification.guardian.group_invite.body"] =
+                "Un groupe a invité ton enfant : ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Membre d'une communauté pour ton enfant",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Quand une communauté ajoute ton enfant",
+            ["notification.guardian.community_invite.subject"] =
+                "Une communauté a ajouté ton enfant",
+            ["notification.guardian.community_invite.body"] =
+                "Une communauté a ajouté ton enfant : ",
+
+            // ── GU community-approval lane (ADR 0141) — la page enfant ──
+            ["guardian.pending_community_requests"] = "Communautés en attente",
+            ["guardian.no_community_requests"] = "Aucune communauté en attente.",
+            ["guardian.reject"] = "Refuser",
+
             ["pages.subscribe"] = "S'abonner aux mises à jour",
             ["pages.unsubscribe"] = "Se désabonner des mises à jour",
 
@@ -6960,6 +7125,34 @@ public static class KnownTranslationKeys
 
             ["nav.change_password"] = "Skift adgangskode",
 
+            // ── ADR 0142 — sletning af konto (da) ──
+            ["account.delete_title"] = "Slet konto",
+            ["account.delete_lede"] =
+                "Når du sletter din konto, fjernes din login, din profil og " +
+                "dine gruppe- og fællesskabsmedlemskaber. Dine tidligere " +
+                "handlinger i platformens audit-log bevares — din identitet " +
+                "bliver erstattet af et anonymt pseudonym (platformens " +
+                "konfidentialitetspolitik, OPS.md §9). Det kan ikke " +
+                "undgås.",
+            ["account.delete_password"] = "Adgangskode",
+            ["account.delete_confirm_checkbox"] =
+                "Jeg forstår, at min konto bliver slettet permanent, og at " +
+                "det ikke kan undgås.",
+            ["account.delete_submit"] = "Slet konto",
+            ["account.delete_refused"] =
+                "Den selvbetjente sletningsvej er kun tilgængelig for " +
+                "GlobalAdmin. En beboer, der ikke er GlobalAdmin, kan ikke " +
+                "slette sin egen konto — kontakt en administrator for at " +
+                "fjerne kontoen.",
+
+            ["nav.delete_account"] = "Slet konto",
+
+            ["admin.delete_account_label"] = "Slet konto",
+            ["admin.delete_account_confirm"] =
+                "Slet denne konto permanent? Audit-protokollen bevares " +
+                "(pseudonymiseret); kontoen, profilen og medlemskaberne " +
+                "fjernes. Det kan ikke undgås.",
+
             ["admin.sample_title"] = "Eksempeldata",
             ["admin.sample_lede"] =
                 "Denne instans kører det demonstrerende nabolag (eksempeldata). " +
@@ -7966,6 +8159,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
             ["notification.message.new.subject"] = "Ny besked",
             ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
+
+            // ── GU community-approval lane (ADR 0141) — den vagts type ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Gruppindbydelse til dit barn",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Når en gruppe inviterer dit barn",
+            ["notification.guardian.group_invite.subject"] =
+                "En gruppe har inviteret dit barn",
+            ["notification.guardian.group_invite.body"] =
+                "En gruppe har inviteret dit barn: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Communitymedlemskab til dit barn",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Når en community tilføjer dit barn",
+            ["notification.guardian.community_invite.subject"] =
+                "En community har tilføjet dit barn",
+            ["notification.guardian.community_invite.body"] =
+                "En community har tilføjet dit barn: ",
+
+            // ── GU community-approval lane (ADR 0141) — børns-siden ──
+            ["guardian.pending_community_requests"] = "Community'er i ventetid",
+            ["guardian.no_community_requests"] = "Ingen community'er i ventetid.",
+            ["guardian.reject"] = "Afvise",
+
             ["pages.subscribe"] = "Abonner på opdateringer",
             ["pages.unsubscribe"] = "Opsig abonnement",
 

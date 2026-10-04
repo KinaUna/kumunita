@@ -70,6 +70,23 @@
             </form>
         }
     }
+
+    @* Delete account — the admin removal lane (ADR 0142). Hidden on the
+       admin's own row (the controller refuses self-deletion through this
+       surface too — the GlobalAdmin who wants to leave uses /account/delete,
+       the self-serve lane). *@
+    @if (!Model.IsSelf)
+    {
+        <form method="post" asp-action="DeleteAccount"
+              class="ms-2 d-inline-flex"
+              data-confirm="Delete this account permanently? Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed. This cannot be undone.">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="subjectId" value="@Model.Account.SubjectId" />
+            <button class="btn btn-danger" type="submit">
+                Delete account
+            </button>
+        </form>
+    }
 </div>
 
 <div class="card mb-4">
