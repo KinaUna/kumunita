@@ -116,4 +116,42 @@ public class MediaOptionsPreviewableTests
         Assert.DoesNotContain(options.ResolvedPreviewableTypes,
                               t => t.Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase));
     }
+
+    // ── Parameter-insensitive matching (the zip/charset 415 class) ──────────
+    //
+    // A client-supplied Content-Type with a <c>;</c>-parameter
+    // (e.g. <c>text/plain; charset=utf-8</c>, <c>text/csv; charset=utf-8</c>)
+    // must match the bare allowlist entry. The prior exact-match rejected these
+    // with a 415. A malicious *base* type must still be refused (the parameter
+    // must not smuggle a disallowed base type past the closed set).
+
+    [Fact(DisplayName = "IsAttachmentAllowed / IsDocumentAllowed match a parameterized text type")]
+    public void Parameterized_Text_Matches_Allowlist()
+    {
+        var options = new MediaOptions();
+        Assert.True(options.IsAttachmentAllowed("text/plain; charset=utf-8"));
+        Assert.True(options.IsAttachmentAllowed("text/csv; charset=UTF-8"));
+        Assert.True(options.IsDocumentAllowed("text/plain; charset=utf-8"));
+        Assert.True(options.IsDocumentAllowed("text/csv"));
+    }
+
+    [Fact(DisplayName = "IsAllowed / IsPreviewable match a parameterized pdf type")]
+    public void Parameterized_Pdf_Matches_Allowlist()
+    {
+        var options = new MediaOptions();
+        Assert.True(options.IsAttachmentAllowed("application/pdf; name=report.pdf"));
+        Assert.True(options.IsPreviewable("application/pdf; name=report.pdf"));
+    }
+
+    [Fact(DisplayName = "A parameterized base type NOT on the allowlist is still refused")]
+    public void Parameterized_MaliciousBase_IsStillRefused()
+    {
+        var options = new MediaOptions();
+        // The base type (text/html / application/javascript) is the security
+        // boundary — a trailing parameter must not turn a disallowed base into
+        // an allowed one.
+        Assert.False(options.IsAttachmentAllowed("text/html; charset=utf-8"));
+        Assert.False(options.IsDocumentAllowed("application/javascript; x=y"));
+        Assert.False(options.IsPreviewable("image/svg+xml; width=10"));
+    }
 }

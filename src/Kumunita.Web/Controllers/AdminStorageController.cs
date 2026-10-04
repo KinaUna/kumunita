@@ -72,7 +72,7 @@ public sealed class AdminStorageController(
         var snap = await snapshotTask;
 
         // The env fallback is the same <see cref="MediaOptions.MaxBytes"/> cap
-        // the four upload-lane guards use (5 MiB default, C-MED·5) — the
+        // the four upload-lane guards use (10 MiB default, C-MED·5) — the
         // <c>settings.MaxFileBytes ?? envMaxBytes</c> expression the U8 gate and
         // <see cref="StorageLimits.EffectiveMaxFileBytes"/> compute. Displaying
         // it here keeps the admin's "effective per-file" figure equal to what

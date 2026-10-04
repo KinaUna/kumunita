@@ -163,7 +163,7 @@ public class AdminStorageControllerTests
         var store    = Substitute.For<IDocumentStore>();
         var session  = Substitute.For<IDocumentSession>();
 
-        // The env fallback cap (MediaOptions.MaxBytes default 5 MiB) — the
+        // The env fallback cap (MediaOptions.MaxBytes default 10 MiB) — the
         // controller reads it only on the GET path; the set-lane ignores it.
         var mediaOpts = Options.Create(new MediaOptions());
 

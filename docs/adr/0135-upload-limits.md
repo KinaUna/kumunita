@@ -55,7 +55,7 @@ The platform already has **two** relevant surfaces, and M25 sits *between* them:
   upload lane (avatar / content-image / attachment / document) already writes
   through the *same* `IMediaStore` + volume.
 - **The per-lane size gate (pre-M25):** each Web upload action read
-  `MediaOptions.MaxBytes` (env `Media__MaxBytes`, default 5 MiB) and rejected an
+  `MediaOptions.MaxBytes` (env `Media__MaxBytes`, default 10 MiB) and rejected an
   oversize payload with **413** *before* `PutAsync`. That gate was **env-only**
   (operator-set at deploy time) and **duplicated per lane** — the
   `if (mediaOpts.Value.MaxBytes > 0 && file.Length > MaxBytes) return 413;` line

@@ -71,7 +71,7 @@ so orphan bytes are inert and existence never leaks. **No new
 `AccessAction`, no new `IMediaStore` seam, no new signature on the frozen
 `IAuthorizationService`** — the route copies the existing avatar idiom.
 Upload is `POST /content-image`, ADR 0011's boundary verbatim (allowlist,
-5 MiB cap, guards-before-write 400/413/415, one `PutAsync`).
+10 MiB cap, guards-before-write 400/413/415, one `PutAsync`).
 
 This resolves ADR 0011's "follow-on lanes" non-decision **for the
 post/reply/announcement/about lane specifically**. Group logos, badge

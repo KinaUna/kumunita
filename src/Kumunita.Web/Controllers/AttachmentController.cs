@@ -22,7 +22,7 @@ namespace Kumunita.Web.Controllers;
 /// the **attachment** allowlist
 /// (<see cref="MediaOptions.AttachmentAllowedContentTypes"/> — a **separate**
 /// gate from the image lane's raster-only <see cref="MediaOptions.AllowedContentTypes"/>),
-/// the same <see cref="MediaOptions.MaxBytes"/> cap (5 MiB default — reused,
+/// the same <see cref="MediaOptions.MaxBytes"/> cap (10 MiB default — reused,
 /// not a second size cap), the same guards-before-write ordering — empty →
 /// <b>400</b>, oversize → <b>413</b>, disallowed type → <b>415</b> — **no
 /// file written on any guard** — then one <see cref="IMediaStore.PutAsync"/>

@@ -73,7 +73,7 @@ local volume.
   (`image/jpeg|png|webp|gif` — **SVG excluded**: it is a document format
   carrying executable content, i.e. an XSS/XXE vector into a page that also
   carries the resident's session cookie); `MediaOptions.AllowedContentTypes`
-  and `Media__MaxBytes` (default 5 MiB) are operator-tunable (OPS.md) and
+  and `Media__MaxBytes` (default 10 MiB) are operator-tunable (OPS.md) and
   are the extension point for follow-on lanes.
 - **Two restore surfaces, one story (C-MED·7).** The catalog (`MediaObject`)
   lives in Postgres and restores with the `pg_dump`; the payload restores

@@ -138,7 +138,7 @@ public sealed class ContentImageController(
     /// <c>POST /content-image</c> — the content-image upload lane (RC R·6 —
     /// ADR 0011's boundary, **verbatim**: the same allowlist
     /// <c>image/jpeg|png|webp|gif</c> (SVG excluded), the same
-    /// <see cref="MediaOptions.MaxBytes"/> cap (5 MiB default), the same
+    /// <see cref="MediaOptions.MaxBytes"/> cap (10 MiB default), the same
     /// guards-before-write ordering — empty → <b>400</b>, oversize →
     /// <b>413</b>, disallowed type → <b>415</b> — **no file written on any
     /// guard** — then one <see cref="IMediaStore.PutAsync"/> write. The
