@@ -2254,7 +2254,7 @@ public static class KnownTranslationKeys
             ["admin.guests_surface_directory"]   = "Verzeichnis",
             ["admin.guests_saved"]               = "Gastzugang gespeichert.",
             ["account.guest_welcome"] =
-                "Sie sind als Gast angemeldet. Ihr Zugriff ist auf die " +
+                "Du bist als Gast angemeldet. Dein Zugriff ist auf die " +
                 "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
                 "das von ihr gesetzte Zeitfenster.",
 
@@ -2863,11 +2863,11 @@ public static class KnownTranslationKeys
             ["admin.sample_lock_on"] = "Gesperrt — Beispielkonten können ihr Passwort nicht ändern",
             ["admin.sample_lock_off"] = "Nicht gesperrt — Beispielkonten können ihr Passwort ändern",
             ["account.login.error.blocked"] =
-                "Ihr Konto wurde vorübergehend gesperrt. Wenden Sie sich an einen Administrator.",
+                "Dein Konto wurde vorübergehend gesperrt. Wende dich an einen Administrator.",
             ["account.login.error.removed"] =
-                "Ihr Konto wurde entfernt. Wenden Sie sich an einen Administrator.",
+                "Dein Konto wurde entfernt. Wende dich an einen Administrator.",
             ["account.login.error.role_changed"] =
-                "Ihre Rolle wurde geändert. Bitte melden Sie sich erneut an.",
+                "Deine Rolle wurde geändert. Bitte melde dich erneut an.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Gemeinschaft",
@@ -3575,7 +3575,7 @@ public static class KnownTranslationKeys
             ["whatsnew.heading"]        = "Was ist neu — Version für Version",
             ["whatsnew.lead"] =
                 "Jede Veröffentlichung ist hier mit Datum gelistet — lies nach, " +
-                "was in jeder Minor-Version der Plattform, die du nutzt, eingezogen ist.",
+                "was in jeder Minor-Version der Plattform, die du nutzt, gelandet ist.",
             ["whatsnew.version"]        = "Version",
             ["whatsnew.show_more"]      = "Weitere Versionen anzeigen",
             ["whatsnew.show_more_remaining"] = "Die {n} älteren Versionen anzeigen",
@@ -4796,7 +4796,7 @@ public static class KnownTranslationKeys
             ["account.signup_closed_title"] = "L'inscription est fermée",
             ["account.signup_closed_body"]  =
                 "L'inscription est actuellement réservée aux invitations sur cette instance. " +
-                "Si vous avez été invité·e, une personne administratrice créera votre compte et vous enverra le lien de connexion.",
+                "Si tu as été invité·e, une personne administratrice créera ton compte et t'enverra le lien de connexion.",
 
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Où en est ce projet",
@@ -6133,20 +6133,20 @@ public static class KnownTranslationKeys
             // finish/skip (D2/D4). U03 crée le jeu FERMÉ COMPLET ; U02/U03 le
             // consomment. La pin de parité exige chaque clé présente, non
             // vide, dans les quatre langues (C-M22·6, GATE-6). ──
-            ["onboarding.title"]            = "Configurer votre compte",
-            ["onboarding.intro"]            = "Une brève visite guidée des quelques réglages qui font fonctionner Kumunita pour vous. Tout mène au réglage qui l'a déjà — terminez en une minute ou revenez quand vous voulez.",
-            ["onboarding.step_displayname"] = "Votre nom d'affichage",
-            ["onboarding.step_avatar"]      = "Votre avatar",
-            ["onboarding.step_language"]    = "Votre langue d'interface",
-            ["onboarding.step_timezone"]    = "Votre fuseau horaire",
-            ["onboarding.step_dateformat"]  = "Votre format de date et d'heure",
-            ["onboarding.step_email"]       = "Votre langue des e-mails et des notifications",
-            ["onboarding.step_contact"]     = "Vos coordonnées et qui peut les voir",
+            ["onboarding.title"]            = "Configurer ton compte",
+            ["onboarding.intro"]            = "Une brève visite guidée des quelques réglages qui font fonctionner Kumunita pour toi. Tout mène au réglage qui l'a déjà — termine en une minute ou reviens quand tu veux.",
+            ["onboarding.step_displayname"] = "Ton nom d'affichage",
+            ["onboarding.step_avatar"]      = "Ton avatar",
+            ["onboarding.step_language"]    = "Ta langue d'interface",
+            ["onboarding.step_timezone"]    = "Ton fuseau horaire",
+            ["onboarding.step_dateformat"]  = "Ton format de date et d'heure",
+            ["onboarding.step_email"]       = "Ta langue des e-mails et des notifications",
+            ["onboarding.step_contact"]     = "Tes coordonnées et qui peut les voir",
             ["onboarding.visit"]            = "Aller à ce réglage",
             ["onboarding.finish"]           = "Tout est prêt — terminer la configuration",
             ["onboarding.skip"]             = "Passer pour l'instant",
-            ["onboarding.flash_done"]       = "Configuration terminée — bienvenue dans votre quartier.",
-            ["onboarding.banner.text"]      = "Terminer la configuration de votre compte ?",
+            ["onboarding.flash_done"]       = "Configuration terminée — bienvenue dans ton quartier.",
+            ["onboarding.banner.text"]      = "Terminer la configuration de ton compte ?",
             ["onboarding.banner.action"]    = "Démarrer la configuration",
 
             // ── M9 amendment — le contrôle de messagerie par résident + le
@@ -6357,8 +6357,8 @@ public static class KnownTranslationKeys
         {
             // ── M19 (ADR 0120) — gæstekonti-overfladen: /admin/guests
             // admin-overfladen (D6) + den tilloggede gæsts modtagelse (D5) ──
-            ["admin.guests_title"]               = "Gæstekonti",
-            ["admin.guests_empty"]               = "Ingen gæstekonti endnu.",
+            ["admin.guests_title"]               = "Gæstekonto",
+            ["admin.guests_empty"]               = "Ingen gæstekonto endnu.",
             ["admin.guests_create"]              = "Opret gæst",
             ["admin.guests_window_label"]        = "Adgangsvindue",
             ["admin.guests_surfaces_label"]      = "Tilladte flader",
@@ -8192,7 +8192,7 @@ public static class KnownTranslationKeys
             ["onboarding.visit"]            = "Gå til denne indstilling",
             ["onboarding.finish"]           = "Alt er klar — afslut opsætningen",
             ["onboarding.skip"]             = "Spring over for nu",
-            ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen i din nabolag.",
+            ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen til dit nabolag.",
             ["onboarding.banner.text"]      = "Færdiggøre opsætningen af din konto?",
             ["onboarding.banner.action"]    = "Start opsætning",
 

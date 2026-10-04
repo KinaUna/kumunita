@@ -101,6 +101,45 @@ mechanics.
 
 ## Amendments
 
+### 2026-10-04 — context-reuse: accepted design choice (P2-4)
+
+**The 13 context-reuse keys.** A full drift scan of every `<kw-l>` against the
+registry `en` floor found 37 keys whose view fallback text differs from the
+registry value. 13 of these are **intentional context-reuse**: a single key
+carries per-entity or per-voice wording that is more accurate than the generic
+registry floor. Splitting each key into one-per-entity would multiply the
+closed set without adding information (the provider floor renders the generic
+form on a fresh `en` instance, which is correct for the *platform* copy; the
+view's per-entity fallback is the *user-visible* truth on a translated
+instance). The 13 keys are:
+
+| # | Key | Reuse pattern |
+|---|-----|---------------|
+| 1 | `events.community_hint` | "this event" (en) → "this board / goal / project" (×3 views) |
+| 2 | `posts.audience_all_members` | "Everyone in this community" (en) → "Everyone" (×7 non-post views) |
+| 3 | `posts.draft_note` | "under its audience" (en) → "to this group's members" (group view) |
+| 4 | `posts.language_hint` | "this post" (en) → "this event / board / goal / project" (×7 views) |
+| 5 | `posts.publish` | "Publish" (en) → "Open" (draft-list view) |
+| 6 | `posts.reply_language_note` | "replying" (en) → "commenting" (announcement view) |
+| 7 | `posts.title_hint` | "body-only post" (en) → "body-only entry" (group/event view) |
+| 8 | `projects.board.audience_default` | "this board" (en) → "this goal / project" (×2 views) |
+| 9 | `settings.dateformat_default_tail` | "you reset" (resident voice) → "a resident resets" (admin voice) |
+| 10 | `tag.input.hint` | "this post" (en) → "this event" (event view) / no tail (profile view) |
+| 11 | `grant.empty_groups` | curly vs. straight quotes in "under …" |
+| 12 | `grant.hint` | curly vs. straight quotes in "Select all" |
+| 13 | `profile.audience_off_note` | curly vs. straight quotes in "switch on …" |
+
+**Decision.** Context-reuse is an accepted pattern: the registry `en` value
+is the **generic platform form** (the floor a fresh `en` instance renders),
+and the view fallback is the **per-entity or per-voice form** that is more
+accurate for that specific context. The provider floor (D1) still resolves
+every registered key to its `en` text, so the generic form is always
+available; the view's fallback is an **opt-in refinement** for the one site
+where the generic wording would be misleading. No key is dead, no key is
+unregistered, and `KwLRegistryConsistencyTests` passes cleanly for all 13 —
+this amendment documents the design choice so a future audit does not flag
+them as drift.
+
 ### 2026-09-12 — full-sweep + provider floor (the upgrade path)
 
 **Full sweep.** The registry is no longer a pilot surface: it now covers the
