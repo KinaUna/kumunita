@@ -620,7 +620,8 @@ public static class KnownTranslationKeys
 
             // ── ADR 0138 — the resident self-serve change-password surface
             //    (/account/password: the form + the locked notice), the
-            //    account-menu link (nav.change_password), and the
+            //    settings-tab link (nav.change_password, moved out of the
+            //    account dropdown 2026-10-04), and the
             //    GlobalAdmin /admin/sample toggle (admin.sample.*) ──
             ["account.change_password_title"] = "Change password",
             ["account.change_password_lede"] =

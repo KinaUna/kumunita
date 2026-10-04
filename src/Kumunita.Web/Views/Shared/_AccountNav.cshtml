@@ -157,13 +157,9 @@
                     <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>
                 @* ADR 0138 — the resident's self-serve change-password surface
-                   (/account/password). Available to every signed-in resident; a
-                   locked sample account (a SampleData__Enabled instance that has
-                   opted in to the lock, except the sample admin) sees the locked
-                   notice when they open it — the link stays, the write is refused. *@
-                <li class="nav-item">
-                    <a class="dropdown-item text-dark" href="/account/password"><kw-l key="nav.change_password">Change password</kw-l></a>
-                </li>
+                   (/account/password) moved to a settings tab (2026-10-04); it
+                   is reached via the settings "Change password" tab, not here
+                   (the ADR 0080 idiom, the ADR 0028 "Children" precedent). *@
                 @* ADR 0084 — the per-target subscriptions surface (the resident's
                    explicit "notify me for this community / group / page" choice,
                    distinct from the per-kind email preferences). *@

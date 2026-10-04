@@ -155,10 +155,11 @@ param):
   just changed — confirm the new one on the next sign-in) and redirected to the
   login surface with an `info` flash.
 
-A "Change password" entry is added to the resident account menu
-(`_AccountNav.cshtml`, a `nav.change_password` kw-l key); a locked sample
-account sees the notice when it opens the page (the link stays, the write is
-refused).
+"Change password" is a **settings tab** (a `nav.change_password` kw-l key in
+the shared `_SettingsTabs.cshtml` sub-nav, reached from the account menu's
+single "Settings" entry) — moved out of the account dropdown 2026-10-04, the
+ADR 0028 "Children" / ADR 0080 idiom; a locked sample account sees the notice
+when it opens the page (the link stays, the write is refused).
 
 ### Persistence
 

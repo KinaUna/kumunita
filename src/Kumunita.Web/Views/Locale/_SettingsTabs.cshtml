@@ -1,34 +1,37 @@
 @* The /settings section sub-nav (the _EventsTabs.cshtml Bootstrap nav-tabs idiom,
-   ADR 0062 / ADR 0080). Five tabs — Language (now also the home of the email &
+   ADR 0062 / ADR 0080). Six tabs — Language (now also the home of the email &
    notification language section, folded in 2026-09-30), Time zone, Date & time
-   format, Quiet hours (M20, ADR 0121 D7 — the 5th resident section, added
-   2026-09-30), and Children — so a resident can jump between sections without
-   scrolling. The active tab is derived from the current controller + action:
-   LocaleController owns the four settings GET actions (Index, SettingsTimezone,
-   SettingsDateFormat, SettingsQuiet) and GuardianController owns the Children
-   page. Active detection is controller-aware because the Children page's action
-   is also named "Index" (GuardianController.Index), so the action name alone is
-   ambiguous. *@
+   format, Quiet hours (M20, ADR 0121 D7), Children (ADR 0028, moved here from
+   the account dropdown 2026-09-30), and Change password (ADR 0138, moved here
+   from the account dropdown 2026-10-04) — so a resident can jump between
+   sections without scrolling. The active tab is derived from the current
+   controller + action: LocaleController owns the four settings GET actions
+   (Index, SettingsTimezone, SettingsDateFormat, SettingsQuiet),
+   GuardianController owns the Children page, and AccountController owns the
+   ChangePassword page. Active detection is controller-aware because both the
+   Children and Language tabs' actions are named "Index", so the action name
+   alone is ambiguous. *@
 @{
     var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "Locale";
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
     var tabs = new (string LabelKey, string Label, string Href)[]
     {
-        ("locale.language_heading", "Language",         "/settings/language"),
-        ("settings.timezone_title", "Time zone",        "/settings/timezone"),
-        ("settings.dateformat_title", "Date & time format", "/settings/dateformat"),
-        ("settings.quiet.title",    "Quiet hours",      "/settings/quiet"),
-        ("nav.children",            "Children",         "/me/children"),
+        ("locale.language_heading",  "Language",          "/settings/language"),
+        ("settings.timezone_title",  "Time zone",         "/settings/timezone"),
+        ("settings.dateformat_title","Date & time format","/settings/dateformat"),
+        ("settings.quiet.title",     "Quiet hours",       "/settings/quiet"),
+        ("nav.children",             "Children",          "/me/children"),
+        ("nav.change_password",      "Change password",   "/account/password"),
     };
-    var activeLabel = controller == "Guardian"
-        ? "Children"
-        : action switch
-        {
-            "SettingsTimezone"   => "Time zone",
-            "SettingsDateFormat" => "Date & time format",
-            "SettingsQuiet"      => "Quiet hours",
-            _                    => "Language",
-        };
+    var activeLabel = (controller, action) switch
+    {
+        ("Guardian", _)                   => "Children",
+        ("Account",  "ChangePassword")    => "Change password",
+        ("Locale",   "SettingsTimezone")  => "Time zone",
+        ("Locale",   "SettingsDateFormat")=> "Date & time format",
+        ("Locale",   "SettingsQuiet")     => "Quiet hours",
+        _                                 => "Language",
+    };
 }
 <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
     @foreach (var tab in tabs)
