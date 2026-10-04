@@ -455,6 +455,17 @@ builder.Services.Configure<Kumunita.Core.Notifications.NotificationOptions>(o =>
     o.SuppressForSampleAccountsInProduction = !builder.Environment.IsDevelopment());
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
+// The §6.4 scheduled jobs bind their retention/window config per-instance from
+// their own sections (the AuditPurgeOptions / EventReminderOptions POCOs, whose
+// defaults apply when the env vars are absent — i.e. these are optional). The
+// AddOptions<T>() registrations above already make IOptions<T> resolvable; these
+// Configure<T>() calls are what actually read the section values, so the
+// AuditPurge__RoutineDays / AuditPurge__UnresolvedReportDays and
+// EventReminder__WindowHours env knobs reach the jobs (OPS §6.4).
+builder.Services.Configure<Kumunita.Core.Authorization.AuditPurgeOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Authorization.AuditPurgeOptions.SectionName));
+builder.Services.Configure<Kumunita.Core.Events.EventReminderOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Events.EventReminderOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP
 // section (SmtpOptions.SectionName = "SMTP") — same pattern as the two lines above.
 // Without this binding IOptions<SmtpSender> resolves a bare SmtpOptions and the

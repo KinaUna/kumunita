@@ -19,6 +19,11 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.29.0", "2026-10-04", new List<string>
+        {
+            "Platform storage limit — an operator can cap how much resident content the platform may hold (Media__MaxPlatformBytes, 0 = unlimited). When set, the GlobalAdmin's /admin/storage \"available\" figure is capped to the remaining budget, and all new uploads are blocked once that budget is spent or the volume's free space drops below 100 MiB (ADR 0136).",
+            "Storage settings — the per-file size limit and per-user content quota on /admin/storage/settings are now entered in MiB instead of raw bytes (blank still means the platform default / unlimited).",
+        }),
         new("0.28.0", "2026-10-03", new List<string>
         {
             "Upload limits — admin-set per-file size limit and per-user total content quota; residents see how much space they are using and how much of their quota remains (ADR 0135).",
