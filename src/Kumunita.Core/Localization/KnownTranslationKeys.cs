@@ -371,6 +371,22 @@ public static class KnownTranslationKeys
             ["guardian.password"]            = "Password",
             ["guardian.child_email_hint"]    =
                 "The child verifies their own email to sign in — the usual sign-up flow.",
+            ["guardian.consent.intro"]       =
+                "By creating this profile, you confirm that you are the legal " +
+                "guardian of this child. As their guardian, you maintain full " +
+                "control over their account:",
+            ["guardian.consent.duties_invitations"] =
+                "You must approve or deny all group and event invitations.",
+            ["guardian.consent.duties_chat"] =
+                "You can enable or disable chat features for this profile at " +
+                "any time.",
+            ["guardian.consent.duties_data"] =
+                "This data is fully isolated, hosted securely in the " +
+                "Switzerland/EU region, and will never be sold, profiled, or " +
+                "used for advertising.",
+            ["guardian.consent.checkbox"]    =
+                "I consent to the processing of my child's data under these " +
+                "terms.",
 
             // ── posts (composer helper hints) ──────────────────────────────
             ["posts.title_hint"] =

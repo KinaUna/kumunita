@@ -71,6 +71,10 @@ public sealed record MembershipEditorModel(
 /// (one commit, G·4). <see cref="DisplayName"/> / <see cref="Email"/> /
 /// <see cref="Password"/> feed the usual <c>RegisterAsync</c> signup lane — the
 /// verification email is M1's, the form does not bypass it.
+/// <see cref="GuardianConsent"/> is the guardian's consent to the child-account
+/// terms (guardian confirmation + data-processing terms), bound from the
+/// "I consent" checkbox on the add-a-child form; creation is refused until it
+/// is checked.
 /// </summary>
 public sealed class AddChildForm
 {
@@ -85,6 +89,10 @@ public sealed class AddChildForm
     [Required, DataType(DataType.Password), MinLength(8)]
     [Display(Name = "Password")]
     public string? Password { get; set; }
+
+    [Required]
+    [Display(Name = "Guardian consent")]
+    public bool GuardianConsent { get; set; }
 }
 
 /// <summary>

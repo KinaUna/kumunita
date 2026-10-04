@@ -71,7 +71,7 @@ public sealed class GuardianViewModelsTests
     }
 
     [Fact]
-    public void AddChildForm_Is_Form_Model_With_Three_Required_Fields()
+    public void AddChildForm_Is_Form_Model_With_Four_Fields()
     {
         var fields = typeof(AddChildForm)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -80,8 +80,10 @@ public sealed class GuardianViewModelsTests
             .ToList();
 
         // The U07 pin: DisplayName + Email + Password — the three form-bound
-        // fields. The guardian is *never* a form-bound field (minted from the
-        // signed-in principal); the three carry [Required] (see the VM doc-comments).
-        Assert.Equal(new[] { "DisplayName", "Email", "Password" }, fields.ToArray());
+        // fields, plus the guardian consent checkbox (GuardianConsent — the
+        // guardian's confirmation of the child-account terms before creation).
+        // The guardian is *never* a form-bound field (minted from the signed-in
+        // principal); all four carry [Required] (see the VM doc-comments).
+        Assert.Equal(new[] { "DisplayName", "Email", "GuardianConsent", "Password" }, fields.ToArray());
     }
 }

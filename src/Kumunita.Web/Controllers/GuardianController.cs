@@ -344,6 +344,16 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             return View(form);
         }
 
+        // The guardian consent checkbox: [Required] can't reject a non-nullable
+        // bool of false, so the guard is explicit — creation is refused until
+        // the guardian confirms the child-account terms.
+        if (!form.GuardianConsent)
+        {
+            ModelState.AddModelError(nameof(AddChildForm.GuardianConsent),
+                "You must consent to the child-account terms before adding the account.");
+            return View(form);
+        }
+
         try
         {
             // (1) the usual M1 signup — unverified account + profile + the

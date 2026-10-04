@@ -91,6 +91,26 @@
                 <input id="Password" name="Password" type="password" class="form-control" minlength="8" required />
             </div>
 
+            @*
+                Guardian consent — before creation, the guardian confirms they
+                are the legal guardian and agrees to the child-account terms
+                (guardian duties + data-processing terms). The checkbox is the
+                [Required] field on AddChildForm.GuardianConsent; the controller
+                refuses creation until it is checked.
+            *@
+            <div class="mb-3 border rounded p-3 bg-body-tertiary">
+                <p class="mb-2"><kw-l key="guardian.consent.intro">By creating this profile, you confirm that you are the legal guardian of this child. As their guardian, you maintain full control over their account:</kw-l></p>
+                <ul class="list-unstyled mb-2">
+                    <li><kw-l key="guardian.consent.duties_invitations">You must approve or deny all group and event invitations.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_chat">You can enable or disable chat features for this profile at any time.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_data">This data is fully isolated, hosted securely in the Switzerland/EU region, and will never be sold, profiled, or used for advertising.</kw-l></li>
+                </ul>
+                <div class="form-check">
+                    <input id="GuardianConsent" name="GuardianConsent" type="checkbox" value="true" class="form-check-input" required />
+                    <label class="form-check-label" for="GuardianConsent"><kw-l key="guardian.consent.checkbox">I consent to the processing of my child's data under these terms.</kw-l></label>
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>
             <div class="form-text mt-1"><kw-l key="guardian.child_email_hint">The child verifies their own email to sign in — the usual sign-up flow.</kw-l></div>
         </form>
