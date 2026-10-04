@@ -79,6 +79,35 @@
         "history",
         "photography"
       ]
+    },
+    {
+      "email": "mila.kubiak@examplium.com",
+      "name": "Mila Kubiak",
+      "bio": "My mum Carla keeps my account going. I mostly come along to the **garden** on the green and the Saturday tidy-ups.",
+      "tagSlugs": [
+        "gardening"
+      ]
+    },
+    {
+      "email": "luka.lis@examplium.com",
+      "name": "Luka Lis",
+      "bio": "My dad David runs my account. I like the **book club** and riding my bike around the river bend — that's where the good **photography** happens.",
+      "tagSlugs": [
+        "cycling",
+        "photography"
+      ]
+    }
+  ],
+  "guardianLinks": [
+    {
+      "guardianEmail": "carla@examplium.com",
+      "childEmail": "mila.kubiak@examplium.com",
+      "daysAgo": 20
+    },
+    {
+      "guardianEmail": "david@examplium.com",
+      "childEmail": "luka.lis@examplium.com",
+      "daysAgo": 18
     }
   ],
   "moderatorAssignments": [

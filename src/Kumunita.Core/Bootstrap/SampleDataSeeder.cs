@@ -818,6 +818,40 @@ public static class SampleDataSeeder
             }
         }
 
+        // ── Guardian links (ADR 0028 §B) — a guardian account supervising a child ────
+        // One `Active` row per (guardian, child) pair + its `guardian.create` audit (the
+        // CreateGuardianLinkAsync formation shape, G·4): the guardian acts under their own
+        // standing, targeting the link row. Store the domain + audit in this SAME session
+        // (invariant C3 — the row commits atomically with the corpus). A created-but-unlinked
+        // account can never exist. Cross-references resolve by e-mail (the stable key).
+        foreach (var link in doc.GuardianLinks)
+        {
+            var guardianId = usersByEmail[link.GuardianEmail].Id;
+            var childId = usersByEmail[link.ChildEmail].Id;
+            var linkId = Id();
+            var linkCreatedAt = now.AddDays(-link.DaysAgo);
+            session.Store(new GuardianLink
+            {
+                Id = linkId,
+                GuardianId = guardianId,
+                ChildId = childId,
+                Status = GuardianLinkStatus.Active,
+                CreatedAt = linkCreatedAt
+            });
+            session.Store(new Authorization.AccessAudit
+            {
+                Id = Id(),
+                At = linkCreatedAt,
+                ActorId = guardianId,
+                EffectivePrincipalId = guardianId,
+                Action = "guardian.create",
+                TargetKind = "guardian-link",
+                TargetId = linkId,
+                Via = Authorization.AccessVia.Guardian,
+                Outcome = Authorization.AccessOutcome.Allow
+            });
+        }
+
         await session.SaveChangesAsync();
 
         // Deploy posture (ADR 0056): hand the demo credentials to the instance's admin
@@ -1083,6 +1117,7 @@ public static class SampleDataSeeder
         var existingBoardTrans = await session.Query<BoardTranslation>().ToListAsync(ct);
         var existingInventory = await session.Query<InventoryItem>().ToListAsync(ct);
         var existingCheckouts = await session.Query<InventoryCheckout>().ToListAsync(ct);
+        var existingGuardianLinks = await session.Query<GuardianLink>().ToListAsync(ct);
 
         // ── Tags (by slug) + per-language display names ────────────────────────────────
         var tagsBySlug = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -1827,6 +1862,44 @@ public static class SampleDataSeeder
                 Created = now.AddDays(-(community.DaysAgo ?? 0)),
             });
             haveCommTrans.Add(key);
+        }
+
+        // ── Guardian links (ADR 0028 §B) — create-if-missing by (GuardianId, ChildId) ─
+        // A row for a pair already present (any status) is a no-op (the
+        // CreateGuardianLinkAsync idempotent-formation precedent). The `guardian.create`
+        // audit rides the same session (C3).
+        var haveGuardianLinks = existingGuardianLinks
+            .Select(l => (l.GuardianId, l.ChildId))
+            .ToHashSet();
+        foreach (var link in doc.GuardianLinks)
+        {
+            var guardianId = usersByEmail[link.GuardianEmail].Id;
+            var childId = usersByEmail[link.ChildEmail].Id;
+            var key = (guardianId, childId);
+            if (haveGuardianLinks.Contains(key)) continue;
+            var linkId = Id();
+            var linkCreatedAt = now.AddDays(-link.DaysAgo);
+            session.Store(new GuardianLink
+            {
+                Id = linkId,
+                GuardianId = guardianId,
+                ChildId = childId,
+                Status = GuardianLinkStatus.Active,
+                CreatedAt = linkCreatedAt
+            });
+            session.Store(new Authorization.AccessAudit
+            {
+                Id = Id(),
+                At = linkCreatedAt,
+                ActorId = guardianId,
+                EffectivePrincipalId = guardianId,
+                Action = "guardian.create",
+                TargetKind = "guardian-link",
+                TargetId = linkId,
+                Via = Authorization.AccessVia.Guardian,
+                Outcome = Authorization.AccessOutcome.Allow
+            });
+            haveGuardianLinks.Add(key);
         }
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);

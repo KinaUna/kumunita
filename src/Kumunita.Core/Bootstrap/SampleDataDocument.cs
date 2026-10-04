@@ -35,6 +35,14 @@ internal sealed class SampleDataDocument
 
     public IReadOnlyList<SampleAccount> Accounts { get; set; } = [];
     public IReadOnlyList<SampleModeratorAssignment> ModeratorAssignments { get; set; } = [];
+
+    /// <summary>The <c>GuardianLink</c> rows (ADR 0028 §B / ADR 0038) — a guardian account
+    /// supervising a child account (one or two guardians per child). Each row keys its two
+    /// accounts by <c>e-mail</c> (<see cref="SampleGuardianLink.GuardianEmail"/> /
+    /// <see cref="SampleGuardianLink.ChildEmail"/>), resolved to the <c>SubjectId</c>s at
+    /// seed time; the seeder stores the <c>Active</c> row (a created-but-unlinked account can
+    /// never exist — the <c>AddChild</c> formation-lane guarantee, G·4).</summary>
+    public IReadOnlyList<SampleGuardianLink> GuardianLinks { get; set; } = [];
     public IReadOnlyList<SampleGroup> Groups { get; set; } = [];
     public IReadOnlyList<SampleTag> Tags { get; set; } = [];
     public IReadOnlyList<SampleAnnouncement> Announcements { get; set; } = [];
@@ -135,6 +143,19 @@ internal sealed class SampleModeratorAssignment
     /// <summary>The grantor (defaults to the instance's admin when omitted — every seeded
     /// scope is admin-granted).</summary>
     public string? GrantedByEmail { get; set; }
+}
+
+/// <summary>A <c>GuardianLink</c> (ADR 0028 §B): <see cref="GuardianEmail"/> is the
+/// guardian (the account that supervises) and <see cref="ChildEmail"/> the child account it
+/// manages. Both are resolved to <c>SubjectId</c>s at seed time; the seeder stores the
+/// <c>Active</c> row + its <c>guardian.create</c> audit (the <c>CreateGuardianLinkAsync</c>
+/// formation shape, G·4). <see cref="DaysAgo"/> offsets <see cref="Kumunita.Core.UserInfo.GuardianLink.CreatedAt"/>
+/// back from seed time (the established "recent" convention).</summary>
+internal sealed class SampleGuardianLink
+{
+    public string GuardianEmail { get; set; } = string.Empty;
+    public string ChildEmail { get; set; } = string.Empty;
+    public int DaysAgo { get; set; }
 }
 
 /// <summary>A <c>Group</c> + its memberships + its name/description translations (ADR 0026).
