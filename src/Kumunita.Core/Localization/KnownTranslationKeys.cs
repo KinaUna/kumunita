@@ -797,8 +797,9 @@ public static class KnownTranslationKeys
                 "Whatever you choose here is exactly what the neighbor directory " +
                 "shows — no surprises.",
             ["profile.avatar_heading"] = "Your avatar",
+            ["upload.max_size"] = "Maximum file size: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the " +
+                "JPEG, PNG, WebP or GIF. Saving replaces the " +
                 "avatar currently shown in the directory.",
             ["profile.name_email_heading"] = "Your name + email",
             ["profile.address_heading"] = "Your address + phone (optional)",
@@ -2628,8 +2629,9 @@ public static class KnownTranslationKeys
                 "Was du hier wählst, zeigt das Nachbarnverzeichnis " +
                 "genau so — ohne Überraschungen.",
             ["profile.avatar_heading"] = "Dein Avatar",
+            ["upload.max_size"] = "Maximale Dateigröße: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP oder GIF · bis zu 5 MB. Speichern ersetzt den " +
+                "JPEG, PNG, WebP oder GIF. Speichern ersetzt den " +
                 "aktuell im Verzeichnis gezeigten Avatar.",
             ["profile.name_email_heading"] = "Dein Name + E-Mail",
             ["profile.address_heading"] = "Deine Adresse + Telefon (optional)",
@@ -4383,8 +4385,9 @@ public static class KnownTranslationKeys
                 "Ce que tu choisis ici est exactement ce que l'annuaire des voisins " +
                 "affiche — aucune surprise.",
             ["profile.avatar_heading"] = "Ton avatar",
+            ["upload.max_size"] = "Taille maximale du fichier : {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP ou GIF · jusqu'à 5 Mo. Enregistrer remplace " +
+                "JPEG, PNG, WebP ou GIF. Enregistrer remplace " +
                 "l'avatar actuellement affiché dans l'annuaire.",
             ["profile.name_email_heading"] = "Ton nom + e-mail",
             ["profile.address_heading"] = "Ton adresse + téléphone (optionnel)",
@@ -6137,8 +6140,9 @@ public static class KnownTranslationKeys
                 "Det, du vælger her, er præcis det, kontaktlisten " +
                 "viser — ingen overraskelser.",
             ["profile.avatar_heading"] = "Din avatar",
+            ["upload.max_size"] = "Maksimal filstørrelse: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP eller GIF · op til 5 MB. Gemning erstatter " +
+                "JPEG, PNG, WebP eller GIF. Gemning erstatter " +
                 "avatar'en, der aktuelt vises i kontaktlisten.",
             ["profile.name_email_heading"] = "Dit navn + e-mail",
             ["profile.address_heading"] = "Din adresse + telefon (valgfrit)",

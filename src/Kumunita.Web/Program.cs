@@ -248,6 +248,8 @@ builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
         sp.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>(),
         sp.GetRequiredService<Kumunita.Core.Usage.IStorageMetricsService>()));
 
+builder.Services.AddScoped<Kumunita.Web.Security.IUploadLimitHint, Kumunita.Web.Security.UploadLimitHint>();
+
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
 // a config POCO bound per-instance, not improvised). AddOptions<T>() here the

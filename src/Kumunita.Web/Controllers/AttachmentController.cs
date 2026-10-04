@@ -38,6 +38,15 @@ public sealed class AttachmentController(
     Marten.IDocumentStore store) : Controller
 {
     /// <summary>
+    /// <c>GET /upload-limit</c> — the localized per-file limit hint for the
+    /// client-built upload modals (<c>text</c> is <c>null</c> when unlimited).
+    /// </summary>
+    [HttpGet("/upload-limit")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> UploadLimit([FromServices] IUploadLimitHint hint)
+        => Json(new { text = await hint.GetTextAsync() });
+
+    /// <summary>
     /// <c>POST /attachment</c> — the file-attachment upload lane (C-ATT·6 —
     /// ADR 0011's boundary, **verbatim**: the **attachment** allowlist
     /// <c>application/pdf|…|image/gif</c> (SVG excluded, raster included), the

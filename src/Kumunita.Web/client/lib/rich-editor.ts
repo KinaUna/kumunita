@@ -487,6 +487,7 @@ type RcmField = {
   value?: string;
   placeholder?: string;
   required?: boolean;
+  hint?: string;
 };
 type RcmOpts = {
   title: string;
@@ -624,6 +625,16 @@ function rcmAnyFilled(fields: RcmField[]): boolean {
   });
 }
 
+/** The localized per-file limit text (admin setting), or undefined when unlimited / unavailable. */
+async function fetchUploadLimitHint(): Promise<string | undefined> {
+  try {
+    const { text } = await apiFetch<{ text: string | null }>('/upload-limit');
+    return text ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rcmFieldGroup(f: RcmField): HTMLElement {
   const group = document.createElement('div');
   group.className = 'mb-3';
@@ -644,6 +655,13 @@ function rcmFieldGroup(f: RcmField): HTMLElement {
     if (f.placeholder) input.placeholder = f.placeholder;
   }
   group.appendChild(input);
+
+  if (f.hint) {
+    const hint = document.createElement('div');
+    hint.className = 'form-text small';
+    hint.textContent = f.hint;
+    group.appendChild(hint);
+  }
 
   const fb = document.createElement('div');
   fb.className = 'invalid-feedback';
@@ -1373,7 +1391,7 @@ export function bindRichEditor(root: HTMLElement): void {
       e.preventDefault();
     });
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       if (kind === 'bold' || kind === 'italic' || kind === 'code') {
         // Bold / italic / code is a toggle: unwrap if the caret/selection is
         // already inside the kind's element, otherwise wrap (or, for a
@@ -1520,10 +1538,11 @@ export function bindRichEditor(root: HTMLElement): void {
         // image (C-ATT·2). A rejected type 415s and the error is shown in
         // the modal (C-ATT·6); the label defaults to "Attachment".
         rcmSaveRange();
+        const limitHint = await fetchUploadLimitHint();
         rcmPresent({
           title: 'Attach file',
           fields: [
-            { id: 'rcm-file', label: 'File', type: 'file', required: true },
+            { id: 'rcm-file', label: 'File', type: 'file', required: true, hint: limitHint },
             {
               id: 'rcm-attach-label',
               label: 'Link text',
