@@ -20,6 +20,11 @@ read seams follow), **0101** (the admin-toggle + in-transaction audit-row
 shape the toggle seam mirrors — with the **floor inverted**: a missing
 `LocaleSettings` row reads as **off**, not on).
 
+Amended by **0139** (the per-resident half of the messaging gate — the
+resident's own opt-in + the guardian's ceiling over a supervised child —
+composed on top of this ADR's instance-level master gate, which 0139
+preserves as the authoritative on/off switch for the whole platform).
+
 ## Context
 
 The platform has public and group-scoped conversation surfaces (posts,

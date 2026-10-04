@@ -170,8 +170,18 @@
                    when signed in AND the instance toggle is on (the F5 pin — a read of
                    the toggle, never of data; the /messages controller repeats the gate
                    first in every action). One <li> in the existing dropdown — no
-                   navbar reflow. *@
-                @if (await Messaging.IsMessagingEnabledAsync())
+                   navbar reflow.
+                   M9 amendment — the per-actor gate: on top of the instance master
+                   gate, the link renders only when *this* resident is messaging-
+                   allowed (their own opt-in on AND no guardian restriction — the
+                   composite IsMessagingAllowedForAsync read, the C-M9·2 "enforced
+                   in the service, not only the view" pin carried to the nav).
+                   A resident who is opted out / restricted sees no Messages entry
+                   (the same non-leaky shape as an off instance: the surface is
+                   simply absent, no explanation). *@
+                @if (await Messaging.IsMessagingEnabledAsync()
+                     && navAvatarSubject is not null
+                     && await Messaging.IsMessagingAllowedForAsync(navAvatarSubject))
                 {
                     <li class="nav-item">
                         <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>

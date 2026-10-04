@@ -1,0 +1,68 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Controllers.MessagingSettingsController.MessagingSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Messaging";
+}
+
+@* M9 amendment (per-resident messaging control) — the /settings/messaging
+   section. Mirrors the ADR 0080 settings-tab shape: the sub-nav strip, the
+   page heading, the section heading + lede, a single checkbox save form,
+   and (when the instance master gate is off) a notice that the instance is
+   not currently accepting messages. Every user-visible string is a kw-l key
+   (the ADR 0015 / KwLRegistryConsistencyTests pin). No data-confirm — the
+   toggle is reversible, the ADR 0015 "destructive only" shape. *@
+@await Html.PartialAsync("../Locale/_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+
+<h2 class="mt-1"><kw-l key="settings.messaging.title">Messaging</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="settings.messaging.description">Choose whether you can use direct 1:1 messaging with other residents. Your choice is saved on your account and takes effect immediately.</kw-l>
+</p>
+
+@* The instance master-gate notice — the per-user opt-in is meaningful even
+   when the instance is off (a resident can opt in in advance), so the page
+   is always reachable; this notice just tells them the instance is not
+   currently accepting messages (the C-M9·2 "enforced in the service" pin
+   is the source of truth, this is the presentation). *@
+@if (!Model.InstanceEnabled)
+{
+    <div class="alert alert-info">
+        <kw-l key="settings.messaging.instance_off">Messaging is currently turned off on this instance by an administrator. You can opt in now and messaging will be available to you as soon as it is turned on.</kw-l>
+    </div>
+}
+
+@* The guardian's ceiling — when a guardian has forced messaging OFF for
+   this account, the checkbox is rendered disabled and a notice explains why
+   (the ADR 0028 G·2/G·3 guardian-standing shape, the Suspend/Blocked
+   precedent; the POST is refused at the Web boundary, the ceiling is the
+   source of truth). *@
+@if (Model.Restricted)
+{
+    <div class="alert alert-warning">
+        <kw-l key="settings.messaging.restricted">Messaging has been restricted on your account by a guardian. Contact them to change this.</kw-l>
+    </div>
+}
+
+<form method="post" action="/settings/messaging">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" role="switch" id="messagingOptIn"
+                       name="optIn" value="true"
+                       @(Model.OptIn ? "checked" : null)
+                       @(Model.Restricted ? "disabled" : null) />
+                <label class="form-check-label" for="messagingOptIn">
+                    <kw-l key="settings.messaging.optin">Allow me to use direct 1:1 messaging</kw-l>
+                </label>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"
+                    @(Model.Restricted ? "disabled" : null)>
+                <kw-l key="settings.messaging.save">Save messaging preference</kw-l>
+            </button>
+        </div>
+    </div>
+</form>

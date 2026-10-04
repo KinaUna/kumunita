@@ -112,6 +112,83 @@
         }
 
         @*
+            M9 amendment — the guardian's messaging-restriction ceiling over
+            the supervised child (the ADR 0028 G·2/G·3 guardian-standing
+            shape, the Suspend/Unsuspend idiom verbatim): a single checkbox
+            toggle. true = force messaging OFF for the child (a hard ceiling
+            that wins over the child's own opt-in); false = allow messaging,
+            deferring to the child's own opt-in. The standing gate + the
+            audit row are minted in the Core seam (the
+            SetChildMessagingRestrictionAsync lane), not here — the Web
+            layer resolves the actor (the ActiveLinkAsync check) and
+            passes it through. The flag + the child's own opt-in state are
+            exposed on ViewData (the MembershipEditorModel is a pinned
+            5-field record — the U07 pin forbids adding a field; the repo's
+            _AudienceEditor / SeedGrantPickerOptionsAsync precedent for
+            non-model view data).
+        *@
+        @{
+            var _messagingRestricted = (bool)(ViewData["MessagingRestricted"] ?? false);
+            var _childOptIn = (bool)(ViewData["ChildMessagingOptIn"] ?? false);
+        }
+        <h2 class="mt-4"><kw-l key="guardian.messaging.title">Messaging</kw-l></h2>
+        <p class="text-muted">
+            <kw-l key="guardian.messaging.description">Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.</kw-l>
+        </p>
+
+        @* The current state — the child's MessagingRestricted flag (the
+           guardian's ceiling) plus, as context, the child's own opt-in
+           state (a read; the messaging gate composes all three: instance
+           master gate + child's own opt-in + this ceiling). *@
+        <div class="alert @(_messagingRestricted ? "alert-warning" : "alert-success") mb-2">
+            @if (_messagingRestricted)
+            {
+                <kw-l key="guardian.messaging.current_restricted">Messaging is currently restricted for this child.</kw-l>
+            }
+            else
+            {
+                <kw-l key="guardian.messaging.current_allowed">Messaging is currently allowed for this child.</kw-l>
+            }
+            @if (_childOptIn)
+            {
+                <span class="d-block small mt-1"><kw-l key="guardian.messaging.child_optin_on">The child has opted in to messaging on their own account.</kw-l></span>
+            }
+            else
+            {
+                <span class="d-block small mt-1"><kw-l key="guardian.messaging.child_optin_off">The child has not opted in to messaging on their own account — even if you allow it, they will need to opt in on their own settings page.</kw-l></span>
+            }
+        </div>
+
+        @* The toggle — two POSTs (the ADR 0028 Suspend/Unsuspend idiom
+           verbatim: two buttons, two routes, two data-confirms; the
+           server gate is the SetChildMessaging action's ActiveLinkAsync
+           standing check + the Core seam's audit row). *@
+        <div class="d-flex gap-2">
+            @if (_messagingRestricted)
+            {
+                <form method="post" action="@Url.Action("SetChildMessaging", "Guardian", new { childId = Model.ChildId })"
+                      data-confirm="Allow messaging for this child? They will be able to send and receive direct messages (their own opt-in must also be on).">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="restricted" value="false" />
+                    <button type="submit" class="btn btn-outline-primary">
+                        <kw-l key="guardian.messaging.allow">Allow messaging</kw-l>
+                    </button>
+                </form>
+            }
+            else
+            {
+                <form method="post" action="@Url.Action("SetChildMessaging", "Guardian", new { childId = Model.ChildId })"
+                      data-confirm="Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="restricted" value="true" />
+                    <button type="submit" class="btn btn-outline-danger">
+                        <kw-l key="guardian.messaging.restrict">Restrict messaging</kw-l>
+                    </button>
+                </form>
+            }
+        </div>
+
+        @*
             GU (independence lane) — dissolve the link. The child's
             memberships are preserved; their self-serve lanes restore on the
             next read (G·2/C4). The destructive POST is confirm-guarded

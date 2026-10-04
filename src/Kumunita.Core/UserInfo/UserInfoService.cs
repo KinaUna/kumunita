@@ -1860,6 +1860,79 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetMessagingOptInAsync(string subjectId, bool optIn, string actorBy)
+    {
+        // M9 amendment — the resident's own messaging opt-in write lane.
+        // Mirrors CompleteOnboardingAsync exactly (the C-MED·8 single
+        // write-lane shape): the self-scope check happens at the Web boundary
+        // (the owner is the actor); this lane writes
+        // Profile.MessagingOptIn only. One session, one SaveChangesAsync
+        // (C3); no audit row (a Profile field write — the UpsertProfileAsync
+        // shape, "not an access decision"). Fail closed on a missing profile
+        // (never load-or-create, the CompleteOnboardingAsync pin). Strong
+        // consistency (C4): the value is live on the very next
+        // GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.MessagingOptIn = optIn;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetChildMessagingRestrictionAsync(string childId, bool restricted, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // M9 amendment — the guardian's messaging restriction over a
+        // supervised child. Mirrors SuspendChildAsync exactly (the guardian
+        // write-lane shape): standing gate first (G·2/G·3), then the flag
+        // write, then one audit row — all in one session / one
+        // SaveChangesAsync (C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // Load the child's profile (missing → bad state, not a no-op — the
+        // SuspendChildAsync pin).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Flip the ceiling flag (enforcement parity — the
+        // MessagingService per-actor gate reads this exact field).
+        profile.MessagingRestricted = restricted;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.messaging_restrict",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,

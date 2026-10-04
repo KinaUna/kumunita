@@ -107,6 +107,14 @@ public sealed class MessagesController(
         if (!await _messaging.IsMessagingEnabledAsync())
             return View(new MessagesIndexViewModel { Disabled = true });
 
+        // M9 amendment — the per-actor gate: the actor's own opt-in must be
+        // on AND the guardian's ceiling (if any) must not be forcing it off.
+        // Disallowed → the same disabled render (no list call, no picker —
+        // the resident is told "messaging is off" the same way an off
+        // instance is; the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
+            return View(new MessagesIndexViewModel { Disabled = true });
+
         var pageNum = page is > 0 ? page.Value : 1;
         var list = await _messaging.ListConversationsAsync(actorId, pageNum);
 
@@ -151,6 +159,11 @@ public sealed class MessagesController(
         if (!await _messaging.IsMessagingEnabledAsync())
             return View("Index", new MessagesIndexViewModel { Disabled = true });
 
+        // M9 amendment — the per-actor gate: disallowed → the disabled render
+        // (the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
+            return View("Index", new MessagesIndexViewModel { Disabled = true });
+
         try
         {
             var conversation = await _messaging.OpenConversationAsync(actorId, otherId ?? string.Empty);
@@ -192,6 +205,12 @@ public sealed class MessagesController(
 
         // F5 — the toggle read is first; off → 404 (no thread data read).
         if (!await _messaging.IsMessagingEnabledAsync())
+            return NotFound();
+
+        // M9 amendment — the per-actor gate: disallowed → 404 (no thread
+        // data read; the non-leaky shape — the same as a missing id, the
+        // C-M9·1 pin: the reason is not surfaced).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
             return NotFound();
 
         var pageNum = page is > 0 ? page.Value : 1;
@@ -278,6 +297,17 @@ public sealed class MessagesController(
 
         // F5 — the toggle read is first; off → error render, no send read.
         if (!await _messaging.IsMessagingEnabledAsync())
+            return View("Thread", new MessagesThreadViewModel
+            {
+                Conversation = null,
+                Messages = Array.Empty<Message>(),
+                Error = true,
+                Disabled = true,
+            });
+
+        // M9 amendment — the per-actor gate: disallowed → the disabled
+        // error render (the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
             return View("Thread", new MessagesThreadViewModel
             {
                 Conversation = null,

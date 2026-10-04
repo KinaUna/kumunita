@@ -266,6 +266,57 @@ public interface IUserInfoService
     /// </summary>
     Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId);
 
+    // ── M9 amendment additions (per-resident + guardian messaging controls;
+    // the ADR 0006-E compatible-addition idiom this file uses, mirroring the
+    // Onboarding lanes above and the GU guardian lanes below) ──────────────
+
+    /// <summary>
+    /// M9 amendment — the resident's own <b>messaging opt-in</b> write lane
+    /// (the <see cref="SetProfileTimezoneAsync"/> / <see
+    /// cref="CompleteOnboardingAsync"/> owner-scope single-write shape
+    /// verbatim): flips <see cref="Profile.MessagingOptIn"/> to
+    /// <paramref name="optIn"/>. One <c>SaveChangesAsync</c>; **no**
+    /// <see cref="Authorization.AccessAudit"/> row (a profile-field write — the
+    /// <see cref="UpsertProfileAsync"/> shape, "not an access decision"; the
+    /// self-scope check happens at the Web boundary, the owner is the actor).
+    /// Strong consistency (invariant C4): the value is live on the very next
+    /// <see cref="GetProfileAsync"/> call. Written by the profile editor's
+    /// "Allow me to message / messaging" toggle; read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// as the resident's own half of the decision (the instance toggle is the
+    /// master gate; a guardian's restriction is the ceiling).
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">No
+    /// profile with that <c>subjectId</c> exists (fail closed — the lane never
+    /// load-or-creates, the <see cref="CompleteOnboardingAsync"/> pin).</exception>
+    Task SetMessagingOptInAsync(string subjectId, bool optIn, string actorBy);
+
+    /// <summary>
+    /// M9 amendment — the <b>guardian's messaging restriction</b> over a
+    /// supervised child (the <see cref="SuspendChildAsync"/> / <see
+    /// cref="UnsuspendChildAsync"/> guardian-scope shape verbatim): flips
+    /// <see cref="Profile.MessagingRestricted"/> to
+    /// <paramref name="restricted"/>. <c>true</c> = force messaging OFF for the
+    /// child (a hard ceiling that wins over the child's own opt-in);
+    /// <c>false</c> = allow messaging, deferring to the child's own opt-in.
+    /// One <c>SaveChangesAsync</c>. The standing gate is an <b>active</b>
+    /// <see cref="GuardianLink"/> for the exact (guardian, child) pair (G·2/G·3
+    /// deny-by-default); the audit row is <c>guardian.messaging_restrict</c>,
+    /// <c>TargetKind</c> "profile", <see cref="Authorization.AccessVia
+    /// .Guardian"/> (the <c>guardian.suspend</c> / <c>guardian.unsuspend</c>
+    /// shape). Written by the child curation view's messaging switch; read by
+    /// the <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor
+    /// gate as the veto over <see cref="Profile.MessagingOptIn"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No profile for the child
+    /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
+    Task SetChildMessagingRestrictionAsync(string childId, bool restricted, string guardianId);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

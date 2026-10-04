@@ -75,6 +75,33 @@ public sealed class MessagingService : IMessagingService
         return settings?.MessagingEnabled == true;
     }
 
+    /// <inheritdoc />
+    public async Task<bool> IsMessagingAllowedForAsync(string actorId)
+    {
+        // M9 amendment — the per-actor half of the gate. The instance toggle
+        // (IsMessagingEnabledAsync) is the master gate; this reads the actor's
+        // own Profile (MessagingOptIn must be true, MessagingRestricted must
+        // be false). A missing profile or a harness without the directory seam
+        // reads as not-allowed (fail closed — the floor is "no messaging", the
+        // same ADR 0105 opt-in default-<c>false</c> convention).
+        if (string.IsNullOrWhiteSpace(actorId))
+            return false;
+
+        if (!await IsMessagingEnabledAsync().ConfigureAwait(false))
+            return false;   // the instance master gate — off ⇒ no one
+
+        if (_userInfo is null)
+            return false;   // no directory seam ⇒ cannot verify the opt-in ⇒ fail closed
+
+        var profile = await _userInfo.GetProfileAsync(actorId).ConfigureAwait(false);
+        if (profile is null)
+            return false;   // fail closed — the opt-in floor is "off"
+
+        // The resident's own opt-in must be on, AND the guardian's ceiling
+        // (for a supervised child) must not be forcing it off.
+        return profile.MessagingOptIn && !profile.MessagingRestricted;
+    }
+
     public async Task SetMessagingEnabledAsync(bool enabled, string actorId)
     {
         if (string.IsNullOrEmpty(actorId))
@@ -120,6 +147,14 @@ public sealed class MessagingService : IMessagingService
         if (actorId == otherId)
             throw new ArgumentException("A conversation is between two distinct residents (D1 — no self-conversations).", nameof(otherId));
 
+        // The per-actor gate (M9 amendment) — the actor must be messaging-
+        // allowed (instance on + own opt-in + no guardian veto). Enforced at
+        // the Web boundary (the MessagesController, the app's real request
+        // surface — the IMessagingService is an internal composition seam,
+        // not an exposed endpoint) via the IsMessagingAllowedForAsync read,
+        // mirroring how the instance toggle is surfaced in the nav +
+        // controller. The instance-toggle throw below stays as the
+        // defense-in-depth backstop (C-M9·2).
         await EnsureEnabledAsync().ConfigureAwait(false);
 
         // The pair is stored **sorted** (ParticipantA < ParticipantB) so the

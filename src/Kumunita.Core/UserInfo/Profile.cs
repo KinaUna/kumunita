@@ -200,6 +200,53 @@ public sealed class Profile
     /// idempotent, no re-seed, no EF migration, no new <c>*DocTypes</c> surface.
     /// </summary>
     public DateTimeOffset? OnboardingCompletedAt { get; set; }
+
+    // M9-amendment (per-resident messaging opt-in; ADR 0004 §B.1 additive — the
+    // 12th additive Profile field after AvatarId, TimeZone, DateFormat,
+    // EmailLanguage, Bio, TagIds, OnboardingCompletedAt):
+    /// <summary>
+    /// The resident's own <b>messaging opt-in</b> (M9 amendment on top of ADR
+    /// 0105 — the per-user control the instance-level
+    /// <see cref="Localization.LocaleSettings.MessagingEnabled"/> toggle
+    /// gates over). <c>true</c> = this resident participates in 1:1 direct
+    /// messaging (may open/send); <c>false</c> = the resident has opted out
+    /// (cannot open a conversation or send a message; the Messages surface is
+    /// hidden for them). Read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// alongside the instance toggle (the master gate) and, for a supervised
+    /// child, the guardian's restriction ceiling (the guardian lane reads this
+    /// child's active <see cref="GuardianLink"/> set to decide the ceiling; a
+    /// restriction always wins over the child's own choice). An *additive*
+    /// field (ADR 0004 §B.1), like <see cref="OnboardingCompletedAt"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration, no new
+    /// <c>*DocTypes</c> surface. Defaults to <c>false</c> (the ADR 0105
+    /// opt-in convention — a privacy-sensitive capability is off until the
+    /// resident chooses it on).
+    /// </summary>
+    public bool MessagingOptIn { get; set; } = false;
+
+    /// <summary>
+    /// The <b>guardian's messaging restriction</b> over a supervised child
+    /// (M9 amendment — the parent/guardian control). A <b>ceiling</b> (the
+    /// normal parental-restriction model): <c>true</c> = a guardian has
+    /// <b>forced messaging OFF</b> for this child, and it stays OFF no matter
+    /// what the child's own <see cref="MessagingOptIn"/> says; <c>false</c> =
+    /// the guardian has <b>allowed</b> messaging, deferring the decision to
+    /// the child's own opt-in. Read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// as a hard veto over <see cref="MessagingOptIn"/> (the restriction always
+    /// wins; the allowance merely lifts the veto). Written only by the
+    /// <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/> lane
+    /// (a guardian with an active <see cref="GuardianLink"/> — the
+    /// <see cref="IUserInfoService.SuspendChildAsync"/> / <see
+    /// cref="Profile.Blocked"/> precedent: a guardian action that writes a
+    /// single flag on the profile, one active-link standing gate). For an
+    /// unsupervised resident this stays <c>false</c> (no guardian to set it),
+    /// so the gate reduces to the resident's own opt-in. An *additive* field
+    /// (ADR 0004 §B.1), like <see cref="Blocked"/>: delta-detected, idempotent,
+    /// no re-seed, no EF migration.
+    /// </summary>
+    public bool MessagingRestricted { get; set; } = false;
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

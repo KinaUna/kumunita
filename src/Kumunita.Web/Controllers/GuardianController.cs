@@ -106,12 +106,77 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         var guardianItems = await ActiveGuardiansAsync(childId);
 
+        // M9 amendment — the guardian's messaging-restriction ceiling
+        // (the child's Profile.MessagingRestricted flag, read through the
+        // existing GetProfileAsync; null-safe — a missing profile degrades
+        // to "not restricted", the floor). Exposed on ViewData (the
+        // MembershipEditorModel is a pinned 5-field record — the U07
+        // GuardianViewModelsTests.MembershipEditorModel_Is_Exact_Five_Field_Projection
+        // pin forbids adding a field; the repo's _AudienceEditor /
+        // SeedGrantPickerOptionsAsync precedent for non-model view data).
+        var childProfile = await userInfo.GetProfileAsync(childId);
+        ViewData["MessagingRestricted"] = childProfile?.MessagingRestricted ?? false;
+        ViewData["ChildMessagingOptIn"] = childProfile?.MessagingOptIn ?? false;
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
             communityIds.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList(),
             invitations,
             guardianItems));
+    }
+
+    /// <summary>
+    /// <b>Restrict / allow messaging</b> over a supervised child (POST
+    /// <c>me/children/{childId}/messaging</c>) — the M9 amendment
+    /// guardian-side control (the ADR 0028 G·2/G·3 guardian-standing shape,
+    /// the <see cref="Suspend"/> / <see cref="Unsuspend"/> idiom
+    /// verbatim): writes <c>Profile.MessagingRestricted</c> through the
+    /// frozen <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/>
+    /// seam. <c>true</c> = force messaging OFF for the child (a hard
+    /// ceiling that wins over the child's own opt-in); <c>false</c> = allow
+    /// messaging, deferring to the child's own opt-in.
+    /// <para>
+    /// <b>Standing gate:</b> the actor must hold an <b>active</b>
+    /// <see cref="GuardianLink"/> over this child (the same
+    /// <see cref="ActiveLinkAsync"/> standing the <see cref="Detail"/>
+    /// GET / <see cref="Suspend"/> POST already use). A non-guardian (or a
+    /// dissolved link) is a <c>404</c> — the ADR 0028 deny-by-default
+    /// shape. A missing profile is a user-presentable
+    /// <c>TempData["error"]</c>, never a 500.
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/messaging")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetChildMessaging(string childId, bool restricted)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        // Standing gate first (the Detail GET's ActiveLinkAsync check — a
+        // non-guardian / dissolved link is a 404, the ADR 0028 shape).
+        var link = await ActiveLinkAsync(subject, childId);
+        if (link is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.SetChildMessagingRestrictionAsync(childId, restricted, subject);
+            TempData["info"] = restricted
+                ? "Messaging restricted for this child account."
+                : "Messaging allowed for this child account.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
     }
 
     /// <summary>Suspend a child (sets <c>Profile.Blocked</c>; the existing
