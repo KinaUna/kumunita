@@ -220,7 +220,7 @@ public sealed class DocumentController(
             var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
             var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
             var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
-            var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes);
+            var reject = await uploadGate.CheckUpload(form.File.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
             if (reject is not null) return reject;
 
             if (!mediaOpts.Value.IsDocumentAllowed(form.File.ContentType))
@@ -318,7 +318,7 @@ public sealed class DocumentController(
         var settingsSvc = requestServices.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
         var uploadGate  = requestServices.GetRequiredService<IUploadGate>();
         var settings = await settingsSvc.GetOrCreateAsync(CancellationToken.None);
-        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes);
+        var reject = await uploadGate.CheckUpload(file.Length, subject, settings, mediaOpts.Value.MaxBytes, mediaOpts.Value.MaxPlatformBytes);
         if (reject is not null) return reject;                              // oversize/over-quota → 413 (the gate)
         if (!mediaOpts.Value.IsDocumentAllowed(file.ContentType))
             return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type → 415 (untouched)

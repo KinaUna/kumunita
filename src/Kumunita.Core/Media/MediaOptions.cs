@@ -16,6 +16,26 @@ public sealed class MediaOptions
     /// <summary>Max payload bytes. 0 = unset (Web enforces the same constant).</summary>
     public long MaxBytes { get; set; } = 5L * 1024 * 1024; // 5 MiB
 
+    /// <summary>
+    /// Optional **platform-wide** storage-space limit in bytes (env knob
+    /// <c>Media__MaxPlatformBytes</c>). When set to a value &gt; 0, the platform
+    /// may use at most this many bytes of resident content: the <c>/admin/storage</c>
+    /// "available" figure is capped to this budget, and all new uploads are
+    /// blocked (413) once used space reaches it **or** the volume's physical free
+    /// space drops below the 100 MiB floor. <c>0</c> or unset = **unlimited**
+    /// (the default — the admin "available" figure then reports the physical
+    /// free space, exactly as before). This is an operator knob (OPS.md), not an
+    /// admin-set in-app value.
+    /// </summary>
+    public long MaxPlatformBytes { get; set; } = 0; // 0 = unlimited
+
+    /// <summary>
+    /// The physical free-space floor (bytes) below which new uploads are blocked
+    /// regardless of the platform limit — the 100 MiB operator safety margin that
+    /// keeps the volume from filling to its physical edge. A constant, not a knob.
+    /// </summary>
+    public const long MinFreeSpaceFloor = 100L * 1024 * 1024; // 100 MiB
+
     /// <summary>Comma-separated allowed Content-Types (case-insensitive).</summary>
     public string? AllowedContentTypes { get; set; }
 

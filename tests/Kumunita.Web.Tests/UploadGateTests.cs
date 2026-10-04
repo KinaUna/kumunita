@@ -72,14 +72,21 @@ public class UploadGateTests
         settingsSvc.GetPerUserUsageBytesAsync(OverQuotaSubject, Arg.Any<CancellationToken>())
             .Returns(100L); // over-quota: pre-seeded usage (100 + 12 > 50)
 
-        var gate = new UploadGate(settingsSvc);
+        // Platform-space seam (the platform-limit lane): not full (unlimited),
+        // so the gate falls through to the per-file/per-user decision below.
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(0, long.MaxValue, 0, false));
+
+        var gate = new UploadGate(settingsSvc, metricsSvc);
 
         const long envMaxBytes = long.MaxValue; // the env fallback is irrelevant here — the doc caps are explicit
+        const long platformLimit = 0;           // unlimited (no platform block in this test)
         const long oversizeIncoming = 100;      // > 16 cap → oversize
         const long overQuotaIncoming = 12;      // ≤ long.MaxValue cap, but 100 + 12 > 50 quota
 
-        var oversize = await gate.CheckUpload(oversizeIncoming, OversizeSubject, OversizeSettings(), envMaxBytes);
-        var overQuota = await gate.CheckUpload(overQuotaIncoming, OverQuotaSubject, OverQuotaSettings(), envMaxBytes);
+        var oversize = await gate.CheckUpload(oversizeIncoming, OversizeSubject, OversizeSettings(), envMaxBytes, platformLimit);
+        var overQuota = await gate.CheckUpload(overQuotaIncoming, OverQuotaSubject, OverQuotaSettings(), envMaxBytes, platformLimit);
 
         // Both reject reasons are a 413 (the single 413 producer, C-UP·3), and
         // BOTH are the exact type the per-lane tests pin (Assert.IsType<
@@ -104,5 +111,76 @@ public class UploadGateTests
         Assert.Equal(StorageDecision.OverQuota, overQuotaDecision);
         // The two reject reasons are distinguishable (oversize ≠ over-quota):
         Assert.NotEqual(oversizeDecision, overQuotaDecision);
+    }
+
+    /// <summary>
+    /// The **platform-limit lane**: when the platform is full (used space at/above
+    /// <c>Media__MaxPlatformBytes</c> **or** physical free space below the
+    /// 100 MiB floor), the gate blocks **every** new upload with a 413 — before
+    /// the per-file/per-user limits are even consulted. This is authoritative
+    /// over the per-resident decision: a payload that would otherwise be
+    /// <see cref="StorageDecision.Allowed"/> (well under the per-file cap, well
+    /// under quota, zero prior usage) is still rejected when the platform is full.
+    /// </summary>
+    [Fact]
+    public async Task UploadGate_PlatformFull_BlocksEvenWithinAllPerResidentLimits()
+    {
+        const string subject = "subj-platform-full";
+
+        // Per-resident settings that would ALLOW the incoming payload: a large
+        // per-file cap, an unlimited quota, zero prior usage.
+        var settings = new CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 0 };
+
+        var settingsSvc = Substitute.For<IStorageSettingsService>();
+        settingsSvc.GetPerUserUsageBytesAsync(subject, Arg.Any<CancellationToken>())
+            .Returns(0L); // no prior usage → the per-resident decision is Allowed
+
+        // The platform is FULL (used >= limit OR free < 100 MiB floor) — the
+        // gate must reject before consulting the per-resident decision above.
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(1000, 0, 1000, true));
+
+        var gate = new UploadGate(settingsSvc, metricsSvc);
+
+        // A payload comfortably within the (unlimited) per-file cap and quota —
+        // StorageLimits.Decide would say Allowed:
+        var wouldBeAllowed = StorageLimits.Decide(1, 0L, settings, long.MaxValue);
+        Assert.Equal(StorageDecision.Allowed, wouldBeAllowed);
+
+        // …but the platform is full, so the gate blocks it:
+        var reject = await gate.CheckUpload(1, subject, settings, long.MaxValue, platformLimitBytes: 1000);
+
+        Assert.NotNull(reject);
+        Assert.IsType<StatusCodeResult>(reject);
+        Assert.Equal(413, ((StatusCodeResult)reject!).StatusCode);
+    }
+
+    /// <summary>
+    /// The converse: when the platform is **not** full (unlimited / above the
+    /// floor), a payload within the per-resident limits proceeds (the gate
+    /// returns null) — confirming the platform check does not over-block.
+    /// </summary>
+    [Fact]
+    public async Task UploadGate_PlatformNotFull_AllowsWithinLimits()
+    {
+        const string subject = "subj-platform-not-full";
+
+        var settings = new CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 0 };
+
+        var settingsSvc = Substitute.For<IStorageSettingsService>();
+        settingsSvc.GetPerUserUsageBytesAsync(subject, Arg.Any<CancellationToken>())
+            .Returns(0L);
+
+        // Platform NOT full — the gate falls through to the per-resident decision.
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(100, long.MaxValue, 0, false));
+
+        var gate = new UploadGate(settingsSvc, metricsSvc);
+
+        var reject = await gate.CheckUpload(1, subject, settings, long.MaxValue, platformLimitBytes: 0);
+
+        Assert.Null(reject); // proceed (within limits, platform not full)
     }
 }

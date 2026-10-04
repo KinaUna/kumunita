@@ -89,8 +89,8 @@ public sealed class AdminStorageController(
             EnvMaxFileBytes       = envMax,
             EffectiveMaxFileBytes = effectiveMax,
             QuotaUnlimited        = s.PerUserQuotaBytes == 0,
-            MaxFileBytesInput     = s.MaxFileBytes?.ToString(),
-            PerUserQuotaBytesInput = s.PerUserQuotaBytes == 0 ? string.Empty : s.PerUserQuotaBytes.ToString()
+            MaxFileBytesInput     = s.MaxFileBytes.HasValue ? (s.MaxFileBytes.Value / (1024 * 1024L)).ToString() : null,
+            PerUserQuotaBytesInput = s.PerUserQuotaBytes == 0 ? string.Empty : (s.PerUserQuotaBytes / (1024 * 1024L)).ToString()
         });
     }
 
@@ -105,9 +105,10 @@ public sealed class AdminStorageController(
     /// lane) and passes it to the service, so the settings doc commits atomically
     /// in the caller's session.
     /// <para>
-    /// <b>Value semantics (C-UP·5):</b> a <b>blank</b> per-file limit ⇒
-    /// <c>null</c> (the env <c>MediaOptions.MaxBytes</c> fallback is in force) —
-    /// blank is <b>not</b> coerced to <c>0</c>; a <c>0</c> per-user quota ⇒
+    /// <b>Value semantics (C-UP·5):</b> inputs are in **MiB**, converted to
+    /// bytes before persisting. A <b>blank</b> per-file limit ⇒ <c>null</c>
+    /// (the env <c>MediaOptions.MaxBytes</c> fallback is in force) — blank is
+    /// <b>not</b> coerced to <c>0</c>; a <c>0</c> per-user quota ⇒
     /// <b>unlimited</b> (the sentinel). The subject is minted server-side from
     /// the signed-in principal (never a path param).
     /// </para>
@@ -126,31 +127,31 @@ public sealed class AdminStorageController(
         {
             maxFileBytes = null;
         }
-        else if (!long.TryParse(maxFileBytesInput, out var parsedMax) || parsedMax < 0)
+        else if (!long.TryParse(maxFileBytesInput, out var parsedMaxMiB) || parsedMaxMiB < 0)
         {
-            TempData["error"] = "The per-file limit must be a whole number of bytes, or left blank for the platform default.";
+            TempData["error"] = "The per-file limit must be a whole number of MiB, or left blank for the platform default.";
             return RedirectToAction(nameof(Index));
         }
         else
         {
-            maxFileBytes = parsedMax;
+            maxFileBytes = parsedMaxMiB * 1024 * 1024L;
         }
 
         // Per-user quota (C-UP·5): blank or 0 ⇒ unlimited (the sentinel);
-        // otherwise the concrete cap in bytes.
+        // otherwise the concrete cap in MiB (converted to bytes).
         long quota;
         if (string.IsNullOrWhiteSpace(perUserQuotaBytesInput) || perUserQuotaBytesInput == "0")
         {
             quota = 0;
         }
-        else if (!long.TryParse(perUserQuotaBytesInput, out var parsedQuota) || parsedQuota < 0)
+        else if (!long.TryParse(perUserQuotaBytesInput, out var parsedQuotaMiB) || parsedQuotaMiB < 0)
         {
-            TempData["error"] = "The per-user quota must be a whole number of bytes (0 for unlimited).";
+            TempData["error"] = "The per-user quota must be a whole number of MiB (0 for unlimited).";
             return RedirectToAction(nameof(Index));
         }
         else
         {
-            quota = parsedQuota;
+            quota = parsedQuotaMiB * 1024 * 1024L;
         }
 
         // Session shape (C3): the controller owns the LightweightSession; the

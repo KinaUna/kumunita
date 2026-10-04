@@ -133,4 +133,38 @@ public sealed class StorageMetricsService : IStorageMetricsService
             .ToListAsync(ct);
         return rows.Sum(o => o.SizeBytes);
     }
+
+    /// <inheritdoc/>
+    public async Task<AvailablePlatformSpace> GetPlatformSpaceAsync(long platformLimitBytes,
+        CancellationToken ct = default)
+    {
+        // Two independent block triggers (the platform-limit lane):
+        //  (a) the platform limit (Media__MaxPlatformBytes, 0 = unlimited) is
+        //      reached — used space at or above the budget. This needs the
+        //      Σ SizeBytes catalog total (the same read GetSnapshotAsync does).
+        //  (b) the volume's physical free space is below the 100 MiB floor —
+        //      the operator safety margin that stops the volume hitting its edge.
+        //      This needs only the free-space volume read.
+        // When the limit is unlimited (0) trigger (a) is off, so the catalog
+        // read is skipped entirely — only the cheap free-space stat runs.
+        var freeVolume = await _volume.GetFreeSpaceBytesAsync(ct);
+        var belowFloor = freeVolume < MediaOptions.MinFreeSpaceFloor;
+
+        if (platformLimitBytes <= 0)
+            return new AvailablePlatformSpace(0, freeVolume, 0, belowFloor);
+
+        long totalUsed;
+        await using (var session = _store.QuerySession())
+        {
+            var all = await session.Query<MediaObject>().ToListAsync(ct);
+            totalUsed = all.Sum(o => o.SizeBytes);
+        }
+        var limitReached = totalUsed >= platformLimitBytes;
+
+        return new AvailablePlatformSpace(
+            UsedBytes: totalUsed,
+            FreeVolumeBytes: freeVolume,
+            LimitBytes: platformLimitBytes,
+            IsFull: limitReached || belowFloor);
+    }
 }

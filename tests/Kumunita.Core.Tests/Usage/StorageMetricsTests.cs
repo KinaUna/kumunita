@@ -247,6 +247,83 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await store.DisposeAsync();
     }
 
+    // ── Platform-space decision input (the platform-limit lane) ────────────
+    // GetPlatformSpaceAsync reports IsFull = (limit reached) OR (free space
+    // below the 100 MiB floor). These pin the four combinations of those two
+    // triggers. The floor constant is MediaOptions.MinFreeSpaceFloor (100 MiB).
+
+    // (a) limit unlimited (0) + free space comfortably above the floor → not full.
+    [Fact]
+    public async Task GetPlatformSpace_Unlimited_AboveFloor_NotFull()
+    {
+        var store = await BootStoreAsync();
+        // Plant some content — with no limit it is irrelevant to IsFull.
+        await PlantMedia(store, sizeBytes: 100, createdById: "u1");
+        var svc = new StorageMetricsService(
+            store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 1_000));
+
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0);
+
+        Assert.False(sp.IsFull);
+        Assert.Equal(0, sp.LimitBytes);
+        Assert.Equal(MediaOptions.MinFreeSpaceFloor + 1_000, sp.FreeVolumeBytes);
+        await store.DisposeAsync();
+    }
+
+    // (b) limit unlimited (0) + free space below the 100 MiB floor → full,
+    //     even though no limit was set (the physical-safety-margin trigger).
+    [Fact]
+    public async Task GetPlatformSpace_Unlimited_BelowFloor_Full()
+    {
+        var store = await BootStoreAsync();
+        var svc = new StorageMetricsService(
+            store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor - 1_000));
+
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0);
+
+        Assert.True(sp.IsFull);
+        Assert.Equal(MediaOptions.MinFreeSpaceFloor - 1_000, sp.FreeVolumeBytes);
+        await store.DisposeAsync();
+    }
+
+    // (c) limit set + used space at/above the limit → full (limit trigger wins
+    //     even though free space is still above the floor).
+    [Fact]
+    public async Task GetPlatformSpace_LimitReached_Full()
+    {
+        var store = await BootStoreAsync();
+        await PlantMedia(store, sizeBytes: 600, createdById: "u1");
+        await PlantMedia(store, sizeBytes: 400, createdById: "u2");   // Σ = 1000
+        var svc = new StorageMetricsService(
+            store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 10_000));
+
+        // used (1000) == limit (1000) → "at or above" → full.
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 1000);
+
+        Assert.True(sp.IsFull);
+        Assert.Equal(1000, sp.UsedBytes);
+        Assert.Equal(1000, sp.LimitBytes);
+        await store.DisposeAsync();
+    }
+
+    // (d) limit set + used below limit + free above floor → not full (the
+    //     happy path: within budget, room to spare).
+    [Fact]
+    public async Task GetPlatformSpace_WithinLimit_AboveFloor_NotFull()
+    {
+        var store = await BootStoreAsync();
+        await PlantMedia(store, sizeBytes: 100, createdById: "u1");
+        var svc = new StorageMetricsService(
+            store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 10_000));
+
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 500);   // 100 < 500
+
+        Assert.False(sp.IsFull);
+        Assert.Equal(100, sp.UsedBytes);
+        Assert.Equal(500, sp.LimitBytes);
+        await store.DisposeAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh <c>mt</c> schema over <see cref="MediaObject"/> in

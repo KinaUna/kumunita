@@ -47,7 +47,16 @@
         <div class="card text-bg-light">
             <div class="card-body py-3">
                 <div class="fs-4 fw-semibold">@Bytes(Model.AvailableBytes)</div>
-                <div class="text-muted small">available</div>
+                <div class="text-muted small">
+                    @if (Model.PlatformLimitBytes > 0)
+                    {
+                        <span>available (platform limit @Bytes(Model.PlatformLimitBytes))</span>
+                    }
+                    else
+                    {
+                        <span>available</span>
+                    }
+                </div>
             </div>
         </div>
     </div>

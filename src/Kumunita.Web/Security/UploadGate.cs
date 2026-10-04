@@ -61,8 +61,14 @@ public interface IUploadGate
     /// pure <see cref="StorageLimits.Decide"/> reads when
     /// <see cref="CommunityStorageSettings.MaxFileBytes"/> is <c>null</c>
     /// (C-UP·1/5).</param>
+    /// <param name="platformLimitBytes">The env
+    /// <c>Media__MaxPlatformBytes</c> platform-wide storage limit (0 =
+    /// unlimited). The gate blocks new uploads (413) when the platform is full
+    /// — used space at/above this limit **or** physical free space below the
+    /// 100 MiB floor — regardless of per-file/per-user limits.</param>
     Task<ActionResult?> CheckUpload(long incomingBytes, string subjectId,
-        CommunityStorageSettings settings, long envMaxBytes);
+        CommunityStorageSettings settings, long envMaxBytes,
+        long platformLimitBytes);
 }
 
 /// <summary>
@@ -71,15 +77,31 @@ public interface IUploadGate
 /// edit-lane re-upload all route their size/over-quota decision through
 /// <see cref="CheckUpload"/>, so a rejected upload writes no byte (C-UP·2, F9).
 /// </summary>
-public sealed class UploadGate(IStorageSettingsService storageSettings) : IUploadGate
+public sealed class UploadGate(
+    IStorageSettingsService storageSettings,
+    IStorageMetricsService storageMetrics) : IUploadGate
 {
     private readonly IStorageSettingsService _storageSettings =
         storageSettings ?? throw new ArgumentNullException(nameof(storageSettings));
+    private readonly IStorageMetricsService _storageMetrics =
+        storageMetrics ?? throw new ArgumentNullException(nameof(storageMetrics));
 
     /// <inheritdoc/>
     public async Task<ActionResult?> CheckUpload(long incomingBytes, string subjectId,
-        CommunityStorageSettings settings, long envMaxBytes)
+        CommunityStorageSettings settings, long envMaxBytes,
+        long platformLimitBytes)
     {
+        // The platform-space check (the platform-limit lane) runs **first** and
+        // is authoritative: when the platform is full (used space at/above the
+        // Media__MaxPlatformBytes limit, or physical free space below the 100 MiB
+        // floor) **every** new upload is blocked, before the per-file/per-user
+        // limits even get a look-in. This is the single 413 producer for the
+        // platform-limit case (C-UP·3) — Core stays HTTP-free (ADR 0006-D).
+        var platform = await _storageMetrics.GetPlatformSpaceAsync(
+            platformLimitBytes, CancellationToken.None);
+        if (platform.IsFull)
+            return Reject413();   // platform full → block all new uploads
+
         // The C-SM·7 seam (Σ SizeBytes WHERE CreatedById, re-exposed by U4) — the
         // subject's current usage. Read **here** (the gate), not in the lane: the
         // gate is the single reader of the decision's inputs (no double read).

@@ -70,12 +70,12 @@ public class AdminStorageControllerTests
         // inside the service).
         store.LightweightSession().Returns(session);
 
-        // A GlobalAdmin POST sets both values: per-file override 12345 bytes +
-        // per-user quota 67890 bytes (concrete, non-sentinel figures so the
+        // A GlobalAdmin POST sets both values: per-file override 5 MiB +
+        // per-user quota 2 MiB (concrete, non-sentinel figures so the
         // "stored doc reflects them" side is unambiguous). The seam is called
-        // with exactly those values, the actor minted from the principal, and
+        // with the byte equivalents, the actor minted from the principal, and
         // the caller's session.
-        var result = await controller.Save("12345", "67890");
+        var result = await controller.Save("5", "2");
 
         // Redirect back to the GET view (the AdminMessagingController.Save /
         // AdminTimezoneController.Save redirect-after-save shape).
@@ -83,9 +83,10 @@ public class AdminStorageControllerTests
         Assert.Equal(nameof(AdminStorageController.Index), redirect.ActionName);
 
         // The single write lane (C-UP·1) is the seam — called exactly once with
-        // the admin values, the server-minted actor, and the caller's session.
+        // the admin values (5 MiB → 5242880 bytes, 2 MiB → 2097152 bytes),
+        // the server-minted actor, and the caller's session.
         await settings.Received(1)
-            .SetAsync(12345L, 67890L, Admin, session);
+            .SetAsync(5 * 1024 * 1024L, 2 * 1024 * 1024L, Admin, session);
 
         // The controller opened its session exactly once (one in-caller-session
         // write; no second session, no re-read in this lane).

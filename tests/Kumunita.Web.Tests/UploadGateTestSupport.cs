@@ -70,9 +70,15 @@ internal static class UploadGateTestSupport
     /// <c>0</c> (no prior usage) — the U8 baseline. The U9 over-quota fixture
     /// passes a positive value so <c>usage + incoming &gt; PerUserQuotaBytes</c>
     /// (F3) while <c>MaxFileBytes</c> stays large (not oversize).</param>
+    /// <param name="platformIsFull">When <c>true</c>, the stub
+    /// <see cref="IStorageMetricsService"/> reports the platform as full (the
+    /// platform-limit lane) so the gate rejects every upload with a 413 before
+    /// the per-file/per-user limits are consulted. Default <c>false</c>
+    /// (unlimited — the M24/M25 baseline; existing assertions unchanged).</param>
     public static IServiceProvider ServicesWith(
         CommunityStorageSettings? settings = null,
-        long currentUsageBytes = 0)
+        long currentUsageBytes = 0,
+        bool platformIsFull = false)
     {
         settings ??= new CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
 
@@ -82,9 +88,18 @@ internal static class UploadGateTestSupport
         settingsSvc.GetPerUserUsageBytesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(currentUsageBytes);
 
+        // The platform-space seam (the platform-limit lane) — the gate reads this
+        // first. Default IsFull=false (unlimited), so the pre-existing
+        // oversize/over-quota/success assertions are unchanged; pass
+        // platformIsFull:true to exercise the platform-block path.
+        var metricsSvc = Substitute.For<IStorageMetricsService>();
+        metricsSvc.GetPlatformSpaceAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new AvailablePlatformSpace(0, long.MaxValue, 0, platformIsFull));
+
         return new ServiceCollection()
             .AddSingleton<IStorageSettingsService>(settingsSvc)
-            .AddSingleton<IUploadGate>(new UploadGate(settingsSvc))
+            .AddSingleton<IStorageMetricsService>(metricsSvc)
+            .AddSingleton<IUploadGate>(new UploadGate(settingsSvc, metricsSvc))
             // The two success-path MVC lookups the non-null provider must
             // satisfy (see class doc). No-op versions mirroring the baseline's
             // NullUrlHelper / NullTempDataDictionary fallback:

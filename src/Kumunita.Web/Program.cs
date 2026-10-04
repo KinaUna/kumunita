@@ -245,7 +245,8 @@ builder.Services.AddKumunitaCore();
 // captive dependency.
 builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
     new Kumunita.Web.Security.UploadGate(
-        sp.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>()));
+        sp.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>(),
+        sp.GetRequiredService<Kumunita.Core.Usage.IStorageMetricsService>()));
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,

@@ -1,9 +1,9 @@
+using Kumunita.Core.Media;
 using Kumunita.Core.Usage;
 using Kumunita.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-namespace Kumunita.Web.Controllers;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// The <c>/admin/storage</c> surface (M24, C-SM·1/2/6) — the GlobalAdmin's
@@ -31,7 +31,9 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Route("admin/storage")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
-public sealed class AdminStorageMetricsController(IStorageMetricsService metrics) : Controller
+public sealed class AdminStorageMetricsController(
+    IStorageMetricsService metrics,
+    IOptions<MediaOptions> mediaOpts) : Controller
 {
     /// <summary>
     /// <c>GET /admin/storage?page=1</c> — the four metrics + the paged
@@ -57,14 +59,33 @@ public sealed class AdminStorageMetricsController(IStorageMetricsService metrics
         var snapshot = await snapshotTask;
         var perUser  = await perUserTask;
 
+        // The "available" figure the admin sees. When the operator has set a
+        // platform storage limit (Media__MaxPlatformBytes > 0), the available
+        // space is the smaller of the physical free space and the remaining
+        // platform budget (limit − used); a limit of 0/unset leaves the figure
+        // as the physical free space (unchanged from M24).
+        var platformLimit = mediaOpts.Value.MaxPlatformBytes;
+        long available;
+        if (platformLimit > 0)
+        {
+            var remaining = platformLimit - snapshot.TotalUsedBytes;
+            if (remaining < 0) remaining = 0;
+            available = Math.Min(snapshot.FreeVolumeBytes, remaining);
+        }
+        else
+        {
+            available = snapshot.FreeVolumeBytes;
+        }
+
         return View(new AdminStorageMetricsViewModel
         {
             TotalUsedBytes       = snapshot.TotalUsedBytes,
-            AvailableBytes       = snapshot.FreeVolumeBytes,
+            AvailableBytes       = available,
             UserContentUsedBytes = snapshot.UserContentUsedBytes,
             TotalUniqueFiles     = snapshot.TotalUniqueFiles,
             TotalDistinctUsers   = snapshot.TotalDistinctUsers,
             AsOf                 = snapshot.AsOf,
+            PlatformLimitBytes   = platformLimit,
             Items                = perUser.Items,
             TotalUsers           = perUser.TotalUsers,
             Page                 = perUser.Page,

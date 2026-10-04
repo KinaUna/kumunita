@@ -292,6 +292,89 @@ public class AdminStorageMetricsControllerTests
         Assert.DoesNotContain(model.Items, r => string.IsNullOrEmpty(r.CreatedById));
     }
 
+    // ── Platform-limit lane: /admin/storage "available" is capped ──────────
+    // When Media__MaxPlatformBytes is set, AvailableBytes = min(physical free,
+    // limit − used); a limit of 0 (unset) leaves it as the physical free space.
+
+    [Fact]
+    public async Task AdminStorage_PlatformLimitSet_AvailableCappedToRemainingBudget()
+    {
+        // Free space 90_000, used 10_000. A 50_000 platform limit leaves a
+        // 40_000 remaining budget — smaller than the physical free space, so
+        // the "available" figure the admin sees is capped to 40_000.
+        const long free = 90_000, used = 10_000, limit = 50_000;
+
+        var metrics = Substitute.For<IStorageMetricsService>();
+        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+            TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
+            UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
+            AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
+        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+            Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
+
+        var controller = BuildWithMetrics(metrics,
+            new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = limit });
+
+        var action = await controller.Index(page: 1);
+        var model = Assert.IsType<AdminStorageMetricsViewModel>(
+            Assert.IsType<ViewResult>(action).Model);
+
+        Assert.Equal(limit - used, model.AvailableBytes);   // 40_000 (capped)
+        Assert.Equal(limit, model.PlatformLimitBytes);
+    }
+
+    [Fact]
+    public async Task AdminStorage_PlatformLimitExceeded_AvailableClampedToZero()
+    {
+        // Used (60_000) already exceeds the limit (50_000) → the remaining
+        // budget is negative → clamped to 0 (the platform budget is spent).
+        const long free = 90_000, used = 60_000, limit = 50_000;
+
+        var metrics = Substitute.For<IStorageMetricsService>();
+        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+            TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
+            UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
+            AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
+        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+            Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
+
+        var controller = BuildWithMetrics(metrics,
+            new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = limit });
+
+        var action = await controller.Index(page: 1);
+        var model = Assert.IsType<AdminStorageMetricsViewModel>(
+            Assert.IsType<ViewResult>(action).Model);
+
+        Assert.Equal(0, model.AvailableBytes);   // clamped, not negative
+        Assert.Equal(limit, model.PlatformLimitBytes);
+    }
+
+    [Fact]
+    public async Task AdminStorage_PlatformLimitUnset_AvailableIsPhysicalFreeSpace()
+    {
+        // A limit of 0 (unset) leaves AvailableBytes as the raw physical free
+        // space (the M24 baseline) — and PlatformLimitBytes reports 0.
+        const long free = 90_000, used = 10_000;
+
+        var metrics = Substitute.For<IStorageMetricsService>();
+        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+            TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
+            UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
+            AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
+        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+            Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
+
+        var controller = BuildWithMetrics(metrics,
+            new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = 0 });
+
+        var action = await controller.Index(page: 1);
+        var model = Assert.IsType<AdminStorageMetricsViewModel>(
+            Assert.IsType<ViewResult>(action).Model);
+
+        Assert.Equal(free, model.AvailableBytes);   // 90_000, uncapped
+        Assert.Equal(0, model.PlatformLimitBytes);
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -299,17 +382,35 @@ public class AdminStorageMetricsControllerTests
     /// over a <see cref="DefaultHttpContext"/> whose <see cref="HttpContext.User"/>
     /// carries an authenticated principal in <paramref name="role"/> (the
     /// <c>ClaimTypes.Subject</c> claim <see cref="Admin"/>). The U6 controller
-    /// takes the <see cref="IStorageMetricsService"/> seam as its single
-    /// constructor dependency (C-SM·2/3) — no <see cref="IDocumentStore"/>
+    /// takes the <see cref="IStorageMetricsService"/> seam + the
+    /// <see cref="Kumunita.Core.Media.MediaOptions"/> (the platform-limit knob)
+    /// as constructor dependencies (C-SM·2/3) — no <see cref="IDocumentStore"/>
     /// (the C-SM·6 "read = no audit row" discipline is pinned in
     /// <see cref="AdminStorage_NoAccessAuditRow"/> via a stand-in store).
     /// </summary>
     private static (AdminStorageMetricsController controller, IStorageMetricsService metrics)
         Build(string role)
-    {
-        var metrics = Substitute.For<IStorageMetricsService>();
+        => Build(role, metrics: null, mediaOptions: null);
 
-        var controller = new AdminStorageMetricsController(metrics);
+    /// <summary>
+    /// Build the controller over a <see cref="DefaultHttpContext"/> for
+    /// <paramref name="role"/>, using the caller-supplied
+    /// <see cref="IStorageMetricsService"/> (when non-null) and
+    /// <see cref="Kumunita.Core.Media.MediaOptions"/> (when non-null; else the
+    /// default, i.e. <c>MaxPlatformBytes = 0</c> = unlimited). The default
+    /// <c>Build(role)</c> form supplies neither, so the M24 baseline assertions
+    /// (AvailableBytes == physical free) are unchanged.
+    /// </summary>
+    private static (AdminStorageMetricsController controller, IStorageMetricsService metrics)
+        Build(string role, IStorageMetricsService? metrics = null,
+            Kumunita.Core.Media.MediaOptions? mediaOptions = null)
+    {
+        metrics ??= Substitute.For<IStorageMetricsService>();
+
+        var controller = new AdminStorageMetricsController(
+            metrics,
+            Microsoft.Extensions.Options.Options.Create(
+                mediaOptions ?? new Kumunita.Core.Media.MediaOptions()));
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
@@ -324,4 +425,14 @@ public class AdminStorageMetricsControllerTests
 
         return (controller, metrics);
     }
+
+    /// <summary>
+    /// The convenience form the platform-limit tests use: build a
+    /// GlobalAdmin controller wired to the supplied (stubbed)
+    /// <see cref="IStorageMetricsService"/> + <see cref
+    /// "Kumunita.Core.Media.MediaOptions"/>.
+    /// </summary>
+    private static AdminStorageMetricsController BuildWithMetrics(
+        IStorageMetricsService metrics, Kumunita.Core.Media.MediaOptions mediaOptions)
+        => Build(Kumunita.Core.Identity.Roles.GlobalAdmin, metrics, mediaOptions).controller;
 }
