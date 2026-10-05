@@ -3,6 +3,7 @@ using Kumunita.Core.Documents;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
+using Kumunita.Core.Query;
 using Kumunita.Core.Posts;
 using Marten;
 using Marten.Services;
@@ -512,7 +513,9 @@ public sealed class TagService : ITagService
     /// page with <c>HasMore: false</c> (the not-found shape — the Web's
     /// 404-floor reads it as an empty page).
     /// </summary>
-    public async Task<TagPostPage> ListPostsByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default)
+    public async Task<TagPostPage> ListPostsByTagPagedAsync(
+        string slug, string actorId, int page,
+        SortSpec? sort = null, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
@@ -526,10 +529,22 @@ public sealed class TagService : ITagService
             return new TagPostPage(Items: Array.Empty<Post>(), HasMore: false);
 
         var (readablePosts, _) = await LoadActorReadableContentAsync(actorId, session);
-        var candidates = readablePosts
-            .Where(p => p.TagIds.Contains(tag.Id))
-            .OrderBy(p => p.Created)
-            .ToList();
+        // M26 U8 (design doc §2.2 row 14, closed allowlist created/modified/
+        // title; correction C-1 — the pinned default is <b>ascending</b>):
+        // null keeps the pinned .OrderBy(p => p.Created) byte-for-byte
+        // (C-SORT·2); non-null applies the allowlist + the ThenBy(Id)
+        // tie-breaker (C-SORT·5) via the shared TagPeopleSortSupport helper
+        // (in-memory LINQ-to-objects — the §2.2 `?? MinValue` modified
+        // sentinel works as pinned).
+        IEnumerable<Post> ordered = readablePosts.Where(p => p.TagIds.Contains(tag.Id));
+        if (sort is null)
+            ordered = ordered.OrderBy(p => p.Created); // ← the pinned line, verbatim
+        else
+            ordered = TagPeopleSortSupport.OrderByTagFeedSort(ordered, sort,
+                new HashSet<string> { "created", "modified", "title" },
+                defaultDir: false, // the pinned default (correction C-1): created, asc
+                p => p.Created, p => p.Modified, p => p.Title, p => p.Id);
+        var candidates = ordered.ToList();
 
         var items = candidates
             .Skip((page - 1) * PageSize)
@@ -559,7 +574,9 @@ public sealed class TagService : ITagService
     /// page with <c>HasMore: false</c> (the not-found shape — the Web's
     /// 404-floor reads it as an empty page).
     /// </summary>
-    public async Task<TagPagePage> ListPagesByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default)
+    public async Task<TagPagePage> ListPagesByTagPagedAsync(
+        string slug, string actorId, int page,
+        SortSpec? sort = null, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
@@ -573,10 +590,22 @@ public sealed class TagService : ITagService
             return new TagPagePage(Items: Array.Empty<Page>(), HasMore: false);
 
         var (_, readablePages) = await LoadActorReadableContentAsync(actorId, session);
-        var candidates = readablePages
-            .Where(p => p.TagIds.Contains(tag.Id))
-            .OrderBy(p => p.Created)
-            .ToList();
+        // M26 U8 (design doc §2.2 row 15, closed allowlist created/modified/
+        // title; the <b>created asc</b> default is the current order):
+        // null keeps the pinned .OrderBy(p => p.Created) byte-for-byte
+        // (C-SORT·2); non-null applies the allowlist + the ThenBy(Id)
+        // tie-breaker (C-SORT·5) via the shared TagPeopleSortSupport helper
+        // (in-memory LINQ-to-objects — the §2.2 `?? MinValue` modified
+        // sentinel works as pinned).
+        IEnumerable<Page> ordered = readablePages.Where(p => p.TagIds.Contains(tag.Id));
+        if (sort is null)
+            ordered = ordered.OrderBy(p => p.Created); // ← the pinned line, verbatim
+        else
+            ordered = TagPeopleSortSupport.OrderByTagFeedSort(ordered, sort,
+                new HashSet<string> { "created", "modified", "title" },
+                defaultDir: false, // the pinned default: created, asc
+                p => p.Created, p => p.Modified, p => p.Title, p => p.Id);
+        var candidates = ordered.ToList();
 
         var items = candidates
             .Skip((page - 1) * PageSize)

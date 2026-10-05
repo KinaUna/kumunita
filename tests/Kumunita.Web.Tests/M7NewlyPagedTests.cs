@@ -4,6 +4,7 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
@@ -152,9 +153,9 @@ public class M7NewlyPagedTests
         }).ToList();
 
         var tags = Substitute.For<ITagService>();
-        tags.ListPostsByTagPagedAsync(slug, actorId, page, Arg.Any<CancellationToken>())
+        tags.ListPostsByTagPagedAsync(slug, actorId, page, Arg.Any<SortSpec?>(), Arg.Any<CancellationToken>())
             .Returns(new TagPostPage(Items: posts, HasMore: true));
-        tags.ListPagesByTagPagedAsync(slug, actorId, page, Arg.Any<CancellationToken>())
+        tags.ListPagesByTagPagedAsync(slug, actorId, page, Arg.Any<SortSpec?>(), Arg.Any<CancellationToken>())
             .Returns(new TagPagePage(Items: pages, HasMore: true));
         // No tag in the readable set → tag is null → SeedTranslationFormAsync
         // is not called (no real store needed).

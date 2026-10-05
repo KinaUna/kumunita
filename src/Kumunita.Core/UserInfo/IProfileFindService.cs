@@ -1,3 +1,4 @@
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 
 namespace Kumunita.Core.UserInfo;
@@ -32,7 +33,8 @@ public interface IProfileFindService
     /// blank/missing slug returns an empty page with no row (the M3 0-candidate
     /// shape).
     /// </summary>
-    Task<ProfileTagPage> FindPeopleByTagAsync(string slug, string actorId, int page);
+    Task<ProfileTagPage> FindPeopleByTagAsync(
+        string slug, string actorId, int page, SortSpec? sort = null);
 
     /// <summary>
     /// The bio-substring find: the actor-visible profiles whose <c>Bio</c>
@@ -42,7 +44,8 @@ public interface IProfileFindService
     /// blank query returns an empty page with no row (the M3 0-candidate / M8
     /// "no decision, no row" shape).
     /// </summary>
-    Task<ProfileBioPage> FindPeopleByBioAsync(string q, string actorId, int page);
+    Task<ProfileBioPage> FindPeopleByBioAsync(
+        string q, string actorId, int page, SortSpec? sort = null);
 }
 
 /// <summary>

@@ -295,3 +295,78 @@
   existing; U6 was 1277).
 - **Handoff to U8:** additive `SortSpec? sort = null` on the 4 tag/people
   seams + their tests. See `m26-u08.md`.
+
+## U8 — Core tags + people
+
+- **Landed:** `SortSpec? sort = null` added to the 4 tag/people seams —
+  `TagService.ListPostsByTagPagedAsync` (row 14 — `created`/`modified`/
+  `title`), `TagService.ListPagesByTagPagedAsync` (row 15 — `created`/
+  `modified`/`title`), `ProfileFindService.FindPeopleByTagAsync` (row 16 —
+  `name` → `DisplayName` only, correction C-2) and
+  `ProfileFindService.FindPeopleByBioAsync` (row 17 — `name` only) + the 2
+  real interface signatures (`ITagService`, `IProfileFindService`). The
+  shared ordering lives in a new
+  `src/Kumunita.Core/Query/TagPeopleSortSupport.OrderByTagFeedSort<T>(…)`
+  (the 2 tag feeds' `created`/`modified`/`title` keys) +
+  `OrderByPeopleSort<T>(…)` (the 2 people feeds' `name` key) static
+  helpers (the U7 `MiscSortSupport` shape). **In-memory, not Marten** —
+  these 4 seams order in-memory candidate lists (LINQ-to-objects), so the
+  U4–U7 Marten drifts (the CS0411 `Queryable.ThenBy` disambiguation, the
+  `?? MinValue` sentinel rejection) do **not** apply: the `?? MinValue`
+  sentinel on the nullable `modified` key works **as pinned** (nulls sort
+  first in asc / last in desc), and `ThenBy` is the plain `Enumerable`
+  form. `null` keeps each pinned order **byte-for-byte** (C-SORT·2);
+  every non-null path applies the `.ThenBy(Id)` / `.ThenBy(SubjectId)`
+  tie-breaker (C-SORT·5 — people's identity member is `SubjectId`,
+  `Profile` has no `Id`). Trailing-`sort` param convention (U5/U6/U7)
+  followed — the tag seams already have a positional
+  `CancellationToken ct`, so `sort` is the trailing param; the 2 people
+  seams have no `ct` at all, so `sort` is appended after `page`. The
+  frozen tag-slug resolve + the `CanSeeAsync` gate / `HasMore` /
+  `Skip`/`Take` are byte-for-byte untouched (C-SORT·4).
+- **Tests:** `tests/Kumunita.Core.Tests/TagPeople/TagPeopleSortTests.cs` —
+  all 18 pinned tests pass (5 tag-posts + 5 tag-pages + 4 people-by-tag +
+  4 people-by-bio): `TagPosts_SortSpecNull_CurrentOrder`,
+  `TagPosts_SortModifiedDesc`, `TagPosts_SortTitle_Ordinal`,
+  `TagPosts_InvalidKey_DefaultOrder`, `TagPosts_StableTieBreakBy_Id`,
+  `TagPages_SortSpecNull_CurrentOrder`, `TagPages_SortModifiedDesc`,
+  `TagPages_SortTitle_Ordinal`, `TagPages_InvalidKey_DefaultOrder`,
+  `TagPages_StableTieBreakBy_Id`, `PeopleByTag_SortSpecNull_CurrentOrder`,
+  `PeopleByTag_SortName_Ordinal`,
+  `PeopleByTag_InvalidKey_DefaultOrder`,
+  `PeopleByTag_StableTieBreakBy_SubjectId`,
+  `PeopleByBio_SortSpecNull_CurrentOrder`,
+  `PeopleByBio_SortName_Ordinal`,
+  `PeopleByBio_InvalidKey_DefaultOrder`,
+  `PeopleByBio_StableTieBreakBy_SubjectId`.
+- **tag-pages-asc-default + people-name-Ordinal pins:** row 14/15 default
+  is `created`, **asc** (the pinned `.OrderBy(p => p.Created)` —
+  **ascending**, correction C-1 — the brief's prose said "posts desc";
+  the frozen doc + the actual code at `TagService.cs:531`/`:578` win, and
+  I preserved asc exactly — no drift pause needed since the brief's own
+  §2.3/§2.5 and the frozen §2.2 row 14/15 all say asc). People's `name`
+  key → `Profile.DisplayName` (`OrdinalIgnoreCase`); the C-2 correction
+  (no `created` key) is honored — the `PeopleByTag_InvalidKey_DefaultOrder`
+  / `PeopleByBio_InvalidKey_DefaultOrder` tests pin that `?sort=created`
+  falls back to the `name` asc default (not an error).
+- **`modified` sentinel-as-pinned:** the `TagPosts_SortModifiedDesc` /
+  `TagPages_SortModifiedDesc` tests pin the **frozen §2.2 sentinel
+  behavior** (null `Modified` → `?? MinValue` → nulls sort **last** in
+  desc / **first** in asc) — the **opposite** of the Postgres
+  null-placement U7 pinned (the in-memory difference). Part 2
+  (§2.2/§2.3) is unchanged — no drift.
+- **Frozen-gate non-change (C-SORT·4, named non-decision):** the tag-slug
+  resolve (`session.Query<Tag>().Where(t => t.Slug == …)`) + the people
+  `CanSeeAsync` gate + the `HasMore` / `Skip`/`Take` paging are
+  byte-for-byte untouched; the sort replaces only the `OrderBy` line (or
+  inserts the `OrderBy` between the gate and `Paged` for the people
+  seams).
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0
+  errors); `Kumunita.Core.Tests` suite **1310** total, **0 failed**
+  (18 new + existing; U7 was 1292). `Kumunita.Web.Tests` suite **849**
+  total, **0 failed** (the `TagService` / `ProfileFindService` NSub
+  substitute call sites in `M7NewlyPagedTests` /
+  `TagControllerTests` / `M23FindPeopleTests` updated for the new
+  trailing `sort` param).
+- **Handoff to U9:** additive `SortSpec? sort = null` on the search seam
+  + the `Search*_*` tests. See `m26-u09.md`.

@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Marten;
 
@@ -45,7 +46,8 @@ public sealed class ProfileFindService : IProfileFindService
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
-    public async Task<ProfileTagPage> FindPeopleByTagAsync(string slug, string actorId, int page)
+    public async Task<ProfileTagPage> FindPeopleByTagAsync(
+        string slug, string actorId, int page, SortSpec? sort = null)
     {
         // Blank slug ⇒ empty page, no decision, no row (the M3 0-candidate shape).
         if (string.IsNullOrWhiteSpace(slug))
@@ -82,7 +84,20 @@ public sealed class ProfileFindService : IProfileFindService
         if (visible.Count == 0)
             return new ProfileTagPage(Array.Empty<Profile>(), tag, false);
 
-        var pageSlice = Paged(visible, page);
+        // M26 U8 (design doc §2.2 row 16, correction C-2 — the people
+        // allowlist is <b>name</b> only, <c>Profile</c> has no
+        // <c>Created</c>): null keeps the current order exactly (the
+        // unsorted storage order — C-SORT·2); non-null applies the
+        // allowlist over <see cref="Profile.DisplayName"/>
+        // (OrdinalIgnoreCase) + the ThenBy(SubjectId) tie-breaker
+        // (C-SORT·5) via the shared TagPeopleSortSupport helper.
+        // In-memory LINQ-to-objects (not a Marten query). The gate above
+        // is frozen (C-SORT·4).
+        var pageSlice = Paged(
+            TagPeopleSortSupport.OrderByPeopleSort(visible, sort,
+                new HashSet<string> { "name" },
+                defaultDir: false, // the pinned default (correction C-2): name, asc
+                p => p.DisplayName, p => p.SubjectId).ToList(), page);
         // ADR 0090 D6 / the M3 ListFeedAsync idiom: HasMore is "the page is
         // full" (the paged slice filled the PageSize window) — the same
         // `pagedSlice.Count == PageSize` shape as PostService.ListFeedAsync
@@ -92,7 +107,8 @@ public sealed class ProfileFindService : IProfileFindService
         return new ProfileTagPage(pageSlice, tag, pageSlice.Count == PageSize);
     }
 
-    public async Task<ProfileBioPage> FindPeopleByBioAsync(string q, string actorId, int page)
+    public async Task<ProfileBioPage> FindPeopleByBioAsync(
+        string q, string actorId, int page, SortSpec? sort = null)
     {
         // Blank query ⇒ empty page, no decision, no row (the M3 0-candidate shape).
         if (string.IsNullOrWhiteSpace(q))
@@ -120,7 +136,19 @@ public sealed class ProfileFindService : IProfileFindService
         if (visible.Count == 0)
             return new ProfileBioPage(Array.Empty<Profile>(), false);
 
-        var pageSlice = Paged(visible, page);
+        // M26 U8 (design doc §2.2 row 17, correction C-2 — the people
+        // allowlist is <b>name</b> only): null keeps the current order
+        // exactly (the unsorted storage order — C-SORT·2); non-null applies
+        // the allowlist over <see cref="Profile.DisplayName"/>
+        // (OrdinalIgnoreCase) + the ThenBy(SubjectId) tie-breaker
+        // (C-SORT·5) via the shared TagPeopleSortSupport helper
+        // (in-memory LINQ-to-objects). The gate above is frozen
+        // (C-SORT·4).
+        var pageSlice = Paged(
+            TagPeopleSortSupport.OrderByPeopleSort(visible, sort,
+                new HashSet<string> { "name" },
+                defaultDir: false, // the pinned default (correction C-2): name, asc
+                p => p.DisplayName, p => p.SubjectId).ToList(), page);
         // ADR 0090 D6 / the M3 ListFeedAsync idiom: HasMore is "the page is
         // full" (the paged slice filled the PageSize window) — not the total
         // candidate count (see the by-tag read's comment).
