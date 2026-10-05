@@ -1223,7 +1223,7 @@ public static class FirstBootSeeder
              "you read what the child writes.\n\n" +
              "**What you can do.** You can suspend and un-suspend the account, " +
              "decide which groups and communities the child belongs to, approve a " +
-             "group invitation the child received, and assign another guardian to " +
+             "group invitation the child received, and invite another guardian to " +
              "share the controls. You can also hand the account over when the child " +
              "is ready to run it on their own.\n\n" +
              "**What you can't do.** You can't read the child's posts, replies, or " +
@@ -1241,9 +1241,16 @@ public static class FirstBootSeeder
              "**To approve a group invitation.** On the child's page, find the " +
              "invitation under **Pending group invitations** and click " +
              "**Approve**.\n\n" +
-             "**To assign another guardian.** On the child's page, open " +
+             "**To invite another guardian.** On the child's page, open " +
              "**Assign a guardian**, enter their email, and click **Assign**. " +
-             "They then hold the same controls you do.\n\n" +
+             "They are then asked to **accept** — agreeing to the same " +
+             "child-account terms you agreed to when you created the account — " +
+             "or to **decline**. Until they accept, they hold no controls over " +
+             "the account; you see a **Pending** badge next to their name on " +
+             "the **Other guardians** list. Once they accept, they hold the " +
+             "same controls you do. You can re-invite them if they declined " +
+             "(the row flips back to **Pending**); you can't force the " +
+             "acceptance.\n\n" +
              "**To hand over the account.** When the child is ready, open their " +
              "page and click **Dissolve guardianship**. Their memberships are " +
              "kept, and their own controls come back on the next read.\n"),
@@ -1256,6 +1263,11 @@ public static class FirstBootSeeder
              "Your parent can't read them, even though they set up the account.\n\n" +
              "**What your parent handles.** Your parent decides which groups and " +
              "communities you're in, and can suspend or un-suspend your account.\n\n" +
+             "**More than one adult.** More than one adult — a parent and a " +
+             "co-parent, a grandparent, or another guardian — may share the " +
+             "controls over your account. You don't do anything for that to " +
+             "happen: the adults arrange it between themselves, and it doesn't " +
+             "change what stays yours.\n\n" +
              "**Group invitations.** You'll see an invitation under **Invitations**. " +
              "You can always **Decline**. To **Accept**, your parent has to approve " +
              "it first — ask them to approve it for you.\n\n" +
@@ -1749,7 +1761,7 @@ public static class FirstBootSeeder
              "**Was du kannst.** Du kannst das Konto sperren und wieder aktivieren, " +
              "entscheiden, in welchen Gruppen und Gemeinschaften das Kind ist, " +
              "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, und " +
-             "einen weiteren Vormund zuweisen, mit dem du die Kontrollen teilst. " +
+             "einen weiteren Vormund einladen, mit dem du die Kontrollen teilst. " +
              "Und du kannst das Konto übergeben, wenn das Kind bereit ist, es " +
              "selbst zu führen.\n\n" +
              "**Was du nicht kannst.** Du kannst die Beiträge, Antworten und das " +
@@ -1770,9 +1782,18 @@ public static class FirstBootSeeder
              "**Eine Gruppeneinladung genehmigen.** Auf der Seite des Kindes " +
              "findest du die Einladung unter **Ausstehende Gruppeneinladungen** " +
              "und klickst auf **Genehmigen**.\n\n" +
-             "**Einen weiteren Vormund zuweisen.** Auf der Seite des Kindes " +
+             "**Einen weiteren Vormund einladen.** Auf der Seite des Kindes " +
              "öffnest du **Vormund zuweisen**, gibst dessen E-Mail ein und klickst " +
-             "auf **Zuweisen**. Dann hat er dieselben Kontrollen wie du.\n\n" +
+             "auf **Zuweisen**. Die Person wird dann gebeten, die Einladung " +
+             "**anzunehmen** — und dabei dieselben Bedingungen für Kinderkonten " +
+             "zu bestätigen, die du beim Erstellen des Kontos bestätigt hast — " +
+             "oder sie **ablehnen**. Solange sie nicht angenommen hat, hat sie " +
+             "keine Kontrollen über das Konto; du siehst neben dem Namen in der " +
+             "Liste **Weitere Vormünder** das Badge **Ausstehend**. Sobald die " +
+             "Person annimmt, hat sie dieselben Kontrollen wie du. Du kannst " +
+             "die Person erneut einladen, wenn sie abgelehnt hat (der Eintrag " +
+             "schaltet wieder auf **Ausstehend** um); die Annahme lässt sich " +
+             "nicht erzwingen.\n\n" +
              "**Das Konto übergeben.** Wenn das Kind bereit ist, öffne seine Seite " +
              "und klicke auf **Vormundschaft auflösen**. Die Mitgliedschaften " +
              "bleiben erhalten, und die eigenen Kontrollen kommen beim nächsten " +
@@ -1789,6 +1810,11 @@ public static class FirstBootSeeder
              "**Was deine Eltern übernehmen.** Deine Eltern entscheiden, in welchen " +
              "Gruppen und Gemeinschaften du bist, und können dein Konto sperren " +
              "oder wieder aktivieren.\n\n" +
+             "**Mehrere Erwachsene.** Mehr als eine erwachsene Person — zum " +
+             "Beispiel Mutter und Vater, ein Großelternteil oder eine andere " +
+             "Person — kann die Kontrollen über dein Konto teilen. Du " +
+             "musst dafür nichts tun: Die Erwachsenen richten das untereinander " +
+             "ein, und es ändert nichts daran, was dir gehört.\n\n" +
              "**Gruppeneinladungen.** Eine Einladung findest du unter " +
              "**Einladungen**. Du kannst sie immer **Ablehnen**. Um sie " +
              "**Anzunehmen**, müssen deine Eltern sie erst genehmigen — bitte sie, " +
@@ -2326,9 +2352,9 @@ public static class FirstBootSeeder
              "écrit.\n\n" +
              "**Ce que tu peux faire.** Tu peux suspendre et réactiver le compte, " +
              "décider de quels groupes et communautés l'enfant fait partie, " +
-             "approuver une invitation de groupe que l'enfant a reçue, et assigner " +
-             "un autre tuteur pour partager les contrôles. Et tu peux transférer " +
-             "le compte quand l'enfant est prêt à le conduire seul.\n\n" +
+             "approuver une invitation de groupe que l'enfant a reçue, et " +
+             "inviter un autre tuteur pour partager les contrôles. Et tu peux " +
+             "transférer le compte quand l'enfant est prêt à le conduire seul.\n\n" +
              "**Ce que tu ne peux pas faire.** Tu ne peux pas lire les " +
              "publications, les réponses ou le profil de l'enfant. Ce sont ceux de " +
              "l'enfant, et ils restent ceux de l'enfant.\n\n" +
@@ -2346,9 +2372,16 @@ public static class FirstBootSeeder
              "**Approuver une invitation de groupe.** Sur la page de l'enfant, " +
              "trouve l'invitation sous **Invitations de groupe en attente** et " +
              "clique sur **Approuver**.\n\n" +
-             "**Assigner un autre tuteur.** Sur la page de l'enfant, ouvre " +
+             "**Inviter un autre tuteur.** Sur la page de l'enfant, ouvre " +
              "**Assigner un tuteur**, entre son e-mail et clique sur **Assigner**. " +
-             "Il a alors les mêmes contrôles que toi.\n\n" +
+             "La personne est alors invitée à **accepter** — en confirmant les " +
+             "mêmes conditions du compte enfant que tu as confirmées à la " +
+             "création — ou à **refuser**. Tant qu'elle n'a pas accepté, elle " +
+             "n'a aucun contrôle sur le compte ; tu vois un badge **En attente** " +
+             "à côté de son nom dans la liste **Autres tuteurs**. Dès qu'elle " +
+             "accepte, elle a les mêmes contrôles que toi. Tu peux la " +
+             "réinviter si elle a refusé (l'entrée repasse en **En attente**) ; " +
+             "tu ne peux pas forcer l'acceptation.\n\n" +
              "**Transférer le compte.** Quand l'enfant est prêt, ouvre sa page et " +
              "clique sur **Dissoudre la tutelle**. Ses adhésions sont " +
              "conservées, et ses propres contrôles reviennent à la prochaine " +
@@ -2363,6 +2396,11 @@ public static class FirstBootSeeder
              "restent. Ton parent ne peut pas les lire, même s'il a créé le compte.\n\n" +
              "**Ce que ton parent gère.** Ton parent décide de quels groupes et " +
              "communautés tu fais partie, et peut suspendre ou réactiver ton compte.\n\n" +
+             "**Plusieurs adultes.** Plus d'un adulte — ton parent et un " +
+             "co-parent, un grand-parent, ou un autre adulte — peut partager " +
+             "les contrôles de ton compte. Tu ne dois rien faire pour ça : " +
+             "les adultes s'organisent entre eux, et ça ne change rien à " +
+             "ce qui te reste.\n\n" +
              "**Invitations de groupe.** Tu verras une invitation sous " +
              "**Invitations**. Tu peux toujours **Refuser**. Pour l'**Accepter**, " +
              "ton parent doit d'abord l'approuver — demande-lui de l'approuver " +
@@ -2879,7 +2917,7 @@ public static class FirstBootSeeder
              "skriver.\n\n" +
              "**Hvad du kan.** Du kan suspendere og genoprette kontoen, bestemme, " +
              "hvilke grupper og fællesskaber barnet tilhører, godkende en " +
-             "gruppeinvitation, barnet har modtaget, og tildele en anden " +
+             "gruppeinvitation, barnet har modtaget, og invitere en anden " +
              "værgemand, så I deler kontrollerne. Og du kan give kontoen videre, " +
              "når barnet er klar til at drive den selv.\n\n" +
              "**Hvad du ikke kan.** Du kan ikke læse barnets indlæg, svar eller " +
@@ -2897,9 +2935,16 @@ public static class FirstBootSeeder
              "**Godkend en gruppeinvitation.** På barnets side finder du " +
              "invitationen under **Afventende gruppeinvitationer** og klikker " +
              "på **Godkend**.\n\n" +
-             "**Tildel en anden værgemand.** På barnets side åbner du **Tildel " +
-             "en værgemand**, indtaster e-mailen og klikker på **Tildel**. Så har " +
-             "personen de samme kontroller som dig.\n\n" +
+             "**Inviter en anden værgemand.** På barnets side åbner du **Tildel " +
+             "en værgemand**, indtaster e-mailen og klikker på **Tildel**. " +
+             "Personen bedes derefter **acceptere** — og dermed bekræfte de " +
+             "samme betingelser for barnets konto, som du bekræftede ved " +
+             "oprettelsen — eller **afvise**. Indtil personen accepterer, har " +
+             "personen ingen kontroller over kontoen; du ser et **Afventer**-" +
+             "badge ved siden af navnet i listen **Andre værgemænd**. Når " +
+             "personen accepterer, har personen de samme kontroller som dig. Du " +
+             "kan invitere personen igen, hvis personen afviste (linjen vender " +
+             "tilbage til **Afventer**); du kan ikke tvinge en accept.\n\n" +
              "**Giv kontoen videre.** Når barnet er klar, åbner du dets side og " +
              "klikker på **Afløs værgemodet**. Medlemskaberne bevares, og " +
              "barnets egne kontroller kommer tilbage ved næste læsning.\n"),
@@ -2920,7 +2965,11 @@ public static class FirstBootSeeder
              "**Når du er klar til at overtage.** Når dine forældre giver kontoen " +
              "videre til dig, kommer dine egne kontroller tilbage: Du kan selv " +
              "acceptere gruppeinvitationer og styre dine egne grupper og " +
-             "fællesskaber.\n"),
+             "fællesskaber.\n\n" +
+             "**Flere voksne.** Mere end én voksen kan have kontrol over din " +
+             "konto — for eksempel en mor og en far, en bedsteforælder eller en " +
+             "anden værgemand. Du behøver ikke gøre noget for det; du skriver " +
+             "sammen, som du plejer, og det du skriver, forbliver dit.\n"),
             ("admins", "Administrerende",
              "## Administrerende\n\n" +
              "En **administrerende** (platformens globale admin) er den person, " +
