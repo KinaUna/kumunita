@@ -13,6 +13,9 @@ namespace Kumunita.Core.Events;
 /// </summary>
 public sealed class EventReminderOptions
 {
+    /// <summary>Configuration section name (bound by the host, e.g. <c>EventReminder__WindowHours</c>).</summary>
+    public const string SectionName = "EventReminder";
+
     /// <summary>The "remind the day before" window in hours (the §3.6 default 24).</summary>
     public int WindowHours { get; set; } = 24;
 }

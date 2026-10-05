@@ -156,6 +156,10 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>
+                @* ADR 0138 — the resident's self-serve change-password surface
+                   (/account/password) moved to a settings tab (2026-10-04); it
+                   is reached via the settings "Change password" tab, not here
+                   (the ADR 0080 idiom, the ADR 0028 "Children" precedent). *@
                 @* ADR 0084 — the per-target subscriptions surface (the resident's
                    explicit "notify me for this community / group / page" choice,
                    distinct from the per-kind email preferences). *@
@@ -166,8 +170,18 @@
                    when signed in AND the instance toggle is on (the F5 pin — a read of
                    the toggle, never of data; the /messages controller repeats the gate
                    first in every action). One <li> in the existing dropdown — no
-                   navbar reflow. *@
-                @if (await Messaging.IsMessagingEnabledAsync())
+                   navbar reflow.
+                   M9 amendment — the per-actor gate: on top of the instance master
+                   gate, the link renders only when *this* resident is messaging-
+                   allowed (their own opt-in on AND no guardian restriction — the
+                   composite IsMessagingAllowedForAsync read, the C-M9·2 "enforced
+                   in the service, not only the view" pin carried to the nav).
+                   A resident who is opted out / restricted sees no Messages entry
+                   (the same non-leaky shape as an off instance: the surface is
+                   simply absent, no explanation). *@
+                @if (await Messaging.IsMessagingEnabledAsync()
+                     && navAvatarSubject is not null
+                     && await Messaging.IsMessagingAllowedForAsync(navAvatarSubject))
                 {
                     <li class="nav-item">
                         <a class="dropdown-item text-dark" href="/messages"><kw-l key="message.nav">Messages</kw-l></a>
@@ -265,6 +279,43 @@
                                     <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(navActive ? "fw-semibold" : "")">
                                         <kw-l key="@variantKey"></kw-l>
                                         @(navActive ? " ✓" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
+                @* ADR 0133 — the appearance (theme) picker: the resident chooses
+                   between auto (default — follow the OS prefers-color-scheme,
+                   resolved in CSS with no JS), light, and dark (the Forest theme).
+                   The active choice is marked with a ✓. Picking a mode POSTs to
+                   /theme (the public, CSRF-protected endpoint) and redirects back
+                   — the new theme renders on the return trip, which doubles as
+                   the confirmation. The same picker shape as the nav-variant
+                   picker above (a preference, never a claim — thin-token rule,
+                   ADR 0001-B). *@
+                @{ var currentTheme = httpReq is null ? ThemeCookie.Auto : ThemeCookie.Read(httpReq); }
+                <li><hr class="dropdown-divider" /></li>
+                <li class="px-3 pt-2 pb-1 small text-secondary">
+                    <kw-l key="theme.label">Appearance</kw-l>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var (modeId, modeKey) in new[] {
+                            (ThemeCookie.Auto, "theme.auto"),
+                            (ThemeCookie.Light, "theme.light"),
+                            (ThemeCookie.Dark, "theme.dark"),
+                        })
+                        {
+                            var isActive = currentTheme == modeId;
+                            <li class="px-3">
+                                <form method="post" action="/theme" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="mode" value="@modeId" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(isActive ? "fw-semibold" : "")">
+                                        <kw-l key="@modeKey"></kw-l>
+                                        @(isActive ? " ✓" : "")
                                     </button>
                                 </form>
                             </li>

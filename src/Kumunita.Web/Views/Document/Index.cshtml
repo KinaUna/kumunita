@@ -1,7 +1,11 @@
 @model Kumunita.Web.Models.DocumentIndexViewModel
 @using Kumunita.Core.Documents
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Documents";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
 }
 
 <div class="row justify-content-center">
@@ -13,9 +17,20 @@
                 </div>
                 @if (Model.CanUpload)
                 {
-                    <a class="btn btn-outline-primary" href="/documents/new">
-                        <kw-l key="documents.upload">Upload a document</kw-l>
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-outline-primary" href="/documents/new">
+                            <kw-l key="documents.upload">Upload a document</kw-l>
+                        </a>
+                        <details class="d-inline-block">
+                            <summary class="btn btn-outline-secondary"><kw-l key="documents.folder_new">New folder</kw-l></summary>
+                            <form method="post" action="/documents/folders" class="mt-2 d-flex gap-2">
+                                @Html.AntiForgeryToken()
+                                <input class="form-control" type="text" name="Name" maxlength="120"
+                                       placeholder="@await Translation.GetAsync("documents.folder_name_placeholder", _kwL)" required />
+                                <button type="submit" class="btn btn-primary"><kw-l key="documents.folder_create">Create</kw-l></button>
+                            </form>
+                        </details>
+                    </div>
                 }
             </div>
         </header>

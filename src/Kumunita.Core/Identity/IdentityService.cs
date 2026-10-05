@@ -41,7 +41,13 @@ public sealed class IdentityService(
     IOptions<VerificationOptions> verificationOptions,
     Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
     Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
-    NotificationService? notifications = null) : IIdentityService
+    NotificationService? notifications = null,
+    // ADR 0138 — the SampleData__Enabled flag (config; the seeder's gate).
+    // Placed last (optional, default null) so no existing positional caller
+    // breaks: a null reader resolves as "not a sample-data instance" (the
+    // <c>false</c> floor — the lock is unreachable by construction, the
+    // ADR 0056 shape). DI always supplies the live value.
+    IOptions<SampleDataOptions>? sampleDataOptions = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -395,6 +401,131 @@ public sealed class IdentityService(
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // ── Sample-data change-password lock (ADR 0138) ────────────────────────
+
+    /// <inheritdoc />
+    public Task<bool> IsSampleDataEnabledAsync()
+    {
+        // ADR 0138 read seam: the SampleData__Enabled flag (config, the seeder's
+        // own gate — ADR 0056). A missing reader (the test-construction floor)
+        // or an unset flag both yield `false`: the sample-data surfaces are
+        // unreachable by construction on a real instance (the "unreachable by
+        // construction" shape). A pure config read — no audit row, no DB.
+        return Task.FromResult(sampleDataOptions?.Value.Enabled ?? false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsSamplePasswordChangeLockedAsync()
+    {
+        // ADR 0138 read seam: the instance gate (LocaleSettings.
+        // SamplePasswordChangeLocked) with the `false` floor — a missing
+        // singleton or an unset value both yield `false`, so a fresh or real
+        // instance never blocks a password change (the deliberate inverse of
+        // IsSignupOpenAsync's `true` floor; the MessagingEnabled shape). A read
+        // (no audit row); the SampleData__Enabled flag is NOT consulted here —
+        // the lock is a pure instance value, and IsChangePasswordLockedForAsync
+        // combines it with the sample-account membership.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `false` floor: a null settings row (never seen — but defensively)
+        // keeps the change open; only an explicit `true` locks sample accounts.
+        // `false` floor: a null settings row keeps the change open; only an
+        // explicit `true` locks sample accounts.
+        return settings is not null && settings.SamplePasswordChangeLocked;
+    }
+
+    /// <inheritdoc />
+    public async Task SetSamplePasswordChangeLockedAsync(bool locked, string adminSubjectId)
+    {
+        // ADR 0138 write seam: the admin-settled instance gate (LocaleSettings
+        // singleton, the same doc the signup / notify / timezone / date-format
+        // lanes read and write) + exactly one audit row (via: Admin, action
+        // "sample.set-password-lock", target "sample") in the same session (C3
+        // — no silent, unaudited access). The same single-target
+        // singleton-toggle shape as SetSignupOpenAsync (the timezone.set-default
+        // / dateformat.set-default precedent). `locked` is the authoritative new
+        // value.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetSignupOpenAsync shape) and set the
+        // gate; the other singleton fields are untouched — this is the sample
+        // password lock only.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { SamplePasswordChangeLocked = locked };
+        }
+        else
+        {
+            settings.SamplePasswordChangeLocked = locked;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "sample.set-password-lock",
+            TargetKind = "sample",
+            TargetId = "sample",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsChangePasswordLockedForAsync(string subjectId)
+    {
+        // ADR 0138 decision seam: the single place the "is this account locked
+        // out of changing its own password?" rule lives, so the resident
+        // /account/password surface and the ChangePasswordAsync enforcement
+        // guard below agree. Four conjuncts:
+        //   (1) the instance carries the closed set (SampleData__Enabled);
+        //   (2) the admin opted the instance in (the locale gate);
+        //   (3) the subject is a sample account (a member of the closed
+        //       SampleAccountEmails set, by its profile e-mail);
+        //   (4) the subject is NOT a GlobalAdmin (the sample admin is exempt).
+        // Any real (non-sample) account, or the sample admin, is never locked
+        // (short-circuit on (3)/(4)) — only a non-admin sample account on an
+        // opted-in demo instance is.
+        if (!await IsSampleDataEnabledAsync())
+            return false;
+        if (!await IsSamplePasswordChangeLockedAsync())
+            return false;
+
+        // (3) sample-account membership by profile e-mail (the ADR 0078 closed
+        // set the notification-suppression gate compares against — the same
+        // single source of truth, so the lock and the suppression cannot drift).
+        var profile = await userInfo.GetProfileAsync(subjectId);
+        var email = profile?.Email;
+        if (string.IsNullOrWhiteSpace(email)
+            || !Kumunita.Core.Bootstrap.SampleDataSeeder.SampleAccountEmails.Contains(email.Trim()))
+            return false;
+
+        // (4) the sample admin is exempt — a sample account holding GlobalAdmin
+        // (the seed admin) may still change its own password, by construction.
+        var user = await userManager.FindByIdAsync(subjectId);
+        if (user is null)
+            return false;   // no account → not a lockable sample account
+        var roles = await userManager.GetRolesAsync(user);
+        if (roles.Contains(Roles.GlobalAdmin))
+            return false;
+
+        return true;
+    }
+
     // ── Admin account notifications (ADR 0077 — the account.signup /
     //    account.verified notify gate + the GlobalAdmin emitters) ──
 
@@ -513,6 +644,283 @@ public sealed class IdentityService(
         });
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ── ADR 0142 — account deletion (the resident-leave / admin-removal lane) ──
+
+    /// <inheritdoc />
+    public async Task DeleteAccountAsync(string targetSubjectId, string adminSubjectId)
+    {
+        // ADR 0142 — the self-serve vs. admin distinction.
+        //   * Self-deletion (adminSubjectId == targetSubjectId): the resident
+        //     is deleting *their own* account. No GlobalAdmin gate — any
+        //     resident may leave the platform. The audit row is Via: Owner.
+        //   * Admin-initiated (adminSubjectId != targetSubjectId): a
+        //     GlobalAdmin is removing *another* resident. The GlobalAdmin
+        //     gate applies (the RequireGlobalAdminAsync shape — the
+        //     BlockAsync / UnblockAsync precedent; the fail-closed pin). The
+        //     audit row is Via: Admin.
+        var isSelfDeletion = string.Equals(
+            targetSubjectId, adminSubjectId, StringComparison.Ordinal);
+
+        if (isSelfDeletion)
+        {
+            // Self-deletion — the resident acts on their own account.
+            // ADR 0142 D5 gate: the self-serve lane is reachable only by a
+            // GlobalAdmin (a non-GlobalAdmin's crafted POST is refused
+            // server-side, the fail-closed pin). The resident's current
+            // password was already verified by the Web controller before
+            // reaching here, so the lane itself only checks the standing.
+            var self = await userManager.FindByIdAsync(targetSubjectId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
+            var selfRoles = (await userManager.GetRolesAsync(self).ConfigureAwait(false)).ToList();
+            if (!selfRoles.Contains(Roles.GlobalAdmin))
+                throw new UnauthorizedAccessException(
+                    "The self-serve delete-account lane is only available to a " +
+                    "GlobalAdmin. A non-GlobalAdmin resident cannot delete " +
+                    "their own account — contact an administrator to remove " +
+                    "the account.");
+            await DeleteCoreAsync(
+                targetSubjectId, self,
+                actorId: targetSubjectId,
+                via: Authorization.AccessVia.Owner);
+            return;
+        }
+
+        // Admin-initiated deletion of a *different* account.
+        // 1. Admin gate (the RequireGlobalAdminAsync shape).
+        var admin = await RequireGlobalAdminAsync(adminSubjectId).ConfigureAwait(false);
+        _ = admin;
+
+        // 2. The target must exist (the BlockAsync / SetBlockedAsync shape).
+        var target = await userManager.FindByIdAsync(targetSubjectId).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
+
+        await DeleteCoreAsync(
+            targetSubjectId, target,
+            actorId: adminSubjectId,
+            via: Authorization.AccessVia.Admin);
+    }
+
+    // ── ADR 0143 — guardian delete-child (the GU standing over the ADR 0142 core) ──
+
+    /// <inheritdoc />
+    public async Task DeleteChildAccountAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // Standing gate FIRST (G·2/G·3, live — the GuardActiveLinkAsync
+        // shape every other GU seam runs, and the house convention: gate
+        // before existence). An ACTIVE GuardianLink for this exact
+        // (guardian, child) pair must exist, else refuse before any write.
+        // A child is never a GlobalAdmin, so there is no GlobalAdmin gate
+        // here (C·2 deny-by-default: the lane is reachable only through an
+        // active link); a non-guardian's crafted call is refused with
+        // UnauthorizedAccessException (the Web's 404). Checking the standing
+        // first also keeps the response uniform for an existing vs. a
+        // non-existing target (both a 404 — no account-existence oracle),
+        // the ADR 0012/0013 "a non-guardian learns nothing" shape.
+        await using (var gateSession = documentStore.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var link = await gateSession.Query<Kumunita.Core.UserInfo.GuardianLink>()
+                .Where(l => l.GuardianId == guardianId && l.ChildId == childId
+                            && l.Status == GuardianLinkStatus.Active)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+            if (link is null)
+                throw new UnauthorizedAccessException(
+                    $"No active guardian link for ({guardianId}, {childId}).");
+        }
+
+        // The target must exist (a defensive check AFTER the standing gate —
+        // the SuspendChildAsync "load the profile, missing → InvalidOperationException"
+        // shape). A second call for an already-deleted child reaches the
+        // standing gate first (the successful delete dissolved the link, C·5)
+        // and is refused with the same 404 — not a silent no-op.
+        var target = await userManager.FindByIdAsync(childId).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"No account '{childId}'.");
+
+        await DeleteCoreAsync(
+            childId, target,
+            actorId: guardianId,
+            via: Authorization.AccessVia.Guardian,
+            // ADR 0143 C·5 — no dangling standing: dissolve every
+            // GuardianLink row for the deleted child (any status) in the
+            // same session as the core's writes, so a co-guardian's row
+            // does not dangle pointing at a deleted account.
+            dissolveGuardianLinksForChildAsync: async (session, now) =>
+            {
+                var rows = await session.Query<Kumunita.Core.UserInfo.GuardianLink>()
+                    .Where(l => l.ChildId == childId)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+                foreach (var row in rows)
+                {
+                    if (row.Status != GuardianLinkStatus.Dissolved)
+                    {
+                        row.Status = GuardianLinkStatus.Dissolved;
+                        row.DissolvedAt = now;
+                        row.DissolvedBy = guardianId;
+                    }
+                    session.Store(row);
+                }
+            });
+    }
+
+    /// <summary>
+    /// ADR 0142 — the shared body of <see cref="DeleteAccountAsync"/> for both
+    /// the self-deletion and admin-initiated branches: the last-GlobalAdmin
+    /// guard, the pseudonymization, the membership/profile removal, the audit
+    /// row, and the Identity account deletion. The branch-specific actor +
+    /// <c>Via</c> are passed in (the self-serve row is <c>Via: Owner</c>; the
+    /// admin row is <c>Via: Admin</c>).
+    /// </summary>
+    private async Task DeleteCoreAsync(
+        string targetSubjectId, User target, string actorId, Authorization.AccessVia via,
+        System.Func<IDocumentSession, DateTimeOffset, Task>? dissolveGuardianLinksForChildAsync = null)
+    {
+        // Last-GlobalAdmin guard (the lockout pin, the OPS.md §9 "Hand over
+        // admin" precedent). If the target is a GlobalAdmin and they are the
+        // only one on the instance, refuse before any write — this applies to
+        // *both* branches (a lone GlobalAdmin cannot self-delete, and no
+        // admin may delete the last GlobalAdmin). The recovery path is to
+        // promote a second GlobalAdmin first (the "Hand over admin" procedure).
+        var targetRoles = (await userManager.GetRolesAsync(target).ConfigureAwait(false)).ToList();
+        if (targetRoles.Contains(Roles.GlobalAdmin))
+        {
+            var allGAs = (await userManager
+                .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false)).ToList();
+            var otherGAs = allGAs.Where(u => u?.Id is string uid && uid != targetSubjectId).ToList();
+            if (otherGAs.Count == 0)
+                throw new InvalidOperationException(
+                    "This is the last GlobalAdmin on the instance. Promote a " +
+                    "second GlobalAdmin before deleting this account (the " +
+                    "OPS.md §9 'Hand over admin' procedure).");
+        }
+
+        // 4. Open the Marten session for the pseudonymization + membership
+        //    removal + audit row (the C3 single-commit shape — all in one
+        //    SaveChangesAsync).
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+        var now = DateTimeOffset.UtcNow;
+
+        // 5. Pseudonymize the target's audit rows (the OPS.md §9 /
+        //    ARCHITECTURE.md §5 "Deletion-of-account interaction" — the
+        //    rows remain, the actor id is rewritten to a tombstone). The
+        //    summary row (step 9 below) is the audit-of-the-deletion; the
+        //    per-row rewrites are the pseudonymization itself.
+        var tombstone = $"deleted:{targetSubjectId}";
+        var auditRows = await session.Query<Authorization.AccessAudit>()
+            .Where(a => a.ActorId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var row in auditRows)
+        {
+            row.ActorId = tombstone;
+            if (row.EffectivePrincipalId == targetSubjectId)
+                row.EffectivePrincipalId = tombstone;
+            session.Store(row);
+        }
+
+        // 6. Remove the target's group memberships (they leave every group;
+        //    the strong-consistency C4 invariant means the next
+        //    GetGroupIdsAsync call will not find them). The audit rows for
+        //    the *individual* removals are subsumed by the single
+        //    "account.delete" summary row (step 9) — the same "one summary,
+        //    many rows" shape the purge job's AuditPurgeSummary follows.
+        var groupMemberships = await session.Query<Kumunita.Core.UserInfo.GroupMembership>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var gm in groupMemberships)
+        {
+            session.Delete(gm);
+        }
+
+        // 7. Remove the target's component memberships (posting rights) and
+        //    moderator assignments (governing scope).
+        var compMemberships = await session.Query<Kumunita.Core.UserInfo.ComponentMembership>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var cm in compMemberships)
+        {
+            session.Delete(cm);
+        }
+
+        var modAssignments = await session.Query<Kumunita.Core.UserInfo.ModeratorAssignment>()
+            .Where(m => m.UserId == targetSubjectId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var ma in modAssignments)
+        {
+            session.Delete(ma);
+        }
+
+        // 8. Remove the target's Profile row (their PII — name, email, phone,
+        //    address, bio, preferences — is gone). The directory's
+        //    non-blocked filter (DirectoryService's `!p.Blocked`) would hide
+        //    a Blocked profile, but deletion is the *stronger* signal: the
+        //    row is simply absent, so every read path (the directory, the
+        //    profile detail, the author-name resolution) falls back to the
+        //    raw subject id (the existing null-safe `profile?.DisplayName ??
+        //    authorId` idiom).
+        var profile = await session.LoadAsync<Kumunita.Core.UserInfo.Profile>(
+            targetSubjectId, ct).ConfigureAwait(false);
+        if (profile is not null)
+        {
+            session.Delete(profile);
+        }
+
+        // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
+        //     child (any status) in this same session (C·5 — no dangling
+        //     standing; C4 strong-consistency). The ADR 0142 self/admin
+        //     branches pass no callback (a GlobalAdmin or a self-deleting
+        //     resident is never a child in a GuardianLink); the guardian
+        //     delete-child branch supplies one. The per-row dissolution
+        //     writes nothing of their own — the single "account.delete"
+        //     summary row (step 9) subsumes them, the ADR 0142 "one
+        //     summary, many rows" shape.
+        if (dissolveGuardianLinksForChildAsync is not null)
+        {
+            await dissolveGuardianLinksForChildAsync(session, now).ConfigureAwait(false);
+        }
+
+        // 9. Exactly one audit row — the "account.delete" summary (the
+        //    AuditPurgeSummary precedent: one summary row for a bulk
+        //    operation). The actor is the one who performed the deletion
+        //    (the resident themselves on self-deletion, the GlobalAdmin on
+        //    admin-initiated); the target is the deleted account. The
+        //    <c>Via</c> tag carries the branch (Owner / Admin).
+        session.Store(AuditRow(now, actorId, actorId,
+            "account.delete", AccountKind, targetSubjectId,
+            via, Authorization.AccessOutcome.Allow));
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // 10. Delete the Identity account (EF Core, the identity schema).
+        //     This removes the password hash, the role assignments, and the
+        //     user row itself. Done AFTER the Marten commit (the
+        //     "the account exists before its derivative mt rows" ordering
+        //     the class doc's "two stores, one Postgres" paragraph
+        //     describes, inverted: the mt cleanup commits first, then the
+        //     identity row is removed). A rare failure between the two is
+        //     the accepted cross-store window (the same "accepted cross-
+        //     store window" the class doc already acknowledges for the
+        //     register/verify lanes).
+        var result = await userManager.DeleteAsync(target).ConfigureAwait(false);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                "Failed to delete the identity account: " +
+                string.Join("; ", result.Errors.Select(e => e.Description)));
+        }
+
+        logger.LogInformation(
+            "Actor {Actor} (via {Via}) deleted account {Target}. {AuditRows} audit rows pseudonymized, {GroupMemberships} group memberships removed, {CompMemberships} component memberships removed, {ModAssignments} moderator assignments removed.",
+            actorId, via, targetSubjectId,
+            auditRows.Count, groupMemberships.Count,
+            compMemberships.Count, modAssignments.Count);
     }
 
     // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
@@ -792,6 +1200,22 @@ public sealed class IdentityService(
     /// <inheritdoc />
     public async Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin)
     {
+        // ADR 0138 — the enforcement guard (the single place the lock bites,
+        // so the resident /account/password surface and this write path can
+        // never disagree). It applies to the self-serve lane only (byAdmin
+        // false): an admin's reset of a sample account is always allowed (an
+        // admin must be able to recover a demo credential they set), so the
+        // guard is a no-op for the byAdmin path. A locked, non-admin sample
+        // account is denied *before* any write (no audit row for the blocked
+        // attempt — the RemoveLanguageAsync / M·7 fail-closed pin) and before
+        // any security-stamp rotation (so the account stays usable).
+        if (!byAdmin && await IsChangePasswordLockedForAsync(subjectId))
+        {
+            throw new UnauthorizedAccessException(
+                "This is a demo (sample) account and password changes are locked by the " +
+                "administrator. Use a different account if you need to test a password change.");
+        }
+
         var user = await userManager.FindByIdAsync(subjectId)
             ?? throw new InvalidOperationException($"No account '{subjectId}'.");
 

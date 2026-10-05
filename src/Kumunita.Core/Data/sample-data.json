@@ -79,6 +79,35 @@
         "history",
         "photography"
       ]
+    },
+    {
+      "email": "mila.kubiak@examplium.com",
+      "name": "Mila Kubiak",
+      "bio": "My mum Carla keeps my account going. I mostly come along to the **garden** on the green and the Saturday tidy-ups.",
+      "tagSlugs": [
+        "gardening"
+      ]
+    },
+    {
+      "email": "luka.lis@examplium.com",
+      "name": "Luka Lis",
+      "bio": "My dad David runs my account. I like the **book club** and riding my bike around the river bend — that's where the good **photography** happens.",
+      "tagSlugs": [
+        "cycling",
+        "photography"
+      ]
+    }
+  ],
+  "guardianLinks": [
+    {
+      "guardianEmail": "carla@examplium.com",
+      "childEmail": "mila.kubiak@examplium.com",
+      "daysAgo": 20
+    },
+    {
+      "guardianEmail": "david@examplium.com",
+      "childEmail": "luka.lis@examplium.com",
+      "daysAgo": 18
     }
   ],
   "moderatorAssignments": [
@@ -97,7 +126,7 @@
     {
       "slug": "kowalski-family",
       "name": "Kowalski Family",
-      "description": "Anna and Ben's household — a private organizing group (ADR 0010).",
+      "description": "Anna and Ben's household — a private organizing group.",
       "isPrivate": true,
       "ownerEmail": "anna@examplium.com",
       "memberEmails": [
@@ -109,7 +138,19 @@
         {
           "languageCode": "da",
           "name": "Familien Kowalski",
-          "description": "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
+          "description": "Anna og Bens husholdning — en privat organiseringsgruppe.",
+          "daysAgo": 40
+        },
+        {
+          "languageCode": "de",
+          "name": "Familie Kowalski",
+          "description": "Der Haushalt von Anna und Ben — eine private Organisationsgruppe.",
+          "daysAgo": 40
+        },
+        {
+          "languageCode": "fr",
+          "name": "Famille Kowalski",
+          "description": "Le ménage d’Anna et de Ben — un groupe d’organisation privé.",
           "daysAgo": 40
         }
       ]
@@ -138,6 +179,12 @@
           "name": "Gadegrønt",
           "description": "Naboer, der arbejder på den fælles grønflade ved legepladsen.",
           "daysAgo": 30
+        },
+        {
+          "languageCode": "fr",
+          "name": "Square de la rue",
+          "description": "Des voisins qui travaillent sur le square partagé près de l’aire de jeux.",
+          "daysAgo": 35
         }
       ]
     },
@@ -154,7 +201,20 @@
         "david@examplium.com"
       ],
       "daysAgo": 54,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Rückstraße-Aufräumteam",
+          "description": "Das kleine Team, das die Rückstraße freihält — zwei mit einer Rechen, einer mit dem Kaffee.",
+          "daysAgo": 53
+        },
+        {
+          "languageCode": "fr",
+          "name": "Équipe de nettoyage de la cour",
+          "description": "La petite équipe qui garde la cour propre — deux avec un râteau, une avec le café.",
+          "daysAgo": 53
+        }
+      ]
     },
     {
       "slug": "book-club",
@@ -168,7 +228,20 @@
         "carla@examplium.com"
       ],
       "daysAgo": 32,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Der Bücherclub des Blocks",
+          "description": "Ein langsames Lesen, ein Kaffee, und ein oder zwei, die das Buch wirklich zu Ende bringen.",
+          "daysAgo": 31
+        },
+        {
+          "languageCode": "fr",
+          "name": "Le club de lecture du quartier",
+          "description": "Une lecture tranquille, un café, et un ou deux qui finissent vraiment le livre.",
+          "daysAgo": 31
+        }
+      ]
     },
     {
       "slug": "bike-repair-crew",
@@ -182,7 +255,20 @@
         "anna@examplium.com"
       ],
       "daysAgo": 51,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Fahrrad-Reparaturgruppe",
+          "description": "Pumpe, Schlauch, Basiswerkzeuge. Wenn dein Fahrrad platt ist, komm in den Lagerraum.",
+          "daysAgo": 50
+        },
+        {
+          "languageCode": "fr",
+          "name": "Équipe de réparation vélo",
+          "description": "Pompe, chambre à air, outils de base. Si votre vélo est à plat, passez au local.",
+          "daysAgo": 50
+        }
+      ]
     },
     {
       "slug": "garden-club",
@@ -197,7 +283,20 @@
         "david@examplium.com"
       ],
       "daysAgo": 34,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Gartenclub des Grüns",
+          "description": "Die Beete, die Keimlinge und die langsame Geschichte von dem, was diese Saison hochgekommen ist.",
+          "daysAgo": 33
+        },
+        {
+          "languageCode": "fr",
+          "name": "Club de jardinage du square",
+          "description": "Les plates-bandes, les semis, et la lente histoire de ce qui a poussé cette saison.",
+          "daysAgo": 33
+        }
+      ]
     },
     {
       "slug": "kitchen-table",
@@ -211,7 +310,20 @@
         "david@examplium.com"
       ],
       "daysAgo": 19,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Der Küchentisch",
+          "description": "Was hier im Ofen war, und die zwei oder drei, die das letzte Stück nehmen.",
+          "daysAgo": 18
+        },
+        {
+          "languageCode": "fr",
+          "name": "La table de la cuisine",
+          "description": "Ce qui est passé au four par ici, et les deux ou trois qui prendront la dernière part.",
+          "daysAgo": 18
+        }
+      ]
     },
     {
       "slug": "photo-corner",
@@ -225,7 +337,20 @@
         "anna@examplium.com"
       ],
       "daysAgo": 55,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Die Foto-Ecke",
+          "description": "Ein kleiner Spaziergang mit einer Kamera, eine langsame Sichtung und ein oder zwei Abzüge für die Lobby.",
+          "daysAgo": 54
+        },
+        {
+          "languageCode": "fr",
+          "name": "Le coin photo",
+          "description": "Une petite promenade avec un appareil, un visionnage tranquille, et une ou deux épreuves pour le hall.",
+          "daysAgo": 54
+        }
+      ]
     },
     {
       "slug": "quiet-hours",
@@ -239,7 +364,20 @@
         "david@examplium.com"
       ],
       "daysAgo": 33,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Die ruhigen Stunden",
+          "description": "Die kleine Gruppe, die die Abende des Blocks ruhig hält — die zwei oder drei, die die erste Gitarre hören.",
+          "daysAgo": 32
+        },
+        {
+          "languageCode": "fr",
+          "name": "Les heures calmes",
+          "description": "Le petit groupe qui garde les soirées du quartier calmes — les deux ou trois qui entendent la première guitare.",
+          "daysAgo": 32
+        }
+      ]
     },
     {
       "slug": "front-desk",
@@ -253,7 +391,20 @@
         "carla@examplium.com"
       ],
       "daysAgo": 16,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Das Empfangsbüro",
+          "description": "Die zwei oder drei, die das Register, den Tauschplatz und das 'Ist jemand zu Hause?'-Board in Ordnung halten.",
+          "daysAgo": 15
+        },
+        {
+          "languageCode": "fr",
+          "name": "Le bureau d'accueil",
+          "description": "Les deux ou trois qui gardent en ordre le registre, le troc de livres et le panneau « quelqu'un est-il à la maison ? ».",
+          "daysAgo": 15
+        }
+      ]
     },
     {
       "slug": "walking-group",
@@ -268,7 +419,20 @@
         "david@examplium.com"
       ],
       "daysAgo": 22,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Die Spaziergang-Gruppe",
+          "description": "Eine flache Runde, ein Kaffee und das langsame Gespräch der Woche. Jeder Schritt ist in Ordnung.",
+          "daysAgo": 21
+        },
+        {
+          "languageCode": "fr",
+          "name": "Le groupe de marche",
+          "description": "Une boucle plate, un café, et les discussions lentes de la semaine. Tout le monde marche à son rythme.",
+          "daysAgo": 21
+        }
+      ]
     },
     {
       "slug": "board-game-night",
@@ -282,7 +446,20 @@
         "anna@examplium.com"
       ],
       "daysAgo": 30,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "name": "Brettspielpartie",
+          "description": "Karten, Plättchen, Würfel — der wöchentliche Freitag, an dem der Gemeinschaftsraum zu einem Spieltisch wird.",
+          "daysAgo": 29
+        },
+        {
+          "languageCode": "fr",
+          "name": "Soirée de jeux de société",
+          "description": "Cartes, tuiles, dés — le vendredi hebdomadaire où la salle communautaire devient une table de jeu.",
+          "daysAgo": 29
+        }
+      ]
     }
   ],
   "tags": [
@@ -586,6 +763,12 @@
           "title": "Velkommen til naboskabet",
           "body": "Dette er en demo-instans af **Kumunita**, en selvhostet platform til ét nabolag.\n\nAlt, hvad du ser her, er eksempeldata — fri til at redigere, skjule eller slette, mens du udforsker.",
           "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bienvenue sur le panneau du quartier",
+          "body": "Ceci est une instance de démo de **Kumunita**, une plateforme auto-hébergée pour un seul quartier. Tout ce que vous voyez ici est des données d’exemple — libres à modifier, masquer ou supprimer pendant que vous explorez.",
+          "daysAgo": 14
         }
       ]
     },
@@ -601,6 +784,18 @@
           "languageCode": "da",
           "title": "Testplatform",
           "body": "Dette er en testplatform — ikke beregnet til reel brug.\n\nTjenester kan holde op med at virke når som helst, data kan slettes når som helst, og der kan ske ændringer når som helst.\n\nDenne testplatform er i øjeblikket åben for, at nye brugere kan tilmelde sig, så alle kan prøve den — del derfor ikke nogen reel eller privat information her."
+        },
+        {
+          "languageCode": "de",
+          "title": "Test-Plattform",
+          "body": "Dies ist eine Test-Plattform — nicht für den echten Gebrauch. Dienste können jederzeit aufhören zu funktionieren, Daten können jederzeit gelöscht werden, und Änderungen können jederzeit passieren. Diese Test-Plattform ist gegenwärtig für neue Benutzer zur Registrierung offen, damit jeder sie ausprobieren kann — teilt also hier keine echten oder privaten Informationen.",
+          "daysAgo": 0
+        },
+        {
+          "languageCode": "fr",
+          "title": "Plateforme de test",
+          "body": "Ceci est une plateforme de test — pas destinée à un usage réel. Les services peuvent cesser de fonctionner à tout moment, les données peuvent être supprimées à tout moment, et des changements peuvent survenir à tout moment. Cette plateforme de test est actuellement ouverte aux nouveaux inscrits, donc n’y partagez aucune information réelle ou privée.",
+          "daysAgo": 0
         }
       ]
     },
@@ -615,6 +810,18 @@
           "languageCode": "da",
           "title": "Frivillige søges til oprydning lørdag",
           "body": "Vi rydder bagvejen på **lørdag**. Tag handsker med — vi stiller med poser.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "de",
+          "title": "Helfer für die Samstag-Säuberung gesucht",
+          "body": "Wir räumen die Rückgasse am **Samstag** auf. Bringt Handschuhe mit; die Tüten stellen wir.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bénévoles recherchés pour le nettoyage du samedi",
+          "body": "Nous déblayons la cour le **samedi**. Apportez des gants ; nous fournissons les sacs.",
           "daysAgo": 3
         }
       ]
@@ -636,6 +843,12 @@
           "languageCode": "da",
           "title": "Test af brandalarmer denne uge",
           "body": "Bygningens alarm vil lyde **torsdag 09:00–09:30**. Det er en test — brug venligst ikke evakueringsstigerne, medmindre de faktisk er i brug.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "de",
+          "title": "Rauchmelder-Test diese Woche",
+          "body": "Der Gebäudealarm wird am **Donnerstag 09:00–09:30** lösen. Es ist ein Test — nutzt die Flucht-Treppe nur, wenn sie tatsächlich in Verwendung ist.",
           "daysAgo": 1
         }
       ]
@@ -724,7 +937,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Rauchmelder-Prüfung diesen Monat",
+          "body": "Die Hausordnung bittet jede Einheit, ihren Rauchmelder zu prüfen. Es dauert eine Minute — macht es diese Woche.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Vérification des détecteurs de fumce ce mois-ci",
+          "body": "Le règlement invite chaque logement à tester son détecteur de fumée. Ça prend une minute — faites-le cette semaine.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "authorEmail": "admin@examplium.com",
@@ -734,7 +960,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Winterbeleuchtung auf dem Weg",
+          "body": "Die Weglichter werden auf die länger brennenden Leuchttäuschel ausgetauscht. Rechnet mit einem Flimmern an einem Abend, während sie verdrahtet werden.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Éclairage hivernal du chemin",
+          "body": "Les luminaires du chemin seront remplacés par des lampes à durée de vie plus longue. Comptez un scintillement un soir lors de la réfection du câblage.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "authorEmail": "anna@examplium.com",
@@ -744,7 +983,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 13,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Defekten Handlauf melden",
+          "body": "Wenn ihr einen lockeren oder verbogenen Handlauf an einer Treppe seht, sagt es dem Rezeptionisten, damit wir die Reparatur buchen können.",
+          "daysAgo": 12
+        },
+        {
+          "languageCode": "fr",
+          "title": "Signaler une main courante cassée",
+          "body": "Si vous voyez une main courante lâche ou tordue dans un escalier, prévenez la réception afin que nous puissions programmer la réparation.",
+          "daysAgo": 12
+        }
+      ]
     },
     {
       "authorEmail": "ben@examplium.com",
@@ -754,7 +1006,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Erste-Hilfe-Kasten aufgefüllt",
+          "body": "Der Erste-Hilfe-Kasten an der Eingangstür ist aufgefüllt — neue Verbände, neue Handschuhe, neue Haltbarkeitsdaten auf den Pflastern.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Trousse de premiers soins réapprovisionnée",
+          "body": "La trousse de premiers secours près de l'entrée a été réapprovisionnée — nouveaux pansements, nouveaux gants, nouvelles dates de péremption sur les compresses.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "authorEmail": "carla@examplium.com",
@@ -764,7 +1029,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 8,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Winterpark-Erinnerung",
+          "body": "Da diese Woche der erste Schnee erwartet wird, vergesst nicht, auf der Rückstraße Platz zu lassen, damit der Schneepflug wenden kann.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Rappel de stationnement hivernal",
+          "body": "Avec la première neige attendue cette semaine, pensez à laisser de la place sur la cour pour que le déneigeuse puisse faire demi-tour.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "authorEmail": "david@examplium.com",
@@ -774,7 +1052,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 20,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fluchtweg-Schilder",
+          "body": "Wir ersetzen diesen Monat einige verblasste Fluchtweg-Schilder. Wenn ein Schild fehlt oder zerrissen ist, sagt uns Bescheid.",
+          "daysAgo": 19
+        },
+        {
+          "languageCode": "fr",
+          "title": "Panneaux d'évacuation",
+          "body": "Nous remplaçons ce mois-ci quelques panneaux d'évacuation décolorés. Si un panneau est manquant ou déchiré, faites-le-nous savoir.",
+          "daysAgo": 19
+        }
+      ]
     },
     {
       "authorEmail": "carla@examplium.com",
@@ -784,7 +1075,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 3,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Mantelaufbewahrung am Tor",
+          "body": "Diesen Winter wird ein Mantelständer am Tor stehen. Bringt auch eure Handschuhe mit — es gibt eine kleine Gemeinschaftsbank an der Tür.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Porte-manteau à la porte",
+          "body": "Un porte-manteau sera disposé près de la porte cet hiver. Apportez aussi vos gants — il y a un petit banc partagé près de la porte.",
+          "daysAgo": 3
+        }
+      ]
     },
     {
       "authorEmail": "carla@examplium.com",
@@ -794,7 +1098,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 23,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gartenschläuche für den Winter einräumen",
+          "body": "Bitte Schläuche einwickeln und einräumen, bevor der erste Frost kommt, damit die Außenzapfstellen abgeleitet werden können.",
+          "daysAgo": 22
+        },
+        {
+          "languageCode": "fr",
+          "title": "Remisage des tuyaux d'arrosage pour l'hiver",
+          "body": "Veuillez enrouler et ranger les tuyaux d'arrosage avant le premier gel afin que les robinets extérieurs puissent être vidés.",
+          "daysAgo": 22
+        }
+      ]
     },
     {
       "authorEmail": "ben@examplium.com",
@@ -804,7 +1121,20 @@
       "componentId": "safety",
       "pinned": false,
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Nächstes Feuer-Drill-Datum",
+          "body": "Das nächste geplante Feuer-Drill ist der zweite Donnerstag im Monat. Rechnet mit einem kurzen All-Clear zur üblichen Zeit.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Prochaine date d'exercice d'évacuation",
+          "body": "Le prochain exercice d'évacuation est prévu le deuxième jeudi du mois. Comptez un court signal de fin à l'heure habituelle.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "authorEmail": "admin@examplium.com",
@@ -814,7 +1144,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 12,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Dachrinne reinigen",
+          "body": "Die Dachrinne wird diesen Monat gereinigt. Leitern könnten an einem Nachmittag auf der Nordseite stehen.",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "title": "Nettoyage de la gouttière du toit",
+          "body": "La gouttière du toit sera nettoyée ce mois-ci. Des échelles pourraient être disposées sur le côté nord pendant un après-midi.",
+          "daysAgo": 11
+        }
+      ]
     },
     {
       "authorEmail": "anna@examplium.com",
@@ -824,7 +1167,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 20,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Zaun neu streichen aufgeschoben",
+          "body": "Das Neulackieren des Zauns wird auf den Frühling verschoben — das Budget ist dieses Quartal enger, und der aktuelle Anstrich hält noch.",
+          "daysAgo": 19
+        },
+        {
+          "languageCode": "fr",
+          "title": "Réenduction de la clôture reportée",
+          "body": "La réenduction de la clôture est reportée au printemps — le budget est plus serré ce trimestre, et la peinture actuelle tient encore.",
+          "daysAgo": 19
+        }
+      ]
     },
     {
       "authorEmail": "admin@examplium.com",
@@ -834,7 +1190,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 27,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinschaftliche Werkzeugkiste jetzt offen",
+          "body": "Die gemeinsame Werkzeugkiste im Lagerraum ist für alle offen. Unterschreibt das kleine Blatt an der Tür, bevor ihr leihnehmt.",
+          "daysAgo": 26
+        },
+        {
+          "languageCode": "fr",
+          "title": "Coffre d'outils partagé maintenant ouvert",
+          "body": "Le coffre d'outils partagé dans le local est ouvert à tous. Signez la petite feuille sur la porte avant d'emprunter.",
+          "daysAgo": 26
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -844,7 +1213,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 24,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Wasserzähler-Ablesewerte",
+          "body": "Die Wasserzähler-Ablesewerte für diesen Monat sind Ende des Monats fällig. Fotos funktionieren gut — keinen Zähler abgeben.",
+          "daysAgo": 23
+        },
+        {
+          "languageCode": "fr",
+          "title": " Relevés des compteurs d'eau",
+          "body": "Les relevés des compteurs d'eau de ce mois sont dus à la fin du mois. Des photos suffisent — pas besoin de remettre le compteur.",
+          "daysAgo": 23
+        }
+      ]
     },
     {
       "authorEmail": "carla@examplium.com",
@@ -854,7 +1236,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 6,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Aufzug-Wartung",
+          "body": "Der Aufzug ist für einen vollen Tag für seine jährliche Wartung außer Betrieb. Nutzt an diesem Tag bitte die Treppe.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Maintenance de l'ascenseur",
+          "body": "L'ascenseur sera hors service un jour entier pour sa maintenance annuelle. Utilisez les escaliers ce jour-là, s'il vous plaît.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -864,7 +1259,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 27,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Zugangstür-Abschlag",
+          "body": "Der Türabschlag der Lobby wird justiert — er fühlt sich ein oder zwei Tage lang etwas 'schwer' an, während er nachgestellt wird.",
+          "daysAgo": 26
+        },
+        {
+          "languageCode": "fr",
+          "title": "Fermeture de la porte du hall",
+          "body": "Le ferme-porte de l'entrée est en cours d'ajustement — il peut paraître un peu « lourd » un ou deux jours pendant qu'il est retendu.",
+          "daysAgo": 26
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -874,7 +1282,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Recyclingtonnen austauschen",
+          "body": "Die Recyclingtonnen am Hintertor werden nächste Woche gegen größere getauscht. Die grüne ist jetzt für Glas.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Échange des poubelles de recyclage",
+          "body": "Les poubelles de recyclage près du portail arrière seront remplacées par de plus grandes la semaine prochaine. La verte est désormais pour le verre.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -884,7 +1305,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 11,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fahrrad-Reparaturstand",
+          "body": "Ein kleiner Fahrrad-Reparaturstand ist im Lagerraum — Pumpe, Schlauch, Basiswerkzeuge. Kostenlos in Benutzung; lasst ihn so, wie ihr ihn gefunden habt.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Poste de réparation vélo",
+          "body": "Un petit poste de réparation vélo est installé dans le local — pompe, chambre à air, outils de base. Gratuit à utiliser ; laissez-le comme vous l'avez trouvé.",
+          "daysAgo": 10
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -894,7 +1328,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 3,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Neue Aushang-Layout",
+          "body": "Das Aushang-Board hat ein neues Layout: Sicherheit links, Sozial rechts. Die alten Papiere wurden abgenommen.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Nouvelle disposition du tableau d'affichage",
+          "body": "Le tableau d'affichage a une nouvelle disposition : la sécurité à gauche, le social à droite. Les anciens documents ont été retirés.",
+          "daysAgo": 3
+        }
+      ]
     },
     {
       "authorEmail": "admin@examplium.com",
@@ -904,7 +1351,20 @@
       "componentId": "maintenance",
       "pinned": false,
       "daysAgo": 25,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinschaftlicher Schirmständer",
+          "body": "Ein Schirmständer steht jetzt an der Eingangstür für Regentage. Wenn euer Schirm nach einer Woche noch drin ist, verpacken wir ihn.",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "title": "Porte-parapluie partagé",
+          "body": "Un porte-parapluies est maintenant près de la porte d'entrée pour les jours de pluie. Si le vôtre y est encore dans une semaine, nous le mettrons en boîte.",
+          "daysAgo": 24
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -914,7 +1374,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 14,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kaffee für Neuzugezogene — Anfang des Monats",
+          "body": "Wenn ihr neu im Block seid, ist der Anfang des Monats ein guter Zeitpunkt, in den Gemeinschaftsraum zu kommen — Kaffee und Kuchen, keine Agenda.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "Café des nouveaux voisins — début du mois",
+          "body": "Si vous êtes nouveau sur le quartier, le début du mois est un bon moment pour passer à la salle communautaire — café et pâtisseries, sans ordre du jour.",
+          "daysAgo": 13
+        }
+      ]
     },
     {
       "authorEmail": "moderator@examplium.com",
@@ -924,7 +1397,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 4,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Buch-Austauschregal aufgefüllt",
+          "body": "Das Buch-Austauschregal an der Lobby hat ein paar neue Titel — ein paar Kochbücher und ein Band zur Ortsgeschichte.",
+          "daysAgo": 4
+        },
+        {
+          "languageCode": "fr",
+          "title": "Étagère d'échange de livres réapprovisionnée",
+          "body": "L'étagère d'échange de livres près du hall a quelques nouveaux titres — quelques livres de cuisine et un volume d'histoire locale.",
+          "daysAgo": 4
+        }
+      ]
     },
     {
       "authorEmail": "anna@examplium.com",
@@ -934,7 +1420,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 28,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Brettspielpartie am Freitag",
+          "body": "Brettspielpartie ist am Freitag um 19:00 zurück. Bringt ein Spiel mit oder spielt unseres — Karten, Plättchen, alles dabei.",
+          "daysAgo": 27
+        },
+        {
+          "languageCode": "fr",
+          "title": "Soirée de jeux de société ce vendredi",
+          "body": "La soirée de jeux de société revient vendredi à 19h00. Apportez un jeu ou jouez les nôtres — cartes, tuiles, tout est compris.",
+          "daysAgo": 27
+        }
+      ]
     },
     {
       "authorEmail": "admin@examplium.com",
@@ -944,7 +1443,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 22,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ruhezeiten-Erinnerung",
+          "body": "Da die Abende kürzer werden, eine sanfte Erinnerung an die Ruhezeiten nach 22:00. Musik aus, Hunde drinnen, Bohrungen fertig.",
+          "daysAgo": 21
+        },
+        {
+          "languageCode": "fr",
+          "title": "Rappel des heures de silence",
+          "body": "Comme les soirées raccourcissent, un doux rappel des heures de silence après 22h00. Musique coupée, chiens à l'intérieur, forages terminés.",
+          "daysAgo": 21
+        }
+      ]
     },
     {
       "authorEmail": "carla@examplium.com",
@@ -954,7 +1466,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 19,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Nachbarschaftsdinner — Datum merken",
+          "body": "Das Herbst-Nachbarschaftsdinner ist Ende des Monats um 18:00. Das Anmeldeblatt kommt diese Woche.",
+          "daysAgo": 18
+        },
+        {
+          "languageCode": "fr",
+          "title": "Dîner des voisins — notez la date",
+          "body": "Le dîner des voisins d'automne est à la fin du mois, à 18h00. La feuille d'inscription sort cette semaine.",
+          "daysAgo": 18
+        }
+      ]
     },
     {
       "authorEmail": "ben@examplium.com",
@@ -964,7 +1489,20 @@
       "componentId": "social",
       "pinned": false,
       "daysAgo": 17,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinschaftsraum-Stunden aktualisiert",
+          "body": "Der Gemeinschaftsraum ist ab diesem Monat werktags von 09:00–21:00 offen. Der Codeschloss-Code ist am Aushang-Board.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "Horaires de la salle communautaire mis à jour",
+          "body": "La salle communautaire est ouverte du lundi au vendredi de 09h00 à 21h00 à partir de ce mois. Le code de la serrure est sur le tableau d'affichage.",
+          "daysAgo": 16
+        }
+      ]
     }
   ],
   "posts": [
@@ -1023,6 +1561,12 @@
           "title": "Nyt genbrugsprogram fra næste måned",
           "body": "Byen flytter glas til **tirsdage** og papir til **fredage**, fra den 1.\n\nHar nogen det nye foldeseddel? Jeg kan trykke eksemplarer til entréen.",
           "daysAgo": 4
+        },
+        {
+          "languageCode": "fr",
+          "title": "Nouveau rythme de tri à partir du mois prochain",
+          "body": "La ville décale le verre aux **mardis** et le papier aux **vendredis** à partir du 1ér. Quelqu’un a la nouvelle brochure ? Je peux imprimer des copies pour le hall.",
+          "daysAgo": 5
         }
       ]
     },
@@ -1056,6 +1600,18 @@
           "title": "Fællesmåltid på grønfladen i weekenden?",
           "body": "Har nogen lyst til en simpel fællesmad under træet **søndag**? Ingen pres — en ret hver, drikkevarer på huset (mine).",
           "daysAgo": 2
+        },
+        {
+          "languageCode": "de",
+          "title": "Potluck im Grün dieses Wochenende?",
+          "body": "Jemand ein einfacher Potluck unter dem Baum am **Sonntag**? Kein Druck — ein Gericht pro Person, Getränke sind von mir (meine).",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Repas partagé sur le square ce week-end ?",
+          "body": "Quelqu’un pour un simple repas partagé sous l’arbre le **dimanche** ? Sans pression — un plat chacun, boissons offertes (les miennes).",
+          "daysAgo": 2
         }
       ]
     },
@@ -1074,6 +1630,18 @@
           "languageCode": "da",
           "title": "Notater fra månedsmøde (udkast til kommentar)",
           "body": "Opsummering af bygningsmødet sidste uge:\n\n- Godkendte plan for havebedene\n- Udsatte ommalet af hegn til næste sæson\n- Indsamlet 3 € til fælleværktøjskassen\n\nMeld dig, hvis du er uenig i noget, inden det afsluttes.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "de",
+          "title": "Monatsversammlung-Protokoll (Entwurf zur Kommentierung)",
+          "body": "Zusammenfassung der wöchentlichen Hausversammlung: — Gartenbeet-Plan genehmigt — Zaun-Streichen auf die nächste Saison verschoben — 3 € für die Gemeinschaftswerkzeugkiste gesammelt. Markiert alles, woran ihr widerspricht, bevor es feststeht.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Compte rendu de l’assemblée (brouillon pour avis)",
+          "body": "Résumé de l’assemblée de l’immeuble de la semaine dernière : — plan des plates-bandes approuvé — réenduction de la clôture reportée — 3 € collectés pour le coffre d’outils partagé. Signalez ce avec quoi vous ne êtes pas d’accord avant validation.",
           "daysAgo": 1
         }
       ]
@@ -1108,6 +1676,12 @@
           "title": "Kender I en god lokal elektriker?",
           "body": "Vores køkkensikring slår fra konstant. Hvis nogen har brugt en lokal elektriker i år, vil jeg sætte pris på en anbefaling.",
           "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Un bon électricien local à recommander ?",
+          "body": "Le disjoncteur de la cuisine déclenche en permanence. Si quelqu’un a utilisé un électricien local cette année, je serais reconnaissant d’une recommandation.",
+          "daysAgo": 3
         }
       ]
     },
@@ -1133,6 +1707,18 @@
           "languageCode": "da",
           "title": "Gratis frøplanter i genbrugshjørnet",
           "body": "Jeg har en bakke med tomat- og basilikumfrøplanter på hylden ved sønderboksene — de første får, de første tager.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "de",
+          "title": "Gratis-Keimlinge in der Recycl-Ecke",
+          "body": "Ich habe eine Schale Tomaten- und Basilikum-Keimlinge auf dem Regal an den Tonnen — Erste kommen, erste bedienen.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Semis gratuits dans le coin du recyclage",
+          "body": "J’ai une cassolette de semis de tomate et de basilic sur l’étagère près des poubelles — premier arrivé, premier servi.",
           "daysAgo": 1
         }
       ]
@@ -1164,6 +1750,18 @@
           "languageCode": "da",
           "title": "Hvor kommer gadenavnet fra?",
           "body": "Halvdelen af kvarteret kalder det for ét, kortet siger noget andet. Veder nogen historien bagved det?"
+        },
+        {
+          "languageCode": "de",
+          "title": "Woher kommt der Straßenname?",
+          "body": "Die Hälfte des Blocks nennt es ein Ding, die Karte sagt ein anderes. Kennt jemand die Geschichte dahinter?",
+          "daysAgo": 0
+        },
+        {
+          "languageCode": "fr",
+          "title": "D’où vient le nom de la rue ?",
+          "body": "La moitié du quartier l’appelle d’une façon, la carte en dit une autre. Quelqu’un connaît l’histoire derrière ?",
+          "daysAgo": 0
         }
       ]
     },
@@ -1188,6 +1786,18 @@
           "title": "Plan for grønfladen til foråret",
           "body": "Udkast til de fælles bed:\n\n- Nordbed: urter (basilikum, persille)\n- Syd­bed: tomater\n\nStem i tråden, så afslutter jeg frølisten.",
           "daysAgo": 2
+        },
+        {
+          "languageCode": "de",
+          "title": "Gartenbeet-Plan für den Frühling",
+          "body": "Grobe Plan für die geteilten Beete: — Nordbeet: Kücher (Basilikum, Petersilie) — Südbeet: Tomaten. Stimm ab im Thread und ich füge die Saatliste fest.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Plan des plates-bandes pour le printemps",
+          "body": "Gros plan des plates-bandes partagées : — plate-bande nord : aromatiques (basilic, persil) — plate-bande sud : tomates.Votez dans le fil et je finalise la liste des graines.",
+          "daysAgo": 2
         }
       ]
     },
@@ -1210,6 +1820,18 @@
           "title": "Kompostkassen — hvem er på denne uge?",
           "body": "Kassen er klar til at skiftes. Kan nogen tage en tur ved at vende den denne uge? Den forfalder mandag.",
           "daysAgo": 1
+        },
+        {
+          "languageCode": "de",
+          "title": "Kompost-Eimer — wer ist diese Woche dran?",
+          "body": "Der Eimer ist bereit zum Wenden. Kann jemand diese Woche eine Runde drehen? Er ist Montag fällig.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bac de compost — qui est de cette semaine ?",
+          "body": "Le bac est prêt à être retourné. Quelqu’un peut passer un tour cette semaine ? C’est à faire lundi.",
+          "daysAgo": 1
         }
       ]
     },
@@ -1230,7 +1852,20 @@
           "daysAgo": 2
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone seen a grey cat near the gate?",
+          "body": "Eine kleine graue Katze ist seit gestern Abend am Hintertor unterwegs. Nicht von mir, aber sie wirkt verloren. Kennt sie jemand?",
+          "daysAgo": 4
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone seen a grey cat near the gate?",
+          "body": "Une petite chatte grise rôde depuis hier soir près du portail arrière. Ce n’est pas la mienne, mais elle a l’air perdue. Quelqu’un la reconnaît-il ?",
+          "daysAgo": 4
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1250,7 +1885,20 @@
           "daysAgo": 11
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a bench by the bike rack",
+          "body": "Am Fahrradständer gibt es einen guten Platz für eine kleine Bank. Will jemand das bei der nächsten Versammlung unterstützen?",
+          "daysAgo": 12
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a bench by the bike rack",
+          "body": "Près du porte-vélos, il y a un bon endroit pour un petit banc. Quelqu’un veut-il le défendre à la prochaine assemblée ?",
+          "daysAgo": 12
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1274,7 +1922,20 @@
           "daysAgo": 6
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Lost a set of keys — small black case",
+          "body": "Ich habe vermutlich einen Schlüsselbund in einer kleinen schwarzen Hülle am Aushang-Board vergessen. Wenn ihr sie seht, ist die Rezeption der beste Ort.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Lost a set of keys — small black case",
+          "body": "J’ai probablement laissé un trousseau de clés dans une petite pochette noire près du tableau d’affichage. Si vous les voyez, la réception est le meilleur endroit.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1293,7 +1954,20 @@
           "daysAgo": 0
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Winter boots for sale (barely used)",
+          "body": "Ein Paar Winterstiefel, Größe 42, zweimal getragen. Gerne im Lagerraum abgeben, wenn jemand sie zu einem fairen Preis möchte.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Winter boots for sale (barely used)",
+          "body": "Une paire de bottes d’hiver, pointure 42, portées deux fois. Je peux les déposer au local si quelqu’un les veut à un prix raisonnable.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1312,7 +1986,20 @@
           "daysAgo": 19
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Found: a folded umbrella",
+          "body": "Ein zusammengeklappter blauer Schirm lag auf der Bank in der Lobby. Falls er deiner ist, ist er bei mir an der Rezeption.",
+          "daysAgo": 21
+        },
+        {
+          "languageCode": "fr",
+          "title": "Found: a folded umbrella",
+          "body": "Un parapluie pliable bleu a été laissé sur le banc du hall. S’il est à vous, il est avec moi à la réception.",
+          "daysAgo": 21
+        }
+      ],
       "modifiedDaysAgo": 20
     },
     {
@@ -1327,7 +2014,20 @@
       ],
       "daysAgo": 9,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Recommend a plumber?",
+          "body": "Der Küchentropf tropft und ich bräuchte eine lokale Empfehlung. Am besten jemand, der diesen Monat kommen kann.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Recommend a plumber?",
+          "body": "Le robinet de la cuisine goutte et je cherche une recommandation locale. De préférence quelqu’un qui peut passer ce mois-ci.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1341,7 +2041,20 @@
       ],
       "daysAgo": 9,
       "replies": [],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on for the gutter sweep?",
+          "body": "Die Rinnen sind fällig. Zwei von uns mit einer Leiter und einem Nachmittag — wer ist dabei?",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on for the gutter sweep?",
+          "body": "Les gouttières sont à nettoyer. Deux d’entre nous avec une échelle et un après-midi — qui est partant ?",
+          "daysAgo": 9
+        }
+      ],
       "modifiedDaysAgo": 6
     },
     {
@@ -1356,7 +2069,20 @@
       ],
       "daysAgo": 12,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Borrow a step ladder?",
+          "body": "Eine Klappleiter für einen Vormittag — das kleine Tor neu streichen. Ich bringe Kaffee zurück.",
+          "daysAgo": 12
+        },
+        {
+          "languageCode": "fr",
+          "title": "Borrow a step ladder?",
+          "body": "Une échelle pour un matin — repeindre le petit portail. Je rapporterai du café en échange.",
+          "daysAgo": 12
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1375,7 +2101,20 @@
           "daysAgo": 13
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Found: a garden trowel",
+          "body": "Ein Spaten lag am Keimling-Regal. Falls er deiner ist, ist er bei mir am Grün.",
+          "daysAgo": 14
+        },
+        {
+          "languageCode": "fr",
+          "title": "Found: a garden trowel",
+          "body": "Une bèche de jardin a été laissée près de l’étagère des semis. S’il est à vous, il est avec moi au square.",
+          "daysAgo": 14
+        }
+      ],
       "modifiedDaysAgo": 12
     },
     {
@@ -1395,7 +2134,20 @@
           "daysAgo": 28
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a small compost log",
+          "body": "Der Komposteimer dreht sich schnell — ein kleines Logbuch, wer gewendet hat, würde den nächsten leichter machen.",
+          "daysAgo": 29
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a small compost log",
+          "body": "Le bac de compost se retourne vite — un petit cahier de qui a fait le tour rendrait le suivant plus facile à choisir.",
+          "daysAgo": 29
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1415,7 +2167,20 @@
           "daysAgo": 20
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone know a good local painter?",
+          "body": "Ein Zimmer muss über ein Wochenende gestrichen werden. Die Farbe habe ich, ich brauche nur eine ruhige Hand.",
+          "daysAgo": 22
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone know a good local painter?",
+          "body": "Une pièce doit être repeinte un week-end. J’ai la peinture, il me faut juste une main ferme.",
+          "daysAgo": 22
+        }
+      ],
       "modifiedDaysAgo": 20
     },
     {
@@ -1436,7 +2201,20 @@
           "daysAgo": 17
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a shared rain barrel",
+          "body": "Eine Regenwanne am Grün würde die Garten-Rechnung deutlich senken. Zwei von uns könnten den Anschluss machen.",
+          "daysAgo": 19
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a shared rain barrel",
+          "body": "Une citerne d’eau de pluie près du square réduirait la facture d’eau du jardin. Deux d’entre nous pourraient faire la plomberie.",
+          "daysAgo": 19
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1461,7 +2239,20 @@
           "daysAgo": 14
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Free: a bag of good soil",
+          "body": "Ich habe einen 20-Liter-Sack guten Boden. Wenn ein Pflanzer ihn möchte, steht er bis Wochenende am Regal.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "Free: a bag of good soil",
+          "body": "J’ai un sac de 20L de bonne terre. Si un jardinier en veut, il est sur l’étagère jusqu’au week-end.",
+          "daysAgo": 16
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1480,7 +2271,20 @@
           "daysAgo": 16
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Potluck ideas for the autumn?",
+          "body": "Für das Nachbarschaftsdinner Ende des Monats — was bringt ihr mit? Ich mache einen großen Salat und ein Brot.",
+          "daysAgo": 17
+        },
+        {
+          "languageCode": "fr",
+          "title": "Potluck ideas for the autumn?",
+          "body": "Pour le dîner des voisins de fin de mois — qu’est-ce que vous pensez apporter ? Je ferai une grande salade et un pain.",
+          "daysAgo": 17
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1499,7 +2303,20 @@
           "daysAgo": 29
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Looking for a book to read this month",
+          "body": "Den Stapel geschafft — welches Buch würdest du empfehlen? Roman oder Sachbuch, beides geht.",
+          "daysAgo": 30
+        },
+        {
+          "languageCode": "fr",
+          "title": "Looking for a book to read this month",
+          "body": "Terminé avec la pile — quel livre recommanderiez-vous ? Un roman ou du non-fiction, les deux vont.",
+          "daysAgo": 30
+        }
+      ],
       "modifiedDaysAgo": 27
     },
     {
@@ -1519,7 +2336,20 @@
           "daysAgo": 27
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a Friday film night?",
+          "body": "Ein Projektor, ein Laken und ein Sofa — das ist das Material. Wenn eine Film-Nacht ein Plan wäre, regle ich den Rest.",
+          "daysAgo": 29
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a Friday film night?",
+          "body": "Un projecteur, une feuille et un canapé — c’est le kit. Si une soirée cinéma vous dit quelque chose, je m’occupe du reste.",
+          "daysAgo": 29
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1539,7 +2369,20 @@
           "daysAgo": 15
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Sourdough starter to share",
+          "body": "Ich habe einen gesunden Sauerteig und möchte jemandem im Block eine Tasse abgeben. Erste kommen, erste bedienen.",
+          "daysAgo": 17
+        },
+        {
+          "languageCode": "fr",
+          "title": "Sourdough starter to share",
+          "body": "J’ai un levain sain et je voudrais en offrir un bol à quelqu’un du quartier. Premier arrivé, premier servi.",
+          "daysAgo": 17
+        }
+      ],
       "modifiedDaysAgo": 15
     },
     {
@@ -1554,7 +2397,20 @@
       ],
       "daysAgo": 1,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Photography walk — anyone in?",
+          "body": "Ein langsamer zweistündiger Spaziergang mit einer Kamera. Kein Druck zu fotografieren, kein Druck zu reden. Samstagmorgen.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Photography walk — anyone in?",
+          "body": "Une promenade tranquille de deux heures avec un appareil. Sans pression de shooter, sans pression de parler. Samedi matin.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1574,7 +2430,20 @@
           "daysAgo": 22
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kids' bike-ride group?",
+          "body": "Ein paar Kinder aus dem Block fahren samstagnachmittags Fahrrad. Falls dein Kind Interesse hat, komm am Grün vorbei.",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "title": "Kids' bike-ride group?",
+          "body": "Quelques enfants du quartier font du vélo le samedi après-midi. Si votre enfant est intéressé, passez au square.",
+          "daysAgo": 24
+        }
+      ],
       "modifiedDaysAgo": 22
     },
     {
@@ -1588,7 +2457,20 @@
       ],
       "daysAgo": 29,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a quiet corner for reading",
+          "body": "Eine kleine ruhige Ecke mit zwei Stühlen und einer Lampe — das ist die ganze Idee. Zwei von uns könnten sie zusammenstellen.",
+          "daysAgo": 29
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a quiet corner for reading",
+          "body": "Un petit coin calme avec deux chaises et une lampe — c’est toute l’idée. Deux d’entre nous pourraient le monter.",
+          "daysAgo": 29
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1608,7 +2490,20 @@
           "daysAgo": 27
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Bread and coffee on Sunday?",
+          "body": "Ich backe am Sonntag ein Brot. Wenn du zum 10-Uhr-Kaffee auf dem Balkon bist, ist die Tür offen.",
+          "daysAgo": 28
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bread and coffee on Sunday?",
+          "body": "Je fais un pain le dimanche. Si vous êtes partant pour un café sur le balcon à 10h, la porte est ouverte.",
+          "daysAgo": 28
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1632,7 +2527,20 @@
           "daysAgo": 7
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Board-game night — who's playing Catan?",
+          "body": "Wenn du Catan spielst, steht das Brett und die Würfel sind bereit. Wer einen Abend abgeben kann, ist Gastgeber.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Board-game night — who's playing Catan?",
+          "body": "Si vous jouez à Catan, le plateau est sorti et les dés sont prêts. Le premier qui a un soir de libre devient l’hôte.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1646,7 +2554,20 @@
       ],
       "daysAgo": 2,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone keep chickens?",
+          "body": "Ich denke über zwei Hühner am Grün-Rand nach. Halten schon jemand am Block Geflügel? Rats willkommen.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone keep chickens?",
+          "body": "Je pense en ajouter deux au bord du square. Quelqu’un élève déjà des volailles ? Les conseils sont bienvenus.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -1666,7 +2587,20 @@
           "daysAgo": 24
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "A small photo corner for the lobby?",
+          "body": "Ein gerahmtes Foto des Grüns im Frühling. Wenn die Lobby eine Wand mit etwas will, mache ich den Rahmen.",
+          "daysAgo": 25
+        },
+        {
+          "languageCode": "fr",
+          "title": "A small photo corner for the lobby?",
+          "body": "Une photo encadrée du square au printemps. Si le hall veut un mur avec quelque chose, je fais le cadre.",
+          "daysAgo": 25
+        }
+      ],
       "modifiedDaysAgo": 24
     },
     {
@@ -1687,7 +2621,20 @@
           "daysAgo": 26
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a seedling swap every month",
+          "body": "Ein monatlicher Keimling-Tausch am Grün. Bringt einen Topf, lasst einen Topf. Zwei von uns könnten den kleinen Tisch halten.",
+          "daysAgo": 27
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a seedling swap every month",
+          "body": "Un échange mensuel de semis près du square. Apportez un pot, laissez un pot. Deux d’entre nous pourraient tenir la petite table.",
+          "daysAgo": 27
+        }
+      ],
       "modifiedDaysAgo": 25
     },
     {
@@ -1707,7 +2654,20 @@
           "daysAgo": 9
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Idea: a resident newsletter (monthly)",
+          "body": "Eine einseitige Monatsausgabe — was geschah, was kommt, wem man dankt. Wer einen Satz beisteuern möchte, sag mir.",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "title": "Idea: a resident newsletter (monthly)",
+          "body": "Un bulletin mensuel d’une page — ce qui s’est passé, ce qui arrive, à qui remercier. Si vous voulez contribuer une ligne, dites-le-moi.",
+          "daysAgo": 11
+        }
+      ],
       "modifiedDaysAgo": 9
     },
     {
@@ -1732,7 +2692,20 @@
           "daysAgo": 2
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Idea: a small shared fund for the green",
+          "body": "Ein kleiner laufender Fonds für die Garten-Pflege, sagen wir fünf Euro pro Haushalt pro Quartal. Was meint der Block?",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Idea: a small shared fund for the green",
+          "body": "Un petit fonds permanent pour l’entretien du square, disons cinq euros par foyer par trimestre. Que pense le quartier ?",
+          "daysAgo": 3
+        }
+      ],
       "modifiedDaysAgo": 1
     },
     {
@@ -1747,7 +2720,20 @@
       ],
       "daysAgo": 28,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Feedback wanted: the new bin layout",
+          "body": "Zwei Wochen mit der neuen Müll-Anlage — funktioniert sie? Bitte ein Satz Feedback, bevor wir sie fixieren.",
+          "daysAgo": 28
+        },
+        {
+          "languageCode": "fr",
+          "title": "Feedback wanted: the new bin layout",
+          "body": "Deux semaines avec le nouvel agencement des poubelles — ça marche ? Une ligne de feedback, s’il vous plaît, avant de valider.",
+          "daysAgo": 28
+        }
+      ]
     },
     {
       "componentId": "governance",
@@ -1761,7 +2747,20 @@
       ],
       "daysAgo": 10,
       "replies": [],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on the winter-lighting rota?",
+          "body": "Die Beleuchtungs-Rotation braucht zwei weitere Namen für die dunklen Monate. Sag mir und ich füge dich hinzu.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on the winter-lighting rota?",
+          "body": "Le tour d’éclairage a besoin de deux noms de plus pour les mois sombres. Dites-le-moi et je vous ajoute.",
+          "daysAgo": 10
+        }
+      ],
       "modifiedDaysAgo": 9
     },
     {
@@ -1775,7 +2774,20 @@
       ],
       "daysAgo": 18,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a shared 'who's home' board",
+          "body": "Ein kleines Papp-Board in der Lobby — ein ‘Ich bin zu Hause bis X’-Stil. Nützlich für die Kinder und älteren Anwohner.",
+          "daysAgo": 18
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a shared 'who's home' board",
+          "body": "Un petit carton dans le hall — style « je suis à la maison jusqu’à X ». Utile pour les enfants et les résidents âgés.",
+          "daysAgo": 18
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1794,7 +2806,20 @@
           "daysAgo": 25
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone seen a grey cat near the gate?",
+          "body": "Eine kleine graue Katze ist seit gestern Abend am Hintertor unterwegs. Nicht von mir, aber sie wirkt verloren. Kennt sie jemand?",
+          "daysAgo": 26
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone seen a grey cat near the gate?",
+          "body": "Une petite chatte grise rôde depuis hier soir près du portail arrière. Ce n’est pas la mienne, mais elle a l’air perdue. Quelqu’un la reconnaît-il ?",
+          "daysAgo": 26
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1814,7 +2839,20 @@
           "daysAgo": 24
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a bench by the bike rack",
+          "body": "Am Fahrradständer gibt es einen guten Platz für eine kleine Bank. Will jemand das bei der nächsten Versammlung unterstützen?",
+          "daysAgo": 25
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a bench by the bike rack",
+          "body": "Près du porte-vélos, il y a un bon endroit pour un petit banc. Quelqu’un veut-il le défendre à la prochaine assemblée ?",
+          "daysAgo": 25
+        }
+      ]
     },
     {
       "componentId": "safety",
@@ -1838,7 +2876,20 @@
           "daysAgo": 15
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Lost a set of keys — small black case",
+          "body": "Ich habe vermutlich einen Schlüsselbund in einer kleinen schwarzen Hülle am Aushang-Board vergessen. Wenn ihr sie seht, ist die Rezeption der beste Ort.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "Lost a set of keys — small black case",
+          "body": "J’ai probablement laissé un trousseau de clés dans une petite pochette noire près du tableau d’affichage. Si vous les voyez, la réception est le meilleur endroit.",
+          "daysAgo": 16
+        }
+      ],
       "modifiedDaysAgo": 15
     },
     {
@@ -1858,7 +2909,20 @@
           "daysAgo": 20
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Winter boots for sale (barely used)",
+          "body": "Ein Paar Winterstiefel, Größe 42, zweimal getragen. Gerne im Lagerraum abgeben, wenn jemand sie zu einem fairen Preis möchte.",
+          "daysAgo": 21
+        },
+        {
+          "languageCode": "fr",
+          "title": "Winter boots for sale (barely used)",
+          "body": "Une paire de bottes d’hiver, pointure 42, portées deux fois. Je peux les déposer au local si quelqu’un les veut à un prix raisonnable.",
+          "daysAgo": 21
+        }
+      ],
       "modifiedDaysAgo": 18
     },
     {
@@ -1883,7 +2947,20 @@
           "daysAgo": 5
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Found: a folded umbrella",
+          "body": "Ein zusammengeklappter blauer Schirm lag auf der Bank in der Lobby. Falls er deiner ist, ist er bei mir an der Rezeption.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Found: a folded umbrella",
+          "body": "Un parapluie pliable bleu a été laissé sur le banc du hall. S’il est à vous, il est avec moi à la réception.",
+          "daysAgo": 6
+        }
+      ],
       "modifiedDaysAgo": 3
     },
     {
@@ -1904,7 +2981,20 @@
           "daysAgo": 22
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Recommend a plumber?",
+          "body": "Der Küchentropf tropft und ich bräuchte eine lokale Empfehlung. Am besten jemand, der diesen Monat kommen kann.",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "title": "Recommend a plumber?",
+          "body": "Le robinet de la cuisine goutte et je cherche une recommandation locale. De préférence quelqu’un qui peut passer ce mois-ci.",
+          "daysAgo": 24
+        }
+      ],
       "modifiedDaysAgo": 22
     },
     {
@@ -1919,7 +3009,20 @@
       ],
       "daysAgo": 17,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on for the gutter sweep?",
+          "body": "Die Rinnen sind fällig. Zwei von uns mit einer Leiter und einem Nachmittag — wer ist dabei?",
+          "daysAgo": 17
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on for the gutter sweep?",
+          "body": "Les gouttières sont à nettoyer. Deux d’entre nous avec une échelle et un après-midi — qui est partant ?",
+          "daysAgo": 17
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1944,7 +3047,20 @@
           "daysAgo": 0
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Borrow a step ladder?",
+          "body": "Eine Klappleiter für einen Vormittag — das kleine Tor neu streichen. Ich bringe Kaffee zurück.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Borrow a step ladder?",
+          "body": "Une échelle pour un matin — repeindre le petit portail. Je rapporterai du café en échange.",
+          "daysAgo": 2
+        }
+      ],
       "modifiedDaysAgo": 0
     },
     {
@@ -1964,7 +3080,20 @@
           "daysAgo": 3
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Found: a garden trowel",
+          "body": "Ein Spaten lag am Keimling-Regal. Falls er deiner ist, ist er bei mir am Grün.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Found: a garden trowel",
+          "body": "Une bèche de jardin a été laissée près de l’étagère des semis. S’il est à vous, il est avec moi au square.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -1977,7 +3106,20 @@
       ],
       "daysAgo": 14,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a small compost log",
+          "body": "Der Komposteimer dreht sich schnell — ein kleines Logbuch, wer gewendet hat, würde den nächsten leichter machen.",
+          "daysAgo": 14
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a small compost log",
+          "body": "Le bac de compost se retourne vite — un petit cahier de qui a fait le tour rendrait le suivant plus facile à choisir.",
+          "daysAgo": 14
+        }
+      ]
     },
     {
       "componentId": "maintenance",
@@ -2002,7 +3144,20 @@
           "daysAgo": 22
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone know a good local painter?",
+          "body": "Ein Zimmer muss über ein Wochenende gestrichen werden. Die Farbe habe ich, ich brauche nur eine ruhige Hand.",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone know a good local painter?",
+          "body": "Une pièce doit être repeinte un week-end. J’ai la peinture, il me faut juste une main ferme.",
+          "daysAgo": 24
+        }
+      ],
       "modifiedDaysAgo": 23
     },
     {
@@ -2017,7 +3172,20 @@
       ],
       "daysAgo": 8,
       "replies": [],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a shared rain barrel",
+          "body": "Eine Regenwanne am Grün würde die Garten-Rechnung deutlich senken. Zwei von uns könnten den Anschluss machen.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a shared rain barrel",
+          "body": "Une citerne d’eau de pluie près du square réduirait la facture d’eau du jardin. Deux d’entre nous pourraient faire la plomberie.",
+          "daysAgo": 8
+        }
+      ],
       "modifiedDaysAgo": 6
     },
     {
@@ -2038,7 +3206,20 @@
           "daysAgo": 22
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Free: a bag of good soil",
+          "body": "Ich habe einen 20-Liter-Sack guten Boden. Wenn ein Pflanzer ihn möchte, steht er bis Wochenende am Regal.",
+          "daysAgo": 24
+        },
+        {
+          "languageCode": "fr",
+          "title": "Free: a bag of good soil",
+          "body": "J’ai un sac de 20L de bonne terre. Si un jardinier en veut, il est sur l’étagère jusqu’au week-end.",
+          "daysAgo": 24
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -2057,7 +3238,20 @@
           "daysAgo": 11
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Potluck ideas for the autumn?",
+          "body": "Für das Nachbarschaftsdinner Ende des Monats — was bringt ihr mit? Ich mache einen großen Salat und ein Brot.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "Potluck ideas for the autumn?",
+          "body": "Pour le dîner des voisins de fin de mois — qu’est-ce que vous pensez apporter ? Je ferai une grande salade et un pain.",
+          "daysAgo": 13
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -2076,7 +3270,20 @@
           "daysAgo": 12
         }
       ],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Looking for a book to read this month",
+          "body": "Den Stapel geschafft — welches Buch würdest du empfehlen? Roman oder Sachbuch, beides geht.",
+          "daysAgo": 14
+        },
+        {
+          "languageCode": "fr",
+          "title": "Looking for a book to read this month",
+          "body": "Terminé avec la pile — quel livre recommanderiez-vous ? Un roman ou du non-fiction, les deux vont.",
+          "daysAgo": 14
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -2095,7 +3302,20 @@
           "daysAgo": 1
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a Friday film night?",
+          "body": "Ein Projektor, ein Laken und ein Sofa — das ist das Material. Wenn eine Film-Nacht ein Plan wäre, regle ich den Rest.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a Friday film night?",
+          "body": "Un projecteur, une feuille et un canapé — c’est le kit. Si une soirée cinéma vous dit quelque chose, je m’occupe du reste.",
+          "daysAgo": 3
+        }
+      ],
       "modifiedDaysAgo": 1
     },
     {
@@ -2116,7 +3336,20 @@
           "daysAgo": 11
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Sourdough starter to share",
+          "body": "Ich habe einen gesunden Sauerteig und möchte jemandem im Block eine Tasse abgeben. Erste kommen, erste bedienen.",
+          "daysAgo": 12
+        },
+        {
+          "languageCode": "fr",
+          "title": "Sourdough starter to share",
+          "body": "J’ai un levain sain et je voudrais en offrir un bol à quelqu’un du quartier. Premier arrivé, premier servi.",
+          "daysAgo": 12
+        }
+      ],
       "modifiedDaysAgo": 9
     },
     {
@@ -2142,7 +3375,20 @@
           "daysAgo": 6
         }
       ],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Photography walk — anyone in?",
+          "body": "Ein langsamer zweistündiger Spaziergang mit einer Kamera. Kein Druck zu fotografieren, kein Druck zu reden. Samstagmorgen.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Photography walk — anyone in?",
+          "body": "Une promenade tranquille de deux heures avec un appareil. Sans pression de shooter, sans pression de parler. Samedi matin.",
+          "daysAgo": 8
+        }
+      ],
       "modifiedDaysAgo": 7
     },
     {
@@ -2157,7 +3403,20 @@
       ],
       "daysAgo": 19,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kids' bike-ride group?",
+          "body": "Ein paar Kinder aus dem Block fahren samstagnachmittags Fahrrad. Falls dein Kind Interesse hat, komm am Grün vorbei.",
+          "daysAgo": 19
+        },
+        {
+          "languageCode": "fr",
+          "title": "Kids' bike-ride group?",
+          "body": "Quelques enfants du quartier font du vélo le samedi après-midi. Si votre enfant est intéressé, passez au square.",
+          "daysAgo": 19
+        }
+      ]
     },
     {
       "componentId": "social",
@@ -2170,7 +3429,20 @@
       ],
       "daysAgo": 13,
       "replies": [],
-      "translations": [],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Suggestion: a quiet corner for reading",
+          "body": "Eine kleine ruhige Ecke mit zwei Stühlen und einer Lampe — das ist die ganze Idee. Zwei von uns könnten sie zusammenstellen.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "Suggestion: a quiet corner for reading",
+          "body": "Un petit coin calme avec deux chaises et une lampe — c’est toute l’idée. Deux d’entre nous pourraient le monter.",
+          "daysAgo": 13
+        }
+      ],
       "modifiedDaysAgo": 10
     },
     {
@@ -2182,7 +3454,20 @@
       "tagSlugs": [],
       "daysAgo": 1,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "groupSlug": "street-green",
@@ -2193,7 +3478,20 @@
       "tagSlugs": [],
       "daysAgo": 17,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "A small update — street-green",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 17
+        },
+        {
+          "languageCode": "fr",
+          "title": "A small update — street-green",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 17
+        }
+      ]
     },
     {
       "groupSlug": "back-lane-cleaning",
@@ -2204,7 +3502,20 @@
       "tagSlugs": [],
       "daysAgo": 16,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "One idea for the next meeting — back-lane-cleaning",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "One idea for the next meeting — back-lane-cleaning",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 16
+        }
+      ]
     },
     {
       "groupSlug": "book-club",
@@ -2215,7 +3526,20 @@
       "tagSlugs": [],
       "daysAgo": 4,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a coffee? — book-club",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 4
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a coffee? — book-club",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 4
+        }
+      ]
     },
     {
       "groupSlug": "bike-repair-crew",
@@ -2226,7 +3550,20 @@
       "tagSlugs": [],
       "daysAgo": 13,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The small win of the week — bike-repair-crew",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "The small win of the week — bike-repair-crew",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 13
+        }
+      ]
     },
     {
       "groupSlug": "garden-club",
@@ -2237,7 +3574,20 @@
       "tagSlugs": [],
       "daysAgo": 1,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The plan for the green — garden-club",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "The plan for the green — garden-club",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "groupSlug": "kitchen-table",
@@ -2248,7 +3598,20 @@
       "tagSlugs": [],
       "daysAgo": 20,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on this weekend? — kitchen-table",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 20
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on this weekend? — kitchen-table",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 20
+        }
+      ]
     },
     {
       "groupSlug": "photo-corner",
@@ -2259,7 +3622,20 @@
       "tagSlugs": [],
       "daysAgo": 11,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "A small update — photo-corner",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 11
+        },
+        {
+          "languageCode": "fr",
+          "title": "A small update — photo-corner",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 11
+        }
+      ]
     },
     {
       "groupSlug": "quiet-hours",
@@ -2270,7 +3646,20 @@
       "tagSlugs": [],
       "daysAgo": 13,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "One idea for the next meeting — quiet-hours",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 13
+        },
+        {
+          "languageCode": "fr",
+          "title": "One idea for the next meeting — quiet-hours",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 13
+        }
+      ]
     },
     {
       "groupSlug": "front-desk",
@@ -2281,7 +3670,20 @@
       "tagSlugs": [],
       "daysAgo": 5,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a coffee? — front-desk",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a coffee? — front-desk",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "groupSlug": "walking-group",
@@ -2292,7 +3694,20 @@
       "tagSlugs": [],
       "daysAgo": 5,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The small win of the week — walking-group",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "The small win of the week — walking-group",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "groupSlug": "board-game-night",
@@ -2303,7 +3718,20 @@
       "tagSlugs": [],
       "daysAgo": 12,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The plan for the green — board-game-night",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 12
+        },
+        {
+          "languageCode": "fr",
+          "title": "The plan for the green — board-game-night",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 12
+        }
+      ]
     },
     {
       "groupSlug": "kowalski-family",
@@ -2314,7 +3742,20 @@
       "tagSlugs": [],
       "daysAgo": 10,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 10
+        }
+      ]
     },
     {
       "groupSlug": "street-green",
@@ -2325,7 +3766,20 @@
       "tagSlugs": [],
       "daysAgo": 20,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "A small update — street-green",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 20
+        },
+        {
+          "languageCode": "fr",
+          "title": "A small update — street-green",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 20
+        }
+      ]
     },
     {
       "groupSlug": "back-lane-cleaning",
@@ -2336,7 +3790,20 @@
       "tagSlugs": [],
       "daysAgo": 1,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "One idea for the next meeting — back-lane-cleaning",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "One idea for the next meeting — back-lane-cleaning",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "groupSlug": "book-club",
@@ -2347,7 +3814,20 @@
       "tagSlugs": [],
       "daysAgo": 6,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a coffee? — book-club",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a coffee? — book-club",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 6
+        }
+      ]
     },
     {
       "groupSlug": "bike-repair-crew",
@@ -2358,7 +3838,20 @@
       "tagSlugs": [],
       "daysAgo": 8,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The small win of the week — bike-repair-crew",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "The small win of the week — bike-repair-crew",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "groupSlug": "garden-club",
@@ -2369,7 +3862,20 @@
       "tagSlugs": [],
       "daysAgo": 14,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The plan for the green — garden-club",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 14
+        },
+        {
+          "languageCode": "fr",
+          "title": "The plan for the green — garden-club",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 14
+        }
+      ]
     },
     {
       "groupSlug": "kitchen-table",
@@ -2380,7 +3886,20 @@
       "tagSlugs": [],
       "daysAgo": 16,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on this weekend? — kitchen-table",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on this weekend? — kitchen-table",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 16
+        }
+      ]
     },
     {
       "groupSlug": "photo-corner",
@@ -2391,7 +3910,20 @@
       "tagSlugs": [],
       "daysAgo": 19,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "A small update — photo-corner",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 19
+        },
+        {
+          "languageCode": "fr",
+          "title": "A small update — photo-corner",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 19
+        }
+      ]
     },
     {
       "groupSlug": "quiet-hours",
@@ -2402,7 +3934,20 @@
       "tagSlugs": [],
       "daysAgo": 16,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "One idea for the next meeting — quiet-hours",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "One idea for the next meeting — quiet-hours",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 16
+        }
+      ]
     },
     {
       "groupSlug": "front-desk",
@@ -2413,7 +3958,20 @@
       "tagSlugs": [],
       "daysAgo": 20,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Anyone up for a coffee? — front-desk",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 20
+        },
+        {
+          "languageCode": "fr",
+          "title": "Anyone up for a coffee? — front-desk",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 20
+        }
+      ]
     },
     {
       "groupSlug": "walking-group",
@@ -2424,7 +3982,20 @@
       "tagSlugs": [],
       "daysAgo": 8,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The small win of the week — walking-group",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "The small win of the week — walking-group",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "groupSlug": "board-game-night",
@@ -2435,7 +4006,20 @@
       "tagSlugs": [],
       "daysAgo": 5,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "The plan for the green — board-game-night",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "The plan for the green — board-game-night",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "groupSlug": "kowalski-family",
@@ -2446,7 +4030,20 @@
       "tagSlugs": [],
       "daysAgo": 2,
       "replies": [],
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Eine Notiz von der Gruppe — die kleine Sache, an der wir diese Woche arbeiten, und die, die wir als Nächstes angehen möchten.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Who's on this weekend? — kowalski-family",
+          "body": "Une note du groupe — la petite chose sur laquelle nous travaillons cette semaine, et celle que nous aimerions aborder ensuite.",
+          "daysAgo": 2
+        }
+      ]
     }
   ],
   "events": [
@@ -2649,6 +4246,20 @@
     {
       "title": "Autumn Film Night",
       "body": "A projector, a white sheet, and a sofa. Bring a blanket; we do the film.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Herbstfilm-Nacht",
+          "body": "Ein Projektor, ein weißes Laken und ein Sofa. Bringt eine Decke mit; wir kümmern uns um den Film.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Soirée cinéma d'automne",
+          "body": "Un projecteur, une feuille blanche et un canapé. Apportez une couverture ; on s'occupe du film.",
+          "daysAgo": 3
+        }
+      ],
       "componentId": "social",
       "authorEmail": "ben@examplium.com",
       "startDaysAhead": 15,
@@ -2675,12 +4286,25 @@
           "status": "Going",
           "daysAgo": 3
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Board Game Afternoon",
       "body": "Cards, tiles, dice — bring a game or play ours. Snacks from the community fridge.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Brettspiel-Nachmittag",
+          "body": "Karten, Plättchen, Würfel — bringt ein Spiel mit oder spielt unseres. Snacks aus dem Gemeinschaftskühlschrank.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Après-midi de jeux de société",
+          "body": "Cartes, tuiles, dés — apportez un jeu ou jouez les nôtres. Goûters du frigo communautaire.",
+          "daysAgo": 6
+        }
+      ],
       "componentId": "social",
       "authorEmail": "david@examplium.com",
       "startDaysAhead": 8,
@@ -2712,12 +4336,25 @@
           "status": "Going",
           "daysAgo": 6
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Bike Maintenance Morning",
       "body": "Pump, tube, basic tools in the store room. Bring a bike; leave a working one.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fahrrad-Wartungs-Morgen",
+          "body": "Pumpe, Schlauch, Basiswerkzeuge im Lagerraum. Bringt ein Fahrrad; bringt eins fahrbereit mit.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Matin d'entretien vélo",
+          "body": "Pompe, chambre à air, outils de base dans le local. Apportez un vélo ; repartez avec un vélo qui roule.",
+          "daysAgo": 6
+        }
+      ],
       "componentId": "maintenance",
       "authorEmail": "moderator@examplium.com",
       "startDaysAhead": 4,
@@ -2739,12 +4376,25 @@
           "status": "Going",
           "daysAgo": 6
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Neighbours' Dinner",
       "body": "One dish each, arrive from 18:00. Drinks and desserts are on the house.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Nachbarschaftsdinner",
+          "body": "Ein Gericht pro Person, Ankunft ab 18:00. Getränke und Desserts gibt es gratis.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Dîner des voisins",
+          "body": "Un plat chacun, arrivez à partir de 18h00. Boissons et desserts sont offerts.",
+          "daysAgo": 10
+        }
+      ],
       "componentId": "social",
       "authorEmail": "carla@examplium.com",
       "startDaysAhead": 3,
@@ -2776,12 +4426,25 @@
           "status": "Maybe",
           "daysAgo": 9
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Seed-Saving Workshop",
       "body": "Two hours of learning to save from tomato, basil, and bean. Seeds to take home.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Samen-Workshop",
+          "body": "Zwei Stunden, wie man von Tomate, Basilikum und Bohne Samen sammelt. Samen zum Mitnehmen.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Atelier de conservation des graines",
+          "body": "Deux heures pour apprendre à récolter des graines de tomate, de basilic et de haricot. Graines à emporter.",
+          "daysAgo": 6
+        }
+      ],
       "componentId": "social",
       "authorEmail": "ben@examplium.com",
       "startDaysAhead": 20,
@@ -2802,12 +4465,25 @@
           "status": "No",
           "daysAgo": 5
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Photography Walk",
       "body": "A slow two-hour walk around the block. No pressure to shoot, no pressure to talk.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fotospaziergang",
+          "body": "Ein langsamer zweistündiger Spaziergang um den Block. Kein Druck zu fotografieren, kein Druck zu reden.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Promenade photo",
+          "body": "Une promenade tranquille de deux heures autour du quartier. Sans pression de shooter, sans pression de parler.",
+          "daysAgo": 1
+        }
+      ],
       "componentId": "social",
       "authorEmail": "moderator@examplium.com",
       "startDaysAhead": 5,
@@ -2838,12 +4514,25 @@
           "status": "No",
           "daysAgo": 1
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Compost 101",
       "body": "How to turn a bin so it doesn't smell. Two of us will demo the turn.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kompost-Grundkurs",
+          "body": "Wie man einen Eimer dreht, dass er nicht stinkt. Zwei von uns zeigen das Wenden.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Initiation au compost",
+          "body": "Comment retourner un bac sans qu'il sente. Deux d'entre nous démontreront le retournement.",
+          "daysAgo": 2
+        }
+      ],
       "componentId": "maintenance",
       "authorEmail": "ben@examplium.com",
       "startDaysAhead": 24,
@@ -2874,12 +4563,25 @@
           "status": "Maybe",
           "daysAgo": 1
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Coffee and Bread on the Balcony",
       "body": "A loaf and a pot of coffee on the front balcony. Come by, stay a while.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kaffee und Brot auf dem Balkon",
+          "body": "Ein Brot und ein Topf Kaffee auf dem vorderen Balkon. Kommt vorbei, bleibt eine Weile.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Café et pain sur le balcon",
+          "body": "Une miche et une cafetière sur le balcon avant. Passez, restez un moment.",
+          "daysAgo": 5
+        }
+      ],
       "componentId": "social",
       "authorEmail": "anna@examplium.com",
       "startDaysAhead": 15,
@@ -2910,12 +4612,25 @@
           "status": "No",
           "daysAgo": 5
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "First-Aid Refresher",
       "body": "A ninety-minute refresher with the local red-cross. Bring nothing; we have the kit.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Erste-Hilfe-Refresher",
+          "body": "Eine neunzigminütige Auffrischung mit der örtlichen Rotkreuz. Bringt nichts mit; wir haben den Kasten.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Rappel de premiers secours",
+          "body": "Un rappel de soixante-quinze minutes avec la Croix-Rouge locale. N'apportez rien ; nous avons la trousse.",
+          "daysAgo": 1
+        }
+      ],
       "componentId": "safety",
       "authorEmail": "admin@examplium.com",
       "startDaysAhead": 14,
@@ -2937,12 +4652,25 @@
           "status": "Going",
           "daysAgo": 0
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Book Swap Launch",
       "body": "Bring a book, leave a book. A small shelf by the lobby is the start of it.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Buch-Austausch-Start",
+          "body": "Bringt ein Buch, hinterlasst ein Buch. Ein kleines Regal an der Lobby ist der Anfang.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Lancement du troc de livres",
+          "body": "Apportez un livre, laissez un livre. Une petite étagère près du hall en est le début.",
+          "daysAgo": 5
+        }
+      ],
       "componentId": "social",
       "authorEmail": "carla@examplium.com",
       "startDaysAhead": 19,
@@ -2963,12 +4691,25 @@
           "status": "Going",
           "daysAgo": 4
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Tool-Sharing Demo",
       "body": "What's in the shared toolbox, how to book it, and what to do with a broken drill bit.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Werkzeug-Teilungs-Demo",
+          "body": "Was in der Gemeinschaftswerkzeugkiste ist, wie man sie bucht und was man mit einem abgebrochenen Bohrer macht.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Démo du partage d'outils",
+          "body": "Ce qu'il y a dans le coffre d'outils partagé, comment le réserver, et que faire d'une mèche cassée.",
+          "daysAgo": 5
+        }
+      ],
       "componentId": "maintenance",
       "authorEmail": "david@examplium.com",
       "startDaysAhead": 5,
@@ -2989,12 +4730,25 @@
           "status": "Going",
           "daysAgo": 4
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Kids' Art Morning",
       "body": "Paper, crayons, one pot of glue. Parents welcome in the corner with a coffee.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kinder-Kunst-Morgen",
+          "body": "Papier, Buntstifte, ein Topf Kleber. Eltern willkommen in der Ecke mit einem Kaffee.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Matinée artistique pour enfants",
+          "body": "Papier, crayons, un pot de colle. Parents bienvenus dans un coin avec un café.",
+          "daysAgo": 3
+        }
+      ],
       "componentId": "social",
       "authorEmail": "david@examplium.com",
       "startDaysAhead": 29,
@@ -3020,12 +4774,25 @@
           "status": "Going",
           "daysAgo": 2
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Open-Month Meeting",
       "body": "The monthly open meeting — budget, green, and the two open questions from the register.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Offene Monatsversammlung",
+          "body": "Die monatliche offene Versammlung — Budget, Grün und die zwei offenen Fragen aus dem Register.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Assembléée ouverte mensuelle",
+          "body": "L'assemblée ouverte mensuelle — budget, square, et les deux questions en cours du registre.",
+          "daysAgo": 7
+        }
+      ],
       "componentId": "governance",
       "authorEmail": "moderator@examplium.com",
       "startDaysAhead": 12,
@@ -3057,12 +4824,25 @@
           "status": "No",
           "daysAgo": 7
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Walking Group (Saturday)",
       "body": "A flat forty-minute loop, coffee at the end. Strollers and slow walkers welcome.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Spaziergruppe (Samstag)",
+          "body": "Eine flache vierzigminütige Runde, am Ende Kaffee. Kinderwagen und langsamere Spaziergänger sind willkommen.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Groupe de marche (samedi)",
+          "body": "Une boucle plate de quarante minutes, café à la fin. Poussettes et marcheurs lents bienvenus.",
+          "daysAgo": 6
+        }
+      ],
       "componentId": "social",
       "authorEmail": "david@examplium.com",
       "startDaysAhead": 30,
@@ -3088,12 +4868,25 @@
           "status": "Maybe",
           "daysAgo": 6
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Gutter Sweep — All Hands",
       "body": "Ladders out by 10. Two people per side, an hour and done.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Rinnen-Reinigung — Alle Hände",
+          "body": "Leitern ab 10 draußen. Zwei pro Seite, eine Stunde und fertig.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Curage des gouttières — tout le monde",
+          "body": "Échelles sorties d'ici 10h. Deux personnes par côté, une heure et c'est fini.",
+          "daysAgo": 3
+        }
+      ],
       "componentId": "maintenance",
       "authorEmail": "anna@examplium.com",
       "startDaysAhead": 23,
@@ -3115,12 +4908,25 @@
           "status": "Going",
           "daysAgo": 3
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Cooking Circle",
       "body": "One recipe each, ninety minutes of swapping. I'll do the bread.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kochkreis",
+          "body": "Ein Rezept pro Person, neunzig Minuten Tauschen. Ich mache das Brot.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Cercle de cuisine",
+          "body": "Une recette chacun, quatre-vingt-dix minutes d'échanges. Je ferai le pain.",
+          "daysAgo": 2
+        }
+      ],
       "componentId": "social",
       "authorEmail": "moderator@examplium.com",
       "startDaysAhead": 20,
@@ -3141,12 +4947,25 @@
           "status": "No",
           "daysAgo": 2
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "New-Resident Welcome",
       "body": "A thirty-minute walk-round and a coffee. If you're new to the block, this is your first stop.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Begrüßung neuer Anwohner",
+          "body": "Ein dreißigminütiger Rundgang und ein Kaffee. Wenn ihr neu im Block seid, ist dies euer erster Halt.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Accueil des nouveaux résidents",
+          "body": "Une visite de trente minutes et un café. Si vous êtes nouveau sur le quartier, c'est votre première étape.",
+          "daysAgo": 7
+        }
+      ],
       "componentId": "governance",
       "authorEmail": "david@examplium.com",
       "startDaysAhead": 25,
@@ -3172,12 +4991,25 @@
           "status": "Going",
           "daysAgo": 6
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Winter-Knitting Circle",
       "body": "Bring your needles; we have the yarn. A lamp and a chair are provided.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Winterstrick-Kreis",
+          "body": "Bringt eure Nadeln; wir haben die Wolle. Eine Lampe und ein Stuhl sind vorhanden.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Cercle de tricot d'hiver",
+          "body": "Apportez vos aiguilles ; nous avons la laine. Une lampe et un siège sont fournis.",
+          "daysAgo": 7
+        }
+      ],
       "componentId": "social",
       "authorEmail": "ben@examplium.com",
       "startDaysAhead": 3,
@@ -3208,12 +5040,25 @@
           "status": "No",
           "daysAgo": 6
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Stargazing on the Green",
       "body": "A flat, dark stretch of the green. Bring a blanket and a warm drink; we point at the constellations.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Sternenwachen am Grün",
+          "body": "Ein flaches, dunkles Stück des Grüns. Bringt eine Decke und ein warmes Getränk; wir zeigen auf die Sternbilder.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Observation des étoiles au square",
+          "body": "Une portion plate et sombre du square. Apportez une couverture et une boisson chaude ; nous montrons les constellations.",
+          "daysAgo": 8
+        }
+      ],
       "componentId": "social",
       "authorEmail": "ben@examplium.com",
       "startDaysAhead": 9,
@@ -3234,12 +5079,25 @@
           "status": "Maybe",
           "daysAgo": 7
         }
-      ],
-      "translations": []
+      ]
     },
     {
       "title": "Small-Repairs Clinic",
       "body": "A wobbly shelf, a stuck drawer, a loose hinge — bring the problem, leave with a fix.",
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kleinreparatur-Klinik",
+          "body": "Ein wackeliges Regal, eine klemmende Schublade, ein lockerer Scharnier — bringt das Problem, geht mit einer Lösung nach Hause.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Clinique des petites réparations",
+          "body": "Une étagère branlante, un tiroir qui coince, une charnière lâche — apportez le problème, repartez avec la réparation.",
+          "daysAgo": 8
+        }
+      ],
       "componentId": "maintenance",
       "authorEmail": "carla@examplium.com",
       "startDaysAhead": 11,
@@ -3266,8 +5124,7 @@
           "status": "Going",
           "daysAgo": 8
         }
-      ],
-      "translations": []
+      ]
     }
   ],
   "pages": [
@@ -3291,6 +5148,12 @@
           "title": "Annas hjørne af gaden",
           "body": "Et lille sted til noter om kvarteret — den slags, man ellers poster i gruppechat, og som ingen finder igen.",
           "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "L’angle d’Anna dans la rue",
+          "body": "Un petit espace pour des notes sur le quartier — le genre de chose qu’on poste autrement dans le groupe et que personne ne retrouve.",
+          "daysAgo": 6
         }
       ]
     },
@@ -3310,6 +5173,18 @@
           "languageCode": "da",
           "title": "Bænken ved porten",
           "body": "Der er en bænk, som de fleste af os er gået glip af. Den får solen først om morgenen, og duerne har erobret den ved ni.\n\nJeg bliver ved med at skulle pudse den for folk, der bruger den til at læse. Lille ting, men den er vores.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "de",
+          "title": "Die Bank am Tor",
+          "body": "Es gibt eine Bank, die die meisten von uns nicht mehr bemerken. Sie bekommt am Morgen zuerst die Sonne und die Tauben nehmen sie um neun für sich. Ich will sie für die Leser immer wieder abwischen. Kleine Sache, aber sie ist unsere.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le banc près du portail",
+          "body": "Il y a un banc que la plupart d’entre nous ne remarquent plus. Il reçoit le soleil en premier le matin et les pigeons le réclament à neuf heures. Je ne cesse de vouloir le nettoyer pour ceux qui s’y assient. Petite chose, mais c’est le nôtre.",
           "daysAgo": 3
         }
       ]
@@ -3332,6 +5207,12 @@
           "languageCode": "da",
           "title": "Hjørnebutikkens gamle klokke",
           "body": "Den lille klokke over hjørnebutikken klinger stadig, når nogen åbner døren. Ingen driver butikken længere, men lyden er geblevet — en lille påmindelse om, at gaden engang var mere travl."
+        },
+        {
+          "languageCode": "fr",
+          "title": "La vieille cloche de l’épicerie du coin",
+          "body": "La petite cloche au-dessus de l’ancienne épicerie sonne encore quand quelqu’un ouvre la porte. Personne ne la tient plus, mais le son est resté — un petit rappel que la rue était autrefois plus animée.",
+          "daysAgo": 1
         }
       ]
     },
@@ -3344,7 +5225,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 3,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Notizen vom Grün",
+          "body": "Kleine Notizen über das geteilte Grün — die Samen, die hochkamen, die, die nicht, und die langsame Geschichte der zwei Bänke.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Notes du square",
+          "body": "Petites notes sur le square partagé — les graines qui ont poussé, celles qui n’ont pas, et la lente histoire des deux bancs.",
+          "daysAgo": 3
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-the-morning-light",
@@ -3355,7 +5249,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Morgenlicht",
+          "body": "Eine Notiz zum Morgenlicht — die Stunde, in der die Straße still ist und der Kaffee genau richtig.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "La lumière du matin",
+          "body": "Une note sur la lumière du matin — l’heure où la rue est calme et le café est juste à point.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-the-quiet-hours",
@@ -3366,7 +5273,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ruhigen Stunden",
+          "body": "Eine Notiz zu den ruhigen Stunden — wenn der Block am stillsten ist und wie das klingt.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les heures calmes",
+          "body": "Une note sur les heures calmes — quand le quartier est le plus silencieux et à quoi ça ressemble.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-the-sound-of-the-street",
@@ -3377,7 +5297,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Straßengeräusch",
+          "body": "Eine Notiz zum Straßengeräusch — die besondere Stille des Blocks und was sie durchbricht.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le bruit de la rue",
+          "body": "Une note sur le bruit de la rue — la tranquillité particulière du quartier et ce qui la brise.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-the-bench-and-the-pigeons",
@@ -3388,7 +5321,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die Bank und die Tauben",
+          "body": "Eine Notiz zur Bank und den Tauben — die kleine Morgenroutine und die Menschen, die sie zusammenbringt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le banc et les pigeons",
+          "body": "Une note sur le banc et les pigeons — la petite routine du matin et les gens qu’elle réunit.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-the-first-seedlings",
@@ -3399,7 +5345,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ersten Keimlinge",
+          "body": "Eine Notiz zu den ersten Keimlingen der Saison — welche es geschafft haben, welche nicht und was ich nächstes Jahr probiere.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les premiers semis",
+          "body": "Une note sur les premiers semis de la saison — lesquels ont réussi, lesquels non, et ce que j’essaierai l’an prochain.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-what-s-in-the-oven",
@@ -3410,7 +5369,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Was im Ofen war",
+          "body": "Eine Notiz zu dem, was im Ofen war — die Brote, die Kuchen, die gelegentliche Katastrophe.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Ce qui est au four",
+          "body": "Une note sur ce qui est passé au four — les pains, les tartes, l’occasionnelle catastrophe.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-a-small-win",
@@ -3421,7 +5393,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein kleiner Erfolg",
+          "body": "Eine Notiz zu einem kleinen Erfolg des Monats — die Art von Dingen, die man leicht vergisst und gut merkt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Une petite victoire",
+          "body": "Une note sur une petite victoire du mois — ce genre de chose qu’on oublie facilement et qu’il est bon de retenir.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "notes-from-the-green-a-word-about-the-weather",
@@ -3432,7 +5417,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein Wort zum Wetter",
+          "body": "Ein Wort zum Wetter — der kleine Weg, wie es den ganzen Block-Tag formt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Un mot sur la météo",
+          "body": "Un mot sur la météo — la façon dont elle façonne la journée de tout le quartier.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins",
@@ -3443,7 +5441,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 10,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die kleinen Siege des Blocks",
+          "body": "Die kleinen Dinge, die diesen Monat richtig liefen — der Hahn, der nicht mehr tropfte, der Handlauf, der nachgezogen wurde, die erste Basilikum-Töpfchen.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les petites victoires du quartier",
+          "body": "Les petites choses qui ont bien tourné ce mois-ci — le robinet qui a cessé de goutter, la main courante resserrée, le premier pot de basilic.",
+          "daysAgo": 10
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-a-word-about-the-weather",
@@ -3454,7 +5465,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 9,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein Wort zum Wetter",
+          "body": "Ein Wort zum Wetter — der kleine Weg, wie es den ganzen Block-Tag formt.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Un mot sur la météo",
+          "body": "Un mot sur la météo — la façon dont elle façonne la journée de tout le quartier.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-the-quiet-hours",
@@ -3465,7 +5489,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 9,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ruhigen Stunden",
+          "body": "Eine Notiz zu den ruhigen Stunden — wenn der Block am stillsten ist und wie das klingt.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les heures calmes",
+          "body": "Une note sur les heures calmes — quand le quartier est le plus silencieux et à quoi ça ressemble.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-what-s-in-the-oven",
@@ -3476,7 +5513,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 7,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Was im Ofen war",
+          "body": "Eine Notiz zu dem, was im Ofen war — die Brote, die Kuchen, die gelegentliche Katastrophe.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Ce qui est au four",
+          "body": "Une note sur ce qui est passé au four — les pains, les tartes, l’occasionnelle catastrophe.",
+          "daysAgo": 7
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-a-small-win",
@@ -3487,7 +5537,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 7,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein kleiner Erfolg",
+          "body": "Eine Notiz zu einem kleinen Erfolg des Monats — die Art von Dingen, die man leicht vergisst und gut merkt.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Une petite victoire",
+          "body": "Une note sur une petite victoire du mois — ce genre de chose qu’on oublie facilement et qu’il est bon de retenir.",
+          "daysAgo": 7
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-the-sound-of-the-street",
@@ -3498,7 +5561,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 9,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Straßengeräusch",
+          "body": "Eine Notiz zum Straßengeräusch — die besondere Stille des Blocks und was sie durchbricht.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le bruit de la rue",
+          "body": "Une note sur le bruit de la rue — la tranquillité particulière du quartier et ce qui la brise.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-the-first-seedlings",
@@ -3509,7 +5585,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 9,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ersten Keimlinge",
+          "body": "Eine Notiz zu den ersten Keimlingen der Saison — welche es geschafft haben, welche nicht und was ich nächstes Jahr probiere.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les premiers semis",
+          "body": "Une note sur les premiers semis de la saison — lesquels ont réussi, lesquels non, et ce que j’essaierai l’an prochain.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-the-bench-and-the-pigeons",
@@ -3520,7 +5609,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 7,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die Bank und die Tauben",
+          "body": "Eine Notiz zur Bank und den Tauben — die kleine Morgenroutine und die Menschen, die sie zusammenbringt.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le banc et les pigeons",
+          "body": "Une note sur le banc et les pigeons — la petite routine du matin et les gens qu’elle réunit.",
+          "daysAgo": 7
+        }
+      ]
     },
     {
       "slug": "the-block-s-small-wins-the-morning-light",
@@ -3531,7 +5633,20 @@
       "authorEmail": "david@examplium.com",
       "tagSlugs": [],
       "daysAgo": 9,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Morgenlicht",
+          "body": "Eine Notiz zum Morgenlicht — die Stunde, in der die Straße still ist und der Kaffee genau richtig.",
+          "daysAgo": 9
+        },
+        {
+          "languageCode": "fr",
+          "title": "La lumière du matin",
+          "body": "Une note sur la lumière du matin — l’heure où la rue est calme et le café est juste à point.",
+          "daysAgo": 9
+        }
+      ]
     },
     {
       "slug": "kitchens-of-the-block",
@@ -3542,7 +5657,20 @@
       "authorEmail": "anna@examplium.com",
       "tagSlugs": [],
       "daysAgo": 8,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Küchen des Blocks",
+          "body": "Was hier im Ofen war — die Brote, die Kuchen, das eine Mal, als das Soufflé saße, und das eine Mal, als es nicht saße.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les cuisines du quartier",
+          "body": "Ce qui a été au four par ici — les pains, les tartes, la fois où le soufflé a réussi et la fois où il n’a pas réussi.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "slug": "kitchens-of-the-block-what-s-in-the-oven",
@@ -3553,7 +5681,20 @@
       "authorEmail": "anna@examplium.com",
       "tagSlugs": [],
       "daysAgo": 6,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Was im Ofen war",
+          "body": "Eine Notiz zu dem, was im Ofen war — die Brote, die Kuchen, die gelegentliche Katastrophe.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Ce qui est au four",
+          "body": "Une note sur ce qui est passé au four — les pains, les tartes, l’occasionnelle catastrophe.",
+          "daysAgo": 6
+        }
+      ]
     },
     {
       "slug": "kitchens-of-the-block-the-bench-and-the-pigeons",
@@ -3564,7 +5705,20 @@
       "authorEmail": "anna@examplium.com",
       "tagSlugs": [],
       "daysAgo": 5,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die Bank und die Tauben",
+          "body": "Eine Notiz zur Bank und den Tauben — die kleine Morgenroutine und die Menschen, die sie zusammenbringt.",
+          "daysAgo": 5
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le banc et les pigeons",
+          "body": "Une note sur le banc et les pigeons — la petite routine du matin et les gens qu’elle réunit.",
+          "daysAgo": 5
+        }
+      ]
     },
     {
       "slug": "kitchens-of-the-block-a-small-win",
@@ -3575,7 +5729,20 @@
       "authorEmail": "anna@examplium.com",
       "tagSlugs": [],
       "daysAgo": 6,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein kleiner Erfolg",
+          "body": "Eine Notiz zu einem kleinen Erfolg des Monats — die Art von Dingen, die man leicht vergisst und gut merkt.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Une petite victoire",
+          "body": "Une note sur une petite victoire du mois — ce genre de chose qu’on oublie facilement et qu’il est bon de retenir.",
+          "daysAgo": 6
+        }
+      ]
     },
     {
       "slug": "kitchens-of-the-block-the-first-seedlings",
@@ -3586,7 +5753,20 @@
       "authorEmail": "anna@examplium.com",
       "tagSlugs": [],
       "daysAgo": 6,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ersten Keimlinge",
+          "body": "Eine Notiz zu den ersten Keimlingen der Saison — welche es geschafft haben, welche nicht und was ich nächstes Jahr probiere.",
+          "daysAgo": 6
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les premiers semis",
+          "body": "Une note sur les premiers semis de la saison — lesquels ont réussi, lesquels non, et ce que j’essaierai l’an prochain.",
+          "daysAgo": 6
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons",
@@ -3597,7 +5777,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 3,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Der Flussknie im Jahreslauf",
+          "body": "Wie das Flussknie von der Parkbank aus, Monat für Monat — das Licht, die Reiher, der erste Frost.",
+          "daysAgo": 3
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le méandres du fleuve au fil des saisons",
+          "body": "Ce à quoi ressemble le méandre du fleuve depuis le banc du parc, mois après mois — la lumière, les hérons, la première gelée.",
+          "daysAgo": 3
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-the-sound-of-the-street",
@@ -3608,7 +5801,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Straßengeräusch",
+          "body": "Eine Notiz zum Straßengeräusch — die besondere Stille des Blocks und was sie durchbricht.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le bruit de la rue",
+          "body": "Une note sur le bruit de la rue — la tranquillité particulière du quartier et ce qui la brise.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-the-bench-and-the-pigeons",
@@ -3619,7 +5825,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 2,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die Bank und die Tauben",
+          "body": "Eine Notiz zur Bank und den Tauben — die kleine Morgenroutine und die Menschen, die sie zusammenbringt.",
+          "daysAgo": 2
+        },
+        {
+          "languageCode": "fr",
+          "title": "Le banc et les pigeons",
+          "body": "Une note sur le banc et les pigeons — la petite routine du matin et les gens qu’elle réunit.",
+          "daysAgo": 2
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-the-quiet-hours",
@@ -3630,7 +5849,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ruhigen Stunden",
+          "body": "Eine Notiz zu den ruhigen Stunden — wenn der Block am stillsten ist und wie das klingt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les heures calmes",
+          "body": "Une note sur les heures calmes — quand le quartier est le plus silencieux et à quoi ça ressemble.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-a-word-about-the-weather",
@@ -3641,7 +5873,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein Wort zum Wetter",
+          "body": "Ein Wort zum Wetter — der kleine Weg, wie es den ganzen Block-Tag formt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Un mot sur la météo",
+          "body": "Un mot sur la météo — la façon dont elle façonne la journée de tout le quartier.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-the-morning-light",
@@ -3652,7 +5897,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Morgenlicht",
+          "body": "Eine Notiz zum Morgenlicht — die Stunde, in der die Straße still ist und der Kaffee genau richtig.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "La lumière du matin",
+          "body": "Une note sur la lumière du matin — l’heure où la rue est calme et le café est juste à point.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-a-small-win",
@@ -3663,7 +5921,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein kleiner Erfolg",
+          "body": "Eine Notiz zu einem kleinen Erfolg des Monats — die Art von Dingen, die man leicht vergisst und gut merkt.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Une petite victoire",
+          "body": "Une note sur une petite victoire du mois — ce genre de chose qu’on oublie facilement et qu’il est bon de retenir.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "the-river-bend-in-seasons-the-first-seedlings",
@@ -3674,7 +5945,20 @@
       "authorEmail": "ben@examplium.com",
       "tagSlugs": [],
       "daysAgo": 1,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ersten Keimlinge",
+          "body": "Eine Notiz zu den ersten Keimlingen der Saison — welche es geschafft haben, welche nicht und was ich nächstes Jahr probiere.",
+          "daysAgo": 1
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les premiers semis",
+          "body": "Une note sur les premiers semis de la saison — lesquels ont réussi, lesquels non, et ce que j’essaierai l’an prochain.",
+          "daysAgo": 1
+        }
+      ]
     },
     {
       "slug": "what-the-green-grows",
@@ -3685,7 +5969,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 10,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Was das Grün bringt",
+          "body": "Ein laufendes Logbuch von dem, was diese Saison in den geteilten Beeten gepflanzt wurde, was hochkam und was ich als Nächstes probiere.",
+          "daysAgo": 10
+        },
+        {
+          "languageCode": "fr",
+          "title": "Ce que le square fait pousser",
+          "body": "Un journal de ce qui a été planté dans les plates-bandes partagées cette saison, ce qui a poussé, et ce que j’essaierai ensuite.",
+          "daysAgo": 10
+        }
+      ]
     },
     {
       "slug": "what-the-green-grows-the-morning-light",
@@ -3696,7 +5993,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 7,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Das Morgenlicht",
+          "body": "Eine Notiz zum Morgenlicht — die Stunde, in der die Straße still ist und der Kaffee genau richtig.",
+          "daysAgo": 7
+        },
+        {
+          "languageCode": "fr",
+          "title": "La lumière du matin",
+          "body": "Une note sur la lumière du matin — l’heure où la rue est calme et le café est juste à point.",
+          "daysAgo": 7
+        }
+      ]
     },
     {
       "slug": "what-the-green-grows-a-word-about-the-weather",
@@ -3707,7 +6017,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 8,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein Wort zum Wetter",
+          "body": "Ein Wort zum Wetter — der kleine Weg, wie es den ganzen Block-Tag formt.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Un mot sur la météo",
+          "body": "Un mot sur la météo — la façon dont elle façonne la journée de tout le quartier.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "slug": "what-the-green-grows-a-small-win",
@@ -3718,7 +6041,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 8,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Ein kleiner Erfolg",
+          "body": "Eine Notiz zu einem kleinen Erfolg des Monats — die Art von Dingen, die man leicht vergisst und gut merkt.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Une petite victoire",
+          "body": "Une note sur une petite victoire du mois — ce genre de chose qu’on oublie facilement et qu’il est bon de retenir.",
+          "daysAgo": 8
+        }
+      ]
     },
     {
       "slug": "what-the-green-grows-the-first-seedlings",
@@ -3729,7 +6065,20 @@
       "authorEmail": "carla@examplium.com",
       "tagSlugs": [],
       "daysAgo": 8,
-      "translations": []
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Die ersten Keimlinge",
+          "body": "Eine Notiz zu den ersten Keimlingen der Saison — welche es geschafft haben, welche nicht und was ich nächstes Jahr probiere.",
+          "daysAgo": 8
+        },
+        {
+          "languageCode": "fr",
+          "title": "Les premiers semis",
+          "body": "Une note sur les premiers semis de la saison — lesquels ont réussi, lesquels non, et ce que j’essaierai l’an prochain.",
+          "daysAgo": 8
+        }
+      ]
     }
   ],
   "communityTranslations": [
@@ -4781,6 +7130,730 @@
           "assigneeEmail": "carla@examplium.com",
           "dueInDays": 5,
           "daysAgo": 19
+        }
+      ]
+    }
+  ],
+  "boards": [
+    {
+      "title": "Path-lighting upgrade",
+      "description": "Track the two-lamp swap, the transformer re-wire, and the bench — one card per to-do, a column per status.",
+      "componentId": "safety",
+      "projectTitle": "Path-lighting upgrade",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 30,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Draft the sign-off sheet",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Collect the budget numbers",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Book the community room",
+          "laneTitle": "Done",
+          "order": 1
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Print the one-pager",
+          "laneTitle": "In progress",
+          "order": 1
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Buy the two lamps",
+          "laneTitle": "In progress",
+          "order": 2
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Add the bench",
+          "laneTitle": "Backlog",
+          "order": 0
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Sign up the first two",
+          "laneTitle": "In progress",
+          "order": 3
+        },
+        {
+          "projectTitle": "Path-lighting upgrade",
+          "todoTitle": "Put up the small notice",
+          "laneTitle": "Done",
+          "order": 2
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Wegebeleuchtung-Upgrade",
+          "body": "Die zwei Leuchtturm-Swap, der Umzug des Trafos und die Bank — eine Karte pro To-do, eine Spalte pro Status.",
+          "daysAgo": 28
+        },
+        {
+          "languageCode": "fr",
+          "title": "Mise à jour de l'éclairage du chemin",
+          "body": "Le remplacement des deux lampes, la réfection du transformateur et le banc — une carte par tâche, une colonne par statut.",
+          "daysAgo": 28
+        }
+      ]
+    },
+    {
+      "title": "Bike-rack and bench plan",
+      "description": "A single bike rack with a small bench by it — budget, location, sign-off.",
+      "componentId": "safety",
+      "projectTitle": "Bike-rack and bench plan",
+      "authorEmail": "david@examplium.com",
+      "daysAgo": 25,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Collect the budget numbers",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Print the one-pager",
+          "laneTitle": "Done",
+          "order": 1
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Buy the two lamps",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Add the bench",
+          "laneTitle": "In progress",
+          "order": 1
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Sign up the first two",
+          "laneTitle": "In progress",
+          "order": 2
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Put up the small notice",
+          "laneTitle": "In progress",
+          "order": 3
+        },
+        {
+          "projectTitle": "Bike-rack and bench plan",
+          "todoTitle": "Check the two numbers",
+          "laneTitle": "In progress",
+          "order": 4
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Fahrradständer- und Bankplan",
+          "body": "Ein einzelner Fahrradständer mit einer kleinen Bank — Budget, Standort, Genehmigung.",
+          "daysAgo": 23
+        },
+        {
+          "languageCode": "fr",
+          "title": "Plan du porte-vélos et du banc",
+          "body": "Un seul porte-vélos avec un petit banc — budget, emplacement, approbation.",
+          "daysAgo": 23
+        }
+      ]
+    },
+    {
+      "title": "Shared tools",
+      "description": "The five-euro-per-household fund, the sign-up sheet, and the 'borrowed and back' log.",
+      "componentId": "maintenance",
+      "projectTitle": "Shared-toolbox standing fund",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 22,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Shared-toolbox standing fund",
+          "todoTitle": "Draft the sign-off sheet",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Shared-toolbox standing fund",
+          "todoTitle": "Collect the budget numbers",
+          "laneTitle": "Done",
+          "order": 1
+        },
+        {
+          "projectTitle": "Shared-toolbox standing fund",
+          "todoTitle": "Book the community room",
+          "laneTitle": "Done",
+          "order": 2
+        },
+        {
+          "projectTitle": "Shared-toolbox standing fund",
+          "todoTitle": "Print the one-pager",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Shared-toolbox standing fund",
+          "todoTitle": "Check the two numbers",
+          "laneTitle": "Backlog",
+          "order": 0
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Gemeinsame Werkzeuge",
+          "body": "Der Fünf-Euro-Haushaltsfonds, das Anmeldeblatt und das 'ausgeliehen und zurück'-Protokoll.",
+          "daysAgo": 20
+        },
+        {
+          "languageCode": "fr",
+          "title": "Outils partagés",
+          "body": "Le fonds de cinq euros par foyer, la feuille d'inscription et le journal « emprunté et rendu ».",
+          "daysAgo": 20
+        }
+      ]
+    },
+    {
+      "title": "Compost rota",
+      "description": "The two-person weekly rota for the turn and the swap, with a small log on the door.",
+      "componentId": "maintenance",
+      "projectTitle": "Compost-bin upkeep rota",
+      "authorEmail": "carla@examplium.com",
+      "daysAgo": 20,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Compost-bin upkeep rota",
+          "todoTitle": "Sign up the first two",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Compost-bin upkeep rota",
+          "todoTitle": "Draft the sign-off sheet",
+          "laneTitle": "Done",
+          "order": 1
+        },
+        {
+          "projectTitle": "Compost-bin upkeep rota",
+          "todoTitle": "Put up the small notice",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Compost-bin upkeep rota",
+          "todoTitle": "Check the two numbers",
+          "laneTitle": "Backlog",
+          "order": 0
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Kompost-Rotation",
+          "body": "Die wöchentliche Zweipersonen-Rotation für das Umrühren und den Tausch, mit einem kleinen Protokoll an der Tür.",
+          "daysAgo": 18
+        },
+        {
+          "languageCode": "fr",
+          "title": "Rotation du compost",
+          "body": "La rotation hebdomadaire à deux personnes pour le retournement et l'échange, avec un petit journal sur la porte.",
+          "daysAgo": 18
+        }
+      ]
+    },
+    {
+      "title": "Newcomers' welcome",
+      "description": "The little folder — the register, the quiet hours, the two nearest neighbours, and the first-coffee invitation.",
+      "componentId": "social",
+      "projectTitle": "Newcomers' welcome pack",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 18,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Newcomers' welcome pack",
+          "todoTitle": "Draft the sign-off sheet",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Newcomers' welcome pack",
+          "todoTitle": "Print the one-pager",
+          "laneTitle": "In progress",
+          "order": 1
+        },
+        {
+          "projectTitle": "Newcomers' welcome pack",
+          "todoTitle": "Book the community room",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Newcomers' welcome pack",
+          "todoTitle": "Put up the small notice",
+          "laneTitle": "Done",
+          "order": 1
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Begrüßung für Neuzugezogene",
+          "body": "Die kleineMappe — das Register, die Ruhezeiten, die zwei nächsten Nachbarn und die Einladung zum ersten Kaffee.",
+          "daysAgo": 16
+        },
+        {
+          "languageCode": "fr",
+          "title": "Bienvenue aux nouveaux arrivants",
+          "body": "Le petit dossier — le registre, les heures de tranquillité, les deux voisins les plus proches et l'invitation au premier café.",
+          "daysAgo": 16
+        }
+      ]
+    },
+    {
+      "title": "Quarterly budget & minutes",
+      "description": "The one-page budget and the meeting-minutes PDF lane — track the quarterly cycle.",
+      "componentId": "governance",
+      "projectTitle": "Quarterly one-page budget",
+      "authorEmail": "david@examplium.com",
+      "daysAgo": 16,
+      "lanes": [
+        {
+          "title": "Backlog",
+          "status": "not-started",
+          "maxItems": null,
+          "order": 0
+        },
+        {
+          "title": "In progress",
+          "status": "in-progress",
+          "maxItems": null,
+          "order": 1
+        },
+        {
+          "title": "Done",
+          "status": "done",
+          "maxItems": null,
+          "order": 2
+        }
+      ],
+      "cards": [
+        {
+          "projectTitle": "Quarterly one-page budget",
+          "todoTitle": "Collect the budget numbers",
+          "laneTitle": "In progress",
+          "order": 0
+        },
+        {
+          "projectTitle": "Quarterly one-page budget",
+          "todoTitle": "Check the two numbers",
+          "laneTitle": "Backlog",
+          "order": 0
+        },
+        {
+          "projectTitle": "Quarterly one-page budget",
+          "todoTitle": "Draft the sign-off sheet",
+          "laneTitle": "Done",
+          "order": 0
+        },
+        {
+          "projectTitle": "Quarterly one-page budget",
+          "todoTitle": "Print the one-pager",
+          "laneTitle": "Done",
+          "order": 1
+        }
+      ],
+      "translations": [
+        {
+          "languageCode": "de",
+          "title": "Quartalsbudget & Protokolle",
+          "body": "Das Ein-Seiten-Budget und die PDF-Spur der Sitzungsprotokolle — der Quartalszyklus im Blick.",
+          "daysAgo": 14
+        },
+        {
+          "languageCode": "fr",
+          "title": "Budget trimestriel et procès-verbaux",
+          "body": "Le budget d'une page et la piste PDF des procès-verbaux — le cycle trimestriel en vue.",
+          "daysAgo": 14
+        }
+      ]
+    }
+  ],
+  "inventoryItems": [
+    {
+      "name": "Shared step ladder",
+      "ownerKind": "community",
+      "description": "A four-step aluminium ladder, in the store room. The top rung holds a small shelf for the drill and the tape.",
+      "componentId": "maintenance",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 28,
+      "checkouts": [
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 12,
+          "checkedInDaysAgo": 10,
+          "note": "Re-painted the front gate."
+        },
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 5,
+          "checkedInDaysAgo": 4,
+          "note": "Hung the new notice."
+        },
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 2,
+          "checkedInDaysAgo": null,
+          "note": "Changing the hallway light."
+        }
+      ]
+    },
+    {
+      "name": "Pressure washer",
+      "ownerKind": "community",
+      "description": "A small electric pressure washer for the driveway and the patio. The hose is coiled on the peg by the door.",
+      "componentId": "maintenance",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 25,
+      "checkouts": [
+        {
+          "borrowerEmail": "david@examplium.com",
+          "checkedOutDaysAgo": 18,
+          "checkedInDaysAgo": 18,
+          "note": "Washed the driveway before the open-house."
+        },
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 8,
+          "checkedInDaysAgo": 7,
+          "note": "Patio and the bike rack."
+        }
+      ]
+    },
+    {
+      "name": "Cordless drill + bits",
+      "ownerKind": "shared",
+      "description": "An 18V cordless drill with the standard bit set. The battery lives in the top drawer of the toolbox.",
+      "componentId": "maintenance",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 22,
+      "checkouts": [
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 15,
+          "checkedInDaysAgo": 14,
+          "note": "Mounted the shelf."
+        },
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 6,
+          "checkedInDaysAgo": 6,
+          "note": "Re-secured the gate hinge."
+        }
+      ]
+    },
+    {
+      "name": "Projector + white sheet",
+      "ownerKind": "shared",
+      "description": "A small 720p projector and a white sheet for the community room. The remote is in the sheet's pocket.",
+      "componentId": "social",
+      "authorEmail": "ben@examplium.com",
+      "daysAgo": 20,
+      "checkouts": [
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 10,
+          "checkedInDaysAgo": 10,
+          "note": "Film night."
+        },
+        {
+          "borrowerEmail": "david@examplium.com",
+          "checkedOutDaysAgo": 3,
+          "checkedInDaysAgo": null,
+          "note": "Autumn film night prep."
+        }
+      ]
+    },
+    {
+      "name": "First-aid spare kit",
+      "ownerKind": "community",
+      "description": "The spare first-aid kit (the one by the front door is the primary). Bandages, antiseptic, gloves, a small trauma pack.",
+      "componentId": "safety",
+      "authorEmail": "moderator@examplium.com",
+      "daysAgo": 18,
+      "checkouts": [
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 22,
+          "checkedInDaysAgo": 21,
+          "note": "Restocked the primary kit."
+        }
+      ]
+    },
+    {
+      "name": "Bike pump + patch kit",
+      "ownerKind": "shared",
+      "description": "A floor pump and a small patch kit. The pump lives on the bike-repair stand in the store room.",
+      "componentId": "maintenance",
+      "authorEmail": "ben@examplium.com",
+      "daysAgo": 16,
+      "checkouts": [
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 14,
+          "checkedInDaysAgo": 14,
+          "note": "Fixed a flat before the walk."
+        },
+        {
+          "borrowerEmail": "david@examplium.com",
+          "checkedOutDaysAgo": 7,
+          "checkedInDaysAgo": 7,
+          "note": "Patched a thorn."
+        }
+      ]
+    },
+    {
+      "name": "Folding tables (pair)",
+      "ownerKind": "community",
+      "description": "Two aluminium folding tables, each 1.5m. The legs fold flat; store them in the community room alcove.",
+      "componentId": "social",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 15,
+      "checkouts": [
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 20,
+          "checkedInDaysAgo": 20,
+          "note": "Newcomers' coffee."
+        },
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 5,
+          "checkedInDaysAgo": 4,
+          "note": "Board-game night."
+        },
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 1,
+          "checkedInDaysAgo": null,
+          "note": "Setting up for the dinner."
+        }
+      ]
+    },
+    {
+      "name": "Charcoal grill",
+      "ownerKind": "private",
+      "description": "Anna's personal charcoal grill. Available for the group when she's not using it — just ask first.",
+      "componentId": "social",
+      "authorEmail": "anna@examplium.com",
+      "daysAgo": 14,
+      "checkouts": [
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 9,
+          "checkedInDaysAgo": 9,
+          "note": "Sunday cookout."
+        }
+      ]
+    },
+    {
+      "name": "Camera + 50mm lens",
+      "ownerKind": "private",
+      "description": "David's mirrorless camera with a 50mm f/1.8. Bring your own memory card; he has two spare.",
+      "componentId": null,
+      "authorEmail": "david@examplium.com",
+      "daysAgo": 12,
+      "checkouts": [
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 16,
+          "checkedInDaysAgo": 15,
+          "note": "Photography walk."
+        }
+      ]
+    },
+    {
+      "name": "Extension cord (15m)",
+      "ownerKind": "shared",
+      "description": "A 15m extension cord, 3-amp. The plug is in the top drawer of the toolbox by the peg.",
+      "componentId": "maintenance",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 12,
+      "checkouts": [
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 11,
+          "checkedInDaysAgo": 10,
+          "note": "Powering the string lights."
+        },
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 4,
+          "checkedInDaysAgo": 4,
+          "note": "Charging the camera batteries."
+        }
+      ]
+    },
+    {
+      "name": "Seedling trays (×6)",
+      "ownerKind": "community",
+      "description": "Six plastic seedling trays, each 20 cells. The small dibber and the marker pens are in the tray's lid pocket.",
+      "componentId": "social",
+      "authorEmail": "carla@examplium.com",
+      "daysAgo": 10,
+      "checkouts": [
+        {
+          "borrowerEmail": "anna@examplium.com",
+          "checkedOutDaysAgo": 8,
+          "checkedInDaysAgo": 7,
+          "note": "Sowed the basil and the tomatoes."
+        },
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 3,
+          "checkedInDaysAgo": null,
+          "note": "Starting the herb row."
+        }
+      ]
+    },
+    {
+      "name": "Lawn mower",
+      "ownerKind": "community",
+      "description": "A push lawn mower for the green. The blade is sharp — wear closed shoes. The fuel is the small can by the door.",
+      "componentId": "maintenance",
+      "authorEmail": "admin@examplium.com",
+      "daysAgo": 9,
+      "checkouts": [
+        {
+          "borrowerEmail": "david@examplium.com",
+          "checkedOutDaysAgo": 13,
+          "checkedInDaysAgo": 13,
+          "note": "Mowed the north half."
+        },
+        {
+          "borrowerEmail": "ben@examplium.com",
+          "checkedOutDaysAgo": 5,
+          "checkedInDaysAgo": 5,
+          "note": "Mowed the south half."
+        },
+        {
+          "borrowerEmail": "carla@examplium.com",
+          "checkedOutDaysAgo": 1,
+          "checkedInDaysAgo": null,
+          "note": "Final trim before the dinner."
         }
       ]
     }

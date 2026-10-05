@@ -359,6 +359,59 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     /// <summary>
+    /// M25 U9 (item 17, F2) — the **oversize** reject on the document lane,
+    /// driven through U8's <see cref="Kumunita.Web.Security.IUploadGate"/>. A
+    /// small <see cref="CommunityStorageSettings.MaxFileBytes"/> + a large
+    /// quota makes the reject purely oversize (not over-quota). The 413 is the
+    /// gate's exact <see cref="StatusCodeResult"/> (the regression-suite pin),
+    /// and <see cref="IMediaStore.PutAsync"/> is <em>never</em> called
+    /// (guards-before-write, C-UP·2 — no byte written, F9). Mirrors the
+    /// <see cref="Upload_Oversize_413_NoPut"/> pin but as the M25 named test.
+    /// </summary>
+    [Fact]
+    public async Task DocumentUpload_Oversize_413()
+    {
+        var (controller, media, _, _) = BuildUploadController(
+            roles: new[] { "GlobalAdmin" },
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = 16, PerUserQuotaBytes = long.MaxValue });
+
+        var result = await controller.Upload(ValidUploadForm(TestFile("big.pdf", "application/pdf", new byte[32])));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// M25 U9 (item 18, F3) — the **over-quota** reject on the document lane.
+    /// Pre-seed the subject's usage (a positive <see cref
+    /// "IStorageSettingsService.GetPerUserUsageBytesAsync"/> value) + a small
+    /// <see cref="CommunityStorageSettings.PerUserQuotaBytes"/> so
+    /// <c>usage + incoming &gt; quota</c>, while <see
+    /// cref="CommunityStorageSettings.MaxFileBytes"/> is large so the file is
+    /// <em>not</em> oversize — the reject is over-quota, not oversize. 413 +
+    /// no byte written (C-UP·2 / F9).
+    /// </summary>
+    [Fact]
+    public async Task DocumentUpload_OverQuota_413()
+    {
+        var (controller, media, _, _) = BuildUploadController(
+            roles: new[] { "GlobalAdmin" },
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 50 },
+            currentUsageBytes: 100);
+
+        var result = await controller.Upload(ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf)));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written — the gate rejects before PutAsync.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
     /// D3 / C-M21·7 — <c>POST /documents</c> with a **disallowed** content
     /// type → 415, and <em>no file written</em>: the guard fires before
     /// <c>PutAsync</c>. Two asserts (the document allowlist is closed):
@@ -904,7 +957,8 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     /// the substitute session is a no-op). Pure NSubstitute.
     /// </summary>
     private static (DocumentController Controller, IMediaStore Media, IDocumentStore Store, IDocumentSession Session) BuildUploadController(
-        string[] roles, long maxBytes = 0)
+        string[] roles, long maxBytes = 0,
+        Kumunita.Core.Usage.CommunityStorageSettings? settings = null, long currentUsageBytes = 0)
     {
         var mediaOpts = new MediaOptions { MaxBytes = maxBytes };
 
@@ -916,7 +970,10 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
             Substitute.For<IUserInfoService>(), Substitute.For<IAuthorizationService>(), store);
         var media = Substitute.For<IMediaStore>();
 
-        var httpContext = PrincipalHttpContext(roles);
+        // M25 U9 — the two enforcement tests pass an explicit settings doc +
+        // pre-seeded usage; the pre-existing tests keep the U8 default (null →
+        // env fallback, 0 → quota disabled), so their assertions are unchanged.
+        var httpContext = PrincipalHttpContext(roles, settings: settings, currentUsageBytes: currentUsageBytes);
         var controller = new DocumentController(docs, media, Options.Create(mediaOpts), store);
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         // The Upload happy path sets TempData["info"] — close the bag with a
@@ -957,13 +1014,30 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     /// given <see cref="ClaimTypes.Role"/> claims (the D5 standing the
     /// <see cref="KumunitaPrincipal"/> helpers read).
     /// </summary>
-    private static DefaultHttpContext PrincipalHttpContext(string[] roles, string subject = Actor)
+    private static DefaultHttpContext PrincipalHttpContext(string[] roles, string subject = Actor,
+        Kumunita.Core.Usage.CommunityStorageSettings? settings = null, long currentUsageBytes = 0)
     {
         var claims = new List<Claim> { new(Kumunita.Core.Identity.ClaimTypes.Subject, subject) };
         claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(
             new ClaimsIdentity(claims, authenticationType: "test"));
+        // M25 (U8) — the upload + edit lanes adopted the Web-only IUploadGate,
+        // which the action resolves from HttpContext.RequestServices. Wire a
+        // minimal provider (stub IStorageSettingsService + the real UploadGate)
+        // here so every harness in this class — which all funnel through this
+        // helper — keeps running against the gate (MaxFileBytes = null → the
+        // harness MediaOptions.MaxBytes is the env fallback; PerUserQuotaBytes
+        // = 0 → quota disabled, the C-UP·5 sentinel).
+        // M25 (U9) — the two new document enforcement tests pass an explicit
+        // settings doc (small MaxFileBytes / small PerUserQuotaBytes) + a
+        // pre-seeded usage; every pre-existing call keeps the U8 default (null
+        // → env fallback, 0 → quota disabled), so their assertions are
+        // unchanged.
+        var gateSettings = settings
+            ?? new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
+        httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
+            gateSettings, currentUsageBytes);
         return httpContext;
     }
 

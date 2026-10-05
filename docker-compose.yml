@@ -79,6 +79,12 @@ services:
       # `docker compose up --build` loses the uploads — same discipline as the
       # keyring mount just above.
       Media__RootPath: "/data/media"
+      # Platform-wide storage cap (ADR 0136; OPS §Media): max bytes of resident
+      # content this deployment may hold. 500 MiB = 524288000. When spent (or the
+      # volume's free space drops below 100 MiB) all new uploads are blocked 413,
+      # and /admin/storage's "available" figure is capped to the remaining budget.
+      # Omit (or set 0) for unlimited.
+      Media__MaxPlatformBytes: "524288000"
     ports:
       - "5080:8080"
     volumes:

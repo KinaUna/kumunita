@@ -37,17 +37,31 @@ All per-instance identity and integration is env. The *image* is identical every
 | `SeedAdmin__Token`          | First-run | Yes    | **One-time** setup token, consumed on first login — never a reusable password |
 | `DataProtection__KeysDirectory` | Recommended | No | Persistent directory holding the data-protection keyring — keeps sign-in + antiforgery state across redeploys (COOLIFY §5.2). Omit = in-memory (sessions die on restart) |
 | `Media__RootPath` | Recommended | No | The dedicated media volume mount (content-addressed byte store, ADR 0011). The in-code default (`{appDir}/media`) sits **inside the image layer** — in prod this must point at an operator-provided attached volume, or uploads are lost on redeploy, same discipline as `DataProtection__KeysDirectory` |
-| `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
+| `Media__MaxBytes` | Optional | No | **Fallback** per-file cap in bytes (default `10485760` = 10 MiB; `0` = no cap). **ADR 0135 (M25):** the per-file limit is now primarily **admin-set in-app** (`GET/POST /admin/storage/settings`), and this env value is the **fallback** in force when the admin has not set an override — a resident over it is still rejected `413` before any byte is written. Under an admin override, its `0` = no-cap sentinel reads as *unlimited file size*. The **per-user total content quota** is **not** an env knob — it is admin-set in-app only (quota `0` = unlimited) |
+| `Media__MaxPlatformBytes` | Optional | No | **Platform-wide** storage-space limit in bytes (default **absent/`0` = unlimited**). When set to a value `> 0`, the platform may hold at most this many bytes of resident content: the `GlobalAdmin`'s `/admin/storage` "available" figure is capped to `min(physical free space, limit − used)` (clamped at `0` once used ≥ limit), and **all** new file uploads are blocked with `413` the moment used space reaches **or** exceeds the limit — *or* the volume's physical free space drops below the fixed **100 MiB** floor, whichever comes first. This is the operator's capacity knob (an env value, **not** an admin-set in-app limit): a value of `0` or unset leaves both the "available" figure and the upload gate exactly as they are without the limit. The 100 MiB floor is a fixed safety margin (not a separate knob) that stops the volume filling to its physical edge |
 | `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The image lane's raster-only gate; the extension point this row was sized to leave open for follow-on lanes |
 | `Media__AttachmentAllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive, for the **attachment (download) lane** (ADR 0034, lane `ATT`) — **distinct** from the image lane's `Media__AllowedContentTypes`. Default: `application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv, application/zip, image/jpeg, image/png, image/webp, image/gif` (SVG excluded; the four raster types included so a photo can be attached *as a download*). Same `Media__MaxBytes` cap. Guards-before-write: empty → 400, oversize → 413, disallowed → 415 (SECURITY.md §3(e)) |
 | `SampleData__Enabled` | Optional | No | First-boot mock-neighborhood seeder (ADR 0055 / 0056) **plus** the warm-boot sample-event translation backfill (ADR 0060). Default **absent/`false`** — a real deployment omits it, so neither lane is reachable by construction. Set `true` only for a **deployed demo site** (`Production` + fresh DB): the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo accounts get random high-entropy passwords, and a single credentials summary is emailed to the seed admin's address through the durable outbox. In `Development` it instead uses the documented weak demo credentials (README §Running table). The content seed is first-boot only (pristine-DB gate); on a warm boot the flag also triggers the create-if-missing, idempotent, never-clobbering backfill of the sample events' missing `de`/`fr`/`da` `EventTranslation` rows (ADR 0060) |
 | `Health__Token` | Optional | Yes | Shared-secret for the full `/health` diagnostic payload (SECURITY.md §6 / M3). When set, the detailed fields (`mail`, `mailDetail`, `emailDeadLetters`, `build`) require either the `X-Health-Token` header to match this value, or an authenticated GlobalAdmin session. The minimal liveness probe (`status`, `database`, `app`, `elapsedMs`) stays anonymous (Coolify / edge-proxy health check relies on it). **Default absent/empty** — the full payload is always visible (back-compat). Recommended for production: `openssl rand -hex 24` |
+| `AuditPurge__RoutineDays` | Optional | No | §6.4 scheduled-job config: routine access-audit rows are purged once older than this many days (default `90`). Omit to keep the default |
+| `AuditPurge__UnresolvedReportDays` | Optional | No | §6.4 scheduled-job config: report-attached + standing audit rows are kept until the report resolves, then a further this many days (default `365`). Omit to keep the default |
+| `EventReminder__WindowHours` | Optional | No | §6.4 scheduled-job config: the "remind the day before" window for event reminders, in hours (default `24`). Omit to keep the default |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
 
 **Config is state too.** The env set defines an instance's identity — back it up (encrypted)
 alongside the database, or a rebuilt VPS won't know who it is.
+
+**Storage metrics (M24, ADR 0134).** A `GlobalAdmin` can read the media byte
+store at **`GET /admin/storage`** — total used space, available space,
+user-content used space, and a paged per-user table. It adds **no env var** and
+**no new surface to provision**: it reads `Media__RootPath` (the configured
+volume) via two read-only `statvfs`/`DriveInfo` calls and the `MediaObject`
+catalog (`Σ SizeBytes` per `CreatedById`). It is a **read** — a page view emits
+**no `AccessAudit` row** (the M13 "read = no row" discipline; there is no
+`/admin/storage/export` route in v1), so there is nothing to audit, back up, or
+rotate for it. Non-`GlobalAdmin`s get **403**.
 
 ## Instance inventory
 

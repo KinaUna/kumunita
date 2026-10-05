@@ -1,6 +1,30 @@
 @model Kumunita.Web.Controllers.LanguagesController.TranslationEditorViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
 @{
     ViewData["Title"] = $"UI strings — {Model.Code}";
+    // The lede, the row-value aria-label, and the per-code strings (title /
+    // th_value / value_aria) carry inlined values ({0}/{1}) — server-resolved
+    // (the kw-l TagHelper does not interpolate), the ADR 0049 effective-language
+    // chain.
+    string? effLang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    string editorTitleRaw = "UI strings for {0}";
+    string editorLedeRaw = "The full list of strings the platform shows to its residents. Each row shows the key, its English reference text, and the current value in {0}. Saving a row adds or updates its translation — visible on the next request.";
+    string thValueRaw = "Value in {0}";
+    string valueAriaTemplate = "Value for {0} in {1}";
+    string modeLabel = "Editor mode";
+    if (Translation is not null)
+    {
+        editorTitleRaw = await Translation.GetAsync("translations.editor.title", effLang);
+        editorLedeRaw = await Translation.GetAsync("translations.editor.lede", effLang);
+        thValueRaw = await Translation.GetAsync("translations.editor.th_value", effLang);
+        valueAriaTemplate = await Translation.GetAsync("translations.editor.value_aria", effLang);
+        modeLabel = await Translation.GetAsync("translations.editor.mode_label", effLang);
+    }
+    var editorTitle = editorTitleRaw.Replace("{0}", Model.Code);
+    var editorLede = editorLedeRaw.Replace("{0}", Model.Code);
+    var thValue = thValueRaw.Replace("{0}", Model.Code);
 
     // M15 U05 (ADR 0116, D6) — the quiet mode toggle (two kw-l links, plain
     // <a>, no JS): each link points at the *other* mode of this same view —
@@ -11,17 +35,17 @@
 }
 
 <p>
-    <a href="/admin/languages" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back to languages</a>
+    <a href="/admin/languages" class="btn btn-outline-secondary btn-sm mb-3"><kw-l key="translations.editor.back">← Back to languages</kw-l></a>
 </p>
 
-<h1>UI strings for @Model.Code</h1>
+<h1>@editorTitle</h1>
 
 @* ── M15 U05 (ADR 0116, D6) — the quiet top toggle: two kw-l links (plain
    <a>, no JS) switching between the two modes of this same view. The
    current mode's link is styled as the active state (Bootstrap .active);
    the other mode is the link. The per-row editor below is the frozen lane
    (byte-identical, C-M15·7) — the toggle is additive markup above it. *@
-<div class="d-inline-flex btn-group mb-3" role="group" aria-label="Editor mode">
+<div class="d-inline-flex btn-group mb-3" role="group" aria-label="@modeLabel">
     <a href="/admin/languages/@Model.Code/translations"
        class="btn btn-sm @(isBatch ? "btn-outline-secondary" : "btn-secondary active")">
         <kw-l key="translations.bulk.mode_single">Edit one at a time</kw-l>
@@ -33,10 +57,7 @@
 </div>
 
 <p class="text-muted">
-    The closed list of canonical platform keys. Each row shows the key, its
-    <code>en</code> reference text, and the current value in
-    <strong>@Model.Code</strong>. Save a row to upsert its translation —
-    visible on the next request.
+    @editorLede
 </p>
 
 @* ── M15 U05 (ADR 0116, D6) — the batch form (one view, two modes): the
@@ -58,9 +79,9 @@
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
-                                <th>Key</th>
-                                <th>English reference</th>
-                                <th>Value in @Model.Code</th>
+                                <th><kw-l key="translations.editor.th_key">Key</kw-l></th>
+                                <th><kw-l key="translations.editor.th_en_reference">English reference</kw-l></th>
+                                <th>@thValue</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -72,7 +93,7 @@
                                     <td>
                                         <input type="text" class="form-control form-control-sm"
                                                name="@row.Key" value="@row.CurrentValue" maxlength="512"
-                                               aria-label="Value for @row.Key in @Model.Code" />
+                                               aria-label="@valueAriaTemplate.Replace("{0}", row.Key).Replace("{1}", Model.Code)" />
                                     </td>
                                 </tr>
                             }
@@ -123,9 +144,9 @@
     <table class="table table-sm align-middle">
         <thead>
             <tr>
-                <th>Key</th>
-                <th>English reference</th>
-                <th>Value in @Model.Code</th>
+                <th><kw-l key="translations.editor.th_key">Key</kw-l></th>
+                <th><kw-l key="translations.editor.th_en_reference">English reference</kw-l></th>
+                <th>@thValue</th>
             </tr>
         </thead>
         <tbody>
@@ -140,8 +161,8 @@
                             <input type="hidden" name="key" value="@row.Key" />
                             <input type="text" class="form-control form-control-sm"
                                    name="text" value="@row.CurrentValue" maxlength="512"
-                                   aria-label="Value for @row.Key in @Model.Code" />
-                            <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Save</button>
+                                   aria-label="@valueAriaTemplate.Replace("{0}", row.Key).Replace("{1}", Model.Code)" />
+                            <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap"><kw-l key="common.save">Save</kw-l></button>
                         </form>
                     </td>
                 </tr>

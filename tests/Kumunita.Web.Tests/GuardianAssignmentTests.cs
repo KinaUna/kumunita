@@ -177,18 +177,19 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
         Assert.Equal(0, auditCount);
     }
 
-    // ── 8 — happy path — AssignGuardianLinkAsync is called, new row + 2 audit ─
+    // ── 8 — happy path (ADR 0038 §F) — AssignGuardianLinkAsync is called, new
+    //      row (PENDING) + ONE assign audit row ─
     // A guardian assigns a known, non-self, non-duplicate email → the
-    // AssignGuardianLinkAsync seam (GA-AR, ADR 0038 §Amendment
-    // (2026-09-17, second)) creates a new GuardianLink row (Active) + TWO
-    // audit rows in one commit (C3 — S·1): guardian.create [ActorId = the
-    // ASSIGNED guardian, the GU seam's shape] + guardian.assign [ActorId =
-    // the ASSIGNING guardian / conferrer] (S·5). The action redirects to
-    // Detail. (Resolves the U06 drift pause: the §D prose pin "ActorId =
-    // the assigning guardian" is now met by the guardian.assign row.)
+    // AssignGuardianLinkAsync seam (ADR 0038 §F) creates a new GuardianLink
+    // row in PENDING state + ONE audit row in one commit (C3 — S·1):
+    // guardian.assign [ActorId = the ASSIGNING guardian / conferrer] (S·5).
+    // The action redirects to Detail. The standing is NOT minted yet — the
+    // guardian.create row is deferred to the Accept action (the assignee's
+    // consent is what mints the standing, the ADR 0038 §F supersession of
+    // the GA-AR "two audit rows" contract).
 
     [Fact]
-    public async Task Assign_KnownEmail_CallsAssignGuardianLinkAsync()
+    public async Task Assign_KnownEmail_WritesPendingRow_AndAssignAuditRow()
     {
         // The actor is the guardian (an active link over the child is seeded).
         // The email resolves to a NEW guardian (non-self, non-duplicate).
@@ -205,71 +206,356 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Detail", redirect.ActionName);
 
-        // A new GuardianLink row for (newGuardian, child) with Active status.
+        // A new GuardianLink row for (newGuardian, child) with PENDING status
+        // (the ADR 0038 §F acceptance lane: the standing is not minted until
+        // the assignee accepts with consent).
         await using var session = store.QuerySession();
         var newLink = await session.Query<GuardianLink>()
             .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
             .FirstOrDefaultAsync(ct);
         Assert.NotNull(newLink);
-        Assert.Equal(GuardianLinkStatus.Active, newLink!.Status);
+        Assert.Equal(GuardianLinkStatus.Pending, newLink!.Status);
 
-        // Two audit rows target the new link (S·1 — one commit, two rows):
-        // (1) guardian.create — ActorId = the ASSIGNED guardian (S·5).
-        var createRow = await LastAuditAsync(store, "guardian.create", newLink.Id, ct);
-        Assert.Equal(NewGuardian, createRow.ActorId);          // the assigned guardian
-        Assert.Equal(AccessVia.Guardian, createRow.Via);
+        // The conferrer is persisted on the row (ADR 0038 §F — the S·3
+        // byte-identical-POCO invariant is superseded: the "who conferred the
+        // standing" legibility is now on the row itself).
+        Assert.Equal(Guardian, newLink.AssignedById);
+        // The assignee's ResolvedAt/ResolvedBy are null (the row is still
+        // Pending — they have not yet acted).
+        Assert.Null(newLink.ResolvedAt);
+        Assert.Null(newLink.ResolvedBy);
 
-        // (2) guardian.assign — ActorId = the ASSIGNING guardian (S·5).
+        // ONE audit row targets the new link (S·1 — one commit, one row):
+        // guardian.assign — ActorId = the ASSIGNING guardian (the conferrer,
+        // S·5).
         var assignRow = await LastAuditAsync(store, "guardian.assign", newLink.Id, ct);
         Assert.Equal(Guardian, assignRow.ActorId);             // the assigning guardian (the test's actor)
         Assert.Equal(AccessVia.Guardian, assignRow.Via);
-
-        Assert.Equal(newLink.Id, createRow.TargetId);
-        Assert.Equal(newLink.Id, assignRow.TargetId);
         Assert.Equal("guardian-link", assignRow.TargetKind);
+
+        // NO guardian.create row (the standing is not minted until the
+        // assignee accepts — the ADR 0038 §F supersession of the GA-AR
+        // "two audit rows" contract).
+        Assert.Equal(0, await CountAuditAsync(store, "guardian.create", newLink.Id, ct));
     }
 
-    // ── 8a — GA-AR (2026-09-17) — the guardian.assign row's ActorId is the
-    //      ASSIGNING guardian (the conferrer), NOT the assigned guardian.
-    //      This is the §D named legibility limitation (ADR 0038, first
-    //      amendment) now resolved: the conferrer is on the audit trail.
+    // ── 8a — ADR 0038 §F — the assignee's ACCEPT action: consent gate +
+    //      seam call + redirect + audit rows ─
+    // The assignee (the NewGuardian's subject id is the actor) accepts a
+    // pending request. The consent gate is the form's GuardianConsent
+    // checkbox: unchecked → the action refuses (redirects to Index with
+    // TempData["error"]); checked → the accept seam runs (Pending → Active,
+    // guardian.create + guardian.accept audit rows commit), redirect to
+    // Index with TempData["info"].
 
     [Fact]
-    public async Task Assign_KnownEmail_WritesAssignAuditRow()
+    public async Task Accept_NoConsent_Refused_RedirectsToIndex()
     {
-        // The actor is the guardian (an active link over the child is seeded).
-        // The email resolves to a NEW guardian (non-self, non-duplicate).
-        var (controller, identity, store) = await BuildAsync();
+        // The actor is the NEW GUARDIAN (the assignee — their subject id is
+        // the NewGuardian constant), NOT the conferring Guardian. The
+        // assignee holds no standing yet — the standing gate is not
+        // applicable (the accept is what mints the standing).
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: NewGuardian, seedGuardianLink: false);
         var ct = TestContext.Current.CancellationToken;
-        identity.FindSubjectByEmailAsync("new@example.com")
-            .Returns(Task.FromResult<string?>(NewGuardian));
 
-        var result = await controller.Assign(
+        // Seed the pending request: the Guardian (the conferrer) assigns the
+        // NewGuardian (the assignee) as a co-guardian for the child.
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            // The Guardian's own active link (their standing basis).
+            await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+            // The Pending row (the assignee's request) — write it directly
+            // (the seam is not called here — the test is about the ACCEPT
+            // action's consent gate, not the seam's write).
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        // The consent gate: unchecked → refused.
+        var result = await controller.Accept(
             Child,
-            new AssignGuardianForm { Email = "new@example.com" });
+            new AcceptGuardianForm { GuardianConsent = false });
 
+        // The action redirects to Index (the consent gate's error surface —
+        // the TempData["error"] the _FlashToast surfaces; the Suspend /
+        // Unsuspend / Dissolve precedent in this controller).
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Detail", redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
-        // The new link row exists (the seam's write, S·1).
+        // The row is STILL Pending (the accept did not run — the consent
+        // gate refused it).
         await using var session = store.QuerySession();
-        var newLink = await session.Query<GuardianLink>()
+        var link = await session.Query<GuardianLink>()
             .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
             .FirstOrDefaultAsync(ct);
-        Assert.NotNull(newLink);
+        Assert.NotNull(link);
+        Assert.Equal(GuardianLinkStatus.Pending, link!.Status);
+    }
 
-        // S·5 — the guardian.assign row's ActorId is the ASSIGNING guardian
-        // (the actor, the test's Guardian constant), NOT the assigned
-        // guardian (NewGuardian). This is the conferral legibility the
-        // GA-AR lane adds (ADR 0038 §D's named limitation, resolved).
-        var assignRow = await LastAuditAsync(store, "guardian.assign", newLink!.Id, ct);
-        Assert.Equal(Guardian, assignRow.ActorId);             // the assigning guardian (the actor)
-        Assert.Equal(Guardian, assignRow.EffectivePrincipalId);
-        Assert.NotEqual(NewGuardian, assignRow.ActorId);       // NOT the assigned guardian
-        Assert.Equal("guardian-link", assignRow.TargetKind);
-        Assert.Equal(newLink.Id, assignRow.TargetId);
-        Assert.Equal(AccessVia.Guardian, assignRow.Via);
-        Assert.Equal(AccessOutcome.Allow, assignRow.Outcome);
+    [Fact]
+    public async Task Accept_WithConsent_MintsStanding_RedirectsToIndex()
+    {
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: NewGuardian, seedGuardianLink: false);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the pending request (same shape as the consent-gate test).
+        await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        // The consent gate: checked → the accept runs.
+        var result = await controller.Accept(
+            Child,
+            new AcceptGuardianForm { GuardianConsent = true });
+
+        // The action redirects to Index (the success path — the TempData
+        // ["info"] "You are now this child's guardian." the _FlashToast
+        // surfaces).
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+
+        // The row is now ACTIVE (the standing is minted).
+        await using var session = store.QuerySession();
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
+            .FirstOrDefaultAsync(ct);
+        Assert.NotNull(link);
+        Assert.Equal(GuardianLinkStatus.Active, link!.Status);
+        Assert.Equal(NewGuardian, link.ResolvedBy);
+        Assert.NotNull(link.ResolvedAt);
+
+        // TWO audit rows target the link (C3 — one commit, two rows):
+        // (1) guardian.create — ActorId = the ASSIGNED guardian (the
+        //     standing-holder, the GU seam's shape — byte-identical to what
+        //     CreateGuardianLinkAsync writes).
+        var createRow = await LastAuditAsync(store, "guardian.create", link.Id, ct);
+        Assert.Equal(NewGuardian, createRow.ActorId);
+        Assert.Equal(AccessVia.Guardian, createRow.Via);
+
+        // (2) guardian.accept — ActorId = the ASSIGNED guardian (the one who
+        //     consented — the ADR 0038 §F consent event).
+        var acceptRow = await LastAuditAsync(store, "guardian.accept", link.Id, ct);
+        Assert.Equal(NewGuardian, acceptRow.ActorId);
+        Assert.Equal(AccessVia.Guardian, acceptRow.Via);
+
+        // The conferral legibility (ADR 0038 §F — the S·3
+        // byte-identical-POCO invariant is superseded) is now on the row
+        // itself: the conferrer's SubjectId is persisted in AssignedById
+        // (the row's "who conferred the standing" legibility, the ADR 0038
+        // §F amendment). The Web test harness seeds the row directly (not
+        // via the seam), so the guardian.assign audit row is not written
+        // here — the row's AssignedById field is the legibility surface.
+        Assert.Equal(Guardian, link.AssignedById);
+    }
+
+    // ── 8b — ADR 0038 §F — the assignee's DECLINE action: the row flips
+    //      Pending → Declined, the guardian.decline audit row commits ─
+
+    [Fact]
+    public async Task Decline_ByAssignee_FlipsRowToDeclined_WritesDeclineAuditRow()
+    {
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: NewGuardian, seedGuardianLink: false);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the pending request (same shape as the accept tests).
+        await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        // The decline: no consent gate (the decline is a refusal, not an
+        // acceptance).
+        var result = await controller.Decline(Child);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+
+        // The row is now DECLINED (the assignee refused the standing).
+        await using var session = store.QuerySession();
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
+            .FirstOrDefaultAsync(ct);
+        Assert.NotNull(link);
+        Assert.Equal(GuardianLinkStatus.Declined, link!.Status);
+        Assert.Equal(NewGuardian, link.ResolvedBy);
+        Assert.NotNull(link.ResolvedAt);
+
+        // ONE audit row targets the link: guardian.decline — ActorId = the
+        // ASSIGNED guardian (the one who refused).
+        var declineRow = await LastAuditAsync(store, "guardian.decline", link.Id, ct);
+        Assert.Equal(NewGuardian, declineRow.ActorId);
+        Assert.Equal(AccessVia.Guardian, declineRow.Via);
+
+        // NO guardian.create row (the standing was never minted).
+        Assert.Equal(0, await CountAuditAsync(store, "guardian.create", link.Id, ct));
+    }
+
+    // ── 8c — ADR 0038 §F — a non-assignee's accept is refused (the
+    //      ADR 0012/0013 "a non-guardian learns nothing" shape applied to
+    //      the acceptance lane) ─
+
+    [Fact]
+    public async Task Accept_ByNonAssignee_Refused_RedirectsToIndexWithError()
+    {
+        // The actor is the Guardian (the CONFERING guardian — NOT the
+        // assignee of the pending request). The assignee is the NewGuardian.
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: Guardian, seedGuardianLink: false);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the conferrer's active link + the assignee's pending request.
+        await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        // The conferring guardian tries to accept the NewGuardian's request
+        // — refused: the row's GuardianId field is the NewGuardian's
+        // identity, not the Guardian's. The seam throws
+        // InvalidOperationException ("no pending row for this pair"); the
+        // action catches it and redirects to Index with TempData["error"]
+        // (the Suspend / Unsuspend / Dissolve precedent).
+        var result = await controller.Accept(
+            Child,
+            new AcceptGuardianForm { GuardianConsent = true });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+
+        // The row is STILL Pending (the accept did not run — the identity
+        // gate refused it).
+        await using var session = store.QuerySession();
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
+            .FirstOrDefaultAsync(ct);
+        Assert.NotNull(link);
+        Assert.Equal(GuardianLinkStatus.Pending, link!.Status);
+    }
+
+    // ── 8d — ADR 0038 §F — the Index action returns the assignee's pending
+    //      requests (the pending-requests card's source data) ─
+
+    [Fact]
+    public async Task Index_ReturnsAssigneesPendingRequests()
+    {
+        // The actor is the NewGuardian (the assignee — their pending request
+        // is what the Index page's pending-requests card shows).
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: NewGuardian, seedGuardianLink: false);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the conferrer's active link + the assignee's pending request.
+        await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        var result = await controller.Index();
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<Kumunita.Web.Models.GuardianIndexModel>(view.Model);
+
+        // The pending-requests list has exactly one row (the assignee's
+        // pending request for this child).
+        Assert.Single(model.PendingRequests);
+        Assert.Equal(Child, model.PendingRequests[0].ChildId);
+        Assert.Equal(Guardian, model.PendingRequests[0].ConferrerDisplayName);
+        // The children list is empty (the assignee holds no active link yet
+        // — the standing is not minted until they accept).
+        Assert.Empty(model.Children);
+    }
+
+    // ── 8e — ADR 0038 §F — a non-assignee's Index shows no pending
+    //      requests (the ADR 0012/0013 "a non-guardian learns nothing"
+    //      shape applied to the identity axis) ─
+
+    [Fact]
+    public async Task Index_NonAssignee_SeesNoPendingRequests()
+    {
+        // The actor is the Guardian (the CONFERING guardian — NOT the
+        // assignee of the pending request). The assignee is the NewGuardian.
+        var (controller, identity, store) = await BuildAsync(
+            actorSubjectId: Guardian, seedGuardianLink: false);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the conferrer's active link + the assignee's pending request.
+        await SeedGuardianLinkAsync(store, Guardian, Child, ct);
+        await using (var seedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            seedSession.Store(new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = NewGuardian,
+                ChildId = Child,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AssignedById = Guardian
+            });
+            await seedSession.SaveChangesAsync(ct);
+        }
+
+        var result = await controller.Index();
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<Kumunita.Web.Models.GuardianIndexModel>(view.Model);
+
+        // The Guardian is NOT the assignee of the pending request (their
+        // row is Active from SeedGuardianLinkAsync, not Pending) — their
+        // Index page's pending-requests list is empty.
+        Assert.Empty(model.PendingRequests);
+        // But their children list shows the child (their active link).
+        Assert.Single(model.Children);
+        Assert.Equal(Child, model.Children[0].ChildId);
     }
 
     // ── Shared harness ─────────────────────────────────────────────────────

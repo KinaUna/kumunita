@@ -40,7 +40,7 @@ public sealed class GuardianViewModelsTests
     }
 
     [Fact]
-    public void MembershipEditorModel_Is_Exact_Five_Field_Projection()
+    public void MembershipEditorModel_Is_Exact_Six_Field_Projection()
     {
         var fields = typeof(MembershipEditorModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -53,7 +53,13 @@ public sealed class GuardianViewModelsTests
         // guardians" list — the assigned guardian's display name; G-A·3
         // identical-in-kind pin; G·1 held: ids/names only, never the
         // child's posts, profile body, or any audience-restricted content).
-        Assert.Equal(new[] { "ChildId", "CommunityIds", "GroupIds", "GuardianItems", "PendingInvitations" }, fields.ToArray());
+        // GU community-approval lane (ADR 0141) added the 6th:
+        // PendingCommunityRequests (the child's pending
+        // CommunityMembershipRequest rows — the approve/reject buttons'
+        // source data; G·1 held: ids/names only).
+        Assert.Equal(
+            new[] { "ChildId", "CommunityIds", "GroupIds", "GuardianItems", "PendingCommunityRequests", "PendingInvitations" },
+            fields.ToArray());
     }
 
     [Fact]
@@ -71,7 +77,23 @@ public sealed class GuardianViewModelsTests
     }
 
     [Fact]
-    public void AddChildForm_Is_Form_Model_With_Three_Required_Fields()
+    public void PendingCommunityRequestItem_Is_Exact_Three_Field_Projection()
+    {
+        var fields = typeof(PendingCommunityRequestItem)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        // GU community-approval lane (ADR 0141) pin: CommunityId +
+        // CommunityName + RequestedAt — and *nothing else*. The row's
+        // Status / resolution stamps never reach the model (G·1, the
+        // PendingInvitationItem precedent).
+        Assert.Equal(new[] { "CommunityId", "CommunityName", "RequestedAt" }, fields.ToArray());
+    }
+
+    [Fact]
+    public void AddChildForm_Is_Form_Model_With_Four_Fields()
     {
         var fields = typeof(AddChildForm)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -80,8 +102,10 @@ public sealed class GuardianViewModelsTests
             .ToList();
 
         // The U07 pin: DisplayName + Email + Password — the three form-bound
-        // fields. The guardian is *never* a form-bound field (minted from the
-        // signed-in principal); the three carry [Required] (see the VM doc-comments).
-        Assert.Equal(new[] { "DisplayName", "Email", "Password" }, fields.ToArray());
+        // fields, plus the guardian consent checkbox (GuardianConsent — the
+        // guardian's confirmation of the child-account terms before creation).
+        // The guardian is *never* a form-bound field (minted from the signed-in
+        // principal); all four carry [Required] (see the VM doc-comments).
+        Assert.Equal(new[] { "DisplayName", "Email", "GuardianConsent", "Password" }, fields.ToArray());
     }
 }

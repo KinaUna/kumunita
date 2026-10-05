@@ -186,6 +186,91 @@ public sealed class Profile
     /// **additive** field (ADR 0004 §B.1), like <see cref="EmailLanguage"/>.
     /// </summary>
     public IReadOnlyList<string> TagIds { get; set; } = [];
+
+    // M22 ADD (ADR 0132 D1; ADR 0004 §B.1 additive — the 11th additive Profile
+    // field after AvatarId, TimeZone, DateFormat, EmailLanguage, Bio, TagIds):
+    /// <summary>
+    /// M22 (ADR 0132, D1) — the onboarding completion stamp. <c>null</c> =
+    /// the resident has not finished the guided walk-through (the floor: the
+    /// banner shows, the nav entry is present). A non-null value = finished /
+    /// skipped; the banner clears. Written only by the owner-scope
+    /// <see cref="IUserInfoService.CompleteOnboardingAsync"/> lane (D2); read
+    /// through the existing <see cref="IUserInfoService.GetProfileAsync"/>
+    /// read (never a claim, D6). Additive per ADR 0004 §B.1: delta-detected,
+    /// idempotent, no re-seed, no EF migration, no new <c>*DocTypes</c> surface.
+    /// </summary>
+    public DateTimeOffset? OnboardingCompletedAt { get; set; }
+
+    // M9-amendment (per-resident messaging opt-in; ADR 0004 §B.1 additive — the
+    // 12th additive Profile field after AvatarId, TimeZone, DateFormat,
+    // EmailLanguage, Bio, TagIds, OnboardingCompletedAt):
+    /// <summary>
+    /// The resident's own <b>messaging opt-in</b> (M9 amendment on top of ADR
+    /// 0105 — the per-user control the instance-level
+    /// <see cref="Localization.LocaleSettings.MessagingEnabled"/> toggle
+    /// gates over). <c>true</c> = this resident participates in 1:1 direct
+    /// messaging (may open/send); <c>false</c> = the resident has opted out
+    /// (cannot open a conversation or send a message; the Messages surface is
+    /// hidden for them). Read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// alongside the instance toggle (the master gate) and, for a supervised
+    /// child, the guardian's restriction ceiling (the guardian lane reads this
+    /// child's active <see cref="GuardianLink"/> set to decide the ceiling; a
+    /// restriction always wins over the child's own choice). An *additive*
+    /// field (ADR 0004 §B.1), like <see cref="OnboardingCompletedAt"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration, no new
+    /// <c>*DocTypes</c> surface. Defaults to <c>false</c> (the ADR 0105
+    /// opt-in convention — a privacy-sensitive capability is off until the
+    /// resident chooses it on).
+    /// </summary>
+    public bool MessagingOptIn { get; set; } = false;
+
+    /// <summary>
+    /// The <b>guardian's messaging restriction</b> over a supervised child
+    /// (M9 amendment — the parent/guardian control). A <b>ceiling</b> (the
+    /// normal parental-restriction model): <c>true</c> = a guardian has
+    /// <b>forced messaging OFF</b> for this child, and it stays OFF no matter
+    /// what the child's own <see cref="MessagingOptIn"/> says; <c>false</c> =
+    /// the guardian has <b>allowed</b> messaging, deferring the decision to
+    /// the child's own opt-in. Read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// as a hard veto over <see cref="MessagingOptIn"/> (the restriction always
+    /// wins; the allowance merely lifts the veto). Written only by the
+    /// <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/> lane
+    /// (a guardian with an active <see cref="GuardianLink"/> — the
+    /// <see cref="IUserInfoService.SuspendChildAsync"/> / <see
+    /// cref="Profile.Blocked"/> precedent: a guardian action that writes a
+    /// single flag on the profile, one active-link standing gate). For an
+    /// unsupervised resident this stays <c>false</c> (no guardian to set it),
+    /// so the gate reduces to the resident's own opt-in. An *additive* field
+    /// (ADR 0004 §B.1), like <see cref="Blocked"/>: delta-detected, idempotent,
+    /// no re-seed, no EF migration.
+    /// </summary>
+    public bool MessagingRestricted { get; set; } = false;
+
+    /// <summary>
+    /// The <b>guardian's community block</b> over a supervised child — the set of
+    /// community (component) ids a guardian has <b>blocked access to and hidden</b>
+    /// for the child. A <b>ceiling</b>, like <see cref="MessagingRestricted"/> (the
+    /// parental-restriction model), but per-community rather than a single flag:
+    /// an id in this list is excluded from the child's effective community set on
+    /// every access surface (the community directory/sidebar, the community feed,
+    /// the posting gate, and the audience visibility of community-scoped posts) —
+    /// which is exactly why it works for a <b>mandatory</b> community, whose
+    /// membership is implicit and cannot be removed (ADR 0012: the removal lanes
+    /// refuse / skip it, so "removing the child" is impossible there). Removing an
+    /// id restores full access (the child's own membership — explicit or mandatory —
+    /// stands again). Written only by the
+    /// <see cref="IUserInfoService.SetChildCommunityBlockAsync"/> lane (a guardian
+    /// with an active <see cref="GuardianLink"/> — the
+    /// <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/> precedent:
+    /// a guardian action over the child, one active-link standing gate, one audit
+    /// row). For an unsupervised resident this stays empty (no guardian to set it),
+    /// so the effective set reduces to the ordinary membership. An *additive* field
+    /// (ADR 0004 §B.1), like <see cref="MessagingRestricted"/> / <see cref="TagIds"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public IReadOnlyList<string> BlockedCommunityIds { get; set; } = [];
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

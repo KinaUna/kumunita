@@ -52,6 +52,20 @@
         <div class="fw-semibold">Break-glass</div>
         <small class="text-muted">The one-time elevation path for emergencies.</small>
     </a>
+    @* ADR 0138 — the sample-data surface (the change-password lock toggle),
+       rendered only on a SampleData__Enabled instance (the "unreachable by
+       construction" shape, ADR 0056 — a real deployment never carries the
+       flag, so this row is absent there). The row label is plain text (the
+       admin view's local convention — mostly non-kw-l English, so an
+       interpolated kw-l key would break the KwLRegistryConsistencyTests
+       static key scan). *@
+    @if (Model.ShowSampleData)
+    {
+        <a href="/admin/sample" class="list-group-item list-group-item-action">
+            <div class="fw-semibold">Sample data</div>
+            <small class="text-muted">This instance runs the demo neighborhood. Lock the sample accounts out of changing their own password so visitors can test features without breaking the shared credentials.</small>
+        </a>
+    }
 </div>
 
 @* SP U03 (ADR 0043 D4) — the "Platform pages" affordance: the five shipped

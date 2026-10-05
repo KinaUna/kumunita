@@ -1,11 +1,25 @@
 @model Kumunita.Web.Models.AnnouncementIndexViewModel
 @using Kumunita.Core.Announcements
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
     bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
     string? subjectId = (User?.Identity?.IsAuthenticated == true) ? Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User) : null;
+
+    // The delete form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmDelete = "Delete this announcement? This cannot be undone.";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmDelete = await Translation.GetAsync("announcements.delete_confirm", effLang);
+    }
 }
 
 <div class="row justify-content-center">
@@ -110,7 +124,7 @@
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/announcements/@a.Id/delete"
-                                      data-confirm="Delete this announcement? This cannot be undone."
+                                      data-confirm="@confirmDelete"
                                       style="margin:0; display:inline;">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="link-quiet small text-danger text-decoration-none border-0 bg-transparent p-0">

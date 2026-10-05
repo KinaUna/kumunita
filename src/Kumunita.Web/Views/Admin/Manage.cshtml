@@ -1,10 +1,16 @@
 @model Kumunita.Web.Models.AdminAccountManageViewModel
 @using Kumunita.Core.Identity
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaBreadcrumb = await Translation.GetAsync("a11y.breadcrumb", effLang);
 }
 
-<nav aria-label="breadcrumb">
+<nav aria-label="@ariaBreadcrumb">
     <ol class="breadcrumb small">
         <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
         <li class="breadcrumb-item active" aria-current="page">
@@ -64,6 +70,23 @@
             </form>
         }
     }
+
+    @* Delete account — the admin removal lane (ADR 0142). Hidden on the
+       admin's own row (the controller refuses self-deletion through this
+       surface too — the GlobalAdmin who wants to leave uses /account/delete,
+       the self-serve lane). *@
+    @if (!Model.IsSelf)
+    {
+        <form method="post" asp-action="DeleteAccount"
+              class="ms-2 d-inline-flex"
+              data-confirm="Delete this account permanently? Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed. This cannot be undone.">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="subjectId" value="@Model.Account.SubjectId" />
+            <button class="btn btn-danger" type="submit">
+                Delete account
+            </button>
+        </form>
+    }
 </div>
 
 <div class="card mb-4">
@@ -81,7 +104,7 @@
             <fieldset class="mb-3">
                 <legend class="h6"><kw-l key="admin.roles_heading">Roles</kw-l></legend>
                 <p class="text-muted small mb-2">
-                    <kw-l key="admin.roles_independent_hint">Independent — a resident may hold any combination (ADR 0030). Nothing checked = a plain Member.</kw-l>
+                    <kw-l key="admin.roles_independent_hint">Independent — a resident may hold any combination. Nothing checked = a plain Member.</kw-l>
                 </p>
                 <div class="d-flex gap-3 flex-wrap">
                     <div class="form-check">

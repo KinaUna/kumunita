@@ -1,3 +1,4 @@
+using Kumunita.Core.Localization;
 using Kumunita.Core.Messaging;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -48,11 +49,42 @@ namespace Kumunita.Web.Controllers;
 public sealed class MessagesController(
     ILogger<MessagesController> logger,
     IMessagingService messaging,
-    IUserInfoService userInfo) : Controller
+    IUserInfoService userInfo,
+    // The per-request localization read seams (the LocaleController.FlashAsync
+    // idiom): the <c>Send</c> success flash names the recipient ("Sent to
+    // {name}"), and a UI string needs the resident's effective language to
+    // resolve. **Optional** (default null) so the existing test-construction
+    // sites that build this controller without the provider keep compiling —
+    // the flash falls back to the KnownTranslationKeys.EnValues source text
+    // when the seam is absent (the provider floor — a resident never sees a
+    // raw key); DI always supplies the live ILocalizationService +
+    // ITranslationProvider in the app.
+    ILocalizationService? localization = null,
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private readonly ILogger<MessagesController> _logger = logger;
     private readonly IMessagingService _messaging = messaging;
     private readonly IUserInfoService _userInfo = userInfo;
+    private readonly ILocalizationService? _localization = localization;
+    private readonly ITranslationProvider? _translationProvider = translationProvider;
+
+    /// <summary>
+    /// Resolve a UI-string template in the resident's effective language and
+    /// apply its <c>{0}</c> placeholder (the LocaleController.FlashAsync idiom).
+    /// Falls back to the <see cref="KnownTranslationKeys.EnValues"/> source text
+    /// when the seam is absent (the provider floor — ADR 0015 D1), so a
+    /// resident never sees a raw key.
+    /// </summary>
+    private async Task<string> FlashAsync(string key, params object?[] args)
+    {
+        var template = _translationProvider is null
+            ? KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key
+            : await _translationProvider.GetAsync(key,
+                await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, _localization!, _translationProvider));
+        return args.Length > 0
+            ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
+            : template;
+    }
 
     // ── GET /messages — the conversation list (+ new-conversation picker) ──
 
@@ -73,6 +105,14 @@ public sealed class MessagesController(
         // F5 — the toggle read is first; off → the disabled state and nothing
         // else is read (no list call, no picker, no thread).
         if (!await _messaging.IsMessagingEnabledAsync())
+            return View(new MessagesIndexViewModel { Disabled = true });
+
+        // M9 amendment — the per-actor gate: the actor's own opt-in must be
+        // on AND the guardian's ceiling (if any) must not be forcing it off.
+        // Disallowed → the same disabled render (no list call, no picker —
+        // the resident is told "messaging is off" the same way an off
+        // instance is; the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
             return View(new MessagesIndexViewModel { Disabled = true });
 
         var pageNum = page is > 0 ? page.Value : 1;
@@ -119,6 +159,11 @@ public sealed class MessagesController(
         if (!await _messaging.IsMessagingEnabledAsync())
             return View("Index", new MessagesIndexViewModel { Disabled = true });
 
+        // M9 amendment — the per-actor gate: disallowed → the disabled render
+        // (the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
+            return View("Index", new MessagesIndexViewModel { Disabled = true });
+
         try
         {
             var conversation = await _messaging.OpenConversationAsync(actorId, otherId ?? string.Empty);
@@ -162,6 +207,12 @@ public sealed class MessagesController(
         if (!await _messaging.IsMessagingEnabledAsync())
             return NotFound();
 
+        // M9 amendment — the per-actor gate: disallowed → 404 (no thread
+        // data read; the non-leaky shape — the same as a missing id, the
+        // C-M9·1 pin: the reason is not surfaced).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
+            return NotFound();
+
         var pageNum = page is > 0 ? page.Value : 1;
         ConversationDetail detail;
         try
@@ -202,12 +253,22 @@ public sealed class MessagesController(
         PagedViewModel? pager = null;
         if (detail.HasMore || pageNum > 1)
             pager = PagedViewModel.ForRoute($"/messages/{detail.Conversation.Id}", pageNum,
-                MessagingService.PageSize, detail.HasMore);
+                MessagingService.ThreadPageSize, detail.HasMore);
+
+        // The service returns the window newest-first (its own contract);
+        // the thread renders it chronologically — oldest first, the **latest
+        // message last** (a chat reads bottom-up). Reverse for the view only;
+        // the service contract is untouched.
+        var chronological = detail.Messages;
+        if (chronological.Count > 1)
+        {
+            chronological = chronological.Reverse().ToList();
+        }
 
         return View(new MessagesThreadViewModel
         {
             Conversation = detail.Conversation,
-            Messages = detail.Messages,
+            Messages = chronological,
             ActorId = actorId,
             ActorDisplayName = actorDisplayName,
             Page = pageNum,
@@ -236,6 +297,17 @@ public sealed class MessagesController(
 
         // F5 — the toggle read is first; off → error render, no send read.
         if (!await _messaging.IsMessagingEnabledAsync())
+            return View("Thread", new MessagesThreadViewModel
+            {
+                Conversation = null,
+                Messages = Array.Empty<Message>(),
+                Error = true,
+                Disabled = true,
+            });
+
+        // M9 amendment — the per-actor gate: disallowed → the disabled
+        // error render (the reason is not surfaced, the shape is the shape).
+        if (!await _messaging.IsMessagingAllowedForAsync(actorId))
             return View("Thread", new MessagesThreadViewModel
             {
                 Conversation = null,
@@ -281,7 +353,21 @@ public sealed class MessagesController(
             return StatusCode(403);
         }
 
-        TempData["info"] = "Sent.";
+        // The success flash names the recipient — the other participant. The
+        // send above already committed, so a name-read failure (the thread
+        // vanishing mid-request) never blanks the flash: it degrades to the
+        // fallback word and the send stands (the D8 best-effort shape).
+        string recipientName = "the other person";
+        try
+        {
+            var detail = await _messaging.GetConversationAsync(id, actorId, 1);
+            if (!string.IsNullOrWhiteSpace(detail?.Conversation?.OtherDisplayName))
+                recipientName = detail.Conversation.OtherDisplayName;
+        }
+        catch (KeyNotFoundException) { /* the thread vanished mid-send — the send above stood */ }
+        catch (UnauthorizedAccessException) { /* same */ }
+
+        TempData["info"] = await FlashAsync("message.sent_to", recipientName);
         return Redirect($"/messages/{id}");
     }
 

@@ -554,12 +554,19 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
 
         // ADR 0036 — one community-load per AuthorizationModule call (same
         // D4 / C4 contract as the group-load above). The actor's live
-        // community set (the GetCommunityIdsAsync read seam — the union of
-        // explicit ComponentMembership rows and the enabled ∩ mandatory
-        // set) is what the Community branch in Decide checks against the
-        // target's ComponentId.
+        // community set is what the Community branch in Decide checks against
+        // the target's ComponentId. The EFFECTIVE set (the
+        // GetEffectiveCommunityIdsAsync read seam) — the raw union of
+        // explicit ComponentMembership rows and the enabled ∩ mandatory set
+        // MINUS the guardian's per-community block (Profile.BlockedCommunityIds) —
+        // is the access decision: it is what hides a guardian-blocked community
+        // from a supervised child's audience visibility (the
+        // MessagingRestricted ceiling precedent carried to communities, and
+        // the one that works for a MANDATORY community, whose implicit
+        // membership cannot be removed — ADR 0012). A non-child (no block)
+        // reads the identical set to the raw read.
         var communityIdsSet = new HashSet<string>(
-            await userInfoService.GetCommunityIdsAsync(actorId).ConfigureAwait(false),
+            await userInfoService.GetEffectiveCommunityIdsAsync(actorId).ConfigureAwait(false),
             StringComparer.Ordinal);
 
         var grant = await userInfoService.GetActiveGrantAsync(actorId).ConfigureAwait(false);

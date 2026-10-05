@@ -61,4 +61,25 @@ public sealed class LocalVolumeFileStore : IMediaFileStore
         File.Move(tmp, final, overwrite: true); // atomic replace on both Win/POSIX
         return Task.CompletedTask;
     }
+
+    // ── M24 volume-stat reads (ADR 0134 C-SM·2) ─────────────────────────────
+    // Read-only, zero writes (C-SM·2): a filesystem stat of the configured
+    // RootPath's partition — NOT a Postgres query, so it stays out of any
+    // QuerySession (C-SM·4 / F7). No I/O side-effect beyond the stat call.
+
+    public Task<long> GetTotalSpaceBytesAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        // DriveInfo on all platforms: on Unix .NET implements it via the BCL's
+        // own statvfs interop (correct struct layout), so this is the portable
+        // replacement for the hand-rolled statvfs P/Invoke that AV'd under
+        // Linux-in-Docker (M24 defect, flagged in ADR 0135).
+        return Task.FromResult(new DriveInfo(Path.GetPathRoot(RootPath)!).TotalSize);
+    }
+
+    public Task<long> GetFreeSpaceBytesAsync(CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(new DriveInfo(Path.GetPathRoot(RootPath)!).AvailableFreeSpace);
+    }
 }

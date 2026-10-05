@@ -19,6 +19,40 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.30.0", "2026-10-04", new List<string>
+        {
+            "Change password — you can now change your own account password (current → new → confirm) from your account menu. After saving you're signed out and asked to sign in again with the new password (ADR 0138).",
+            "Sample-data demo — on a demo instance (sample data enabled), the admin can lock the demo accounts out of changing their own password, so visitors can test features without breaking the shared credentials — the demo admin keeps its own password lane (ADR 0138).",
+        }),
+        new("0.29.0", "2026-10-04", new List<string>
+        {
+            "Platform storage limit — an operator can cap how much resident content the platform may hold (Media__MaxPlatformBytes, 0 = unlimited). When set, the GlobalAdmin's /admin/storage \"available\" figure is capped to the remaining budget, and all new uploads are blocked once that budget is spent or the volume's free space drops below 100 MiB (ADR 0136).",
+            "Storage settings — the per-file size limit and per-user content quota on /admin/storage/settings are now entered in MiB instead of raw bytes (blank still means the platform default / unlimited).",
+        }),
+        new("0.28.0", "2026-10-03", new List<string>
+        {
+            "Upload limits — admin-set per-file size limit and per-user total content quota; residents see how much space they are using and how much of their quota remains (ADR 0135).",
+        }),
+        new("0.27.0", "2026-10-03", new List<string>
+        {
+            "Storage metrics — a GlobalAdmin view of the byte store at `/admin/storage`: how full the volume is, how much is left, how much is resident content, and who is storing the most (per user). It is a read-only snapshot — it writes nothing and audits nothing — and the per-user figures are the seam the upload-limits lane builds on (ADR 0134).",
+        }),
+        new("0.26.0", "2026-10-03", new List<string>
+        {
+            "Appearance — read the platform in a dark room: a dark theme (\"Forest\") now follows your device's appearance by default, and you can pin light or dark instead. The choice lives in the account menu (Appearance) and sticks per browser — a preference, not an account claim; pure CSS, so no first-paint flash and nothing the site's content-security policy would forbid (ADR 0133).",
+        }),
+        new("0.25.0", "2026-10-02", new List<string>
+        {
+            "Onboarding — a guided walk-through for your first sign-in: one page walks you through display name, avatar, interface language, time zone, date & time format, email & notification language, and contact details, each step linking into the setting that already owns it, and a dismissible reminder banner nudges you until you finish or skip (ADR 0132).",
+        }),
+        new("0.24.0", "2026-10-03", new List<string>
+        {
+            "Messaging, as a conversation — a 1:1 thread now reads as a chat: messages run oldest-to-newest, your own on the right and the other person's on the left, each with the sender's avatar; a \"Load earlier\" button pulls in older messages; and a message you send confirms with the other person's name (\"Sent to …\").",
+        }),
+        new("0.23.0", "2026-10-03", new List<string>
+        {
+            "Guides for every surface — every resident surface in the top navigation now has a how-to guide (announcements, directory, finding people, inventory, bookmarks, documents, pages, and tags, alongside the earlier guides), and the Help page now links all of them so it is the one place to start (ADR 0127).",
+        }),
         new("0.22.0", "2026-10-03", new List<string>
         {
             "Attachment preview — the browser-displayable attachments (images, PDFs, plain text, and CSV) now open in a new tab and preview in your browser instead of forcing a download; Office files and zip archives still download. The preview is a separate tab — never embedded in the page — and every serve keeps the same stored type, the same nosniff lock, and the same one-row audit trail as a download (ADR 0126).",

@@ -1,0 +1,150 @@
+@model Kumunita.Web.Models.AdminStorageViewModel
+@{
+    ViewData["Title"] = "Admin — Storage settings";
+}
+@functions {
+    @* A compact human byte formatter (IEC units), shared with the per-file and
+       quota figures. A plain C# helper — no kw-l dependency. A value of 0 means
+       "unlimited" in this surface's semantics (C-UP·5), which the caller labels. *@
+    static string Bytes(long v)
+    {
+        string[] u = { "B", "KiB", "MiB", "GiB", "TiB", "PiB" };
+        double n = v;
+        int i = 0;
+        while (n >= 1024 && i < u.Length - 1) { n /= 1024; i++; }
+        return i == 0 ? $"{n:0} {u[i]}" : $"{n:0.##} {u[i]}";
+    }
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): this view lives in
+   Views/Admin/ (the AdminController's own section folder), so the shared
+   the shared partial lives in Views/Admin/ (the AdminController's own section)
+   and must be referenced absolutely, the same shape as AdminAnalytics/Index.cshtml. *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1>Storage settings</h1>
+<p class="text-muted">
+    The community's upload limits: the per-file size cap and the per-user content
+    quota, and how much resident content is in use.
+</p>
+
+@* The set-lane form (U6, C-UP·1) — the single admin write on the option-A
+   route (one controller / one route / one view, sharing the GET above; not the
+   /admin/storage/limits name the plan originally carried). Blank per-file = no
+   override (platform default); 0 quota = unlimited (C-UP·5). *@
+<h2 class="h5">Set upload limits</h2>
+<form method="post" action="/admin/storage/settings" class="row g-3 mb-4">
+    @Html.AntiForgeryToken()
+    <div class="col-sm-8 col-md-6">
+        <label for="maxFileBytes" class="form-label">Per-file size limit (MiB)</label>
+        <input type="number" min="0" step="1" class="form-control" id="maxFileBytes"
+               name="maxFileBytesInput" value="@(Model.MaxFileBytesInput ?? "")" />
+        <div class="form-text">Leave blank to use the platform default; 0 = unlimited file size.</div>
+    </div>
+    <div class="col-sm-8 col-md-6">
+        <label for="perUserQuotaBytes" class="form-label">Per-user content quota (MiB)</label>
+        <input type="number" min="0" step="1" class="form-control" id="perUserQuotaBytes"
+               name="perUserQuotaBytesInput" value="@(Model.PerUserQuotaBytesInput ?? "")" />
+        <div class="form-text">0 = unlimited; otherwise each resident's total content cap (in MiB).</div>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save upload limits</button>
+    </div>
+</form>
+
+@* The effective per-file limit (C-UP·5). The admin override wins over the env
+   default; when there is no override the figure shown is the env default, and
+   we say so so an admin can tell a set limit from the platform fallback. *@
+<h2 class="h5">Per-file size limit</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">
+                    @(Model.EffectiveMaxFileBytes == 0 ? "Unlimited" : Bytes(Model.EffectiveMaxFileBytes))
+                </div>
+                <div class="text-muted small">effective per-file limit</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-5 fw-semibold">
+                    @(Model.MaxFileBytes is null
+                        ? "Not set (using platform default)"
+                        : Bytes(Model.MaxFileBytes.Value))
+                </div>
+                <div class="text-muted small">admin override</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-5 fw-semibold">@(Bytes(Model.EnvMaxFileBytes))</div>
+                <div class="text-muted small">platform default (env)</div>
+            </div>
+        </div>
+    </div>
+</div>
+@if (Model.MaxFileBytes is null)
+{
+    <p class="text-muted small">
+        No admin override is set — uploads are capped at the platform default
+        (@Bytes(Model.EnvMaxFileBytes)). Set an override to raise or lower this limit
+        for the whole community.
+    </p>
+}
+
+@* The per-user quota (C-UP·5): 0 = unlimited, otherwise a concrete figure. *@
+<h2 class="h5">Per-user content quota</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">
+                    @(Model.QuotaUnlimited ? "Unlimited" : Bytes(Model.PerUserQuotaBytes))
+                </div>
+                <div class="text-muted small">per-user total content quota</div>
+            </div>
+        </div>
+    </div>
+</div>
+@if (Model.QuotaUnlimited)
+{
+    <p class="text-muted small">
+        Per-user quota is unlimited — residents have no total-content cap. Set a
+        quota to cap each resident's total uploaded content.
+    </p>
+}
+
+@* The community total used (C-UP·7): the Σ SizeBytes figure from M24's metrics
+   seam, with its as-of timestamp for the point-in-time context. *@
+<h2 class="h5">Community usage</h2>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@(Bytes(Model.TotalUsedBytes))</div>
+                <div class="text-muted small">total used (resident content)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-5 fw-semibold"><kw-dt dt="@Model.AsOf" format="g"></kw-dt></div>
+                <div class="text-muted small">as of (UTC)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* A link back to the M24 metrics surface — the two "storage" pages are
+   distinct (settings here, metrics there); this makes the relationship explicit
+   for an admin who lands on one from the nav. Plain href, no taghelper inside
+   the attribute (the Razor attribute trap). *@
+<p class="mt-4">
+    <a href="/admin/storage">&larr; View the byte-store metrics (space used, available, per user)</a>
+</p>

@@ -952,7 +952,13 @@ public sealed class AnnouncementService : IAnnouncementService
                 communities.Add(role[Roles.ModeratorComponent("").Length..]);
         }
 
-        var membership = await _userInfo.GetCommunityIdsAsync(actorId).ConfigureAwait(false);
+        // The EFFECTIVE community set — raw membership MINUS the guardian's
+        // per-community block (Profile.BlockedCommunityIds). A supervised
+        // child whose guardian blocked a community should not see its
+        // community-scoped announcements either (the MessagingRestricted
+        // ceiling precedent carried to communities; works for a mandatory
+        // community, whose implicit membership cannot be removed — ADR 0012).
+        var membership = await _userInfo.GetEffectiveCommunityIdsAsync(actorId).ConfigureAwait(false);
         if (membership is not null)
         {
             foreach (var communityId in membership)

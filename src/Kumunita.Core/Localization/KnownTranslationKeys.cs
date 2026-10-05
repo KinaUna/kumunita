@@ -127,6 +127,14 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Top row",
             ["nav_variant.rail"]  = "Icon rail",
 
+            // ADR 0133 — the appearance (theme) picker: the resident chooses
+            // auto (follow the OS) / light / dark (Forest) from the account
+            // menu (theme.* are the picker labels, the active one marked ✓).
+            ["theme.label"]      = "Appearance",
+            ["theme.auto"]       = "Auto (match device)",
+            ["theme.light"]      = "Light",
+            ["theme.dark"]       = "Dark",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Events",
             ["events.created"]    = "Created",
@@ -167,7 +175,7 @@ public static class KnownTranslationKeys
             ["projects.todo.new_lead"]       = "Write a to-do, optionally assign it to a neighbor, and — if needed — break it into subtasks or put it on a board. By default it is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.",
             ["projects.todo.title_hint"]     = "A short label for the to-do — the card label.",
             ["projects.todo.status"]         = "Status",
-            ["projects.todo.status_assignee_hint"] = "Status is one of the fixed to-do statuses (None, Not started, In progress, Done, Cancelled). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.",
+            ["projects.todo.status_assignee_hint"] = "Status is a free-text label (a string, not a fixed list). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.",
             ["projects.todo.assignee"]       = "Assignee",
             ["projects.todo.unassigned"]     = "Unassigned",
             ["projects.todo.assign"]         = "Assign",
@@ -215,7 +223,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_submit"] = "Comment",
             ["projects.todo.comment_deleted"] = "This comment has been deleted by its author.",
             ["projects.todo.comment_delete"] = "Delete",
-            ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision (the C-M3·1 \"comment-inherits\" rule). You are commenting only where the to-do itself is visible.",
+            ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision. You are commenting only where the to-do itself is visible.",
             ["projects.todo.back"]           = "← Back to to-dos",
             ["projects.todo.untitled"]       = "Untitled to-do",
             ["projects.todo.edit"]           = "Edit",
@@ -310,9 +318,9 @@ public static class KnownTranslationKeys
             ["admin.community_mandatory"]   = "Mandatory",
             ["admin.add_community"]         = "Add community",
             ["admin.roles_heading"]         = "Roles",
-            ["admin.roles_independent_hint"] = "Independent — a resident may hold any combination (ADR 0030). Nothing checked = a plain Member.",
+            ["admin.roles_independent_hint"] = "Independent — a resident may hold any combination. Nothing checked = a plain Member.",
             ["admin.moderator_scope"]       = "Moderator scope",
-            ["admin.moderator_scope_hint"]  = "The communities this account may moderate. Meaningful only when the Moderator role is checked — the Core lane clears scope rows when the Moderator role is off.",
+            ["admin.moderator_scope_hint"]  = "The communities this account may moderate. Meaningful only when the Moderator role is checked — the platform clears the scope picks when the Moderator role is off.",
             ["nav.announcements"] = "Announcements",
             ["nav.community"]     = "Community",
             ["nav.groups"]        = "Groups",
@@ -346,6 +354,16 @@ public static class KnownTranslationKeys
             ["guardian.no_communities"]      = "No community memberships.",
             ["guardian.group_id_label"]      = "Group id",
             ["guardian.community_id_label"]  = "Community id",
+            ["guardian.community_block_note"] =
+                "Choose which communities this child can access. Blocking a " +
+                "community hides it from them — including its posts — even if it " +
+                "is one of the mandatory communities everyone belongs to. This is " +
+                "the guardian's control: you decide who joins a community by " +
+                "inviting them or through an admin, but you can hide one you " +
+                "don't want this child to see.",
+            ["guardian.community_blocked"]   = "Blocked & hidden",
+            ["guardian.community_unblock"]   = "Unblock & show",
+            ["guardian.community_block"]     = "Block access & hide",
             ["guardian.pending_invitations"] = "Pending group invitations",
             ["guardian.no_invitations"]      = "No pending invitations.",
             ["guardian.approve"]             = "Approve",
@@ -358,11 +376,34 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspended",
             ["guardian.unsuspend"]           = "Un-suspend",
             ["guardian.suspend"]             = "Suspend",
+            ["guardian.delete_child"]        = "Delete the child account",
+            ["guardian.delete_child_lede"]   =
+                "Deleting the account removes the child's sign-in, profile, and group and " +
+                "community memberships, and dissolves any other guardianship over it. Their " +
+                "past actions in the audit trail are preserved with their identity replaced " +
+                "by a placeholder. This cannot be undone.",
+            ["guardian.delete_child_confirm_checkbox"] = "I understand the child account will be permanently deleted.",
+            ["guardian.delete_child_submit"] = "Delete account",
             ["guardian.display_name"]        = "Display name",
             ["guardian.email"]               = "Email address",
             ["guardian.password"]            = "Password",
             ["guardian.child_email_hint"]    =
                 "The child verifies their own email to sign in — the usual sign-up flow.",
+            ["guardian.consent.intro"]       =
+                "By creating this profile, you confirm that you are the legal " +
+                "guardian of this child. As their guardian, you maintain full " +
+                "control over their account:",
+            ["guardian.consent.duties_invitations"] =
+                "You must approve or deny all group and event invitations.",
+            ["guardian.consent.duties_chat"] =
+                "You can enable or disable chat features for this profile at " +
+                "any time.",
+            ["guardian.consent.duties_data"] =
+                "This data is fully isolated to this community's own instance " +
+                "and will never be sold, profiled, or used for advertising.",
+            ["guardian.consent.checkbox"]    =
+                "I consent to the processing of my child's data under these " +
+                "terms.",
 
             // ── posts (composer helper hints) ──────────────────────────────
             ["posts.title_hint"] =
@@ -414,7 +455,53 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Assign",
             ["guardian.assign.noAccount"]    = "No account with that email.",
             ["guardian.assign.self"]         = "You are already this child's guardian.",
-            ["guardian.assign.success"]      = "Guardian assigned.",
+            ["guardian.assign.success"]      = "Guardian assigned — they will be asked to accept.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            // The "accept/decline" half of the assignment: the assigned
+            // guardian sees their pending requests on the /me/children Index
+            // page (the pendingRequests card), accepts with the same consent
+            // to the child-account terms the creating guardian accepts on the
+            // AddChild form, or declines. Until they act, they hold no
+            // standing over the child (the standing gates all query Active).
+            ["guardian.pending"]              = "Pending",
+            ["guardian.pendingRequests.title"] =
+                "Guardian requests awaiting your acceptance",
+            ["guardian.pendingRequests.lead"] =
+                "Another guardian has asked you to become a co-guardian for one of their children. " +
+                "Accept (and agree to the child-account terms) or decline — until you act, you hold no standing over the account.",
+            ["guardian.pendingRequests.child"]    = "Child",
+            ["guardian.pendingRequests.conferrer"] = "Requested by",
+            ["guardian.accept"]                   = "Accept & agree to the terms",
+            ["guardian.accept.consent.intro"]     =
+                "By accepting, you confirm that you are a legal guardian of this child. " +
+                "As their guardian, you maintain full control over their account:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "You must approve or deny all group and event invitations.",
+            ["guardian.accept.consent.duties_chat"] =
+                "You can enable or disable chat features for this profile at any time.",
+            ["guardian.accept.consent.duties_data"] =
+                "This data is fully isolated to this community's own instance and will never be sold, profiled, or used for advertising.",
+            ["guardian.accept.consent.checkbox"] =
+                "I consent to the processing of this child's data under these terms.",
+            ["guardian.accept.consent.required"] =
+                "You must consent to the child-account terms before accepting.",
+            ["guardian.decline"] = "Decline",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            // The "guardian.assign" notification: the assigned guardian
+            // (the assignee) gets an inbox row + (best-effort) email when an
+            // existing guardian assigns them as a co-guardian. The LinkPath
+            // is /me/children (the Index page's pending-requests card).
+            // Opt-OUT default (the resident-facing posture).
+            ["notifications.kind.guardian.assign"] =
+                "A guardian has asked you to become a co-guardian",
+            ["notifications.preference.guardian.assign.label"] =
+                "When a guardian asks you to become a co-guardian",
+            ["notification.guardian.assign.subject"] =
+                "A guardian has asked you to become a co-guardian",
+            ["notification.guardian.assign.body"] =
+                "A guardian has asked you to become a co-guardian for their child: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -597,6 +684,47 @@ public static class KnownTranslationKeys
             ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
             ["home.roadmap.show_more_earlier"] = "Show the {n} earlier milestones",
             ["home.roadmap.show_more_upcoming"]  = "Show the {n} upcoming milestones",
+            ["home.roadmap.status.done"]    = "Done",
+            ["home.roadmap.status.next"]    = "In progress",
+            ["home.roadmap.status.planned"] = "Planned",
+
+            // ── client JS strings bundle (P0-6 translation audit: the
+            //    rich editor, image editor, tag-suggest, and the
+            //    notifications bell resolve these from the server-rendered
+            //    #kumunita-strings JSON block in _Layout.cshtml) ──────────
+            ["common.close"]  = "Close",
+            ["common.cancel"] = "Cancel",
+            ["rc.editor.error_generic"] = "Something went wrong.",
+            ["rc.editor.link.title"]    = "Insert link",
+            ["rc.editor.link.url"]      = "URL",
+            ["rc.editor.link.confirm"]  = "Insert link",
+            ["rc.editor.link.busy"]     = "Inserting…",
+            ["rc.editor.link.err_empty"]    = "Enter a URL.",
+            ["rc.editor.link.err_invalid"]  = "Enter a valid link (web address, email, or site-relative path).",
+            ["rc.editor.image.title"]   = "Edit image",
+            ["rc.editor.image.err_rejected"] = "Uploaded image source was rejected.",
+            ["rc.editor.image.err_upload"]   = "Upload failed.",
+            ["rc.editor.attach.title"]  = "Attach file",
+            ["rc.editor.attach.file"]   = "File",
+            ["rc.editor.attach.link_text"] = "Link text",
+            ["rc.editor.attach.default_label"] = "Attachment",
+            ["rc.editor.attach.confirm"]  = "Attach",
+            ["rc.editor.attach.busy"]     = "Uploading…",
+            ["rc.editor.attach.err_no_file"] = "Choose a file to attach.",
+            ["img.edit.close"]       = "Close",
+            ["img.edit.crop_area"]   = "Crop area",
+            ["img.edit.width"]       = "Width",
+            ["img.edit.output"]      = "Output",
+            ["img.edit.reset_crop"]  = "Reset crop",
+            ["img.edit.use_original"] = "Use original",
+            ["img.edit.apply"]       = "Apply",
+            ["img.edit.title"]       = "Crop your avatar",
+            ["img.edit.err_edit"]    = "Edit failed.",
+            ["img.edit.err_could"]   = "Could not edit the image.",
+            ["img.edit.err_load"]    = "Could not load the image for editing.",
+            ["img.edit.err_export"]  = "Image export failed.",
+            ["tag.suggest.remove_prefix"] = "Remove tag: ",
+            ["notif.fallback"]       = "Notifications",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Sign in",
@@ -609,6 +737,68 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Sign up",
             ["account.signup_submit"] = "Sign up",
             ["account.signup_has_account"] = "Already have an account?",
+
+            // ── ADR 0138 — the resident self-serve change-password surface
+            //    (/account/password: the form + the locked notice), the
+            //    settings-tab link (nav.change_password, moved out of the
+            //    account dropdown 2026-10-04), and the
+            //    GlobalAdmin /admin/sample toggle (admin.sample.*) ──
+            ["account.change_password_title"] = "Change password",
+            ["account.change_password_lede"] =
+                "Pick a new password for your account. After saving you'll be " +
+                "signed out and asked to sign in again with the new password.",
+            ["account.change_password_current"] = "Current password",
+            ["account.change_password_new"] = "New password",
+            ["account.change_password_confirm_new"] = "Confirm new password",
+            ["account.change_password_submit"] = "Change password",
+            ["account.change_password_locked_title"] = "Password changes are locked",
+            ["account.change_password_locked_body"] =
+                "This is a demo account and password changes are locked by the " +
+                "administrator so everyone can keep using the shared credentials. " +
+                "You can still use every other feature of the platform.",
+            ["account.change_password_back"] = "Back to your profile",
+
+            ["nav.change_password"] = "Change password",
+
+            // ── ADR 0142 — the resident self-serve delete-account surface
+            //    (/account/delete: the form + the ADR 0142 D5 refusal
+            //    notice for a non-GlobalAdmin resident), the settings-tab
+            //    link (nav.delete_account), and the admin-removal surface
+            //    (admin.delete_account.*) ──
+            ["account.delete_title"] = "Delete account",
+            ["account.delete_lede"] =
+                "Deleting your account removes your sign-in, your profile, " +
+                "and your group and community memberships. Your past actions " +
+                "in the platform's audit trail are preserved with your " +
+                "identity replaced by a placeholder (the platform's privacy " +
+                "policy, OPS.md §9). This cannot be undone.",
+            ["account.delete_password"] = "Password",
+            ["account.delete_confirm_checkbox"] =
+                "I understand my account will be permanently deleted and this " +
+                "cannot be undone.",
+            ["account.delete_submit"] = "Delete account",
+            ["account.delete_refused"] =
+                "The self-serve delete-account lane is only available to a " +
+                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
+                "own account — contact an administrator to remove the account.",
+
+            ["nav.delete_account"] = "Delete account",
+
+            ["admin.delete_account_label"] = "Delete account",
+            ["admin.delete_account_confirm"] =
+                "Delete this account permanently? Their audit trail is " +
+                "preserved (pseudonymized); their account, profile, and " +
+                "memberships are removed. This cannot be undone.",
+
+            ["admin.sample_title"] = "Sample data",
+            ["admin.sample_lede"] =
+                "This instance runs the demo neighborhood (sample data). Lock the " +
+                "sample accounts out of changing their own password so visitors can " +
+                "test features without breaking the shared credentials — the demo " +
+                "admin keeps its own password lane.",
+            ["admin.sample_lock_label"] = "Sample account password changes",
+            ["admin.sample_lock_on"] = "Locked — sample accounts can't change their own password",
+            ["admin.sample_lock_off"] = "Unlocked — sample accounts can change their own password",
             ["account.login.error.blocked"] =
                 "Your account has been temporarily suspended. Contact an administrator.",
             ["account.login.error.removed"] =
@@ -789,8 +979,9 @@ public static class KnownTranslationKeys
                 "Whatever you choose here is exactly what the neighbor directory " +
                 "shows — no surprises.",
             ["profile.avatar_heading"] = "Your avatar",
+            ["upload.max_size"] = "Maximum file size: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the " +
+                "JPEG, PNG, WebP or GIF. Saving replaces the " +
                 "avatar currently shown in the directory.",
             ["profile.name_email_heading"] = "Your name + email",
             ["profile.address_heading"] = "Your address + phone (optional)",
@@ -908,9 +1099,8 @@ public static class KnownTranslationKeys
                 "translation.",
             ["posts.reply_audience_note"] =
                 "Replies have no own audience — they are visible under " +
-                "this post's single audience decision (the C-M3·1 " +
-                "\"reply-inherits\" rule). You are replying only where " +
-                "the post itself is visible.",
+                "this post's single audience decision. You are replying " +
+                "only where the post itself is visible.",
             ["posts.reply_submit"] = "Reply",
             ["posts.reply_edit"] = "Edit",
             ["posts.reply_save"] = "Save",
@@ -1146,7 +1336,8 @@ public static class KnownTranslationKeys
                 "A local summary of how the platform is used — a request count, " +
                 "the signed-in / anonymous split, the number of distinct accounts, " +
                 "and the per-surface ranking, over a fixed window. No per-account " +
-                "detail is shown; the raw rows are the operator's psql surface.",
+                "detail is shown; the raw rows are available only to the operator's " +
+                "database.",
             ["admin.analytics_window"] = "Window",
             ["admin.analytics_total"] = "Total requests",
             ["admin.analytics_authenticated"] = "Signed-in",
@@ -1677,6 +1868,34 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages from other residents",
             ["notification.message.new.subject"] = "A new message",
             ["notification.message.new.body"] = "A resident sent you a message: ",
+
+            // ── GU community-approval lane (ADR 0141) — the guardian-facing
+            // kind + nudge templates (the template ends with ": " — the
+            // emitter appends the UGC snippet, here the group/community name
+            // + the child's display name, after it) ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Group invitation for your child",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "When a group invites your child",
+            ["notification.guardian.group_invite.subject"] =
+                "A group has invited your child",
+            ["notification.guardian.group_invite.body"] =
+                "A group has invited your child: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Community membership for your child",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "When a community adds your child",
+            ["notification.guardian.community_invite.subject"] =
+                "A community has added your child",
+            ["notification.guardian.community_invite.body"] =
+                "A community has added your child: ",
+
+            // ── GU community-approval lane (ADR 0141) — the manage-child
+            // page's new sections ──
+            ["guardian.pending_community_requests"] = "Pending community memberships",
+            ["guardian.no_community_requests"] = "No pending community memberships.",
+            ["guardian.reject"] = "Reject",
+
             // ── M9 (ADR 0105, U04) — the resident surface: nav, list, thread, composer ──
             ["message.nav"] = "Messages",
             ["message.title"] = "Messages",
@@ -1687,6 +1906,8 @@ public static class KnownTranslationKeys
             ["message.unread"] = "unread",
             ["message.disabled"] = "Direct messaging is turned off on this instance.",
             ["message.other"] = "the other person",
+            ["message.sent_to"] = "Sent to {0}.",
+            ["message.load_earlier"] = "Load earlier messages",
             ["pages.subscribe"] = "Subscribe to updates",
             ["pages.unsubscribe"] = "Unsubscribe from updates",
 
@@ -1891,6 +2112,233 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Who can see this document",
             ["documents.edit.submit"]       = "Save changes",
             ["documents.flash_edited"]      = "Document updated.",
+
+            // The "documents organization" lane (tags + folders) — the
+            // documents.folder_* / documents.tags.* keys + the flash keys for
+            // the DocumentFolderController routes (create / rename / move /
+            // delete / document-move).
+            ["documents.folder"]              = "Folder",
+            ["documents.folder_unfiled"]      = "Unfiled",
+            ["documents.folder_hint"]         = "File this document into a folder to keep the repository organized.",
+            ["documents.folder_new"]          = "New folder",
+            ["documents.folder_create"]       = "Create",
+            ["documents.folder_name_placeholder"] = "Folder name",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Type to search existing tags, or start a new one.",
+            ["documents.flash_moved"]         = "Document moved.",
+            ["documents.folder_flash_created"] = "Folder created.",
+            ["documents.folder_flash_renamed"] = "Folder renamed.",
+            ["documents.folder_flash_moved"]   = "Folder moved.",
+            ["documents.folder_flash_deleted"] = "Folder deleted.",
+
+            // ── M22 (ADR 0132) — onboarding: the /onboarding guided
+            // walk-through (D4) + the dismissible home/nav banner (D5) + the
+            // finish/skip flash (D2/D4). U03 authors the COMPLETE closed set;
+            // U02/U03 consume. The parity pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Set up your account",
+            ["onboarding.intro"]            = "A quick guided tour of the few things that make Kumunita work for you. Everything links into the setting that already owns it — you can finish in a minute or come back any time.",
+            ["onboarding.step_displayname"] = "Your display name",
+            ["onboarding.step_avatar"]      = "Your avatar",
+            ["onboarding.step_language"]    = "Your interface language",
+            ["onboarding.step_timezone"]    = "Your time zone",
+            ["onboarding.step_dateformat"]  = "Your date & time format",
+            ["onboarding.step_email"]       = "Your email & notification language",
+            ["onboarding.step_contact"]     = "Your contact details & who can see them",
+            ["onboarding.visit"]            = "Go to this setting",
+            ["onboarding.finish"]           = "I'm all set — finish setup",
+            ["onboarding.skip"]             = "Skip for now",
+            ["onboarding.flash_done"]       = "Setup complete — welcome to your neighborhood.",
+            ["onboarding.banner.text"]      = "Finish setting up your account?",
+            ["onboarding.banner.action"]    = "Start setup",
+
+            // ── M9 amendment — the per-resident messaging control (the
+            // /settings/messaging surface) + the guardian's ceiling (the
+            // /me/children/{id} curation surface) ──
+            ["settings.messaging.title"]           = "Messaging",
+            ["settings.messaging.description"]     = "Choose whether you can use direct 1:1 messaging with other residents. Your choice is saved on your account and takes effect immediately.",
+            ["settings.messaging.instance_off"]    = "Messaging is currently turned off on this instance by an administrator. You can opt in now and messaging will be available to you as soon as it is turned on.",
+            ["settings.messaging.restricted"]      = "Messaging has been restricted on your account by a guardian. Contact them to change this.",
+            ["settings.messaging.optin"]           = "Allow me to use direct 1:1 messaging",
+            ["settings.messaging.save"]            = "Save messaging preference",
+            ["guardian.messaging.title"]           = "Messaging",
+            ["guardian.messaging.description"]     = "Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.",
+            ["guardian.messaging.current_restricted"] = "Messaging is currently restricted for this child.",
+            ["guardian.messaging.current_allowed"]    = "Messaging is currently allowed for this child.",
+            ["guardian.messaging.child_optin_on"]     = "The child has opted in to messaging on their own account.",
+            ["guardian.messaging.child_optin_off"]    = "The child has not opted in to messaging on their own account — even if you allow it, they will need to opt in on their own settings page.",
+            ["guardian.messaging.allow"]              = "Allow messaging",
+            ["guardian.messaging.restrict"]           = "Restrict messaging",
+
+            // ── P1 audit (2026-10-04) ── the ~73 keys the P1 translation audit
+            // found emitted unregistered: shared confirms, account
+            // block/unblock, DataAnnotations fallbacks, the /languages admin +
+            // translator surface, the events/posts/announcements/groups
+            // confirms, guardian confirms, locale resets, the page composer,
+            // the projects board/lane/to-do confirms, the inventory item
+            // confirm, and the closed a11y set (server-side attributes).
+            ["common.remove_translation_confirm"] =
+                "Remove this translation?",
+            ["events.skip_occurrence_confirm"] =
+                "Skip this occurrence? You can restore it later.",
+            ["community.confirm_remove_member"] =
+                "Remove {0} from {1}?",
+            ["a11y.notifications"]             = "Notifications",
+            ["a11y.find_tag"]                  = "Find by tag",
+            ["a11y.find_bio"]                  = "Find by bio",
+            ["a11y.avatar"]                    = "Avatar image",
+            ["a11y.board_actions"]             = "Board actions",
+            ["a11y.calendar_view"]             = "Calendar view",
+            ["a11y.event_time_range"]          = "Event time range",
+            ["a11y.check_out_note"]            = "Check-out note",
+            ["a11y.community_pages"]           = "Community pages",
+            ["a11y.platform_pages"]            = "Platform pages",
+            ["a11y.community_page_tree"]       = "Community page tree",
+            ["a11y.platform_page_tree"]        = "Platform page tree",
+            ["a11y.breadcrumb"]                = "Breadcrumb",
+            ["a11y.about_features"]            = "What Kumunita is",
+            ["a11y.about_audience"]            = "Who it's for",
+            ["a11y.about_philosophy"]          = "The philosophy",
+            ["a11y.about_contact"]             = "Get in touch",
+            ["a11y.about_project"]             = "The project",
+            ["a11y.set_limit"]                 = "Set limit on {0}",
+            ["account.block"]               = "Block",
+            ["account.unblock"]             = "Unblock",
+            ["account.confirm_block"]       = "Block this account? It loses all standing until unblocked.",
+            ["account.confirm_unblock"]     = "Unblock this account? Their standing will be restored.",
+            ["account.err.required"]        = "The {0} field is required.",
+            ["account.err.email"]           = "The {0} field is not a valid e-mail address.",
+            ["account.err.password_min"]    = "{0} must be at least {1} characters.",
+            ["account.err.password_mismatch"] = "The {0} and {1} fields do not match.",
+            ["footer.feed"]                 = "The feed",
+            ["languages.title"]             = "Languages",
+            ["languages.lede_admin"]        =
+                "Manage the languages this instance supports. Changes take effect on the next request — " +
+                "no rebuild, no restart.",
+            ["languages.lede_translator"]   =
+                "Review the platform's translation coverage and update the UI strings. " +
+                "Changes take effect on the next request.",
+            ["languages.add_heading"]       = "Add a language",
+            ["languages.code_label"]        = "Language code",
+            ["languages.native_name_label"] = "Native name",
+            ["languages.code_hint"]         = "Short code, e.g. pl for Polish, no-NO for Norwegian.",
+            ["languages.supported_heading"] = "Supported languages",
+            ["languages.th_code"]           = "Code",
+            ["languages.th_native_name"]    = "Native name",
+            ["languages.th_enabled"]        = "Enabled",
+            ["languages.th_ui_strings"]     = "UI strings",
+            ["languages.th_actions"]        = "Actions",
+            ["languages.enabled"]           = "enabled",
+            ["languages.disabled"]          = "disabled",
+            ["languages.present"]           = "{n} present",
+            ["languages.missing"]           = "{n} missing",
+            ["languages.action_disable"]    = "Disable",
+            ["languages.action_enable"]     = "Enable",
+            ["languages.action_set_default"] = "Set default",
+            ["languages.action_ui_strings"] = "UI strings",
+            ["languages.action_remove"]     = "Remove",
+            ["languages.reorder_btn"]       = "Reorder (confirm current order)",
+            ["languages.reorder_title"]     = "Submit the current order (as shown below) as the new sort order",
+            ["languages.reorder_hint"]      =
+                "Drag-and-drop reordering is not available; the reorder form accepts the codes in the order " +
+                "they appear here. To change the order, the admin should submit the list in the desired " +
+                "sequence.",
+            ["languages.confirm_remove"]    =
+                "Remove {0}? Its translation rows are retained and will be restored if the language is " +
+                "re-added.",
+            ["translations.editor.back"]         = "← Back to languages",
+            ["translations.editor.title"]        = "UI strings for {0}",
+            ["translations.editor.lede"]         =
+                "The full list of strings the platform shows to its residents. Each row shows the key, " +
+                "its English reference text, and the current value in {0}. Saving a row adds or updates " +
+                "its translation — visible on the next request.",
+            ["translations.editor.mode_label"]   = "Editor mode",
+            ["translations.editor.th_key"]       = "Key",
+            ["translations.editor.th_en_reference"] = "English reference",
+            ["translations.editor.th_value"]     = "Value in {0}",
+            ["translations.editor.value_aria"]   = "Value for {0} in {1}",
+            ["events.rsvp_status_going"]     = "Going",
+            ["events.rsvp_status_maybe"]     = "Maybe",
+            ["events.rsvp_status_no"]        = "No",
+            ["posts.delete_confirm"]         = "Delete this post? Your replies will remain visible.",
+            ["posts.reply_delete_confirm"]   =
+                "Delete this reply? It will be replaced by a note. The record is kept.",
+            ["announcements.delete_confirm"] = "Delete this announcement? This cannot be undone.",
+            ["groups.confirm_delete"]        =
+                "Delete this group? This removes the group, its members, and its pending invitations, " +
+                "and cannot be undone.",
+            ["community.confirm_leave"]      = "Leave {0}?",
+            ["guardian.suspend_confirm"]     = "Suspend this child account? They will be blocked until you un-suspend them.",
+            ["guardian.messaging.allow_confirm"] =
+                "Allow messaging for this child? They will be able to send and receive direct messages " +
+                "(their own opt-in must also be on).",
+            ["guardian.messaging.restrict_confirm"] =
+                "Restrict messaging for this child? They will no longer be able to send or receive direct " +
+                "messages, regardless of their own opt-in.",
+            ["guardian.handover_confirm"]    = "Hand over this account to the child? This dissolves your guardianship over it.",
+            ["guardian.delete_child_confirm"] =
+                "Delete this child account permanently? This removes their sign-in, profile, " +
+                "and memberships, and cannot be undone.",
+            ["locale.reset_confirm"]         = "Reset your language preference to the instance default?",
+            ["locale.email_reset_confirm"]   = "Reset your email &amp; notification language to the instance default?",
+            ["settings.quiet.clear_confirm"] =
+                "Clear your quiet hours? All notification emails will be sent immediately again.",
+            ["settings.timezone_reset_confirm"] = "Reset your time zone to the platform default?",
+            ["settings.dateformat_reset_confirm"] = "Reset your date &amp; time format to the platform default?",
+            ["pages.form.body_hint"]         =
+                "Optional — a folder node may have no body. Written in Markdown via the visual editor " +
+                "(the same one posts and announcements use).",
+            ["pages.reset_confirm"]          =
+                "Reset this page to the seeded text? Any edits you made to the body (English) and to its " +
+                "German / French / Danish translations will be overwritten with the seeded baseline. " +
+                "The rest of the page (audience, parent, etc.) is untouched.",
+            ["pl.board.delete_confirm"]      =
+                "Delete this board? Its lanes and card placements are removed — the to-dos themselves " +
+                "are kept.",
+            ["pl.lane.delete_confirm"]       =
+                "Delete this lane? Its cards come off this board — the to-dos themselves are kept.",
+            ["pl.todo.assignee_remove_confirm"] = "Remove the assignee from this to-do?",
+            ["pl.todo.move_confirm"]         = "Move this to-do to another board? It will no longer be on this board.",
+            ["pl.todo.delete_confirm"]       = "Delete this to-do and its subtasks? This cannot be undone.",
+            ["inv.item.delete_confirm"]      = "Delete this item? This cannot be undone.",
+            ["a11y.close"]                   = "Close",
+            ["a11y.toggle_nav"]              = "Toggle navigation",
+            ["a11y.primary_nav"]             = "Primary",
+            ["a11y.pagination"]              = "Pagination",
+            ["a11y.pinned_announcement"]     = "Pinned announcement",
+            ["a11y.banner_read_more"]        = "Read this announcement in full",
+            ["a11y.banner_all"]              = "See all announcements",
+            ["a11y.banner_dismiss"]          = "Dismiss this pinned announcement",
+            ["a11y.onboarding_region"]       = "Account setup",
+            ["a11y.onboarding_action"]       = "Start setup",
+            ["a11y.onboarding_dismiss"]      = "Dismiss this banner",
+            ["a11y.whatsnew_region"]         = "What's new",
+            ["a11y.actions_for"]             = "Actions for {0}",
+            ["a11y.search"]                  = "Search",
+            ["a11y.scope"]                   = "Scope",
+            ["a11y.back_to_messages"]        = "Back to messages",
+            ["a11y.resident"]                = "Resident",
+            ["account.storage_title"]        = "My storage",
+            ["account.storage_lede"]         =
+                "How much of your content the platform counts, your per-user quota, and how much of it " +
+                "you still have left.",
+            ["account.storage_used"]         = "your content used",
+            ["account.storage_quota"]        = "your per-user quota",
+            ["account.storage_remaining"]    = "remaining",
+            ["account.storage_unlimited_note"] =
+                "Your per-user quota is unlimited — there is no total-content cap on your uploads.",
+            ["account.storage_remaining_note"] =
+                "Your remaining is what's left of your per-user quota ({0}). Ask an administrator to " +
+                "raise the quota if you need more.",
+            ["translations.bulk.export_title"] = "Download this language's UI strings as a CSV file",
+            ["common.delete"]          = "Delete",
+            ["pages.delete_confirm"]   = "Delete this page?",
+            ["admin.help.reset_one"]   =
+                "Reset \"{0}\" to its seeded text? This overwrites any hand-edited copy.",
+            ["admin.help.reset_all"]   =
+                "Reset ALL {0} seeded help pages to their seeded text? This overwrites any hand-edited " +
+                "copy on every page.",
         };
 
     /// <summary>
@@ -1921,7 +2369,7 @@ public static class KnownTranslationKeys
             ["admin.guests_surface_directory"]   = "Verzeichnis",
             ["admin.guests_saved"]               = "Gastzugang gespeichert.",
             ["account.guest_welcome"] =
-                "Sie sind als Gast angemeldet. Ihr Zugriff ist auf die " +
+                "Du bist als Gast angemeldet. Dein Zugriff ist auf die " +
                 "Bereiche beschränkt, die die Verwaltung erlaubt hat, für " +
                 "das von ihr gesetzte Zeitfenster.",
 
@@ -1960,6 +2408,12 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Obere Reihe",
             ["nav_variant.rail"]  = "Icon-Leiste",
 
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Erscheinungsbild",
+            ["theme.auto"]       = "Automatisch (wie das Gerät)",
+            ["theme.light"]      = "Hell",
+            ["theme.dark"]       = "Dunkel",
+
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["nav.events"]        = "Veranstaltungen",
             ["events.created"]    = "Erstellt",
@@ -1994,7 +2448,7 @@ public static class KnownTranslationKeys
             ["projects.todo.new_lead"]       = "Erstelle eine Aufgabe, weise sie optional einem Nachbarn zu und — falls nötig — teile sie in Unteraufgaben auf oder lege sie auf ein Board. Standardmäßig ist sie für alle sichtbar; deaktiviere das im Abschnitt „Zielgruppe“, wenn du einschränken willst.",
             ["projects.todo.title_hint"]     = "Ein kurzer Name für die Aufgabe — die Kartenbeschriftung.",
             ["projects.todo.status"]         = "Status",
-            ["projects.todo.status_assignee_hint"] = "Der Status ist einer der festen Aufgaben-Statuswerte (Keine, Nicht begonnen, In Arbeit, Erledigt, Abgebrochen). Eine Aufgabe zuzuweisen gibt diesem Bewohner Handhabung darüber — Anzeige + Handhabung, nie eine Zugangsgrenze.",
+            ["projects.todo.status_assignee_hint"] = "Der Status ist ein freier Text (eine Zeichenkette, keine feste Liste). Eine Aufgabe zuzuweisen gibt diesem Bewohner Handhabung darüber — Anzeige + Handhabung, nie eine Zugangsgrenze.",
             ["projects.todo.assignee"]       = "Zugewiesen an",
             ["projects.todo.unassigned"]     = "Nicht zugewiesen",
             ["projects.todo.assign"]         = "Zuweisen",
@@ -2040,7 +2494,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_submit"] = "Kommentieren",
             ["projects.todo.comment_deleted"] = "Dieser Kommentar wurde von seinem Autor gelöscht.",
             ["projects.todo.comment_delete"] = "Löschen",
-            ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar (die C-M3·1-\"Kommentar-erbt\"-Regel). Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
+            ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar. Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
             ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
             ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
             ["projects.todo.edit"]           = "Bearbeiten",
@@ -2135,9 +2589,9 @@ public static class KnownTranslationKeys
             ["admin.community_mandatory"]   = "Pflicht",
             ["admin.add_community"]         = "Gemeinschaft hinzufügen",
             ["admin.roles_heading"]         = "Rollen",
-            ["admin.roles_independent_hint"] = "Unabhängig — ein Bewohner kann beliebig viele Rollen kombinieren (ADR 0030). Nichts angekreuzt = ein einfacher Member.",
+            ["admin.roles_independent_hint"] = "Unabhängig — ein Bewohner kann beliebig viele Rollen kombinieren. Nichts angekreuzt = ein einfacher Member.",
             ["admin.moderator_scope"]       = "Moderator-Bereich",
-            ["admin.moderator_scope_hint"]  = "Die Gemeinschaften, die dieses Konto moderieren darf. Nur relevant, wenn die Moderator-Rolle angehakt ist — die Core-Lane löscht Scope-Zeilen, wenn die Moderator-Rolle aus ist.",
+            ["admin.moderator_scope_hint"]  = "Die Gemeinschaften, die dieses Konto moderieren darf. Nur relevant, wenn die Moderator-Rolle angehakt ist — die Plattform löscht die Scope-Auswahl, wenn die Moderator-Rolle aus ist.",
             ["nav.announcements"] = "Ankündigungen",
             ["nav.community"]     = "Gemeinschaft",
             ["nav.groups"]        = "Gruppen",
@@ -2171,6 +2625,17 @@ public static class KnownTranslationKeys
             ["guardian.no_communities"]      = "Keine Gemeinschaftsmitgliedschaften.",
             ["guardian.group_id_label"]      = "Gruppen-ID",
             ["guardian.community_id_label"]  = "Gemeinschafts-ID",
+            ["guardian.community_block_note"] =
+                "Wähle aus, auf welche Gemeinschaften dieses Kind Zugriff hat. " +
+                "Eine blockierte Gemeinschaft wird ihm verborgen — " +
+                "einschließlich ihrer Beiträge — selbst wenn sie eine der " +
+                "Pflichtgemeinschaften ist, der alle angehören. Du entscheidest, " +
+                "wer eine Gemeinschaft beitreten darf, indem du ihn einlädst oder " +
+                "über einen Admin, aber du kannst eine Gemeinschaft verstecken, " +
+                "die dieses Kind nicht sehen soll.",
+            ["guardian.community_blocked"]   = "Blockiert & verborgen",
+            ["guardian.community_unblock"]   = "Freigeben & anzeigen",
+            ["guardian.community_block"]     = "Zugriff blockieren & verstecken",
             ["guardian.pending_invitations"] = "Ausstehende Gruppeneinladungen",
             ["guardian.no_invitations"]      = "Keine ausstehenden Einladungen.",
             ["guardian.approve"]             = "Genehmigen",
@@ -2183,11 +2648,37 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Gesperrt",
             ["guardian.unsuspend"]           = "Wieder aktivieren",
             ["guardian.suspend"]             = "Sperren",
+            ["guardian.delete_child"]        = "Das Kind-Konto löschen",
+            ["guardian.delete_child_lede"]   =
+                "Das Löschen entfernt die Anmeldung, das Profil und die Gruppen- und " +
+                "Gemeinschaftsmitgliedschaften des Kindes und löst jede andere " +
+                "Vormundschaft über das Konto auf. Ihre früheren Aktionen in der " +
+                "Prüfspur bleiben erhalten, wobei ihre Identität durch einen " +
+                "Platzhalter ersetzt wird. Das kann nicht rückgängig gemacht werden.",
+            ["guardian.delete_child_confirm_checkbox"] = "Ich verstehe, dass das Kind-Konto dauerhaft gelöscht wird.",
+            ["guardian.delete_child_submit"] = "Konto löschen",
             ["guardian.display_name"]        = "Anzeigename",
             ["guardian.email"]               = "E-Mail-Adresse",
             ["guardian.password"]            = "Passwort",
             ["guardian.child_email_hint"]    =
                 "Das Kind bestätigt seine eigene E-Mail zur Anmeldung — der gewöhnliche Anmeldevorgang.",
+            ["guardian.consent.intro"]       =
+                "Mit der Erstellung dieses Profils bestätigst du, dass du die " +
+                "gesetzliche Vertretung dieses Kindes bist. Als sein " +
+                "Vormund behältst du die volle Kontrolle über sein Konto:",
+            ["guardian.consent.duties_invitations"] =
+                "Du musst alle Gruppen- und Eventeinladungen genehmigen oder " +
+                "ablehnen.",
+            ["guardian.consent.duties_chat"] =
+                "Du kannst die Chatfunktionen für dieses Profil jederzeit " +
+                "einschalten oder ausschalten.",
+            ["guardian.consent.duties_data"] =
+                "Diese Daten sind vollständig auf die eigene Instanz der " +
+                "Gemeinschaft isoliert und werden niemals verkauft, zur " +
+                "Profilbildung genutzt oder für Werbung verwendet.",
+            ["guardian.consent.checkbox"]    =
+                "Ich stimme der Verarbeitung der Daten meines Kindes unter " +
+                "diesen Bedingungen zu.",
 
             // ── posts (composer helper hints) ──────────────────────────────
             ["posts.title_hint"] =
@@ -2241,7 +2732,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Zuweisen",
             ["guardian.assign.noAccount"]    = "Kein Konto mit dieser E-Mail.",
             ["guardian.assign.self"]         = "Du bist bereits Vormund dieses Kindes.",
-            ["guardian.assign.success"]      = "Vormund zugewiesen.",
+            ["guardian.assign.success"]      = "Vormund zugewiesen — sie werden zur Annahme aufgefordert.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "Ausstehend",
+            ["guardian.pendingRequests.title"] =
+                "Vormundsanträge, die auf deine Annahme warten",
+            ["guardian.pendingRequests.lead"] =
+                "Ein anderer Vormund hat dich gebeten, Co-Vormund für eines ihrer Kinder zu werden. " +
+                "Akzeptiere (und stimme den Bedingungen für Kinderkonten zu) oder lehne ab — bis du handelst, hältst du keine Rechte über das Konto.",
+            ["guardian.pendingRequests.child"]    = "Kind",
+            ["guardian.pendingRequests.conferrer"] = "Angefragt von",
+            ["guardian.accept"]                   = "Annehmen & den Bedingungen zustimmen",
+            ["guardian.accept.consent.intro"]     =
+                "Indem du akzeptierst, bestätigst du, dass du ein gesetzlicher Vormund dieses Kindes bist. " +
+                "Als ihr Vormund behältst du die volle Kontrolle über ihr Konto:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Du musst alle Gruppen- und Event-Einladungen genehmigen oder ablehnen.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Du kannst die Chat-Funktionen für dieses Profil jederzeit aktivieren oder deaktivieren.",
+            ["guardian.accept.consent.duties_data"] =
+                "Diese Daten sind vollständig isoliert auf der eigenen Instanz dieser Community und werden nie verkauft, profilisiert oder für Werbung verwendet.",
+            ["guardian.accept.consent.checkbox"] =
+                "Ich stimme der Verarbeitung der Daten dieses Kindes unter diesen Bedingungen zu.",
+            ["guardian.accept.consent.required"] =
+                "Du musst den Bedingungen für Kinderkonten zustimmen, bevor du akzeptierst.",
+            ["guardian.decline"] = "Ablehnen",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
+            ["notifications.preference.guardian.assign.label"] =
+                "Wenn ein Vormund dich bittet, Co-Vormund zu werden",
+            ["notification.guardian.assign.subject"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
+            ["notification.guardian.assign.body"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund für ihr Kind zu werden: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -2416,6 +2942,44 @@ public static class KnownTranslationKeys
             ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
             ["home.roadmap.show_more_earlier"] = "Die {n} früheren Meilensteine anzeigen",
             ["home.roadmap.show_more_upcoming"]  = "Die {n} kommenden Meilensteine anzeigen",
+            ["home.roadmap.status.done"]    = "Fertig",
+            ["home.roadmap.status.next"]    = "In Arbeit",
+            ["home.roadmap.status.planned"] = "Geplant",
+
+            // ── Client-JS-Strings (P0-6: #kumunita-strings-Bundle) ────────
+            ["common.close"]  = "Schließen",
+            ["common.cancel"] = "Abbrechen",
+            ["rc.editor.error_generic"] = "Etwas ist schiefgelaufen.",
+            ["rc.editor.link.title"]    = "Link einfügen",
+            ["rc.editor.link.url"]      = "URL",
+            ["rc.editor.link.confirm"]  = "Link einfügen",
+            ["rc.editor.link.busy"]     = "Wird eingefügt…",
+            ["rc.editor.link.err_empty"]    = "Gib eine URL ein.",
+            ["rc.editor.link.err_invalid"]  = "Gib einen gültigen Link ein (Webadresse, E-Mail oder Pfad relativ zur Seite).",
+            ["rc.editor.image.title"]   = "Bild bearbeiten",
+            ["rc.editor.image.err_rejected"] = "Die hochgeladene Bildquelle wurde abgelehnt.",
+            ["rc.editor.image.err_upload"]   = "Der Upload ist fehlgeschlagen.",
+            ["rc.editor.attach.title"]  = "Datei anhängen",
+            ["rc.editor.attach.file"]   = "Datei",
+            ["rc.editor.attach.link_text"] = "Linktext",
+            ["rc.editor.attach.default_label"] = "Anhang",
+            ["rc.editor.attach.confirm"]  = "Anhängen",
+            ["rc.editor.attach.busy"]     = "Wird hochgeladen…",
+            ["rc.editor.attach.err_no_file"] = "Wähle eine Datei zum Anhängen aus.",
+            ["img.edit.close"]       = "Schließen",
+            ["img.edit.crop_area"]   = "Zuschneidebereich",
+            ["img.edit.width"]       = "Breite",
+            ["img.edit.output"]      = "Ergebnis",
+            ["img.edit.reset_crop"]  = "Zuschneiden zurücksetzen",
+            ["img.edit.use_original"] = "Original verwenden",
+            ["img.edit.apply"]       = "Anwenden",
+            ["img.edit.title"]       = "Dein Avatar zuschneiden",
+            ["img.edit.err_edit"]    = "Die Bearbeitung ist fehlgeschlagen.",
+            ["img.edit.err_could"]   = "Das Bild konnte nicht bearbeitet werden.",
+            ["img.edit.err_load"]    = "Das Bild konnte nicht zum Bearbeiten geladen werden.",
+            ["img.edit.err_export"]  = "Der Bild-Export ist fehlgeschlagen.",
+            ["tag.suggest.remove_prefix"] = "Tag entfernen: ",
+            ["notif.fallback"]       = "Benachrichtigungen",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Anmelden",
@@ -2428,12 +2992,71 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Registrieren",
             ["account.signup_submit"] = "Registrieren",
             ["account.signup_has_account"] = "Du hast schon ein Konto?",
+
+            // ── ADR 0138 — das Passwort-Wechseln (de) ──
+            ["account.change_password_title"] = "Passwort ändern",
+            ["account.change_password_lede"] =
+                "Wähle ein neues Passwort für dein Konto. Nach dem Speichern wirst du " +
+                "abgemeldet und musst dich mit dem neuen Passwort erneut anmelden.",
+            ["account.change_password_current"] = "Aktuelles Passwort",
+            ["account.change_password_new"] = "Neues Passwort",
+            ["account.change_password_confirm_new"] = "Neues Passwort bestätigen",
+            ["account.change_password_submit"] = "Passwort ändern",
+            ["account.change_password_locked_title"] = "Passwortänderungen sind gesperrt",
+            ["account.change_password_locked_body"] =
+                "Dies ist ein Demo-Konto und Passwortänderungen sind vom " +
+                "Administrator gesperrt, damit alle die gemeinsamen Zugangsdaten " +
+                "weiter nutzen können. Alle anderen Funktionen der Plattform kannst du " +
+                "weiterhin verwenden.",
+            ["account.change_password_back"] = "Zurück zu deinem Profil",
+
+            ["nav.change_password"] = "Passwort ändern",
+
+            // ── ADR 0142 — das Konto-Löschen (de) ──
+            ["account.delete_title"] = "Konto löschen",
+            ["account.delete_lede"] =
+                "Wenn du dein Konto löschst, werden deine Anmeldung, dein " +
+                "Profil und deine Gruppen- und Gemeinschaftsmitgliedschaften " +
+                "entfernt. Deine früheren Handlungen im Prüfungsverzeichnis " +
+                "der Plattform bleiben erhalten — mit einer Platzhalter- " +
+                "Kennung anstelle deiner Identität (Datenschutzerklärung der " +
+                "Plattform, OPS.md §9). Das kann nicht rückgängig gemacht " +
+                "werden.",
+            ["account.delete_password"] = "Passwort",
+            ["account.delete_confirm_checkbox"] =
+                "Ich verstehe, dass mein Konto endgültig gelöscht wird und " +
+                "dies nicht rückgängig gemacht werden kann.",
+            ["account.delete_submit"] = "Konto löschen",
+            ["account.delete_refused"] =
+                "Die Selbstlösch-Option steht nur Global-Administratoren " +
+                "zur Verfügung. Ein Bewohner ohne Global-Admin-Stellung kann " +
+                "sein eigenes Konto nicht löschen — wende dich an einen " +
+                "Administrator, um das Konto entfernen zu lassen.",
+
+            ["nav.delete_account"] = "Konto löschen",
+
+            ["admin.delete_account_label"] = "Konto löschen",
+            ["admin.delete_account_confirm"] =
+                "Dieses Konto endgültig löschen? Das Prüfungsverzeichnis wird " +
+                "beibehalten (pseudonymisiert); das Konto, das Profil und die " +
+                "Mitgliedschaften werden entfernt. Das kann nicht rückgängig " +
+                "gemacht werden.",
+
+            ["admin.sample_title"] = "Beispieldaten",
+            ["admin.sample_lede"] =
+                "Diese Instanz führt die Demo-Nachbarschaft (Beispieldaten) aus. " +
+                "Sperre die Beispielkonten, um ihr eigenes Passwort zu ändern, damit " +
+                "Besucher Funktionen testen können, ohne die gemeinsamen Zugangsdaten " +
+                "zu brechen — das Demo-Admin behält seinen eigenen Passwort-Zugang.",
+            ["admin.sample_lock_label"] = "Passwortänderungen der Beispielkonten",
+            ["admin.sample_lock_on"] = "Gesperrt — Beispielkonten können ihr Passwort nicht ändern",
+            ["admin.sample_lock_off"] = "Nicht gesperrt — Beispielkonten können ihr Passwort ändern",
             ["account.login.error.blocked"] =
-                "Ihr Konto wurde vorübergehend gesperrt. Wenden Sie sich an einen Administrator.",
+                "Dein Konto wurde vorübergehend gesperrt. Wende dich an einen Administrator.",
             ["account.login.error.removed"] =
-                "Ihr Konto wurde entfernt. Wenden Sie sich an einen Administrator.",
+                "Dein Konto wurde entfernt. Wende dich an einen Administrator.",
             ["account.login.error.role_changed"] =
-                "Ihre Rolle wurde geändert. Bitte melden Sie sich erneut an.",
+                "Deine Rolle wurde geändert. Bitte melde dich erneut an.",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
             ["posts.feed_all_sections"] = "Gemeinschaft",
@@ -2590,8 +3213,9 @@ public static class KnownTranslationKeys
                 "Was du hier wählst, zeigt das Nachbarnverzeichnis " +
                 "genau so — ohne Überraschungen.",
             ["profile.avatar_heading"] = "Dein Avatar",
+            ["upload.max_size"] = "Maximale Dateigröße: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP oder GIF · bis zu 5 MB. Speichern ersetzt den " +
+                "JPEG, PNG, WebP oder GIF. Speichern ersetzt den " +
                 "aktuell im Verzeichnis gezeigten Avatar.",
             ["profile.name_email_heading"] = "Dein Name + E-Mail",
             ["profile.address_heading"] = "Deine Adresse + Telefon (optional)",
@@ -2709,9 +3333,8 @@ public static class KnownTranslationKeys
                 "Übersetzung.",
             ["posts.reply_audience_note"] =
                 "Antworten haben kein eigenes Publikum — sie sind unter " +
-                "der einzelnen Publikumsentscheidung dieses Beitrags sichtbar (die " +
-                "C-M3·1-Regel „reply-inherits“). Du antwortest nur dort, " +
-                "wo der Beitrag selbst sichtbar ist.",
+                "der einzelnen Publikumsentscheidung dieses Beitrags sichtbar. " +
+                "Du antwortest nur dort, wo der Beitrag selbst sichtbar ist.",
             ["posts.reply_submit"] = "Antworten",
             ["posts.reply_edit"] = "Bearbeiten",
             ["posts.reply_save"] = "Speichern",
@@ -2933,7 +3556,7 @@ public static class KnownTranslationKeys
                 "Eine lokale Zusammenfassung der Plattfornutzung — Anfragen, " +
                 "angemeldet / anonym, eindeutige Konten und Oberflächen-Ranking " +
                 "über ein festes Zeitfenster. Keine Kontodetails; die rohen " +
-                "Zeilen sind das psql-Surface des Betreibers.",
+                "Zeilen sind nur in der Datenbank des Betreibers verfügbar.",
             ["admin.analytics_window"] = "Fenster",
             ["admin.analytics_total"] = "Gesamtanfragen",
             ["admin.analytics_authenticated"] = "Angemeldet",
@@ -3141,7 +3764,7 @@ public static class KnownTranslationKeys
             ["whatsnew.heading"]        = "Was ist neu — Version für Version",
             ["whatsnew.lead"] =
                 "Jede Veröffentlichung ist hier mit Datum gelistet — lies nach, " +
-                "was in jeder Minor-Version der Plattform, die du nutzt, eingezogen ist.",
+                "was in jeder Minor-Version der Plattform, die du nutzt, gelandet ist.",
             ["whatsnew.version"]        = "Version",
             ["whatsnew.show_more"]      = "Weitere Versionen anzeigen",
             ["whatsnew.show_more_remaining"] = "Die {n} älteren Versionen anzeigen",
@@ -3417,6 +4040,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Nachrichten von anderen Bewohnern",
             ["notification.message.new.subject"] = "Neue Nachricht",
             ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
+
+            // ── GU community-approval lane (ADR 0141) — die Betreuer-Art ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Gruppen-Einladung für dein Kind",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Wenn eine Gruppe dein Kind einlädt",
+            ["notification.guardian.group_invite.subject"] =
+                "Eine Gruppe hat dein Kind eingeladen",
+            ["notification.guardian.group_invite.body"] =
+                "Eine Gruppe hat dein Kind eingeladen: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Community-Mitgliedschaft für dein Kind",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Wenn eine Community dein Kind hinzufügt",
+            ["notification.guardian.community_invite.subject"] =
+                "Dein Kind wurde einer Community hinzugefügt",
+            ["notification.guardian.community_invite.body"] =
+                "Dein Kind wurde einer Community hinzugefügt: ",
+
+            // ── GU community-approval lane (ADR 0141) — die Kind-Seite ──
+            ["guardian.pending_community_requests"] = "Offene Community-Mitgliedschaften",
+            ["guardian.no_community_requests"] = "Keine offenen Community-Mitgliedschaften.",
+            ["guardian.reject"] = "Ablehnen",
+
             // ── M9 (ADR 0105, U04) — die Bewohner-Fläche: Navigation, Liste, Thread, Composer ──
             ["message.nav"] = "Nachrichten",
             ["message.title"] = "Nachrichten",
@@ -3427,6 +4074,8 @@ public static class KnownTranslationKeys
             ["message.unread"] = "ungelesen",
             ["message.disabled"] = "Direktnachrichten sind auf dieser Instanz deaktiviert.",
             ["message.other"] = "die andere Person",
+            ["message.sent_to"] = "Gesendet an {0}.",
+            ["message.load_earlier"] = "Frühere Nachrichten laden",
             ["pages.subscribe"] = "Aktualisierungen abonnieren",
             ["pages.unsubscribe"] = "Abonnierung aufheben",
 
@@ -3617,6 +4266,232 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Wer darf dieses Dokument sehen",
             ["documents.edit.submit"]       = "Änderungen speichern",
             ["documents.flash_edited"]      = "Dokument aktualisiert.",
+
+            // Die "Dokumente organisieren"-Lane (Tags + Ordner) — die
+            // documents.folder_* / documents.tags.*-Keys + die Flash-Keys der
+            // DocumentFolderController-Routen (create / rename / move / delete /
+            // document-move).
+            ["documents.folder"]              = "Ordner",
+            ["documents.folder_unfiled"]      = "Nicht abgelegt",
+            ["documents.folder_hint"]         = "Lege dieses Dokument in einen Ordner ab, um das Archiv organisiert zu halten.",
+            ["documents.folder_new"]          = "Neuer Ordner",
+            ["documents.folder_create"]       = "Erstellen",
+            ["documents.folder_name_placeholder"] = "Ordnername",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Tippe, um bestehende Tags zu finden, oder starte ein neues.",
+            ["documents.flash_moved"]         = "Dokument verschoben.",
+            ["documents.folder_flash_created"] = "Ordner erstellt.",
+            ["documents.folder_flash_renamed"] = "Ordner umbenannt.",
+            ["documents.folder_flash_moved"]   = "Ordner verschoben.",
+            ["documents.folder_flash_deleted"] = "Ordner gelöscht.",
+
+            // ── M22 (ADR 0132) — Onboarding: die /onboarding-Führung (D4) +
+            // die schließbare Home-/Nav-Anzeige (D5) + der Finish/Skip-Flash
+            // (D2/D4). U03 erstellt den VOLLSTÄNDIGEN geschlossenen Satz;
+            // U02/U03 nutzen ihn. Die Paritäts-Sicherung verlangt jeden
+            // Schlüssel in allen vier Sprachen, nicht leer (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Dein Konto einrichten",
+            ["onboarding.intro"]            = "Ein kurzer geführter Rundgang durch die wenigen Dinge, die Kumunita für dich zum Laufen bringen. Alles führt in die Einstellung, die es bereits besitzt — du schließt in einer Minute ab oder kommst jederzeit wieder.",
+            ["onboarding.step_displayname"] = "Dein Anzeigename",
+            ["onboarding.step_avatar"]      = "Dein Avatar",
+            ["onboarding.step_language"]    = "Deine Schnittstellensprache",
+            ["onboarding.step_timezone"]    = "Deine Zeitzone",
+            ["onboarding.step_dateformat"]  = "Dein Datums- und Zeitformat",
+            ["onboarding.step_email"]       = "Deine E-Mail- und Benachrichtigungssprache",
+            ["onboarding.step_contact"]     = "Deine Kontaktdaten & wer sie sehen kann",
+            ["onboarding.visit"]            = "Zu dieser Einstellung",
+            ["onboarding.finish"]           = "Alles klar — Einrichtung abschließen",
+            ["onboarding.skip"]             = "Jetzt überspringen",
+            ["onboarding.flash_done"]       = "Einrichtung abgeschlossen — willkommen in deiner Nachbarschaft.",
+            ["onboarding.banner.text"]      = "Dein Konto fertig einrichten?",
+            ["onboarding.banner.action"]    = "Einrichtung starten",
+
+            // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
+            // Betreuer-Obergrenze (initial English values, pending de
+            // translation; the ADR 0015 provider floor resolves them). ──
+            ["settings.messaging.title"]           = "Messaging",
+            ["settings.messaging.description"]     = "Wähle, ob du 1:1-Direktnachrichten mit anderen Bewohnern nutzen kannst. Deine Auswahl wird auf deinem Konto gespeichert und wirkt sofort.",
+            ["settings.messaging.instance_off"]    = "Direktnachrichten sind derzeit von einem Administrator auf dieser Instanz deaktiviert. Du kannst dich jetzt anmelden, und die Funktion steht dir zur Verfügung, sobald sie wieder aktiviert wird.",
+            ["settings.messaging.restricted"]      = "Direktnachrichten wurden auf deinem Konto durch einen Betreuer eingeschränkt. Wende dich an sie, um dies zu ändern.",
+            ["settings.messaging.optin"]           = "Erlaube mir die Nutzung von 1:1-Direktnachrichten",
+            ["settings.messaging.save"]            = "Messaging-Einstellung speichern",
+            ["guardian.messaging.title"]           = "Messaging",
+            ["guardian.messaging.description"]     = "Wähle, ob dieses Kind 1:1-Direktnachrichten nutzen darf. Bei Einschränkung kann das Kind keine Nachrichten senden oder erhalten — diese Auswahl hat Vorrang vor seiner eigenen Opt-in. Bei Erlaubnis entscheidet das Kind selbst auf seiner eigenen Messaging-Einstellungsseite.",
+            ["guardian.messaging.current_restricted"] = "Messaging ist derzeit für dieses Kind eingeschränkt.",
+            ["guardian.messaging.current_allowed"]    = "Messaging ist derzeit für dieses Kind erlaubt.",
+            ["guardian.messaging.child_optin_on"]     = "Das Kind hat sich auf seinem eigenen Konto für Messaging angemeldet.",
+            ["guardian.messaging.child_optin_off"]    = "Das Kind hat sich auf seinem eigenen Konto noch nicht für Messaging angemeldet — selbst wenn du es erlaubst, muss es sich auf seiner eigenen Einstellungsseite anmelden.",
+            ["guardian.messaging.allow"]              = "Messaging erlauben",
+            ["guardian.messaging.restrict"]           = "Messaging einschränken",
+
+            // ── P1 audit (2026-10-04) ── dieselbe ~73-Schlüssel-Sammlung wie
+            // in <see cref="EnValues"/> (die P1-Übersetzungsaudit-Auflistung).
+            ["common.remove_translation_confirm"] =
+                "Diese Übersetzung entfernen?",
+            ["events.skip_occurrence_confirm"] =
+                "Diesen Termin überspringen? Du kannst ihn später wiederherstellen.",
+            ["community.confirm_remove_member"] =
+                "{0} aus {1} entfernen?",
+            ["a11y.notifications"]             = "Benachrichtigungen",
+            ["a11y.find_tag"]                  = "Nach Tag finden",
+            ["a11y.find_bio"]                  = "Nach Bio finden",
+            ["a11y.avatar"]                    = "Avatarbild",
+            ["a11y.board_actions"]             = "Board-Aktionen",
+            ["a11y.calendar_view"]             = "Kalenderansicht",
+            ["a11y.event_time_range"]          = "Zeitraum der Veranstaltung",
+            ["a11y.check_out_note"]            = "Ausleihe-Hinweis",
+            ["a11y.community_pages"]           = "Gemeinschafts-Seiten",
+            ["a11y.platform_pages"]            = "Plattform-Seiten",
+            ["a11y.community_page_tree"]       = "Gemeinschafts-Seitenbaum",
+            ["a11y.platform_page_tree"]        = "Plattform-Seitenbaum",
+            ["a11y.breadcrumb"]                = "Brotkrumen-Navigation",
+            ["a11y.about_features"]            = "Was Kumunita ist",
+            ["a11y.about_audience"]            = "Für wen",
+            ["a11y.about_philosophy"]          = "Die Philosophie",
+            ["a11y.about_contact"]             = "Kontakt aufnehmen",
+            ["a11y.about_project"]             = "Das Projekt",
+            ["a11y.set_limit"]                 = "Limit für {0} setzen",
+            ["account.block"]               = "Sperren",
+            ["account.unblock"]             = "Entsperren",
+            ["account.confirm_block"]       = "Dieses Konto sperren? Es verliert alle Berechtigungen, bis es entsperrt wird.",
+            ["account.confirm_unblock"]     = "Dieses Konto entsperren? Ihre Berechtigungen werden wiederhergestellt.",
+            ["account.err.required"]        = "Das Feld {0} ist erforderlich.",
+            ["account.err.email"]           = "Das Feld {0} ist keine gültige E-Mail-Adresse.",
+            ["account.err.password_min"]    = "{0} muss mindestens {1} Zeichen lang sein.",
+            ["account.err.password_mismatch"] = "Die Felder {0} und {1} stimmen nicht überein.",
+            ["footer.feed"]                 = "Der Feed",
+            ["languages.title"]             = "Sprachen",
+            ["languages.lede_admin"]        =
+                "Verwalte die Sprachen, die diese Instanz unterstützt. Änderungen wirken ab der " +
+                "nächsten Anfrage — ohne Neubau, ohne Neustart.",
+            ["languages.lede_translator"]   =
+                "Prüfe die Übersetzungsabdeckung der Plattform und aktualisiere die UI-Strings. " +
+                "Änderungen wirken ab der nächsten Anfrage.",
+            ["languages.add_heading"]       = "Sprache hinzufügen",
+            ["languages.code_label"]        = "Sprachcode",
+            ["languages.native_name_label"] = "Eigener Name",
+            ["languages.code_hint"]         = "Kurzer Code, z.B. pl für Polnisch, no-NO für Norwegisch.",
+            ["languages.supported_heading"] = "Unterstützte Sprachen",
+            ["languages.th_code"]           = "Code",
+            ["languages.th_native_name"]    = "Eigener Name",
+            ["languages.th_enabled"]        = "Aktiv",
+            ["languages.th_ui_strings"]     = "UI-Strings",
+            ["languages.th_actions"]        = "Aktionen",
+            ["languages.enabled"]           = "aktiv",
+            ["languages.disabled"]          = "deaktiviert",
+            ["languages.present"]           = "{n} vorhanden",
+            ["languages.missing"]           = "{n} fehlt",
+            ["languages.action_disable"]    = "Deaktivieren",
+            ["languages.action_enable"]     = "Aktivieren",
+            ["languages.action_set_default"] = "Als Standard setzen",
+            ["languages.action_ui_strings"] = "UI-Strings",
+            ["languages.action_remove"]     = "Entfernen",
+            ["languages.reorder_btn"]       = "Neu sortieren (aktuelle Reihenfolge bestätigen)",
+            ["languages.reorder_title"]     = "Die aktuelle Reihenfolge (wie unten gezeigt) als neue Sortierreihenfolge senden",
+            ["languages.reorder_hint"]      =
+                "Drag-and-Drop-Sortierung ist nicht verfügbar; das Sortierformular akzeptiert die Codes " +
+                "in der Reihenfolge, in der sie hier erscheinen. Um die Reihenfolge zu ändern, sollte " +
+                "der Administrator die Liste in der gewünschten Reihenfolge senden.",
+            ["languages.confirm_remove"]    =
+                "{0} entfernen? Ihre Übersetzungszeilen bleiben erhalten und werden wiederhergestellt, " +
+                "wenn die Sprache erneut hinzugefügt wird.",
+            ["translations.editor.back"]         = "← Zurück zu den Sprachen",
+            ["translations.editor.title"]        = "UI-Strings für {0}",
+            ["translations.editor.lede"]         =
+                "Die vollständige Liste der Strings, die die Plattform ihren Bewohnern zeigt. Jede " +
+                "Zeile zeigt den Schlüssel, seinen englischen Referenztext und den aktuellen Wert in " +
+                "{0}. Das Speichern einer Zeile fügt ihre Übersetzung hinzu oder aktualisiert sie — " +
+                "sichtbar ab der nächsten Anfrage.",
+            ["translations.editor.mode_label"]   = "Bearbeitungsmodus",
+            ["translations.editor.th_key"]       = "Schlüssel",
+            ["translations.editor.th_en_reference"] = "Englische Referenz",
+            ["translations.editor.th_value"]     = "Wert in {0}",
+            ["translations.editor.value_aria"]   = "Wert für {0} in {1}",
+            ["events.rsvp_status_going"]     = "Geht",
+            ["events.rsvp_status_maybe"]     = "Vielleicht",
+            ["events.rsvp_status_no"]        = "Nein",
+            ["posts.delete_confirm"]         = "Diesen Beitrag löschen? Deine Antworten bleiben sichtbar.",
+            ["posts.reply_delete_confirm"]   =
+                "Diese Antwort löschen? Sie wird durch eine Notiz ersetzt. Der Eintrag bleibt erhalten.",
+            ["announcements.delete_confirm"] = "Diese Ankündigung löschen? Das kann nicht rückgängig gemacht werden.",
+            ["groups.confirm_delete"]        =
+                "Diese Gruppe löschen? Dadurch werden die Gruppe, ihre Mitglieder und ihre " +
+                "ausstehenden Einladungen entfernt, und es kann nicht rückgängig gemacht werden.",
+            ["community.confirm_leave"]      = "{0} verlassen?",
+            ["guardian.suspend_confirm"]     = "Dieses Kind-Konto sperren? Es wird blockiert, bis du es wieder freischaltest.",
+            ["guardian.messaging.allow_confirm"] =
+                "Messaging für dieses Kind erlauben? Es kann dann direkte Nachrichten senden und " +
+                "empfangen (seine eigene Opt-in muss ebenfalls an sein).",
+            ["guardian.messaging.restrict_confirm"] =
+                "Messaging für dieses Kind einschränken? Es kann dann keine direkten Nachrichten mehr " +
+                "senden oder empfangen, unabhängig von seiner eigenen Opt-in.",
+            ["guardian.handover_confirm"]    = "Dieses Konto an das Kind übergeben? Damit löst du deine Vormundschaft über es auf.",
+            ["guardian.delete_child_confirm"] =
+                "Dieses Kind-Konto dauerhaft löschen? Damit werden Anmeldung, Profil und " +
+                "Mitgliedschaften entfernt — das kann nicht rückgängig gemacht werden.",
+            ["locale.reset_confirm"]         = "Deine Sprachpräferenz auf den Instanz-Standard zurücksetzen?",
+            ["locale.email_reset_confirm"]   = "Deine E-Mail- und Benachrichtigungssprache auf den Instanz-Standard zurücksetzen?",
+            ["settings.quiet.clear_confirm"] =
+                "Deine Stumstunden löschen? Alle Benachrichtigungs-E-Mails werden wieder sofort gesendet.",
+            ["settings.timezone_reset_confirm"] = "Deine Zeitzone auf die Plattform-Vorgabe zurücksetzen?",
+            ["settings.dateformat_reset_confirm"] = "Dein Datum- und Zeitformat auf die Plattform-Vorgabe zurücksetzen?",
+            ["pages.form.body_hint"]         =
+                "Optional — ein Ordnerknoten kann ohne Text sein. Geschrieben in Markdown über den " +
+                "visuellen Editor (derselbe, den Beiträge und Ankündigungen nutzen).",
+            ["pages.reset_confirm"]          =
+                "Diese Seite auf den Seed-Text zurücksetzen? Alle Änderungen, die du am Text " +
+                "(Englisch) und an seinen deutschen / französischen / dänischen Übersetzungen " +
+                "vorgenommen hast, werden durch die Seed-Baseline überschrieben. Der Rest der Seite " +
+                "(Zielgruppe, Elternteil, etc.) bleibt unberührt.",
+            ["pl.board.delete_confirm"]      =
+                "Dieses Board löschen? Seine Spuren und Kartenplatzierungen werden entfernt — die " +
+                "To-dos selbst bleiben erhalten.",
+            ["pl.lane.delete_confirm"]       =
+                "Diese Spur löschen? Ihre Karten kommen von diesem Board — die To-dos selbst bleiben " +
+                "erhalten.",
+            ["pl.todo.assignee_remove_confirm"] = "Die Zuweisung von dieser Aufgabe entfernen?",
+            ["pl.todo.move_confirm"]         = "Diese To-do zu einem anderen Board verschieben? Sie ist dann nicht mehr auf diesem Board.",
+            ["pl.todo.delete_confirm"]       = "Diese To-do und ihre Unteraufgaben löschen? Das kann nicht rückgängig gemacht werden.",
+            ["inv.item.delete_confirm"]      = "Dieses Element löschen? Das kann nicht rückgängig gemacht werden.",
+            ["a11y.close"]                   = "Schließen",
+            ["a11y.toggle_nav"]              = "Navigation umschalten",
+            ["a11y.primary_nav"]             = "Primär",
+            ["a11y.pagination"]              = "Paginierung",
+            ["a11y.pinned_announcement"]     = "Angepinnte Ankündigung",
+            ["a11y.banner_read_more"]        = "Diese Ankündigung in vollem Umfang lesen",
+            ["a11y.banner_all"]              = "Alle Ankündigungen ansehen",
+            ["a11y.banner_dismiss"]          = "Diese angepinnte Ankündigung schließen",
+            ["a11y.onboarding_region"]       = "Kontoeinrichtung",
+            ["a11y.onboarding_action"]       = "Einrichtung starten",
+            ["a11y.onboarding_dismiss"]      = "Dieses Banner schließen",
+            ["a11y.whatsnew_region"]         = "Was ist neu",
+            ["a11y.actions_for"]             = "Aktionen für {0}",
+            ["a11y.search"]                  = "Suche",
+            ["a11y.scope"]                   = "Bereich",
+            ["a11y.back_to_messages"]        = "Zurück zu den Nachrichten",
+            ["a11y.resident"]                = "Bewohner",
+            ["account.storage_title"]        = "Mein Speicher",
+            ["account.storage_lede"]         =
+                "Wie viel deiner Inhalte die Plattform zählt, dein Kontingent pro Benutzer und wie " +
+                "viel davon dir noch übrig bleibt.",
+            ["account.storage_used"]         = "dein genutzter Inhalt",
+            ["account.storage_quota"]        = "dein Kontingent pro Benutzer",
+            ["account.storage_remaining"]    = "verbleibend",
+            ["account.storage_unlimited_note"] =
+                "Dein Kontingent pro Benutzer ist unbegrenzt — es gibt keine Inhaltsbeschränkung für " +
+                "deine Uploads.",
+            ["account.storage_remaining_note"] =
+                "Dein verbleibender Betrag ist, was von deinem Kontingent pro Benutzer übrig ist " +
+                "({0}). Bitte einen Administrator, das Kontingent zu erhöhen, wenn du mehr brauchst.",
+            ["translations.bulk.export_title"] = "Lade die UI-Strings dieser Sprache als CSV-Datei herunter",
+            ["common.delete"]          = "Löschen",
+            ["pages.delete_confirm"]   = "Diese Seite löschen?",
+            ["admin.help.reset_one"]   =
+                "\"{0}\" auf den Seed-Text zurücksetzen? Damit werden alle manuellen Änderungen " +
+                "überschrieben.",
+            ["admin.help.reset_all"]   =
+                "ALLE {0} Seed-Hilfeseiten auf den Seed-Text zurücksetzen? Damit werden alle " +
+                "manuellen Änderungen auf jeder Seite überschrieben.",
         };
 
     /// <summary>
@@ -3688,6 +4563,12 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Barre supérieure",
             ["nav_variant.rail"]  = "Barre d’icônes",
 
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Apparence",
+            ["theme.auto"]       = "Automatique (comme l’appareil)",
+            ["theme.light"]      = "Clair",
+            ["theme.dark"]       = "Sombre",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annuler",
             ["common.save"]     = "Enregistrer",
@@ -3717,9 +4598,9 @@ public static class KnownTranslationKeys
             ["admin.community_mandatory"]   = "Obligatoire",
             ["admin.add_community"]         = "Ajouter une communauté",
             ["admin.roles_heading"]         = "Rôles",
-            ["admin.roles_independent_hint"] = "Indépendants — un résident peut cumuler librement les rôles (ADR 0030). Aucune case cochée = un simple Membre.",
+            ["admin.roles_independent_hint"] = "Indépendants — un résident peut cumuler librement les rôles. Aucune case cochée = un simple Membre.",
             ["admin.moderator_scope"]       = "Portée du modérateur",
-            ["admin.moderator_scope_hint"]  = "Les communautés que ce compte peut modérer. N'a de sens que si le rôle Modérateur est coché — la voie Core efface les lignes de portée quand le rôle Modérateur est désactivé.",
+            ["admin.moderator_scope_hint"]  = "Les communautés que ce compte peut modérer. N'a de sens que si le rôle Modérateur est coché — la plateforme efface les choix de portée quand le rôle Modérateur est désactivé.",
             ["nav.announcements"] = "Annonces",
             ["nav.community"]     = "Communauté",
             ["nav.groups"]        = "Groupes",
@@ -3771,7 +4652,7 @@ public static class KnownTranslationKeys
             ["projects.todo.new_lead"]       = "Rédigez une tâche, assignez-la éventuellement à un voisin, et — si besoin — décomposez-la en sous-tâches ou placez-la sur un tableau. Par défaut, elle est visible par tous ; désactivez cela dans la section public pour restreindre l'accès.",
             ["projects.todo.title_hint"]     = "Un libellé court pour la tâche — l'étiquette de la carte.",
             ["projects.todo.status"]         = "Statut",
-            ["projects.todo.status_assignee_hint"] = "Le statut est l'un des statuts fixes des tâches (Aucun, Non commencé, En cours, Fait, Annulé). Assigner une tâche donne à ce résident un droit d'intervention sur elle — affichage + intervention, jamais une limite d'accès.",
+            ["projects.todo.status_assignee_hint"] = "Le statut est un texte libre (une chaîne de caractères, pas une liste fixe). Assigner une tâche donne à ce résident un droit d'intervention sur elle — affichage + intervention, jamais une limite d'accès.",
             ["projects.todo.assignee"]       = "Assignée à",
             ["projects.todo.unassigned"]     = "Non assignée",
             ["projects.todo.assign"]         = "Assigner",
@@ -3817,7 +4698,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_submit"] = "Commenter",
             ["projects.todo.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
             ["projects.todo.comment_delete"] = "Supprimer",
-            ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche (la règle \"commentaire-hérite\" C-M3·1). Vous ne commentez que là où la tâche elle-même est visible.",
+            ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche. Tu ne commentes que là où la tâche elle-même est visible.",
             ["projects.todo.back"]           = "← Retour aux tâches",
             ["projects.todo.untitled"]       = "Tâche sans titre",
             ["projects.todo.edit"]           = "Modifier",
@@ -3899,6 +4780,17 @@ public static class KnownTranslationKeys
             ["guardian.no_communities"]      = "Pas d'adhesions aux communautés.",
             ["guardian.group_id_label"]      = "Identifiant du groupe",
             ["guardian.community_id_label"]  = "Identifiant de la communauté",
+            ["guardian.community_block_note"] =
+                "Choisissez les communautés auxquelles cet enfant peut accéder. " +
+                "Bloquer une communauté la lui masque — ainsi que ses " +
+                "publications — même s'il s'agit d'une des communautés " +
+                "obligatoires auxquelles tous appartiennent. C'est le contrôle " +
+                "du tuteur : vous décidez qui rejoint une communauté en " +
+                "l'invitant ou via un administrateur, mais vous pouvez masquer " +
+                "une communauté que vous ne voulez pas que cet enfant voie.",
+            ["guardian.community_blocked"]   = "Bloquée & masquée",
+            ["guardian.community_unblock"]   = "Débloquer & afficher",
+            ["guardian.community_block"]     = "Bloquer l'accès & masquer",
             ["guardian.pending_invitations"] = "Invitations de groupe en attente",
             ["guardian.no_invitations"]      = "Pas d'invitations en attente.",
             ["guardian.approve"]             = "Approuver",
@@ -3911,11 +4803,36 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspendé",
             ["guardian.unsuspend"]           = "Réactiver",
             ["guardian.suspend"]             = "Suspendre",
+            ["guardian.delete_child"]        = "Supprimer le compte de l'enfant",
+            ["guardian.delete_child_lede"]   =
+                "La suppression retire la connexion, le profil et les adhésions aux groupes " +
+                "et communautés de l'enfant et dissout toute autre tutelle sur ce compte. " +
+                "Ses actions passées sont conservées dans la piste d'audit, avec son " +
+                "identité remplacée par un marqueur. Cette action est irréversible.",
+            ["guardian.delete_child_confirm_checkbox"] = "Je comprends que le compte de l'enfant sera définitivement supprimé.",
+            ["guardian.delete_child_submit"] = "Supprimer le compte",
             ["guardian.display_name"]        = "Nom affiché",
             ["guardian.email"]               = "Adresse e-mail",
             ["guardian.password"]            = "Mot de passe",
             ["guardian.child_email_hint"]    =
                 "L'enfant vérifie son propre e-mail pour se connecter — le flux d'inscription habituel.",
+            ["guardian.consent.intro"]       =
+                "En créant ce profil, tu confirmes être le représentant " +
+                "légal de cet enfant. En tant que tel, tu conserves le " +
+                "contrôle complet de son compte :",
+            ["guardian.consent.duties_invitations"] =
+                "Tu dois approuver ou refuser toutes les invitations à des " +
+                "groupes et à des événements.",
+            ["guardian.consent.duties_chat"] =
+                "Tu peux activer ou désactiver les fonctions de discussion " +
+                "pour ce profil à tout moment.",
+            ["guardian.consent.duties_data"] =
+                "Ces données sont entièrement isolées à l'instance propre de " +
+                "la communauté et ne seront jamais vendues, utilisées pour " +
+                "créer des profils ou à des fins publicitaires.",
+            ["guardian.consent.checkbox"]    =
+                "J'accepte le traitement des données de mon enfant sous ces " +
+                "conditions.",
 
             // ── posts (composer helper hints) ──────────────────────────────
             ["posts.title_hint"] =
@@ -3967,7 +4884,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Assigner",
             ["guardian.assign.noAccount"]    = "Aucun compte avec cet e-mail.",
             ["guardian.assign.self"]         = "Tu es déjà tuteur de cet enfant.",
-            ["guardian.assign.success"]      = "Tuteur assigné.",
+            ["guardian.assign.success"]      = "Tuteur assigné — il/elle sera invité(e) à accepter.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "En attente",
+            ["guardian.pendingRequests.title"] =
+                "Demandes de tutelle en attente de ton acceptation",
+            ["guardian.pendingRequests.lead"] =
+                "Un autre tuteur t'a demandé de devenir co-tuteur pour l'un de ses enfants. " +
+                "Accepte (et accepte les conditions du compte enfant) ou refuse — tant que tu n'agis pas, tu n'as aucun droit sur le compte.",
+            ["guardian.pendingRequests.child"]    = "Enfant",
+            ["guardian.pendingRequests.conferrer"] = "Demandé par",
+            ["guardian.accept"]                   = "Accepter et accepter les conditions",
+            ["guardian.accept.consent.intro"]     =
+                "En acceptant, tu confirmes que tu es un tuteur légal de cet enfant. " +
+                "En tant que tuteur, tu conserves la pleine contrôle sur son compte :",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Tu dois approuver ou refuser toutes les invitations à des groupes et événements.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Tu peux activer ou désactiver les fonctionnalités de discussion pour ce profil à tout moment.",
+            ["guardian.accept.consent.duties_data"] =
+                "Ces données sont entièrement isolées sur l'instance propre de cette communauté et ne seront jamais vendues, profilées ou utilisées à des fins publicitaires.",
+            ["guardian.accept.consent.checkbox"] =
+                "Je consens au traitement des données de cet enfant sous ces conditions.",
+            ["guardian.accept.consent.required"] =
+                "Tu dois accepter les conditions du compte enfant avant d'accepter.",
+            ["guardian.decline"] = "Refuser",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "Un tuteur t'a demandé de devenir co-tuteur",
+            ["notifications.preference.guardian.assign.label"] =
+                "Quand un tuteur te demande de devenir co-tuteur",
+            ["notification.guardian.assign.subject"] =
+                "Un tuteur t'a demandé de devenir co-tuteur",
+            ["notification.guardian.assign.body"] =
+                "Un tuteur t'a demandé de devenir co-tuteur pour son enfant : ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -4103,7 +5055,7 @@ public static class KnownTranslationKeys
             ["account.signup_closed_title"] = "L'inscription est fermée",
             ["account.signup_closed_body"]  =
                 "L'inscription est actuellement réservée aux invitations sur cette instance. " +
-                "Si vous avez été invité·e, une personne administratrice créera votre compte et vous enverra le lien de connexion.",
+                "Si tu as été invité·e, une personne administratrice créera ton compte et t'enverra le lien de connexion.",
 
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Où en est ce projet",
@@ -4142,6 +5094,44 @@ public static class KnownTranslationKeys
             ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
             ["home.roadmap.show_more_earlier"] = "Afficher les {n} jalons précédents",
             ["home.roadmap.show_more_upcoming"]  = "Afficher les {n} prochains jalons",
+            ["home.roadmap.status.done"]    = "Terminé",
+            ["home.roadmap.status.next"]    = "En cours",
+            ["home.roadmap.status.planned"] = "Prévu",
+
+            // ── chaînes du JS client (P0-6 : le bundle #kumunita-strings) ─
+            ["common.close"]  = "Fermer",
+            ["common.cancel"] = "Annuler",
+            ["rc.editor.error_generic"] = "Quelque chose s'est mal passé.",
+            ["rc.editor.link.title"]    = "Insérer un lien",
+            ["rc.editor.link.url"]      = "URL",
+            ["rc.editor.link.confirm"]  = "Insérer le lien",
+            ["rc.editor.link.busy"]     = "Insertion…",
+            ["rc.editor.link.err_empty"]    = "Saisis une URL.",
+            ["rc.editor.link.err_invalid"]  = "Saisis un lien valide (adresse web, courriel ou chemin relatif au site).",
+            ["rc.editor.image.title"]   = "Modifier l'image",
+            ["rc.editor.image.err_rejected"] = "La source de l'image téléversée a été refusée.",
+            ["rc.editor.image.err_upload"]   = "L'envoi a échoué.",
+            ["rc.editor.attach.title"]  = "Joindre un fichier",
+            ["rc.editor.attach.file"]   = "Fichier",
+            ["rc.editor.attach.link_text"] = "Texte du lien",
+            ["rc.editor.attach.default_label"] = "Pièce jointe",
+            ["rc.editor.attach.confirm"]  = "Joindre",
+            ["rc.editor.attach.busy"]     = "Envoi en cours…",
+            ["rc.editor.attach.err_no_file"] = "Choisis un fichier à joindre.",
+            ["img.edit.close"]       = "Fermer",
+            ["img.edit.crop_area"]   = "Zone de rognage",
+            ["img.edit.width"]       = "Largeur",
+            ["img.edit.output"]      = "Résultat",
+            ["img.edit.reset_crop"]  = "Réinitialiser le rognage",
+            ["img.edit.use_original"] = "Utiliser l'original",
+            ["img.edit.apply"]       = "Appliquer",
+            ["img.edit.title"]       = "Rogner ton avatar",
+            ["img.edit.err_edit"]    = "La modification a échoué.",
+            ["img.edit.err_could"]   = "L'image n'a pas pu être modifiée.",
+            ["img.edit.err_load"]    = "L'image n'a pas pu être chargée pour la modification.",
+            ["img.edit.err_export"]  = "L'export de l'image a échoué.",
+            ["tag.suggest.remove_prefix"] = "Supprimer l'étiquette : ",
+            ["notif.fallback"]       = "Notifications",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Se connecter",
@@ -4154,6 +5144,65 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "S'inscrire",
             ["account.signup_submit"] = "S'inscrire",
             ["account.signup_has_account"] = "Tu as déjà un compte ?",
+
+            // ── ADR 0138 — le changement de mot de passe (fr) ──
+            ["account.change_password_title"] = "Changer le mot de passe",
+            ["account.change_password_lede"] =
+                "Choisis un nouveau mot de passe pour ton compte. Après l'enregistrement, " +
+                "tu seras déconnecté·e et demandé·e de te reconnecter avec le nouveau mot de passe.",
+            ["account.change_password_current"] = "Mot de passe actuel",
+            ["account.change_password_new"] = "Nouveau mot de passe",
+            ["account.change_password_confirm_new"] = "Confirmer le nouveau mot de passe",
+            ["account.change_password_submit"] = "Changer le mot de passe",
+            ["account.change_password_locked_title"] = "Les changements de mot de passe sont verrouillés",
+            ["account.change_password_locked_body"] =
+                "Ceci est un compte de démonstration et les changements de mot de passe " +
+                "sont verrouillés par l'administrateur, afin que tout le monde puisse " +
+                "continuer à utiliser les identifiants partagés. Tu peux continuer à " +
+                "utiliser toutes les autres fonctionnalités de la plateforme.",
+            ["account.change_password_back"] = "Retour à ton profil",
+
+            ["nav.change_password"] = "Changer le mot de passe",
+
+            // ── ADR 0142 — la suppression de compte (fr) ──
+            ["account.delete_title"] = "Supprimer le compte",
+            ["account.delete_lede"] =
+                "Supprimer ton compte supprime ta connexion, ton profil et " +
+                "tes affiliations à des groupes et à des communautés. Tes " +
+                "actions passées dans le journal d'audit de la plateforme " +
+                "sont conservées, ton identité étant remplacée par un " +
+                "identifiant anonyme (politique de confidentialité de la " +
+                "plateforme, OPS.md §9). Cette opération est irréversible.",
+            ["account.delete_password"] = "Mot de passe",
+            ["account.delete_confirm_checkbox"] =
+                "Je comprends que mon compte sera définitivement supprimé et " +
+                "que cette opération est irréversible.",
+            ["account.delete_submit"] = "Supprimer le compte",
+            ["account.delete_refused"] =
+                "La voie d'auto-suppression n'est disponible qu'aux " +
+                "administrateurs globaux. Un résident non-administrateur " +
+                "ne peut pas supprimer son propre compte — contacte un " +
+                "administrateur pour supprimer le compte.",
+
+            ["nav.delete_account"] = "Supprimer le compte",
+
+            ["admin.delete_account_label"] = "Supprimer le compte",
+            ["admin.delete_account_confirm"] =
+                "Supprimer définitivement ce compte ? Son journal d'audit " +
+                "est conservé (pseudonymisé) ; le compte, le profil et les " +
+                "affiliations sont supprimés. Cette opération est " +
+                "irréversible.",
+
+            ["admin.sample_title"] = "Données d'exemple",
+            ["admin.sample_lede"] =
+                "Cette instance exécute le quartier de démonstration (données d'exemple). " +
+                "Verrouille les comptes d'exemple pour qu'ils ne puissent pas changer " +
+                "leur propre mot de passe, afin que les visiteurs puissent tester les " +
+                "fonctionnalités sans casser les identifiants partagés — l'administrateur " +
+                "de démonstration conserve sa propre voie de mot de passe.",
+            ["admin.sample_lock_label"] = "Changements de mot de passe des comptes d'exemple",
+            ["admin.sample_lock_on"] = "Verrouillé — les comptes d'exemple ne peuvent pas changer leur mot de passe",
+            ["admin.sample_lock_off"] = "Déverrouillé — les comptes d'exemple peuvent changer leur mot de passe",
             ["account.login.error.blocked"] =
                 "Votre compte a été suspendu temporairement. Contactez un administrateur.",
             ["account.login.error.removed"] =
@@ -4316,8 +5365,9 @@ public static class KnownTranslationKeys
                 "Ce que tu choisis ici est exactement ce que l'annuaire des voisins " +
                 "affiche — aucune surprise.",
             ["profile.avatar_heading"] = "Ton avatar",
+            ["upload.max_size"] = "Taille maximale du fichier : {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP ou GIF · jusqu'à 5 Mo. Enregistrer remplace " +
+                "JPEG, PNG, WebP ou GIF. Enregistrer remplace " +
                 "l'avatar actuellement affiché dans l'annuaire.",
             ["profile.name_email_heading"] = "Ton nom + e-mail",
             ["profile.address_heading"] = "Ton adresse + téléphone (optionnel)",
@@ -4435,9 +5485,8 @@ public static class KnownTranslationKeys
                 "traduction.",
             ["posts.reply_audience_note"] =
                 "Les réponses n'ont pas d'audience propre — elles sont visibles " +
-                "selon la décision d'audience unique de cette publication (la " +
-                "règle « reply-inherits » C-M3·1). Tu réponds uniquement là où " +
-                "la publication elle-même est visible.",
+                "selon la décision d'audience unique de cette publication. " +
+                "Tu réponds uniquement là où la publication elle-même est visible.",
             ["posts.reply_submit"] = "Répondre",
             ["posts.reply_edit"] = "Modifier",
             ["posts.reply_save"] = "Enregistrer",
@@ -4659,7 +5708,7 @@ public static class KnownTranslationKeys
                 "Un résumé local de l'usage de la plateforme — nombre de requêtes, " +
                 "connecté / anonyme, comptes distincts et classement par surface, " +
                 "sur une fenêtre fixe. Aucun détail par compte ; les lignes " +
-                "brutes sont la surface psql de l'opérateur.",
+                "brutes ne sont accessibles que dans la base de données de l'opérateur.",
             ["admin.analytics_window"] = "Fenêtre",
             ["admin.analytics_total"] = "Requêtes totales",
             ["admin.analytics_authenticated"] = "Connectés",
@@ -5146,6 +6195,8 @@ public static class KnownTranslationKeys
             ["message.unread"] = "non lu",
             ["message.disabled"] = "La messagerie directe est désactivée sur cette instance.",
             ["message.other"] = "l'autre personne",
+            ["message.sent_to"] = "Envoyé à {0}.",
+            ["message.load_earlier"] = "Charger les messages antérieurs",
             ["notifications.subscriptions.intro"] = "Choisis quelles communautés, quels groupes et quelles pages t'informent. Les préférences décident des types que tu reçois aussi par e-mail ; ces interrupteurs décident des cibles qui t'informent.",
             ["notifications.subscription.announcement.label"] = "Nouvelles annonces",
             ["notifications.subscription.community.post.label"] = "Nouvelles publications dans les communautés",
@@ -5156,6 +6207,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages d'autres résidents",
             ["notification.message.new.subject"] = "Nouveau message",
             ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
+
+            // ── GU community-approval lane (ADR 0141) — l'art du tuteur ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Invitation à un groupe pour ton enfant",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Quand un groupe invite ton enfant",
+            ["notification.guardian.group_invite.subject"] =
+                "Un groupe a invité ton enfant",
+            ["notification.guardian.group_invite.body"] =
+                "Un groupe a invité ton enfant : ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Membre d'une communauté pour ton enfant",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Quand une communauté ajoute ton enfant",
+            ["notification.guardian.community_invite.subject"] =
+                "Une communauté a ajouté ton enfant",
+            ["notification.guardian.community_invite.body"] =
+                "Une communauté a ajouté ton enfant : ",
+
+            // ── GU community-approval lane (ADR 0141) — la page enfant ──
+            ["guardian.pending_community_requests"] = "Communautés en attente",
+            ["guardian.no_community_requests"] = "Aucune communauté en attente.",
+            ["guardian.reject"] = "Refuser",
+
             ["pages.subscribe"] = "S'abonner aux mises à jour",
             ["pages.unsubscribe"] = "Se désabonner des mises à jour",
 
@@ -5346,6 +6421,235 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Qui peut voir ce document",
             ["documents.edit.submit"]       = "Enregistrer les modifications",
             ["documents.flash_edited"]      = "Document mis à jour.",
+
+            // La lane "organiser les documents" (tags + dossiers) — les clés
+            // documents.folder_* / documents.tags.* + les clés flash des
+            // routes DocumentFolderController (create / rename / move / delete /
+            // document-move).
+            ["documents.folder"]              = "Dossier",
+            ["documents.folder_unfiled"]      = "Non classé",
+            ["documents.folder_hint"]         = "Classez ce document dans un dossier pour garder l'archive organisée.",
+            ["documents.folder_new"]          = "Nouveau dossier",
+            ["documents.folder_create"]       = "Créer",
+            ["documents.folder_name_placeholder"] = "Nom du dossier",
+            ["documents.tags"]                = "Étiquettes",
+            ["documents.tags_hint"]           = "Écris pour chercher des étiquettes existantes, ou en créer une nouvelle.",
+            ["documents.flash_moved"]         = "Document déplacé.",
+            ["documents.folder_flash_created"] = "Dossier créé.",
+            ["documents.folder_flash_renamed"] = "Dossier renommé.",
+            ["documents.folder_flash_moved"]   = "Dossier déplacé.",
+            ["documents.folder_flash_deleted"] = "Dossier supprimé.",
+
+            // ── M22 (ADR 0132) — onboarding : le parcours guidé /onboarding
+            // (D4) + le bandeau fermable d'accueil/nav (D5) + le flash
+            // finish/skip (D2/D4). U03 crée le jeu FERMÉ COMPLET ; U02/U03 le
+            // consomment. La pin de parité exige chaque clé présente, non
+            // vide, dans les quatre langues (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Configurer ton compte",
+            ["onboarding.intro"]            = "Une brève visite guidée des quelques réglages qui font fonctionner Kumunita pour toi. Tout mène au réglage qui l'a déjà — termine en une minute ou reviens quand tu veux.",
+            ["onboarding.step_displayname"] = "Ton nom d'affichage",
+            ["onboarding.step_avatar"]      = "Ton avatar",
+            ["onboarding.step_language"]    = "Ta langue d'interface",
+            ["onboarding.step_timezone"]    = "Ton fuseau horaire",
+            ["onboarding.step_dateformat"]  = "Ton format de date et d'heure",
+            ["onboarding.step_email"]       = "Ta langue des e-mails et des notifications",
+            ["onboarding.step_contact"]     = "Tes coordonnées et qui peut les voir",
+            ["onboarding.visit"]            = "Aller à ce réglage",
+            ["onboarding.finish"]           = "Tout est prêt — terminer la configuration",
+            ["onboarding.skip"]             = "Passer pour l'instant",
+            ["onboarding.flash_done"]       = "Configuration terminée — bienvenue dans ton quartier.",
+            ["onboarding.banner.text"]      = "Terminer la configuration de ton compte ?",
+            ["onboarding.banner.action"]    = "Démarrer la configuration",
+
+            // ── M9 amendment — le contrôle de messagerie par résident + le
+            // plafond du tuteur (valeurs initiales, en fr, à réviser par un
+            // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
+            ["settings.messaging.title"]           = "Messagerie",
+            ["settings.messaging.description"]     = "Choisis si tu peux utiliser la messagerie directe 1:1 avec les autres résidents. Ton choix est enregistré sur ton compte et prend effet immédiatement.",
+            ["settings.messaging.instance_off"]    = "La messagerie est actuellement désactivée sur cette instance par un administrateur. Tu peux t'inscrire maintenant et la messagerie sera disponible dès qu'elle sera activée.",
+            ["settings.messaging.restricted"]      = "La messagerie a été restreinte sur ton compte par un tuteur. Contacte-le pour changer cela.",
+            ["settings.messaging.optin"]           = "Autoriser la messagerie directe 1:1",
+            ["settings.messaging.save"]            = "Enregistrer la préférence de messagerie",
+            ["guardian.messaging.title"]           = "Messagerie",
+            ["guardian.messaging.description"]     = "Choisis si cet enfant peut utiliser la messagerie directe 1:1. Si restreinte, l'enfant ne peut ni envoyer ni recevoir de messages — ce choix prime sur son propre opt-in ; si autorisée, l'enfant décide par lui-même sur sa page de réglages de messagerie.",
+            ["guardian.messaging.current_restricted"] = "La messagerie est actuellement restreinte pour cet enfant.",
+            ["guardian.messaging.current_allowed"]    = "La messagerie est actuellement autorisée pour cet enfant.",
+            ["guardian.messaging.child_optin_on"]     = "L'enfant s'est inscrit à la messagerie sur son propre compte.",
+            ["guardian.messaging.child_optin_off"]    = "L'enfant ne s'est pas encore inscrit à la messagerie sur son propre compte — même si tu l'autorises, il devra s'inscrire sur sa page de réglages.",
+            ["guardian.messaging.allow"]              = "Autoriser la messagerie",
+            ["guardian.messaging.restrict"]           = "Restreindre la messagerie",
+
+            // ── P1 audit (2026-10-04) ── même ensemble des ~73 clés que
+            // <see cref="EnValues"/> (l'inventaire de l'audit de traduction P1).
+            ["common.remove_translation_confirm"] =
+                "Supprimer cette traduction ?",
+            ["events.skip_occurrence_confirm"] =
+                "Passer sur cette occurrence ? Tu peux la restaurer plus tard.",
+            ["community.confirm_remove_member"] =
+                "Retirer {0} de {1} ?",
+            ["a11y.notifications"]             = "Notifications",
+            ["a11y.find_tag"]                  = "Chercher par étiquette",
+            ["a11y.find_bio"]                  = "Chercher par bio",
+            ["a11y.avatar"]                    = "Image du profil",
+            ["a11y.board_actions"]             = "Actions du tableau",
+            ["a11y.calendar_view"]             = "Vue calendrier",
+            ["a11y.event_time_range"]          = "Plage horaire de l'événement",
+            ["a11y.check_out_note"]            = "Note d'emprunt",
+            ["a11y.community_pages"]           = "Pages de la communauté",
+            ["a11y.platform_pages"]            = "Pages de la plateforme",
+            ["a11y.community_page_tree"]       = "Arbre des pages de la communauté",
+            ["a11y.platform_page_tree"]        = "Arbre des pages de la plateforme",
+            ["a11y.breadcrumb"]                = "Fil d'Ariane",
+            ["a11y.about_features"]            = "Ce qu'est Kumunita",
+            ["a11y.about_audience"]            = "Pour qui",
+            ["a11y.about_philosophy"]          = "La philosophie",
+            ["a11y.about_contact"]             = "Nous contacter",
+            ["a11y.about_project"]             = "Le projet",
+            ["a11y.set_limit"]                 = "Définir une limite sur {0}",
+            ["account.block"]               = "Bloquer",
+            ["account.unblock"]             = "Débloquer",
+            ["account.confirm_block"]       = "Bloquer ce compte ? Il perd tous ses droits jusqu'au déblocage.",
+            ["account.confirm_unblock"]     = "Débloquer ce compte ? Ses droits seront restaurés.",
+            ["account.err.required"]        = "Le champ {0} est requis.",
+            ["account.err.email"]           = "Le champ {0} n'est pas une adresse e-mail valide.",
+            ["account.err.password_min"]    = "{0} doit contenir au moins {1} caractères.",
+            ["account.err.password_mismatch"] = "Les champs {0} et {1} ne correspondent pas.",
+            ["footer.feed"]                 = "Le fil",
+            ["languages.title"]             = "Langues",
+            ["languages.lede_admin"]        =
+                "Gère les langues que cette instance prend en charge. Les changements prennent effet " +
+                "à la prochaine requête — sans recompiler, sans redémarrage.",
+            ["languages.lede_translator"]   =
+                "Vérifie la couverture de traduction de la plateforme et mets à jour les chaînes " +
+                "d'interface. Les changements prennent effet à la prochaine requête.",
+            ["languages.add_heading"]       = "Ajouter une langue",
+            ["languages.code_label"]        = "Code de langue",
+            ["languages.native_name_label"] = "Nom natif",
+            ["languages.code_hint"]         = "Code court, p. ex. pl pour polonais, no-NO pour norvégien.",
+            ["languages.supported_heading"] = "Langues prises en charge",
+            ["languages.th_code"]           = "Code",
+            ["languages.th_native_name"]    = "Nom natif",
+            ["languages.th_enabled"]        = "Activ",
+            ["languages.th_ui_strings"]     = "Chaînes d'interface",
+            ["languages.th_actions"]        = "Actions",
+            ["languages.enabled"]           = "activ",
+            ["languages.disabled"]          = "désactivé",
+            ["languages.present"]           = "{n} présentes",
+            ["languages.missing"]           = "{n} manquantes",
+            ["languages.action_disable"]    = "Désactiver",
+            ["languages.action_enable"]     = "Activer",
+            ["languages.action_set_default"] = "Mettre par défaut",
+            ["languages.action_ui_strings"] = "Chaînes d'interface",
+            ["languages.action_remove"]     = "Retirer",
+            ["languages.reorder_btn"]       = "Réordonner (confirmer l'ordre actuel)",
+            ["languages.reorder_title"]     = "Envoyer l'ordre actuel (tel qu'affiché ci-dessous) comme nouvel ordre de tri",
+            ["languages.reorder_hint"]      =
+                "Le réordonnement par glisser-déposer n'est pas disponible ; le formulaire d'ordre " +
+                "accepte les codes dans l'ordre où ils apparaissent ici. Pour changer l'ordre, " +
+                "l'administrateur doit soumettre la liste dans l'ordre souhaité.",
+            ["languages.confirm_remove"]    =
+                "Retirer {0} ? Ses lignes de traduction sont conservées et seront restaurées si la " +
+                "langue est réajoutée.",
+            ["translations.editor.back"]         = "← Retour aux langues",
+            ["translations.editor.title"]        = "Chaînes d'interface pour {0}",
+            ["translations.editor.lede"]         =
+                "La liste complète des chaînes que la plateforme affiche à ses résidents. Chaque ligne " +
+                "montre la clé, son texte de référence en anglais et la valeur actuelle dans {0}. " +
+                "Enregistrer une ligne ajoute ou met à jour sa traduction — visible à la prochaine " +
+                "requête.",
+            ["translations.editor.mode_label"]   = "Mode d'édition",
+            ["translations.editor.th_key"]       = "Clé",
+            ["translations.editor.th_en_reference"] = "Référence en anglais",
+            ["translations.editor.th_value"]     = "Valeur dans {0}",
+            ["translations.editor.value_aria"]   = "Valeur pour {0} dans {1}",
+            ["events.rsvp_status_going"]     = "Va",
+            ["events.rsvp_status_maybe"]     = "Peut-être",
+            ["events.rsvp_status_no"]        = "Non",
+            ["posts.delete_confirm"]         = "Supprimer cette publication ? Tes réponses resteront visibles.",
+            ["posts.reply_delete_confirm"]   =
+                "Supprimer cette réponse ? Elle sera remplacée par une note. L'enregistrement est " +
+                "conservé.",
+            ["announcements.delete_confirm"] = "Supprimer cette annonce ? Cela ne peut pas être annulé.",
+            ["groups.confirm_delete"]        =
+                "Supprimer ce groupe ? Cela supprime le groupe, ses membres et ses invitations en " +
+                "attente, et cela ne peut pas être annulé.",
+            ["community.confirm_leave"]      = "Quitter {0} ?",
+            ["guardian.suspend_confirm"]     = "Suspendre ce compte enfant ? Il sera bloqué jusqu'à ce que tu le réactives.",
+            ["guardian.messaging.allow_confirm"] =
+                "Autoriser la messagerie pour cet enfant ? Il pourra envoyer et recevoir des messages " +
+                "directs (son propre opt-in doit aussi être activé).",
+            ["guardian.messaging.restrict_confirm"] =
+                "Restreindre la messagerie pour cet enfant ? Il ne pourra plus envoyer ni recevoir de " +
+                "messages directs, quelle que soit son propre opt-in.",
+            ["guardian.handover_confirm"]    = "Transférer ce compte à l'enfant ? Cela dissout ta tutelle sur ce compte.",
+            ["guardian.delete_child_confirm"] =
+                "Supprimer définitivement ce compte d'enfant ? Cette opération " +
+                "retire la connexion, le profil et les adhésions, et ne peut pas " +
+                "être annulée.",
+            ["locale.reset_confirm"]         = "Réinitialiser ta préférence de langue au défaut de l'instance ?",
+            ["locale.email_reset_confirm"]   = "Réinitialiser la langue des e-mails et des notifications au défaut de l'instance ?",
+            ["settings.quiet.clear_confirm"] =
+                "Effacer tes heures de silence ? Tous les e-mails de notification seront à nouveau " +
+                "envoyés immédiatement.",
+            ["settings.timezone_reset_confirm"] = "Réinitialiser ta zone horaire à la valeur par défaut de la plateforme ?",
+            ["settings.dateformat_reset_confirm"] = "Réinitialiser ton format de date et d'heure à la valeur par défaut de la plateforme ?",
+            ["pages.form.body_hint"]         =
+                "Facultatif — un nœud de dossier peut ne pas avoir de corps. Écrit en Markdown via " +
+                "l'éditeur visuel (le même que les publications et les annonces).",
+            ["pages.reset_confirm"]          =
+                "Réinitialiser cette page au texte seedé ? Toutes les modifications que tu as " +
+                "apportées au corps (anglais) et à ses traductions allemandes / françaises / danoises " +
+                "seront écrasées par la baseline seedée. Le reste de la page (public, parent, etc.) " +
+                "n'est pas touché.",
+            ["pl.board.delete_confirm"]      =
+                "Supprimer ce tableau ? Ses couloirs et placements de cartes sont supprimés — les " +
+                "tâches elles-mêmes sont conservées.",
+            ["pl.lane.delete_confirm"]       =
+                "Supprimer ce couloir ? Ses cartes quittent ce tableau — les tâches elles-mêmes sont " +
+                "conservées.",
+            ["pl.todo.assignee_remove_confirm"] = "Retirer l'assignation de cette tâche ?",
+            ["pl.todo.move_confirm"]         = "Déplacer cette tâche sur un autre tableau ? Elle ne sera plus sur ce tableau.",
+            ["pl.todo.delete_confirm"]       = "Supprimer cette tâche et ses sous-tâches ? Cela ne peut pas être annulé.",
+            ["inv.item.delete_confirm"]      = "Supprimer cet article ? Cela ne peut pas être annulé.",
+            ["a11y.close"]                   = "Fermer",
+            ["a11y.toggle_nav"]              = "Basculer la navigation",
+            ["a11y.primary_nav"]             = "Principal",
+            ["a11y.pagination"]              = "Pagination",
+            ["a11y.pinned_announcement"]     = "Annonce épinglée",
+            ["a11y.banner_read_more"]        = "Lire cette annonce en entier",
+            ["a11y.banner_all"]              = "Voir toutes les annonces",
+            ["a11y.banner_dismiss"]          = "Fermer cette annonce épinglée",
+            ["a11y.onboarding_region"]       = "Configuration du compte",
+            ["a11y.onboarding_action"]       = "Démarrer la configuration",
+            ["a11y.onboarding_dismiss"]      = "Fermer cette bannière",
+            ["a11y.whatsnew_region"]         = "Nouveautés",
+            ["a11y.actions_for"]             = "Actions pour {0}",
+            ["a11y.search"]                  = "Recherche",
+            ["a11y.scope"]                   = "Portée",
+            ["a11y.back_to_messages"]        = "Retour aux messages",
+            ["a11y.resident"]                = "Résident",
+            ["account.storage_title"]        = "Mon stockage",
+            ["account.storage_lede"]         =
+                "Combien de ton contenu la plateforme compte, ton quota par utilisateur et combien " +
+                "il t'en reste encore.",
+            ["account.storage_used"]         = "ton contenu utilisé",
+            ["account.storage_quota"]        = "ton quota par utilisateur",
+            ["account.storage_remaining"]    = "restant",
+            ["account.storage_unlimited_note"] =
+                "Ton quota par utilisateur est illimité — il n'y a pas de limite de contenu total sur " +
+                "tes uploads.",
+            ["account.storage_remaining_note"] =
+                "Ton restant est ce qui reste de ton quota par utilisateur ({0}). Demande à un " +
+                "administrateur d'augmenter le quota si tu en as besoin.",
+            ["translations.bulk.export_title"] = "Télécharge les chaînes d'interface de cette langue au format fichier CSV",
+            ["common.delete"]          = "Supprimer",
+            ["pages.delete_confirm"]   = "Supprimer cette page ?",
+            ["admin.help.reset_one"]   =
+                "Réinitialiser « {0} » au texte seedé ? Cela écrase tout le contenu modifié " +
+                "manuellement.",
+            ["admin.help.reset_all"]   =
+                "Réinitialiser TOUTES les {0} pages d'aide seedées au texte seedé ? Cela écrase tout " +
+                "le contenu modifié manuellement sur chaque page.",
         };
 
     /// <summary>
@@ -5369,8 +6673,8 @@ public static class KnownTranslationKeys
         {
             // ── M19 (ADR 0120) — gæstekonti-overfladen: /admin/guests
             // admin-overfladen (D6) + den tilloggede gæsts modtagelse (D5) ──
-            ["admin.guests_title"]               = "Gæstekonti",
-            ["admin.guests_empty"]               = "Ingen gæstekonti endnu.",
+            ["admin.guests_title"]               = "Gæstekonto",
+            ["admin.guests_empty"]               = "Ingen gæstekonto endnu.",
             ["admin.guests_create"]              = "Opret gæst",
             ["admin.guests_window_label"]        = "Adgangsvindue",
             ["admin.guests_surfaces_label"]      = "Tilladte flader",
@@ -5417,6 +6721,12 @@ public static class KnownTranslationKeys
             ["nav_variant.row"]   = "Øverste række",
             ["nav_variant.rail"]  = "Ikonrail",
 
+            // ADR 0133 — the appearance (theme) picker labels.
+            ["theme.label"]      = "Visning",
+            ["theme.auto"]       = "Automatisk (som enheden)",
+            ["theme.light"]      = "Lys",
+            ["theme.dark"]       = "Mørk",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Annullér",
             ["common.save"]     = "Gem",
@@ -5446,9 +6756,9 @@ public static class KnownTranslationKeys
             ["admin.community_mandatory"]   = "Påkrævet",
             ["admin.add_community"]         = "Tilføj fællesskab",
             ["admin.roles_heading"]         = "Roller",
-            ["admin.roles_independent_hint"] = "Uafhængige — en beboer kan frit kombinere roller (ADR 0030). Intet markeret = almindeligt Medlem.",
+            ["admin.roles_independent_hint"] = "Uafhængige — en beboer kan frit kombinere roller. Intet markeret = almindeligt Medlem.",
             ["admin.moderator_scope"]       = "Moderatørens område",
-            ["admin.moderator_scope_hint"]  = "De fællesskaber, dette konto kan moderere. Kun meningsfuldt når Moderator-rollen er markeret — Core-lanet rydder scope-rækker, når Moderator-rollen er fra.",
+            ["admin.moderator_scope_hint"]  = "De fællesskaber, dette konto kan moderere. Kun meningsfuldt, når Moderator-rollen er markeret — platformen rydder scope-valgene, når Moderator-rollen er fra.",
             ["nav.announcements"] = "Meddelelser",
             ["nav.community"]     = "Fællesskab",
             ["nav.groups"]        = "Grupper",
@@ -5500,7 +6810,7 @@ public static class KnownTranslationKeys
             ["projects.todo.new_lead"]       = "Skriv en opgave, tildel den evt. til en nabo, og — hvis nødvendigt — opdel den i delopgaver eller læg den på et board. Som udgangspunkt kan alle se den; slå den fra i publikumsafsnittet, hvis du vil begrænse adgang.",
             ["projects.todo.title_hint"]     = "Et kort navn til opgaven — kortets label.",
             ["projects.todo.status"]         = "Status",
-            ["projects.todo.status_assignee_hint"] = "Status er et af de faste opgavestatusser (Ingen, Ikke startet, I gang, Færdig, Annulleret). Tildeling af en opgave giver denne beboer håndtering af den — visning + håndtering, aldrig en adgangsbegrænsning.",
+            ["projects.todo.status_assignee_hint"] = "Status er en fri tekstlabel (en streng, ikke en fast liste). Tildeling af en opgave giver denne beboer håndtering af den — visning + håndtering, aldrig en adgangsbegrænsning.",
             ["projects.todo.assignee"]       = "Tildelt til",
             ["projects.todo.unassigned"]     = "Ikke tildelt",
             ["projects.todo.assign"]         = "Tildel",
@@ -5546,7 +6856,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_submit"] = "Kommentér",
             ["projects.todo.comment_deleted"] = "Denne kommentar er slettet af dens forfatter.",
             ["projects.todo.comment_delete"] = "Slet",
-            ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse (C-M3·1-\"kommentar-arver\"-reglen). Du kommenterer kun hvor opgaven selv er synlig.",
+            ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse. Du kommenterer kun hvor opgaven selv er synlig.",
             ["projects.todo.back"]           = "← Tilbage til opgaverne",
             ["projects.todo.untitled"]       = "Opgave uden navn",
             ["projects.todo.edit"]           = "Rediger",
@@ -5628,6 +6938,17 @@ public static class KnownTranslationKeys
             ["guardian.no_communities"]      = "Ingen fællesskabsmedlemskaber.",
             ["guardian.group_id_label"]      = "Gruppe-ID",
             ["guardian.community_id_label"]  = "Fællesskab-ID",
+            ["guardian.community_block_note"] =
+                "Vælg, hvilke fællesskaber dette barn kan få adgang til. At " +
+                "blokke et fællesskab skjuler det for dem — herunder deres " +
+                "indlæg — selvom det er et af de obligatoriske fællesskaber, " +
+                "alle tilhører. Det er forældrens kontrol: du bestemmer, hvem " +
+                "der kan tilslutte sig et fællesskab ved at invitere dem eller " +
+                "gennem en admin, men du kan skjule et fællesskab, du ikke " +
+                "ønsker, at dette barn skal se.",
+            ["guardian.community_blocked"]   = "Blokeret & skjult",
+            ["guardian.community_unblock"]   = "Løslas & vis",
+            ["guardian.community_block"]     = "Blokér adgang & skjul",
             ["guardian.pending_invitations"] = "Afventende gruppeinvitationer",
             ["guardian.no_invitations"]      = "Ingen afventende invitationer.",
             ["guardian.approve"]             = "Godkend",
@@ -5640,11 +6961,35 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspendert",
             ["guardian.unsuspend"]           = "Genopret",
             ["guardian.suspend"]             = "Suspendér",
+            ["guardian.delete_child"]        = "Slet barnkontoen",
+            ["guardian.delete_child_lede"]   =
+                "Sletningen fjerner barnets login, profil og gruppemedlemskaber og " +
+                "fællesskabsmedlemskaber, og ophæver enhver anden forældremyndighed over " +
+                "kontoen. Deres tidligere handlinger bevares i revisionslogget, hvor " +
+                "deres identitet er erstattet af en placeholder. Det kan ikke fortrydes.",
+            ["guardian.delete_child_confirm_checkbox"] = "Jeg forstår, at barnkontoen bliver slettet permanent.",
+            ["guardian.delete_child_submit"] = "Slet konto",
             ["guardian.display_name"]        = "Vistnavn",
             ["guardian.email"]               = "E-mailadresse",
             ["guardian.password"]            = "Adgangskode",
             ["guardian.child_email_hint"]    =
                 "Barnet bekræfter sin egen e-mail for at logge ind — den sædvanlige tilmeldingsproces.",
+            ["guardian.consent.intro"]       =
+                "Ved at oprette denne profil bekræfter du, at du er dette " +
+                "barns værgemand. Som dets værgemand har du fuldstændig " +
+                "kontrol over dens konto:",
+            ["guardian.consent.duties_invitations"] =
+                "Du skal godkende eller afvise alle gruppe- og eventinvitationer.",
+            ["guardian.consent.duties_chat"] =
+                "Du kan til- eller fravælge chatfunktionaliteter for denne " +
+                "profil til enhver tid.",
+            ["guardian.consent.duties_data"] =
+                "Disse data er fuldt isoleret til fællesskabets egen instans " +
+                "og vil aldrig blive solgt, brugt til profilopbygning eller " +
+                "til reklame.",
+            ["guardian.consent.checkbox"]    =
+                "Jeg samtykker til behandlingen af mit barns data under " +
+                "disse vilkår.",
 
             // ── posts (composer helper hints) ──────────────────────────────
             ["posts.title_hint"] =
@@ -5695,7 +7040,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Tildel",
             ["guardian.assign.noAccount"]    = "Ingen konto med den e-mail.",
             ["guardian.assign.self"]         = "Du er allerede dette barns værgemand.",
-            ["guardian.assign.success"]      = "Værgemand tildelt.",
+            ["guardian.assign.success"]      = "Værgemand tildelt — de vil blive bedt om at acceptere.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "Afventer",
+            ["guardian.pendingRequests.title"] =
+                "Værgemandsansøgninger, der afventer din accept",
+            ["guardian.pendingRequests.lead"] =
+                "En anden værgemand har bedt dig om at blive medværgemand for ét af deres børn. " +
+                "Accepter (og acceptér betingelserne for barnes konto) eller afvis — indtil du handler, har du ingen rettigheder over kontoen.",
+            ["guardian.pendingRequests.child"]    = "Barn",
+            ["guardian.pendingRequests.conferrer"] = "Anmodet af",
+            ["guardian.accept"]                   = "Acceptér og acceptér betingelserne",
+            ["guardian.accept.consent.intro"]     =
+                "Ved at acceptere bekræfter du, at du er dette barns lovlige værgemand. " +
+                "Som dennes værgemand har du fuld kontrol over deres konto:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Du skal godkende eller afvise alle inviter til grupper og arrangementer.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Du kan til- eller fraaktivere chat-funktioner for denne profil når som helst.",
+            ["guardian.accept.consent.duties_data"] =
+                "Disse data er fuldstændig isoleret på denne communities egen instance og bliver aldrig solgt, profileret eller brugt til reklame.",
+            ["guardian.accept.consent.checkbox"] =
+                "Jeg accepterer behandlingen af dette barns data under disse betingelser.",
+            ["guardian.accept.consent.required"] =
+                "Du skal acceptere betingelserne for barnes konto, før du accepterer.",
+            ["guardian.decline"] = "Afvis",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "En værgemand har bedt dig om at blive medværgemand",
+            ["notifications.preference.guardian.assign.label"] =
+                "Når en værgemand beder dig om at blive medværgemand",
+            ["notification.guardian.assign.subject"] =
+                "En værgemand har bedt dig om at blive medværgemand",
+            ["notification.guardian.assign.body"] =
+                "En værgemand har bedt dig om at blive medværgemand for deres barn: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -5869,6 +7249,44 @@ public static class KnownTranslationKeys
             ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",
             ["home.roadmap.show_more_earlier"] = "Vis de {n} tidligere milepæle",
             ["home.roadmap.show_more_upcoming"]  = "Vis de {n} kommende milepæle",
+            ["home.roadmap.status.done"]    = "Færdig",
+            ["home.roadmap.status.next"]    = "I gang",
+            ["home.roadmap.status.planned"] = "Planlagt",
+
+            // ── klient-JS-strenge (P0-6: #kumunita-strings-bundlen) ───────
+            ["common.close"]  = "Luk",
+            ["common.cancel"] = "Annuller",
+            ["rc.editor.error_generic"] = "Noget gik galt.",
+            ["rc.editor.link.title"]    = "Indsæt link",
+            ["rc.editor.link.url"]      = "URL",
+            ["rc.editor.link.confirm"]  = "Indsæt link",
+            ["rc.editor.link.busy"]     = "Indsætter…",
+            ["rc.editor.link.err_empty"]    = "Indtast en URL.",
+            ["rc.editor.link.err_invalid"]  = "Indtast et gyldigt link (webadresse, e-mail eller en sti relativ til siden).",
+            ["rc.editor.image.title"]   = "Rediger billede",
+            ["rc.editor.image.err_rejected"] = "Den uploadede billedkilde blev afvist.",
+            ["rc.editor.image.err_upload"]   = "Upload mislykkedes.",
+            ["rc.editor.attach.title"]  = "Vedhæft fil",
+            ["rc.editor.attach.file"]   = "Fil",
+            ["rc.editor.attach.link_text"] = "Linktekst",
+            ["rc.editor.attach.default_label"] = "Vedhæftelse",
+            ["rc.editor.attach.confirm"]  = "Vedhæft",
+            ["rc.editor.attach.busy"]     = "Uploader…",
+            ["rc.editor.attach.err_no_file"] = "Vælg en fil at vedhæfte.",
+            ["img.edit.close"]       = "Luk",
+            ["img.edit.crop_area"]   = "Beskæring",
+            ["img.edit.width"]       = "Bredde",
+            ["img.edit.output"]      = "Resultat",
+            ["img.edit.reset_crop"]  = "Nulstil beskæring",
+            ["img.edit.use_original"] = "Brug originalen",
+            ["img.edit.apply"]       = "Anvend",
+            ["img.edit.title"]       = "Beskær dit avatar",
+            ["img.edit.err_edit"]    = "Redigeringen mislykkedes.",
+            ["img.edit.err_could"]   = "Billedet kunne ikke redigeres.",
+            ["img.edit.err_load"]    = "Billedet kunne ikke indlæses til redigering.",
+            ["img.edit.err_export"]  = "Billedeksporten mislykkedes.",
+            ["tag.suggest.remove_prefix"] = "Fjern tag: ",
+            ["notif.fallback"]       = "Notifikationer",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Log ind",
@@ -5881,6 +7299,64 @@ public static class KnownTranslationKeys
             ["account.signup_title"]  = "Opret konto",
             ["account.signup_submit"] = "Opret konto",
             ["account.signup_has_account"] = "Har du allerede en konto?",
+
+            // ── ADR 0138 — adgangskodeændring (da) ──
+            ["account.change_password_title"] = "Skift adgangskode",
+            ["account.change_password_lede"] =
+                "Vælg en ny adgangskode til din konto. Efter gemme bliver du " +
+                "logget ud og beder om at logge ind igen med den nye adgangskode.",
+            ["account.change_password_current"] = "Aktuel adgangskode",
+            ["account.change_password_new"] = "Ny adgangskode",
+            ["account.change_password_confirm_new"] = "Bekræft ny adgangskode",
+            ["account.change_password_submit"] = "Skift adgangskode",
+            ["account.change_password_locked_title"] = "Adgangskodeændringer er låst",
+            ["account.change_password_locked_body"] =
+                "Dette er en demo-konto, og adgangskodeændringer er låst af " +
+                "administratoren, så alle kan fortsætte med at bruge de delte " +
+                "login-oplysninger. Du kan fortsat bruge alle de andre " +
+                "funktionaliteter på platformen.",
+            ["account.change_password_back"] = "Tilbage til din profil",
+
+            ["nav.change_password"] = "Skift adgangskode",
+
+            // ── ADR 0142 — sletning af konto (da) ──
+            ["account.delete_title"] = "Slet konto",
+            ["account.delete_lede"] =
+                "Når du sletter din konto, fjernes din login, din profil og " +
+                "dine gruppe- og fællesskabsmedlemskaber. Dine tidligere " +
+                "handlinger i platformens audit-log bevares — din identitet " +
+                "bliver erstattet af et anonymt pseudonym (platformens " +
+                "konfidentialitetspolitik, OPS.md §9). Det kan ikke " +
+                "undgås.",
+            ["account.delete_password"] = "Adgangskode",
+            ["account.delete_confirm_checkbox"] =
+                "Jeg forstår, at min konto bliver slettet permanent, og at " +
+                "det ikke kan undgås.",
+            ["account.delete_submit"] = "Slet konto",
+            ["account.delete_refused"] =
+                "Den selvbetjente sletningsvej er kun tilgængelig for " +
+                "GlobalAdmin. En beboer, der ikke er GlobalAdmin, kan ikke " +
+                "slette sin egen konto — kontakt en administrator for at " +
+                "fjerne kontoen.",
+
+            ["nav.delete_account"] = "Slet konto",
+
+            ["admin.delete_account_label"] = "Slet konto",
+            ["admin.delete_account_confirm"] =
+                "Slet denne konto permanent? Audit-protokollen bevares " +
+                "(pseudonymiseret); kontoen, profilen og medlemskaberne " +
+                "fjernes. Det kan ikke undgås.",
+
+            ["admin.sample_title"] = "Eksempeldata",
+            ["admin.sample_lede"] =
+                "Denne instans kører det demonstrerende nabolag (eksempeldata). " +
+                "Lås eksempelkontoerne, så de ikke kan ændre deres egen " +
+                "adgangskode, så besøgende kan teste funktionaliteter uden at " +
+                "brænde de delte login-oplysninger — demo-administratoren " +
+                "beholder sin egen adgangskodevej.",
+            ["admin.sample_lock_label"] = "Eksempelkontos adgangskodeændringer",
+            ["admin.sample_lock_on"] = "Låst — eksempelkonti kan ikke ændre deres egen adgangskode",
+            ["admin.sample_lock_off"] = "Ulåst — eksempelkonti kan ændre deres egen adgangskode",
             ["account.login.error.blocked"] =
                 "Din konto er midlertidigt suspenderet. Kontakt en administrator.",
             ["account.login.error.removed"] =
@@ -6041,8 +7517,9 @@ public static class KnownTranslationKeys
                 "Det, du vælger her, er præcis det, kontaktlisten " +
                 "viser — ingen overraskelser.",
             ["profile.avatar_heading"] = "Din avatar",
+            ["upload.max_size"] = "Maksimal filstørrelse: {0}",
             ["profile.avatar_hint"] =
-                "JPEG, PNG, WebP eller GIF · op til 5 MB. Gemning erstatter " +
+                "JPEG, PNG, WebP eller GIF. Gemning erstatter " +
                 "avatar'en, der aktuelt vises i kontaktlisten.",
             ["profile.name_email_heading"] = "Dit navn + e-mail",
             ["profile.address_heading"] = "Din adresse + telefon (valgfrit)",
@@ -6160,9 +7637,8 @@ public static class KnownTranslationKeys
                 "oversættelse.",
             ["posts.reply_audience_note"] =
                 "Svar har ingen egen modtagerkreds — de er synlige under " +
-                "dette indlægs ene modtagerkredsbeslutning (C-M3·1-reglen " +
-                "\"svaret arver\"). Du svarer kun der, hvor " +
-                "indlægget selv er synligt.",
+                "dette indlægs ene modtagerkredsbeslutning. " +
+                "Du svarer kun der, hvor indlægget selv er synligt.",
             ["posts.reply_submit"] = "Svar",
             ["posts.reply_edit"] = "Rediger",
             ["posts.reply_save"] = "Gem",
@@ -6382,8 +7858,8 @@ public static class KnownTranslationKeys
             ["admin.analytics_lede"] =
                 "Et lokalt overblik over platformens brug — anmodninger, " +
                 "tilmeldt / anonym, distinkte konti og overfladeranking over " +
-                "et fast vindue. Ingen konto-detaljer; de rå rækker er " +
-                "operatørets psql-overflade.",
+                "et fast vindue. Ingen konto-detaljer; de rå rækker er kun " +
+                "tilgængelige i operatørens database.",
             ["admin.analytics_window"] = "Vindue",
             ["admin.analytics_total"] = "Samtlige anmodninger",
             ["admin.analytics_authenticated"] = "Tilmeldte",
@@ -6865,6 +8341,8 @@ public static class KnownTranslationKeys
             ["message.unread"] = "ulæst",
             ["message.disabled"] = "Direkte beskeder er slået fra på denne instans.",
             ["message.other"] = "den anden person",
+            ["message.sent_to"] = "Sendt til {0}.",
+            ["message.load_earlier"] = "Indlæs tidligere beskeder",
             ["notifications.subscriptions.intro"] = "Vælg hvilke lokalsamfund, grupper og sider, der giver dig besked. Indstillinger afgør hvilke typer du også får på e-mail; disse indstillingsknapper afgør hvilke mål der giver dig besked.",
             ["notifications.subscription.announcement.label"] = "Nye meddelelser",
             ["notifications.subscription.community.post.label"] = "Nye indlæg i lokalsamfund",
@@ -6875,6 +8353,30 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
             ["notification.message.new.subject"] = "Ny besked",
             ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
+
+            // ── GU community-approval lane (ADR 0141) — den vagts type ──
+            ["notifications.kind.guardian.group_invite"] =
+                "Gruppindbydelse til dit barn",
+            ["notifications.preference.guardian.group_invite.label"] =
+                "Når en gruppe inviterer dit barn",
+            ["notification.guardian.group_invite.subject"] =
+                "En gruppe har inviteret dit barn",
+            ["notification.guardian.group_invite.body"] =
+                "En gruppe har inviteret dit barn: ",
+            ["notifications.kind.guardian.community_invite"] =
+                "Communitymedlemskab til dit barn",
+            ["notifications.preference.guardian.community_invite.label"] =
+                "Når en community tilføjer dit barn",
+            ["notification.guardian.community_invite.subject"] =
+                "En community har tilføjet dit barn",
+            ["notification.guardian.community_invite.body"] =
+                "En community har tilføjet dit barn: ",
+
+            // ── GU community-approval lane (ADR 0141) — børns-siden ──
+            ["guardian.pending_community_requests"] = "Community'er i ventetid",
+            ["guardian.no_community_requests"] = "Ingen community'er i ventetid.",
+            ["guardian.reject"] = "Afvise",
+
             ["pages.subscribe"] = "Abonner på opdateringer",
             ["pages.unsubscribe"] = "Opsig abonnement",
 
@@ -7065,6 +8567,227 @@ public static class KnownTranslationKeys
             ["documents.edit_audience"]     = "Hvem kan se dette dokument",
             ["documents.edit.submit"]       = "Gem ændringer",
             ["documents.flash_edited"]      = "Dokument opdateret.",
+
+            // "Dokumenter organiseret"-lanen (tags + mapper) —
+            // documents.folder_* / documents.tags.* nøgler + flash-nøglerne
+            // for DocumentFolderController-ruterne (create / rename / move /
+            // delete / document-move).
+            ["documents.folder"]              = "Mappe",
+            ["documents.folder_unfiled"]      = "Ikke fileret",
+            ["documents.folder_hint"]         = "Filér dette dokument i en mappe for at holde arkivet organiseret.",
+            ["documents.folder_new"]          = "Ny mappe",
+            ["documents.folder_create"]       = "Opret",
+            ["documents.folder_name_placeholder"] = "Mappens navn",
+            ["documents.tags"]                = "Tags",
+            ["documents.tags_hint"]           = "Skriv for at søge i eksisterende tags, eller start et nyt.",
+            ["documents.flash_moved"]         = "Dokument flyttet.",
+            ["documents.folder_flash_created"] = "Mappe oprettet.",
+            ["documents.folder_flash_renamed"] = "Mappe omdøbt.",
+            ["documents.folder_flash_moved"]   = "Mappe flyttet.",
+            ["documents.folder_flash_deleted"] = "Mappe slettet.",
+
+            // ── M22 (ADR 0132) — onboarding: /onboarding-guideturen (D4) +
+            // den lukkelige home-/nav-banner (D5) + finish/skip-flaschen
+            // (D2/D4). U03 opretter det FULDE lukkede sæt; U02/U03 forbruger
+            // det. Paritets-pin'eren kræver hver nøgle til stede, ikke tom,
+            // på alle fire sprog (C-M22·6, GATE-6). ──
+            ["onboarding.title"]            = "Opsæt din konto",
+            ["onboarding.intro"]            = "En kort guidet tur gennem de få ting, der får Kumunita til at fungere for dig. Alt henviser til den indstilling, der allerede ejer det — du kan færdiggøre det på et minut eller komme tilbage, når du vil.",
+            ["onboarding.step_displayname"] = "Dit visningsnavn",
+            ["onboarding.step_avatar"]      = "Din avatar",
+            ["onboarding.step_language"]    = "Dit grænsefladesprog",
+            ["onboarding.step_timezone"]    = "Din tidszone",
+            ["onboarding.step_dateformat"]  = "Dit dato- og tidsformat",
+            ["onboarding.step_email"]       = "Dit e-mail- og beskedssprog",
+            ["onboarding.step_contact"]     = "Dine kontaktoplysninger og hvem der kan se dem",
+            ["onboarding.visit"]            = "Gå til denne indstilling",
+            ["onboarding.finish"]           = "Alt er klar — afslut opsætningen",
+            ["onboarding.skip"]             = "Spring over for nu",
+            ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen til dit nabolag.",
+            ["onboarding.banner.text"]      = "Færdiggøre opsætningen af din konto?",
+            ["onboarding.banner.action"]    = "Start opsætning",
+
+            // ── M9 amendment — den pro-borger-beskedkontrol + værgens
+            // loft (startværdier på da, til revidering af en oversætter;
+            // ADR 0015 leverandørens bundløsning løser dem). ──
+            ["settings.messaging.title"]           = "Beskeder",
+            ["settings.messaging.description"]     = "Vælg, om du kan bruge direkte 1:1-beskeder med andre beboere. Dit valg gemmes på din konto og gælder straks.",
+            ["settings.messaging.instance_off"]    = "Direkte beskeder er i øjeblikket slået fra på denne instans af en administrator. Du kan tilmelde dig nu, og beskeder vil være tilgængelige, så snart de slås til.",
+            ["settings.messaging.restricted"]      = "Beskeder er blevet begrænset på din konto af en værgmand. Kontakt dem for at ændre det.",
+            ["settings.messaging.optin"]           = "Tillad mig at bruge direkte 1:1-beskeder",
+            ["settings.messaging.save"]            = "Gem beskedindstilling",
+            ["guardian.messaging.title"]           = "Beskeder",
+            ["guardian.messaging.description"]     = "Vælg, om dette barn kan bruge direkte 1:1-beskeder. Ved begrænsning kan barnet hverken sende eller modtage beskeder — dette valg har forrang over dets eget opt-in; ved tilladelse vælger barnet selv på sin egen beskedindstillingsside.",
+            ["guardian.messaging.current_restricted"] = "Beskeder er i øjeblikket begrænset for dette barn.",
+            ["guardian.messaging.current_allowed"]    = "Beskeder er i øjeblikket tilladt for dette barn.",
+            ["guardian.messaging.child_optin_on"]     = "Barnet har tilmeldt sig beskeder på sin egen konto.",
+            ["guardian.messaging.child_optin_off"]    = "Barnet har ikke endnu tilmeldt sig beskeder på sin egen konto — selvom du tillader det, skal det tilmelde sig på sin egen indstillingsside.",
+            ["guardian.messaging.allow"]              = "Tillad beskeder",
+            ["guardian.messaging.restrict"]           = "Begræns beskeder",
+
+            // ── P1 audit (2026-10-04) ── samme ~73-nøglesæt som
+            // <see cref="EnValues"/> (P1-oversættelsesaudittens opstilling).
+            ["common.remove_translation_confirm"] =
+                "Fjern denne oversættelse?",
+            ["events.skip_occurrence_confirm"] =
+                "Spring over denne forekomst? Du kan gendanne den senere.",
+            ["community.confirm_remove_member"] =
+                "Fjern {0} fra {1}?",
+            ["a11y.notifications"]             = "Notifikationer",
+            ["a11y.find_tag"]                  = "Find med tag",
+            ["a11y.find_bio"]                  = "Find med bio",
+            ["a11y.avatar"]                    = "Avatarbillede",
+            ["a11y.board_actions"]             = "Bræt-handlinger",
+            ["a11y.calendar_view"]             = "Kalendervisning",
+            ["a11y.event_time_range"]          = "Arrangementets tidsrum",
+            ["a11y.check_out_note"]            = "Udlånsnote",
+            ["a11y.community_pages"]           = "Fællesskabssider",
+            ["a11y.platform_pages"]            = "Platformsider",
+            ["a11y.community_page_tree"]       = "Fællesskabssidetræ",
+            ["a11y.platform_page_tree"]        = "Platformsidetræ",
+            ["a11y.breadcrumb"]                = "Brødkrumsnavigation",
+            ["a11y.about_features"]            = "Hvad Kumunita er",
+            ["a11y.about_audience"]            = "For hvem",
+            ["a11y.about_philosophy"]          = "Filosofien",
+            ["a11y.about_contact"]             = "Kontakt os",
+            ["a11y.about_project"]             = "Projektet",
+            ["a11y.set_limit"]                 = "Sæt grænse på {0}",
+            ["account.block"]               = "Suspendér",
+            ["account.unblock"]             = "Afsuspendér",
+            ["account.confirm_block"]       = "Suspendér dette konto? Det mister alle rettigheder, indtil det afsuspenderes.",
+            ["account.confirm_unblock"]     = "Afsuspendér dette konto? Dets rettigheder gendannes.",
+            ["account.err.required"]        = "Feltet {0} er påkrævet.",
+            ["account.err.email"]           = "Feltet {0} er ikke en gyldig e-mailadresse.",
+            ["account.err.password_min"]    = "{0} skal være mindst {1} tegn.",
+            ["account.err.password_mismatch"] = "Felterne {0} og {1} matcher ikke.",
+            ["footer.feed"]                 = "Føden",
+            ["languages.title"]             = "Sprog",
+            ["languages.lede_admin"]        =
+                "Administrér sprogene, denne instans understøtter. Ændringer træder i kraft ved " +
+                "næste anmodning — uden genkompilering, uden genstart.",
+            ["languages.lede_translator"]   =
+                "Tjek platformens oversættelsesdækning og opdater UI-strings. Ændringer træder i " +
+                "kraft ved næste anmodning.",
+            ["languages.add_heading"]       = "Tilføj sprog",
+            ["languages.code_label"]        = "Sprogekode",
+            ["languages.native_name_label"] = "Egennavn",
+            ["languages.code_hint"]         = "Kort kode, f.eks. pl for polsk, no-NO for norsk.",
+            ["languages.supported_heading"] = "Understøttede sprog",
+            ["languages.th_code"]           = "Kode",
+            ["languages.th_native_name"]    = "Egennavn",
+            ["languages.th_enabled"]        = "Aktiveret",
+            ["languages.th_ui_strings"]     = "UI-strings",
+            ["languages.th_actions"]        = "Handlinger",
+            ["languages.enabled"]           = "aktiveret",
+            ["languages.disabled"]          = "deaktiveret",
+            ["languages.present"]           = "{n} til stede",
+            ["languages.missing"]           = "{n} mangler",
+            ["languages.action_disable"]    = "Deaktiver",
+            ["languages.action_enable"]     = "Aktivér",
+            ["languages.action_set_default"] = "Sæt som standard",
+            ["languages.action_ui_strings"] = "UI-strings",
+            ["languages.action_remove"]     = "Fjern",
+            ["languages.reorder_btn"]       = "Ændr rækkefølge (bekræft nuværende rækkefølge)",
+            ["languages.reorder_title"]     = "Send den nuværende rækkefølge (som vist nedenfor) som den nye sortering",
+            ["languages.reorder_hint"]      =
+                "Drag-and-drop-sortering er ikke tilgængelig; sorteringsformularet accepterer koderne " +
+                "i den rækkefølge, de optræder her. For at ændre rækkefølgen skal admin indsende " +
+                "listen i den ønskede rækkefølge.",
+            ["languages.confirm_remove"]    =
+                "Fjern {0}? Dens oversættelsesrækker beholdes og gendannes, hvis sproget tilføjes " +
+                "igen.",
+            ["translations.editor.back"]         = "← Tilbage til sprog",
+            ["translations.editor.title"]        = "UI-strings for {0}",
+            ["translations.editor.lede"]         =
+                "Den fulde liste over de strenge, platformmen viser til sine beboere. Hver linje " +
+                "viser nøglen, dens engelske referencetext og den aktuelle værdi i {0}. Gemme en linje " +
+                "tilføjer eller opdaterer dens oversættelse — synlig ved næste anmodning.",
+            ["translations.editor.mode_label"]   = "Redigerings tilstand",
+            ["translations.editor.th_key"]       = "Nøgle",
+            ["translations.editor.th_en_reference"] = "Engelsk reference",
+            ["translations.editor.th_value"]     = "Værdi i {0}",
+            ["translations.editor.value_aria"]   = "Værdi for {0} i {1}",
+            ["events.rsvp_status_going"]     = "Går",
+            ["events.rsvp_status_maybe"]     = "Måske",
+            ["events.rsvp_status_no"]        = "Nej",
+            ["posts.delete_confirm"]         = "Slet dette indlæg? Dine svar forbliver synlige.",
+            ["posts.reply_delete_confirm"]   =
+                "Slet dette svar? Det erstattes af en note. Optagelsen beholdes.",
+            ["announcements.delete_confirm"] = "Slet denne meddelelse? Det kan ikke fortrydes.",
+            ["groups.confirm_delete"]        =
+                "Slet denne gruppe? Dette fjerner gruppen, dens medlemmer og dens ventende " +
+                "invitationer, og det kan ikke fortrydes.",
+            ["community.confirm_leave"]      = "Forlad {0}?",
+            ["guardian.suspend_confirm"]     = "Suspendér denne barnkonto? Den bliver blokeret, indtil du afsuspendérer den.",
+            ["guardian.messaging.allow_confirm"] =
+                "Tillad beskeder for dette barn? Det vil kunne sende og modtage direkte beskeder " +
+                "(dets eget opt-in skal også være til).",
+            ["guardian.messaging.restrict_confirm"] =
+                "Begræns beskeder for dette barn? Det vil ikke længere kunne sende eller modtage " +
+                "direkte beskeder, uanset dets eget opt-in.",
+            ["guardian.handover_confirm"]    = "Overtag dette konto til barnet? Dette ophæver din forældremyndighed over det.",
+            ["guardian.delete_child_confirm"] =
+                "Slet denne barnkonto permanent? Dette fjerner login, profil og " +
+                "medlemskaber, og det kan ikke fortrydes.",
+            ["locale.reset_confirm"]         = "Nulstil dit sprogvalg til instansstandarden?",
+            ["locale.email_reset_confirm"]   = "Nulstil dit e-mail- og beskedssprog til instansstandarden?",
+            ["settings.quiet.clear_confirm"] =
+                "Ryd dine stille timer? Alle notifikations-e-mails sendes straks igen.",
+            ["settings.timezone_reset_confirm"] = "Nulstil din tidszone til platform-standard?",
+            ["settings.dateformat_reset_confirm"] = "Nulstil dit dato- og tidsformat til platform-standard?",
+            ["pages.form.body_hint"]         =
+                "Valgfrit — en mappeknude kan være uden tekst. Skrevet i Markdown via den visuelle " +
+                "editor (den samme, indlæg og meddelelser bruger).",
+            ["pages.reset_confirm"]          =
+                "Nulstil denne side til seedteksten? Alle ændringer, du har foretaget i teksten " +
+                "(engelsk) og i dens tyske / franske / danske oversættelser, bliver overskrevet af " +
+                "seed-baseline'en. Resten af siden (publikum, forælder, etc.) er uberørt.",
+            ["pl.board.delete_confirm"]      =
+                "Slet dette board? Dens baner og kortplaceringer fjernes — to-dos'ene selv beholdes.",
+            ["pl.lane.delete_confirm"]       =
+                "Slet denne bane? Dens kort kommer af dette board — to-dos'ene selv beholdes.",
+            ["pl.todo.assignee_remove_confirm"] = "Fjern den tildelte fra denne to-do?",
+            ["pl.todo.move_confirm"]         = "Flyt denne to-do til et andet board? Den er ikke længere på dette board.",
+            ["pl.todo.delete_confirm"]       = "Slet denne to-do og dens underafgørelser? Det kan ikke fortrydes.",
+            ["inv.item.delete_confirm"]      = "Slet dette element? Det kan ikke fortrydes.",
+            ["a11y.close"]                   = "Luk",
+            ["a11y.toggle_nav"]              = "Skift navigation",
+            ["a11y.primary_nav"]             = "Primær",
+            ["a11y.pagination"]              = "Paginering",
+            ["a11y.pinned_announcement"]     = "Fastgjort meddelelse",
+            ["a11y.banner_read_more"]        = "Læs denne meddelelse i fuld længde",
+            ["a11y.banner_all"]              = "Se alle meddelelser",
+            ["a11y.banner_dismiss"]          = "Luk denne fastgjorte meddelelse",
+            ["a11y.onboarding_region"]       = "Kontoopsætning",
+            ["a11y.onboarding_action"]       = "Start opsætning",
+            ["a11y.onboarding_dismiss"]      = "Luk denne banner",
+            ["a11y.whatsnew_region"]         = "Nyt",
+            ["a11y.actions_for"]             = "Handlinger for {0}",
+            ["a11y.search"]                  = "Søg",
+            ["a11y.scope"]                   = "Område",
+            ["a11y.back_to_messages"]        = "Tilbage til beskeder",
+            ["a11y.resident"]                = "Beboer",
+            ["account.storage_title"]        = "Min opbevaring",
+            ["account.storage_lede"]         =
+                "Hvor meget af dit indhold platformen tæller, dit kontingent pr. bruger og hvor " +
+                "meget af det, du stadig har tilbage.",
+            ["account.storage_used"]         = "dit brugte indhold",
+            ["account.storage_quota"]        = "dit kontingent pr. bruger",
+            ["account.storage_remaining"]    = "resterende",
+            ["account.storage_unlimited_note"] =
+                "Dit kontingent pr. bruger er ubegrænset — der er ingen indholdsgrænse for dine " +
+                "uploads.",
+            ["account.storage_remaining_note"] =
+                "Din resterende andel er, hvad der er tilbage af dit kontingent pr. bruger ({0}). " +
+                "Bed en administrator om at hæve kontingentet, hvis du har brug for mere.",
+            ["translations.bulk.export_title"] = "Download UI-strings i dette sprog som en CSV-fil",
+            ["common.delete"]          = "Slet",
+            ["pages.delete_confirm"]   = "Slet denne side?",
+            ["admin.help.reset_one"]   =
+                "Nulstil \"{0}\" til seedteksten? Dette overskriver al manuelt redigeret tekst.",
+            ["admin.help.reset_all"]   =
+                "Nulstil ALLE {0} seeded hjælpesider til seedteksten? Dette overskriver al manuelt " +
+                "redigeret tekst på hver side.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

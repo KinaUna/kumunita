@@ -54,6 +54,29 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Usage.IUsageAnalyticsService>(sp => new Usage.UsageAnalyticsService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M24 (ADR 0134, plan U4): the storage-metrics read seam — the Usage
+        // context's operator-plane read service (C-SM·2/3/4). It composes the
+        // host-registered Marten IDocumentStore (the MediaObject catalog read)
+        // + the IMediaFileStore volume seam (the two volume-stat reads, U3).
+        // Read-only, zero writes (C-SM·2); no new authorization surface
+        // (C-SM·6). Same "AddTransient with the store injected" shape as
+        // IUsageAnalyticsService above.
+        services.AddTransient<Usage.IStorageMetricsService>(sp => new Usage.StorageMetricsService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IMediaFileStore>()));
+
+        // M25 (design §2.1, U4): the storage-settings seam — the Usage
+        // context's admin write lane + pure decision (C-UP·1/3/4). Composes the
+        // host-registered Marten IDocumentStore (the CommunityStorageSettings
+        // read / single admin write) + the M24 IStorageMetricsService (the
+        // C-SM·7 per-user-usage read seam it reuses — design §2.6 drift-guard:
+        // not a second copy of the query). Core stays HTTP-free (C-UP·3 /
+        // ADR 0006-D): the Web gate (U8) is the only place a 413 is produced.
+        // Same "AddTransient with the store injected" shape as the M24 line above.
+        services.AddTransient<Usage.IStorageSettingsService>(sp => new Usage.StorageSettingsService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Usage.IStorageMetricsService>()));   // C-SM·7 seam reuse
+
         // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
         // seam (the account.signup / account.verified admin-lane emitters) is
         // resolved automatically by the container from the registered
@@ -124,6 +147,24 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Documents.DocumentService>(sp => new Documents.DocumentService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // The "documents organization" lane (the TG attach seam — the
+            // PostService.CreatePostAsync tag-attach precedent). Optional on
+            // DocumentService (CS1736 — the existing DocumentServiceTests
+            // call sites construct it positionally and keep compiling);
+            // the DI registration passes the live ITagService so the
+            // UploadAsync / UpdateAsync lanes resolve typed slugs to Tag
+            // ids in production (the M3/M7 tag-attach idiom carried to
+            // Documents).
+            sp.GetRequiredService<Tags.ITagService>()));
+
+        // The "documents organization" lane (the folder CRUD + document-move
+        // seams — the ADR 0039 Pages ParentId forest carried to Documents).
+        // A store-composing service (the same "AddTransient with the store
+        // injected" shape as the Documents.DocumentService registration
+        // above); the standing probes are pure, the write lanes take the
+        // caller's IDocumentSession (C3).
+        services.AddTransient<Documents.DocumentFolderService>(sp => new Documents.DocumentFolderService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
         // M3b (the "platform announcements" lane, bounded context

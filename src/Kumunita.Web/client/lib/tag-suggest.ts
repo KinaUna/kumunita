@@ -40,6 +40,14 @@
  */
 import { apiFetch } from './api.js';
 
+// ── Localized UI strings (P0-6, the #kumunita-strings bundle) ───────────
+const S: Record<string, string> = (() => {
+  if (typeof document === 'undefined') return {}; // non-DOM / SSR
+  const el = document.getElementById('kumunita-strings');
+  try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
+})();
+const L = (key: string, fallback: string): string => S[key] || fallback;
+
 // ── Suggest wire shape (the `POST /api/tags/suggest` JSON projection) ──────
 
 /**
@@ -150,7 +158,7 @@ export function bindTagSuggest(input: HTMLInputElement): void {
       const x = document.createElement('button');
       x.type = 'button';
       x.className = 'btn-close btn-close-white ms-1';
-      x.setAttribute('aria-label', 'Remove tag: ' + label);
+      x.setAttribute('aria-label', L('tag.suggest.remove_prefix', 'Remove tag: ') + label);
       x.addEventListener('click', () => {
         selected.delete(label);
         syncHidden();

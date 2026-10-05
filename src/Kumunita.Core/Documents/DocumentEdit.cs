@@ -30,4 +30,24 @@ public sealed record DocumentEdit(
     string ContentType,
     long SizeBytes,
     Authorization.Audience Audience,
-    bool FileReplaced);
+    bool FileReplaced,
+    // ── Organization (the "documents organization" lane) ────────────────────
+    // The folder this document is being moved to (the ADR 0039 Pages
+    // <c>ParentId</c> forest carried to Documents). <c>null</c> = "Unfiled"
+    // (the root). The Web layer resolves the folder id (a validated,
+    // actor-visible id); a shape-violating folder is a form error at the Web
+    // boundary, never here. The Core write lane (DocumentService.UpdateAsync)
+    // writes <c>FolderId</c> verbatim onto <c>Document.FolderId</c>
+    // (the ADR 0125 D2 "editable alongside" shape, the owner-only lane).
+    string? FolderId,
+    // The TG-lane tag slugs the owner typed (the client posts a JSON array of
+    // label strings; the Web parses via TagSlugs.Parse — trim / dedup /
+    // drop-blank). <c>null</c> = "leave the document's existing tags"
+    // (the M3/M7 default-empty idiom, the U8b register patch's detach
+    // semantics: a **present** field — even an empty <c>[]</c> when the
+    // owner removed every chip — is authoritative ⇒ empty detaches all,
+    // non-empty attaches). The Core write lane resolves them to Tag ids
+    // through ITagService.AttachToDocumentAsync (the AttachToPostAsync /
+    // AttachToPageAsync precedent) and stores the resolved ids on
+    // Document.TagIds (replacing the POCO's default-empty list).
+    IReadOnlyList<string>? TagSlugs);

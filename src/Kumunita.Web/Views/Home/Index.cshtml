@@ -17,6 +17,12 @@
     // (kw-l can't substitute {n}, so the count is filled in with C# .Replace,
     // the same pattern the About page uses for its "N earlier versions").
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+
+    // The two section aria-labels are server-resolved (the kw-l TagHelper can't
+    // wrap an attribute); the a11y.* floor is the closed set (the short names
+    // — screen readers prefer short over the visible heading wording).
+    string ariaFeatures = await Translation.GetAsync("a11y.about_features", effLang);
+    string ariaWhatsNew = await Translation.GetAsync("whatsnew.heading", effLang);
 }
 
 <!-- ══════════ 1. Intro: what Kumunita is and does ══════════ -->
@@ -46,7 +52,7 @@
 </section>
 
 <!-- ══════════ 2. What Kumunita does (the three surfaces) ══════════ -->
-<section class="kmb-features" aria-label="What Kumunita is">
+<section class="kmb-features" aria-label="@ariaFeatures">
     <div class="kmb-features-band">
         <div class="container">
             <div class="row g-4 justify-content-center">
@@ -95,7 +101,7 @@
 <!-- ══════════ 3. What's new (signed-in visitors only) ══════════ -->
 @if (Model.Feed is { } feed)
 {
-    <section class="kmb-section" aria-label="What's new">
+    <section class="kmb-section" aria-label="@ariaWhatsNew">
         <div class="container">
             <div class="row mb-4">
                 <div>
@@ -272,6 +278,25 @@
                 ? "Show the {n} upcoming milestones" : _upcomingRaw;
             string _earlierText = _earlierLabel.Replace("{n}", _earlierHidden.ToString());
             string _upcomingText = _upcomingLabel.Replace("{n}", _upcomingHidden.ToString());
+            // Localized status-badge labels (Done / In progress / Planned) — resolved
+            // here because the kw-l TagHelper can't be called from the @for row body
+            // the way the show-more labels are (the rows are a C# loop over an array,
+            // so each badge is looked up in a small dictionary keyed on the raw status).
+            static async Task<string> _ResolveBadge(string key, string fallback, Kumunita.Core.Localization.ITranslationProvider t, string lang)
+            {
+                var v = (await t.GetAsync(key, lang)) ?? "";
+                return (string.IsNullOrWhiteSpace(v) || v == key) ? fallback : v;
+            }
+            string _badgeDone    = await _ResolveBadge("home.roadmap.status.done",    "Done",        Translation, effLang);
+            string _badgeNext    = await _ResolveBadge("home.roadmap.status.next",    "In progress", Translation, effLang);
+            string _badgePlanned = await _ResolveBadge("home.roadmap.status.planned", "Planned",     Translation, effLang);
+            static string _StatusLabel(string s, string done, string next, string planned) => s switch
+            {
+                Milestones.StatusDone    => done,
+                Milestones.StatusNext    => next,
+                Milestones.StatusPlanned => planned,
+                _                        => s,
+            };
             // Precompute per-row attributes so the markup-level @for body is pure markup.
             string[] _rowAttr = new string[_n];
             string[] _rowHidden = new string[_n];
@@ -302,7 +327,7 @@
                     var _m = _rm[_ri];
                     <li @_rowHidden[_ri] data-rm="@_rowAttr[_ri]">
                         <span class="flex-grow-1"><span class="kmb-milestone-id me-2">@_m.Id</span>@_m.Title</span>
-                        <span class="badge rounded-pill @Milestones.BadgeClass(_m.Status)">@Milestones.LabelFor(_m.Status)</span>
+                        <span class="badge rounded-pill @Milestones.BadgeClass(_m.Status)">@_StatusLabel(_m.Status, _badgeDone, _badgeNext, _badgePlanned)</span>
                     </li>
                 }
             </ul>

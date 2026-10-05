@@ -157,6 +157,18 @@ public interface IIdentityService
     /// Change password (self-serve, or a GlobalAdmin reset): rotates the security stamp
     /// so the account's existing sessions invalidate. Appends an audit row
     /// <c>(via: Owner | Admin)</c>.
+    /// <para>
+    /// <b>ADR 0138 — the sample-account guard.</b> The self-serve lane
+    /// (<c>byAdmin: false</c>) is additionally subject to
+    /// <see cref="IsChangePasswordLockedForAsync"/>: when a
+    /// <c>SampleData__Enabled</c> instance has opted in to the lock (an admin
+    /// flipped <see cref="SetSamplePasswordChangeLockedAsync"/>) and the subject
+    /// is a non-admin sample account, this throws
+    /// <see cref="UnauthorizedAccessException"/> <b>before</b> any write (no
+    /// audit row for the blocked attempt — the fail-closed pin). The admin
+    /// reset lane (<c>byAdmin: true</c>) is always allowed — an admin must be
+    /// able to recover a demo credential they set.
+    /// </para>
     /// </summary>
     Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin);
 
@@ -185,6 +197,70 @@ public interface IIdentityService
     /// this; the Web's <c>AdminSignupController</c> enforces the gate.
     /// </summary>
     Task SetSignupOpenAsync(bool open, string adminSubjectId);
+
+    // ── Sample-data change-password lock (ADR 0138) ────────────────────────
+    // A demo-instance guard: when the SampleData__Enabled instance is opted in
+    // (an admin flips the LocaleSettings.SamplePasswordChangeLocked gate at
+    // /admin/sample), a non-admin sample account (the closed
+    // SampleDataSeeder.SampleAccountEmails set) is denied the self-serve
+    // password change — so a visitor testing the demo can't break the shared
+    // credentials. The sample GlobalAdmin and every real account are exempt.
+
+    /// <summary>
+    /// Whether the <c>SampleData__Enabled</c> flag is set on this instance
+    /// (ADR 0138) — the gate that decides whether the sample-data surfaces
+    /// (the <c>/admin/sample</c> change-password lock and the locked-account
+    /// notice) exist at all. A read (no audit row); a real deployment never
+    /// carries the flag, so this is <c>false</c> there and the surfaces are
+    /// unreachable by construction (the ADR 0056 "unreachable by construction"
+    /// shape).
+    /// </summary>
+    Task<bool> IsSampleDataEnabledAsync();
+
+    /// <summary>
+    /// Whether sample accounts are currently <b>locked out of changing their
+    /// own password</b> (ADR 0138). The <c>false</c> floor — a missing
+    /// singleton or an unset value both yield <c>false</c>, so a fresh or real
+    /// instance never blocks a password change (the deliberate inverse of the
+    /// codebase <c>true</c>-floor convention, the <see
+    /// cref="Localization.LocaleSettings.MessagingEnabled"/> shape). A read
+    /// (no audit row); the <see cref="IsSampleDataEnabledAsync"/> flag is NOT
+    /// consulted here — the lock is a pure instance value, and the
+    /// <see cref="IsChangePasswordLockedForAsync"/> decision combines it with
+    /// the sample-account membership.
+    /// </summary>
+    Task<bool> IsSamplePasswordChangeLockedAsync();
+
+    /// <summary>
+    /// Set whether sample accounts are locked out of changing their own
+    /// password (ADR 0138): a GlobalAdmin flips the instance-wide gate at
+    /// <c>/admin/sample</c> — <c>true</c> locks the non-admin sample accounts
+    /// (so a demo visitor can't break the shared credentials), <c>false</c>
+    /// unlocks them. Writes the
+    /// <see cref="Localization.LocaleSettings.SamplePasswordChangeLocked"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"sample.set-password-lock"</c>, target
+    /// "sample") in the same session (C3 — no silent, unaudited access). Only
+    /// a GlobalAdmin may call this; the Web's <c>AdminSampleDataController</c>
+    /// enforces the gate (and 404s when <c>SampleData__Enabled</c> is unset).
+    /// </summary>
+    Task SetSamplePasswordChangeLockedAsync(bool locked, string adminSubjectId);
+
+    /// <summary>
+    /// Whether the given <paramref name="subjectId"/>'s self-serve password
+    /// change is currently <b>locked</b> (ADR 0138). Combines the three
+    /// conditions into one decision (the single place the rule lives, so the
+    /// resident <c>/account/password</c> surface and the
+    /// <see cref="ChangePasswordAsync"/> enforcement guard agree):
+    /// <see cref="IsSampleDataEnabledAsync"/> (the instance carries the closed
+    /// set) <b>AND</b> <see cref="IsSamplePasswordChangeLockedAsync"/> (the
+    /// admin opted in) <b>AND</b> the subject is a member of
+    /// <see cref="Bootstrap.SampleDataSeeder.SampleAccountEmails"/> (a sample
+    /// account) <b>AND NOT</b> a <c>GlobalAdmin</c> (the sample admin is
+    /// exempt). Returns <c>false</c> for every real account and for the sample
+    /// admin regardless of the gate.
+    /// </summary>
+    Task<bool> IsChangePasswordLockedForAsync(string subjectId);
 
     // ── Admin account notifications (ADR 0077 — the admin-lane signup/verify
     //    notify gate) ──
@@ -238,4 +314,132 @@ public interface IIdentityService
     /// document directly (C-M19·5, D2's *Forbids*).
     /// </summary>
     Task SetGuestAccessAsync(GuestAccess access, string adminSubjectId);
+
+    // ── Account deletion (ADR 0142 — the resident-leave / admin-removal lane) ──
+
+    /// <summary>
+    /// ADR 0142 — <b>delete a resident's account</b> (the privacy lane the
+    /// resident self-serve surface <c>POST /account/delete</c> and the
+    /// GlobalAdmin surface <c>POST /admin/delete</c> both reach). The target
+    /// loses every standing immediately: their
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> rows are
+    /// **pseudonymized** (the actor id replaced by a tombstone), their
+    /// group/community memberships are removed (they leave the group and
+    /// component membership rows), their
+    /// <see cref="Kumunita.Core.UserInfo.Profile"/> row is removed, and the
+    /// underlying ASP.NET Identity account is deleted (their password hash
+    /// and roles are gone). The audit trail itself is preserved: the
+    /// rows that were written *by* the target before this moment remain —
+    /// their <c>ActorId</c> is rewritten to a deterministic
+    /// <c>"deleted:{subjectId}"</c> tombstone, so an operator can prove
+    /// what happened without retaining the identity (OPS.md §9 /
+    /// ARCHITECTURE.md §5 "Deletion-of-account interaction").
+    /// <para>
+    /// **Two branches, one seam (the ADR 0138 self-serve/admin
+    /// distinction):**
+    /// </para>
+    /// <list type="bullet">
+    /// <item><b>Self-deletion</b> — <paramref name="adminSubjectId"/>
+    /// equals <paramref name="targetSubjectId"/>: the resident is deleting
+    /// *their own* account (the Web self-serve surface
+    /// <c>POST /account/delete</c> invokes this shape, after verifying the
+    /// resident's current password). **ADR 0142 D5 gate:** the self-serve
+    /// lane is reachable only by a <c>GlobalAdmin</c> — a non-GlobalAdmin
+    /// invoking this branch throws <c>UnauthorizedAccessException</c>
+    /// (the fail-closed pin, mirroring the admin-initiated branch). The
+    /// Web surface renders the ADR 0138 "surface-replaced-by-notice" shape
+    /// for a non-GlobalAdmin, so the resident sees the gate before
+    /// submitting. The audit row is <c>Via: Owner</c>.</item>
+    /// <item><b>Admin-initiated</b> — <paramref name="adminSubjectId"/>
+    /// differs from <paramref name="targetSubjectId"/>: a GlobalAdmin is
+    /// removing *another* resident (the Web admin surface
+    /// <c>POST /admin/delete</c>). The <c>GlobalAdmin</c> gate applies
+    /// (<see cref="BlockAsync"/> / <see cref="UnblockAsync"/> shape — the
+    /// fail-closed pin); a non-admin invoking this branch throws
+    /// <c>UnauthorizedAccessException</c>. The audit row is
+    /// <c>Via: Admin</c>.</item>
+    /// </list>
+    /// <para>
+    /// **Last-GlobalAdmin guard (the lockout pin, the ADR 0006-E
+    /// precedent):** if the target holds the <c>GlobalAdmin</c> role and
+    /// they are the *only* GlobalAdmin on the instance, the lane throws
+    /// <see cref="InvalidOperationException"/> before any write — a
+    /// single-admin instance cannot self-erase its last admin (the
+    /// OPS.md §9 "Hand over admin" procedure is the recovery path).
+    /// </para>
+    /// <para>
+    /// **Audit:** exactly one <c>AccessAudit</c> row (action
+    /// <c>"account.delete"</c>, <c>TargetKind</c> "account",
+    /// <c>TargetId</c> the subject, <c>Via: Admin</c>) written in the
+    /// *same Marten session* as the pseudonymization + membership removal
+    /// (C3 — no silent, unaudited access). The pseudonymization itself
+    /// is not a per-row audit — the single <c>"account.delete"</c> row
+    /// is the summary row, the way the purge job's
+    /// <c>AuditPurgeSummary</c> summarizes the bulk delete (the same
+    /// "one summary, many rows" shape).
+    /// </para>
+    /// <para>
+    /// **Fail-closed / idempotency:** if the target account does not
+    /// exist (already deleted, or never created), the lane throws
+    /// <see cref="InvalidOperationException"/> before any write. A
+    /// *second* call for the same subject (after a successful first
+    /// call) throws the same <c>InvalidOperationException</c> (the
+    /// Identity row is gone) — the lane is not a silent no-op.
+    /// </para>
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">Either branch was
+    /// invoked by a non-<c>GlobalAdmin</c> (the self-serve lane's ADR 0142
+    /// D5 gate, or the admin-initiated branch's fail-closed pin).</exception>
+    /// <exception cref="InvalidOperationException">The target account does
+    /// not exist, or the target is the last <c>GlobalAdmin</c> on the
+    /// instance (the lockout pin — applies to <i>both</i> branches: a lone
+    /// GlobalAdmin cannot self-delete).</exception>
+    Task DeleteAccountAsync(string targetSubjectId, string adminSubjectId);
+
+    // ── ADR 0143 — guardian delete-child (the GU standing over the ADR 0142 core) ──
+
+    /// <summary>
+    /// ADR 0143 — a **guardian** deletes a **child** account: the 6th GU
+    /// supervisory action (ADR 0028's five + this), reusing the ADR 0142
+    /// deletion core (<see cref="DeleteAccountAsync"/>'s shared body).
+    /// <para>
+    /// **Standing gate (G·2/G·3, live):** before any write, an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> with
+    /// <c>GuardianId == <paramref name="guardianId"/></c> and
+    /// <c>ChildId == <paramref name="childId"/></c> must exist, else
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404 — the
+    /// <c>GuardActiveLinkAsync</c> shape every other GU seam runs). No
+    /// projection, no cache — a dissolve is live on the next read.
+    /// </para>
+    /// <para>
+    /// **On success:** every <see cref="Kumunita.Core.UserInfo.GuardianLink"/>
+    /// row for the child (any status) is dissolved in the same session (C·5 —
+    /// no dangling standing; a co-guardian's row ends here, C4 strong
+    /// consistency); then the ADR 0142 core runs — the child's audit rows are
+    /// pseudonymized to a <c>deleted:{childId}</c> tombstone, their
+    /// memberships + <see cref="Kumunita.Core.UserInfo.Profile"/> are removed,
+    /// the Identity account is deleted, and exactly one
+    /// <c>"account.delete"</c> summary audit row is written
+    /// (<see cref="Authorization.AccessVia.Guardian"/>).
+    /// </para>
+    /// <para>
+    /// **Not a silent no-op:** a second call for the same child after a
+    /// successful first is refused — the standing gate runs first and the
+    /// successful delete dissolved the link (so the gate now fails), surfacing
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404). A repeat
+    /// attempt cannot re-delete, and it errors rather than succeeding.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> for this
+    /// (guardian, child) pair — the actor has no standing (deny-by-default,
+    /// G·3; the Web surfaces a 404). This is also the failure for a second
+    /// call after a successful delete (the link was dissolved).</exception>
+    /// <exception cref="InvalidOperationException">The child account does
+    /// not exist (defensive, after the standing gate passed), or the child is
+    /// the last <c>GlobalAdmin</c> on the instance (the lockout pin — a child
+    /// is never a GlobalAdmin, so this is a no-op in practice).</exception>
+    Task DeleteChildAccountAsync(string childId, string guardianId);
 }

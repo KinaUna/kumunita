@@ -42,6 +42,27 @@
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>
 
+            @*
+                Guardian consent — before creation, the guardian confirms they
+                are the legal guardian and agrees to the child-account terms
+                (guardian duties + data-processing terms). The checkbox is the
+                [Required] field on AddChildForm.GuardianConsent; the controller
+                refuses creation until it is checked.
+            *@
+            <div class="mb-3 border rounded p-3 bg-body-tertiary">
+                <p class="mb-2"><kw-l key="guardian.consent.intro">By creating this profile, you confirm that you are the legal guardian of this child. As their guardian, you maintain full control over their account:</kw-l></p>
+                <ul class="list-unstyled mb-2">
+                    <li><kw-l key="guardian.consent.duties_invitations">You must approve or deny all group and event invitations.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_chat">You can enable or disable chat features for this profile at any time.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_data">This data is fully isolated to this community's own instance and will never be sold, profiled, or used for advertising.</kw-l></li>
+                </ul>
+                <div class="form-check">
+                    <input asp-for="GuardianConsent" value="true" class="form-check-input" required />
+                    <label asp-for="GuardianConsent" class="form-check-label"><kw-l key="guardian.consent.checkbox">I consent to the processing of my child's data under these terms.</kw-l></label>
+                    <span asp-validation-for="GuardianConsent" class="text-danger"></span>
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>
         </form>
     </div>

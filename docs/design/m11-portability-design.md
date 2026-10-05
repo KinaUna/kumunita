@@ -107,9 +107,9 @@ unit (U07) flips `Milestones.cs` / the README Roadmap / `docs/STATUS.md` /
 `docs/ARCHITECTURE.md` + `MilestonesTests.cs` (the AGENTS.md doc↔code
 parity contract — C-M11·8). This design doc (authored U00, **LOCKED**) is
 the **primary tier**; the register
-`docs/plans-milestones/done/plan-m11-portability.md` is the secondary tier;
+`docs/plans-milestones/done/m11/plan-m11-portability.md` is the secondary tier;
 the scratch handoff note is
-`docs/plans-milestones/done/m11-portability-handoff-notes.md`.
+`docs/plans-milestones/done/m11/m11-portability-handoff-notes.md`.
 
 ## Goals / Non-goals
 

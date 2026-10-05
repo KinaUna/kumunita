@@ -1,6 +1,9 @@
-using System.Net.Mail;
+using MailKit;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MimeKit;
 
 namespace Kumunita.Core.Identity;
 
@@ -28,9 +31,12 @@ public interface ISmtpSender
     /// the <paramref name="email"/>'s body is pre-rendered Markdown (§6.2:
     /// "the durable state the handler needs when SMTP is down"), so this
     /// method does no localization or template work — it only transmits.
-    /// Throws <see cref="SmtpException"/> / <see cref="MailAddressException"/> /
-    /// <see cref="ArgumentNullException"/> as appropriate; the host's retry
-    /// policy inspects the exception type, not any envelope.
+    /// Throws <see cref="MailKit.Net.Smtp.SmtpCommandException"/> (AUTH / mailbox /
+    /// delivery rejections), <see cref="MailKit.Net.Smtp.SmtpProtocolException"/>
+    /// or <see cref="MailKit.ProtocolException"/> (connection / TLS / protocol-level
+    /// failures incl. connection drops), <see cref="MimeKit.ParseException"/>
+    /// (malformed address), <see cref="ArgumentNullException"/> as appropriate;
+    /// the host's retry policy inspects the exception type, not any envelope.
     /// </summary>
     Task SendAsync(OutboxEmail email, CancellationToken ct = default);
 }
@@ -61,12 +67,14 @@ public sealed class SmtpOptions
     public int Port { get; set; } = 587;
 
     /// <summary>
-    /// If true, the sender authenticates with the process's Windows/OS credentials
-    /// (BCL <c>SmtpClient.UseDefaultCredentials</c>). Mutually exclusive with
-    /// <see cref="User"/> — if both are set <see cref="User"/> wins (per the BCL
-    /// precedence: explicitly-set credentials take effect over the default-credential
-    /// flag). Left at the default (false) everywhere except the rare case of a
-    /// Windows-service relay with the process already in the right domain.
+    /// Retained for environment compatibility: the BCL
+    /// <c>System.Net.Mail.SmtpClient.UseDefaultCredentials</c> let a relay rely
+    /// on the process's OS credentials (a rare Windows-service shape). MailKit
+    /// has no equivalent — it authenticates via AUTH PLAIN / LOGIN / XOAUTH2
+    /// against an explicit username — so this flag is a **no-op** under the
+    /// MailKit transport (ADR 0131). Leave it at the default (false); a relay
+    /// that relies on this shape predates the swap and needs the explicit
+    /// <see cref="User"/> / <see cref="Pass"/> pair instead.
     /// </summary>
     public bool UseDefaultCredentials { get; set; } = false;
 
@@ -111,10 +119,13 @@ public sealed class SmtpOptions
     /// </summary>
     public string Secure { get; set; } = SecureTls;
 
-    /// <summary>STARTTLS (conventional 587). The default — the only encrypted shape the BCL supports.</summary>
+    /// <summary>STARTTLS (conventional 587). The default encrypted shape.</summary>
     public const string SecureTls = "Tls";
 
-    /// <summary>No encryption — plain SMTP. Local-only (Mailpit, localhost relay).</summary>
+    /// <summary>Implicit TLS / SMTPS (conventional 465 — the "TLS up front" shape).</summary>
+    public const string SecureSsl = "Ssl";
+
+    /// <summary>No enforced encryption — take TLS if the relay offers it, else plain. Local-only (Mailpit, localhost relay).</summary>
     public const string SecureNone = "None";
 
     /// <summary>
@@ -127,10 +138,24 @@ public sealed class SmtpOptions
 }
 
 /// <summary>
-/// BCL <c>System.Net.Mail</c> implementation of <see cref="ISmtpSender"/>. One
-/// <c>SmtpClient</c> instance per call (cheap to construct; avoids holding a
-/// network socket across many email dispatches and keeps each attempt
-/// independent in the presence of relay connection resets).
+/// <see cref="MailKit.Net.Smtp.SmtpClient"/> (MailKit) implementation of
+/// <see cref="ISmtpSender"/>. One client instance per call (cheap to construct;
+/// avoids holding a network socket across many email dispatches and keeps each
+/// attempt independent in the presence of relay connection resets).
+/// <para>
+/// <b>Transport choice (ADR 0131):</b> the original implementation used the BCL
+/// <c>System.Net.Mail.SmtpClient</c>. In the 2026-10-02 VPS deployment (Proton
+/// Mail SMTP submission, <c>smtp.protonmail.ch:587</c>), the BCL client reached
+/// <c>MAIL FROM</c> without a live AUTH session even though the *same* credentials
+/// authenticated cleanly from the same container (curl), from the VPS host
+/// (openssl), and from the app's own <see cref="SmtpProbe"/> handshake inside the
+/// same process (/health <c>mail: "ok"</c>) — a live, reproducible BCL regression
+/// on .NET 10. MailKit drives the identical
+/// EHLO → STARTTLS → AUTH (PLAIN/LOGIN) sequence correctly and also adds implicit
+/// TLS (465) support the BCL never had (the limitation documented in COOLIFY.md
+/// §5.1B), which is why <see cref="SmtpOptions.SecureSsl"/> is now a first-class
+/// value.
+/// </para>
 /// <para>
 /// The <c>OutboxEmail</c>'s <see cref="OutboxEmail.IdempotencyKey"/> is set as
 /// the X-Message-Id so the relay can deduplicate if (and only if) it honors
@@ -147,36 +172,31 @@ public sealed class SmtpSender(
     private readonly SmtpOptions _cfg = options.Value;
 
     /// <summary>
-    /// Maps <see cref="SmtpOptions.Secure"/> onto the BCL's single
-    /// <see cref="System.Net.Mail.SmtpClient.EnableSsl"/> switch. Only two shapes
-    /// are legitimate: <c>Tls</c> → <c>EnableSsl = true</c> (STARTTLS),
-    /// <c>None</c> → <c>EnableSsl = false</c> (plain). The BCL's <c>EnableSsl</c>
-    /// is STARTTLS-only (the .NET reference document is explicit that the implicit
-    /// TLS / SMTPS model — port 465 — is <b>not</b> supported by <c>SmtpClient</c>);
-    /// an <c>Ssl</c> / 465 relay therefore does not work on this code path and the
-    /// operator needs to either swap the relay to one that exposes a STARTTLS
-    /// port (most do — 587 is the standard) or replace this implementation before
-    /// attempting it.
+    /// Maps <see cref="SmtpOptions.Secure"/> onto MailKit's
+    /// <see cref="SecureSocketOptions"/>. Three shapes:
+    /// <c>Tls</c> → <see cref="SecureSocketOptions.StartTls"/> (STARTTLS, the
+    /// conventional 587 shape; the default), <c>Ssl</c> →
+    /// <see cref="SecureSocketOptions.SslOnConnect"/> (implicit TLS / SMTPS,
+    /// port 465), <c>None</c> →
+    /// <see cref="SecureSocketOptions.StartTlsWhenAvailable"/> (take TLS if
+    /// the relay offers it, plain otherwise — the Mailpit / loopback-only
+    /// shape). Anything unrecognized throws before the client is constructed,
+    /// so a typo'd value fails fast instead of silently talking plain to a
+    /// relay that expects TLS.
     /// </summary>
-    private static bool ResolveEnableSsl(string? secure)
+    private static SecureSocketOptions ResolveSecurity(string? secure)
     {
-        if (string.IsNullOrWhiteSpace(secure)) return true;     // default: Tls
+        if (string.IsNullOrWhiteSpace(secure)) return SecureSocketOptions.StartTls;  // default: Tls
         return secure.Trim().ToLowerInvariant() switch
         {
-            "tls"  => true,
-            "none" => false,
-            // Fail fast: a typo'd value (e.g. "starttls", "STARTTLS", "Ssl")
-            // should not silently fall through to a default the operator did
-            // not intend — the .NET API reference is explicit that the BCL
-            // does not support the port-465 implicit TLS shape that "Ssl"
-            // might suggest, so the guard message needs to say so.
+            "tls"  => SecureSocketOptions.StartTls,
+            "ssl"  => SecureSocketOptions.SslOnConnect,
+            "none" => SecureSocketOptions.StartTlsWhenAvailable,
             _ => throw new InvalidOperationException(
                 $"SMTP__Secure value '{secure}' is not supported. " +
-                $"Recognized values: {SmtpOptions.SecureTls} (STARTTLS, the BCL's only TLS mode; " +
-                "use the relay's STARTTLS port, conventionally 587), or " +
-                $"{SmtpOptions.SecureNone} (plain SMTP, local-only). " +
-                "Note: the BCL SmtpClient does not support implicit TLS (port 465 / SMTPS) — " +
-                "pick a relay that exposes a STARTTLS port instead.")
+                $"Recognized values: {SmtpOptions.SecureTls} (STARTTLS — the conventional 587 shape), " +
+                $"{SmtpOptions.SecureSsl} (implicit TLS / SMTPS — port 465), or " +
+                $"{SmtpOptions.SecureNone} (no enforced encryption; local-only).")
         };
     }
 
@@ -184,13 +204,13 @@ public sealed class SmtpSender(
     /// The "exactly one or zero" invariant on credentials (SmtpOptions.User /
     /// SmtpOptions.Pass): both set → AUTH, neither set → no AUTH sent — and
     /// exactly one set is a configuration error, not a silent relay handshake
-    /// failure. Throwing here (before the <c>SmtpClient</c> is even constructed)
-    /// keeps the failure in the "SMTP is not configured" message shape the
-    /// durable handler's retry policy already inspects (SmtpException /
-    /// TimeoutException / MailAddressException / ArgumentNullException), not a
-    /// half-open connection failure that shows up as something new.
+    /// failure. Throwing here (before the client is even constructed) keeps the
+    /// failure in the "SMTP is not configured" message shape the durable
+    /// handler's retry policy already inspects (MailKit.SmtpCommandException /
+    /// MailKit.ProtocolException / MailAddressException / ArgumentNullException),
+    /// not a half-open connection failure that shows up as something new.
     /// </summary>
-    private static SmtpClient CreateClient(SmtpOptions cfg)
+    private static MailKit.Net.Smtp.SmtpClient CreateClient(SmtpOptions cfg)
     {
         bool hasUser  = !string.IsNullOrWhiteSpace(cfg.User);
         bool hasPass  = !string.IsNullOrWhiteSpace(cfg.Pass);
@@ -201,27 +221,39 @@ public sealed class SmtpSender(
                 $"User={(hasUser ? "set" : "unset")}, Pass={(hasPass ? "set" : "unset")}. " +
                 "No email was sent; the durable handler will retry / dead-letter per the configured policy.");
 
-        var client = new SmtpClient
+        var client = new MailKit.Net.Smtp.SmtpClient
         {
-            Host = cfg.Host!,
-            Port = cfg.Port,
-            EnableSsl = ResolveEnableSsl(cfg.Secure),
-            // BCL precedence (when both are set, the explicit credentials win —
-            // UseDefaultCredentials is only used as a fallback). We set it only
-            // when explicitly requested; the default (false) is the common case.
-            UseDefaultCredentials = cfg.UseDefaultCredentials
+            // Parity with the BCL default X.509 policy check (chain + name + CRL)
+            // — the .NET reference for the original implementation documented the
+            // CRL check explicitly, so we keep it opt-in-true rather than
+            // inheriting MailKit's default (which is also true, but pinning it
+            // here keeps the intent visible for future readers).
+            CheckCertificateRevocation = true
         };
-
-        if (hasUser && hasPass)
-        {
-            // The BCL exposes SMTP auth via the `Credentials` property (a
-            // NetworkCredential) — assign the pair rather than calling a method.
-            // This is the shape Mailgun / Resend / MailerSend / Postmark /
-            // corporate SMTP expect.
-            client.Credentials = new System.Net.NetworkCredential(cfg.User, cfg.Pass);
-        }
+        // cfg.UseDefaultCredentials is a documented no-op under MailKit (see the
+        // property doc) — nothing to configure here.
 
         return client;
+    }
+
+    /// <summary>
+    /// Connect (STARTTLS or implicit TLS per <see cref="SmtpOptions.Secure"/>)
+    /// + AUTH when the credential pair is set. Split from <see cref="CreateClient"/>
+    /// so the invariant guard stays a pure configuration check and the network
+    /// handshake is exercised in one place — the same EHLO → STARTTLS → AUTH
+    /// sequence <see cref="SmtpProbe"/> validates on the /health path, driven
+    /// through the same MailKit API a real send uses.
+    /// </summary>
+    private static async Task ConnectAndAuthenticateAsync(
+        MailKit.Net.Smtp.SmtpClient client, SmtpOptions cfg, CancellationToken ct)
+    {
+        await client.ConnectAsync(cfg.Host!, cfg.Port, ResolveSecurity(cfg.Secure), ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(cfg.User) && !string.IsNullOrWhiteSpace(cfg.Pass))
+        {
+            // Mailgun / Resend / MailerSend / Postmark / Proton Mail all expect
+            // AUTH PLAIN or LOGIN — the mechanisms MailKit advertises by default.
+            await client.AuthenticateAsync(cfg.User, cfg.Pass, ct).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -239,16 +271,16 @@ public sealed class SmtpSender(
 
         using var client = CreateClient(_cfg);
 
-        var msg = new MailMessage
-        {
-            To = { new MailAddress(email.Recipient) },
-            Subject = email.Subject,
-            Body = email.Body,
-            IsBodyHtml = false               // the body is Markdown (§6.2: "rendered Markdown"); relays don't re-render
-        };
-
-        if (!string.IsNullOrWhiteSpace(_cfg.From))
-            msg.From = new MailAddress(_cfg.From);
+        // MimeMessage.From is read-only in MailKit 4.x — set it through the
+        // 4-arg constructor (from, to, subject, body) rather than patching
+        // after the fact. The body is Markdown (§6.2: "rendered Markdown");
+        // relays don't re-render it, so a plain-text MIME part is the honest
+        // shape.
+        IEnumerable<InternetAddress>? fromList = string.IsNullOrWhiteSpace(_cfg.From)
+            ? null
+            : new InternetAddress[] { new MailboxAddress(null, _cfg.From) };
+        var toList = new InternetAddress[] { new MailboxAddress(null, email.Recipient) };
+        var msg = new MimeMessage(fromList, toList, email.Subject, new TextPart("plain") { Text = email.Body });
 
         // X-Message-Id carries the per-email idempotency key (§6.2) — a relay-side
         // duplicate signal, not a delivery guarantee (that belongs to the caller's
@@ -258,15 +290,46 @@ public sealed class SmtpSender(
 
         try
         {
-            await client.SendMailAsync(msg, ct);
+            await ConnectAndAuthenticateAsync(client, _cfg, ct).ConfigureAwait(false);
+            await client.SendAsync(msg, ct).ConfigureAwait(false);
             logger.LogInformation("Delivered email {Idp} to {Recipient} (attempt sent).", email.IdempotencyKey, email.Recipient);
         }
-        catch (TimeoutException)
+        catch (MailKit.Net.Smtp.SmtpCommandException)
         {
-            // Re-throw as-is; the host's retry policy (RetryWithCooldown) inspects
-            // the concrete type (SmtpException/Timeout/MailAddressException) and
-            // the cooldown list drives the 6-attempt / ~24h window (§6.2).
+            // Re-throw as-is — the host's retry policy (Program.cs) inspects the
+            // concrete type (MailKit.Net.Smtp.SmtpCommandException for AUTH /
+            // mailbox / delivery rejections; MailKit.ProtocolException for
+            // connection / TLS failures) and the cooldown list drives the
+            // 6-attempt / ~24h window (§6.2). The SmtpCommandException.Message
+            // carries the relay's verbatim status line (e.g. "5.7.1 ... Sender
+            // address rejected"), which is the operator signal the dead-letter
+            // row is designed to surface.
             throw;
+        }
+        catch (MailKit.Net.Smtp.SmtpProtocolException)
+        {
+            // Connection reset mid-send, TLS handshake failure, relay dropping
+            // the socket — the "relay is down / network path broken" shape the
+            // retry policy is designed to absorb on cooldown. (The base
+            // MailKit.ProtocolException covers the same surface for connection
+            // drops at the socket level; both are retried per the host's policy.)
+            throw;
+        }
+        catch (MailKit.ProtocolException)
+        {
+            // Base-class catch for any other connection-level failure (DNS,
+            // socket reset, protocol parse) — same retry semantics.
+            throw;
+        }
+        finally
+        {
+            // Best-effort teardown: a relay that reset the connection mid-send
+            // (the shape that motivated the BCL-era try/catch) can leave the
+            // local side in a limbo state; the next attempt should start clean.
+            if (client.IsConnected)
+            {
+                try { client.Disconnect(true); } catch { /* best-effort */ }
+            }
         }
     }
 }

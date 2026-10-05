@@ -74,6 +74,12 @@ public static class M1DocTypes
         // DB layer (the surrogate Id is the Marten document identity).
         opts.Schema.For<ComponentMembership>()
                .UniqueIndex(m => m.ComponentId, m => m.UserId);
+        // GU community-approval lane: one row per (component, child) request —
+        // the pending-approval state for a supervised child's community
+        // membership (the sibling of GroupInvitation, but with the guardian as
+        // the resolver). A re-request after a resolution resets the row.
+        opts.Schema.For<CommunityMembershipRequest>()
+               .UniqueIndex(r => r.ComponentId, r => r.UserId);   // business key
 
         // Identity
         opts.Schema.For<IdentityToken>();

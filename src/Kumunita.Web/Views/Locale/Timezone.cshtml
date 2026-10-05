@@ -1,7 +1,20 @@
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
 @{
     ViewData["Title"] = "Settings — Time zone";
+    // The reset form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmReset = "Reset your time zone to the platform default?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmReset = await Translation.GetAsync("settings.timezone_reset_confirm", effLang);
+    }
 }
 
 @* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
@@ -47,7 +60,7 @@
     </form>
 
     <form method="post" action="/settings/timezone" class="mt-3"
-          data-confirm="Reset your time zone to the platform default?">
+          data-confirm="@confirmReset">
         @Html.AntiForgeryToken()
         <input type="hidden" name="clear" value="1" />
         <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.timezone_reset">Reset to platform default</kw-l></button>

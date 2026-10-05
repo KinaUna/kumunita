@@ -94,6 +94,7 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
             M5DocTypes.Configure(opts);
             M6DocTypes.Configure(opts);
             M9DocTypes.Configure(opts);
+            M16DocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
@@ -271,6 +272,48 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
         Assert.True(await Count<Event>(store, ct) > 0, "no events created");
         Assert.True(await Count<Announcement>(store, ct) > 0, "no announcements created");
         Assert.True(await Count<Page>(store, ct) > 0, "no pages created");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 2b — Never clobbers the admin's display name on a reboot (ADR 0042 D1)
+    // ═══════════════════════════════════════════════════════════════════════
+    [Fact(DisplayName = "ADR 0130 never clobbers: the admin's in-app display name survives a warm-boot backfill")]
+    public async Task Backfill_NeverClobbersAdminDisplayName()
+    {
+        var (store, db, userManager, roleManager, userInfo) =
+            await BootAsync(TestContext.Current.CancellationToken);
+        var ct = TestContext.Current.CancellationToken;
+
+        // First boot: the sample admin comes up named "Alex Admin" from the
+        // embedded sample-data document.
+        await RunBackfill(db, store, userManager, roleManager, userInfo, ct);
+
+        var admin = await userManager.FindByEmailAsync(AdminEmail);
+        Assert.NotNull(admin);
+
+        // The admin renames themselves in-app (the M2 profile editor). This is
+        // the exact scenario the ADR 0042 D1 "create-if-missing, never clobber"
+        // invariant protects: a reboot must not reset the name to the sample.
+        const string residentChosenName = "Per M.";
+        await using (var s = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var updated = await s.LoadAsync<Profile>(admin!.Id, ct)
+                ?? throw new InvalidOperationException("seed admin profile is missing");
+            updated.DisplayName = residentChosenName;
+            s.Store(updated);
+            await s.SaveChangesAsync(ct);
+        }
+
+        // A reboot (a warm-boot backfill over the same database) runs.
+        await RunBackfill(db, store, userManager, roleManager, userInfo, ct);
+
+        // The resident's chosen name survives — the backfill did not reset it to
+        // the sample name. (Before the fix, EnsureUserAsync unconditionally
+        // re-applied the document's name, clobbering the edit on every reboot.)
+        await using var q = store.OpenSession(new Marten.Services.SessionOptions());
+        var profile = await q.LoadAsync<Profile>(admin!.Id, ct);
+        Assert.NotNull(profile);
+        Assert.Equal(residentChosenName, profile!.DisplayName);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

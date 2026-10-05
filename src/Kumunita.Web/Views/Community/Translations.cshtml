@@ -1,7 +1,21 @@
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.CommunityTranslationViewModel
 @{
     ViewData["Title"] = $"{Model.Name} — translations";
+
+    // The per-row remove-translation form's data-confirm (the ADR 0072
+    // attribute idiom — the confirm.js seam reads the attribute verbatim;
+    // the kw-l TagHelper can't wrap an attribute). The en floor is the server
+    // fallback (a null provider — a non-HTTP render — degrades to en).
+    string confirmRemoveTranslation = "Remove this translation?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmRemoveTranslation = await Translation.GetAsync("common.remove_translation_confirm", effLang);
+    }
 
     // ADR 0026 — translation helpers (mirrors the ADR 0022 post-detail
     // helpers): the enabled-catalog language set with its HasTranslation
@@ -107,7 +121,7 @@
                                 </form>
                                 <form method="post"
                                       action="@($"/community/translations/{Model.ComponentId}/remove")"
-                                      class="mt-2" data-confirm="Remove this translation?">
+                                      class="mt-2" data-confirm="@confirmRemoveTranslation">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">

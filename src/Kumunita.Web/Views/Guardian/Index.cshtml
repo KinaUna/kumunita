@@ -1,6 +1,20 @@
-@model IReadOnlyList<Kumunita.Web.Models.ChildAccountItem>
+@model Kumunita.Web.Models.GuardianIndexModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Your children";
+    // The suspend form's data-confirm (the ADR 0072 attribute idiom — resolved
+    // through the provider, the confirm.js seam reads the attribute verbatim).
+    // The kw-l TagHelper can't wrap an attribute, so the en floor is the
+    // server fallback (a null provider, a non-HTTP render, degrades to en).
+    string confirmSuspend = "Suspend this child account? They will be blocked until you un-suspend them.";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmSuspend = await Translation.GetAsync("guardian.suspend_confirm", effLang);
+    }
 }
 
 <div class="row justify-content-center">
@@ -16,6 +30,86 @@
         <p class="text-muted"><kw-l key="guardian.lead">The accounts you set up for a child, and the controls you hold over each one.</kw-l></p>
 
         @*
+            GA (ADR 0038 §F) — the acceptance lane: when an existing guardian
+            assigns you as a co-guardian for one of their supervised children,
+            you are asked to ACCEPT (with the same consent to the child-account
+            terms the creating guardian accepts on the AddChild form) or to
+            DECLINE. Until you accept, you hold no standing over the child —
+            the standing gates all query Active exclusively (the ADR 0038 §F
+            supersession of the "no acceptance step" deferral). The card shows
+            only for assignees with at least one pending request; a non-assignee
+            sees nothing (the GU lane's "a non-guardian sees an empty card"
+            shape, applied to the acceptance lane).
+        *@
+        @if (Model.PendingRequests.Count > 0)
+        {
+            <div class="mb-4">
+                <h2><kw-l key="guardian.pendingRequests.title">Guardian requests awaiting your acceptance</kw-l></h2>
+                <p class="text-muted"><kw-l key="guardian.pendingRequests.lead">Another guardian has asked you to become a co-guardian for one of their children. Accept (and agree to the child-account terms) or decline — until you act, you hold no standing over the account.</kw-l></p>
+                <ul class="list-group">
+                    @foreach (var req in Model.PendingRequests)
+                    {
+                        <li class="list-group-item p-3">
+                            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+                                <div>
+                                    <div class="fw-semibold">
+                                        <kw-l key="guardian.pendingRequests.child">Child</kw-l>:
+                                        @req.ChildDisplayName
+                                    </div>
+                                    <div class="text-muted">
+                                        <kw-l key="guardian.pendingRequests.conferrer">Requested by</kw-l>:
+                                        @req.ConferrerDisplayName
+                                        <span class="ms-1">(@req.RequestedAt)</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <form method="post" action="@Url.Action("Decline", "Guardian", new { childId = req.ChildId })" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-secondary"><kw-l key="guardian.decline">Decline</kw-l></button>
+                                    </form>
+                                </div>
+                            </div>
+                            @*
+                                The consent block + Accept — the ADR 0038 §F
+                                acceptance step: the assignee confirms the
+                                child-account terms inside the Accept form
+                                (the AddChild form's GuardianConsent
+                                precedent, verbatim — the checkbox is the
+                                [Required] field on
+                                AcceptGuardianForm.GuardianConsent, and the
+                                controller refuses the accept until it is
+                                checked: the TempData["error"] surface, the
+                                Suspend / Unsuspend / Dissolve precedent).
+                                The consent block and the Accept button are
+                                the same form — the browser requires the
+                                checkbox (required attribute) to be ticked
+                                before the form can submit, AND the
+                                controller enforces the same guard (defense
+                                in depth).
+                            *@
+                            <div class="border rounded p-3 bg-body-tertiary mt-3">
+                                <p class="mb-2"><kw-l key="guardian.accept.consent.intro">By accepting, you confirm that you are a legal guardian of this child. As their guardian, you maintain full control over their account:</kw-l></p>
+                                <ul class="list-unstyled mb-2">
+                                    <li><kw-l key="guardian.accept.consent.duties_invitations">You must approve or deny all group and event invitations.</kw-l></li>
+                                    <li><kw-l key="guardian.accept.consent.duties_chat">You can enable or disable chat features for this profile at any time.</kw-l></li>
+                                    <li><kw-l key="guardian.accept.consent.duties_data">This data is fully isolated to this community's own instance and will never be sold, profiled, or used for advertising.</kw-l></li>
+                                </ul>
+                                <form method="post" action="@Url.Action("Accept", "Guardian", new { childId = req.ChildId })">
+                                    @Html.AntiForgeryToken()
+                                    <div class="form-check">
+                                        <input name="GuardianConsent" type="checkbox" value="true" class="form-check-input" required />
+                                        <label class="form-check-label"><kw-l key="guardian.accept.consent.checkbox">I consent to the processing of this child's data under these terms.</kw-l></label>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary mt-2"><kw-l key="guardian.accept">Accept &amp; agree to the terms</kw-l></button>
+                                </form>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @*
             GU (ADR 0028) — the child list: each row is the child's display name
             + the Blocked badge only (G·1 — never the child's posts or profile
             body). The Blocked state picks the action button (the m2b
@@ -23,7 +117,7 @@
             carries Un-suspend, an active child carries Suspend. The list is
             the standing itself — a non-guardian sees an empty card, nothing else.
         *@
-        @if (Model.Count == 0)
+        @if (Model.Children.Count == 0)
         {
             <div class="alert alert-info">
                 <kw-l key="guardian.empty">No children yet.</kw-l>
@@ -32,7 +126,7 @@
         else
         {
             <ul class="list-group mb-3">
-                @foreach (var item in Model)
+                @foreach (var item in Model.Children)
                 {
                     <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
                         <span>
@@ -53,7 +147,7 @@
                         {
                             <form method="post"
                                   action="@Url.Action("Suspend", "Guardian", new { childId = item.ChildId })"
-                                  data-confirm="Suspend this child account? They will be blocked until you un-suspend them.">
+                                  data-confirm="@confirmSuspend">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.suspend">Suspend</kw-l></button>
                             </form>
@@ -89,6 +183,26 @@
             <div class="mb-3">
                 <label for="Password" class="form-label"><kw-l key="guardian.password">Password</kw-l></label>
                 <input id="Password" name="Password" type="password" class="form-control" minlength="8" required />
+            </div>
+
+            @*
+                Guardian consent — before creation, the guardian confirms they
+                are the legal guardian and agrees to the child-account terms
+                (guardian duties + data-processing terms). The checkbox is the
+                [Required] field on AddChildForm.GuardianConsent; the controller
+                refuses creation until it is checked.
+            *@
+            <div class="mb-3 border rounded p-3 bg-body-tertiary">
+                <p class="mb-2"><kw-l key="guardian.consent.intro">By creating this profile, you confirm that you are the legal guardian of this child. As their guardian, you maintain full control over their account:</kw-l></p>
+                <ul class="list-unstyled mb-2">
+                    <li><kw-l key="guardian.consent.duties_invitations">You must approve or deny all group and event invitations.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_chat">You can enable or disable chat features for this profile at any time.</kw-l></li>
+                    <li><kw-l key="guardian.consent.duties_data">This data is fully isolated to this community's own instance and will never be sold, profiled, or used for advertising.</kw-l></li>
+                </ul>
+                <div class="form-check">
+                    <input id="GuardianConsent" name="GuardianConsent" type="checkbox" value="true" class="form-check-input" required />
+                    <label class="form-check-label" for="GuardianConsent"><kw-l key="guardian.consent.checkbox">I consent to the processing of my child's data under these terms.</kw-l></label>
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>

@@ -38,6 +38,358 @@ public sealed class AccountController(
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
+    // P1-5 (translation audit) — localize the four Account forms' DataAnnotations
+    // messages. The platform's closed translation surface is the KnownTranslationKeys
+    // registry (ADR 0015); the four account.err.* keys live there (en/de/fr/da).
+    // Resolved from the request scope (the Storage() idiom) so the constructor is
+    // unchanged for the existing harnesses. A no-op on a non-HTTP render (null
+    // provider) or an unmapped attribute.
+    private async Task LocalizeValidationAsync(object model)
+    {
+        // In unit tests (and any non-HTTP host) RequestServices is absent —
+        // skip localization rather than throw on a null provider.
+        var services = HttpContext?.RequestServices;
+        var request = HttpContext?.Request;
+        if (services is null)
+        {
+            return;
+        }
+        var localization = services.GetService<Kumunita.Core.Localization.ILocalizationService>();
+        var provider = services.GetService<Kumunita.Core.Localization.ITranslationProvider>();
+        if (provider is null)
+        {
+            return;
+        }
+        await Kumunita.Web.Localization.AccountValidationLocalizer.ApplyAsync(
+            model, ModelState, request, localization, provider);
+    }
+
+    // ── My storage (M25 U7 — the self-only resident usage read) ────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/storage</c> — the resident's **own** storage usage (M25
+    /// U7, C-UP·4/F7): their own usage bytes, the community per-user quota (or
+    /// "unlimited"), and how much of it remains. **Self-only** — the subject is
+    /// the signed-in principal (<see cref="SubjectId(System.Security.Claims.ClaimsPrincipal)"/>),
+    /// minted server-side and never taken from a route param, so a resident can
+    /// never read another resident's numbers.
+    /// <para>
+    /// <b>Read-only</b> — no write lane here (the admin settings surface, U5/U6,
+    /// is the only writer), and it emits **no** <c>AccessAudit</c> row
+    /// (C-UP·7: a resident's own usage is not an audience-restricted read).
+    /// The seam (<see cref="Kumunita.Core.Usage.IStorageSettingsService"/>) is
+    /// resolved from the request scope — the <see cref="Verify(string)"/> idiom —
+    /// so the controller constructor is unchanged. The usage read
+    /// (<c>GetPerUserUsageBytesAsync</c>) reuses the M24 C-SM·7
+    /// <c>Σ SizeBytes WHERE CreatedById</c> seam (U4); the quota comes from
+    /// <c>GetOrCreateAsync</c> (the create-if-missing sentinel). Sentinel
+    /// (C-UP·5): a quota of <c>0</c> ⇒ **unlimited** — rendered as "Unlimited",
+    /// not <c>0</c> remaining and not an error.
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Storage()
+    {
+        // Self-only (C-UP·4/F7): the subject is the signed-in principal —
+        // never a path param.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // Resolve the read seam from the request scope (the Verify idiom) — keeps
+        // the controller constructor untouched for the existing harnesses.
+        var settings = HttpContext.RequestServices
+            .GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>();
+
+        // Two independent reads (quota doc + own usage): start both, then await
+        // each for its value (the AdminStorageController.Index shape).
+        var quotaTask  = settings.GetOrCreateAsync(CancellationToken.None);
+        var usageTask  = settings.GetPerUserUsageBytesAsync(subject, CancellationToken.None);
+        var quota      = await quotaTask;
+        long usage      = await usageTask;
+
+        bool unlimited = quota.PerUserQuotaBytes == 0;      // C-UP·5 sentinel
+        var remaining  = unlimited ? (long?)null
+                                   : Math.Max(0, quota.PerUserQuotaBytes - usage);
+
+        return View(new ResidentStorageViewModel
+        {
+            MyUsageBytes      = usage,
+            PerUserQuotaBytes = quota.PerUserQuotaBytes,
+            RemainingBytes    = remaining,                  // null ⇒ unlimited
+            QuotaUnlimited    = unlimited,
+            MyUsageHuman      = ResidentStorageViewModel.FormatBytes(usage),
+            QuotaHuman        = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(quota.PerUserQuotaBytes),
+            RemainingHuman    = unlimited ? "Unlimited" : ResidentStorageViewModel.FormatBytes(remaining!.Value)
+        });
+    }
+
+    // ── Change password (self-serve; ADR 0138) ───────────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/password</c> — the resident's self-serve change-password
+    /// form (ADR 0138). The subject is the signed-in principal (never a path
+    /// param). When the instance has opted in to the sample-account lock
+    /// (<see cref="IIdentityService.IsChangePasswordLockedForAsync"/> — a
+    /// <c>SampleData__Enabled</c> instance, the admin lock on, and this account
+    /// a non-admin sample account), the form is replaced by the static
+    /// <c>ChangePasswordLocked</c> notice (the same "surface replaced by a
+    /// notice" shape as the ADR 0050 <c>SignupClosed</c> lane). Otherwise the
+    /// change-password form is returned.
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> ChangePassword()
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0138 — the lock (the single decision seam, so the GET and the
+        // POST agree): a locked, non-admin sample account gets the static
+        // notice instead of the form.
+        if (await identity.IsChangePasswordLockedForAsync(subject))
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+
+        return View(new ChangePasswordViewModel());
+    }
+
+    /// <summary>
+    /// <c>POST /account/password</c> — the self-serve write lane (ADR 0138).
+    /// <b>The guard is authoritative on the write path too</b> (the ADR 0050
+    /// gate shape): a locked account is denied before any write, even if the
+    /// form were crafted by hand. Otherwise the <b>current</b> password is
+    /// verified against the account (the self-serve lane confirms it is really
+    /// this resident), and the new password is written through
+    /// <see cref="IIdentityService.ChangePasswordAsync"/> (the single audited
+    /// write lane, <c>via: Owner</c>; it rotates the security stamp). On
+    /// success the resident is signed out (the credential just changed —
+    /// confirm the new one on the next sign-in) and returned to the login
+    /// surface with a <c>info</c> flash.
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0138 — the lock, authoritative on the write path (defense in
+        // depth over the Core guard inside ChangePasswordAsync): a locked,
+        // non-admin sample account is denied with the static notice — no
+        // current-password check, no write.
+        if (await identity.IsChangePasswordLockedForAsync(subject))
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+
+        if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
+            return View(model);
+        }
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident changing their own credential — not a blind set). A
+        // wrong current password is a form error (the account is untouched).
+        var user = await userManager.FindByIdAsync(subject);
+        if (user is null)
+        {
+            ModelState.AddModelError(nameof(model.CurrentPassword),
+                "We could not find that account — sign in again.");
+            return View(model);
+        }
+
+        var currentOk = await userManager.CheckPasswordAsync(user, model.CurrentPassword);
+        if (!currentOk)
+        {
+            ModelState.AddModelError(nameof(model.CurrentPassword),
+                "Your current password is incorrect.");
+            return View(model);
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner; rotates the security
+            // stamp, so this account's existing sessions are invalidated).
+            await identity.ChangePasswordAsync(subject, model.NewPassword, byAdmin: false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core guard (IsChangePasswordLockedForAsync) refused the write
+            // — surface the locked notice (defense in depth: the GET/POST lock
+            // check above normally catches this first).
+            return View("ChangePasswordLocked", new ChangePasswordLockedViewModel());
+        }
+
+        // The credential just changed: sign this session out so the new
+        // password is confirmed on the next sign-in (the ChangePasswordAsync
+        // security-stamp rotation already invalidates this account's other
+        // sessions).
+        await signInManager.SignOutAsync();
+        TempData["info"] = "Your password was changed. Sign in again with the new password.";
+        return RedirectToAction(nameof(Login));
+    }
+
+    // ── Delete account (self-serve; ADR 0142) ─────────────────────────────
+
+    /// <summary>
+    /// <c>GET /account/delete</c> — the resident's self-serve delete-account
+    /// form (ADR 0142). The subject is the signed-in principal (never a path
+    /// param). The form asks for the resident's current password (verified
+    /// server-side on the POST) and an explicit acknowledgment checkbox (the
+    /// dangerous-action guard). The lede text explains the consequences:
+    /// the account is removed, the resident's audit trail is pseudonymized
+    /// (their identity replaced by a tombstone), and their group/community
+    /// memberships are removed — the privacy lane OPS.md §9 / ARCHITECTURE.md
+    /// §5 prescribe.
+    /// <para>
+    /// **ADR 0142 D5 gate (the ADR 0138 "surface-replaced-by-notice"
+    /// shape, generalized):** the self-serve lane is reachable only by a
+    /// <c>GlobalAdmin</c>. A non-GlobalAdmin resident sees the same form
+    /// with the <see cref="DeleteAccountViewModel.SelfDeletionRefused"/>
+    /// flag set, so the view renders a notice that the self-serve lane is
+    /// unavailable for them and that they should contact an administrator
+    /// instead — rather than letting the resident discover the gate only
+    /// on submit. A crafted POST is refused server-side with the same
+    /// message (defense in depth).
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    public async Task<IActionResult> Delete()
+    {
+        // The subject must be the signed-in principal — the [Authorize]
+        // attribute above guarantees that (an unauthenticated request is
+        // redirected to /Account/Login by the cookie handler's
+        // AccessDeniedPath), so this method only runs for an authenticated
+        // resident. A defensive null-check mirrors the Storage() /
+        // ChangePassword() shape.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // ADR 0142 D5 gate — read the standing (a read, no audit row) and
+        // set the notice flag when the resident is not a GlobalAdmin.
+        // The form is still rendered (so the surface is discoverable), but
+        // the page makes the gate visible (the ADR 0138
+        // ChangePasswordLockedViewModel "notice" shape, generalized).
+        var user = await userManager.FindByIdAsync(subject);
+        var roles = user is null
+            ? new List<string>()
+            : (await userManager.GetRolesAsync(user)).ToList();
+        var refused = !roles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin);
+
+        return View(new DeleteAccountViewModel { SelfDeletionRefused = refused });
+    }
+
+    /// <summary>
+    /// <c>POST /account/delete</c> — the self-serve write lane (ADR 0142).
+    /// <b>The guard is authoritative on the write path too</b> (the ADR 0138
+    /// shape): the resident must have checked the acknowledgment box AND
+    /// provided the correct current password — otherwise the form re-renders
+    /// with the error (the account is untouched). When both pass, the Core
+    /// lane (<see cref="Kumunita.Core.Identity.IIdentityService
+    /// .DeleteAccountAsync"/>) is invoked with the resident as the actor —
+    /// the Core lane still enforces the GlobalAdmin gate (the fail-closed
+    /// pin), so a non-admin self-deletion is refused server-side.
+    /// <para>
+    /// On success the resident is signed out (their credential is gone) and
+    /// redirected to the login page with a confirmation message. The
+    /// login page's "account-removed" error code is NOT used here — that
+    /// code is for the PrivilegedStampMiddleware's "user deleted while
+    /// signed in" path; this is the *intentional* self-deletion lane, so
+    /// the message is the positive "your account was deleted" form.
+    /// </para>
+    /// </summary>
+    [Authorize]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(DeleteAccountViewModel model)
+    {
+        // Self-only (the C-UP·4/F7 shape from Storage()): the subject is
+        // the signed-in principal — never a path param.
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Challenge();
+
+        // The dangerous-action guard: the resident must have checked the
+        // acknowledgment box. A bare [Required] on a bool would accept
+        // false (the bound value is non-null), so the check is explicit.
+        if (!model.Confirmed)
+        {
+            ModelState.AddModelError(
+                nameof(model.Confirmed),
+                "You must confirm that you understand your account will be permanently deleted.");
+        }
+
+        // Verify the current password (the self-serve lane proves it is really
+        // this resident deleting their own account — not a crafted request).
+        // A wrong password is a form error (the account is untouched).
+        var user = await userManager.FindByIdAsync(subject);
+        if (user is null)
+        {
+            ModelState.AddModelError(nameof(model.Password),
+                "We could not find that account — sign in again.");
+        }
+        else
+        {
+            var currentOk = await userManager.CheckPasswordAsync(user, model.Password);
+            if (!currentOk)
+            {
+                ModelState.AddModelError(nameof(model.Password),
+                    "Your password is incorrect.");
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
+            return View(model);
+        }
+
+        try
+        {
+            // The single audited write lane (via: Owner on the self-serve
+            // branch — actor == target). ADR 0142 D5 gate: the Core seam
+            // enforces the GlobalAdmin standing on this branch (a
+            // non-GlobalAdmin's crafted POST is refused server-side, the
+            // fail-closed pin). Pseudonymizes the resident's audit rows,
+            // removes their memberships + profile, and deletes the Identity
+            // account.
+            await identity.DeleteAccountAsync(subject, adminSubjectId: subject);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // ADR 0142 D5 gate (defense in depth — the GET's
+            // SelfDeletionRefused notice is the primary surface, but a
+            // crafted POST reaches the Core seam directly). The resident is
+            // not a GlobalAdmin, so the self-serve lane is unavailable for
+            // them. Surface the notice (the ADR 0138 "locked" shape).
+            ModelState.AddModelError(string.Empty,
+                "The self-serve delete-account lane is only available to a " +
+                "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
+                "own account — contact an administrator to remove the account.");
+            return View(new DeleteAccountViewModel { SelfDeletionRefused = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The Core lane refused the write (the last-GlobalAdmin guard —
+            // a lone GlobalAdmin cannot self-delete — or the account no
+            // longer exists, the idempotency pin). Surface the message.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(model);
+        }
+
+        // The account is gone: sign this session out (their credential is
+        // deleted — the cookie is now stale) and redirect to the login page
+        // with a positive confirmation.
+        await signInManager.SignOutAsync();
+        TempData["info"] = "Your account has been deleted. Your audit trail is preserved (pseudonymized) per the platform's privacy policy.";
+        return RedirectToAction(nameof(Login));
+    }
+
     // ── Signup ──────────────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]
@@ -70,7 +422,10 @@ public sealed class AccountController(
             return View("SignupClosed", new SignupClosedViewModel());
 
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         try
         {
@@ -105,7 +460,10 @@ public sealed class AccountController(
     public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
     {
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         await identity.ResendVerificationEmailAsync(model.Email);
         // M1 — uniform response: whether or not an account exists for this email
@@ -231,7 +589,10 @@ public sealed class AccountController(
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)
+        {
+            await LocalizeValidationAsync(model);
             return View(model);
+        }
 
         var user = await userManager.FindByNameAsync(model.Email)
                  ?? await userManager.FindByEmailAsync(model.Email);

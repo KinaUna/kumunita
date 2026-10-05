@@ -3,9 +3,12 @@
 @using Kumunita.Web.Models
 @using Kumunita.Core.Authorization
 @inject Kumunita.Core.UserInfo.IUserInfoService UserInfo
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Upload a document";
     string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     // Null-safe: U03's GET New() returns View("New") with no model (the form is
     // blank); the POST re-render path passes the bound form. So read the model
     // through Model? — both paths render.
@@ -91,7 +94,7 @@
                         <kw-l key="documents.upload_file">File</kw-l>
                     </label>
                     <input class="form-control" type="file" id="file" name="File" required />
-                </div>
+                                        <kw-upload-limit></kw-upload-limit>                </div>
             </div>
 
             <div class="card mb-4 audience-editor">
@@ -176,6 +179,46 @@
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="folder" style="font-weight:600;">
+                        <kw-l key="documents.folder">Folder</kw-l>
+                    </label>
+                    <select class="form-control" id="folder" name="FolderId">
+                        <option value=""><kw-l key="documents.folder_unfiled">Unfiled</kw-l></option>
+                    </select>
+                    <div class="text-muted small mt-1">
+                        <kw-l key="documents.folder_hint">File this document into a folder to keep the repository organized.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="tags" style="font-weight:600;">
+                        <kw-l key="documents.tags">Tags</kw-l>
+                    </label>
+                    @* The "documents organization" lane (TG) — the composer tag
+                       input (a free-text field + autocomplete dropdown). The
+                       `data-tag-suggest` self-wire selector (the
+                       Posts/New.cshtml + Posts/Edit.cshtml idiom) drives the
+                       client/lib/tag-suggest.ts module to create the chips,
+                       the dropdown, and the hidden TagIds submission field
+                       around this input. The filter (starts_with(displayName)
+                       OR starts_with(slug), ≤ 10) is server-side via
+                       POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 /
+                       C-TG·4). A "[]" ⇒ no chips (new/untagged document
+                       behaves as before). *@
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           maxlength="64"
+                           placeholder="@await Translation.GetAsync("tags.pages_example", _kwL)" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="documents.tags_hint">Type to search existing tags, or start a new one.</kw-l>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="documents.upload.submit">Upload document</kw-l></button>
                 <a href="/documents" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
@@ -183,3 +226,38 @@
         </form>
     </div>
 </div>
+
+@section Scripts {
+    @* The "documents organization" lane (TG) — the composer tag-input
+       autocomplete (client/lib/tag-suggest.ts, tsc-built, no editor
+       dependency — the RE·3 idiom). Self-wires any input[data-tag-suggest]
+       (the Tags field above); the filter + ≤ 10 cap are server-side via
+       POST /api/tags/suggest (the SuggestAsync seam, C-TG·2 / C-TG·4; the
+       privacy-pin holds because the server returns only the actor-readable
+       set). *@
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
+
+    @* The folder picker — a small client-side script that fetches the
+       folder tree from /documents/folders and populates the <select>
+       (the PostController / PageController "seed the picker" idiom — the
+       folder tree is dynamic, so a server-rendered <select> would be
+       stale). *@
+    <script type="module">
+        (async () => {
+            const select = document.getElementById('folder');
+            if (!select) return;
+            try {
+                const res = await fetch('/documents/folders', { credentials: 'same-origin' });
+                if (!res.ok) return;
+                const { folders } = await res.json();
+                for (const f of folders) {
+                    const opt = document.createElement('option');
+                    opt.value = f.Id;
+                    const depth = f.ParentId ? '  ' : '';
+                    opt.textContent = depth + f.Name;
+                    select.appendChild(opt);
+                }
+            } catch { /* leave the "Unfiled" option only */ }
+        })();
+    </script>
+}

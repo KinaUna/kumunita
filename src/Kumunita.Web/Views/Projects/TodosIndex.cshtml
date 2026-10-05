@@ -12,6 +12,18 @@
     // <kw-l> TagHelper renders text nodes, not attributes — the same reason
     // the board card's assign modal resolves its labels server-side).
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+
+    // The to-do row's action menu + the modals' close buttons carry accessible
+    // names the kw-l TagHelper can't wrap (an attribute) — server-resolved,
+    // same idiom (the a11y.* closed set is the floor). The en floor is the
+    // server fallback (a null provider — a non-HTTP render — degrades to en).
+    string ariaClose      = "Close";
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        ariaClose      = await Translation.GetAsync("a11y.close", _kwL);
+        ariaActionsFor = await Translation.GetAsync("a11y.actions_for", _kwL);
+    }
     // The row dropdown's "Copy to board" / "Move to board" pickers need the
     // *other* boards (the target option list) — the same frozen-store read
     // the board card menu's pickers lean on (BoardDetail's otherBoards).
@@ -192,7 +204,7 @@
                     <div class="dropdown" data-detach>
                         <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                 data-bs-toggle="dropdown" aria-expanded="false"
-                                aria-label="Actions for @row.Title">⋮</button>
+                                aria-label="@(ariaActionsFor.Replace("{0}", row.Title))">⋮</button>
                         <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
                             <li>
                                 <button type="button" class="dropdown-item text-dark"
@@ -311,7 +323,7 @@
                                             <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                aria-label="@("Close")"></button>
+                                                aria-label="@ariaClose"></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="mb-3">
@@ -411,7 +423,7 @@
                                             <span class="text-body-secondary">· @row.Title</span>
                                         </h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                                aria-label="@("Close")"></button>
+                                                aria-label="@ariaClose"></button>
                                     </div>
                                     <div class="modal-body">
                                         @if (!string.IsNullOrWhiteSpace(row.AssigneeId))

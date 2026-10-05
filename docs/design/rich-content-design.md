@@ -25,7 +25,7 @@ terms / help) — headings, paragraphs, lists, bold/italic/code, and links —
 but **every UGC surface deliberately ignores it**.
 
 The ADR 0011 media store (`IMediaStore` / `MediaObject`, content-addressed,
-5 MiB cap, `image/jpeg|png|webp|gif`) has exactly **one** consumer: the
+10 MiB cap, `image/jpeg|png|webp|gif`) has exactly **one** consumer: the
 profile avatar (`ProfileController.Avatar` / `AvatarUpload`). ADR 0011's
 "not decided here" explicitly names "post attachments" as a follow-on lane,
 gated on the owning resource's audience. **This lane is that follow-on lane.**
@@ -84,7 +84,7 @@ renumbering is a breaking change and is not allowed mid-lane.
 | **R·3** | **References are data, not URLs-in-prose:** an image in a body is `![alt](/content-image/{id})` where `id` is a `MediaObject.Id`, **and** the owning resource's `ImageIds` contains it. `ImageIds` is populated **server-side** by parsing the body's route-shaped links on every create/edit write lane (the Web layer's job — Core stays HTTP-free AND body-parse-free: the draft records carry `ImageIds`, the service writes them verbatim). A well-formed link with no matching owner renders as plain text (the renderer cannot know) and 404s if fetched (the route is the defense). | **U04** (the parse) · **U03** (the route) |
 | **R·4** | **The serving route defers to the owning resource's decision:** `GET /content-image/{id}` → `IMediaStore.GetAsync` (miss ⇒ 404, **zero** audit rows) → bounded reverse lookup across the four owners (miss ⇒ 404, **zero** rows — **orphan is inert, there is no GlobalAdmin branch**) → UGC owner: **one** frozen `CanAsync(Read)` on the owner (Allow **and** Deny each emit the seam's own one audit row, the owner's `TargetKind`); platform-page owner: **no call, zero rows** (public by construction). Deny ⇒ **404**, not 403 (existence doesn't leak — the avatar route's precedent). No new `AccessAction` id (C-MED·1). | **U03** |
 | **R·5** | **Core stays HTTP-free (C-MED·6 / ADR 0006-D):** the reverse lookup is a read seam on the existing services (`PostService` for `Post`/`PostReply`, `AnnouncementService` for `Announcement`, the `LocalizedPage`-owning service for `LocalizedPage`); `IFormFile`/`Stream` never cross into Core; the lookup itself is **un-audited** (the audit row belongs to the route's `CanAsync` call). | **U03** |
-| **R·6** | **Upload boundary is ADR 0011's, verbatim:** the same allowlist (`image/jpeg\|png\|webp\|gif` — SVG excluded), the same `MediaOptions.MaxBytes` cap (5 MiB default), the same guards-before-write ordering (empty → 400, oversize → 413, disallowed type → 415 — no file written on any guard), one `IMediaStore.PutAsync` write. | **U04** |
+| **R·6** | **Upload boundary is ADR 0011's, verbatim:** the same allowlist (`image/jpeg\|png\|webp\|gif` — SVG excluded), the same `MediaOptions.MaxBytes` cap (10 MiB default), the same guards-before-write ordering (empty → 400, oversize → 413, disallowed type → 415 — no file written on any guard), one `IMediaStore.PutAsync` write. | **U04** |
 | **R·7** | **Zero schema migrations:** `Body` stays a `string` on every document; the four `ImageIds` fields are additive (ADR 0004 §B.1 — delta-detected, idempotent, no seed reset); existing plain-text content re-renders under the Markdown rules (plain text is valid Markdown; the paragraph rule wraps it — strictly better than raw text). | **U03** (the fields) · **U06** (the switch) · **U07** (the regression pin) |
 
 ## FACES (pinned, 8)

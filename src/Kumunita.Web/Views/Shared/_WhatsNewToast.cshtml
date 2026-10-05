@@ -48,9 +48,14 @@
     string seeLabel = (string.IsNullOrWhiteSpace(seeRaw) || seeRaw == "whatsnew.toast_see")
         ? "See what's new"
         : seeRaw.Replace("{v}", version);
+
+    // The toast's accessible names are server-resolved (the kw-l TagHelper
+    // can't wrap an attribute); the a11y.* floor is the closed set.
+    string ariaWhatsNewRegion = await Translation.GetAsync("a11y.whatsnew_region", effLang);
+    string ariaClose          = await Translation.GetAsync("a11y.close", effLang);
 }
 <div class="toast-container position-fixed top-0 end-0 p-3 kmb-whatsnew-toast"
-     id="whatsnew-toast-container" aria-label="What's new"
+     id="whatsnew-toast-container" aria-label="@ariaWhatsNewRegion"
      data-whatsnew-version="@version">
     <div class="toast align-items-center text-bg-primary border-0 show"
          role="status" aria-live="polite" aria-atomic="true"
@@ -63,7 +68,7 @@
                 </a>
             </div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                    data-bs-dismiss="toast" aria-label="Close"></button>
+                    data-bs-dismiss="toast" aria-label="@ariaClose"></button>
         </div>
     </div>
 </div>

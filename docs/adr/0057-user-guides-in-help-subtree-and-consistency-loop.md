@@ -107,8 +107,8 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   | `language` | the language picker, the `Accept-Language` fallback, the per-resident override | ADR 0005 / 0015 / 0046 / 0019 / 0020 |
   | `events` | how an event works: the feed, the detail view, RSVP, the day-before reminder | ADR 0054 |
   | `translator` | what the `Translator` role may and may not do, in plain language | ADR 0021 |
-  | `child-accounts` | the guardian's child accounts: what a guardian may and may not do (suspend, memberships, invitation approval, assign a second guardian, hand-over), and the privacy boundary (no reading the child's content) | ADR 0028 / 0038 |
-  | `being-a-child` | the child's own view of a child account: what stays theirs (posts/replies/profile the guardian can't read), what the guardian handles (memberships, suspend), group invitations (decline always open, accept needs guardian approval), and hand-over restoring the child's own controls | ADR 0028 / 0038 |
+  | `child-accounts` | the guardian's child accounts: what a guardian may and may not do (suspend, memberships, invitation approval, invite a second guardian who must accept with the same consent or decline, hand-over), and the privacy boundary (no reading the child's content) | ADR 0028 / 0038 §F |
+  | `being-a-child` | the child's own view of a child account: what stays theirs (posts/replies/profile the guardian can't read), what the guardian(s) handle (memberships, suspend; more than one adult may share the controls), group invitations (decline always open, accept needs guardian approval), and hand-over restoring the child's own controls | ADR 0028 / 0038 §F |
   | `admins` | what a global admin does (accounts, communities, the platform pages incl. reset-to-seeded, the sign-up gate, the platform defaults) and what keeps the role in check (audit trail; no reading of residents' content) | ADR 0062 / 0050 / 0019 / 0020 / 0040 / 0058 |
   | `moderators` | what a standing moderator may do (see their scoped report queue) and may not (act on a report — assign/unlock/resolve stay with an admin; see outside their part; read anyone's content) | ADR 0003 / 0030 |
 

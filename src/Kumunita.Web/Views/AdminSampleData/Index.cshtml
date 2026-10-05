@@ -1,0 +1,28 @@
+@model Kumunita.Web.Models.SampleAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Sample data";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.sample_title">Sample data</kw-l></h1>
+
+<p class="text-muted">
+    <kw-l key="admin.sample_lede">This instance runs the demo neighborhood (sample data). Lock the sample accounts out of changing their own password so visitors can test features without breaking the shared credentials — the demo admin keeps its own password lane.</kw-l>
+</p>
+
+<form method="post" action="/admin/sample">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="passwordChangeLocked" class="form-label"><kw-l key="admin.sample_lock_label">Sample account password changes</kw-l></label>
+            <select class="form-select" name="passwordChangeLocked" id="passwordChangeLocked">
+                <option value="True" selected="@(Model.PasswordChangeLocked ? "selected" : null)"><kw-l key="admin.sample_lock_on">Locked — sample accounts can't change their own password</kw-l></option>
+                <option value="False" selected="@(!Model.PasswordChangeLocked ? "selected" : null)"><kw-l key="admin.sample_lock_off">Unlocked — sample accounts can change their own password</kw-l></option>
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="common.save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

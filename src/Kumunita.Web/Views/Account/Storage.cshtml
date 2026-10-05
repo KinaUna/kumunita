@@ -1,0 +1,65 @@
+@model Kumunita.Web.Models.ResidentStorageViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@{
+    ViewData["Title"] = "My storage";
+    // The remaining-note template (the {0} slot carries the human remaining
+    // figure) is resolved server-side — the kw-l TagHelper does not interpolate.
+    string remainingNote = Model.RemainingHuman;
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+        var raw = await Translation.GetAsync("account.storage_remaining_note", effLang);
+        if (!string.IsNullOrWhiteSpace(raw) && raw != "account.storage_remaining_note")
+            remainingNote = raw.Replace("{0}", Model.RemainingHuman);
+    }
+}
+
+<h1><kw-l key="account.storage_title">My storage</kw-l></h1>
+<p class="text-muted">
+    <kw-l key="account.storage_lede">How much of your content the platform counts, your per-user quota, and how much of it you still have left.</kw-l>
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Model.MyUsageHuman</div>
+                <div class="text-muted small"><kw-l key="account.storage_used">your content used</kw-l></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Model.QuotaHuman</div>
+                <div class="text-muted small"><kw-l key="account.storage_quota">your per-user quota</kw-l></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-4 fw-semibold">@Model.RemainingHuman</div>
+                <div class="text-muted small"><kw-l key="account.storage_remaining">remaining</kw-l></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Sentinel (C-UP·5): quota 0 ⇒ unlimited. The remaining figure is "Unlimited"
+   (not 0, not an error) — the model's RemainingHuman is already resolved to
+   that label, so the card above shows it directly. *@
+@if (Model.QuotaUnlimited)
+{
+    <p class="text-muted small">
+        <kw-l key="account.storage_unlimited_note">Your per-user quota is unlimited — there is no total-content cap on your uploads.</kw-l>
+    </p>
+}
+else
+{
+    <p class="text-muted small">
+        @remainingNote
+    </p>
+}

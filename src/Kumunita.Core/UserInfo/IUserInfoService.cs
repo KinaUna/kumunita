@@ -236,6 +236,87 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileDateFormatAsync"/> pin).</exception>
     Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy);
 
+    // ── Onboarding addition (ADR 0132; the *single* completion-stamp write
+    // lane + its owner-scope read — the ADR 0006-E compatible-addition idiom
+    // this file uses, the exact shape of SetProfileTimezoneAsync) ──────────
+
+    /// <summary>
+    /// M22 (ADR 0132, D2) — stamp the onboarding-completed state. Owner-scope
+    /// single write lane (the <see cref="SetProfileTimezoneAsync"/> shape
+    /// verbatim): stamps <see cref="Profile.OnboardingCompletedAt"/> = now, one
+    /// <c>SaveChangesAsync</c>, **no <see cref="Authorization.AccessAudit"/>
+    /// row** (a profile-field write — the <see cref="UpsertProfileAsync"/>
+    /// shape, "not an access decision"). Strong consistency (invariant C4): the
+    /// stamp is live on the very next <see cref="GetProfileAsync"/> call. The
+    /// self-scope check happens at the Web boundary (the owner is the actor);
+    /// this lane writes <c>Profile.OnboardingCompletedAt</c> only.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task CompleteOnboardingAsync(string subjectId, string actorBy);
+
+    /// <summary>
+    /// M22 (ADR 0132, D2) — owner-scope read of the completion stamp
+    /// (<see cref="Profile.OnboardingCompletedAt"/>; <c>null</c> = not
+    /// completed, the floor). The <see cref="GetProfileAsync"/> read re-
+    /// projected: owner-scope, **no audit row**, **never load-or-creates**
+    /// (returns <c>null</c> when no <see cref="Profile"/> exists — the read is
+    /// the floor, not a write). Mirrors <see cref="GetProfileAsync"/>.
+    /// </summary>
+    Task<DateTimeOffset?> GetOnboardingCompletedAsync(string subjectId);
+
+    // ── M9 amendment additions (per-resident + guardian messaging controls;
+    // the ADR 0006-E compatible-addition idiom this file uses, mirroring the
+    // Onboarding lanes above and the GU guardian lanes below) ──────────────
+
+    /// <summary>
+    /// M9 amendment — the resident's own <b>messaging opt-in</b> write lane
+    /// (the <see cref="SetProfileTimezoneAsync"/> / <see
+    /// cref="CompleteOnboardingAsync"/> owner-scope single-write shape
+    /// verbatim): flips <see cref="Profile.MessagingOptIn"/> to
+    /// <paramref name="optIn"/>. One <c>SaveChangesAsync</c>; **no**
+    /// <see cref="Authorization.AccessAudit"/> row (a profile-field write — the
+    /// <see cref="UpsertProfileAsync"/> shape, "not an access decision"; the
+    /// self-scope check happens at the Web boundary, the owner is the actor).
+    /// Strong consistency (invariant C4): the value is live on the very next
+    /// <see cref="GetProfileAsync"/> call. Written by the profile editor's
+    /// "Allow me to message / messaging" toggle; read by the
+    /// <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor gate
+    /// as the resident's own half of the decision (the instance toggle is the
+    /// master gate; a guardian's restriction is the ceiling).
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">No
+    /// profile with that <c>subjectId</c> exists (fail closed — the lane never
+    /// load-or-creates, the <see cref="CompleteOnboardingAsync"/> pin).</exception>
+    Task SetMessagingOptInAsync(string subjectId, bool optIn, string actorBy);
+
+    /// <summary>
+    /// M9 amendment — the <b>guardian's messaging restriction</b> over a
+    /// supervised child (the <see cref="SuspendChildAsync"/> / <see
+    /// cref="UnsuspendChildAsync"/> guardian-scope shape verbatim): flips
+    /// <see cref="Profile.MessagingRestricted"/> to
+    /// <paramref name="restricted"/>. <c>true</c> = force messaging OFF for the
+    /// child (a hard ceiling that wins over the child's own opt-in);
+    /// <c>false</c> = allow messaging, deferring to the child's own opt-in.
+    /// One <c>SaveChangesAsync</c>. The standing gate is an <b>active</b>
+    /// <see cref="GuardianLink"/> for the exact (guardian, child) pair (G·2/G·3
+    /// deny-by-default); the audit row is <c>guardian.messaging_restrict</c>,
+    /// <c>TargetKind</c> "profile", <see cref="Authorization.AccessVia
+    /// .Guardian"/> (the <c>guardian.suspend</c> / <c>guardian.unsuspend</c>
+    /// shape). Written by the child curation view's messaging switch; read by
+    /// the <see cref="Kumunita.Core.Messaging.IMessagingService"/> per-actor
+    /// gate as the veto over <see cref="Profile.MessagingOptIn"/>.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No profile for the child
+    /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
+    Task SetChildMessagingRestrictionAsync(string childId, bool restricted, string guardianId);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 
@@ -466,6 +547,67 @@ public interface IUserInfoService
     /// the gate point).
     /// </summary>
     Task<IReadOnlyCollection<string>> GetCommunityIdsAsync(string userId);
+
+    /// <summary>
+    /// The actor's <b>effective</b> community set: the raw
+    /// <see cref="GetCommunityIdsAsync"/> membership <b>minus</b> the
+    /// actor's <see cref="Profile.BlockedCommunityIds"/> (a guardian's
+    /// per-community block-and-hide ceiling over a supervised child, the
+    /// <see cref="Profile.MessagingRestricted"/> precedent carried to
+    /// communities). This is the seam the <b>child's own access surfaces</b>
+    /// read through — the community directory/sidebar, the community feed
+    /// gate, the composer's posting gate, and the
+    /// <see cref="Authorization.AuthorizationService"/> community branch of
+    /// <c>Decide</c> (audience visibility of community-scoped posts). It is
+    /// why a <b>mandatory</b> community can be hidden for a child: mandatory
+    /// membership is implicit and the removal lanes refuse / skip it
+    /// (ADR 0012), so "removing the child" is impossible there, but
+    /// <em>blocking</em> it is — the id simply drops out of this set.
+    /// <para>
+    /// Strong consistency (invariant C4): a
+    /// <see cref="SetChildCommunityBlockAsync"/> write is live on the very
+    /// next call. Like <see cref="GetCommunityIdsAsync"/>, this is a
+    /// candidate read — no <see cref="Authorization.AccessAudit"/> row is
+    /// appended here (the access decision + its audit live in the caller).
+    /// The <b>raw</b> <see cref="GetCommunityIdsAsync"/> stays available to
+    /// the surfaces that reason about the child's *actual* memberships
+    /// regardless of a guardian's restriction — the guardian's own curation
+    /// view (so the guardian sees the child's mandatory memberships and can
+    /// toggle the block on each) and the /admin per-account community diff.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetEffectiveCommunityIdsAsync(string userId);
+
+    /// <summary>
+    /// A guardian's <b>block access + hide</b> of one community for a
+    /// supervised child (the <see cref="SetChildMessagingRestrictionAsync"/>
+    /// guardian-ceiling precedent, per-community rather than a single flag):
+    /// <paramref name="blocked"/> = <c>true</c> adds
+    /// <paramref name="communityId"/> to the child's
+    /// <see cref="Profile.BlockedCommunityIds"/> (the community is hidden
+    /// from the child's effective set on every access surface — including a
+    /// <b>mandatory</b> community, whose implicit membership cannot be
+    /// removed); <paramref name="blocked"/> = <c>false</c> removes it (full
+    /// access restored — the child's own membership stands again). One
+    /// <c>SaveChangesAsync</c>. The standing gate is an <b>active</b>
+    /// <see cref="GuardianLink"/> for the exact (guardian, child) pair
+    /// (G·2/G·3 deny-by-default). The component must exist (a block on a
+    /// missing community is a data bug — <see cref="InvalidOperationException"/>).
+    /// The audit row is <c>guardian.community_block</c> when blocking,
+    /// <c>guardian.community_unblock</c> when lifting; <c>TargetKind</c>
+    /// "community", <c>TargetId</c> the component id,
+    /// <see cref="Authorization.AccessVia.Guardian"/> (the
+    /// <c>guardian.suspend</c> / <c>guardian.messaging_restrict</c> shape).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/>,
+    /// <paramref name="communityId"/> or <paramref name="guardianId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No component with that id
+    /// exists, or no profile for the child (bad state, not a no-op).</exception>
+    Task SetChildCommunityBlockAsync(string childId, string communityId, bool blocked, string guardianId);
 
     /// <summary>
     /// Add a membership row (or refresh an existing one) so that
@@ -1020,28 +1162,135 @@ public interface IUserInfoService
     Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
 
     /// <summary>
-    /// GA-AR (ADR 0038 amendment): assign a second guardian to a child — the
-    /// conferral-based standing basis (vs. <see cref="CreateGuardianLinkAsync"/>'s
-    /// creation-based basis). Writes the <see cref="GuardianLink"/> row + TWO
-    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
-    /// <c>ActorId = guardianId</c> (the standing-holder, the GU seam's shape —
-    /// byte-identical to what <see cref="CreateGuardianLinkAsync"/> writes);
-    /// (2) <c>guardian.assign</c> with <c>ActorId = assignedById</c> (the
-    /// conferrer). Together they answer "who holds standing" AND "who
-    /// conferred it." The <see cref="GuardianLink"/> POCO is unchanged (S·3).
-    /// Idempotent for the (guardianId, childId) pair (S·6 — the G-A·4
-    /// precedent, inherited): a duplicate active row is a no-op — no second
-    /// row, no second pair of audit rows.
+    /// GA (ADR 0038 §F): assign a second guardian to a child — the
+    /// conferral-based standing basis. Writes the <see cref="GuardianLink"/>
+    /// row in <see cref="GuardianLinkStatus.Pending"/> state + ONE audit row
+    /// in ONE commit (C3): <c>guardian.assign</c> with
+    /// <c>ActorId = assignedById</c> (the conferrer). The standing is NOT
+    /// conferred yet — the assigned guardian must accept with consent via
+    /// <see cref="AcceptGuardianLinkAsync"/> before the row moves to
+    /// <see cref="GuardianLinkStatus.Active"/> and the
+    /// <c>guardian.create</c> row is written.
+    /// <para>
+    /// <b>Idempotency:</b> if a row already exists for (guardianId, childId)
+    /// in <see cref="GuardianLinkStatus.Pending"/> state, the call is a no-op
+    /// (the row is returned as-is, no second audit row). If the row is in
+    /// <see cref="GuardianLinkStatus.Declined"/> state, it is overwritten
+    /// back to <see cref="GuardianLinkStatus.Pending"/> (a deliberate re-act
+    /// by the conferrer — the row's <c>ResolvedAt</c>/<c>ResolvedBy</c> are
+    /// cleared and a fresh <c>guardian.assign</c> audit row is written). If
+    /// the row is <see cref="GuardianLinkStatus.Active"/> or
+    /// <see cref="GuardianLinkStatus.Dissolved"/>, the call is a no-op.
+    /// </para>
+    /// <para>
+    /// <b>Notification:</b> emits a <c>guardian.assign</c> notification to the
+    /// assigned guardian (the recipient) with a link to
+    /// <c>/me/children</c> (their Index page, where the pending-requests
+    /// card shows the accept/decline actions). The emission is silent when
+    /// <c>services</c> is null (the test-harness precedent).
+    /// </para>
     /// </summary>
     /// <param name="childId">The supervised child's subject id.</param>
     /// <param name="guardianId">The assigned guardian's subject id (the
-    /// standing-holder; the <c>GuardianLink.GuardianId</c> value; the
-    /// <c>guardian.create</c> audit row's <c>ActorId</c>).</param>
+    /// assignee; the <c>GuardianLink.GuardianId</c> value).</param>
     /// <param name="assignedById">The assigning guardian's subject id (the
     /// conferrer; the <c>guardian.assign</c> audit row's
     /// <c>ActorId</c>/<c>EffectivePrincipalId</c>).</param>
     Task<GuardianLink> AssignGuardianLinkAsync(
         string childId, string guardianId, string assignedById);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assigned guardian <b>accepts</b> a pending
+    /// guardian-assignment request for a child. Moves the
+    /// (guardianId, childId) row from <see cref="GuardianLinkStatus
+    /// .Pending"/> → <see cref="GuardianLinkStatus.Active"/> + writes TWO
+    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
+    /// <c>ActorId = guardianId</c> (the standing-holder — the GU seam's
+    /// shape, byte-identical to what <see cref="CreateGuardianLinkAsync"/>
+    /// writes); (2) <c>guardian.accept</c> with <c>ActorId = guardianId</c>
+    /// (the consent event). Stamps <c>ResolvedAt</c>/<c>ResolvedBy</c> on
+    /// the row.
+    /// <para>
+    /// <b>Precondition:</b> a <see cref="GuardianLinkStatus.Pending"/> row
+    /// must exist for the (guardianId, childId) pair. An
+    /// <see cref="InvalidOperationException"/> is thrown if no Pending row
+    /// exists (the row is missing, already Active, already Declined, or
+    /// Dissolved — in all cases the accept is refused, not a no-op).
+    /// </para>
+    /// <para>
+    /// <b>Standing:</b> the acceptee IS the assigned guardian
+    /// (<paramref name="guardianId"/>); no standing gate is needed because
+    /// the row's <c>GuardianId</c> field IS the assignee's identity (the
+    /// row was written by the conferrer, not the assignee — the assignee
+    /// simply identifies with the row they were assigned to).
+    /// </para>
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// assignee; must match the row's <c>GuardianId</c>).</param>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No Pending
+    /// <see cref="GuardianLink"/> for this (guardianId, childId) pair.</exception>
+    Task<GuardianLink> AcceptGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assigned guardian <b>declines</b> a pending
+    /// guardian-assignment request for a child. Moves the
+    /// (guardianId, childId) row from <see cref="GuardianLinkStatus
+    /// .Pending"/> → <see cref="GuardianLinkStatus.Declined"/> + writes ONE
+    /// audit row in ONE commit (C3): <c>guardian.decline</c> with
+    /// <c>ActorId = guardianId</c>. Stamps <c>ResolvedAt</c>/<c>ResolvedBy</c>
+    /// on the row.
+    /// <para>
+    /// <b>Precondition:</b> a <see cref="GuardianLinkStatus.Pending"/> row
+    /// must exist for the (guardianId, childId) pair. An
+    /// <see cref="InvalidOperationException"/> is thrown if no Pending row
+    /// exists (the row is missing, already Active, already Declined, or
+    /// Dissolved — in all cases the decline is refused, not a no-op).
+    /// </para>
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// assignee; must match the row's <c>GuardianId</c>).</param>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No Pending
+    /// <see cref="GuardianLink"/> for this (guardianId, childId) pair.</exception>
+    Task<GuardianLink> DeclineGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assignee's <b>pending</b> guardian-assignment
+    /// requests — a read, not a decision. Returns every
+    /// <see cref="GuardianLink"/> row where
+    /// <see cref="GuardianLink.GuardianId"/> = <paramref name="guardianId"/>
+    /// AND <see cref="GuardianLinkStatus.Pending"/> = the row's state, in
+    /// <see cref="GuardianLink.CreatedAt"/> ascending order (the oldest
+    /// request first — the inbox's natural order). Each row carries
+    /// <see cref="GuardianLink.ChildId"/> (the supervised child) and
+    /// <see cref="GuardianLink.AssignedById"/> (the conferrer — the
+    /// assignee's Index card + Detail "other guardians" list read this to
+    /// resolve the conferrer's display name via the profile read, the
+    /// <c>ChildAccountItem</c> precedent). A non-assignee (no pending row
+    /// for their <c>GuardianId</c>) gets an empty list — the GU lane's
+    /// "a non-guardian sees an empty list" shape.
+    /// <para>
+    /// This read is <b>not</b> standing-gated: the assignee holds no
+    /// standing yet (that is exactly what the accept confers), so the
+    /// <c>GuardActiveLinkAsync</c> gate is not possible. The read IS
+    /// identity-gated: only rows where <c>GuardianId</c> = the caller's
+    /// <c>SubjectId</c> are returned — a different assignee's pending
+    /// requests are not visible (the ADR 0012/0013 "a non-guardian learns
+    /// nothing" shape applied to the identity axis rather than the
+    /// standing axis).
+    /// </para>
+    /// </summary>
+    /// <param name="guardianId">The assignee's subject id (the row's
+    /// <c>GuardianId</c> value).</param>
+    /// <exception cref="ArgumentException"><paramref name="guardianId"/> is
+    /// null/whitespace.</exception>
+    Task<IReadOnlyList<GuardianLink>> GetPendingGuardianRequestsForAssigneeAsync(
+        string guardianId);
 
     /// <summary>
     /// Suspend the child (ADR 0028 §C action 2; G·2 — live standing off
@@ -1115,4 +1364,78 @@ public interface IUserInfoService
     /// false and <paramref name="actorId"/> is not the row's
     /// <see cref="GuardianLink.GuardianId"/>.</exception>
     Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
+
+    // ── GU community-approval lane (the GU extension — the sibling of the m2b
+    // group-invitation lane, but for communities and with the guardian as the
+    // resolver) ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A **guardian** rejects a **supervised child's** pending group
+    /// invitation — the decline write path (no <see cref="GroupMembership"/>
+    /// row lands) with the **guardian** recorded as <c>ResolvedBy</c> and
+    /// the audit row <c>group.invite.reject</c> <c>Via: Guardian</c>.
+    /// Precondition: an **active** <see cref="GuardianLink"/> for (guardian,
+    /// child) and a <b>Pending</b> invitation on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape, its decline
+    /// sibling).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No group invitation for
+    /// this (group, child) pair, or the row is not <c>Pending</c>.</exception>
+    Task RejectGroupInvitationAsync(string groupId, string childId, string guardianId);
+
+    /// <summary>
+    /// A **guardian** rejects a **supervised child's** pending community
+    /// membership request — the decline write path (no
+    /// <see cref="ComponentMembership"/> row lands) with the **guardian**
+    /// recorded as <c>ResolvedBy</c> and the audit row
+    /// <c>community.membership.decline</c> <c>Via: Guardian</c>. Precondition:
+    /// an **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> request on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No community membership
+    /// request for this (component, child) pair, or the row is not
+    /// <c>Pending</c>.</exception>
+    Task DeclineCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId);
+
+    /// <summary>
+    /// A **guardian** approves a **supervised child's** pending community
+    /// membership request — the approve write path (the
+    /// <see cref="ComponentMembership"/> row lands, the
+    /// <c>GetCommunityIdsAsync</c> union read includes it on the very next
+    /// call — invariant C4) with the **guardian** recorded as
+    /// <c>ResolvedBy</c> and the audit row
+    /// <c>community.membership.approve</c> <c>Via: Guardian</c>. Precondition:
+    /// an **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> request on the child (the
+    /// <see cref="ApproveGroupInvitationAsync"/> G·2 shape).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair (deny-by-default — the Web surfaces a
+    /// 404).</exception>
+    /// <exception cref="InvalidOperationException">No community membership
+    /// request for this (component, child) pair, or the row is not
+    /// <c>Pending</c>, or no component with that id exists.</exception>
+    Task ApproveCommunityMembershipRequestAsync(
+        string componentId, string childId, string guardianId);
+
+    /// <summary>
+    /// A child's <b>own</b> pending community membership requests (the
+    /// guardian's Detail curation read + the resolve lanes' Web gate
+    /// "in my child's pending list, else 404"). <c>Pending</c> rows only,
+    /// sorted by <see cref="CommunityMembershipRequest.RequestedAt"/>
+    /// descending (newest first). A candidate read: no
+    /// <see cref="Authorization.AccessAudit"/> row. Live rows (invariant C4):
+    /// a resolve on the guardian lane in the same commit is live on the very
+    /// next call.
+    /// </summary>
+    Task<IReadOnlyList<CommunityMembershipRequest>>
+        GetPendingCommunityMembershipRequestsForChildAsync(string childId);
 }

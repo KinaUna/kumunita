@@ -33,6 +33,36 @@
             <p class="lede text-muted">@Model.Document.Summary</p>
         }
 
+        @* ── Organization (the "documents organization" lane) ────────────────
+           The tag chip row (the Posts/Detail.cshtml shape — a label, never a
+           gate, C-TG·1): each badge links to the by-tag view (/tags/{slug}).
+           A label, never a gate (C-TG·1): a broken reference is dropped
+           upstream, never an error. Not a .td-variant, so it stays visible
+           on every language swap. *@
+        @if (Model.Tags.Count > 0)
+        {
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                @foreach (var tag in Model.Tags)
+                {
+                    <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                       href="/tags/@tag.Slug">@tag.DisplayedName</a>
+                }
+            </div>
+        }
+
+        @* The folder chip (a label, never a gate — the ADR 0039 Pages
+           "folder" is a pure organizational aid, not a navigation tree).
+           A null FolderId = "Unfiled" (the root) — rendered as a plain
+           label, not a link (the "Unfiled" root has no dedicated view). *@
+        @if (Model.FolderId is not null && !string.IsNullOrWhiteSpace(Model.FolderName))
+        {
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span class="badge rounded-pill text-bg-light border">
+                    <kw-l key="documents.folder">Folder</kw-l>: @Model.FolderName
+                </span>
+            </div>
+        }
+
         <div class="card mb-4">
             <div class="card-body">
                 <div class="row g-2">

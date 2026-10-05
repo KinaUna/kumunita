@@ -243,14 +243,18 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
 
         var view = Assert.IsType<ViewResult>(result);                    // 200
         var vm = Assert.IsType<NotificationPreferencesViewModel>(view.ViewData.Model);
-        // The sixteen-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
+        // The closed kind set (C-M6·2 / C-M6·9; ADR 0077
         // adds the two admin-lane kinds — account.signup / account.verified;
         // ADR 0083 adds the two group-membership kinds — group.added /
         // group.invite; ADR 0084 adds the three per-target subscription
         // kinds — announcement / community.post / page.child; ADR 0105
-        // (M9) adds message.new — the direct-messaging nudge kind).
+        // (M9) adds message.new — the direct-messaging nudge kind; ADR 0141
+        // adds the two GU guardian-facing kinds — guardian.group_invite /
+        // guardian.community_invite; ADR 0038 §F adds the acceptance-lane
+        // kind — guardian.assign, the assigned guardian's "a guardian has
+        // asked you to become a co-guardian" nudge).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(17, vm.AllKinds.Count);
+        Assert.Equal(20, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

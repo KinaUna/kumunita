@@ -20,7 +20,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Mail;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Marten;
@@ -207,6 +206,14 @@ var marten = builder.Services.AddMarten(opts =>
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
     DocumentDocTypes.Configure(opts);
+
+    // M25 (ADR 0004 §B.1): the community storage-settings doc
+    // (CommunityStorageSettings, ADR 0004 §B.1 — a parallel surface to
+    // UsageDocTypes / MediaDocTypes, not additive on an existing one:
+    // it uses the conventional string Id, so no non-default convention or
+    // business-key index is pinned). Without this call the doc is invisible
+    // to Marten (the M3/Media/Usage/Document precedent).
+    StorageSettingsDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -226,6 +233,22 @@ if (builder.Environment.IsDevelopment())
 // so Web is the composition root and registers IUserInfoService (→ UserInfoService)
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
+
+// M25 (U8) — the Web-only upload gate (C-UP·3): the single 413-producing
+// call-site the four upload lanes + the document edit-lane re-upload adopt
+// before IMediaStore.PutAsync. Web-layer (it returns an IActionResult — the
+// 413 + the distinct oversize/over-quota message live here); its one
+// dependency is the U4 IStorageSettingsService (registered by AddKumunitaCore
+// above) for the C-SM·7 usage read. Core stays HTTP-free (ADR 0006-D).
+// Scoped — a per-request concern resolved from the request scope, and its
+// dependency (IStorageSettingsService) is transient, so singleton would be a
+// captive dependency.
+builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
+    new Kumunita.Web.Security.UploadGate(
+        sp.GetRequiredService<Kumunita.Core.Usage.IStorageSettingsService>(),
+        sp.GetRequiredService<Kumunita.Core.Usage.IStorageMetricsService>()));
+
+builder.Services.AddScoped<Kumunita.Web.Security.IUploadLimitHint, Kumunita.Web.Security.UploadLimitHint>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
@@ -434,6 +457,17 @@ builder.Services.Configure<Kumunita.Core.Notifications.NotificationOptions>(o =>
     o.SuppressForSampleAccountsInProduction = !builder.Environment.IsDevelopment());
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
+// The §6.4 scheduled jobs bind their retention/window config per-instance from
+// their own sections (the AuditPurgeOptions / EventReminderOptions POCOs, whose
+// defaults apply when the env vars are absent — i.e. these are optional). The
+// AddOptions<T>() registrations above already make IOptions<T> resolvable; these
+// Configure<T>() calls are what actually read the section values, so the
+// AuditPurge__RoutineDays / AuditPurge__UnresolvedReportDays and
+// EventReminder__WindowHours env knobs reach the jobs (OPS §6.4).
+builder.Services.Configure<Kumunita.Core.Authorization.AuditPurgeOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Authorization.AuditPurgeOptions.SectionName));
+builder.Services.Configure<Kumunita.Core.Events.EventReminderOptions>(
+    builder.Configuration.GetSection(Kumunita.Core.Events.EventReminderOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP
 // section (SmtpOptions.SectionName = "SMTP") — same pattern as the two lines above.
 // Without this binding IOptions<SmtpSender> resolves a bare SmtpOptions and the
@@ -502,9 +536,12 @@ builder.Services.AddAuthorization();
 //  4. Retry policy per §6.2 — an explicit RetryWithCooldown TimeSpan list (Wolverine's
 //     "delay list sets retry count" shape, not a maxRetries integer). Six cooldowns sum
 //     to 24 h exactly: 5 + 15 + 45 + 120 + 275 + 980 min = 1 440 min. Applied to the
-//     two SMTP failure classes (SmtpClient throws SmtpException or TimeoutException on
-//     send) — narrower than Exception so a real programming error doesn't sit retrying
-//     for a day.
+//     two SMTP failure classes (MailKit's SmtpClient throws SmtpCommandException for
+//     relay-level rejections — AUTH / mailbox / delivery — or ProtocolException for
+//     connection / TLS / protocol-level failures) — narrower than Exception so a real
+//     programming error doesn't sit retrying for a day. (The BCL-era
+//     SmtpException / TimeoutException pair was replaced by these two types when the
+//     transport moved to MailKit — ADR 0131.)
 var backoff = new[]
 {
     TimeSpan.FromMinutes(5),   TimeSpan.FromMinutes(15),
@@ -521,8 +558,14 @@ builder.UseWolverine(opts =>
     // Ancillary-role store that confuses the Main/Ancillary resolution.
     opts.Policies.UseDurableLocalQueues();
     opts.PublishFaultEvents();
-    opts.OnException<SmtpException>().RetryWithCooldown(backoff);
-    opts.OnException<TimeoutException>().RetryWithCooldown(backoff);
+    // ADR 0131 — the BCL System.Net.Mail.SmtpException / TimeoutException pair was
+    // replaced by MailKit's two SMTP failure classes when the transport swapped
+    // from the .NET BCL to MailKit.SmtpClient. Both cover the "relay-level
+    // rejection" surface the original pair did, plus the connection/TLS surface
+    // (MailKit.ProtocolException) that the BCL's TimeoutException did.
+    opts.OnException<MailKit.Net.Smtp.SmtpCommandException>().RetryWithCooldown(backoff);
+    opts.OnException<MailKit.Net.Smtp.SmtpProtocolException>().RetryWithCooldown(backoff);
+    opts.OnException<MailKit.ProtocolException>().RetryWithCooldown(backoff);
 });
 
 var app = builder.Build();

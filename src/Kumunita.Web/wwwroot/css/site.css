@@ -217,6 +217,562 @@
   --kmb-navbar-tab-offset: 1rem;
 }
 
+/* ==========================================================================
+   Dark theme — "Forest" (ADR 0133)
+   --------------------------------------------------------------------------
+   A second surface over the same token-driven system. The resident chooses
+   the mode from the account menu (POST /theme → the kumunita.theme cookie):
+     auto   (default) — follow the OS prefers-color-scheme. Resolved here in
+                        CSS: no JS, no first-paint flash, live-follows an OS
+                        preference flip.
+     light  — force the light theme (wins over the OS).
+     dark   — force the Forest dark theme (wins over the OS).
+   The dark surface applies under EITHER of these two scopes:
+     (a) the OS prefers dark (prefers-color-scheme) AND html:not([data-kmb-theme='light'])
+     (b) html[data-kmb-theme='dark']
+   Both share the exact tokens + patches below. CSS has no mixins, so the
+   block is written for each scope; the light :root block above remains the
+   single source of the light values.
+
+   Two Bootstrap 5.3 traps are handled (the light-mode readability bug the
+   samples exposed before this shipped):
+   1. Text colours resolve through the --bs-*-rgb *triples*, not the hex —
+      so every -rgb triple is overridden alongside its hex.
+   2. site.css pins some utilities with !important (e.g. .text-secondary to
+      amber, an AA guard; .navbar-brand to pine). The dark overrides below
+      carry !important too and are scoped on the html attribute
+      (html[data-kmb-theme='dark'] / html:not([data-kmb-theme='light'])),
+      which beats the base (0,1,0) rules on specificity even when the base
+      rule is declared later in this same file — do NOT wrap that scope in
+      :where(), which would zero its specificity and lose the tie.
+   ========================================================================== */
+
+/* ---- Forest dark tokens (shared by the auto + explicit-dark scopes) ------ */
+@media (prefers-color-scheme: dark) {
+  html:not([data-kmb-theme='light']) {
+    --bs-body-bg: #0f1a14;      --bs-body-bg-rgb: 15, 26, 20;
+    --bs-body-color: #e6ece7;   --bs-body-color-rgb: 230, 236, 231;
+    --bs-emphasis-color: #f2f6f2; --bs-emphasis-color-rgb: 242, 246, 242;
+    --bs-secondary-color: rgba(230, 236, 231, 0.78);
+    --bs-tertiary-color: rgba(230, 236, 231, 0.55);
+    --bs-tertiary-bg: #16241c;  --bs-tertiary-bg-rgb: 22, 36, 28;
+
+    --bs-light: #182720;        --bs-light-rgb: 24, 39, 32;
+    --bs-light-emphasis: #e6ece7; --bs-light-emphasis-rgb: 230, 236, 231;
+    --bs-light-bg-subtle: #16241c; --bs-light-bg-subtle-rgb: 22, 36, 28;
+    --bs-light-border-subtle: #26382f;
+    --bs-dark: #f2f6f2;         --bs-dark-rgb: 242, 246, 242;
+    --bs-dark-emphasis: #0c1510; --bs-dark-emphasis-rgb: 12, 21, 16;
+    --bs-dark-bg-subtle: #0f1a14; --bs-dark-bg-subtle-rgb: 15, 26, 20;
+    --bs-dark-border-subtle: #26382f;
+    --bs-dark-text-emphasis: #0f1a14; --bs-dark-text-emphasis-rgb: 15, 26, 20;
+
+    --bs-primary: #2f6b4a;      --bs-primary-rgb: 47, 107, 74;
+    --bs-primary-emphasis: #86c9a3; --bs-primary-emphasis-rgb: 134, 201, 163;
+    --bs-primary-bg-subtle: #182720; --bs-primary-bg-subtle-rgb: 24, 39, 32;
+    --bs-primary-border-subtle: #2c4a37;
+    --bs-primary-text-emphasis: #86c9a3; --bs-primary-text-emphasis-rgb: 134, 201, 163;
+
+    --bs-secondary: #f59e0b;    --bs-secondary-rgb: 245, 158, 11;
+    --bs-secondary-emphasis: #f0c97e; --bs-secondary-emphasis-rgb: 240, 201, 126;
+    --bs-secondary-bg-subtle: #2a2314; --bs-secondary-bg-subtle-rgb: 42, 35, 20;
+    --bs-secondary-border-subtle: #4a3a1e;
+    --bs-secondary-text-emphasis: #f0c97e; --bs-secondary-text-emphasis-rgb: 240, 201, 126;
+
+    --bs-success: #3fa866;      --bs-success-rgb: 63, 168, 102;
+    --bs-success-emphasis: #2f7d4f; --bs-success-emphasis-rgb: 47, 125, 79;
+    --bs-success-bg-subtle: #14271b; --bs-success-bg-subtle-rgb: 20, 39, 27;
+    --bs-success-border-subtle: #2c4a37;
+    --bs-success-text-emphasis: #7fd6a0; --bs-success-text-emphasis-rgb: 127, 214, 160;
+    --bs-danger: #c65a53;       --bs-danger-rgb: 198, 90, 83;
+    --bs-danger-emphasis: #a8483f; --bs-danger-emphasis-rgb: 168, 72, 63;
+    --bs-danger-bg-subtle: #2a1815; --bs-danger-bg-subtle-rgb: 42, 24, 21;
+    --bs-danger-border-subtle: #4a2b27;
+    --bs-danger-text-emphasis: #e79a94; --bs-danger-text-emphasis-rgb: 231, 154, 148;
+    --bs-warning: #d6901f;      --bs-warning-rgb: 214, 144, 31;
+    --bs-warning-emphasis: #b47318; --bs-warning-emphasis-rgb: 180, 115, 24;
+    --bs-warning-bg-subtle: #2a2114; --bs-warning-bg-subtle-rgb: 42, 33, 20;
+    --bs-warning-border-subtle: #4a3a1e;
+    --bs-warning-text-emphasis: #e8bd7a; --bs-warning-text-emphasis-rgb: 232, 189, 122;
+    --bs-info: #4fa3a0;         --bs-info-rgb: 79, 163, 160;
+    --bs-info-emphasis: #357f7c; --bs-info-emphasis-rgb: 53, 127, 124;
+    --bs-info-bg-subtle: #142625; --bs-info-bg-subtle-rgb: 20, 38, 37;
+    --bs-info-border-subtle: #2b4a48;
+    --bs-info-text-emphasis: #8fd0cd; --bs-info-text-emphasis-rgb: 143, 208, 205;
+
+    --bs-border-color: #26382f; --bs-border-color-rgb: 38, 56, 47;
+    --bs-border-color-translucent: rgba(230, 236, 231, 0.18);
+    --bs-link-color: #86c9a3;   --bs-link-color-rgb: 134, 201, 163;
+    --bs-link-hover-color: #a7dab9; --bs-link-hover-color-rgb: 167, 218, 185;
+    --bs-focus-ring-color: rgba(134, 201, 163, 0.40);
+
+    /* Kumunita component tokens — the dark reads */
+    --kmb-ink: #e6ece7;
+    --kmb-ink-soft: #c3cec6;
+    --kmb-muted: #8fa196;
+    --kmb-eyebrow: #d8b36a;
+    --kmb-cream: #f2f6f2;
+    --kmb-amber-soft: #f0c97e;
+    --kmb-tint-a: #182720;
+    --kmb-tint-b: #201d14;
+    --kmb-border: #26382f;
+    --kmb-border-soft: #1f3027;
+    --kmb-hover-border: #3a5245;
+    --kmb-hover-row: #14211a;
+    --kmb-surface: #16241c;    /* the "white card" fill in dark */
+    --kmb-surface-2: #1b2d24;  /* nested / raised panels */
+    --kmb-band: #0c1510;       /* the features band (lighter than canvas) */
+  }
+}
+html[data-kmb-theme='dark'] {
+  --bs-body-bg: #0f1a14;      --bs-body-bg-rgb: 15, 26, 20;
+  --bs-body-color: #e6ece7;   --bs-body-color-rgb: 230, 236, 231;
+  --bs-emphasis-color: #f2f6f2; --bs-emphasis-color-rgb: 242, 246, 242;
+  --bs-secondary-color: rgba(230, 236, 231, 0.78);
+  --bs-tertiary-color: rgba(230, 236, 231, 0.55);
+  --bs-tertiary-bg: #16241c;  --bs-tertiary-bg-rgb: 22, 36, 28;
+  --bs-light: #182720;        --bs-light-rgb: 24, 39, 32;
+  --bs-light-emphasis: #e6ece7; --bs-light-emphasis-rgb: 230, 236, 231;
+  --bs-light-bg-subtle: #16241c; --bs-light-bg-subtle-rgb: 22, 36, 28;
+  --bs-light-border-subtle: #26382f;
+  --bs-dark: #f2f6f2;         --bs-dark-rgb: 242, 246, 242;
+  --bs-dark-emphasis: #0c1510; --bs-dark-emphasis-rgb: 12, 21, 16;
+  --bs-dark-bg-subtle: #0f1a14; --bs-dark-bg-subtle-rgb: 15, 26, 20;
+  --bs-dark-border-subtle: #26382f;
+  --bs-dark-text-emphasis: #0f1a14; --bs-dark-text-emphasis-rgb: 15, 26, 20;
+  --bs-primary: #2f6b4a;      --bs-primary-rgb: 47, 107, 74;
+  --bs-primary-emphasis: #86c9a3; --bs-primary-emphasis-rgb: 134, 201, 163;
+  --bs-primary-bg-subtle: #182720; --bs-primary-bg-subtle-rgb: 24, 39, 32;
+  --bs-primary-border-subtle: #2c4a37;
+  --bs-primary-text-emphasis: #86c9a3; --bs-primary-text-emphasis-rgb: 134, 201, 163;
+  --bs-secondary: #f59e0b;    --bs-secondary-rgb: 245, 158, 11;
+  --bs-secondary-emphasis: #f0c97e; --bs-secondary-emphasis-rgb: 240, 201, 126;
+  --bs-secondary-bg-subtle: #2a2314; --bs-secondary-bg-subtle-rgb: 42, 35, 20;
+  --bs-secondary-border-subtle: #4a3a1e;
+  --bs-secondary-text-emphasis: #f0c97e; --bs-secondary-text-emphasis-rgb: 240, 201, 126;
+  --bs-success: #3fa866;      --bs-success-rgb: 63, 168, 102;
+  --bs-success-emphasis: #2f7d4f; --bs-success-emphasis-rgb: 47, 125, 79;
+  --bs-success-bg-subtle: #14271b; --bs-success-bg-subtle-rgb: 20, 39, 27;
+  --bs-success-border-subtle: #2c4a37;
+  --bs-success-text-emphasis: #7fd6a0; --bs-success-text-emphasis-rgb: 127, 214, 160;
+  --bs-danger: #c65a53;       --bs-danger-rgb: 198, 90, 83;
+  --bs-danger-emphasis: #a8483f; --bs-danger-emphasis-rgb: 168, 72, 63;
+  --bs-danger-bg-subtle: #2a1815; --bs-danger-bg-subtle-rgb: 42, 24, 21;
+  --bs-danger-border-subtle: #4a2b27;
+  --bs-danger-text-emphasis: #e79a94; --bs-danger-text-emphasis-rgb: 231, 154, 148;
+  --bs-warning: #d6901f;      --bs-warning-rgb: 214, 144, 31;
+  --bs-warning-emphasis: #b47318; --bs-warning-emphasis-rgb: 180, 115, 24;
+  --bs-warning-bg-subtle: #2a2114; --bs-warning-bg-subtle-rgb: 42, 33, 20;
+  --bs-warning-border-subtle: #4a3a1e;
+  --bs-warning-text-emphasis: #e8bd7a; --bs-warning-text-emphasis-rgb: 232, 189, 122;
+  --bs-info: #4fa3a0;         --bs-info-rgb: 79, 163, 160;
+  --bs-info-emphasis: #357f7c; --bs-info-emphasis-rgb: 53, 127, 124;
+  --bs-info-bg-subtle: #142625; --bs-info-bg-subtle-rgb: 20, 38, 37;
+  --bs-info-border-subtle: #2b4a48;
+  --bs-info-text-emphasis: #8fd0cd; --bs-info-text-emphasis-rgb: 143, 208, 205;
+  --bs-border-color: #26382f; --bs-border-color-rgb: 38, 56, 47;
+  --bs-border-color-translucent: rgba(230, 236, 231, 0.18);
+  --bs-link-color: #86c9a3;   --bs-link-color-rgb: 134, 201, 163;
+  --bs-link-hover-color: #a7dab9; --bs-link-hover-color-rgb: 167, 218, 185;
+  --bs-focus-ring-color: rgba(134, 201, 163, 0.40);
+  --kmb-ink: #e6ece7;
+  --kmb-ink-soft: #c3cec6;
+  --kmb-muted: #8fa196;
+  --kmb-eyebrow: #d8b36a;
+  --kmb-cream: #f2f6f2;
+  --kmb-amber-soft: #f0c97e;
+  --kmb-tint-a: #182720;
+  --kmb-tint-b: #201d14;
+  --kmb-border: #26382f;
+  --kmb-border-soft: #1f3027;
+  --kmb-hover-border: #3a5245;
+  --kmb-hover-row: #14211a;
+  --kmb-surface: #16241c;
+  --kmb-surface-2: #1b2d24;
+  --kmb-band: #0c1510;
+}
+
+/* ---- Forest dark patches (auto scope) ------------------------------------
+   Re-points the hardcoded light literals + resolves the !important text
+   utilities. The html attribute scope gives each rule higher specificity
+   than the base (0,1,0) rules (which are declared later in this file), so
+   with !important on both sides the dark rule still wins. Do not wrap the
+   scope in :where() — that would zero its specificity and lose the tie. */
+@media (prefers-color-scheme: dark) {
+  /* White card / surface fills → dark surface */
+  html:not([data-kmb-theme='light']) .kmb-feat-card,
+  html:not([data-kmb-theme='light']) .kmb-nested-card,
+  html:not([data-kmb-theme='light']) .airy-ann-list,
+  html:not([data-kmb-theme='light']) .airy-post-card,
+  html:not([data-kmb-theme='light']) .airy-group-card,
+  html:not([data-kmb-theme='light']) .airy-page-list,
+  html:not([data-kmb-theme='light']) .dir-card,
+  html:not([data-kmb-theme='light']) .events-calendar-day,
+  html:not([data-kmb-theme='light']) .events-time-grid,
+  html:not([data-kmb-theme='light']) .kanban-card,
+  html:not([data-kmb-theme='light']) .kmb-rail {
+    background: var(--kmb-surface) !important;
+  }
+  html:not([data-kmb-theme='light']) .kmb-nested-card {
+    background: var(--kmb-surface-2) !important;
+  }
+  /* Features band — one step deeper than the canvas */
+  html:not([data-kmb-theme='light']) .kmb-features-band {
+    background-color: var(--kmb-band) !important;
+  }
+  /* Footer */
+  html:not([data-kmb-theme='light']) .kmb-footer {
+    background-color: var(--kmb-surface) !important;
+    color: var(--kmb-ink-soft) !important;
+    border-top-color: var(--kmb-border) !important;
+  }
+  /* Navbar: the bg-white bar + the !important-pinned brand */
+  html:not([data-kmb-theme='light']) .navbar.bg-white,
+  html:not([data-kmb-theme='light']) .bg-white {
+    background-color: var(--kmb-surface) !important;
+  }
+  html:not([data-kmb-theme='light']) .navbar-brand {
+    color: var(--kmb-cream) !important;
+  }
+  html:not([data-kmb-theme='light']) .navbar-light .nav-link:hover,
+  html:not([data-kmb-theme='light']) .navbar-light .nav-link:focus {
+    color: var(--bs-primary-text-emphasis) !important;
+  }
+  /* Two-tier tab strip: the active tab's white merge into the navbar */
+  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link.active,
+  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-item.show .nav-link {
+    border-top-color: var(--kmb-surface) !important;
+    background-color: var(--kmb-surface) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+  }
+  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link:hover,
+  html:not([data-kmb-theme='light']) .kmb-tab-under-navbar .nav-link:focus {
+    color: var(--bs-primary-text-emphasis) !important;
+  }
+  /* Rail-mode tooltip: bg is --kmb-ink (light in dark), so flip the text */
+  html:not([data-kmb-theme='light']) .kmb-rail-tip {
+    color: var(--kmb-ink) !important;
+  }
+  /* Full-screen surfaces (board + calendar) + their close button */
+  html:not([data-kmb-theme='light']) .kanban-board:fullscreen,
+  html:not([data-kmb-theme='light']) #events-calendar:fullscreen {
+    background: var(--bs-body-bg) !important;
+  }
+  html:not([data-kmb-theme='light']) .kanban-fullscreen-close,
+  html:not([data-kmb-theme='light']) .calendar-fullscreen-close {
+    background: var(--kmb-surface) !important;
+  }
+  /* Buttons: re-point the --bs-btn-* literals to the dark reads */
+  html:not([data-kmb-theme='light']) .btn-primary {
+    --bs-btn-bg: #2f6b4a; --bs-btn-border-color: #2f6b4a;
+    --bs-btn-hover-bg: #3a7d59; --bs-btn-hover-border-color: #3a7d59;
+    --bs-btn-active-bg: #356e50; --bs-btn-active-border-color: #356e50;
+    --bs-btn-disabled-bg: #2f6b4a; --bs-btn-disabled-border-color: #2f6b4a;
+  }
+  html:not([data-kmb-theme='light']) .btn-outline-primary {
+    --bs-btn-color: #86c9a3; --bs-btn-border-color: #4a7a5f;
+    --bs-btn-hover-color: #f2f6f2; --bs-btn-hover-bg: #2f6b4a; --bs-btn-hover-border-color: #2f6b4a;
+    --bs-btn-active-color: #f2f6f2; --bs-btn-active-bg: #2f6b4a; --bs-btn-active-border-color: #2f6b4a;
+    --bs-btn-disabled-color: #86c9a3; --bs-btn-disabled-border-color: #4a7a5f;
+  }
+  html:not([data-kmb-theme='light']) .btn-outline-secondary {
+    --bs-btn-color: #f0c97e; --bs-btn-border-color: #b5842e;
+    --bs-btn-hover-color: #17251d; --bs-btn-hover-bg: #f59e0b; --bs-btn-hover-border-color: #f59e0b;
+    --bs-btn-active-color: #17251d; --bs-btn-active-bg: #d6901f; --bs-btn-active-border-color: #d6901f;
+    --bs-btn-disabled-color: #f0c97e; --bs-btn-disabled-border-color: #b5842e;
+  }
+  /* The !important-pinned text utilities (the amber AA guard, .text-dark) */
+  html:not([data-kmb-theme='light']) .text-secondary {
+    color: var(--kmb-ink-soft) !important;
+  }
+  html:not([data-kmb-theme='light']) .text-muted,
+  html:not([data-kmb-theme='light']) .text-body-secondary {
+    color: var(--kmb-ink-soft) !important;
+  }
+  html:not([data-kmb-theme='light']) .text-dark {
+    color: var(--kmb-ink) !important;
+  }
+  html:not([data-kmb-theme='light']) .badge.text-bg-light {
+    background-color: var(--kmb-tint-a) !important;
+    color: var(--kmb-ink) !important;
+  }
+  /* .card.text-bg-light (the admin dashboard's count cards): the fill
+     re-resolves to the dark surface via the --bs-light token, but the text
+     stays Bootstrap's hard-coded black — unreadable on the dark fill.
+     Flip the text to the light emphasis ink. */
+  html:not([data-kmb-theme='light']) .card.text-bg-light {
+    color: var(--bs-light-emphasis) !important;
+  }
+  /* .badge.text-bg-dark (the "mandatory" community chip): the token flip
+     makes it a near-white chip with white text — a glaring bright block in
+     dark mode. Re-point it to a subtle dark chip with light text, matching
+     the .badge.text-bg-light patch above. */
+  html:not([data-kmb-theme='light']) .badge.text-bg-dark {
+    background-color: var(--kmb-tint-a) !important;
+    color: var(--kmb-ink) !important;
+    border-color: var(--kmb-border);
+  }
+  /* Section lead text + the milestone-ID chip (both pinned to light-mode
+     dark-on-light colours: #46534b and #1c4532) — re-point to readable dark. */
+  html:not([data-kmb-theme='light']) .kmb-section-lead {
+    color: var(--kmb-ink-soft) !important;
+  }
+  html:not([data-kmb-theme='light']) .kmb-milestone-id {
+    color: var(--kmb-cream) !important;
+    background-color: rgba(134, 201, 163, 0.14) !important;
+  }
+  /* Feature-card icon glyphs: the base pins them to the light-mode deep pine
+     (#1c4532) and amber-brown (#8a5a12) — on the dark tint discs these read
+     too dark. Re-point to the dark accent reads so the glyphs lift off the disc. */
+  html:not([data-kmb-theme='light']) .kmb-feat-icon {
+    color: var(--bs-primary-text-emphasis) !important;
+  }
+  html:not([data-kmb-theme='light']) .kmb-feat-icon.kmb-feat-icon-warm {
+    color: var(--bs-secondary-text-emphasis) !important;
+  }
+  /* Feature-card body text: the base pins the paragraph to the light-mode
+     muted ink #46534b — on the dark card surface it reads too dark. Re-point
+     to the soft-ink read (the same muted read .kmb-footer / .text-muted use). */
+  html:not([data-kmb-theme='light']) .kmb-feat-card p {
+    color: var(--kmb-ink-soft) !important;
+  }
+  /* Pinned-announcement links: the base rule pins them to the light-mode
+     deep pine #1c4532, which on the dark banner fill reads DARKER than its
+     own background — nearly invisible. Re-point to a light pine (the
+     platform's own link-hover read) so the links lift off the dark fill. */
+  html:not([data-kmb-theme='light']) .kumunita-pinned-announcement .btn-link {
+    color: #a7dab9 !important;
+  }
+  /* Disabled pagination page-links keep Bootstrap's near-white default
+     (rgb(233,236,239) bg + near-white text) — washed out on the dark surface.
+     Darken the background to the tint and dim the text so it reads as
+     "disabled but present". Normal/active page-links already resolve from the
+     dark tokens (bg body-bg, link green) and need no patch. */
+  html:not([data-kmb-theme='light']) .page-item.disabled .page-link {
+    background-color: var(--kmb-tint-a) !important;
+    color: var(--kmb-muted) !important;
+    border-color: var(--kmb-border) !important;
+  }
+  /* Dropdown menus (the account menu / language list ride bg-white) */
+  html:not([data-kmb-theme='light']) .dropdown-menu {
+    background-color: var(--kmb-surface-2) !important;
+    border-color: var(--kmb-border) !important;
+  }
+  html:not([data-kmb-theme='light']) .dropdown-item {
+    color: var(--kmb-ink) !important;
+  }
+  html:not([data-kmb-theme='light']) .dropdown-item:hover,
+  html:not([data-kmb-theme='light']) .dropdown-item:focus {
+    background-color: var(--kmb-tint-a) !important;
+    color: var(--kmb-ink) !important;
+  }
+  /* .btn-close is a black SVG glyph by default — invisible on the dark
+     banner / toasts. Invert it to light (Bootstrap's own .btn-close-white
+     technique), scoped to dark only so light mode keeps the black glyph. */
+  html:not([data-kmb-theme='light']) .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%) !important;
+  }
+  /* .link-light is a "light text on a dark/colored surface" utility (the
+     whats-new toast link on the primary-green toast). The dark token flip
+     re-points --bs-light-rgb to a dark green (#182720), so the link would
+     render dark-on-green — lower contrast than the surrounding near-white
+     toast text. Pin it to white so it keeps its light-on-dark meaning and
+     reads as a link against the primary surface. */
+  html:not([data-kmb-theme='light']) .link-light,
+  html:not([data-kmb-theme='light']) .link-light:hover,
+  html:not([data-kmb-theme='light']) .link-light:focus {
+    color: #fff !important;
+    -webkit-text-decoration-color: #fff !important;
+    text-decoration-color: #fff !important;
+  }
+  /* Off-position form switches: the unchecked track falls back to the dark
+     body-bg (#0f1a14) with a near-black knob — nearly invisible on the canvas.
+     Give the off track a visible dark-green fill + edge and a light knob so
+     the "off" state reads clearly (mirrors Bootstrap's own data-bs-theme=dark
+     switch patch, which this app never triggers since it keys on kmb-theme). */
+  html:not([data-kmb-theme='light']) .form-switch .form-check-input:not(:checked):not(:focus) {
+    --bs-form-check-bg: #2a3a30;
+    border-color: #3d4a42;
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
+  }
+}
+
+/* ---- Forest dark patches (explicit-dark scope) ----------------------------
+   Identical patch list, keyed on html[data-kmb-theme='dark'] so the override
+   wins even when the OS is in light mode. */
+html[data-kmb-theme='dark'] .kmb-feat-card,
+html[data-kmb-theme='dark'] .kmb-nested-card,
+html[data-kmb-theme='dark'] .airy-ann-list,
+html[data-kmb-theme='dark'] .airy-post-card,
+html[data-kmb-theme='dark'] .airy-group-card,
+html[data-kmb-theme='dark'] .airy-page-list,
+html[data-kmb-theme='dark'] .dir-card,
+html[data-kmb-theme='dark'] .events-calendar-day,
+html[data-kmb-theme='dark'] .events-time-grid,
+html[data-kmb-theme='dark'] .kanban-card,
+html[data-kmb-theme='dark'] .kmb-rail {
+  background: var(--kmb-surface) !important;
+}
+html[data-kmb-theme='dark'] .kmb-nested-card {
+  background: var(--kmb-surface-2) !important;
+}
+html[data-kmb-theme='dark'] .kmb-features-band {
+  background-color: var(--kmb-band) !important;
+}
+html[data-kmb-theme='dark'] .kmb-footer {
+  background-color: var(--kmb-surface) !important;
+  color: var(--kmb-ink-soft) !important;
+  border-top-color: var(--kmb-border) !important;
+}
+html[data-kmb-theme='dark'] .navbar.bg-white,
+html[data-kmb-theme='dark'] .bg-white {
+  background-color: var(--kmb-surface) !important;
+}
+html[data-kmb-theme='dark'] .navbar-brand {
+  color: var(--kmb-cream) !important;
+}
+html[data-kmb-theme='dark'] .navbar-light .nav-link:hover,
+html[data-kmb-theme='dark'] .navbar-light .nav-link:focus {
+  color: var(--bs-primary-text-emphasis) !important;
+}
+html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link.active,
+html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-item.show .nav-link {
+  border-top-color: var(--kmb-surface) !important;
+  background-color: var(--kmb-surface) !important;
+  color: var(--bs-primary-text-emphasis) !important;
+}
+html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link:hover,
+html[data-kmb-theme='dark'] .kmb-tab-under-navbar .nav-link:focus {
+  color: var(--bs-primary-text-emphasis) !important;
+}
+html[data-kmb-theme='dark'] .kmb-rail-tip {
+  color: var(--kmb-ink) !important;
+}
+html[data-kmb-theme='dark'] .kanban-board:fullscreen,
+html[data-kmb-theme='dark'] #events-calendar:fullscreen {
+  background: var(--bs-body-bg) !important;
+}
+html[data-kmb-theme='dark'] .kanban-fullscreen-close,
+html[data-kmb-theme='dark'] .calendar-fullscreen-close {
+  background: var(--kmb-surface) !important;
+}
+html[data-kmb-theme='dark'] .btn-primary {
+  --bs-btn-bg: #2f6b4a; --bs-btn-border-color: #2f6b4a;
+  --bs-btn-hover-bg: #3a7d59; --bs-btn-hover-border-color: #3a7d59;
+  --bs-btn-active-bg: #356e50; --bs-btn-active-border-color: #356e50;
+  --bs-btn-disabled-bg: #2f6b4a; --bs-btn-disabled-border-color: #2f6b4a;
+}
+html[data-kmb-theme='dark'] .btn-outline-primary {
+  --bs-btn-color: #86c9a3; --bs-btn-border-color: #4a7a5f;
+  --bs-btn-hover-color: #f2f6f2; --bs-btn-hover-bg: #2f6b4a; --bs-btn-hover-border-color: #2f6b4a;
+  --bs-btn-active-color: #f2f6f2; --bs-btn-active-bg: #2f6b4a; --bs-btn-active-border-color: #2f6b4a;
+  --bs-btn-disabled-color: #86c9a3; --bs-btn-disabled-border-color: #4a7a5f;
+}
+html[data-kmb-theme='dark'] .btn-outline-secondary {
+  --bs-btn-color: #f0c97e; --bs-btn-border-color: #b5842e;
+  --bs-btn-hover-color: #17251d; --bs-btn-hover-bg: #f59e0b; --bs-btn-hover-border-color: #f59e0b;
+  --bs-btn-active-color: #17251d; --bs-btn-active-bg: #d6901f; --bs-btn-active-border-color: #d6901f;
+  --bs-btn-disabled-color: #f0c97e; --bs-btn-disabled-border-color: #b5842e;
+}
+html[data-kmb-theme='dark'] .text-secondary {
+  color: var(--kmb-ink-soft) !important;
+}
+html[data-kmb-theme='dark'] .text-muted,
+html[data-kmb-theme='dark'] .text-body-secondary {
+  color: var(--kmb-ink-soft) !important;
+}
+html[data-kmb-theme='dark'] .text-dark {
+  color: var(--kmb-ink) !important;
+}
+html[data-kmb-theme='dark'] .badge.text-bg-light {
+  background-color: var(--kmb-tint-a) !important;
+  color: var(--kmb-ink) !important;
+}
+/* .card.text-bg-light (the admin dashboard's count cards): dark fill +
+   Bootstrap's hard-coded black text — flip the text to the light ink. */
+html[data-kmb-theme='dark'] .card.text-bg-light {
+  color: var(--bs-light-emphasis) !important;
+}
+/* .badge.text-bg-dark (the "mandatory" community chip): re-point the
+   near-white chip with white text to a subtle dark chip with light text. */
+html[data-kmb-theme='dark'] .badge.text-bg-dark {
+  background-color: var(--kmb-tint-a) !important;
+  color: var(--kmb-ink) !important;
+  border-color: var(--kmb-border);
+}
+/* Section lead text + the milestone-ID chip (light-mode dark colours) —
+   re-point to readable dark. */
+html[data-kmb-theme='dark'] .kmb-section-lead {
+  color: var(--kmb-ink-soft) !important;
+}
+html[data-kmb-theme='dark'] .kmb-milestone-id {
+  color: var(--kmb-cream) !important;
+  background-color: rgba(134, 201, 163, 0.14) !important;
+}
+/* Feature-card icon glyphs: the base pins them to the light-mode deep pine
+   (#1c4532) and amber-brown (#8a5a12) — on the dark tint discs these read
+   too dark. Re-point to the dark accent reads so the glyphs lift off the disc. */
+html[data-kmb-theme='dark'] .kmb-feat-icon {
+  color: var(--bs-primary-text-emphasis) !important;
+}
+html[data-kmb-theme='dark'] .kmb-feat-icon.kmb-feat-icon-warm {
+  color: var(--bs-secondary-text-emphasis) !important;
+}
+/* Feature-card body text: the base pins the paragraph to the light-mode
+   muted ink #46534b — on the dark card surface it reads too dark. Re-point
+   to the soft-ink read (the same muted read .kmb-footer / .text-muted use). */
+html[data-kmb-theme='dark'] .kmb-feat-card p {
+  color: var(--kmb-ink-soft) !important;
+}
+/* Pinned-announcement links: the base rule pins them to the light-mode
+   deep pine #1c4532 — nearly invisible on the dark banner fill. Re-point
+   to a light pine (the platform's own link-hover read). */
+html[data-kmb-theme='dark'] .kumunita-pinned-announcement .btn-link {
+  color: #a7dab9 !important;
+}
+/* Disabled pagination page-links (Bootstrap's near-white default) — darken. */
+html[data-kmb-theme='dark'] .page-item.disabled .page-link {
+  background-color: var(--kmb-tint-a) !important;
+  color: var(--kmb-muted) !important;
+  border-color: var(--kmb-border) !important;
+}
+html[data-kmb-theme='dark'] .dropdown-menu {
+  background-color: var(--kmb-surface-2) !important;
+  border-color: var(--kmb-border) !important;
+}
+html[data-kmb-theme='dark'] .dropdown-item {
+  color: var(--kmb-ink) !important;
+}
+html[data-kmb-theme='dark'] .dropdown-item:hover,
+html[data-kmb-theme='dark'] .dropdown-item:focus {
+  background-color: var(--kmb-tint-a) !important;
+  color: var(--kmb-ink) !important;
+}
+/* .btn-close is a black SVG glyph by default — invisible on the dark banner /
+   toasts. Invert it to light (Bootstrap's .btn-close-white technique). */
+html[data-kmb-theme='dark'] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%) !important;
+}
+/* .link-light — the "light text on a dark/colored surface" link utility (the
+   whats-new toast link on the primary-green toast). The dark token flip
+   re-points --bs-light-rgb to a dark green, so pin it to white to keep its
+   light-on-dark meaning and read as a link against the primary surface. */
+html[data-kmb-theme='dark'] .link-light,
+html[data-kmb-theme='dark'] .link-light:hover,
+html[data-kmb-theme='dark'] .link-light:focus {
+  color: #fff !important;
+  -webkit-text-decoration-color: #fff !important;
+  text-decoration-color: #fff !important;
+}
+/* Off-position form switches: a visible dark-green track + light knob so the
+   "off" state reads clearly (Bootstrap's own data-bs-theme=dark switch patch,
+   which this app never triggers since it keys on data-kmb-theme). */
+html[data-kmb-theme='dark'] .form-switch .form-check-input:not(:checked):not(:focus) {
+  --bs-form-check-bg: #2a3a30;
+  border-color: #3d4a42;
+  --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
+}
+
 /* --- Base ----------------------------------------------------------------- */
 html {
   position: relative;
@@ -919,6 +1475,7 @@ body.kmb-nav-rail-mode {
 body.kmb-nav-rail-mode main,
 body.kmb-nav-rail-mode .kmb-footer,
 body.kmb-nav-rail-mode .kumunita-pinned-announcement,
+body.kmb-nav-rail-mode .kumunita-onboarding-banner,
 body.kmb-nav-rail-mode .kmb-topbar {
   margin-left: var(--kmb-rail-w, 68px);
 }
@@ -936,6 +1493,7 @@ body.kmb-nav-rail-mode.kmb-page-expanded .kmb-rail {
 body.kmb-nav-rail-mode.kmb-page-expanded main,
 body.kmb-nav-rail-mode.kmb-page-expanded .kmb-footer,
 body.kmb-nav-rail-mode.kmb-page-expanded .kumunita-pinned-announcement,
+body.kmb-nav-rail-mode.kmb-page-expanded .kumunita-onboarding-banner,
 body.kmb-nav-rail-mode.kmb-page-expanded .kmb-topbar {
   margin-left: 0;
 }
@@ -1400,6 +1958,64 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   width: 28px;
   height: 28px;
   font-size: 0.85rem;
+}
+
+/* --- M9 message thread (chat layout) ---------------------------------------
+   Each row is avatar + bundle; the actor's own rows sit on the right, the
+   other participant's on the left (the .message-thread list itself is plain —
+   no list-group borders, a column of chat bubbles). */
+.message-thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+/* Mine = row pushed to the right (row-reverse keeps avatar + bundle on the
+   right side); the text within each card stays left-aligned for reading. */
+.msg-row.mine {
+  flex-direction: row-reverse;
+}
+.msg-bundle {
+  max-width: 78%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+/* A touch larger than the 42px default so the bubble reads as a chat face. */
+.msg-avatar .avatar,
+.msg-avatar .avatar-mono {
+  width: 36px;
+  height: 36px;
+  font-size: 0.95rem;
+}
+.msg-meta {
+  line-height: 1.3;
+}
+.msg-meta .message-body {
+  font-size: 0.95rem;
+}
+.message-thread .message-body {
+  white-space: pre-wrap;
+  /* A very long unbroken token (a URL, an id, a single long word) must wrap
+     instead of spilling past the bubble: `overflow-wrap: anywhere` is the
+     standard that reliably breaks it inside the flex `.msg-bundle`, where the
+     legacy `word-break: break-word` did not (the same fix the site already uses
+     for long overflow — e.g. the directory-card / group-name rules above).
+     `white-space: pre-wrap` is kept so intentional newlines still render. */
+  overflow-wrap: anywhere;
+}
+/* The unread marker — a left-edge accent, kept distinct from the bubble. */
+.msg-row.other.unread .msg-avatar .avatar,
+.msg-row.other.unread .msg-avatar .avatar-mono {
+  box-shadow: 0 0 0 2px var(--kmb-amber);
 }
 
 /* --- Rich-content bodies (RC U06) ------------------------------------------

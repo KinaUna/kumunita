@@ -1,5 +1,7 @@
 @model IReadOnlyList<Kumunita.Web.Controllers.LanguagesController.LanguageRowViewModel>
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
 @{
     ViewData["Title"] = "Languages";
     // ADR 0021 — the split surface: a GlobalAdmin sees the full catalog
@@ -8,51 +10,62 @@
     // "UI strings" editor. isGlobalAdmin gates the catalog controls below (the
     // controller gates the same actions with [Authorize]).
     bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+    // The remove-form's data-confirm (the ADR 0072 attribute idiom — resolved
+    // through the provider, the confirm.js seam reads the attribute verbatim).
+    // The reorder button's title tooltip is a simple attribute (kw-l can't wrap
+    // one), so it is server-resolved the same way.
+    string? effLang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var confirmRemoveTemplate = Translation is null ? "Remove {0}? Its translation rows are retained and will be restored if the language is re-added." :
+        await Translation.GetAsync("languages.confirm_remove", effLang);
+    var reorderTitle = Translation is null ? "Submit the current order (as shown below) as the new sort order" :
+        await Translation.GetAsync("languages.reorder_title", effLang);
+    // The present/missing counts are templates with an inlined value ({n}) —
+    // server-resolved (the kw-l TagHelper does not interpolate).
+    var presentTemplate = Translation is null ? "{n} present" : await Translation.GetAsync("languages.present", effLang);
+    var missingTemplate = Translation is null ? "{n} missing" : await Translation.GetAsync("languages.missing", effLang);
+    // The download tooltip is a simple attribute (kw-l can't wrap one) —
+    // server-resolved, plain copy (the old "§bundle CSV" internal term is gone).
+    var downloadTitle = Translation is null ? "Download this language's UI strings as a CSV file" :
+        await Translation.GetAsync("translations.bulk.export_title", effLang);
 }
 
-<h1>Languages</h1>
+<h1><kw-l key="languages.title">Languages</kw-l></h1>
 <p class="text-muted">
     @if (isGlobalAdmin)
     {
-        <text>
-            Manage the languages this instance supports. Changes take effect on the
-            next request — no rebuild, no restart.
-        </text>
+        <kw-l key="languages.lede_admin">Manage the languages this instance supports. Changes take effect on the next request — no rebuild, no restart.</kw-l>
     }
     else
     {
-        <text>
-            Review the platform's translation coverage and update the UI strings.
-            Changes take effect on the next request.
-        </text>
+        <kw-l key="languages.lede_translator">Review the platform's translation coverage and update the UI strings. Changes take effect on the next request.</kw-l>
     }
 </p>
 
 @if (isGlobalAdmin)
 {
     <!-- ── Add a language (GlobalAdmin-only, ADR 0021) ─────────────────────── -->
-    <h2 class="mt-4">Add a language</h2>
+    <h2 class="mt-4"><kw-l key="languages.add_heading">Add a language</kw-l></h2>
     <form method="post" action="/admin/languages" class="row g-2 align-items-end mb-4">
         @Html.AntiForgeryToken()
         <div class="col-sm-3">
-            <label for="code" class="form-label">Language code</label>
+            <label for="code" class="form-label"><kw-l key="languages.code_label">Language code</kw-l></label>
             <input type="text" class="form-control" name="code" id="code"
                    required placeholder="pl" maxlength="16" />
-            <div class="form-text small">Short code, e.g. pl for Polish, no-NO for Norwegian.</div>
+            <div class="form-text small"><kw-l key="languages.code_hint">Short code, e.g. pl for Polish, no-NO for Norwegian.</kw-l></div>
         </div>
         <div class="col-sm-4">
-            <label for="nativeName" class="form-label">Native name</label>
+            <label for="nativeName" class="form-label"><kw-l key="languages.native_name_label">Native name</kw-l></label>
             <input type="text" class="form-control" name="nativeName" id="nativeName"
                    required placeholder="Polski" maxlength="64" />
         </div>
         <div class="col-sm-3">
-            <button type="submit" class="btn btn-primary">Add</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="common.add">Add</kw-l></button>
         </div>
     </form>
 }
 
 <!-- ── Existing languages ───────────────────────────────────────────────── -->
-<h2>Supported languages</h2>
+<h2><kw-l key="languages.supported_heading">Supported languages</kw-l></h2>
 
 @if (isGlobalAdmin)
 {
@@ -64,13 +77,11 @@
             <input type="hidden" name="codesInOrder" value="@Model[i].Code" />
         }
         <button type="submit" class="btn btn-outline-secondary btn-sm"
-                title="Submit the current order (as shown below) as the new sort order">
-            Reorder (confirm current order)
+                title="@reorderTitle">
+            <kw-l key="languages.reorder_btn">Reorder (confirm current order)</kw-l>
         </button>
         <span class="text-muted small ms-2">
-            Drag-and-drop reordering is not available; the reorder form accepts the
-            codes in the order they appear here. To change the order, the admin
-            should submit the list in the desired sequence.
+            <kw-l key="languages.reorder_hint">Drag-and-drop reordering is not available; the reorder form accepts the codes in the order they appear here. To change the order, the admin should submit the list in the desired sequence.</kw-l>
         </span>
     </form>
 }
@@ -79,11 +90,11 @@
     <table class="table table-sm align-middle">
         <thead>
             <tr>
-                <th>Code</th>
-                <th>Native name</th>
-                <th>Enabled</th>
-                <th>UI keys</th>
-                <th>Actions</th>
+                <th><kw-l key="languages.th_code">Code</kw-l></th>
+                <th><kw-l key="languages.th_native_name">Native name</kw-l></th>
+                <th><kw-l key="languages.th_enabled">Enabled</kw-l></th>
+                <th><kw-l key="languages.th_ui_strings">UI strings</kw-l></th>
+                <th><kw-l key="languages.th_actions">Actions</kw-l></th>
             </tr>
         </thead>
         <tbody>
@@ -95,18 +106,18 @@
                     <td>
                         @if (row.Enabled)
                         {
-                            <span class="badge text-bg-success">enabled</span>
+                            <span class="badge text-bg-success"><kw-l key="languages.enabled">enabled</kw-l></span>
                         }
                         else
                         {
-                            <span class="badge text-bg-secondary">disabled</span>
+                            <span class="badge text-bg-secondary"><kw-l key="languages.disabled">disabled</kw-l></span>
                         }
                     </td>
                     <td>
-                        <span class="text-success small">@row.PresentKeys.Count present</span>
+                        <span class="text-success small">@presentTemplate.Replace("{n}", row.PresentKeys.Count.ToString())</span>
                         @if (row.MissingKeys.Count > 0)
                         {
-                            <span class="text-warning small">· @row.MissingKeys.Count missing</span>
+                            <span class="text-warning small">· @missingTemplate.Replace("{n}", row.MissingKeys.Count.ToString())</span>
                         }
                     </td>
                     <td class="text-nowrap">
@@ -117,43 +128,50 @@
                                 {
                                     <form method="post" action="/admin/languages/@row.Code/disable" class="d-inline">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-outline-secondary">Disable</button>
+                                        <button type="submit" class="btn btn-outline-secondary"><kw-l key="languages.action_disable">Disable</kw-l></button>
                                     </form>
                                 }
                                 else
                                 {
                                     <form method="post" action="/admin/languages/@row.Code/enable" class="d-inline">
                                         @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-outline-secondary">Enable</button>
+                                        <button type="submit" class="btn btn-outline-secondary"><kw-l key="languages.action_enable">Enable</kw-l></button>
                                     </form>
                                 }
 
                                 <form method="post" action="/admin/languages/@row.Code/default" class="d-inline">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-primary">Set default</button>
+                                    <button type="submit" class="btn btn-outline-primary"><kw-l key="languages.action_set_default">Set default</kw-l></button>
                                 </form>
                             }
 
                             @* Translation editor — open to both GlobalAdmin and Translator (ADR 0021). *@
                             <a href="/admin/languages/@row.Code/translations"
-                               class="btn btn-outline-info">UI strings</a>
+                               class="btn btn-outline-info"><kw-l key="languages.action_ui_strings">UI strings</kw-l></a>
 
                             @* M15 U04 (ADR 0116, D2/D4) — the per-language download: a plain
                                <a>, no JS, to the bundle.csv route. Open to both roles (the
                                class gate, D3). The kw-l label is the U04 `translations.bulk.export`
                                key; the en fallback is the registry floor (M·1). *@
+                            @* M15 U04 (ADR 0116, D2/D4) — the per-language download: a plain
+                               <a>, no JS, to the bundle.csv route. Open to both roles (the
+                               class gate, D3). The kw-l label is the U04 `translations.bulk.export`
+                               key; the en fallback is the registry floor (M·1). The tooltip is
+                               server-resolved (a simple attribute — kw-l can't wrap one); the
+                               "§bundle CSV" internal term it carried has been reworded to plain
+                               copy in the registry floor. *@
                             <a href="/admin/languages/@row.Code/translations/bundle.csv"
                                class="btn btn-outline-secondary"
-                               title="Download this language's UI strings as the §bundle CSV">
+                               title="@downloadTitle">
                                 <kw-l key="translations.bulk.export">Download translations (CSV)</kw-l>
                             </a>
 
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/admin/languages/@row.Code" class="d-inline"
-                                      data-confirm="Remove @row.Code? Its translation rows are retained and will be restored if the language is re-added.">
+                                      data-confirm="@confirmRemoveTemplate.Replace("{0}", row.Code)">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-danger">Remove</button>
+                                    <button type="submit" class="btn btn-outline-danger"><kw-l key="languages.action_remove">Remove</kw-l></button>
                                 </form>
                             }
                         </div>

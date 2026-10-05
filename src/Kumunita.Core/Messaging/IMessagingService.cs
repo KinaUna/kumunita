@@ -21,6 +21,30 @@ public interface IMessagingService
     Task<bool> IsMessagingEnabledAsync();
     Task SetMessagingEnabledAsync(bool enabled, string actorId);
 
+    /// <summary>
+    /// M9 amendment — the <b>per-actor</b> messaging gate (the per-user control
+    /// the instance-level <see cref="IsMessagingEnabledAsync"/> toggle sits
+    /// above). A resident may participate in messaging only when ALL of:
+    /// <list type="number">
+    /// <item>the instance toggle is on (the <see cref="IsMessagingEnabledAsync"/>
+    /// master gate), AND</item>
+    /// <item>their own <c>Profile.MessagingOptIn</c> is <c>true</c> (their
+    /// opt-in — the M9 privacy-sensitive default-<c>false</c> convention), AND</item>
+    /// <item>their <c>Profile.MessagingRestricted</c> is <c>false</c> (the
+    /// guardian's ceiling — for a supervised child whose guardian forced
+    /// messaging OFF, this veto wins over their own opt-in; for an
+    /// unsupervised resident it is always <c>false</c>).</item>
+    /// </list>
+    /// A read-only seam (no audit row — the <c>IsMessagingEnabledAsync</c>
+    /// read shape; the gate is evaluated, never a decision surface). Used by
+    /// the account nav (to hide the Messages surface for an ineligible
+    /// resident) and enforced inside <see cref="OpenConversationAsync"/> /
+    /// <see cref="SendAsync"/> (the C-M9·2 "enforced in the service, never
+    /// only the view" pin carried to the per-actor half). A missing profile
+    /// reads as not-allowed (fail closed — the floor is "no messaging").
+    /// </summary>
+    Task<bool> IsMessagingAllowedForAsync(string actorId);
+
     // Conversation (D1/D3/D4)
     /// <summary>
     /// Open or return the existing 1:1 conversation for the unordered pair

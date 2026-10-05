@@ -301,6 +301,116 @@ public class MessagesControllerTests
             .SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
+    // ── M9 amendment — per-actor gate (the resident's opt-in + the
+    //      guardian's ceiling, the composite IsMessagingAllowedForAsync
+    //      read) ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// M9 amendment — <c>GET /messages</c> when the instance toggle is on
+    /// but <see cref="IMessagingService.IsMessagingAllowedForAsync"/>
+    /// returns <c>false</c> for the actor (the resident has opted out, or a
+    /// guardian has restricted them): the action returns the same
+    /// <c>Disabled = true</c> render as an off instance (the non-leaky
+    /// shape — the reason is not surfaced), and
+    /// <see cref="IMessagingService.ListConversationsAsync"/> is
+    /// <b>never called</b>.
+    /// </summary>
+    [Fact]
+    public async Task Messages_Index_PerActorDisallowed_RendersDisabled_NoListCall()
+    {
+        var (controller, messaging, userInfo) = BuildMessaging(true);
+        messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
+
+        var action = await controller.Index(null);
+        var view   = Assert.IsType<ViewResult>(action);
+        var model  = Assert.IsType<MessagesController.MessagesIndexViewModel>(view.ViewData.Model);
+
+        Assert.True(model.Disabled);
+        Assert.Empty(model.Conversations);
+        Assert.Empty(model.Candidates);
+        Assert.Null(model.Pager);
+
+        // The per-actor gate was read (the action reached the read).
+        await messaging.Received(1).IsMessagingAllowedForAsync(Actor);
+        // And no list data was fetched at all (the disabled state is
+        // decided by the gate read alone).
+        await messaging.DidNotReceiveWithAnyArgs()
+            .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>());
+        await userInfo.DidNotReceiveWithAnyArgs()
+            .GetProfilesAsync(Arg.Any<bool>());
+    }
+
+    /// <summary>
+    /// M9 amendment — <c>GET /messages/{id}</c> when the per-actor gate is
+    /// disallowed for the actor: the action returns a <see
+    /// cref="NotFoundResult"/> (the non-leaky 404 — indistinguishable from a
+    /// missing id, the C-M9·1 pin), and
+    /// <see cref="IMessagingService.GetConversationAsync"/> is
+    /// <b>never called</b> (no thread data read).
+    /// </summary>
+    [Fact]
+    public async Task Messages_Thread_PerActorDisallowed_404_NoThreadRead()
+    {
+        var (controller, messaging, _) = BuildMessaging(true);
+        messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
+
+        var action = await controller.Thread(ConvoId, null);
+
+        Assert.IsType<NotFoundResult>(action);
+        await messaging.Received(1).IsMessagingAllowedForAsync(Actor);
+        await messaging.DidNotReceiveWithAnyArgs()
+            .GetConversationAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>());
+    }
+
+    /// <summary>
+    /// M9 amendment — <c>POST /messages/{id}/send</c> when the per-actor
+    /// gate is disallowed for the actor: the action returns the disabled
+    /// error render (<c>Disabled = true</c>) and
+    /// <see cref="IMessagingService.SendAsync"/> is <b>never called</b>.
+    /// </summary>
+    [Fact]
+    public async Task Messages_Send_PerActorDisallowed_Disabled_NoSendCall()
+    {
+        var (controller, messaging, _) = BuildMessaging(true);
+        messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(false);
+
+        var action = await controller.Send(ConvoId, "Hello");
+        var view   = Assert.IsType<ViewResult>(action);
+        var model  = Assert.IsType<MessagesController.MessagesThreadViewModel>(view.ViewData.Model);
+
+        Assert.True(model.Disabled);
+        Assert.Null(model.Conversation);
+        Assert.Empty(model.Messages);
+
+        await messaging.Received(1).IsMessagingAllowedForAsync(Actor);
+        await messaging.DidNotReceiveWithAnyArgs()
+            .SendAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// M9 amendment — <c>_AccountNav.cshtml</c> (the U04 deliverable, the
+    /// M9 amendment gate) renders the <c>/messages</c> link <b>only</b>
+    /// when the instance toggle is on <b>AND</b> the signed-in resident is
+    /// per-actor allowed — the view source carries the
+    /// <c>IsMessagingAllowedForAsync</c> read alongside the
+    /// <c>IsMessagingEnabledAsync</c> F5 gate, both wrapping the
+    /// <c>/messages</c> href + the <c>message.nav</c> key.
+    /// </summary>
+    [Fact]
+    public void Messages_Nav_PerActorGate_Wraps_Messages_Link()
+    {
+        var nav = ReadViewSource("Shared", "_AccountNav.cshtml");
+
+        // The M9 amendment gate: the nav entry is behind the
+        // IsMessagingAllowedForAsync per-actor read (in addition to the
+        // F5 IsMessagingEnabledAsync instance-toggle read).
+        Assert.Contains("Messaging.IsMessagingEnabledAsync()", nav, StringComparison.Ordinal);
+        Assert.Contains("IsMessagingAllowedForAsync", nav, StringComparison.Ordinal);
+        // The gate's body carries the /messages link + the message.nav key.
+        Assert.Contains("href=\"/messages\"", nav, StringComparison.Ordinal);
+        Assert.Contains("message.nav", nav, StringComparison.Ordinal);
+    }
+
     // ── 7 — nav entry: toggle off → hidden (view-source pin) ───────────
 
     /// <summary>
@@ -430,6 +540,12 @@ public class MessagesControllerTests
     {
         var messaging = Substitute.For<IMessagingService>();
         messaging.IsMessagingEnabledAsync().Returns(enabled);
+        // M9 amendment — the per-actor gate: defaults to allowed for the
+        // harness actor (the existing tests pin the instance-toggle gate,
+        // not the per-actor gate — the per-actor behavior is pinned in its
+        // own new tests below). A test that wants to exercise the
+        // disallowed path can re-stub this to false.
+        messaging.IsMessagingAllowedForAsync(Arg.Any<string>()).Returns(true);
 
         var userInfo = Substitute.For<IUserInfoService>();
         // Default: the actor's profile (for the "You" sender label on the

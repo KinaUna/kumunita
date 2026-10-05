@@ -88,6 +88,21 @@ export function outputDims(sw: number, sh: number, targetW: number): Dims {
   return { w, h: Math.max(1, Math.round(sh * scale)) };
 }
 
+// ── Localized UI strings (P0-6, the #kumunita-strings bundle) ───────────
+
+/**
+ * The server-rendered strings bundle (`_Layout.cshtml` emits the
+ * closed client-facing key set in the effective language). `L` reads
+ * a key from it, falling back to the en floor when the bundle (or the
+ * key) is absent, so the module keeps working unlocalized.
+ */
+const S: Record<string, string> = (() => {
+  if (typeof document === 'undefined') return {}; // non-DOM / SSR
+  const el = document.getElementById('kumunita-strings');
+  try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
+})();
+const L = (key: string, fallback: string): string => S[key] || fallback;
+
 // ── Image decode (shared by preview + apply) ────────────────────────────
 
 function loadImage(blob: Blob): Promise<HTMLImageElement> {
@@ -97,7 +112,7 @@ function loadImage(blob: Blob): Promise<HTMLImageElement> {
     img.onload = () => resolve(img);
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('Could not load the image for editing.'));
+      reject(new Error(L('img.edit.err_load', 'Could not load the image for editing.')));
     };
     img.src = url;
   });
@@ -133,7 +148,7 @@ function renderCrop(
   );
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error('Image export failed.'))),
+      (b) => (b ? resolve(b) : reject(new Error(L('img.edit.err_export', 'Image export failed.')))),
       mime,
       quality,
     );
@@ -244,31 +259,31 @@ function ieInstance0(): IeModalInstance {
       '<div class="modal-content ie-modal">' +
         '<div class="modal-header">' +
           '<h5 class="modal-title"></h5>' +
-          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' + L('img.edit.close', 'Close') + '"></button>' +
         '</div>' +
         '<div class="modal-body">' +
-          '<div class="ie-stage" role="application" aria-label="Crop area">' +
+          '<div class="ie-stage" role="application" aria-label="' + L('img.edit.crop_area', 'Crop area') + '">' +
             '<canvas class="ie-canvas"></canvas>' +
             '<div class="ie-rect"></div>' +
           '</div>' +
           '<div class="ie-controls d-flex flex-wrap align-items-end gap-3 mt-3">' +
             '<div class="ie-field">' +
-              '<label class="form-label" for="ie-width">Resize width (px)</label>' +
+              '<label class="form-label" for="ie-width">' + L('img.edit.width', 'Width') + '</label>' +
               '<input class="form-control ie-width" id="ie-width" type="number" min="16" step="1" style="width:6rem" />' +
               '<div class="ie-presets d-flex gap-1 mt-1"></div>' +
             '</div>' +
             '<div class="ie-field">' +
-              '<span class="form-label d-block" id="ie-size-label">Output</span>' +
+              '<span class="form-label d-block" id="ie-size-label">' + L('img.edit.output', 'Output') + '</span>' +
               '<span class="ie-size" id="ie-size"></span>' +
             '</div>' +
             '<div class="ie-field">' +
-              '<button type="button" class="btn btn-secondary ie-reset">Reset crop</button>' +
+              '<button type="button" class="btn btn-secondary ie-reset">' + L('img.edit.reset_crop', 'Reset crop') + '</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
         '<div class="modal-footer">' +
-          '<button type="button" class="btn btn-secondary ie-original">Use original</button>' +
-          '<button type="button" class="btn btn-primary ie-apply">Apply</button>' +
+          '<button type="button" class="btn btn-secondary ie-original">' + L('img.edit.use_original', 'Use original') + '</button>' +
+          '<button type="button" class="btn btn-primary ie-apply">' + L('img.edit.apply', 'Apply') + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -315,7 +330,7 @@ function ieInstance0(): IeModalInstance {
       .then((b) => s.finish(b))
       .catch((err) => {
         applyBtn.disabled = false;
-        window.alert(err instanceof Error ? err.message : 'Edit failed.');
+        window.alert(err instanceof Error ? err.message : L('img.edit.err_edit', 'Edit failed.'));
       });
   });
 
@@ -541,7 +556,7 @@ export function openImageEditor(opts: IeOpts): Promise<Blob | null> {
       .catch((err) => {
         // Decoding failed (corrupt / non-image) — surface, fall through to
         // "use original".
-        window.alert(err instanceof Error ? err.message : 'Could not edit the image.');
+        window.alert(err instanceof Error ? err.message : L('img.edit.err_could', 'Could not edit the image.'));
         finish(null);
       });
   });
@@ -555,7 +570,7 @@ export function openImageEditor(opts: IeOpts): Promise<Blob | null> {
  */
 export function editAvatarBlob(blob: Blob, mime: string): Promise<Blob | null> {
   return openImageEditor({
-    title: 'Crop your avatar',
+    title: L('img.edit.title', 'Crop your avatar'),
     blob,
     mime,
     aspect: 1,

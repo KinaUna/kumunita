@@ -1,7 +1,16 @@
 @model Kumunita.Web.Models.PageTreeViewModel
 @using Kumunita.Web.Models
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Pages";
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaCommunityPages  = await Translation.GetAsync("a11y.community_pages", effLang);
+    string ariaCommunityTree   = await Translation.GetAsync("a11y.community_page_tree", effLang);
+    string ariaPlatformPages   = await Translation.GetAsync("a11y.platform_pages", effLang);
+    string ariaPlatformTree    = await Translation.GetAsync("a11y.platform_page_tree", effLang);
 }
 
 <div class="row justify-content-center">
@@ -49,11 +58,11 @@
                short until the resident expands a branch. *@
             @if (Model.Roots.Count > 0)
             {
-                <section aria-label="Community pages">
+                <section aria-label="@ariaCommunityPages">
                     <h2 class="h5 mb-2 mt-1">
                         <kw-l key="pages.section_community">Community pages</kw-l>
                     </h2>
-                    <nav aria-label="Community page tree">
+                    <nav aria-label="@ariaCommunityTree">
                         <ul class="airy-page-list">
                         @foreach (var node in Model.Roots)
                         {
@@ -65,14 +74,14 @@
             }
             @if (Model.SystemRoots.Count > 0)
             {
-                <section aria-label="Platform pages" class="mt-5">
+                <section aria-label="@ariaPlatformPages" class="mt-5">
                     <h2 class="h5 mb-2 mt-1">
                         <kw-l key="pages.section_platform">Platform pages</kw-l>
                     </h2>
                     <p class="text-secondary small mb-3">
                         <kw-l key="pages.section_platform_lede">Published by the platform — terms, help, privacy, and the code of conduct.</kw-l>
                     </p>
-                    <nav aria-label="Platform page tree">
+                    <nav aria-label="@ariaPlatformTree">
                         <ul class="airy-page-list">
                         @foreach (var node in Model.SystemRoots)
                         {

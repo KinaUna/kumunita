@@ -41,9 +41,10 @@ namespace Kumunita.Web.Tests;
 /// </para>
 /// <para>
 /// <b>Allowlist pick (recorded):</b> the default attachment allowlist
-/// (12 types: pdf, msword, docx, ms-excel, xlsx, text/plain, text/csv, zip, +
+/// (17 types: pdf, msword, docx, ms-excel, xlsx, text/plain, text/csv, zip,
+/// x-zip-compressed, audio/mpeg, audio/mp3, audio/mp4, video/mp4, +
 /// the 4 raster image types) <b>excludes</b> SVG (C-ATT·6's named exclusion)
-/// and — for the second F6 assert — <c>video/mp4</c> (a type not in the
+/// and — for the second F6 assert — <c>video/ogg</c> (a type not in the
 /// default at all; the allowlist is closed, so an otherwise-harmless media
 /// type is still refused). Neither is <i>in</i> the default.
 /// </para>
@@ -115,9 +116,9 @@ public class AttachmentUploadTests
     // <item><b>SVG</b> — <c>image/svg+xml</c> — C-ATT·6's named exclusion
     //       (a scriptable vector type the attachment allowlist explicitly
     //       refuses).</item>
-    // <item><b>Video</b> — <c>video/mp4</c> — a type <b>not</b> in the
-    //       attachment allowlist at all (the 12-type default has no
-    //       <c>video/*</c>); the allowlist is closed, so an otherwise-harmless
+    // <item><b>Video</b> — <c>video/ogg</c> — a type <b>not</b> in the
+    //       attachment allowlist at all (the default has <c>video/mp4</c> but no
+    //       other <c>video/*</c>); the allowlist is closed, so an otherwise-harmless
     //       media type is still refused.</item>
     // </list>
     // Both 415, both with zero writes (F6). Mirrors
@@ -132,11 +133,59 @@ public class AttachmentUploadTests
         var svg = await controller.Upload(TestFile("logo.svg", "image/svg+xml", Pdf));
         Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(svg).StatusCode);
 
-        // Assert 2 — video/mp4 (a type not in the attachment allowlist at all):
-        var video = await controller.Upload(TestFile("clip.mp4", "video/mp4", Pdf));
+        // Assert 2 — video/ogg (a type not in the attachment allowlist at all):
+        var video = await controller.Upload(TestFile("clip.ogg", "video/ogg", Pdf));
         Assert.Equal(StatusCodes.Status415UnsupportedMediaType, Assert.IsType<StatusCodeResult>(video).StatusCode);
 
         // F6: no file written on the disallowed-type guard (either assert).
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── M25 U9 — per-lane enforcement (items 15–16) ───────────────────────
+    //
+    // The two enforcement rejects on this lane, driven through U8's gate. The
+    // existing <see cref="AttachUpload_F6_Oversize413"/> (C-ATT·6) already pins
+    // the oversize 413; these add the named pins (15) + the over-quota reject
+    // (16), each asserting the 413 status and that <see cref="IMediaStore
+    // .PutAsync"/> was never called (C-UP·2 / F9).
+
+    /// <summary>
+    /// M25 U9 (item 15, F2) — the **oversize** reject on the attachment lane.
+    /// A small <see cref="CommunityStorageSettings.MaxFileBytes"/> + a large
+    /// quota makes the reject purely oversize. 413 + no byte written.
+    /// </summary>
+    [Fact]
+    public async Task AttachmentUpload_Oversize_413()
+    {
+        var (controller, media) = Build(mediaOptions: new MediaOptions(), actor: Actor,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = 16, PerUserQuotaBytes = long.MaxValue });
+
+        var result = await controller.Upload(TestFile("big.pdf", "application/pdf", new byte[32]));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written.
+        await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// M25 U9 (item 16, F3) — the **over-quota** reject on the attachment
+    /// lane. Pre-seeded usage + a small quota (so <c>usage + incoming &gt;
+    /// quota</c>) with a large per-file cap (so the file is not oversize).
+    /// 413 + no byte written.
+    /// </summary>
+    [Fact]
+    public async Task AttachmentUpload_OverQuota_413()
+    {
+        var (controller, media) = Build(mediaOptions: new MediaOptions(), actor: Actor,
+            settings: new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = long.MaxValue, PerUserQuotaBytes = 50 },
+            currentUsageBytes: 100);
+
+        var result = await controller.Upload(TestFile("report.pdf", "application/pdf", Pdf));
+
+        var status = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status413RequestEntityTooLarge, status.StatusCode);
+        // C-UP·2 / F9: no byte written.
         await media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
@@ -181,7 +230,54 @@ public class AttachmentUploadTests
         await media.Received(1).PutAsync(Arg.Is<byte[]>(b => b.SequenceEqual(Pdf)), "report.pdf", "application/pdf", Actor, Arg.Any<CancellationToken>());
     }
 
-    // ── fixtures ──────────────────────────────────────────────────────────
+        // ── Regression: the legacy zip MIME alias the browser sends for .zip ──
+    //
+    // A zip upload whose <c>IFormFile.ContentType</c> is the legacy alias
+    // <c>application/x-zip-compressed</c> (what Firefox and some Chrome paths
+    // report for a .zip, as opposed to the canonical <c>application/zip</c>)
+    // must now <b>succeed</b> — the allowlist carries both aliases. This is the
+    // positive contrast to <see cref="AttachUpload_F6_WrongType415"/>: the
+    // variant that historically 415'd is now on the closed set.
+
+    [Fact]
+    public async Task AttachUpload_Support_ZipLegacyAlias_IsAllowed()
+    {
+        var (controller, media) = Build(mediaOptions: new MediaOptions(), actor: Actor);
+
+        var stored = new MediaObject
+        {
+            Id = StoredId,
+            ContentType = "application/x-zip-compressed",
+            SizeBytes = Pdf.Length,
+            CreatedById = Actor,
+        };
+        media.PutAsync(Arg.Is<byte[]>(b => b.SequenceEqual(Pdf)), "bundle.zip", "application/x-zip-compressed", Actor, Arg.Any<CancellationToken>())
+            .Returns(stored);
+
+        var result = await controller.Upload(TestFile("bundle.zip", "application/x-zip-compressed", Pdf));
+
+        var json = Assert.IsType<JsonResult>(result);
+        var wire = System.Text.Json.JsonSerializer.Serialize(json.Value);
+        Assert.Contains($"\"id\":\"{StoredId}\"", wire);
+
+        await media.Received(1).PutAsync(Arg.Is<byte[]>(b => b.SequenceEqual(Pdf)), "bundle.zip", "application/x-zip-compressed", Actor, Arg.Any<CancellationToken>());
+    }
+
+    // ── Regression: the env per-file default is 10 MiB (not the old 5 MiB) ──
+    //
+    // Pins the <see cref="MediaOptions.MaxBytes"/> default so a future bump to
+    // a different size is a *visible* test change, not a silent behavior shift.
+    // The admin-set override (<c>CommunityStorageSettings.MaxFileBytes</c>) is
+    // unrelated — it overrides this when non-null.
+
+    [Fact]
+    public void MediaOptions_MaxBytes_Default_IsTenMiB()
+    {
+        var options = new MediaOptions();
+        Assert.Equal(10L * 1024 * 1024, options.MaxBytes);
+    }
+
+// ── fixtures ──────────────────────────────────────────────────────────
 
     /// <summary>
     /// A minimal <see cref="IFormFile"/> carrier backed by a byte array: the
@@ -252,7 +348,9 @@ public class AttachmentUploadTests
     /// reads.
     /// </summary>
     private static (AttachmentController Controller, IMediaStore Media) Build(
-        MediaOptions mediaOptions, string actor)
+        MediaOptions mediaOptions, string actor,
+        Kumunita.Core.Usage.CommunityStorageSettings? settings = null,
+        long currentUsageBytes = 0)
     {
         // The PostService ctor null-checks its three arguments (no DB work in
         // the ctor); the Upload action never calls it, so substitutes suffice
@@ -276,6 +374,13 @@ public class AttachmentUploadTests
             new ClaimsIdentity(
                 new[] { new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, actor) },
                 authenticationType: "test"));
+        // M25 U9 — the two enforcement tests pass an explicit settings doc +
+        // pre-seeded usage; the pre-existing tests keep the U8 default (null →
+        // env fallback, 0 → quota disabled), so their assertions are unchanged.
+        var gateSettings = settings
+            ?? new Kumunita.Core.Usage.CommunityStorageSettings { MaxFileBytes = null, PerUserQuotaBytes = 0 };
+        httpContext.RequestServices = UploadGateTestSupport.ServicesWith(
+            gateSettings, currentUsageBytes);
 
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
         return (controller, media);

@@ -42,6 +42,20 @@ import { openImageEditor } from './image-editor.js';
 // ── Private helpers (not exported — internal to the module) ───────────────
 
 /**
+ * The server-rendered strings bundle (P0-6): `_Layout.cshtml` emits the
+ * closed client-facing key set resolved in the effective language as a
+ * `<script type="application/json" id="kumunita-strings">` element. `L`
+ * reads a key from it, falling back to the en floor when the bundle (or
+ * the key) is absent, so the module keeps working unlocalized.
+ */
+const S: Record<string, string> = (() => {
+  if (typeof document === 'undefined') return {}; // non-DOM / SSR (RE·2)
+  const el = document.getElementById('kumunita-strings');
+  try { return el ? JSON.parse(el.textContent || '{}') : {}; } catch { return {}; }
+})();
+const L = (key: string, fallback: string): string => S[key] || fallback;
+
+/**
  * HTML-escape the five HTML-significant characters. Applied to every
  * input character **before** any inline rules run (client-side R·2,
  * the same construction as `MarkdownRenderer.HtmlEscape`). A hostile
@@ -487,6 +501,7 @@ type RcmField = {
   value?: string;
   placeholder?: string;
   required?: boolean;
+  hint?: string;
 };
 type RcmOpts = {
   title: string;
@@ -527,7 +542,8 @@ function rcmInstance0(): RcmModalInstance {
       '<div class="modal-content">' +
         '<div class="modal-header">' +
           '<h5 class="modal-title"></h5>' +
-          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="' +
+            htmlEscape(L('common.close', 'Close')) + '"></button>' +
         '</div>' +
         '<div class="modal-body"></div>' +
         '<div class="modal-footer"></div>' +
@@ -624,6 +640,16 @@ function rcmAnyFilled(fields: RcmField[]): boolean {
   });
 }
 
+/** The localized per-file limit text (admin setting), or undefined when unlimited / unavailable. */
+async function fetchUploadLimitHint(): Promise<string | undefined> {
+  try {
+    const { text } = await apiFetch<{ text: string | null }>('/upload-limit');
+    return text ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rcmFieldGroup(f: RcmField): HTMLElement {
   const group = document.createElement('div');
   group.className = 'mb-3';
@@ -644,6 +670,13 @@ function rcmFieldGroup(f: RcmField): HTMLElement {
     if (f.placeholder) input.placeholder = f.placeholder;
   }
   group.appendChild(input);
+
+  if (f.hint) {
+    const hint = document.createElement('div');
+    hint.className = 'form-text small';
+    hint.textContent = f.hint;
+    group.appendChild(hint);
+  }
 
   const fb = document.createElement('div');
   fb.className = 'invalid-feedback';
@@ -672,7 +705,7 @@ function rcmPresent(opts: RcmOpts): void {
   cancel.type = 'button';
   cancel.className = 'btn btn-secondary';
   cancel.dataset.bsDismiss = 'modal';
-  cancel.textContent = 'Cancel';
+  cancel.textContent = L('common.cancel', 'Cancel');
   footer.appendChild(cancel);
   // The confirm button lives in the footer, OUTSIDE the (body) form, so it
   // is associated with that form via the `form` attribute. `type="submit"`
@@ -708,7 +741,9 @@ function rcmPresent(opts: RcmOpts): void {
     } catch (err) {
       rcmSetBusy(false, { confirm: opts.confirmLabel, busy: opts.busyLabel });
       rcmShowError(
-        err instanceof Error ? err.message : 'Something went wrong.',
+        err instanceof Error
+          ? err.message
+          : L('rc.editor.error_generic', 'Something went wrong.'),
       );
       return;
     }
@@ -1273,6 +1308,9 @@ export function bindRichEditor(root: HTMLElement): void {
   const changeBlockTag = (tag: string): void => {
     if (!previewPane) return;
     const block = currentBlock();
+    // The empty-block seed becomes post content on save, so it is deliberately
+    // left as the en floor (a contenteditable placeholder would be the fuller
+    // fix — a larger change, P0-6 out of scope).
     const content = (block ? block.innerHTML : '') || 'Heading';
     const newBlock = document.createElement(tag);
     newBlock.innerHTML = content;
@@ -1289,6 +1327,8 @@ export function bindRichEditor(root: HTMLElement): void {
   const wrapBlockInList = (listTag: string): void => {
     if (!previewPane) return;
     const block = currentBlock();
+    // Empty list-item seed — like the heading seed, left as the en floor
+    // (it becomes user content on save; a placeholder would be the real fix).
     const content = (block ? block.innerHTML : '') || 'item';
     const list = document.createElement(listTag);
     const li = document.createElement('li');
@@ -1373,7 +1413,7 @@ export function bindRichEditor(root: HTMLElement): void {
       e.preventDefault();
     });
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       if (kind === 'bold' || kind === 'italic' || kind === 'code') {
         // Bold / italic / code is a toggle: unwrap if the caret/selection is
         // already inside the kind's element, otherwise wrap (or, for a
@@ -1397,28 +1437,31 @@ export function bindRichEditor(root: HTMLElement): void {
         // reject precedent, RC R·2).
         rcmSaveRange();
         rcmPresent({
-          title: 'Insert link',
+          title: L('rc.editor.link.title', 'Insert link'),
           fields: [
             {
               id: 'rcm-url',
-              label: 'URL',
+              label: L('rc.editor.link.url', 'URL'),
               type: 'url',
               placeholder: 'https://…',
               required: true,
             },
           ],
-          confirmLabel: 'Insert link',
-          busyLabel: 'Inserting…',
+          confirmLabel: L('rc.editor.link.confirm', 'Insert link'),
+          busyLabel: L('rc.editor.link.busy', 'Inserting…'),
           onConfirm: () => {
             const url = rcmField('rcm-url').value.trim();
             if (!url) {
-              rcmSetFieldError('rcm-url', 'Enter a URL.');
+              rcmSetFieldError('rcm-url', L('rc.editor.link.err_empty', 'Enter a URL.'));
               return false;
             }
             if (!isSafeUrl(url)) {
               rcmSetFieldError(
                 'rcm-url',
-                'Use an http(s), mailto, or relative URL.',
+                L(
+                  'rc.editor.link.err_invalid',
+                  'Enter a valid link (web address, email, or site-relative path).',
+                ),
               );
               return false;
             }
@@ -1448,7 +1491,7 @@ export function bindRichEditor(root: HTMLElement): void {
             // store's content-addressing (id = SHA-256 of the bytes) yields a
             // fresh MediaObject with zero server / renderer / serializer change.
             const edited = await openImageEditor({
-              title: 'Edit image',
+              title: L('rc.editor.image.title', 'Edit image'),
               blob: file,
               mime: file.type || 'image/png',
               aspect: null,
@@ -1469,7 +1512,7 @@ export function bindRichEditor(root: HTMLElement): void {
             // parses (zero server change).
             const canonical = `/content-image/${id}`;
             if (!isSafeImageSrc(canonical)) {
-              window.alert('Uploaded image source was rejected.');
+              window.alert(L('rc.editor.image.err_rejected', 'Uploaded image source was rejected.'));
               return;
             }
             // Pinned alt rule (the RE image convention): the file name
@@ -1505,7 +1548,9 @@ export function bindRichEditor(root: HTMLElement): void {
             syncTextarea();
           } catch (err) {
             window.alert(
-              err instanceof Error ? err.message : 'Upload failed.',
+              err instanceof Error
+                ? err.message
+                : L('rc.editor.image.err_upload', 'Upload failed.'),
             );
           }
         });
@@ -1520,27 +1565,29 @@ export function bindRichEditor(root: HTMLElement): void {
         // image (C-ATT·2). A rejected type 415s and the error is shown in
         // the modal (C-ATT·6); the label defaults to "Attachment".
         rcmSaveRange();
+        const limitHint = await fetchUploadLimitHint();
         rcmPresent({
-          title: 'Attach file',
+          title: L('rc.editor.attach.title', 'Attach file'),
           fields: [
-            { id: 'rcm-file', label: 'File', type: 'file', required: true },
+            { id: 'rcm-file', label: L('rc.editor.attach.file', 'File'), type: 'file', required: true, hint: limitHint },
             {
               id: 'rcm-attach-label',
-              label: 'Link text',
+              label: L('rc.editor.attach.link_text', 'Link text'),
               type: 'text',
-              value: 'Attachment',
+              value: L('rc.editor.attach.default_label', 'Attachment'),
             },
           ],
-          confirmLabel: 'Attach',
-          busyLabel: 'Uploading…',
+          confirmLabel: L('rc.editor.attach.confirm', 'Attach'),
+          busyLabel: L('rc.editor.attach.busy', 'Uploading…'),
           onConfirm: async () => {
             const file = rcmField('rcm-file').files?.[0];
             if (!file) {
-              rcmSetFieldError('rcm-file', 'Choose a file to attach.');
+              rcmSetFieldError('rcm-file', L('rc.editor.attach.err_no_file', 'Choose a file to attach.'));
               return false;
             }
             const label =
-              rcmField('rcm-attach-label').value.trim() || 'Attachment';
+              rcmField('rcm-attach-label').value.trim() ||
+              L('rc.editor.attach.default_label', 'Attachment');
             const fd = new FormData();
             fd.append('file', file);
             const { id } = await apiFetch<{ id: string }>('/attachment', {

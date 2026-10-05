@@ -33,4 +33,27 @@ public sealed class DocumentUploadViewModel
     /// cref="AudienceEditorModel.BuildAudience"/> at <c>POST</c>.
     /// </summary>
     public AudienceEditorModel Audience { get; set; } = new();
+
+    // ── Organization (the "documents organization" lane) ─────────────────────
+    /// <summary>
+    /// The folder the new document is filed into (the ADR 0039 Pages
+    /// <c>ParentId</c> forest carried to Documents). An empty value =
+    /// "Unfiled" (the root). The controller resolves it to a validated
+    /// folder id (a shape-violating folder is a form error — the M3 "a form
+    /// is a shape" precedent) before the Core write lane sees it.
+    /// </summary>
+    public string? FolderId { get; set; }
+
+    /// <summary>
+    /// The TG-lane tag labels the uploader typed (the client
+    /// <c>client/lib/tag-suggest.ts</c> posts a JSON array of label strings,
+    /// e.g. <c>["bylaws", "budget"]</c>, into this one field; the server
+    /// parses + normalizes via <see cref="TagSlugs.Parse"/>). The Core write
+    /// lane resolves them to <c>Tag</c> ids through
+    /// <see cref="Kumunita.Core.Tags.ITagService.AttachToDocumentAsync"/>
+    /// (the <c>AttachToPostAsync</c> / <c>AttachToPageAsync</c> precedent).
+    /// A blank / absent value is the "no tags" state (the M3/M7
+    /// default-empty idiom).
+    /// </summary>
+    public string? TagIds { get; set; }
 }

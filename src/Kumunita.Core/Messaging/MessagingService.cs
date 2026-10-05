@@ -30,9 +30,17 @@ public sealed class MessagingService : IMessagingService
     /// §Drift-guard may amend the number, not the cap rule).</summary>
     public const int MaxBodyChars = 2000;
 
-    /// <summary>The list / thread page size (the ADR 0090 D4 neighborhood-scale
-    /// page; <c>HasMore</c> is the sole paging signal, ADR 0090 D1).</summary>
+    /// <summary>The conversation-list page size (the ADR 0090 D4
+    /// neighborhood-scale page; <c>HasMore</c> is the sole paging signal,
+    /// ADR 0090 D1).</summary>
     public const int PageSize = 20;
+
+    /// <summary>The thread page size — the <b>10 most recent</b> messages a
+    /// single thread read returns (the "show only the 10 latest" pin; a
+    /// "load earlier" button pages backwards through the rest). Smaller than
+    /// the list's <see cref="PageSize"/>: a 1:1 thread is a tight, recent
+    /// exchange, not a directory-scale feed.</summary>
+    public const int ThreadPageSize = 10;
 
     private readonly IDocumentStore _store;
     // The OtherDisplayName resolution lane (design doc refinement 8) —
@@ -65,6 +73,33 @@ public sealed class MessagingService : IMessagingService
         // (the deliberate inverse of the AnnouncementCommentsEnabled
         // <c>true</c> floor — a privacy-sensitive opt-in, design doc §D2).
         return settings?.MessagingEnabled == true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsMessagingAllowedForAsync(string actorId)
+    {
+        // M9 amendment — the per-actor half of the gate. The instance toggle
+        // (IsMessagingEnabledAsync) is the master gate; this reads the actor's
+        // own Profile (MessagingOptIn must be true, MessagingRestricted must
+        // be false). A missing profile or a harness without the directory seam
+        // reads as not-allowed (fail closed — the floor is "no messaging", the
+        // same ADR 0105 opt-in default-<c>false</c> convention).
+        if (string.IsNullOrWhiteSpace(actorId))
+            return false;
+
+        if (!await IsMessagingEnabledAsync().ConfigureAwait(false))
+            return false;   // the instance master gate — off ⇒ no one
+
+        if (_userInfo is null)
+            return false;   // no directory seam ⇒ cannot verify the opt-in ⇒ fail closed
+
+        var profile = await _userInfo.GetProfileAsync(actorId).ConfigureAwait(false);
+        if (profile is null)
+            return false;   // fail closed — the opt-in floor is "off"
+
+        // The resident's own opt-in must be on, AND the guardian's ceiling
+        // (for a supervised child) must not be forcing it off.
+        return profile.MessagingOptIn && !profile.MessagingRestricted;
     }
 
     public async Task SetMessagingEnabledAsync(bool enabled, string actorId)
@@ -112,6 +147,14 @@ public sealed class MessagingService : IMessagingService
         if (actorId == otherId)
             throw new ArgumentException("A conversation is between two distinct residents (D1 — no self-conversations).", nameof(otherId));
 
+        // The per-actor gate (M9 amendment) — the actor must be messaging-
+        // allowed (instance on + own opt-in + no guardian veto). Enforced at
+        // the Web boundary (the MessagesController, the app's real request
+        // surface — the IMessagingService is an internal composition seam,
+        // not an exposed endpoint) via the IsMessagingAllowedForAsync read,
+        // mirroring how the instance toggle is surfaced in the nav +
+        // controller. The instance-toggle throw below stays as the
+        // defense-in-depth backstop (C-M9·2).
         await EnsureEnabledAsync().ConfigureAwait(false);
 
         // The pair is stored **sorted** (ParticipantA < ParticipantB) so the
@@ -198,11 +241,11 @@ public sealed class MessagingService : IMessagingService
         var messages = await session.Query<Message>()
             .Where(m => m.ConversationId == convo.Id)
             .OrderByDescending(m => m.Created)
-            .Skip((p - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((p - 1) * ThreadPageSize)
+            .Take(ThreadPageSize)
             .ToListAsync(ct)
             .ConfigureAwait(false);
-        var hasMore = messages.Count == PageSize;
+        var hasMore = messages.Count == ThreadPageSize;
 
         var other = actorId == convo.ParticipantA ? convo.ParticipantB : convo.ParticipantA;
         return new ConversationDetail(

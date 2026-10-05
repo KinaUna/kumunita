@@ -101,7 +101,7 @@ public class NavMoreFoldTests
     /// <summary>
     /// <c>site.css</c> styles the <c>.kmb-nav-folded</c> state class (the
     /// folded items' navbar-voice rule), and it is NOT inside an
-    /// <c>@media</c> block — so the six-<c>@media</c> inventory pinned by
+    /// <c>@media</c> block — so the eight-<c>@media</c> inventory pinned by
     /// <see cref="PwaManifestTests.Site_Css_Media_Block_Boundary_Pinned"/> is
     /// preserved (the M10 drift-guard frozen pin #7).
     /// </summary>
@@ -118,12 +118,13 @@ public class NavMoreFoldTests
         // The state-class rule lives OUTSIDE any @media block. A naive
         // "@media…{…}" could in principle swallow a nested rule, so check the
         // .kmb-nav-folded occurrences all sit in the top-level (non-media)
-        // region: i.e. the media-block count is still exactly six (the pinned
-        // boundary) — a change would mean a new block was added, which is the
-        // breach this pin guards against.
+        // region: i.e. the media-block count is still exactly eight (the
+        // pinned boundary — 4 width + 1 collapsed + 1 reduced-motion + 2
+        // ADR 0133 dark blocks). A change would mean a new block was added
+        // without a record, which is the breach this pin guards against.
         var allMedia = Regex.Matches(css, @"@media");
-        Assert.True(allMedia.Count == 6,
-            $"Expected exactly 6 '@media' occurrences (the M10 pinned boundary — the ADR 0113 fold state class is intentionally not a media block); found {allMedia.Count}.");
+        Assert.True(allMedia.Count == 8,
+            $"Expected exactly 8 '@media' occurrences (the M10 pinned boundary — the ADR 0113 fold state class is intentionally not a media block; the 2 dark blocks are ADR 0133); found {allMedia.Count}.");
     }
 
     // ── (4) the decision is recorded ────────────────────────────────────────

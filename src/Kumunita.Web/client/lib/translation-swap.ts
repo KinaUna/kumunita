@@ -24,7 +24,28 @@ function swapTo(group: HTMLElement, code: string, activeChip: HTMLButtonElement)
   // `[data-td-variant]` set: the chips carry the same data-td-variant
   // attribute and sit inside the group wrapper, so showing/hiding only the
   // containers leaves the chip row (the selector) intact (TD·1 / TD·2).
+  //
+  // Some detail views (the community post detail) split a variant's title and
+  // body into two containers (the title on the title row, the body below the
+  // author footer). They opt in with two extra classes on the `.td-variant`
+  // containers — heading-agnostic (works for <h4>, <h1>, …):
+  //   * `td-variant-shared` — the authored-in title, used as the FALLBACK
+  //     heading whenever the picked language has no title of its own.
+  //   * `td-variant-title`  — a dedicated per-translation title (rendered only
+  //     for translations that DO carry a title).
+  // A classic detail surface (announcement / event / group / reply / page /
+  // project) has neither marker: there every `.td-variant` swaps on the code
+  // alone, exactly as before. So the only added rule is: the shared fallback
+  // title hides when the picked code has its own dedicated title, and shows
+  // otherwise (a translation with no title keeps the authored-in heading).
+  const pickedHasDedicatedTitle = Array.from(group.querySelectorAll<HTMLElement>('.td-variant')).some(
+    (c) => c.dataset.tdVariant === code && c.classList.contains('td-variant-title'),
+  );
   group.querySelectorAll<HTMLElement>('.td-variant').forEach((container) => {
+    if (container.classList.contains('td-variant-shared')) {
+      container.style.display = pickedHasDedicatedTitle ? 'none' : '';
+      return;
+    }
     container.style.display = container.dataset.tdVariant === code ? '' : 'none';
   });
   // Reflect the current variant on the chip row (accessibility + feedback).

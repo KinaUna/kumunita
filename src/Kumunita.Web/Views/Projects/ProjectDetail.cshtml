@@ -18,6 +18,22 @@
     var _kwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     bool _originalHidden = Model.Translations is { Count: > 0 }
         && Model.Translations.Any(t => String.Equals(t.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase));
+
+    // The remove-translation form's data-confirm (the ADR 0072 attribute
+    // idiom — the confirm.js seam reads the attribute verbatim; the kw-l
+    // TagHelper can't wrap an attribute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string confirmRemoveTrans = "Remove this translation?";
+    // The actions menu's accessible name is a template with a {0} slot (the
+    // project's title) — server-resolved (the kw-l TagHelper can't wrap an
+    // attribute, and can't substitute). The en floor is the server fallback
+    // (a null provider — a non-HTTP render — degrades to en).
+    string ariaActionsFor = "Actions for {0}";
+    if (Translation is not null)
+    {
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
+        ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
+    }
 }
 
 <div class="row justify-content-center">
@@ -183,7 +199,7 @@
                         <div class="dropdown">
                             <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
-                                    aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Title) ? "project" : Model.Title)}")">⋮</button>
+                                    aria-label="@(ariaActionsFor.Replace("{0}", string.IsNullOrWhiteSpace(Model.Title) ? "project" : Model.Title))">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 @if (Model.CanEdit)
                                 {
@@ -223,7 +239,7 @@
                                         {
                                             <li>
                                                 <form method="post" action="@($"/projects/projects/{Model.Id}/translations/remove")"
-                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                      data-confirm="@confirmRemoveTrans" style="margin:0;">
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                     <button type="submit" class="dropdown-item text-danger">

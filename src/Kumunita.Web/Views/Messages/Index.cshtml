@@ -11,6 +11,10 @@
     // attribute, so resolve them server-side, once, up front (the ADR 0072 /
     // Search/Index placeholder pattern).
     var lang = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    // The new-conversation resident picker's accessible name is server-resolved
+    // (the kw-l TagHelper can't wrap an attribute); the a11y.* floor is the
+    // closed set.
+    var ariaResident = await Translation.GetAsync("a11y.resident", lang);
     var unreadWord = await Translation.GetAsync("message.unread", lang);
     var otherWord = await Translation.GetAsync("message.other", lang);
 }
@@ -86,7 +90,7 @@
                     {
                         <form method="post" action="/messages/open" class="mb-0">
                             @Html.AntiForgeryToken()
-                            <select class="form-select mb-2" name="otherId" required aria-label="Resident">
+                            <select class="form-select mb-2" name="otherId" required aria-label="@ariaResident">
                                 <option value="" disabled selected>…</option>
                                 @foreach (var candidate in Model.Candidates)
                                 {

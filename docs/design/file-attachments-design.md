@@ -304,7 +304,9 @@ create a second options type). Mirror the real instance-style members
 (`AllowedContentTypes` / `ResolvedAllowedTypes` / `IsAllowed`) exactly:
 
 ```csharp
-/// <summary>Comma-separated allowed attachment Content-Types (case-insensitive).
+/// <summary>Comma-separated allowed attachment Content-Types (case-insensitive,
+/// and parameter-insensitive — a client's <c>text/plain; charset=utf-8</c>
+/// matches the bare <c>text/plain</c> entry).
 /// Config key: Media:AttachmentAllowedContentTypes (distinct from the image
 /// Media:AllowedContentTypes). Positive-only; SVG excluded (C-ATT·6).</summary>
 public string? AttachmentAllowedContentTypes { get; set; }
@@ -317,7 +319,9 @@ public IEnumerable<string> ResolvedAttachmentAllowedTypes =>
 public bool IsAttachmentAllowed(string? contentType) =>
     !System.String.IsNullOrWhiteSpace(contentType)
     && ResolvedAttachmentAllowedTypes.Any(t =>
-        System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
+        // (membership funnels through the shared parameter-insensitive matcher
+        // — see MediaOptions.AllowedTypeMatches — so `; charset=…` variants match)
+        AllowedTypeMatches(ResolvedAttachmentAllowedTypes, contentType));
 ```
 
 - The **pinned default allowlist** (verbatim, C-ATT·6): `application/pdf`,
@@ -329,7 +333,7 @@ public bool IsAttachmentAllowed(string? contentType) =>
   are included** so a resident can attach a photo *as a download* without also
   using the Image button.
 - The image lane's `AllowedContentTypes` / `ResolvedAllowedTypes` / `IsAllowed`
-  are **untouched** (C-ATT·9). `MaxBytes` (5 MiB) is **reused**, not a second
+  are **untouched** (C-ATT·9). `MaxBytes` (10 MiB) is **reused**, not a second
   size cap.
 
 ### 2.6 Upload route `POST /attachment` (mirror `POST /content-image`)

@@ -132,10 +132,14 @@ from the page; the audit row is the only trail). The guards are:
 - **Route:** `GET /admin/help`, `POST /admin/help/reset`, `POST /admin/help/reset-all`.
 - **Link:** a `/admin/help` entry added to the Platform section list-group in
   `Views/Admin/Platform.cshtml`, alongside the other `/admin/*` surfaces.
-- **View:** `Views/Admin/Help.cshtml` — a table of seeded pages (title, slug, an
-  "Up to date" / "Newer text shipped" badge, a per-page Reset button) plus a
-  single prominent "Reset all" action card. A warning banner names how many pages
-  have newer shipped text, so the admin sees the affected *set* at a glance.
+- **View:** `Views/AdminHelp/Index.cshtml` (following the `Views/Admin{X}/`
+  controller-view convention every other `Admin*` controller uses — it was
+  filed at `Views/Admin/Help.cshtml` and broke MVC's action-view resolution,
+  so `/admin/help` 500'd with "The view 'Index' was not found") — a table of
+  seeded pages (title, slug, an "Up to date" / "Newer text shipped" badge, a
+  per-page Reset button) plus a single prominent "Reset all" action card. A
+  warning banner names how many pages have newer shipped text, so the admin
+  sees the affected *set* at a glance.
 - **Localisation:** the admin shell is **plain English by local convention**
   (the `Platform.cshtml` list-group copy is deliberately non-`kw-l`, because an
   interpolated `kw-l` key there would break the `KwLRegistryConsistencyTests`

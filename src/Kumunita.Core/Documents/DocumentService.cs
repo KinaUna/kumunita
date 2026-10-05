@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -25,6 +26,20 @@ namespace Kumunita.Core.Documents;
 /// no new <c>AccessAction</c>, no new overload, no new seam on a frozen
 /// interface.
 /// </para>
+/// <para>
+/// **Organization lane (the "documents organization" feature):** the
+/// <c>UploadAsync</c> / <c>UpdateAsync</c> write lanes accept a
+/// <c>FolderId</c> (written verbatim onto <see cref="Document.FolderId"/>,
+/// the ADR 0039 Pages <c>ParentId</c> forest carried to Documents) and
+/// <c>TagSlugs</c> (the <c>TG</c>-lane slugs, resolved to <c>TagIds</c>
+/// through the <see cref="ITagService.AttachToDocumentAsync"/> seam — the
+/// <see cref="PostService.CreatePostAsync"/> tag-attach precedent). The
+/// <see cref="ITagService"/> seam is **optional** (nullable default, the
+/// CS1736 shape — the existing <see cref="DocumentServiceTests"/> call sites
+/// that construct <see cref="DocumentService"/> positionally keep compiling
+/// unchanged; they omit it ⇒ <c>null</c> ⇒ **no tag attach** on the lane).
+/// The DI registration passes the live <see cref="ITagService"/>.
+/// </para>
 /// </summary>
 public sealed class DocumentService
 {
@@ -33,12 +48,15 @@ public sealed class DocumentService
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
+    private readonly ITagService? _tags;
 
-    public DocumentService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store)
+    public DocumentService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
+        ITagService? tags = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _tags = tags;
     }
 
     /// <summary>
@@ -157,12 +175,33 @@ public sealed class DocumentService
             SizeBytes = draft.SizeBytes,
             Audience = draft.Audience,   // C-M21·1 — written verbatim; never mutated here.
             OwnerId = actorId,
+            FolderId = draft.FolderId,   // the organization lane — written verbatim (the Web layer validated it).
             Created = DateTimeOffset.UtcNow,
             Modified = null
         };
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG lane (the "documents organization" feature) — resolve the typed
+        // slugs to Tag ids through the AttachToDocumentAsync seam (the
+        // PostService.CreatePostAsync tag-attach precedent). Only if the form
+        // gave slugs (empty ⇒ no tags, the M3/M7 default-empty idiom). The
+        // lane re-checks the standing (owner ∪ GlobalAdmin — here the actor
+        // is the owner by construction) and create-or-reuses each tag
+        // (C-TG·4); it stores the resolved Tag ids onto Document.TagIds. A
+        // bad Slug is an ArgumentException (the Web layer maps it to a form
+        // error — the M3 "a form is a shape" precedent).
+        if (draft.TagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var actorRoles = new HashSet<string>(0); // empty — the owner-match short-circuits the standing probe
+            var resolved = await _tags.AttachToDocumentAsync(doc.Id, draft.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            doc.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(doc);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
         return doc;
     }
 
@@ -214,6 +253,11 @@ public sealed class DocumentService
         doc.Audience = edit.Audience;
         doc.Title = edit.Title;
         doc.Summary = edit.Summary;
+        // Organization lane (the "documents organization" feature): the folder
+        // is written verbatim (the Web layer resolved it to a validated id; a
+        // null = "Unfiled" the root). The owner-only gate above already
+        // passed, so the write is authorized.
+        doc.FolderId = edit.FolderId;
         if (edit.FileReplaced)
         {
             doc.MediaId = edit.MediaId;
@@ -225,6 +269,30 @@ public sealed class DocumentService
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG lane (the "documents organization" feature) — resolve the typed
+        // slugs to Tag ids through the AttachToDocumentAsync seam (the
+        // PostService.UpdatePostAsync tag-attach precedent). The tri-state
+        // (the U8b register patch's detach semantics): <c>null</c> ⇒ leave
+        // the document's existing tags (the <c>PostService.UpdatePostAsync</c>
+        // "leave existing" shape — the optional trailing param); a **present**
+        // field (even an empty <c>[]</c> when the owner removed every chip) is
+        // authoritative ⇒ empty detaches all, non-empty attaches (the
+        // AttachToDocumentAsync lane's standing probe is the authoritative
+        // gate — it throws UnauthorizedAccessException before anything is
+        // written if the actor lacks standing; here the owner-only gate
+        // already passed, so it short-circuits on the owner match).
+        if (edit.TagSlugs is not null && _tags is not null)
+        {
+            var actorRoles = new HashSet<string>(0); // empty — the owner-match short-circuits the standing probe
+            var resolved = await _tags.AttachToDocumentAsync(
+                    documentId, edit.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            doc.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(doc);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
         return doc;
     }
 }
