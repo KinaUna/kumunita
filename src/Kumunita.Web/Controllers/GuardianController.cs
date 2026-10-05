@@ -160,6 +160,21 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         var guardianItems = await ActiveGuardiansAsync(childId);
 
+        // Count-aware steering (ADR 0028 §G·6 amendment): a <b>co-guardian</b>
+        // (this child has ≥2 active guardians) is steered to "Remove myself as
+        // guardian" — their standing over the child ends, the child keeps the
+        // account, and the other guardian(s) keep their standing. A
+        // <b>sole</b> guardian (this child has exactly 1 active guardian — this
+        // one) cannot simply step down, because doing so would leave the child
+        // with no guardian at all; they are steered to the two existing
+        // terminal lanes instead: <b>hand the account over</b> to the child
+        // (the dissolve lane — the child keeps the account and comes of age) or
+        // <b>delete the account</b> entirely (the ADR 0143 lane). The signal
+        // rides ViewData (the M9 MessagingRestricted precedent — the
+        // MembershipEditorModel is a pinned record; adding a field would break
+        // the U07 exact-projection pin).
+        ViewData["IsSoleGuardian"] = (await ActiveGuardianCountAsync(childId)) == 1;
+
         // M9 amendment — the guardian's messaging-restriction ceiling
         // (the child's Profile.MessagingRestricted flag, read through the
         // existing GetProfileAsync; null-safe — a missing profile degrades
@@ -572,7 +587,16 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         try
         {
             await userInfo.DissolveGuardianLinkAsync(link.Id, subject, viaAdmin: false);
-            TempData["info"] = "Guardianship dissolved — the account is now the child's own.";
+            // The count-aware success message (ADR 0028 §G·6): the Detail
+            // view's steering already frames this correctly per case — a
+            // co-guardian sees "You are no longer this child's guardian…"
+            // (the other guardian(s) continue), a sole guardian sees "The
+            // account is now the child's own…" (the hand-over lane). The
+            // single message below covers both framings honestly: the
+            // guardian's standing over the child has ended; what happens
+            // next (the child keeps it, or it is deleted) is a separate act
+            // the guardian has not yet performed.
+            TempData["info"] = "Your guardianship over this account has ended.";
         }
         catch (UnauthorizedAccessException)
         {
@@ -1041,6 +1065,28 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// The count of <b>active</b> <see cref="GuardianLink"/> rows for a child
+    /// (a read, not a decision) — the standing count that drives the count-aware
+    /// steering (ADR 0028 §G·6): <c>= 1</c> means the caller is the child's
+    /// <b>sole</b> active guardian, <c>&gt;= 2</c> means at least one other
+    /// active guardian remains. <b>Active</b> rows only (the standing the G·2
+    /// rule confers) — <see cref="GuardianLinkStatus.Pending"/> rows are
+    /// excluded, because a pending assignment confers no standing yet: a
+    /// child with one active + one pending guardian is still sole for steering
+    /// purposes, exactly as it is for the standing gates
+    /// (<c>ActiveLinkAsync</c> / <c>ActiveGuardiansAsync</c> query Active
+    /// exclusively).
+    /// </summary>
+    private async Task<int> ActiveGuardianCountAsync(string childId)
+    {
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GuardianLink>()
+            .Where(l => l.ChildId == childId && l.Status == GuardianLinkStatus.Active)
+            .CountAsync(System.Threading.CancellationToken.None);
     }
 
     /// <summary>

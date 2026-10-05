@@ -373,6 +373,21 @@ public static class KnownTranslationKeys
                 "Their memberships are preserved, and their own controls come " +
                 "back on the next read.",
             ["guardian.dissolve"]            = "Dissolve guardianship",
+            // Count-aware steering (ADR 0028 §G·6): a <b>co-guardian</b> (this
+            // child has ≥2 active guardians) sees this heading + hint + button
+            // instead of the "Hand over the account" lane — removing yourself
+            // ends your standing over the child, the other guardian(s)
+            // continue, and the child keeps their account. The POST is the
+            // <b>same</b> <c>Dissolve</c> action as the sole-guardian hand-over
+            // lane (the standing over the child ends either way); only the
+            // framing differs (a co-guardian is not handing anything over —
+            // the other guardian is still there).
+            ["guardian.remove_myself"]       = "Remove myself as guardian",
+            ["guardian.remove_myself_hint"]  =
+                "You are one of several guardians of this child. Removing yourself " +
+                "ends your standing over their account; the other guardian(s) " +
+                "continue, and their account is preserved.",
+            ["guardian.remove_myself_submit"] = "Remove myself",
             ["guardian.suspended"]           = "Suspended",
             ["guardian.unsuspend"]           = "Un-suspend",
             ["guardian.suspend"]             = "Suspend",
@@ -2277,6 +2292,10 @@ public static class KnownTranslationKeys
                 "Restrict messaging for this child? They will no longer be able to send or receive direct " +
                 "messages, regardless of their own opt-in.",
             ["guardian.handover_confirm"]    = "Hand over this account to the child? This dissolves your guardianship over it.",
+            ["guardian.remove_myself_confirm"] =
+                "Remove yourself as this child's guardian? You will no longer be " +
+                "able to manage their account. They keep their account, and " +
+                "their other guardian(s) continue.",
             ["guardian.delete_child_confirm"] =
                 "Delete this child account permanently? This removes their sign-in, profile, " +
                 "and memberships, and cannot be undone.",
@@ -2645,6 +2664,14 @@ public static class KnownTranslationKeys
                 "Die Mitgliedschaften bleiben erhalten, und die eigenen " +
                 "Einstellmöglichkeiten kommen beim nächsten Lesen zurück.",
             ["guardian.dissolve"]            = "Vormundschaft auflösen",
+            // Count-aware steering (ADR 0028 §G·6) — de.
+            ["guardian.remove_myself"]       = "Ich nehme meine Vormundstellung zurück",
+            ["guardian.remove_myself_hint"]  =
+                "Du bist einer von mehreren Vormündern dieses Kindes. " +
+                "Wenn du deine Vormundstellung zurücknimmst, enden deine " +
+                "Befugnisse über das Konto; die übrigen Vormünder bleiben " +
+                "dabei, und das Konto bleibt erhalten.",
+            ["guardian.remove_myself_submit"] = "Ich nehme mich zurück",
             ["guardian.suspended"]           = "Gesperrt",
             ["guardian.unsuspend"]           = "Wieder aktivieren",
             ["guardian.suspend"]             = "Sperren",
@@ -4426,6 +4453,10 @@ public static class KnownTranslationKeys
                 "Messaging für dieses Kind einschränken? Es kann dann keine direkten Nachrichten mehr " +
                 "senden oder empfangen, unabhängig von seiner eigenen Opt-in.",
             ["guardian.handover_confirm"]    = "Dieses Konto an das Kind übergeben? Damit löst du deine Vormundschaft über es auf.",
+            ["guardian.remove_myself_confirm"] =
+                "Nimmst du deine Vormundstellung für dieses Kind zurück? Du " +
+                "kannst das Konto danach nicht mehr verwalten. Es bleibt " +
+                "erhalten, und die übrigen Vormünder bleiben dabei.",
             ["guardian.delete_child_confirm"] =
                 "Dieses Kind-Konto dauerhaft löschen? Damit werden Anmeldung, Profil und " +
                 "Mitgliedschaften entfernt — das kann nicht rückgängig gemacht werden.",
@@ -4800,7 +4831,14 @@ public static class KnownTranslationKeys
                 "adhesions sont conservées, et ses propres réglages reviennent " +
                 "à la prochaine lecture.",
             ["guardian.dissolve"]            = "Dissoudre la tutelle",
-            ["guardian.suspended"]           = "Suspendé",
+            // Count-aware steering (ADR 0028 §G·6) — fr.
+            ["guardian.remove_myself"]       = "Retirer ma tutelle",
+            ["guardian.remove_myself_hint"]  =
+                "Vous êtes l'un des tuteurs de cet enfant. Retirer votre " +
+                "tutelle met fin à vos droits sur le compte ; les autres " +
+                "tuteurs restent en place, et le compte est conservé.",
+            ["guardian.remove_myself_submit"] = "Me retirer",
+            ["guardian.suspended"]           = "Suspendu",
             ["guardian.unsuspend"]           = "Réactiver",
             ["guardian.suspend"]             = "Suspendre",
             ["guardian.delete_child"]        = "Supprimer le compte de l'enfant",
@@ -6582,6 +6620,10 @@ public static class KnownTranslationKeys
                 "Restreindre la messagerie pour cet enfant ? Il ne pourra plus envoyer ni recevoir de " +
                 "messages directs, quelle que soit son propre opt-in.",
             ["guardian.handover_confirm"]    = "Transférer ce compte à l'enfant ? Cela dissout ta tutelle sur ce compte.",
+            ["guardian.remove_myself_confirm"] =
+                "Retirer ta tutelle sur ce compte ? Tu ne pourras plus gérer " +
+                "le compte. Le compte est conservé, et les autres tuteurs " +
+                "restent en place.",
             ["guardian.delete_child_confirm"] =
                 "Supprimer définitivement ce compte d'enfant ? Cette opération " +
                 "retire la connexion, le profil et les adhésions, et ne peut pas " +
@@ -6958,6 +7000,13 @@ public static class KnownTranslationKeys
                 "Medlemskaberne bevares, og barnets egne kontroller kommer " +
                 "tilbage ved næste læsning.",
             ["guardian.dissolve"]            = "Afløs værgemodet",
+            // Count-aware steering (ADR 0028 §G·6) — da.
+            ["guardian.remove_myself"]       = "Fjern mig selv som værgemand",
+            ["guardian.remove_myself_hint"]  =
+                "Du er en af flere værgemænd for dette barn. Når du fjerner " +
+                "dig selv som værgemand, ophører dine rettigheder over " +
+                "kontoen; de øvrige værgemænd bliver ved, og kontoen bevares.",
+            ["guardian.remove_myself_submit"] = "Fjern mig selv",
             ["guardian.suspended"]           = "Suspendert",
             ["guardian.unsuspend"]           = "Genopret",
             ["guardian.suspend"]             = "Suspendér",
@@ -8726,6 +8775,10 @@ public static class KnownTranslationKeys
                 "Begræns beskeder for dette barn? Det vil ikke længere kunne sende eller modtage " +
                 "direkte beskeder, uanset dets eget opt-in.",
             ["guardian.handover_confirm"]    = "Overtag dette konto til barnet? Dette ophæver din forældremyndighed over det.",
+            ["guardian.remove_myself_confirm"] =
+                "Fjerner du dig selv som værgemand for dette barn? Du kan " +
+                "derefter ikke administrere kontoen. Kontoen bevares, og de " +
+                "øvrige værgemænd bliver ved.",
             ["guardian.delete_child_confirm"] =
                 "Slet denne barnkonto permanent? Dette fjerner login, profil og " +
                 "medlemskaber, og det kan ikke fortrydes.",

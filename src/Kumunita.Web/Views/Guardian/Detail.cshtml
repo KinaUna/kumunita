@@ -12,6 +12,7 @@
     string confirmAllow    = "Allow messaging for this child? They will be able to send and receive direct messages (their own opt-in must also be on).";
     string confirmRestrict = "Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.";
     string confirmHandover = "Hand over this account to the child? This dissolves your guardianship over it.";
+    string confirmRemoveMyself = "Remove yourself as this child's guardian? You will no longer be able to manage their account. They keep their account, and their other guardian(s) continue.";
     string confirmDeleteChild = "Delete this child account permanently? This removes their sign-in, profile, and memberships, and cannot be undone.";
     if (Translation is not null)
     {
@@ -19,6 +20,7 @@
         confirmAllow    = await Translation.GetAsync("guardian.messaging.allow_confirm", effLang);
         confirmRestrict = await Translation.GetAsync("guardian.messaging.restrict_confirm", effLang);
         confirmHandover = await Translation.GetAsync("guardian.handover_confirm", effLang);
+        confirmRemoveMyself = await Translation.GetAsync("guardian.remove_myself_confirm", effLang);
         confirmDeleteChild = await Translation.GetAsync("guardian.delete_child_confirm", effLang);
     }
     @*
@@ -306,19 +308,50 @@
         </div>
 
         @*
-            GU (independence lane) — dissolve the link. The child's
-            memberships are preserved; their self-serve lanes restore on the
-            next read (G·2/C4). The destructive POST is confirm-guarded
-            client-side (a UX nicety — the server gate is the U07 route + the
-            Core seam's standing check).
+            Count-aware steering (ADR 0028 §F amendment, 2026-10-05). Both
+            lanes below POST to the same Dissolve action — the standing over
+            the child ends either way — but they are framed differently
+            depending on whether this is the child's sole active guardian or
+            a co-guardian:
+              • co-guardian (≥2 active guardians): "Remove myself as
+                guardian" — the other guardian(s) continue, the child keeps
+                their account. The hand-over framing would be misleading
+                (nothing is being handed over; the other guardian is still
+                there), so it is not shown.
+              • sole guardian (this is the only active guardian): "Hand over
+                the account" — the account is handed to the child and they
+                come of age (the independence lane, ADR 0028 G·4/G·2). A
+                separate "delete" lane below covers the case where the
+                account itself should go away.
+            The branching reads the IsSoleGuardian flag the Detail action
+            exposes on ViewData (the M9 MessagingRestricted precedent — the
+            MembershipEditorModel is a pinned 6-field record, the U07
+            exact-projection pin forbids adding a field, so the flag rides
+            ViewData).
         *@
-        <h2 class="mt-4"><kw-l key="guardian.handover">Hand over the account</kw-l></h2>
-        <p class="text-muted"><kw-l key="guardian.handover_hint">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</kw-l></p>
-        <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
-              data-confirm="@confirmHandover">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
-        </form>
+        @{
+            var _isSoleGuardian = (bool)(ViewData["IsSoleGuardian"] ?? false);
+        }
+        @if (_isSoleGuardian)
+        {
+            <h2 class="mt-4"><kw-l key="guardian.handover">Hand over the account</kw-l></h2>
+            <p class="text-muted"><kw-l key="guardian.handover_hint">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</kw-l></p>
+            <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
+                  data-confirm="@confirmHandover">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
+            </form>
+        }
+        else
+        {
+            <h2 class="mt-4"><kw-l key="guardian.remove_myself">Remove myself as guardian</kw-l></h2>
+            <p class="text-muted"><kw-l key="guardian.remove_myself_hint">You are one of several guardians of this child. Removing yourself ends your standing over their account; the other guardian(s) continue, and their account is preserved.</kw-l></p>
+            <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
+                  data-confirm="@confirmRemoveMyself">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger"><kw-l key="guardian.remove_myself_submit">Remove myself</kw-l></button>
+            </form>
+        }
 
         @*
             ADR 0143 — delete the child account (the 6th GU supervisory
@@ -333,18 +366,21 @@
             GuardianDeleteChildForm shape). The child's content never
             reaches this form (G·1).
         *@
-        <h2 class="mt-4"><kw-l key="guardian.delete_child">Delete the child account</kw-l></h2>
-        <p class="text-muted"><kw-l key="guardian.delete_child_lede">Deleting the account removes the child's sign-in, profile, and group and community memberships, and dissolves any other guardianship over it. Their past actions in the audit trail are preserved with their identity replaced by a placeholder. This cannot be undone.</kw-l></p>
-        <form method="post" action="@Url.Action("DeleteChild", "Guardian", new { childId = Model.ChildId })"
-              data-confirm="@confirmDeleteChild">
-            @Html.AntiForgeryToken()
-            <div asp-validation-summary="All" class="text-danger mb-2"></div>
-            <div class="mb-2 form-check">
-                <input name="Confirmed" type="checkbox" class="form-check-input" />
-                <label class="form-check-label"><kw-l key="guardian.delete_child_confirm_checkbox">I understand the child account will be permanently deleted.</kw-l></label>
-            </div>
-            <button type="submit" class="btn btn-danger"><kw-l key="guardian.delete_child_submit">Delete account</kw-l></button>
-        </form>
+        @if (_isSoleGuardian)
+        {
+            <h2 class="mt-4"><kw-l key="guardian.delete_child">Delete the child account</kw-l></h2>
+            <p class="text-muted"><kw-l key="guardian.delete_child_lede">Deleting the account removes the child's sign-in, profile, and group and community memberships, and dissolves any other guardianship over it. Their past actions in the audit trail are preserved with their identity replaced by a placeholder. This cannot be undone.</kw-l></p>
+            <form method="post" action="@Url.Action("DeleteChild", "Guardian", new { childId = Model.ChildId })"
+                  data-confirm="@confirmDeleteChild">
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="All" class="text-danger mb-2"></div>
+                <div class="mb-2 form-check">
+                    <input name="Confirmed" type="checkbox" class="form-check-input" />
+                    <label class="form-check-label"><kw-l key="guardian.delete_child_confirm_checkbox">I understand the child account will be permanently deleted.</kw-l></label>
+                </div>
+                <button type="submit" class="btn btn-danger"><kw-l key="guardian.delete_child_submit">Delete account</kw-l></button>
+            </form>
+        }
 
         @*
             GA (ADR 0038 §F) — the "other guardians" list: the child's
