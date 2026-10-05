@@ -702,6 +702,74 @@ public sealed class IdentityService(
             via: Authorization.AccessVia.Admin);
     }
 
+    // ── ADR 0143 — guardian delete-child (the GU standing over the ADR 0142 core) ──
+
+    /// <inheritdoc />
+    public async Task DeleteChildAccountAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // Standing gate FIRST (G·2/G·3, live — the GuardActiveLinkAsync
+        // shape every other GU seam runs, and the house convention: gate
+        // before existence). An ACTIVE GuardianLink for this exact
+        // (guardian, child) pair must exist, else refuse before any write.
+        // A child is never a GlobalAdmin, so there is no GlobalAdmin gate
+        // here (C·2 deny-by-default: the lane is reachable only through an
+        // active link); a non-guardian's crafted call is refused with
+        // UnauthorizedAccessException (the Web's 404). Checking the standing
+        // first also keeps the response uniform for an existing vs. a
+        // non-existing target (both a 404 — no account-existence oracle),
+        // the ADR 0012/0013 "a non-guardian learns nothing" shape.
+        await using (var gateSession = documentStore.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var link = await gateSession.Query<Kumunita.Core.UserInfo.GuardianLink>()
+                .Where(l => l.GuardianId == guardianId && l.ChildId == childId
+                            && l.Status == GuardianLinkStatus.Active)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+            if (link is null)
+                throw new UnauthorizedAccessException(
+                    $"No active guardian link for ({guardianId}, {childId}).");
+        }
+
+        // The target must exist (a defensive check AFTER the standing gate —
+        // the SuspendChildAsync "load the profile, missing → InvalidOperationException"
+        // shape). A second call for an already-deleted child reaches the
+        // standing gate first (the successful delete dissolved the link, C·5)
+        // and is refused with the same 404 — not a silent no-op.
+        var target = await userManager.FindByIdAsync(childId).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"No account '{childId}'.");
+
+        await DeleteCoreAsync(
+            childId, target,
+            actorId: guardianId,
+            via: Authorization.AccessVia.Guardian,
+            // ADR 0143 C·5 — no dangling standing: dissolve every
+            // GuardianLink row for the deleted child (any status) in the
+            // same session as the core's writes, so a co-guardian's row
+            // does not dangle pointing at a deleted account.
+            dissolveGuardianLinksForChildAsync: async (session, now) =>
+            {
+                var rows = await session.Query<Kumunita.Core.UserInfo.GuardianLink>()
+                    .Where(l => l.ChildId == childId)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+                foreach (var row in rows)
+                {
+                    if (row.Status != GuardianLinkStatus.Dissolved)
+                    {
+                        row.Status = GuardianLinkStatus.Dissolved;
+                        row.DissolvedAt = now;
+                        row.DissolvedBy = guardianId;
+                    }
+                    session.Store(row);
+                }
+            });
+    }
+
     /// <summary>
     /// ADR 0142 — the shared body of <see cref="DeleteAccountAsync"/> for both
     /// the self-deletion and admin-initiated branches: the last-GlobalAdmin
@@ -711,7 +779,8 @@ public sealed class IdentityService(
     /// admin row is <c>Via: Admin</c>).
     /// </summary>
     private async Task DeleteCoreAsync(
-        string targetSubjectId, User target, string actorId, Authorization.AccessVia via)
+        string targetSubjectId, User target, string actorId, Authorization.AccessVia via,
+        System.Func<IDocumentSession, DateTimeOffset, Task>? dissolveGuardianLinksForChildAsync = null)
     {
         // Last-GlobalAdmin guard (the lockout pin, the OPS.md §9 "Hand over
         // admin" precedent). If the target is a GlobalAdmin and they are the
@@ -801,6 +870,20 @@ public sealed class IdentityService(
         if (profile is not null)
         {
             session.Delete(profile);
+        }
+
+        // 8b. ADR 0143 — dissolve every GuardianLink row for the deleted
+        //     child (any status) in this same session (C·5 — no dangling
+        //     standing; C4 strong-consistency). The ADR 0142 self/admin
+        //     branches pass no callback (a GlobalAdmin or a self-deleting
+        //     resident is never a child in a GuardianLink); the guardian
+        //     delete-child branch supplies one. The per-row dissolution
+        //     writes nothing of their own — the single "account.delete"
+        //     summary row (step 9) subsumes them, the ADR 0142 "one
+        //     summary, many rows" shape.
+        if (dissolveGuardianLinksForChildAsync is not null)
+        {
+            await dissolveGuardianLinksForChildAsync(session, now).ConfigureAwait(false);
         }
 
         // 9. Exactly one audit row — the "account.delete" summary (the

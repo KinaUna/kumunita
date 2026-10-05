@@ -1223,9 +1223,10 @@ public static class FirstBootSeeder
              "you read what the child writes.\n\n" +
              "**What you can do.** You can suspend and un-suspend the account, " +
              "decide which groups and communities the child belongs to, approve a " +
-             "group invitation the child received, and invite another guardian to " +
-             "share the controls. You can also hand the account over when the child " +
-             "is ready to run it on their own.\n\n" +
+             "group invitation the child received, invite another guardian to " +
+             "share the controls, and delete the account when the child is done " +
+             "with it. You can also hand the account over when the child is ready " +
+             "to run it on their own.\n\n" +
              "**What you can't do.** You can't read the child's posts, replies, or " +
              "profile. Those are the child's, and they stay the child's.\n\n" +
              "**To add one.** Open **Account → Children**, fill in the child's " +
@@ -1253,7 +1254,15 @@ public static class FirstBootSeeder
              "acceptance.\n\n" +
              "**To hand over the account.** When the child is ready, open their " +
              "page and click **Dissolve guardianship**. Their memberships are " +
-             "kept, and their own controls come back on the next read.\n"),
+             "kept, and their own controls come back on the next read.\n\n" +
+             "**To delete the account.** When the child is done with the " +
+             "account, open their page and use the **Delete the child account** " +
+             "section at the bottom. Tick the box and click **Delete account**. " +
+             "This removes the child's sign-in, profile, and group and community " +
+             "memberships, and dissolves any other guardianship over it. Their " +
+             "past actions in the audit trail are kept, with their identity " +
+             "replaced by a placeholder. This cannot be undone — see " +
+             "[Deleting an account](deleting-an-account).\n"),
             ("being-a-child", "Being a child on Kumunita",
              "## Being a child on Kumunita\n\n" +
              "A child account is one your parent set up for you. It works like a " +
@@ -1554,6 +1563,44 @@ public static class FirstBootSeeder
              "— a note about what the tag is for. The description is visible " +
              "to everyone who can see the tag, and is editable by the tag's " +
              "creator or a global admin.\n"),
+            ("deleting-an-account", "Deleting an account",
+             "## Deleting an account\n\n" +
+             "Deleting an account is the permanent end of it — the account can't " +
+             "be restored, and it can't be signed in to again. It's the strongest " +
+             "of the account actions, and the only one that isn't reversible: " +
+             "a **suspend** and a **hand-over** both keep the account in place, " +
+             "where a deletion takes it away for good.\n\n" +
+             "**What deleting removes.** The account's sign-in, its profile " +
+             "(the name, the email, the phone, and the contact details), and " +
+             "its group and community memberships are all gone. A guardian's " +
+             "deletion also dissolves every other guardianship over the child. " +
+             "What stays is the record of what the account did — the audit " +
+             "trail keeps its actions, with the account's identity replaced by " +
+             "a placeholder, so the record remains without the person behind " +
+             "it (the platform's privacy policy, the audit-by-default rule).\n\n" +
+             "**Who can delete, and how.** There are three lanes, each for a " +
+             "different person:\n" +
+             "- **Your own account.** Only a **global admin** can delete their " +
+             "own account — a resident who isn't an admin can't. Open " +
+             "**Account → Delete account**, type your password, tick the box " +
+             "that you understand it's permanent, and click **Delete account**. " +
+             "If you're not a global admin and you need your account removed, " +
+             "ask an administrator.\n" +
+             "- **Another resident's account.** A **global admin** removes it: " +
+             "on the resident's **Manage** page, use the **Delete account** " +
+             "section. The admin can't remove the last global admin on the " +
+             "instance — promote a second admin first, then remove the " +
+             "original.\n" +
+             "- **A child's account.** The child's **guardian** removes it: " +
+             "open the child's page and use the **Delete the child account** " +
+             "section at the bottom. Tick the box and click **Delete account**. " +
+             "See [Child accounts](child-accounts).\n\n" +
+             "**Before you delete.** Deletion is permanent. If the account " +
+             "still matters, consider what you can do instead — a **suspend** " +
+             "(the child's or your own account stops signing in until it's " +
+             "reopened) or a **hand-over** (a child account's controls come " +
+             "back to the child) both keep the account. Only when the account " +
+             "is truly done is a deletion the right end.\n"),
         ];
     }
 
@@ -1760,10 +1807,11 @@ public static class FirstBootSeeder
              "was das Kind schreibt.\n\n" +
              "**Was du kannst.** Du kannst das Konto sperren und wieder aktivieren, " +
              "entscheiden, in welchen Gruppen und Gemeinschaften das Kind ist, " +
-             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, und " +
-             "einen weiteren Vormund einladen, mit dem du die Kontrollen teilst. " +
-             "Und du kannst das Konto übergeben, wenn das Kind bereit ist, es " +
-             "selbst zu führen.\n\n" +
+             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, " +
+             "einen weiteren Vormund einladen, mit dem du die Kontrollen teilst, " +
+             "und das Konto löschen, wenn das Kind damit fertig ist. Und du " +
+             "kannst das Konto übergeben, wenn das Kind bereit ist, es selbst " +
+             "zu führen.\n\n" +
              "**Was du nicht kannst.** Du kannst die Beiträge, Antworten und das " +
              "Profil des Kindes nicht lesen. Das sind des Kindes, und es bleibt " +
              "des Kindes.\n\n" +
@@ -1797,7 +1845,17 @@ public static class FirstBootSeeder
              "**Das Konto übergeben.** Wenn das Kind bereit ist, öffne seine Seite " +
              "und klicke auf **Vormundschaft auflösen**. Die Mitgliedschaften " +
              "bleiben erhalten, und die eigenen Kontrollen kommen beim nächsten " +
-             "Lesen zurück.\n"),
+             "Lesen zurück.\n\n" +
+             "**Das Konto löschen.** Wenn das Kind mit dem Konto fertig ist, " +
+             "öffne seine Seite und nutze den Bereich **Das Kind-Konto " +
+             "löschen** ganz unten. Hake an und klicke auf **Konto löschen**. " +
+             "Dadurch verschwinden die Anmeldung des Kindes, das Profil und die " +
+             "Gruppen- und Gemeinschaftsmitgliedschaften, und jede weitere " +
+             "Vormundschaft über das Kind wird aufgelöst. Die bisherigen " +
+             "Handlungen bleiben im Prüfprotokoll, der Kontoinhaber wird durch " +
+             "einen Platzhalter ersetzt. Das lässt sich nicht rückgängig " +
+             "machen — siehe " +
+             "[Ein Konto löschen](/pages/system/help/deleting-an-account).\n"),
             ("being-a-child", "Ein Kinderkonto nutzen",
              "## Ein Kinderkonto nutzen\n\n" +
              "Ein Kinderkonto ist eines, das deine Eltern für dich eingerichtet " +
@@ -2151,6 +2209,54 @@ public static class FirstBootSeeder
              "ist. Die Beschreibung ist für alle sichtbar, die den Tag " +
              "sehen können, und von der Schöpferin oder dem Schöpfer des " +
              "Tags oder einem globalen Admin editierbar.\n"),
+            ("deleting-an-account", "Ein Konto löschen",
+             "## Ein Konto löschen\n\n" +
+             "Ein Konto zu löschen ist das dauerhafte Ende des Kontos — es " +
+             "lässt sich weder wiederherstellen noch erneut daran anmelden. " +
+             "Es ist die stärkste der Kontoaktionen und die einzige, die " +
+             "nicht rückgängig zu machen ist: eine **Sperrung** und eine " +
+             "**Übertragung** lassen das Konto an seinem Platz, eine " +
+             "Löschung nimmt es endgültig.\n\n" +
+             "**Was eine Löschung entfernt.** Die Anmeldung des Kontos, sein " +
+             "Profil (der Name, die E-Mail, das Telefon und die " +
+             "Kontaktdaten) und seine Gruppen- und " +
+             "Gemeinschaftsmitgliedschaften verschwinden alle. Löscht eine " +
+             "Vormundin das Kind, löst das darüber hinaus jede " +
+             "Vormundschaft über das Kind auf. Was bleibt, ist die " +
+             "Aufzeichnung dessen, was das Konto getan hat — das " +
+             "Prüfprotokoll behält seine Handlungen bei, der " +
+             "Kontoinhaber wird dabei durch einen Platzhalter ersetzt, so " +
+             "dass die Aufzeichnung bleibt, nicht aber die Person hinter " +
+             "ihr (die Datenschutzerklärung der Plattform, die " +
+             "Audit-by-default-Regel).\n\n" +
+             "**Wer löschen darf und wie.** Es gibt drei Wege, je nachdem " +
+             "um wen es geht:\n" +
+             "- **Dein eigenes Konto.** Nur ein **globaler Admin** kann " +
+             "eigenes Konto löschen — eine Person ohne diese Rolle kann " +
+             "dies nicht. Öffne **Konto → Konto löschen**, gib dein " +
+             "Passwort ein, hake an, dass du verstehst, dass es dauerhaft " +
+             "ist, und klicke auf **Konto löschen**. Bist du kein globaler " +
+             "Admin und brauchst die Löschung deines Kontos, wende dich an " +
+             "eine Administratorin.\n" +
+             "- **Das Konto einer anderen Person.** Ein **globaler Admin** " +
+             "entfernt es: auf der Seite **Verwalten** der Person nutzt " +
+             "du den Bereich **Konto löschen**. Ein Admin kann den letzten " +
+             "globalen Admin der Instanz nicht entfernen — weise zuerst " +
+             "eine zweite Administratorin zu, dann entferne die " +
+             "ursprüngliche.\n" +
+             "- **Das Konto eines Kindes.** Die **Vormundin** des Kindes " +
+             "entfernt es: öffne die Seite des Kindes und nutze den " +
+             "Bereich **Das Kinderkonto löschen** ganz unten. Hake an und " +
+             "klicke auf **Konto löschen**. Siehe " +
+             "[Kinderkonten](/pages/system/help/child-accounts).\n\n" +
+             "**Bevor du löschst.** Eine Löschung ist dauerhaft. Wenn das " +
+             "Konto noch etwas wert ist, überlege, was du stattdessen tun " +
+             "kannst — eine **Sperrung** (das Konto kann sich nicht mehr " +
+             "anmelden, bis es wieder freigegeben wird) und eine " +
+             "**Übertragung** (die Kontrollen eines Kinderkontos kommen " +
+             "zurück zum Kind) lassen das Konto bestehen. Nur wenn ein " +
+             "Konto wirklich fertig ist, ist eine Löschung das passende " +
+             "Ende.\n"),
         ];
     }
 
@@ -2352,9 +2458,10 @@ public static class FirstBootSeeder
              "écrit.\n\n" +
              "**Ce que tu peux faire.** Tu peux suspendre et réactiver le compte, " +
              "décider de quels groupes et communautés l'enfant fait partie, " +
-             "approuver une invitation de groupe que l'enfant a reçue, et " +
-             "inviter un autre tuteur pour partager les contrôles. Et tu peux " +
-             "transférer le compte quand l'enfant est prêt à le conduire seul.\n\n" +
+             "approuver une invitation de groupe que l'enfant a reçue, inviter " +
+             "un autre tuteur pour partager les contrôles, et supprimer le " +
+             "compte quand l'enfant en a fini. Et tu peux transférer le " +
+             "compte quand l'enfant est prêt à le conduire seul.\n\n" +
              "**Ce que tu ne peux pas faire.** Tu ne peux pas lire les " +
              "publications, les réponses ou le profil de l'enfant. Ce sont ceux de " +
              "l'enfant, et ils restent ceux de l'enfant.\n\n" +
@@ -2385,7 +2492,16 @@ public static class FirstBootSeeder
              "**Transférer le compte.** Quand l'enfant est prêt, ouvre sa page et " +
              "clique sur **Dissoudre la tutelle**. Ses adhésions sont " +
              "conservées, et ses propres contrôles reviennent à la prochaine " +
-             "lecture.\n"),
+             "lecture.\n\n" +
+             "**Supprimer le compte.** Quand l'enfant en a fini, ouvre sa page " +
+             "et utilise la section **Supprimer le compte de l'enfant** tout " +
+             "en bas. Coche la case et clique sur **Supprimer le compte**. " +
+             "Cela retire la connexion de l'enfant, son profil et ses " +
+             "adhésions aux groupes et aux communautés, et dissout toute " +
+             "autre tutelle sur lui. Ses actions passées restent dans le " +
+             "registre d'audit, son identité y est remplacée par un " +
+             "marqueur. Cela ne peut pas être annulé — voir " +
+             "[Supprimer un compte](/pages/system/help/deleting-an-account).\n"),
             ("being-a-child", "Utiliser un compte enfant",
              "## Utiliser un compte enfant\n\n" +
              "Un compte enfant est celui que ton parent a créé pour toi. Il " +
@@ -2730,6 +2846,53 @@ public static class FirstBootSeeder
              "tout le monde qui peut voir l'étiquette, et peut être " +
              "modifiée par le créateur de l'étiquette ou un " +
              "administrateur global.\n"),
+            ("deleting-an-account", "Supprimer un compte",
+             "## Supprimer un compte\n\n" +
+             "Supprimer un compte est sa fin définitive — le compte ne " +
+             "peut être ni restauré ni utilisé de nouveau pour se " +
+             "connecter. C'est l'action de compte la plus forte, et la " +
+             "seule qui n'est pas réversible : une **suspension** et un " +
+             "**transfert** gardent le compte en place, une suppression " +
+             "l'enlève pour de bon.\n\n" +
+             "**Ce qu'une suppression retire.** La connexion du compte, " +
+             "son profil (le nom, l'e-mail, le téléphone et les détails " +
+             "de contact) et ses adhésions aux groupes et aux " +
+             "communautés disparaissent toutes. Une suppression par un " +
+             "tuteur dissout par ailleurs toute autre tutelle sur " +
+             "l'enfant. Ce qui reste, c'est l'enregistrement de ce que " +
+             "le compte a fait — le registre d'audit conserve ses " +
+             "actions, son identité y est remplacée par un marqueur, " +
+             "pour que l'enregistrement reste sans la personne qui " +
+             "était derrière (la politique de confidentialité de la " +
+             "plateforme, la règle audit-par-défaut).\n\n" +
+             "**Qui peut supprimer, et comment.** Il y a trois voies, " +
+             "selon la personne concernée :\n" +
+             "- **Ton propre compte.** Seul un **administrateur " +
+             "global** peut supprimer son propre compte — une personne " +
+             "qui n'a pas ce rôle ne le peut pas. Ouvre **Compte → " +
+             "Supprimer le compte**, tape ton mot de passe, coche la " +
+             "case qui dit que tu comprends que c'est définitif, et " +
+             "clique sur **Supprimer le compte**. Si tu n'es pas un " +
+             "administrateur global et que tu as besoin de faire " +
+             "supprimer ton compte, adresse-toi à un administrateur.\n" +
+             "- **Le compte d'une autre personne.** Un **administrateur " +
+             "global** le retire : sur la page **Gérer** de la " +
+             "personne, utilise la section **Supprimer le compte**. " +
+             "Un administrateur ne peut pas retirer le dernier " +
+             "administrateur global de l'instance — nomme d'abord un " +
+             "second administrateur, puis retire l'original.\n" +
+             "- **Le compte d'un enfant.** Le **tuteur** de l'enfant le " +
+             "retire : ouvre la page de l'enfant et utilise la section " +
+             "**Supprimer le compte de l'enfant** tout en bas. Coche la " +
+             "case et clique sur **Supprimer le compte**. Voir " +
+             "[Comptes enfants](/pages/system/help/child-accounts).\n\n" +
+             "**Avant de supprimer.** La suppression est définitive. " +
+             "Si le compte a encore une valeur, réfléchis à ce que tu " +
+             "peux faire à la place — une **suspension** (le compte ne " +
+             "peut plus se connecter jusqu'à ce qu'il soit réactivé) " +
+             "et un **transfert** (les contrôles d'un compte enfant " +
+             "reviennent à l'enfant) gardent le compte. Seule la fin " +
+             "vraiment achevée justifie une suppression.\n"),
         ];
     }
 
@@ -2917,9 +3080,10 @@ public static class FirstBootSeeder
              "skriver.\n\n" +
              "**Hvad du kan.** Du kan suspendere og genoprette kontoen, bestemme, " +
              "hvilke grupper og fællesskaber barnet tilhører, godkende en " +
-             "gruppeinvitation, barnet har modtaget, og invitere en anden " +
-             "værgemand, så I deler kontrollerne. Og du kan give kontoen videre, " +
-             "når barnet er klar til at drive den selv.\n\n" +
+             "gruppeinvitation, barnet har modtaget, invitere en anden " +
+             "værgemand, så I deler kontrollerne, og slette kontoen, når barnet " +
+             "er færdig med den. Og du kan give kontoen videre, når barnet er " +
+             "klar til at drive den selv.\n\n" +
              "**Hvad du ikke kan.** Du kan ikke læse barnets indlæg, svar eller " +
              "profil. De er barnets, og de forbliver barnets.\n\n" +
              "**For at tilføje en.** Åbn **Konto → Børn**, udfyld barnets " +
@@ -2947,7 +3111,16 @@ public static class FirstBootSeeder
              "tilbage til **Afventer**); du kan ikke tvinge en accept.\n\n" +
              "**Giv kontoen videre.** Når barnet er klar, åbner du dets side og " +
              "klikker på **Afløs værgemodet**. Medlemskaberne bevares, og " +
-             "barnets egne kontroller kommer tilbage ved næste læsning.\n"),
+             "barnets egne kontroller kommer tilbage ved næste læsning.\n\n" +
+             "**Slet kontoen.** Når barnet er færdig med kontoen, åbner du " +
+             "dens side og bruger området **Slet barnkontoen** nederst. " +
+             "Afkryds boksen og klik på **Slet konto**. Derved fjernes " +
+             "barnets login, profil og dets gruppe- og " +
+             "fællesskabsmedlemskaber, og ethvert andet værgemod over barnet " +
+             "opløses. Barnets tidligere handlinger forbliver i " +
+             "revisionsprotokollen, med identiteten erstattet af en " +
+             "placeholder. Det kan ikke fortrydes — se " +
+             "[Slet en konto](/pages/system/help/deleting-an-account).\n"),
             ("being-a-child", "At bruge en barnkonto",
              "## At bruge en barnkonto\n\n" +
              "En barnkonto er en, dine forældre har oprettet til dig. Den virker " +
@@ -3285,6 +3458,49 @@ public static class FirstBootSeeder
              "til. Beskrivelsen er synlig for alle, der kan se " +
              "tagen, og kan redigeres af tagens " +
              "opretter eller en global admin.\n"),
+            ("deleting-an-account", "Slet en konto",
+             "## Slet en konto\n\n" +
+             "At slette en konto er dens varige afslutning — kontoen kan " +
+             "hverken gendannes eller bruges til at logge ind på igen. Det " +
+             "er den stærkeste af kontoaktionerne og den eneste, der ikke " +
+             "kan fortrydes: en **suspendering** og en **overdragelse** " +
+             "bevarer kontoen på sit sted, mens en sletning fjerner den " +
+             "for altid.\n\n" +
+             "**Hvad en sletning fjerner.** Kontoens login, dens profil " +
+             "(navnet, e-mailen, telefonen og kontaktoplysningerne) og " +
+             "dens gruppe- og fællesskabsmedlemskaber forsvinder alle. En " +
+             "sletning af en værgemand opløser desuden ethvert andet " +
+             "værgemod over barnet. Det, der forbliver, er optagelsen af " +
+             "det, kontoen gjorde — revisionsprotokollen bevarer dens " +
+             "handlinger, mens kontoens identitet erstattes af en " +
+             "placeholder, så optagelsen forbliver, uden den person bag " +
+             "den (platformens privatlivspolitik, reglen om " +
+             "revisionsprotokol som udgangspunkt).\n\n" +
+             "**Hvem der kan slette, og hvordan.** Der er tre veje, hver " +
+             "for en forskellig person:\n" +
+             "- **Din egen konto.** Kun en **global admin** kan slette " +
+             "egen konto — en beboer, der ikke er admin, kan ikke. Åbn " +
+             "**Konto → Slet konto**, indtast din adgangskode, afkryds " +
+             "boksen om, at du forstår, at det er varigt, og klik på " +
+             "**Slet konto**. Hvis du ikke er en global admin og har " +
+             "brug for at få din konto fjernet, kontakt en " +
+             "administrator.\n" +
+             "- **En anden beboers konto.** En **global admin** fjerner " +
+             "den: på beboerens **Administrér**-side, brug området " +
+             "**Slet konto**. En admin kan ikke fjerne den sidste " +
+             "global admin på instansen — udnævns en anden admin " +
+             "først, og fjern derefter den oprindelige.\n" +
+             "- **Et barns konto.** Barnets **værgemand** fjerner den: " +
+             "åbn barnets side og brug området **Slet barnkontoen** " +
+             "nederst. Afkryds boksen og klik på **Slet konto**. Se " +
+             "[Barnkonti](/pages/system/help/child-accounts).\n\n" +
+             "**Før du sletter.** En sletning er varig. Hvis kontoen " +
+             "stadig betyder noget, overvej, hvad du kan gøre i stedet — " +
+             "en **suspendering** (kontoen kan ikke logge ind, indtil " +
+             "den genoprettes) og en **overdragelse** (barnets " +
+             "kontroller kommer tilbage til barnet) bevarer begge " +
+             "kontoen. Kun når kontoen virkelig er færdig, er en " +
+             "sletning den rette afslutning.\n"),
         ];
     }
 
@@ -3347,6 +3563,7 @@ public static class FirstBootSeeder
              "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
              "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
+             "- [Deleting an account](/pages/system/help/deleting-an-account) — what deleting removes, who may do it, and how\n" +
              "- [Admins](/pages/system/help/admins) — what a global admin does, and what keeps it in check\n" +
              "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n" +
              "- [Projects](/pages/system/help/projects) — to-dos, assignments, boards, and the neighborhood's shared work\n" +
@@ -3453,6 +3670,7 @@ public static class FirstBootSeeder
              "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
              "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
+             "- [Ein Konto löschen](/pages/system/help/deleting-an-account) — Was eine Löschung entfernt, wer sie darf und wie\n" +
              "- [Administratoren](/pages/system/help/admins) — Was ein globaler Admin macht, und was die Rolle bremst\n" +
              "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n" +
              "- [Projekte](/pages/system/help/projects) — Aufgaben, Zuweisungen, Boards und die gemeinsame Arbeit des Viertels\n" +
@@ -3564,6 +3782,7 @@ public static class FirstBootSeeder
              "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
              "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
+             "- [Supprimer un compte](/pages/system/help/deleting-an-account) — Ce qu'une suppression retire, qui peut le faire et comment\n" +
              "- [Administrateurs](/pages/system/help/admins) — Ce qu'un administrateur global fait, et ce qui freine le rôle\n" +
              "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n" +
              "- [Projets](/pages/system/help/projects) — les tâches, les attributions, les tableaux et le travail partagé du quartier\n" +
@@ -3672,6 +3891,7 @@ public static class FirstBootSeeder
              "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
              "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +
+             "- [Slet en konto](/pages/system/help/deleting-an-account) — Hvad en sletning fjerner, hvem der kan det og hvordan\n" +
              "- [Administrerende](/pages/system/help/admins) — Hvad en global admin gør, og hvad der holder rollen i skak\n" +
              "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n" +
              "- [Projekter](/pages/system/help/projects) — opgaver, tildelelser, brætter og nabolagets fælles arbejde\n" +

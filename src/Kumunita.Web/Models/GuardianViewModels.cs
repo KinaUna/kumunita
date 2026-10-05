@@ -119,6 +119,26 @@ public sealed class AddChildForm
 }
 
 /// <summary>
+/// ADR 0143: the guardian delete-child form model, bound via <c>[FromForm]</c>
+/// on <c>GuardianController.DeleteChild</c>. The <b>guardian</b> is never
+/// form-bound — it is minted by the Web layer from
+/// <c>KumunitaPrincipal.SubjectId(User)</c> (the single identity source, the
+/// <c>AddChildForm</c> precedent); the <b>child</b> is the route's
+/// <c>{childId}</c>. <see cref="Confirmed"/> is the dangerous-action
+/// acknowledgment (the ADR 0142 <c>DeleteAccountViewModel.Confirmed</c>
+/// precedent, verbatim): a bare <c>[Required]</c> on a bool would accept
+/// <c>false</c> (the bound value is non-null), so the controller checks it
+/// explicitly. The <c>data-confirm</c> client dialog (the repo's existing
+/// idiom — the Dissolve form's precedent) is a second, client-side layer;
+/// this checkbox is the first and is enforced server-side.
+/// </summary>
+public sealed class GuardianDeleteChildForm
+{
+    [Display(Name = "I understand the child account will be permanently deleted")]
+    public bool Confirmed { get; set; }
+}
+
+/// <summary>
 /// GA (ADR 0038): the assign-a-second-guardian form model, bound
 /// via <c>[FromForm]</c> on <c>GuardianController.Assign</c>.
 /// The <b>assigned guardian</b> is never form-bound beyond the

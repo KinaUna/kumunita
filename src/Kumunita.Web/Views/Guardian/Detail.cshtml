@@ -12,12 +12,14 @@
     string confirmAllow    = "Allow messaging for this child? They will be able to send and receive direct messages (their own opt-in must also be on).";
     string confirmRestrict = "Restrict messaging for this child? They will no longer be able to send or receive direct messages, regardless of their own opt-in.";
     string confirmHandover = "Hand over this account to the child? This dissolves your guardianship over it.";
+    string confirmDeleteChild = "Delete this child account permanently? This removes their sign-in, profile, and memberships, and cannot be undone.";
     if (Translation is not null)
     {
         var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
         confirmAllow    = await Translation.GetAsync("guardian.messaging.allow_confirm", effLang);
         confirmRestrict = await Translation.GetAsync("guardian.messaging.restrict_confirm", effLang);
         confirmHandover = await Translation.GetAsync("guardian.handover_confirm", effLang);
+        confirmDeleteChild = await Translation.GetAsync("guardian.delete_child_confirm", effLang);
     }
     @*
         The child's per-community block set (the guardian's block-and-hide
@@ -316,6 +318,32 @@
               data-confirm="@confirmHandover">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
+        </form>
+
+        @*
+            ADR 0143 — delete the child account (the 6th GU supervisory
+            action, reusing the ADR 0142 deletion core). The dangerous-action
+            guard is the same two layers as the admin self-serve delete
+            surface (the ADR 0142 Delete.cshtml precedent): a client-side
+            data-confirm dialog (resolved through the provider; the kw-l
+            TagHelper can't wrap an attribute) + a server-side checkbox. The
+            form is NOT bound to the child or the guardian (both come from
+            the route + the cookie principal — the AddChildForm precedent);
+            the only bound field is the Confirmed checkbox (the
+            GuardianDeleteChildForm shape). The child's content never
+            reaches this form (G·1).
+        *@
+        <h2 class="mt-4"><kw-l key="guardian.delete_child">Delete the child account</kw-l></h2>
+        <p class="text-muted"><kw-l key="guardian.delete_child_lede">Deleting the account removes the child's sign-in, profile, and group and community memberships, and dissolves any other guardianship over it. Their past actions in the audit trail are preserved with their identity replaced by a placeholder. This cannot be undone.</kw-l></p>
+        <form method="post" action="@Url.Action("DeleteChild", "Guardian", new { childId = Model.ChildId })"
+              data-confirm="@confirmDeleteChild">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger mb-2"></div>
+            <div class="mb-2 form-check">
+                <input name="Confirmed" type="checkbox" class="form-check-input" />
+                <label class="form-check-label"><kw-l key="guardian.delete_child_confirm_checkbox">I understand the child account will be permanently deleted.</kw-l></label>
+            </div>
+            <button type="submit" class="btn btn-danger"><kw-l key="guardian.delete_child_submit">Delete account</kw-l></button>
         </form>
 
         @*

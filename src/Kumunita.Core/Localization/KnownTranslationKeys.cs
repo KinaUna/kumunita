@@ -376,6 +376,14 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspended",
             ["guardian.unsuspend"]           = "Un-suspend",
             ["guardian.suspend"]             = "Suspend",
+            ["guardian.delete_child"]        = "Delete the child account",
+            ["guardian.delete_child_lede"]   =
+                "Deleting the account removes the child's sign-in, profile, and group and " +
+                "community memberships, and dissolves any other guardianship over it. Their " +
+                "past actions in the audit trail are preserved with their identity replaced " +
+                "by a placeholder. This cannot be undone.",
+            ["guardian.delete_child_confirm_checkbox"] = "I understand the child account will be permanently deleted.",
+            ["guardian.delete_child_submit"] = "Delete account",
             ["guardian.display_name"]        = "Display name",
             ["guardian.email"]               = "Email address",
             ["guardian.password"]            = "Password",
@@ -2269,6 +2277,9 @@ public static class KnownTranslationKeys
                 "Restrict messaging for this child? They will no longer be able to send or receive direct " +
                 "messages, regardless of their own opt-in.",
             ["guardian.handover_confirm"]    = "Hand over this account to the child? This dissolves your guardianship over it.",
+            ["guardian.delete_child_confirm"] =
+                "Delete this child account permanently? This removes their sign-in, profile, " +
+                "and memberships, and cannot be undone.",
             ["locale.reset_confirm"]         = "Reset your language preference to the instance default?",
             ["locale.email_reset_confirm"]   = "Reset your email &amp; notification language to the instance default?",
             ["settings.quiet.clear_confirm"] =
@@ -2637,6 +2648,15 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Gesperrt",
             ["guardian.unsuspend"]           = "Wieder aktivieren",
             ["guardian.suspend"]             = "Sperren",
+            ["guardian.delete_child"]        = "Das Kind-Konto löschen",
+            ["guardian.delete_child_lede"]   =
+                "Das Löschen entfernt die Anmeldung, das Profil und die Gruppen- und " +
+                "Gemeinschaftsmitgliedschaften des Kindes und löst jede andere " +
+                "Vormundschaft über das Konto auf. Ihre früheren Aktionen in der " +
+                "Prüfspur bleiben erhalten, wobei ihre Identität durch einen " +
+                "Platzhalter ersetzt wird. Das kann nicht rückgängig gemacht werden.",
+            ["guardian.delete_child_confirm_checkbox"] = "Ich verstehe, dass das Kind-Konto dauerhaft gelöscht wird.",
+            ["guardian.delete_child_submit"] = "Konto löschen",
             ["guardian.display_name"]        = "Anzeigename",
             ["guardian.email"]               = "E-Mail-Adresse",
             ["guardian.password"]            = "Passwort",
@@ -4406,6 +4426,9 @@ public static class KnownTranslationKeys
                 "Messaging für dieses Kind einschränken? Es kann dann keine direkten Nachrichten mehr " +
                 "senden oder empfangen, unabhängig von seiner eigenen Opt-in.",
             ["guardian.handover_confirm"]    = "Dieses Konto an das Kind übergeben? Damit löst du deine Vormundschaft über es auf.",
+            ["guardian.delete_child_confirm"] =
+                "Dieses Kind-Konto dauerhaft löschen? Damit werden Anmeldung, Profil und " +
+                "Mitgliedschaften entfernt — das kann nicht rückgängig gemacht werden.",
             ["locale.reset_confirm"]         = "Deine Sprachpräferenz auf den Instanz-Standard zurücksetzen?",
             ["locale.email_reset_confirm"]   = "Deine E-Mail- und Benachrichtigungssprache auf den Instanz-Standard zurücksetzen?",
             ["settings.quiet.clear_confirm"] =
@@ -4780,6 +4803,14 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspendé",
             ["guardian.unsuspend"]           = "Réactiver",
             ["guardian.suspend"]             = "Suspendre",
+            ["guardian.delete_child"]        = "Supprimer le compte de l'enfant",
+            ["guardian.delete_child_lede"]   =
+                "La suppression retire la connexion, le profil et les adhésions aux groupes " +
+                "et communautés de l'enfant et dissout toute autre tutelle sur ce compte. " +
+                "Ses actions passées sont conservées dans la piste d'audit, avec son " +
+                "identité remplacée par un marqueur. Cette action est irréversible.",
+            ["guardian.delete_child_confirm_checkbox"] = "Je comprends que le compte de l'enfant sera définitivement supprimé.",
+            ["guardian.delete_child_submit"] = "Supprimer le compte",
             ["guardian.display_name"]        = "Nom affiché",
             ["guardian.email"]               = "Adresse e-mail",
             ["guardian.password"]            = "Mot de passe",
@@ -6551,6 +6582,10 @@ public static class KnownTranslationKeys
                 "Restreindre la messagerie pour cet enfant ? Il ne pourra plus envoyer ni recevoir de " +
                 "messages directs, quelle que soit son propre opt-in.",
             ["guardian.handover_confirm"]    = "Transférer ce compte à l'enfant ? Cela dissout ta tutelle sur ce compte.",
+            ["guardian.delete_child_confirm"] =
+                "Supprimer définitivement ce compte d'enfant ? Cette opération " +
+                "retire la connexion, le profil et les adhésions, et ne peut pas " +
+                "être annulée.",
             ["locale.reset_confirm"]         = "Réinitialiser ta préférence de langue au défaut de l'instance ?",
             ["locale.email_reset_confirm"]   = "Réinitialiser la langue des e-mails et des notifications au défaut de l'instance ?",
             ["settings.quiet.clear_confirm"] =
@@ -6926,6 +6961,14 @@ public static class KnownTranslationKeys
             ["guardian.suspended"]           = "Suspendert",
             ["guardian.unsuspend"]           = "Genopret",
             ["guardian.suspend"]             = "Suspendér",
+            ["guardian.delete_child"]        = "Slet barnkontoen",
+            ["guardian.delete_child_lede"]   =
+                "Sletningen fjerner barnets login, profil og gruppemedlemskaber og " +
+                "fællesskabsmedlemskaber, og ophæver enhver anden forældremyndighed over " +
+                "kontoen. Deres tidligere handlinger bevares i revisionslogget, hvor " +
+                "deres identitet er erstattet af en placeholder. Det kan ikke fortrydes.",
+            ["guardian.delete_child_confirm_checkbox"] = "Jeg forstår, at barnkontoen bliver slettet permanent.",
+            ["guardian.delete_child_submit"] = "Slet konto",
             ["guardian.display_name"]        = "Vistnavn",
             ["guardian.email"]               = "E-mailadresse",
             ["guardian.password"]            = "Adgangskode",
@@ -8683,6 +8726,9 @@ public static class KnownTranslationKeys
                 "Begræns beskeder for dette barn? Det vil ikke længere kunne sende eller modtage " +
                 "direkte beskeder, uanset dets eget opt-in.",
             ["guardian.handover_confirm"]    = "Overtag dette konto til barnet? Dette ophæver din forældremyndighed over det.",
+            ["guardian.delete_child_confirm"] =
+                "Slet denne barnkonto permanent? Dette fjerner login, profil og " +
+                "medlemskaber, og det kan ikke fortrydes.",
             ["locale.reset_confirm"]         = "Nulstil dit sprogvalg til instansstandarden?",
             ["locale.email_reset_confirm"]   = "Nulstil dit e-mail- og beskedssprog til instansstandarden?",
             ["settings.quiet.clear_confirm"] =

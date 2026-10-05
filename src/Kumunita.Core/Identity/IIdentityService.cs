@@ -395,4 +395,51 @@ public interface IIdentityService
     /// instance (the lockout pin — applies to <i>both</i> branches: a lone
     /// GlobalAdmin cannot self-delete).</exception>
     Task DeleteAccountAsync(string targetSubjectId, string adminSubjectId);
+
+    // ── ADR 0143 — guardian delete-child (the GU standing over the ADR 0142 core) ──
+
+    /// <summary>
+    /// ADR 0143 — a **guardian** deletes a **child** account: the 6th GU
+    /// supervisory action (ADR 0028's five + this), reusing the ADR 0142
+    /// deletion core (<see cref="DeleteAccountAsync"/>'s shared body).
+    /// <para>
+    /// **Standing gate (G·2/G·3, live):** before any write, an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> with
+    /// <c>GuardianId == <paramref name="guardianId"/></c> and
+    /// <c>ChildId == <paramref name="childId"/></c> must exist, else
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404 — the
+    /// <c>GuardActiveLinkAsync</c> shape every other GU seam runs). No
+    /// projection, no cache — a dissolve is live on the next read.
+    /// </para>
+    /// <para>
+    /// **On success:** every <see cref="Kumunita.Core.UserInfo.GuardianLink"/>
+    /// row for the child (any status) is dissolved in the same session (C·5 —
+    /// no dangling standing; a co-guardian's row ends here, C4 strong
+    /// consistency); then the ADR 0142 core runs — the child's audit rows are
+    /// pseudonymized to a <c>deleted:{childId}</c> tombstone, their
+    /// memberships + <see cref="Kumunita.Core.UserInfo.Profile"/> are removed,
+    /// the Identity account is deleted, and exactly one
+    /// <c>"account.delete"</c> summary audit row is written
+    /// (<see cref="Authorization.AccessVia.Guardian"/>).
+    /// </para>
+    /// <para>
+    /// **Not a silent no-op:** a second call for the same child after a
+    /// successful first is refused — the standing gate runs first and the
+    /// successful delete dissolved the link (so the gate now fails), surfacing
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404). A repeat
+    /// attempt cannot re-delete, and it errors rather than succeeding.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> for this
+    /// (guardian, child) pair — the actor has no standing (deny-by-default,
+    /// G·3; the Web surfaces a 404). This is also the failure for a second
+    /// call after a successful delete (the link was dissolved).</exception>
+    /// <exception cref="InvalidOperationException">The child account does
+    /// not exist (defensive, after the standing gate passed), or the child is
+    /// the last <c>GlobalAdmin</c> on the instance (the lockout pin — a child
+    /// is never a GlobalAdmin, so this is a no-op in practice).</exception>
+    Task DeleteChildAccountAsync(string childId, string guardianId);
 }

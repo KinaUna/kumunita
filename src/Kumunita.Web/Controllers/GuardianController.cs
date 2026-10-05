@@ -586,6 +586,90 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         return RedirectToAction(nameof(Index));
     }
 
+    // ── ADR 0143 — delete a child account (the GU standing over the ADR 0142 core) ──
+
+    /// <summary>
+    /// ADR 0143 — <b>delete</b> a child account: the 6th GU supervisory
+    /// action (ADR 0028's five + this), reusing the ADR 0142 deletion
+    /// core. The child's audit rows are pseudonymized (the identity is
+    /// replaced by a <c>deleted:{childId}</c> tombstone), their
+    /// memberships + profile are removed, every
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> row for the child
+    /// is dissolved (a co-guardian loses their standing on the next read,
+    /// C·5), and the Identity account is deleted. The standing gate
+    /// (an active link, else <see cref="NotFound()"/>) runs first — a
+    /// non-guardian learns nothing (the ADR 0012/0013 shape). The
+    /// dangerous-action guard is the <c>data-confirm</c> client dialog
+    /// (the <see cref="Dissolve"/> form's precedent) + the server-side
+    /// <see cref="GuardianDeleteChildForm.Confirmed"/> checkbox, which
+    /// must be checked before the write. On success: redirect to
+    /// <see cref="Index"/> (the child is no longer in the guardian's
+    /// list) with a confirmation <c>TempData["info"]</c> (the
+    /// <see cref="Dissolve"/> redirect precedent). The Core seam
+    /// re-gates the standing (fail-closed — a crafted POST by a
+    /// non-guardian is refused with a 404, the C·2 pin) and audits
+    /// <c>account.delete</c> <see cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>
+    /// (the ADR 0028 "narrower standing" rule).
+    /// </summary>
+    [HttpPost("{childId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteChild(string childId, [FromForm] GuardianDeleteChildForm form)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        // The dangerous-action guard (the ADR 0142 DeleteAccountViewModel
+        // .Confirmed precedent): the guardian must have checked the
+        // acknowledgment box. A bare [Required] on a bool would accept
+        // false (the bound value is non-null), so the check is explicit.
+        // Surface the message on the Detail page's TempData error (the
+        // Suspend / Unsuspend / Dissolve precedent — this action
+        // redirects, it does not re-render the form).
+        if (!form.Confirmed)
+        {
+            TempData["error"] = "You must confirm the deletion before it can proceed.";
+            return RedirectToAction(nameof(Detail), new { childId });
+        }
+
+        // The standing gate (the Detail GET's ActiveLinkAsync check — a
+        // non-guardian / a dissolved link → 404; the ADR 0012/0013
+        // "a non-guardian learns nothing" shape). The Core seam re-gates
+        // (fail-closed pin).
+        var link = await ActiveLinkAsync(subject, childId);
+        if (link is null)
+            return NotFound();
+
+        try
+        {
+            // The single audited write lane (via: Guardian — the ADR 0028
+            // "narrower standing" rule; the ADR 0142 core's shared body does
+            // the rest: the last-GlobalAdmin guard, the pseudonymization,
+            // the membership + profile removal, the one summary audit row,
+            // the Identity-account deletion, and — this lane only — the
+            // GuardianLink dissolution, C·5).
+            await identity.DeleteChildAccountAsync(childId, subject);
+            TempData["info"] = "Child account deleted. Their audit trail is preserved (pseudonymized); their account, profile, and memberships are removed.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core seam re-gated the standing (fail-closed pin) — a
+            // non-guardian's crafted POST reached the seam directly. The
+            // Web surfaces a 404 (they learn nothing).
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The Core lane refused the write (the idempotency pin — a
+            // second call for an already-deleted child — or the account no
+            // longer exists). Surface the message on the Detail page's
+            // error surface (the Suspend / Unsuspend / Dissolve precedent).
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     /// <summary>
     /// <b>Add a child account</b> (POST <c>me/children</c>) — the GU formation lane
     /// (G·4, one commit): <see cref="IIdentityService.RegisterAsync"/> (the usual M1
