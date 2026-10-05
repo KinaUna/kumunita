@@ -28,6 +28,13 @@ public sealed record FindPeopleTagViewModel(
     /// <see cref="Kumunita.Core.Tags.Tag.Name"/> the U03 service surfaced);
     /// <c>null</c> when the tag is a miss (the empty state).</summary>
     public string? TagDisplayName => Result.Tag?.Name;
+
+    /// <summary>The by-tag find's sort control (M26 U14, D-SORT·5 — the
+    /// U10 <c>_Sort</c> reference, reused verbatim, C-SORT·1): the closed
+    /// row 16 allowlist (<c>name</c> → <c>DisplayName</c>, asc — correction
+    /// C-2, the only key this surface offers, F9). Renders nothing when
+    /// null (the no-sort pin).</summary>
+    public SortViewModel? Sort { get; init; }
 }
 
 /// <summary>
@@ -39,4 +46,12 @@ public sealed record FindPeopleTagViewModel(
 public sealed record FindPeopleBioViewModel(
     string Query,
     ProfileBioPage Result,
-    int Page);
+    int Page)
+{
+    /// <summary>The by-bio find's sort control (M26 U14, D-SORT·5 — the
+    /// U10 <c>_Sort</c> reference, reused verbatim, C-SORT·1): the closed
+    /// row 17 allowlist (<c>name</c> → <c>DisplayName</c>, asc — correction
+    /// C-2, the only key this surface offers, F9). Renders nothing when
+    /// null (the no-sort pin).</summary>
+    public SortViewModel? Sort { get; init; }
+}

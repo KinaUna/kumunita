@@ -1,6 +1,7 @@
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -98,20 +99,33 @@ public sealed class TagController(
     /// the tag lane's own (C-TG·8).
     /// </summary>
     [HttpGet("/tags/{slug}")]
-    public async Task<IActionResult> ByTag([FromRoute] string slug, int page = 1)
+    public async Task<IActionResult> ByTag(
+        [FromRoute] string slug, int page = 1, string? sort = null, string? dir = null)
     {
         if (string.IsNullOrWhiteSpace(slug))
             return NotFound();
 
         var actor = ActorId(User) ?? string.Empty;
+
+        // M26 U14 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against each section's closed allowlist (U2 §2.2
+        // rows 14/15 — both created/modified/title) — or null when the viewer
+        // chose no sort (C-SORT·2, F1 — the seam keeps its pinned
+        // <c>.OrderBy(p => p.Created)</c> (ascending) exactly). Both sections
+        // share the pinned default direction (**asc** — the U8 correction
+        // C-1 / C-SORT·2 tag-feed default; C-SORT·1 surface-unknown-key
+        // fallback).
+        var postsSort = ParseSort(sort, dir, TagFeedAllowedKeys);
+        var pagesSort = ParseSort(sort, dir, TagFeedAllowedKeys);
+
         // M7 (ADR 0090 D6) — the two paged seams are the read (U01's D6 lane:
         // the same readable-content filter + order, then a Skip/Take(30)
         // window). <c>HasMore</c> (D1) is the sole paging signal.
-        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page);
+        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page, sort: postsSort);
         IReadOnlyList<Post> posts = pagedPosts.Items;
         bool postsHasMore = pagedPosts.HasMore;
 
-        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page);
+        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page, sort: pagesSort);
         IReadOnlyList<Page> blogPages = pagedPages.Items;
         bool pagesHasMore = pagedPages.HasMore;
 
@@ -148,12 +162,50 @@ public sealed class TagController(
             // partial renders nothing). The tag is the route (D9) — no filter
             // form; the links carry ?page=N only. Section-scoped names (the
             // Groups.Detail precedent) keep each _Pager's BaseUrl unambiguous.
+            // M26 U14 (C-SORT·8) — the sort/dir pairs join **each section's
+            // own** pager <c>FilterParams</c> only when the request carried
+            // a non-blank ?sort= (U11's <c>SortViewModel.SortFilterParams</c>
+            // helper, reused — not re-derived); an unsorted read keeps the
+            // pre-M26 pairs byte-identical (C-SORT·2). **Dual-pager key
+            // split** (the U12 <c>ProjectsIndex</c> precedent): both
+            // sections' <c>BaseUrl</c> is the **same** <c>/tags/{slug}</c>,
+            // so the same <c>sort</c>/<c>dir</c> query keys ride each
+            // section's own pager without a collision — both read the
+            // request's single <c>?sort=</c>/<c>?dir=</c> pair (each
+            // parsed against its own allowlist, C-SORT·1).
             PagerPosts = (postsHasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, postsHasMore)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, postsHasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
             PagerPages = (pagesHasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, pagesHasMore)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, pagesHasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
+            // M26 U14 (D-SORT·5) — the one shared sort control (the U10
+            // _Sort reference, reused verbatim — C-SORT·1), **per section**:
+            // the posts section (row 14) and the pages section (row 15)
+            // each pass their own closed allowlist — the identical
+            // created/modified/title set, both with the pinned <b>asc</b>
+            // <c>created</c> default (the U8 correction C-1 / C-SORT·2
+            // current order — the tag-pages <c>created</c>-asc pin).
+            SortPosts = SortViewModel.ForRoute(
+                $"/tags/{slug}",
+                currentKey: postsSort?.Key,
+                currentDir: postsSort is { } ps ? (ps.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "asc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
+            SortPages = SortViewModel.ForRoute(
+                $"/tags/{slug}",
+                currentKey: pagesSort?.Key,
+                currentDir: pagesSort is { } pg ? (pg.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "asc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
         };
 
         // U8c — seed the reword form (C-TG·5 standing split: the view renders
@@ -170,6 +222,29 @@ public sealed class TagController(
 
         return View(model);
     }
+
+    // M26 U14 (C-SORT·1) — the by-tag feed's closed sort allowlist (U2 §2.2
+    // rows 14/15 — tag→posts + tag→pages, both created/modified/title; the
+    // <b>asc</b> <c>created</b> default is the pinned current order — the U8
+    // correction C-1 / C-SORT·2, and the Core's <c>OrderByTagFeedSort</c>
+    // call site's own <c>defaultDir: false</c>, so the Web parse matches the
+    // seam exactly).
+    private static readonly IReadOnlySet<string> TagFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title" };
+
+    // M26 U14 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (?dir= alone is not a sort
+    // choice; C-SORT·2, F1).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U14 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // by-tag feed's closed allowlist (the pinned <b>asc</b> default —
+    // rows 14/15) — or null when the viewer chose no sort.
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: false)
+            : null;
 
     // ── POST /tags/{slug}/translate — the U8c reword lane (C-TG·5, C-TG·9) ──
 

@@ -606,3 +606,65 @@
   mismatch, unlike U12's `priority` case.
 - **Handoff to U14:** apply the U10 `_Sort` pattern to the tags +
   people-find surfaces + their Web tests. See `m26-u14.md`.
+
+## U14 — Web tags + people
+
+- **Landed (Web unit):** the U10 `_Sort` pattern applied to the **tags**
+  surfaces (by-tag posts `row 14` + by-tag pages `row 15` — the
+  `TagController.ByTag` **dual-pager** surface, mirroring U12's
+  `ProjectsIndex` handling) and the **people-find** surfaces (by-tag
+  `row 16` + by-bio `row 17` — the `FindPeopleController` `ByTag` /
+  `Index`-bio actions) — 4 surfaces wired, all reusing the one shared
+  `SortViewModel` + `_Sort` partial verbatim (C-SORT·1, no fork). Each
+  section passes **its own** closed allowlist `Options` + **its own**
+  pager-carry `sort`/`dir` pair via U11's `SortViewModel.SortFilterParams`
+  helper (C-SORT·8, not re-derived).
+- **Per-surface `Options` pin (U2 §2.2):** the tag feeds (rows 14/15)
+  each offer `created`/`modified`/`title` — with the **`created`-asc**
+  default (the pinned `.OrderBy(p => p.Created)` current order, C-SORT·2 /
+  the U8 correction C-1 — the `TagPosts_SortControl_DefaultDir_Asc` pin),
+  no dead options (F9). The people feeds (rows 16/17) each offer
+  **only** `name` → `DisplayName` (`OrdinalIgnoreCase`, asc — correction
+  C-2 — the `People_SortControl_Offers_Name` pin; no `created` key, no
+  `title`). The `TagByTagViewModel` **dual-pager split:** both sections'
+  `BaseUrl` is the same `/tags/{slug}`, so the same `sort`/`dir` query
+  keys ride each section's own pager without a collision (the U12
+  precedent) — both read the request's single `?sort=`/`?dir=` pair.
+- **Pager-carry scope (C-SORT·8):** the tag sections carry a
+  `PagedViewModel` pager — each gains its own `sort`/`dir` pair only when
+  the request carried a non-blank `?sort=` (C-SORT·2 — unsorted reads
+  byte-identical). The people-find surfaces render a plain "Older"
+  next-link (no `PagedViewModel`, the U13 documents precedent) — the
+  carry is the `Sort` control's `CarriedParams` + the view's next-link
+  (the `…_Pager_Carries_Sort_And_Dir` pins model the data-shape, the
+  U13 precedent).
+- **Tests:** `tests/Kumunita.Web.Tests/TagPeopleSortWebTests.cs` — all 14
+  pinned names pass: `TagPosts_SortControl_Renders_AllowedKeys`,
+  `TagPosts_Pager_Carries_Sort_And_Dir`, `TagPosts_SortParam_DefaultsWhenAbsent`;
+  `TagPages_SortControl_Renders_AllowedKeys`,
+  `TagPages_Pager_Carries_Sort_And_Dir`,
+  `TagPages_SortParam_DefaultsWhenAbsent`,
+  `TagPages_SortControl_DefaultDir_Asc`; `PeopleByTag_SortControl_Renders_AllowedKeys`,
+  `PeopleByTag_Pager_Carries_Sort_And_Dir`,
+  `PeopleByTag_SortParam_DefaultsWhenAbsent`;
+  `PeopleByBio_SortControl_Renders_AllowedKeys`,
+  `PeopleByBio_Pager_Carries_Sort_And_Dir`,
+  `PeopleByBio_SortParam_DefaultsWhenAbsent`; `People_SortControl_Offers_Name`.
+  The frozen gates are untouched (C-SORT·4): the tag-slug resolve + the
+  people `CanSeeAsync` gate / `HasMore` / `Skip`/`Take` are
+  byte-for-byte unchanged; the existing `TagControllerTests` /
+  `M7NewlyPagedTests` / `M23FindPeopleTests` controller-level pins still
+  pass unchanged — they invoke the actions **without** sort params →
+  `feedSort = null` → the seam's pinned order stays byte-for-byte
+  (C-SORT·2).
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0
+  errors); `Kumunita.Web.Tests` suite **904** total, **0 failed**
+  (14 new + existing; U13 was 890).
+- **No drift pause this unit:** the U14 brief's per-surface key sets
+  (`created`/`modified`/`title` for the tag feeds; `name`-only for the
+  people feeds) match the U8-locked Core allowlists in
+  `TagPeopleSortSupport` (`OrderByTagFeedSort` / `OrderByPeopleSort`)
+  exactly, and the `created`-asc default matches the Core call sites'
+  own `defaultDir: false` — no brief-vs-locked-Part-2 mismatch.
+- **Handoff to U15:** apply the U10 `_Sort` pattern to the search
+  surface + its Web tests. See `m26-u15.md`.
