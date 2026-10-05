@@ -61,3 +61,26 @@
 - **Handoff to U3:** add the pure Core `SortSpec` + `SortKeys.Parse` in
   `Kumunita.Core.Query` + the 6 pinned `SortSpecTests` (no Postgres, no DI).
   See `m26-u03.md`.
+
+## U3 — Core SortSpec
+
+- **Landed:** `src/Kumunita.Core/Query/SortSpec.cs` — `sealed record
+  SortSpec(string Key, bool Descending)` + `static class SortKeys.Parse(key,
+  dir, allowedKeys, defaultKey, defaultDir)` in the new
+  `Kumunita.Core.Query` namespace (byte-for-byte per design §2.1 — no drift).
+  **DI confirmation: zero new `AddKumunitaCore` registrations** (value object +
+  static parser — C-SORT·7 holds; `DependencyInjection.cs` convention read, no
+  precedent requires a registration).
+- **Tests:** `tests/Kumunita.Core.Tests/Query/SortSpecTests.cs` — all 6 pinned
+  pure tests pass (no Postgres): `Parse_AllowedKey_Applies`,
+  `Parse_UnknownKey_Defaults`, `Parse_InvalidDir_Defaults`, `Parse_NullKey_Defaults`,
+  `Parse_DirAsc_DescendingFalse`, `Parse_DirDesc_DescendingTrue`.
+- **Key normalization: lowercase** (per U2 §2.1 pin) — `Parse` applies
+  `Trim().ToLowerInvariant()` before the allowlist match; `SortSpec.Key` is
+  always lowercase. `dir` matching is exact (`"asc"`/`"desc"`), other/null →
+  the key's default direction.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Core.Tests` suite 1251 total, 0 failed (6 new + existing).
+- **Handoff to U4:** additive `SortSpec? sort = null` on the 3 post-feed
+  seams + the `PostFeed_*` group tests (design §2.3 rows 1–3, §2.5 pins 7–12).
+  See `m26-u04.md`.
