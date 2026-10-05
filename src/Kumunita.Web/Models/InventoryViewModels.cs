@@ -42,7 +42,15 @@ public sealed record InventoryListViewModel(
     string? CurrentOwnerKind,
     string? CurrentComponentId,
     int CurrentPage,
-    PagedViewModel? Pager = null);
+    PagedViewModel? Pager = null)
+{
+    /// <summary>M26 U13 (D-SORT·5) — the one shared sort control (the U10
+    /// _Sort reference, reused verbatim — C-SORT·1): the closed inventory
+    /// allowlist (U2 §2.2 row 13 — created/modified/name, `name` being this
+    /// surface's own extra key, F9). A null <c>Sort</c> renders nothing (the
+    /// no-sort pin, C-SORT·2).</summary>
+    public SortViewModel? Sort { get; init; }
+}
 
 /// <summary>
 /// One inventory list row (the M16 pinned row shape — <c>Name</c> /

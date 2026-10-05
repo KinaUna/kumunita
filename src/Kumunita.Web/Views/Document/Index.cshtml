@@ -67,6 +67,17 @@
                 </div>
             }
 
+            @* M26 U13 (D-SORT·5) — the documents list's sort control
+               (the U10 _Sort reference, reused): the closed documents
+               allowlist (U2 §2.2 row 12 — created/modified/title + this
+               surface's own size key). Renders nothing when the VM field is
+               null (the no-sort pin — the _Pager null ⇒ no partial
+               precedent). Placed above the pager so the viewer's sort choice
+               stays beside the paging affordance. *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             @if (Model.HasMore)
             {
                 <nav aria-label="pagination" class="mt-3">

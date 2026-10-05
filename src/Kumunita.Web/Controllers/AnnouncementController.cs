@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Query;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -167,14 +168,19 @@ public sealed class AnnouncementController(
     /// </para>
     /// </summary>
     [HttpGet("/announcements")]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int page = 1, string? sort = null, string? dir = null)
     {
         var subjectId = SubjectId(User);
         var roles     = RoleSet(User);
         // M7 (ADR 0090 D6) — the paged seam is the read (U01's D6 lane: the
         // same visibility filter + order, then a Skip/Take(30) window).
         // <c>HasMore</c> (D1) is the sole paging signal.
-        var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page);
+        // M26 U13 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against the announcements' closed allowlist (row 11:
+        // created/modified/title), or null when the viewer chose no sort
+        // (C-SORT·2, F1 — the seam keeps its pinned Created-desc order).
+        var feedSort = ParseSort(sort, dir, AnnouncementFeedAllowedKeys);
+        var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page, sort: feedSort);
         IReadOnlyList<Announcement> visible = paged.Items;
         bool hasMore = paged.HasMore;
 
@@ -233,13 +239,53 @@ public sealed class AnnouncementController(
         // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin: null on a
         // single page so the _Pager partial renders nothing). No filter form
         // (D9) — the links carry ?page=N only.
+        // M26 U13 (C-SORT·8) — the sort/dir pairs join the pager's FilterParams
+        // only when the request carried a non-blank ?sort= (an unsorted read
+        // keeps the pager's links byte-identical to pre-M26, C-SORT·2; D9 —
+        // the links carry ?page=N only).
+        var filterParams = new Dictionary<string, string>();
+        foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+            filterParams[k] = v;
+
         return View(new AnnouncementIndexViewModel(rows)
         {
             Pager = (hasMore || page > 1)
-                ? PagedViewModel.ForRoute("/announcements", page, 30, hasMore)
+                ? PagedViewModel.ForRoute("/announcements", page, 30, hasMore,
+                    filterParams.Count > 0 ? filterParams : null)
                 : null,
+            // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort
+            // reference, reused verbatim — C-SORT·1): the closed announcements
+            // allowlist (U2 §2.2 row 11 — created/modified/title), no dead
+            // options (F9).
+            Sort = SortViewModel.ForRoute(
+                "/announcements",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
         });
     }
+
+    // M26 U13 (C-SORT·1) — the announcements feed's closed sort allowlist
+    // (U2 §2.2 row 11: created/modified/title; surface default created desc).
+    private static readonly IReadOnlySet<string> AnnouncementFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title" };
+
+    // M26 U13 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (?dir= alone is not a sort
+    // choice; C-SORT·2, F1).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U13 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // surface's closed allowlist — or null when the viewer chose no sort.
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: true)
+            : null;
 
     // ── Detail (GET /announcements/{id}) ───────────────────────────────────
 

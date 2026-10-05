@@ -550,3 +550,59 @@
   projects / goals) row ordering is now user-selectable via `?sort=`/`?dir=`.
   The existing M7 filters (assignee / project / blocked) are frozen and still
   carried on the pager (C-SORT·4).
+
+## U13 — Web announcements + documents + inventory
+
+- **Landed (Web unit):** the U10 `_Sort` pattern applied to the **announcements**
+  (`/announcements`, `AnnouncementController.Index`), **documents**
+  (`/documents`, `DocumentController.Index`), and **inventory** (`/inventory`,
+  `InventoryController.List`) surfaces — 3 more surfaces wired, all reusing the
+  one shared `SortViewModel` + `_Sort` partial verbatim (C-SORT·1, no fork).
+  Each surface passes **its own** closed allowlist `Options` + **its own**
+  pager-carry `sort`/`dir` pair via U11's `SortViewModel.SortFilterParams`
+  helper (C-SORT·8, not re-derived).
+- **Per-surface `Options` pin (U2 §2.2):** announcements (row 11) offers
+  `created`/`modified`/`title` only (no extra key, F9); documents (row 12)
+  offers `created`/`modified`/`title` **plus** its own `size` key (→ the
+  non-null `SizeBytes` long); inventory (row 13) offers `created`/`modified`
+  **plus** its own `name` key (→ the non-null `Name` string) — **no** `title`
+  on inventory (that is announcements/documents' own key). Each extra key is
+  pinned **only** on its own surface's `Options` (F9), cross-checked by the
+  `Document_SortControl_Offers_Size` / `Inventory_SortControl_Offers_Name`
+  pins.
+- **Pager-carry scope (C-SORT·8) — surface-specific, not a drift:** the
+  announcements + inventory surfaces both carry a `PagedViewModel` pager, so
+  each gains **its own** `sort`/`dir` `FilterParams` pair only when the request
+  carried a non-blank `?sort=` (C-SORT·2 — an unsorted read stays
+  byte-identical). The **documents** surface renders a plain "Older" next-link
+  (no `PagedViewModel`, no `Pager` property on `DocumentIndexViewModel`) — so
+  C-SORT·8's pager-carry is a non-applicable surface there; the sort control
+  (`Sort` field + `_Sort`) is still wired identically. The
+  `Document_Pager_Carries_Sort_And_Dir` pin models the pairs +
+  `PagedViewModel.ForRoute` shape as the brief names it (data-shape, the
+  U10–U12 harness precedent).
+- **Tests:** `tests/Kumunita.Web.Tests/MiscListSortWebTests.cs` — all 11
+  pinned names pass: `Announcement_SortControl_Renders_AllowedKeys`,
+  `Announcement_Pager_Carries_Sort_And_Dir`,
+  `Announcement_SortParam_DefaultsWhenAbsent`; `Document_SortControl_Renders_AllowedKeys`,
+  `Document_Pager_Carries_Sort_And_Dir`, `Document_SortParam_DefaultsWhenAbsent`,
+  `Document_SortControl_Offers_Size`; `Inventory_SortControl_Renders_AllowedKeys`,
+  `Inventory_Pager_Carries_Sort_And_Dir`,
+  `Inventory_SortParam_DefaultsWhenAbsent`, `Inventory_SortControl_Offers_Name`.
+  The frozen filters are still carried alongside the sort/dir pairs (C-SORT·4):
+  announcements' has no filter form (D9 — `?page=N` + sort/dir only); the
+  inventory pager still carries the frozen `ownerKind`/`componentId` filters
+  (the `Inventory_Pager_Carries_Sort_And_Dir` pin). The existing
+  `AnnouncementControllerTests` / `DocumentControllerTests` /
+  `InventoryControllerTests` controller-level pins still pass unchanged — they
+  invoke the actions **without** sort params → `feedSort = null` → the seam's
+  pinned `OrderByDescending(Created)` stays byte-for-byte (C-SORT·2).
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Web.Tests` suite **890** total, **0 failed** (11 new + existing;
+  U12 was 879).
+- **No drift pause this unit:** the U13 brief's per-surface key sets and the
+  extra-key names (`size`, `name`) match the U7-locked Core allowlists in
+  `MiscSortSupport.OrderByMiscSort` exactly — no brief-vs-locked-Part-2
+  mismatch, unlike U12's `priority` case.
+- **Handoff to U14:** apply the U10 `_Sort` pattern to the tags +
+  people-find surfaces + their Web tests. See `m26-u14.md`.
