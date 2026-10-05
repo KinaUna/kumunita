@@ -84,6 +84,17 @@
                     </div>
                 }
 
+                @* M26 U12 (D-SORT·5) — the goals section's sort control (the
+                   U10 _Sort reference, reused): the closed goals allowlist
+                   (U2 §2.2 row 9 — created/modified/title). Renders nothing
+                   when the VM field is null (the no-sort pin — the _Pager
+                   null ⇒ no partial precedent). Placed above the section's
+                   pager so the viewer's sort choice stays beside the paging
+                   affordance. *@
+                @if (Model.SortGoals is not null)
+                {
+                    <partial name="_Sort" model="Model.SortGoals" />
+                }
                 @* M7 (ADR 0090 D5) — the goals section pager (F2 one-page
                    no-render pin): the <c>_Pager</c> partial renders nothing when
                    the VM field is null. *@
@@ -141,6 +152,17 @@
                     </div>
                 }
 
+                @* M26 U12 (D-SORT·5) — the standalone-projects section's sort
+                   control (the U10 _Sort reference, reused): the closed
+                   projects allowlist (U2 §2.2 row 10 — created/modified/
+                   title). Renders nothing when the VM field is null (the
+                   no-sort pin — the _Pager null ⇒ no partial precedent).
+                   Placed above the section's pager so the viewer's sort
+                   choice stays beside the paging affordance. *@
+                @if (Model.SortProjects is not null)
+                {
+                    <partial name="_Sort" model="Model.SortProjects" />
+                }
                 @* M7 (ADR 0090 D5) — the standalone-projects section pager
                    (F2 one-page no-render pin): the <c>_Pager</c> partial renders
                    nothing when the VM field is null. *@

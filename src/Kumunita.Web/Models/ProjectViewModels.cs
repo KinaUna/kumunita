@@ -105,7 +105,14 @@ public sealed record ProjectsIndexViewModel(
     // single page — the <c>_Pager</c> partial renders nothing. Each carries the
     // <c>componentId</c> filter (D7) as <see cref="PagedViewModel.FilterParams"/>.
     PagedViewModel? PagerGoals = null,
-    PagedViewModel? PagerProjects = null);
+    PagedViewModel? PagerProjects = null,
+    // M26 U12 (D-SORT·5) — the one shared sort control (the U10 _Sort
+    // reference, reused verbatim — C-SORT·1), **per section**: the goals
+    // section (row 9) and the projects section (row 10) each carry their own
+    // closed allowlist (the identical created/modified/title set); a
+    // <c>null</c> field (a no-sort surface) renders nothing (the C-SORT·2 pin).
+    SortViewModel? SortGoals = null,
+    SortViewModel? SortProjects = null);
 
 /// <summary>
 /// One <see cref="Kumunita.Core.Projects.Project"/> in the **goal detail's

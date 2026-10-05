@@ -67,7 +67,12 @@ public sealed record BoardIndexViewModel(
     // M7 (ADR 0090 D5) — the pager (the F2 one-page no-render pin: null on a
     // single page). Carries the <c>componentId</c> filter (D7) as
     // <see cref="PagedViewModel.FilterParams"/>.
-    PagedViewModel? Pager = null);
+    PagedViewModel? Pager = null,
+    // M26 U12 (D-SORT·5) — the one shared sort control (the U10 _Sort
+    // reference, reused verbatim — C-SORT·1). The boards surface's closed
+    // allowlist (row 8: created/modified/title); <c>null</c> (a no-sort
+    // surface) renders nothing (the C-SORT·2 pin).
+    SortViewModel? Sort = null);
 
 /// <summary>
 /// One <see cref="KanbanLane"/> of a board, enriched with its visible

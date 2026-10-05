@@ -102,7 +102,13 @@ public sealed record TodoIndexViewModel(
     // single page). Carries the <c>componentId</c> / <c>assigneeId</c> /
     // <c>unassignedOnly</c> / <c>blockedOnly</c> filters (D7) as
     // <see cref="PagedViewModel.FilterParams"/>.
-    PagedViewModel? Pager = null);
+    PagedViewModel? Pager = null,
+    // M26 U12 (D-SORT·5) — the one shared sort control (the U10 _Sort
+    // reference, reused verbatim — C-SORT·1). The todos surface's closed
+    // allowlist (row 7: created/modified/title + its own due/status keys);
+    // <c>null</c> (a no-sort surface) renders nothing (the C-SORT·2 pin —
+    // the _Pager null ⇒ no partial precedent).
+    SortViewModel? Sort = null);
 
 /// <summary>
 /// One <see cref="BoardItemPlacement"/> of the to-do, enriched with the

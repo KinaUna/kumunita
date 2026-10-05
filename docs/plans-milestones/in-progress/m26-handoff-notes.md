@@ -486,3 +486,67 @@
 - **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
   `Kumunita.Web.Tests` suite **867** total, **0 failed** (15 new + existing;
   U10 was 852).
+
+## U12 — Web projects
+
+- **Landed (Web unit):** the U10 `_Sort` pattern applied to the **projects**
+  surfaces — the todos list (`TodosIndex` → `TodoIndexViewModel`), the boards
+  list (`BoardsIndex` → `BoardIndexViewModel`), and the projects+goals landing
+  (`ProjectsIndex` → `ProjectsIndexViewModel`, **two** paged sections: goals +
+  standalone projects) — **reuse, not fork** (the one shared `SortViewModel` +
+  `_Sort` partial, C-SORT·1). Each surface passes **its own** closed
+  allowlist (`Options`) + **its own** pager-carry `sort`/`dir` pair
+  (C-SORT·8, U11's `SortViewModel.SortFilterParams` helper reused — not
+  re-derived).
+- **Per-surface `Options` (U2 §2.2):** the todos surface (row 7) offers
+  `created`/`modified`/`title` + its own `due`/`status` keys (the U6 locked
+  set — see the drift pause below); the boards (row 8), projects (row 9), and
+  goals (row 10) surfaces each share the identical `created`/`modified`/`title`
+  set. `ProjectsIndex` **dual-pager:** the goals + projects sections each pass
+  **their own** `SortViewModel` (C-SORT·1) so a surface-unknown key falls back
+  to that section's own default (the U11 dual-section rule); **both** sections'
+  `BaseUrl` is the **same** `/projects`, so the same `sort`/`dir` query keys are
+  safe on each section's own pager without a collision (the brief's
+  `psort`/`pdir` alternative was unnecessary — the split is *not* by `BaseUrl`,
+  both sections read the request's single `?sort=`/`?dir=` pair).
+- **Tests:** `tests/Kumunita.Web.Tests/ProjectSortWebTests.cs` — all 12 pinned
+  names pass: `Todo_*` (3), `Board_*` (3), `Project_*` (3), `Goal_*` (3) — each
+  `SortControl_Renders_AllowedKeys` / `Pager_Carries_Sort_And_Dir` /
+  `SortParam_DefaultsWhenAbsent`. The frozen M7 filters (assignee/project/
+  blocked) are still carried alongside the sort/dir pairs (C-SORT·4, the
+  `Todo_Pager_Carries_Sort_And_Dir` pin). The existing `ProjectsControllerTests`
+  controller-level pins (`…_BlockedOnlyTrue_PassesFilterToService` /
+  `ProjectsIndex_GoalsPlusStandaloneProjects_Render`) still pass unchanged —
+  they invoke the actions **without** sort params → `feedSort = null` → the
+  trailing seam arg is `null`, so their 8-arg NSubstitute setups still match.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Web.Tests` suite **879** total, **0 failed** (12 new + existing;
+  U11 was 867).
+- **Handoff to U13:** apply the U10 `_Sort` pattern to the announcements +
+  documents + inventory surfaces + their Web tests. See `m26-u13.md`.
+
+## U12 — Drift pause
+
+- **`priority` key (the brief's `Todo_SortControl_Offers_Due_Priority_Status`
+  name) — NOT implemented; logged as a user-call, mirroring U6's drift pause,
+  not a silent change.** The U12 unit brief (`m26-u12.md`) lists the todos
+  surface as offering `due`/`priority`/`status` keys + a
+  `Todo_SortControl_Offers_Due_Priority_Status` test name. But **frozen Part 2
+  (C-3) removed `priority`**: `TodoItem` has **no** `Priority` property
+  (confirmed in `Projects/TodoItem.cs`), and the U6-locked todos allowlist is
+  exactly `created`/`modified`/`title`/`due`/`status`. Per the user's call
+  (mirroring the U6 decision), the `priority` key is **not** implemented and
+  there is no `Todo_SortControl_Offers_Due_Priority_Status` test — the frozen
+  C-3 allowlist wins. `Todo_SortControl_Renders_AllowedKeys` here pins the
+  actual locked set (the 5-key set, no `priority`);
+  `Todo_SortParam_DefaultsWhenAbsent` additionally pins that a `?sort=priority`
+  request **falls back**
+  to the surface's default `created` key (C-SORT·1 / F4), so the brief's intent
+  (`priority` is offered **only** if the Core switch resolves it — it doesn't)
+  is still honored.
+- **Kanban column-order non-change (named non-decision, carried from U6):**
+  the card order **within** a kanban board column is content the user sets —
+  untouched by this unit. Only the 4 *feed* surfaces' (todos / boards /
+  projects / goals) row ordering is now user-selectable via `?sort=`/`?dir=`.
+  The existing M7 filters (assignee / project / blocked) are frozen and still
+  carried on the pager (C-SORT·4).
