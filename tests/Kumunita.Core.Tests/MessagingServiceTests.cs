@@ -49,7 +49,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
         Assert.False(await svc.IsMessagingEnabledAsync());
 
         // A read is a read — no audit row is committed for the floor probe
-        // (the IsSignupOpen_FreshInstance_FloorsToTrue_NoAuditRow shape, the
+        // (the IsSignupOpen_FreshInstance_FloorsToFalse_NoAuditRow shape, the
         // false floor).
         var audits = await AuditRows(store);
         Assert.Empty(audits);

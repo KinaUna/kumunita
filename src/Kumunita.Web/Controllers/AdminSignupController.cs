@@ -29,12 +29,13 @@ namespace Kumunita.Web.Controllers;
 /// one audited write lane).
 /// </para>
 /// <para>
-/// <b>The gate.</b> The README's deferred "Invitation-only sign-up" item is the
-/// long-term default this surfaces: while the platform widens beyond the
-/// development circle, sign-up is <c>true</c> (open) by default; an admin
-/// tightens it to <c>false</c> (invitation-only) when the community is ready.
-/// Existing residents are never touched by the flip — only new self-service
-/// accounts are gated (SECURITY.md §6, adversary A2).
+/// <b>The gate.</b> A fresh instance ships **invitation-only** (sign-up
+/// <c>false</c>, the ADR 0050 amended 2026-10-05 <c>false</c> floor): a
+/// GlobalAdmin sets up the platform before any resident can self-register, then
+/// opens the gate to <c>true</c> from this surface once the community should be
+/// able to sign up (the README *Deferred* / SECURITY.md §6 long-term posture,
+/// adversary A2). Existing residents are never touched by the flip — only new
+/// self-service accounts are gated.
 /// </para>
 /// </summary>
 [Route("admin/signup")]
@@ -88,7 +89,7 @@ public sealed class AdminSignupController(
     /// (the two are distinct admin-settled instance values; each has its own
     /// audited write lane — the ADR 0019 / ADR 0020 singleton-toggle shape).
     /// </summary>
-    [HttpPost]
+    [HttpPost("notify")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveNotify(bool notifyAdmins)
     {

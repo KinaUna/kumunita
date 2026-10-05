@@ -1,3 +1,9 @@
 {
-    "inlineChat.defaultModel": "qwen3.8:latest (ollama-models)"
+    "inlineChat.defaultModel": "qwen3.8:latest (ollama-models)",
+    "chat.tools.terminal.autoApprove": {
+        "/^dotnet exec tests\\\\Kumunita\\.Web\\.Tests\\\\bin\\\\Debug\\\\net10\\.0\\\\Kumunita\\.Web\\.Tests\\.dll 2>&1 \\| Select-Object -Last 12$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

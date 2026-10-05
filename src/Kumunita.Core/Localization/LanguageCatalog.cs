@@ -67,11 +67,15 @@ public sealed class LocaleSettings
     /// item describes as the long-term default). An *additive* field on the
     /// singleton (ADR 0004 §B.1), the same shape as <see
     /// cref="DefaultTimezone"/> / <see cref="DefaultDateFormat"/>. Defaults to
-    /// <c>true</c> so a fresh instance ships with sign-up open (the development
-    /// circle keeps working; an admin tightens it to invitation-only before the
-    /// community widens — SECURITY.md §6, adversary A2).
+    /// <c>false</c> so a fresh instance ships **invitation-only** (a GlobalAdmin
+    /// sets up the platform before any resident can self-register; open sign-up
+    /// is then an explicit opt-in — the README *Deferred* and SECURITY.md §6
+    /// long-term default, adversary A2). An admin opens it to <c>true</c> from
+    /// <c>/admin/signup</c> once the community should be able to sign up.
+    /// (Amended 2026-10-05, ADR 0050 §Amendments — the floor flipped from open
+    /// to invitation-only; the gate and its audited write lane are unchanged.)
     /// </summary>
-    public bool IsSignupOpen { get; set; } = true;
+    public bool IsSignupOpen { get; set; } = false;
 
     /// <summary>
     /// Whether the <see cref="Kumunita.Core.Identity"/> account lane notifies the
@@ -84,9 +88,11 @@ public sealed class LocaleSettings
     /// <see cref="DefaultDateFormat"/>. Defaults to <c>true</c> so a fresh
     /// instance ships with the admin notification on — a small neighborhood's
     /// admins want to know who is joining out of the box (the M6
-    /// "null / empty = all enabled" lean-default and the <see cref="IsSignupOpen"/>
-    /// <c>true</c> floor, ADR 0077 D1). An admin tightens it to <c>false</c> only
-    /// if the signal becomes noise.
+    /// "null / empty = all enabled" lean-default, ADR 0077 D1). An admin
+    /// tightens it to <c>false</c> only if the signal becomes noise. (This
+    /// floor is independent of <see cref="IsSignupOpen"/>'s — a fresh instance
+    /// ships invitation-only, but *if* an admin opens sign-up, the notification
+    /// is on by default.)
     /// </summary>
     public bool NotifyAdminsOnSignup { get; set; } = true;
 

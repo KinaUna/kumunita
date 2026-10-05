@@ -1162,7 +1162,7 @@ public sealed class AnnouncementService : IAnnouncementService
             .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
             .ConfigureAwait(false);
         // The <c>true</c> floor: a missing singleton reads as "comments on"
-        // (the IsSignupOpen / NotifyAdminsOnSignup precedent).
+        // (the NotifyAdminsOnSignup precedent).
         return settings is null || settings.AnnouncementCommentsEnabled;
     }
 

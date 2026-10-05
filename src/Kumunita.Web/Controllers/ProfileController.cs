@@ -174,6 +174,12 @@ public sealed class ProfileController(
         // pair per invocation).
         await SeedGrantPickerOptionsAsync();
 
+        // Seed the avatar <img> flag in the view (same read-only ViewData
+        // channel as the grant-picker option lists above): the serving lane
+        // fails closed to 404 when no avatar is set, so the view renders
+        // the monogram directly instead of making a doomed request.
+        ViewData["HasAvatar"] = !string.IsNullOrEmpty(savedProfile?.AvatarId);
+
         return View(model);
     }
 

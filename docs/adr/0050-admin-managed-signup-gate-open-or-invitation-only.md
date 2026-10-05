@@ -168,3 +168,41 @@ Negative / accepted risks
   already have accounts (including the development team's), which is the intent
   — "existing residents are unaffected" is stated in the admin surface's own
   lede.
+
+## Amendments
+
+### 2026-10-05 — the default flips from open to **invitation-only** (`false` floor)
+
+The gate, its audited write lane, and the `/admin/signup` surface are **unchanged**.
+Only the **default** a fresh (or un-migrated) instance reads as is amended — from the
+original permissive `true` floor to a restrictive `false` floor — so that **a GlobalAdmin
+can set up the platform before any resident can self-register**, and open sign-up becomes
+the explicit opt-in it was always meant to be (this is exactly the long-term default the
+README *Deferred* section and SECURITY.md §6 A2 both committed the instance to, and the
+original ADR's own "Negative / accepted risks" already framed "closed" as the intended
+posture).
+
+- **`LocaleSettings.IsSignupOpen`** — the field initializer defaults to `false` (was
+  `true`).
+- **`IsSignupOpenAsync()`** — the read floor flips: a missing singleton or an unset
+  value now yield **closed** (the `settings is not null && settings.IsSignupOpen` shape,
+  the same `false`-floor posture as `IsSamplePasswordChangeLockedAsync`). Only an
+  explicit `true` opens sign-up.
+- **Why this is safe.** The platform's own accounts are not gated by this value: the
+  first-boot **GlobalAdmin is created by the seeder** (`userManager.CreateAsync`, not the
+  `/account/signup` lane) and first-boot completion is a **separate** check
+  (`IsFirstBootSetupCompleteAsync` / the setup-token lane). So a `false` floor can never
+  lock the platform's own admin out of the account-creation surface it needs.
+- **What changes for operators.** A fresh instance now boots with the sign-up nav affordance
+  hidden and the self-service write refused until an admin opens the gate at
+  `/admin/signup`. A development or demo deployment that wants open sign-up must flip it to
+  "Open" once (or, for the sample-data demo, rely on its pre-seeded admin rather than
+  self-registration).
+- **The pinned test flips.** `IdentityServiceSignupPolicyTests.
+  IsSignupOpen_FreshInstance_FloorsToFalse_NoAuditRow` now asserts `false` on a fresh
+  instance (was `…FloorsToTrue…`); the `SetSignupOpenAsync` write-lane, audit-row, and
+  re-open tests are unchanged (they drive the explicit value, not the floor).
+- **Out of scope (unchanged).** The invitation mechanism (the token / link an invited
+  resident self-serves a password with) is still the follow-on that makes "closed" a place
+  a resident is invited *to* — this amendment only changes which side of the gate the
+  platform starts on.

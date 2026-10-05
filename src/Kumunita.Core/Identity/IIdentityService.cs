@@ -180,17 +180,20 @@ public interface IIdentityService
     /// surface and to deny the signup write when it is closed (the README's deferred
     /// "Invitation-only sign-up" item — the long-term default the community should
     /// run under once it widens beyond the development circle). A read (no audit
-    /// row); the <c>true</c> floor — a missing singleton or a null value both yield
-    /// <c>true</c>, so a fresh instance ships with sign-up open.
+    /// row); the <c>false</c> floor — a missing singleton or a null value both yield
+    /// <c>false</c>, so a fresh instance ships **invitation-only** (a GlobalAdmin
+    /// sets up the platform before any resident can self-register, then opens the
+    /// gate explicitly — the README *Deferred* / SECURITY.md §6 posture, amended
+    /// 2026-10-05).
     /// </summary>
     Task<bool> IsSignupOpenAsync();
 
     /// <summary>
     /// Set whether self-service sign-up is open (ADR 0050): a GlobalAdmin flips the
     /// instance-wide gate — <c>true</c> opens the public <c>Sign up</c> surface
-    /// (the development-circle default), <c>false</c> closes it (the invitation-only
-    /// state: existing residents are unaffected; only new self-service accounts are
-    /// gated). Writes the <see cref="Kumunita.Core.Localization.LocaleSettings.IsSignupOpen"/>
+    /// (a fresh instance ships closed, so this is the explicit opt-in), <c>false</c>
+    /// closes it (the invitation-only state — the fresh-instance default: existing
+    /// residents are unaffected; only new self-service accounts are gated). Writes the <see cref="Kumunita.Core.Localization.LocaleSettings.IsSignupOpen"/>
     /// singleton and appends exactly one <c>AccessAudit</c> row
     /// (<c>via: Admin</c>, action <c>"signup.set-open"</c>, target "signup") in the
     /// same session (C3 — no silent, unaudited access). Only a GlobalAdmin may call

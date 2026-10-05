@@ -285,18 +285,20 @@ stays trivial and the authorization rules can grow freely.
 - **Cross-neighborhood federation** — a standalone OpenIddict IdP; global identity, local authorization.
 - **Group helpers** — suggest/populate groups (neighbors from addresses, family from household).
 - **MCP**, calendar integration, cross-neighborhood data migration.
-- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR 0050):
-  a GlobalAdmin flips the instance between **open** (residents may
-  self-register, the current development-circle default) and **invitation-only**
-  (closed to new self-service accounts) from `/admin/signup`, with the
-  `/account/signup` write lane and the nav/login sign-up affordances all
-  authoritative — existing residents are unaffected. What remains to land is
-  the **invitation mechanism** the gate closes the door *to*: an invited
-  resident self-serves their password from an admin-sent invitation link
-  (token lifecycle, expiry, admin UX) rather than registering on their own —
-  so "closed" is a place a resident is invited *to*, not a dead end. Land it
-  before the community is open beyond the development circle (SECURITY.md §6
-  open items — the control that answers adversary A2, the signup bot).
+- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR 0050),
+  and a fresh instance ships **invitation-only** (ADR 0050, amended 2026-10-05):
+  a GlobalAdmin sets up the platform before any resident can self-register,
+  then opens the gate to **open** (residents may self-register) from
+  `/admin/signup` — closing it back to **invitation-only** (closed to new
+  self-service accounts) at any time. The `/account/signup` write lane and the
+  nav/login sign-up affordances are all authoritative — existing residents are
+  unaffected. What remains to land is the **invitation mechanism** the gate
+  closes the door *to*: an invited resident self-serves their password from an
+  admin-sent invitation link (token lifecycle, expiry, admin UX) rather than
+  registering on their own — so "closed" is a place a resident is invited *to*,
+  not a dead end. Land it before the community is open beyond the development
+  circle (SECURITY.md §6 open items — the control that answers adversary A2,
+  the signup bot).
 
 ## Running
 
