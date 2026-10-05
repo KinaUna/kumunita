@@ -84,3 +84,46 @@
 - **Handoff to U4:** additive `SortSpec? sort = null` on the 3 post-feed
   seams + the `PostFeed_*` group tests (design §2.3 rows 1–3, §2.5 pins 7–12).
   See `m26-u04.md`.
+
+## U4 — Core post feeds
+
+- **Landed:** `SortSpec? sort = null` added to the 3 post-feed seams
+  (`PostService.ListFeedAsync` / `ListAllFeedAsync` / `ListGroupFeedAsync`) —
+  the shared ordering lives in a single private helper `OrderByPostSort`
+  (`src/Kumunita.Core/Posts/PostService.cs`) so all three apply the identical
+  closed allowlist (U2 §2.2 rows 1–3: `created`/`modified`/`title`) + the
+  `.ThenBy(Id)` tie-breaker. **Interface (deliverable 2) is a no-op:**
+  `PostService` is a `sealed` concrete class with **no** `IPostService`
+  interface in the tree (confirmed — the file-attachments U3 note pins this),
+  so no interface seam to edit. `null` path is byte-for-byte the pinned
+  `OrderByDescending(p => p.Created)` (C-SORT·2 confirmed); `CanSeeAsync` /
+  `HasMore` / `Total` untouched (C-SORT·4).
+- **Tests:** `tests/Kumunita.Core.Tests/Posts/PostSortTests.cs` — all 6 pinned
+  `PostFeed_*` names pass (driving `ListFeedAsync`; the other two seams share
+  `OrderByPostSort`): `PostFeed_SortSpecNull_CurrentOrder`,
+  `PostFeed_SortCreatedAsc`, `PostFeed_SortModifiedDesc`,
+  `PostFeed_SortTitle_Ordinal`, `PostFeed_InvalidKey_DefaultOrder`,
+  `PostFeed_StableTieBreakBy_Id`.
+- **Tie-breaker pin (C-SORT·5):** `.ThenBy(Id)` present on every non-null sort
+  path — written as `Queryable.ThenBy(q.OrderBy(…), p => p.Id)`.
+- **Marten 9.31.2 drift (documented, NOT a silent change):** the frozen
+  Part-2 comparator rules pin `?? MinValue` (modified) / `?? ""` (title)
+  sentinels in the OrderBy key, but Marten's Linq parser rejects both
+  (`BadLinqExpressionException: Invalid OrderBy() expression` — verified by a
+  probe). Per the user's call, the keys order on the **raw nullable column**
+  and Postgres supplies the null-ordering (nulls-first in desc, nulls-last in
+  asc — the opposite of the pinned sentinels); the `OrdinalIgnoreCase`
+  comparator on `title` is preserved. `PostFeed_SortModifiedDesc` /
+  `PostFeed_SortTitle_Ordinal` pin the actual Postgres behavior and carry the
+  drift comment. **Part 2 (§2.2/§2.3) is unchanged** — the deviation is
+  recorded here and in the `OrderByPostSort` doc-comment. Downstream units
+  (U5–U9) with nullable keys will hit the same Marten limit.
+- **Also (compiler):** on Marten's `IAsyncQueryable`, the unqualified
+  `.ThenBy(…)` form is ambiguous with an async-enumerable extension (CS0411);
+  the fully-qualified `Queryable.ThenBy(…)` is the one that resolves.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Core.Tests` suite 1257 total, 0 failed (6 new + existing).
+- **Handoff to U5:** additive `SortSpec? sort = null` on the 3 event seams
+  (`EventService.ListUpcomingAsync` / `ListPastAsync` /
+  `ListGroupEventsAsync`) + the `Event*_*` group tests. Note the same Marten
+  nullable-key limit will apply to any nullable event key. See `m26-u05.md`.

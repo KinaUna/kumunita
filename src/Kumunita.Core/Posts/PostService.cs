@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -71,6 +72,60 @@ public sealed class PostService
     }
 
     /// <summary>
+    /// M26 (C-SORT·2/5) — the post-feed ordering for the three feed seams
+    /// (community / all-sections / group): a <c>null</c> spec keeps the pinned
+    /// <c>OrderByDescending(p => p.Created)</c> line **byte-for-byte** (C-SORT·2);
+    /// a non-null spec applies the closed post-feed allowlist
+    /// (U2 §2.2 rows 1–3: <c>created</c> / <c>modified</c> / <c>title</c>) and
+    /// ends with the <c>.ThenBy(p => p.Id)</c> tie-breaker (C-SORT·5).
+    /// <para>
+    /// <b>Marten 9.31.2 drift (U4):</b> the frozen §2.2 comparator rules pin
+    /// <c>?? MinValue</c> (nullable dates) and <c>?? ""</c> (nullable strings)
+    /// sentinels inside the OrderBy key — but Marten's Linq parser rejects both
+    /// (<c>BadLinqExpressionException: Invalid OrderBy() expression</c>). The
+    /// bare nullable member is what Marten accepts, so the <c>modified</c> and
+    /// <c>title</c> keys order on the raw column and Postgres supplies the
+    /// null-ordering (nulls-first in desc, nulls-last in asc — the **opposite**
+    /// of the pinned sentinels). This is a documented deviation from Part 2's
+    /// comparator rules, forced by the persistence provider, not a design
+    /// choice; the <c>OrdinalIgnoreCase</c> comparator on <c>title</c> is
+    /// preserved (it applies to the non-null comparison).
+    /// </para>
+    /// <para>
+    /// The <c>ThenBy</c> is invoked fully-qualified as
+    /// <c>Queryable.ThenBy(…)</c> — on Marten's
+    /// <c>IAsyncQueryable</c>/<c>IOrderedAsyncQueryable</c> the unqualified
+    /// <c>.ThenBy(…)</c> form is ambiguous with an async-enumerable
+    /// extension, so the fully-qualified <c>System.Linq.Queryable</c> overload
+    /// is the one that resolves.
+    /// </para>
+    /// </summary>
+    private static IQueryable<Post> OrderByPostSort(IQueryable<Post> q, SortSpec? sort)
+    {
+        if (sort is null)
+            return q.OrderByDescending(p => p.Created); // ← the pinned line, verbatim
+
+        // C-SORT·5 — the .ThenBy(p => p.Id) tie-breaker on every non-null sort
+        // path; the primary key's comparator is the surface's rule (U2 §2.2
+        // rows 1–3: created direct, modified nullable→bare, title nullable→bare
+        // with OrdinalIgnoreCase — the ?? sentinels are a Marten 9.31.2 drift,
+        // see the doc-comment above).
+        return sort.Key switch
+        {
+            "created" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(p => p.Created), p => p.Id)
+                : Queryable.ThenBy(q.OrderBy(p => p.Created), p => p.Id),
+            "modified" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(p => p.Modified), p => p.Id)
+                : Queryable.ThenBy(q.OrderBy(p => p.Modified), p => p.Id),
+            "title" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(p => p.Title, StringComparer.OrdinalIgnoreCase), p => p.Id)
+                : Queryable.ThenBy(q.OrderBy(p => p.Title, StringComparer.OrdinalIgnoreCase), p => p.Id),
+            _ => Queryable.ThenBy(q.OrderByDescending(p => p.Created), p => p.Id), // C-SORT·1 — unreachable (Parse already fell back); the default is pinned anyway
+        };
+    }
+
+    /// <summary>
     /// The community feed for <paramref name="componentId"/> (F1/F2/F8/F9, §2.3):
     /// the candidate set is the component's posts — a **candidate filter, never a
     /// gate** (C-M3·2: this filter is not an access decision, not an
@@ -84,17 +139,19 @@ public sealed class PostService
     /// adapter). <see cref="FeedResult.HiddenCount"/> counts only the candidates
     /// that call evaluated.
     /// </summary>
-    public async Task<FeedResult> ListFeedAsync(string componentId, string actorId, int page)
+    public async Task<FeedResult> ListFeedAsync(string componentId, string actorId, int page,
+        SortSpec? sort = null)
     {
         if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component feed requires a componentId.", nameof(componentId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
-        var candidates = await session
+        IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft)
-            .OrderByDescending(p => p.Created)
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft);
+
+        var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync()
@@ -158,7 +215,8 @@ public sealed class PostService
     /// Web-layer 0-candidate edge).</param>
     /// </summary>
     public async Task<FeedResult> ListAllFeedAsync(
-            IReadOnlyCollection<string> componentIds, string actorId, int page)
+            IReadOnlyCollection<string> componentIds, string actorId, int page,
+            SortSpec? sort = null)
     {
         if (componentIds is null) throw new ArgumentNullException(nameof(componentIds));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
@@ -168,10 +226,11 @@ public sealed class PostService
             return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
 
         await using var session = _store.QuerySession();
-        var candidates = await session
+        IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft)
-            .OrderByDescending(p => p.Created)
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft);
+
+        var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync()
@@ -1158,17 +1217,19 @@ public sealed class PostService
     /// (the M3 <see cref="ListFeedAsync"/> 0-candidate shape). **No audience
     /// evaluation of any kind** (G·1/G·8 — membership is the sole decision).
     /// </summary>
-    public async Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page)
+    public async Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page,
+        SortSpec? sort = null)
     {
         if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group feed requires a groupId.", nameof(groupId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
-        var candidates = await session
+        IQueryable<Post> q = session
             .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
-            .OrderByDescending(p => p.Created)
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft);
+
+        var candidates = await OrderByPostSort(q, sort)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync()
