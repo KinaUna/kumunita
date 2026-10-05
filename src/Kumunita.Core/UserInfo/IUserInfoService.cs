@@ -1162,28 +1162,135 @@ public interface IUserInfoService
     Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
 
     /// <summary>
-    /// GA-AR (ADR 0038 amendment): assign a second guardian to a child — the
-    /// conferral-based standing basis (vs. <see cref="CreateGuardianLinkAsync"/>'s
-    /// creation-based basis). Writes the <see cref="GuardianLink"/> row + TWO
-    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
-    /// <c>ActorId = guardianId</c> (the standing-holder, the GU seam's shape —
-    /// byte-identical to what <see cref="CreateGuardianLinkAsync"/> writes);
-    /// (2) <c>guardian.assign</c> with <c>ActorId = assignedById</c> (the
-    /// conferrer). Together they answer "who holds standing" AND "who
-    /// conferred it." The <see cref="GuardianLink"/> POCO is unchanged (S·3).
-    /// Idempotent for the (guardianId, childId) pair (S·6 — the G-A·4
-    /// precedent, inherited): a duplicate active row is a no-op — no second
-    /// row, no second pair of audit rows.
+    /// GA (ADR 0038 §F): assign a second guardian to a child — the
+    /// conferral-based standing basis. Writes the <see cref="GuardianLink"/>
+    /// row in <see cref="GuardianLinkStatus.Pending"/> state + ONE audit row
+    /// in ONE commit (C3): <c>guardian.assign</c> with
+    /// <c>ActorId = assignedById</c> (the conferrer). The standing is NOT
+    /// conferred yet — the assigned guardian must accept with consent via
+    /// <see cref="AcceptGuardianLinkAsync"/> before the row moves to
+    /// <see cref="GuardianLinkStatus.Active"/> and the
+    /// <c>guardian.create</c> row is written.
+    /// <para>
+    /// <b>Idempotency:</b> if a row already exists for (guardianId, childId)
+    /// in <see cref="GuardianLinkStatus.Pending"/> state, the call is a no-op
+    /// (the row is returned as-is, no second audit row). If the row is in
+    /// <see cref="GuardianLinkStatus.Declined"/> state, it is overwritten
+    /// back to <see cref="GuardianLinkStatus.Pending"/> (a deliberate re-act
+    /// by the conferrer — the row's <c>ResolvedAt</c>/<c>ResolvedBy</c> are
+    /// cleared and a fresh <c>guardian.assign</c> audit row is written). If
+    /// the row is <see cref="GuardianLinkStatus.Active"/> or
+    /// <see cref="GuardianLinkStatus.Dissolved"/>, the call is a no-op.
+    /// </para>
+    /// <para>
+    /// <b>Notification:</b> emits a <c>guardian.assign</c> notification to the
+    /// assigned guardian (the recipient) with a link to
+    /// <c>/me/children</c> (their Index page, where the pending-requests
+    /// card shows the accept/decline actions). The emission is silent when
+    /// <c>services</c> is null (the test-harness precedent).
+    /// </para>
     /// </summary>
     /// <param name="childId">The supervised child's subject id.</param>
     /// <param name="guardianId">The assigned guardian's subject id (the
-    /// standing-holder; the <c>GuardianLink.GuardianId</c> value; the
-    /// <c>guardian.create</c> audit row's <c>ActorId</c>).</param>
+    /// assignee; the <c>GuardianLink.GuardianId</c> value).</param>
     /// <param name="assignedById">The assigning guardian's subject id (the
     /// conferrer; the <c>guardian.assign</c> audit row's
     /// <c>ActorId</c>/<c>EffectivePrincipalId</c>).</param>
     Task<GuardianLink> AssignGuardianLinkAsync(
         string childId, string guardianId, string assignedById);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assigned guardian <b>accepts</b> a pending
+    /// guardian-assignment request for a child. Moves the
+    /// (guardianId, childId) row from <see cref="GuardianLinkStatus
+    /// .Pending"/> → <see cref="GuardianLinkStatus.Active"/> + writes TWO
+    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
+    /// <c>ActorId = guardianId</c> (the standing-holder — the GU seam's
+    /// shape, byte-identical to what <see cref="CreateGuardianLinkAsync"/>
+    /// writes); (2) <c>guardian.accept</c> with <c>ActorId = guardianId</c>
+    /// (the consent event). Stamps <c>ResolvedAt</c>/<c>ResolvedBy</c> on
+    /// the row.
+    /// <para>
+    /// <b>Precondition:</b> a <see cref="GuardianLinkStatus.Pending"/> row
+    /// must exist for the (guardianId, childId) pair. An
+    /// <see cref="InvalidOperationException"/> is thrown if no Pending row
+    /// exists (the row is missing, already Active, already Declined, or
+    /// Dissolved — in all cases the accept is refused, not a no-op).
+    /// </para>
+    /// <para>
+    /// <b>Standing:</b> the acceptee IS the assigned guardian
+    /// (<paramref name="guardianId"/>); no standing gate is needed because
+    /// the row's <c>GuardianId</c> field IS the assignee's identity (the
+    /// row was written by the conferrer, not the assignee — the assignee
+    /// simply identifies with the row they were assigned to).
+    /// </para>
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// assignee; must match the row's <c>GuardianId</c>).</param>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No Pending
+    /// <see cref="GuardianLink"/> for this (guardianId, childId) pair.</exception>
+    Task<GuardianLink> AcceptGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assigned guardian <b>declines</b> a pending
+    /// guardian-assignment request for a child. Moves the
+    /// (guardianId, childId) row from <see cref="GuardianLinkStatus
+    /// .Pending"/> → <see cref="GuardianLinkStatus.Declined"/> + writes ONE
+    /// audit row in ONE commit (C3): <c>guardian.decline</c> with
+    /// <c>ActorId = guardianId</c>. Stamps <c>ResolvedAt</c>/<c>ResolvedBy</c>
+    /// on the row.
+    /// <para>
+    /// <b>Precondition:</b> a <see cref="GuardianLinkStatus.Pending"/> row
+    /// must exist for the (guardianId, childId) pair. An
+    /// <see cref="InvalidOperationException"/> is thrown if no Pending row
+    /// exists (the row is missing, already Active, already Declined, or
+    /// Dissolved — in all cases the decline is refused, not a no-op).
+    /// </para>
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// assignee; must match the row's <c>GuardianId</c>).</param>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No Pending
+    /// <see cref="GuardianLink"/> for this (guardianId, childId) pair.</exception>
+    Task<GuardianLink> DeclineGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assignee's <b>pending</b> guardian-assignment
+    /// requests — a read, not a decision. Returns every
+    /// <see cref="GuardianLink"/> row where
+    /// <see cref="GuardianLink.GuardianId"/> = <paramref name="guardianId"/>
+    /// AND <see cref="GuardianLinkStatus.Pending"/> = the row's state, in
+    /// <see cref="GuardianLink.CreatedAt"/> ascending order (the oldest
+    /// request first — the inbox's natural order). Each row carries
+    /// <see cref="GuardianLink.ChildId"/> (the supervised child) and
+    /// <see cref="GuardianLink.AssignedById"/> (the conferrer — the
+    /// assignee's Index card + Detail "other guardians" list read this to
+    /// resolve the conferrer's display name via the profile read, the
+    /// <c>ChildAccountItem</c> precedent). A non-assignee (no pending row
+    /// for their <c>GuardianId</c>) gets an empty list — the GU lane's
+    /// "a non-guardian sees an empty list" shape.
+    /// <para>
+    /// This read is <b>not</b> standing-gated: the assignee holds no
+    /// standing yet (that is exactly what the accept confers), so the
+    /// <c>GuardActiveLinkAsync</c> gate is not possible. The read IS
+    /// identity-gated: only rows where <c>GuardianId</c> = the caller's
+    /// <c>SubjectId</c> are returned — a different assignee's pending
+    /// requests are not visible (the ADR 0012/0013 "a non-guardian learns
+    /// nothing" shape applied to the identity axis rather than the
+    /// standing axis).
+    /// </para>
+    /// </summary>
+    /// <param name="guardianId">The assignee's subject id (the row's
+    /// <c>GuardianId</c> value).</param>
+    /// <exception cref="ArgumentException"><paramref name="guardianId"/> is
+    /// null/whitespace.</exception>
+    Task<IReadOnlyList<GuardianLink>> GetPendingGuardianRequestsForAssigneeAsync(
+        string guardianId);
 
     /// <summary>
     /// Suspend the child (ADR 0028 §C action 2; G·2 — live standing off

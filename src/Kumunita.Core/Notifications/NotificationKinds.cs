@@ -159,6 +159,25 @@ public static class NotificationKinds
     /// </summary>
     public const string GuardianCommunityInvite = "guardian.community_invite";
 
+    /// <summary>
+    /// GA (ADR 0038 §F) — the acceptance lane: an existing guardian has
+    /// <b>assigned</b> the resident as a co-guardian for one of their
+    /// supervised children. The recipient is the <b>assigned</b> guardian
+    /// (the assignee), not the child. The notification's
+    /// <see cref="Kumunita.Core.Notifications.Notification.LinkPath"/>
+    /// points at the assignee's <c>/me/children</c> Index page (where the
+    /// pending-requests card shows the Accept / Decline actions); no
+    /// <c>AcceptPath</c> / <c>DeclinePath</c> (the actions are form-POST
+    /// with a consent block, not link-clickable — the ADR 0038 §F
+    /// acceptance step is deliberate, not a one-click). Opt-OUT default
+    /// (the resident-facing posture, like <see cref="GroupInvite"/>).
+    /// Emitter: <see cref="Kumunita.Core.UserInfo.UserInfoService"/> via
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .AssignGuardianLinkAsync"/> (the ADR 0038 §F supersession of the
+    /// "no email notification" deferral).
+    /// </summary>
+    public const string GuardianAssign = "guardian.assign";
+
     public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         Announcement, PageChild,
@@ -179,6 +198,6 @@ public static class NotificationKinds
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
-        GuardianGroupInvite, GuardianCommunityInvite,
+        GuardianGroupInvite, GuardianCommunityInvite, GuardianAssign,
     ];
 }

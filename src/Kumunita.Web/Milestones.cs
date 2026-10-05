@@ -34,7 +34,7 @@ public static class Milestones
         new("TR", "Translator role — delegate translation editing to non-admin residents; UI strings + static pages open to GlobalAdmin and Translator", StatusDone),
         new("RC", "Rich content — Markdown bodies + in-content images on posts, replies, announcements and static pages", StatusDone),
         new("GU", "Guardian controls — a parent adds a child's account and supervises it at the account level (suspend, communities/groups, invitation approval); no standing to read the child's private content", StatusDone),
-        new("GA", "Guardian assignment — an existing guardian assigns a second guardian to a child's account (email-driven)", StatusDone),
+        new("GA", "Guardian assignment — an existing guardian invites a second guardian to a child's account (email-driven); the invited guardian accepts (with the same consent to the child-account terms the creating guardian accepts) or declines, and holds no standing over the child until they accept", StatusDone),
         new("RE", "Rich editor — a WYSIWYG split-view + Markdown-splice toolbar, with no external editor dependency", StatusDone),
         new("TG", "Tags — free author-set subject labels on posts (community + group) + blog pages; creator-owned per-language display names; by-tag browse + autocomplete (a tag is a label, never a gate)", StatusDone),
         new("PG", "Pages — a hierarchical, audience-restricted, translatable knowledge tree (absorbs and retires the legacy static pages)", StatusDone),

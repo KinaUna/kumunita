@@ -52,9 +52,15 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
     /// The guardian's <b>own</b> active child list (G·2 — the active
     /// <see cref="GuardianLink"/> rows where <c>GuardianId == SubjectId</c>, joined
     /// to each child's <see cref="Kumunita.Core.UserInfo.Profile.DisplayName"/> +
-    /// <c>Blocked</c> flag). A read, not a decision: the list's shape is the
-    /// standing itself (a non-guardian sees an empty list — the same as the
-    /// ADR 0013 owner ∪ member projection, a non-member sees nothing).
+    /// <c>Blocked</c> flag), plus the ADR 0038 §F acceptance lane's
+    /// <b>pending guardian-assignment requests</b> (the
+    /// <see cref="GuardianLink"/> rows where <c>GuardianId == SubjectId</c>
+    /// AND <c>Status == Pending</c> — the assignee's own inbox of
+    /// unacted-upon assignments, the ADR 0038 §F supersession of the
+    /// "no acceptance step" deferral). A read, not a decision: the list's
+    /// shape is the standing itself (a non-guardian sees an empty list — the
+    /// same as the ADR 0013 owner ∪ member projection, a non-member sees
+    /// nothing).
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> Index()
@@ -63,11 +69,30 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         if (string.IsNullOrEmpty(subject))
             return Unauthorized();
 
-        // The pinned <see cref="ChildAccountItem"/> list (the 4-VM pin — no
-        // container record; U08's Index view binds this projection directly).
-        var rows = await ActiveChildrenAsync(subject);
+        // The pinned <see cref="ChildAccountItem"/> list (the GU 4-VM pin —
+        // the U08 Index view binds <c>Model.Children</c> to this projection).
+        var children = await ActiveChildrenAsync(subject);
 
-        return View(rows);
+        // The ADR 0038 §F pending requests (the assignee's inbox of
+        // unacted-upon assignments; the <see cref="PendingGuardianRequestItem"/>
+        // shape: child display name + conferrer display name + requested-at,
+        // ids/names only — G·1 held). A non-assignee gets an empty list.
+        var pendingRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(subject);
+        var pendingRequests = new List<PendingGuardianRequestItem>(pendingRows.Count);
+        foreach (var link in pendingRows)
+        {
+            var childProfile = await userInfo.GetProfileAsync(link.ChildId);
+            var conferrerProfile = link.AssignedById is null
+                ? null
+                : await userInfo.GetProfileAsync(link.AssignedById);
+            pendingRequests.Add(new PendingGuardianRequestItem(
+                link.ChildId,
+                childProfile?.DisplayName ?? link.ChildId,
+                conferrerProfile?.DisplayName ?? link.AssignedById ?? string.Empty,
+                link.CreatedAt.ToString("O")));
+        }
+
+        return View(new GuardianIndexModel(children, pendingRequests));
     }
 
     /// <summary>
@@ -708,8 +733,14 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             // guardian.create row [ActorId = the assigned guardian, S·5]
             // + the guardian.assign row [ActorId = the assigning
             // guardian / conferrer, S·5]). GA-AR (ADR 0038 amendment).
+            // ADR 0038 §F — the seam now writes a PENDING row (the standing is
+            // not minted until the assignee accepts with consent). The
+            // guardian.assign audit row + the assignee's notification are the
+            // commit's contents (C3). The conferrer's Detail page now shows a
+            // "pending" badge next to the assigned guardian's name (the
+            // ActiveGuardiansAsync helper now includes Pending rows).
             await userInfo.AssignGuardianLinkAsync(childId, assignedId, subject);
-            TempData["info"] = $"Guardian assigned.";
+            TempData["info"] = $"Guardian assigned — they will be asked to accept.";
         }
         catch (UnauthorizedAccessException)
         {
@@ -722,6 +753,148 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         }
 
         return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assignee <b>accepts</b> a pending guardian-
+    /// assignment request for a child. The <b>consent gate</b> is the
+    /// <see cref="AcceptGuardianForm.GuardianConsent"/> checkbox — the
+    /// assignee's confirmation of the child-account terms, the same
+    /// obligations the creating guardian accepts on the
+    /// <c>AddChildForm</c> before creation (the "like when a guardian creates
+    /// a new child account" the ADR 0038 §F acceptance lane mirrors). The
+    /// accept is refused until the box is checked (the
+    /// <c>AddChildForm.GuardianConsent</c> precedent, verbatim).
+    /// <para>
+    /// <b>Standing gate:</b> none — the assignee holds no standing yet (that
+    /// is exactly what the accept confers). The <b>identity gate</b> IS the
+    /// seam's precondition: the <c>(guardianId, childId)</c> pair must match
+    /// the assignee's <c>SubjectId</c> + the route's <c>{childId}</c>, and
+    /// the row must be <see cref="Kumunita.Core.UserInfo.GuardianLinkStatus
+    /// .Pending"/> — an <see cref="InvalidOperationException"/> from the
+    /// seam maps to the form's error surface (the
+    /// <c>Assign</c> action's <c>InvalidOperationException</c> catch, the
+    /// "user-presentable, never a 500" precedent).
+    /// </para>
+    /// <para>
+    /// <b>One commit (C3):</b> the row flips Pending → Active, the
+    /// <c>ResolvedAt</c>/<c>ResolvedBy</c> stamps are written, and TWO audit
+    /// rows land in the same <c>SaveChangesAsync</c> (the
+    /// <c>guardian.create</c> row — the standing-holder's GU seam's shape,
+    /// byte-identical to what <c>CreateGuardianLinkAsync</c> writes — plus
+    /// the <c>guardian.accept</c> consent-event row). The assignee's
+    /// standing is live on the very next lane read (G·2/C4).
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/accept")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Accept(string childId, [FromForm] AcceptGuardianForm form)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        // The consent gate (the ADR 0038 §F supersession of the "no
+        // acceptance step" deferral): the assignee confirms the
+        // child-account terms before their standing is minted. The same
+        // [Required] guard the <c>AddChildForm.GuardianConsent</c> uses
+        // (a non-nullable bool of false is not rejected by [Required] —
+        // the explicit guard is the AddChild action's precedent). The
+        // error lands on the Index page's TempData error surface (the
+        // Suspend / Unsuspend / Dissolve precedent in this controller —
+        // the "TempData['error'], never a 500" idiom) — the accept
+        // action re-renders the Index page with the pending-requests
+        // card still showing the consent block.
+        if (!form.GuardianConsent)
+        {
+            TempData["error"] = "You must consent to the child-account terms before accepting.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            // The accept seam: the row flips Pending → Active, the
+            // guardian.create + guardian.accept audit rows commit (C3). The
+            // assignee's standing is live on the next read (G·2/C4).
+            await userInfo.AcceptGuardianLinkAsync(childId, subject);
+            TempData["info"] = "You are now this child's guardian. Their account controls are available.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // A non-assignee (the row's GuardianId != the subject) — the
+            // seam's deny-by-default (G·3). The Web surfaces a 404 (the
+            // ADR 0012/0013 "a non-guardian learns nothing" shape).
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // No Pending row for this (subject, childId) pair — the assignee
+            // has already accepted, already declined, or was never assigned
+            // to this child. User-presentable on the Index page's TempData
+            // error surface (the Suspend / Unsuspend / Dissolve precedent),
+            // never a 500.
+            TempData["error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// GA (ADR 0038 §F): the assignee <b>declines</b> a pending guardian-
+    /// assignment request for a child. No consent gate — the decline is a
+    /// refusal, not an acceptance; the assignee simply refuses the
+    /// standing (the ADR 0038 §F "decline" half of the acceptance step).
+    /// <para>
+    /// <b>Standing gate:</b> none — the assignee holds no standing yet (the
+    /// decline refuses the minting of standing, it does not exercise it).
+    /// The <b>identity gate</b> IS the seam's precondition: the
+    /// <c>(guardianId, childId)</c> pair must match the assignee's
+    /// <c>SubjectId</c> + the route's <c>{childId}</c>, and the row must be
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLinkStatus.Pending"/>.
+    /// </para>
+    /// <para>
+    /// <b>One commit (C3):</b> the row flips Pending → Declined, the
+    /// <c>ResolvedAt</c>/<c>ResolvedBy</c> stamps are written, and ONE
+    /// audit row lands in the same <c>SaveChangesAsync</c> (the
+    /// <c>guardian.decline</c> row). No <c>guardian.create</c> row — the
+    /// standing was never minted.
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/decline")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Decline(string childId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        try
+        {
+            // The decline seam: the row flips Pending → Declined, the
+            // guardian.decline audit row commits (C3). The assignee's
+            // Index page no longer lists this request (the read seam
+            // GetPendingGuardianRequestsForAssigneeAsync filters on
+            // Pending).
+            await userInfo.DeclineGuardianLinkAsync(childId, subject);
+            TempData["info"] = "You declined the guardian request.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // No Pending row for this (subject, childId) pair — the assignee
+            // has already accepted, already declined, or was never assigned
+            // to this child. User-presentable on the Index page's TempData
+            // error surface (the Suspend / Unsuspend / Dissolve precedent),
+            // never a 500.
+            TempData["error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     // ── Read helpers (the GuardianLink standing read + the per-child
@@ -752,18 +925,25 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
     }
 
     /// <summary>
-    /// GA (ADR 0038) — the child's <b>active</b>
+    /// GA (ADR 0038 §F) — the child's <b>active or pending</b>
     /// <see cref="GuardianLink"/> rows (a read, not a decision), joined
     /// to each guardian's display name (ids/names only — G-A·3). The
-    /// <c>ActiveChildrenAsync</c> helper inverted: the child's active
-    /// guardian rows, not the guardian's child rows.
+    /// <c>ActiveChildrenAsync</c> helper inverted: the child's guardian rows
+    /// (active <em>or</em> pending), not the guardian's child rows. The
+    /// <see cref="GuardianItem.IsPending"/> field is the ADR 0038 §F
+    /// acceptance-lane state: <c>true</c> for pending rows (the assignee has
+    /// not yet accepted — the conferrer's Detail page shows a "pending"
+    /// badge), <c>false</c> for active rows (the assignee accepted — the
+    /// conferrer's Detail page shows the active guardian).
     /// </summary>
     private async Task<IReadOnlyList<GuardianItem>> ActiveGuardiansAsync(string childId)
     {
         await using var session = store.QuerySession();
         var links = await session
             .Query<GuardianLink>()
-            .Where(l => l.ChildId == childId && l.Status == GuardianLinkStatus.Active)
+            .Where(l => l.ChildId == childId
+                        && (l.Status == GuardianLinkStatus.Active
+                            || l.Status == GuardianLinkStatus.Pending))
             .ToListAsync(System.Threading.CancellationToken.None);
 
         var rows = new List<GuardianItem>(links.Count);
@@ -772,7 +952,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             var profile = await userInfo.GetProfileAsync(link.GuardianId);
             rows.Add(new GuardianItem(
                 link.GuardianId,
-                profile?.DisplayName ?? link.GuardianId));
+                profile?.DisplayName ?? link.GuardianId,
+                link.Status == GuardianLinkStatus.Pending));
         }
 
         return rows;

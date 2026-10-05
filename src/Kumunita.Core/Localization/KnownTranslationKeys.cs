@@ -447,7 +447,53 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Assign",
             ["guardian.assign.noAccount"]    = "No account with that email.",
             ["guardian.assign.self"]         = "You are already this child's guardian.",
-            ["guardian.assign.success"]      = "Guardian assigned.",
+            ["guardian.assign.success"]      = "Guardian assigned — they will be asked to accept.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            // The "accept/decline" half of the assignment: the assigned
+            // guardian sees their pending requests on the /me/children Index
+            // page (the pendingRequests card), accepts with the same consent
+            // to the child-account terms the creating guardian accepts on the
+            // AddChild form, or declines. Until they act, they hold no
+            // standing over the child (the standing gates all query Active).
+            ["guardian.pending"]              = "Pending",
+            ["guardian.pendingRequests.title"] =
+                "Guardian requests awaiting your acceptance",
+            ["guardian.pendingRequests.lead"] =
+                "Another guardian has asked you to become a co-guardian for one of their children. " +
+                "Accept (and agree to the child-account terms) or decline — until you act, you hold no standing over the account.",
+            ["guardian.pendingRequests.child"]    = "Child",
+            ["guardian.pendingRequests.conferrer"] = "Requested by",
+            ["guardian.accept"]                   = "Accept & agree to the terms",
+            ["guardian.accept.consent.intro"]     =
+                "By accepting, you confirm that you are a legal guardian of this child. " +
+                "As their guardian, you maintain full control over their account:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "You must approve or deny all group and event invitations.",
+            ["guardian.accept.consent.duties_chat"] =
+                "You can enable or disable chat features for this profile at any time.",
+            ["guardian.accept.consent.duties_data"] =
+                "This data is fully isolated to this community's own instance and will never be sold, profiled, or used for advertising.",
+            ["guardian.accept.consent.checkbox"] =
+                "I consent to the processing of this child's data under these terms.",
+            ["guardian.accept.consent.required"] =
+                "You must consent to the child-account terms before accepting.",
+            ["guardian.decline"] = "Decline",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            // The "guardian.assign" notification: the assigned guardian
+            // (the assignee) gets an inbox row + (best-effort) email when an
+            // existing guardian assigns them as a co-guardian. The LinkPath
+            // is /me/children (the Index page's pending-requests card).
+            // Opt-OUT default (the resident-facing posture).
+            ["notifications.kind.guardian.assign"] =
+                "A guardian has asked you to become a co-guardian",
+            ["notifications.preference.guardian.assign.label"] =
+                "When a guardian asks you to become a co-guardian",
+            ["notification.guardian.assign.subject"] =
+                "A guardian has asked you to become a co-guardian",
+            ["notification.guardian.assign.body"] =
+                "A guardian has asked you to become a co-guardian for their child: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -2666,7 +2712,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Zuweisen",
             ["guardian.assign.noAccount"]    = "Kein Konto mit dieser E-Mail.",
             ["guardian.assign.self"]         = "Du bist bereits Vormund dieses Kindes.",
-            ["guardian.assign.success"]      = "Vormund zugewiesen.",
+            ["guardian.assign.success"]      = "Vormund zugewiesen — sie werden zur Annahme aufgefordert.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "Ausstehend",
+            ["guardian.pendingRequests.title"] =
+                "Vormundsanträge, die auf deine Annahme warten",
+            ["guardian.pendingRequests.lead"] =
+                "Ein anderer Vormund hat dich gebeten, Co-Vormund für eines ihrer Kinder zu werden. " +
+                "Akzeptiere (und stimme den Bedingungen für Kinderkonten zu) oder lehne ab — bis du handelst, hältst du keine Rechte über das Konto.",
+            ["guardian.pendingRequests.child"]    = "Kind",
+            ["guardian.pendingRequests.conferrer"] = "Angefragt von",
+            ["guardian.accept"]                   = "Annehmen & den Bedingungen zustimmen",
+            ["guardian.accept.consent.intro"]     =
+                "Indem du akzeptierst, bestätigst du, dass du ein gesetzlicher Vormund dieses Kindes bist. " +
+                "Als ihr Vormund behältst du die volle Kontrolle über ihr Konto:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Du musst alle Gruppen- und Event-Einladungen genehmigen oder ablehnen.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Du kannst die Chat-Funktionen für dieses Profil jederzeit aktivieren oder deaktivieren.",
+            ["guardian.accept.consent.duties_data"] =
+                "Diese Daten sind vollständig isoliert auf der eigenen Instanz dieser Community und werden nie verkauft, profilisiert oder für Werbung verwendet.",
+            ["guardian.accept.consent.checkbox"] =
+                "Ich stimme der Verarbeitung der Daten dieses Kindes unter diesen Bedingungen zu.",
+            ["guardian.accept.consent.required"] =
+                "Du musst den Bedingungen für Kinderkonten zustimmen, bevor du akzeptierst.",
+            ["guardian.decline"] = "Ablehnen",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
+            ["notifications.preference.guardian.assign.label"] =
+                "Wenn ein Vormund dich bittet, Co-Vormund zu werden",
+            ["notification.guardian.assign.subject"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
+            ["notification.guardian.assign.body"] =
+                "Ein Vormund hat dich gebeten, Co-Vormund für ihr Kind zu werden: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -4772,7 +4853,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Assigner",
             ["guardian.assign.noAccount"]    = "Aucun compte avec cet e-mail.",
             ["guardian.assign.self"]         = "Tu es déjà tuteur de cet enfant.",
-            ["guardian.assign.success"]      = "Tuteur assigné.",
+            ["guardian.assign.success"]      = "Tuteur assigné — il/elle sera invité(e) à accepter.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "En attente",
+            ["guardian.pendingRequests.title"] =
+                "Demandes de tutelle en attente de ton acceptation",
+            ["guardian.pendingRequests.lead"] =
+                "Un autre tuteur t'a demandé de devenir co-tuteur pour l'un de ses enfants. " +
+                "Accepte (et accepte les conditions du compte enfant) ou refuse — tant que tu n'agis pas, tu n'as aucun droit sur le compte.",
+            ["guardian.pendingRequests.child"]    = "Enfant",
+            ["guardian.pendingRequests.conferrer"] = "Demandé par",
+            ["guardian.accept"]                   = "Accepter et accepter les conditions",
+            ["guardian.accept.consent.intro"]     =
+                "En acceptant, tu confirmes que tu es un tuteur légal de cet enfant. " +
+                "En tant que tuteur, tu conserves la pleine contrôle sur son compte :",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Tu dois approuver ou refuser toutes les invitations à des groupes et événements.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Tu peux activer ou désactiver les fonctionnalités de discussion pour ce profil à tout moment.",
+            ["guardian.accept.consent.duties_data"] =
+                "Ces données sont entièrement isolées sur l'instance propre de cette communauté et ne seront jamais vendues, profilées ou utilisées à des fins publicitaires.",
+            ["guardian.accept.consent.checkbox"] =
+                "Je consens au traitement des données de cet enfant sous ces conditions.",
+            ["guardian.accept.consent.required"] =
+                "Tu dois accepter les conditions du compte enfant avant d'accepter.",
+            ["guardian.decline"] = "Refuser",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "Un tuteur t'a demandé de devenir co-tuteur",
+            ["notifications.preference.guardian.assign.label"] =
+                "Quand un tuteur te demande de devenir co-tuteur",
+            ["notification.guardian.assign.subject"] =
+                "Un tuteur t'a demandé de devenir co-tuteur",
+            ["notification.guardian.assign.body"] =
+                "Un tuteur t'a demandé de devenir co-tuteur pour son enfant : ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
@@ -6881,7 +6997,42 @@ public static class KnownTranslationKeys
             ["guardian.assign.submit"]       = "Tildel",
             ["guardian.assign.noAccount"]    = "Ingen konto med den e-mail.",
             ["guardian.assign.self"]         = "Du er allerede dette barns værgemand.",
-            ["guardian.assign.success"]      = "Værgemand tildelt.",
+            ["guardian.assign.success"]      = "Værgemand tildelt — de vil blive bedt om at acceptere.",
+
+            // ── guardian acceptance lane (GA ADR 0038 §F) ──────────────────
+            ["guardian.pending"]              = "Afventer",
+            ["guardian.pendingRequests.title"] =
+                "Værgemandsansøgninger, der afventer din accept",
+            ["guardian.pendingRequests.lead"] =
+                "En anden værgemand har bedt dig om at blive medværgemand for ét af deres børn. " +
+                "Accepter (og acceptér betingelserne for barnes konto) eller afvis — indtil du handler, har du ingen rettigheder over kontoen.",
+            ["guardian.pendingRequests.child"]    = "Barn",
+            ["guardian.pendingRequests.conferrer"] = "Anmodet af",
+            ["guardian.accept"]                   = "Acceptér og acceptér betingelserne",
+            ["guardian.accept.consent.intro"]     =
+                "Ved at acceptere bekræfter du, at du er dette barns lovlige værgemand. " +
+                "Som dennes værgemand har du fuld kontrol over deres konto:",
+            ["guardian.accept.consent.duties_invitations"] =
+                "Du skal godkende eller afvise alle inviter til grupper og arrangementer.",
+            ["guardian.accept.consent.duties_chat"] =
+                "Du kan til- eller fraaktivere chat-funktioner for denne profil når som helst.",
+            ["guardian.accept.consent.duties_data"] =
+                "Disse data er fuldstændig isoleret på denne communities egen instance og bliver aldrig solgt, profileret eller brugt til reklame.",
+            ["guardian.accept.consent.checkbox"] =
+                "Jeg accepterer behandlingen af dette barns data under disse betingelser.",
+            ["guardian.accept.consent.required"] =
+                "Du skal acceptere betingelserne for barnes konto, før du accepterer.",
+            ["guardian.decline"] = "Afvis",
+
+            // ── notification kind (GA ADR 0038 §F) ──────────────────────────
+            ["notifications.kind.guardian.assign"] =
+                "En værgemand har bedt dig om at blive medværgemand",
+            ["notifications.preference.guardian.assign.label"] =
+                "Når en værgemand beder dig om at blive medværgemand",
+            ["notification.guardian.assign.subject"] =
+                "En værgemand har bedt dig om at blive medværgemand",
+            ["notification.guardian.assign.body"] =
+                "En værgemand har bedt dig om at blive medværgemand for deres barn: ",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =

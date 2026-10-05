@@ -95,16 +95,21 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     }
 
     // ── 9 (2026-09-17) — the gate's HANDOFF leg, promoted from inference to a test ──
-    // G-A·3 — the assigned guardian's standing is identical in kind to the
-    // creator's: after the GA lane confers standing (a second active
-    // GuardianLink over the child, via the same CreateGuardianLinkAsync seam
-    // GuardianController.Assign calls), the assigned guardian can drive the GU
-    // supervisory lanes over the child — here, SuspendChildAsync /
-    // UnsuspendChildAsync. This is the acceptance gate's second leg (closed
-    // loop / HANDOFF / part-vs-whole), now proven, not inferred.
+    // ADR 0038 §F — the acceptance lane: after the GA lane writes a PENDING
+    // row, the assigned guardian must ACCEPT (with consent) before their
+    // standing is minted. This test drives the full acceptance flow:
+    // (a) the assigning guardian assigns → Pending row;
+    // (b) the assigned guardian accepts → Active row + guardian.create +
+    //     guardian.accept audit rows;
+    // (c) the assigned guardian, now a full guardian, drives the GU
+    //     supervisory lanes over the child (SuspendChildAsync /
+    //     UnsuspendChildAsync) — G-A·3 held (identical in kind to the
+    //     creator's).
+    // This is the acceptance gate's second leg (closed loop / HANDOFF /
+    // part-vs-whole), now proven, not inferred.
 
     [Fact]
-    public async Task Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild()
+    public async Task Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild_AfterAccept()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
         var ct = TestContext.Current.CancellationToken;
@@ -120,10 +125,29 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
 
         // The GA lane: the assigning guardian assigns the second guardian —
-        // exactly the seam GuardianController.Assign calls
-        // (CreateGuardianLinkAsync(childId, assignedId)).
-        var link = await userInfo.CreateGuardianLinkAsync(child, assignedGuardian);
-        Assert.Equal(GuardianLinkStatus.Active, link.Status);
+        // exactly the seam GuardianController.Assign calls (ADR 0038 §F:
+        // the seam now writes a PENDING row; the standing is not minted
+        // until the assignee accepts).
+        var link = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Pending, link.Status);
+
+        // The assignee's identity gate: BEFORE the accept, the assignee
+        // holds no standing over the child (the standing gates all query
+        // Active exclusively — the GU G·3 deny-by-default shape applied to
+        // the acceptance lane).
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => userInfo.SuspendChildAsync(child, assignedGuardian));
+
+        // The assignee ACCEPTS (the ADR 0038 §F supersession of the
+        // "no acceptance step" deferral; the consent gate is the Web's
+        // AcceptGuardianForm.GuardianConsent — the Core seam is the
+        // state-machine transition, the consent check is the Web layer's
+        // job). The row flips Pending → Active; the guardian.create +
+        // guardian.accept audit rows commit (C3).
+        var accepted = await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        Assert.Equal(GuardianLinkStatus.Active, accepted.Status);
+        Assert.Equal(assignedGuardian, accepted.ResolvedBy);
 
         // HANDOFF: the assigned guardian, now a full guardian, suspends +
         // un-suspends the child — the GU lanes resolve the new row (G-A·3 —
@@ -142,31 +166,181 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(AccessVia.Guardian, row.Via);
     }
 
-    // ── 10 (GA-AR) — the conferral seam writes BOTH audit rows in one commit ──
-    // S·1 (C3 atomicity) + S·5 (audit shape) + S·6 (idempotency). The
-    // guardian.create row records the ASSIGNED guardian (the standing-holder,
-    // the GU seam's shape); the guardian.assign row records the ASSIGNING
-    // guardian (the conferrer, the GA-AR verb). Together they answer "who
-    // holds standing" AND "who conferred it."
+    // ── ADR 0038 §F — the assignee's identity gate: a different assignee's
+    // accept is refused (the ADR 0012/0013 "a non-guardian learns nothing"
+    // shape applied to the acceptance lane) ─────────────────────────────────
 
     [Fact]
-    public async Task AssignGuardianLink_WritesBothAuditRows()
+    public async Task Accept_ByNonAssignee_Refused()
     {
         var (_, userInfo, store) = await BootIdentityAsync();
         var ct = TestContext.Current.CancellationToken;
 
-        const string assigningGuardian = "ga-ar-assigning";
-        const string assignedGuardian = "ga-ar-assigned";
-        const string child = "ga-ar-child";
+        const string assigningGuardian = "ga-accept-nonassigning";
+        const string assignedGuardian = "ga-accept-assigned";
+        const string otherAssignee  = "ga-accept-other";
+        const string child          = "ga-accept-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+
+        // A different account (the otherAssignee) tries to accept the
+        // assignedGuardian's request — refused: the row's GuardianId field
+        // is the assignedGuardian's identity, not the otherAssignee's. The
+        // seam throws InvalidOperationException (the "no Pending row for
+        // this pair" shape); the Web maps this to the Index page's
+        // TempData["error"] surface (the Suspend / Unsuspend / Dissolve
+        // precedent).
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => userInfo.AcceptGuardianLinkAsync(child, otherAssignee));
+    }
+
+    // ── ADR 0038 §F — the accept over an already-Active row is refused ──
+    // A second accept over the same (guardianId, childId) pair is refused,
+    // not a no-op (the GroupInvitation.AcceptAsync C-M2b·3 shape: a
+    // re-resolved invitation is a bug the caller must surface, not a
+    // silent idempotent).
+
+    [Fact]
+    public async Task Accept_AlreadyActive_Refused()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-accept-already-active-assigning";
+        const string assignedGuardian = "ga-accept-already-active-assigned";
+        const string child          = "ga-accept-already-active-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+
+        // First accept: Pending → Active (the happy path).
+        await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+
+        // Second accept over the same pair: refused (the row is no longer
+        // Pending — the lane's honesty invariant, the C-M2b·3 shape).
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => userInfo.AcceptGuardianLinkAsync(child, assignedGuardian));
+    }
+
+    // ── ADR 0038 §F — the decline seam: Pending → Declined + audit row ──
+
+    [Fact]
+    public async Task Decline_PendingToDeclined_WritesDeclineAuditRow()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-decline-assigning";
+        const string assignedGuardian = "ga-decline-assigned";
+        const string child          = "ga-decline-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        var pending = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Pending, pending.Status);
+
+        // The decline: Pending → Declined + the guardian.decline audit row.
+        var declined = await userInfo.DeclineGuardianLinkAsync(child, assignedGuardian);
+        Assert.Equal(GuardianLinkStatus.Declined, declined.Status);
+        Assert.Equal(assignedGuardian, declined.ResolvedBy);
+        Assert.NotNull(declined.ResolvedAt);
+
+        // The guardian.decline row: ActorId = the assigned guardian (the
+        // one who refused). No guardian.create row (the standing was never
+        // minted).
+        var declineRow = await LastAuditAsync(store, "guardian.decline", pending.Id, ct);
+        Assert.Equal(assignedGuardian, declineRow.ActorId);
+        Assert.Equal(assignedGuardian, declineRow.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Guardian, declineRow.Via);
+        Assert.Equal(AccessOutcome.Allow, declineRow.Outcome);
+
+        // No guardian.create row (the standing was never minted).
+        Assert.Equal(0, await CountAuditAsync(store, "guardian.create", pending.Id, ct));
+
+        // The decline is one-way for the lane (the ADR 0038 §F
+        // "Declined is terminal for the lane" shape): a re-accept over a
+        // Declined row is refused (the row is no longer Pending).
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => userInfo.AcceptGuardianLinkAsync(child, assignedGuardian));
+    }
+
+    // ── ADR 0038 §F — the conferrer's re-act over a Declined row: the row
+    // flips back to Pending (a deliberate new act, the ADR 0038 §F
+    // "re-assignment is a deliberate new act, not an undo" shape) ──
+
+    [Fact]
+    public async Task Assign_ReActOverDeclined_FlipsBackToPending()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-react-assigning";
+        const string assignedGuardian = "ga-react-assigned";
+        const string child          = "ga-react-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+
+        // First assign: Pending.
+        var first = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Pending, first.Status);
+
+        // The assignee declines: Pending → Declined.
+        await userInfo.DeclineGuardianLinkAsync(child, assignedGuardian);
+
+        // The conferrer re-acts (the ADR 0038 §F re-act lane): the row flips
+        // back to Pending. The unique index keeps this ONE row (not a
+        // second); the state machine re-enters Pending. The assignee's
+        // ResolvedAt/ResolvedBy are cleared; a fresh guardian.assign audit
+        // row is written.
+        var second = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Pending, second.Status);
+        Assert.Equal(first.Id, second.Id);   // the same row (the unique index)
+        Assert.Null(second.ResolvedAt);
+        Assert.Null(second.ResolvedBy);
+
+        // Two guardian.assign rows (the first assign + the re-act).
+        Assert.Equal(2, await CountAuditAsync(store, "guardian.assign", first.Id, ct));
+    }
+
+    // ── 10 (ADR 0038 §F) — the conferral seam writes a PENDING row + ONE
+    // guardian.assign audit row in one commit ──
+    // S·1 (C3 atomicity) + S·5 (audit shape) + S·6 (idempotency). The
+    // ADR 0038 §F amendment supersedes the GA-AR "two audit rows" contract:
+    // the standing is CONFIRMED, not conferred — the row lands Pending, and
+    // the guardian.create row (the standing-holder's GU seam's shape) is
+    // deferred to AcceptGuardianLinkAsync (the assignee's consent is what
+    // mints the standing). The guardian.assign row (the conferrer) is the
+    // commit's audit.
+    // The "who holds standing" legibility is now on the row itself (the
+    // GuardianLink.AssignedById field, ADR 0038 §F supersedes the
+    // "byte-identical POCO" invariant S·3): the conferrer's SubjectId is
+    // persisted on the row, not only recoverable from the audit trail.
+
+    [Fact]
+    public async Task AssignGuardianLink_WritesPendingRow_AndAssignAuditRow()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-f-assigning";
+        const string assignedGuardian = "ga-f-assigned";
+        const string child = "ga-f-child";
 
         await SeedChildProfileAsync(store, child, ct);
 
-        // Call the seam — one commit, two audit rows (S·1).
+        // Call the seam — one commit, the Pending row + one audit row (S·1).
         var link = await userInfo.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
-        Assert.Equal(GuardianLinkStatus.Active, link.Status);
+        Assert.Equal(GuardianLinkStatus.Pending, link.Status);
 
-        // (a) one GuardianLink row for the pair, Active.
+        // (a) one GuardianLink row for the pair, Pending.
         await using var q1 = store.QuerySession();
         var linkCount = await Marten.QueryableExtensions.CountAsync(
             q1.Query<GuardianLink>()
@@ -174,27 +348,35 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
             ct);
         Assert.Equal(1, linkCount);
 
-        // (b) one guardian.create row, ActorId = the ASSIGNED guardian (S·5).
-        var createRow = await LastAuditAsync(store, "guardian.create", link.Id, ct);
-        Assert.Equal(assignedGuardian, createRow.ActorId);
-        Assert.Equal(AccessVia.Guardian, createRow.Via);
-        Assert.Equal(AccessOutcome.Allow, createRow.Outcome);
+        // (b) the conferrer is persisted on the row (ADR 0038 §F — the
+        //     "who conferred the standing" legibility, the S·3
+        //     byte-identical-POCO invariant is superseded).
+        Assert.Equal(assigningGuardian, link.AssignedById);
+        // The assignee's ResolvedAt/ResolvedBy are null (the row is still
+        // Pending — they have not yet acted).
+        Assert.Null(link.ResolvedAt);
+        Assert.Null(link.ResolvedBy);
 
-        // (c) one guardian.assign row, ActorId = the ASSIGNING guardian (S·5).
+        // (c) one guardian.assign row, ActorId = the ASSIGNING guardian (the
+        //     conferrer, S·5).
         var assignRow = await LastAuditAsync(store, "guardian.assign", link.Id, ct);
         Assert.Equal(assigningGuardian, assignRow.ActorId);
         Assert.Equal(assigningGuardian, assignRow.EffectivePrincipalId);
         Assert.Equal(AccessVia.Guardian, assignRow.Via);
         Assert.Equal(AccessOutcome.Allow, assignRow.Outcome);
 
-        // (d) both rows target the same link id, TargetKind = "guardian-link".
-        Assert.Equal(link.Id, createRow.TargetId);
+        // (d) the row targets the link id, TargetKind = "guardian-link".
         Assert.Equal(link.Id, assignRow.TargetId);
-        Assert.Equal("guardian-link", createRow.TargetKind);
         Assert.Equal("guardian-link", assignRow.TargetKind);
 
-        // (e) S·6 — idempotency: a second call with the same pair is a no-op —
-        //     the row count stays 1, the audit-row counts stay 1 each.
+        // (e) NO guardian.create row (the standing is not minted until the
+        //     assignee accepts — the ADR 0038 §F supersession of the GA-AR
+        //     "two audit rows" contract).
+        Assert.Equal(0, await CountAuditAsync(store, "guardian.create", link.Id, ct));
+
+        // (f) S·6 — idempotency: a second call with the same pair (while the
+        //     row is still Pending) is a no-op — the row count stays 1, the
+        //     audit-row count stays 1.
         await userInfo.AssignGuardianLinkAsync(
             child, assignedGuardian, assigningGuardian);
 
@@ -205,10 +387,111 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
             ct);
         Assert.Equal(1, linkCount2);
 
-        var createCount2 = await CountAuditAsync(store, "guardian.create", link.Id, ct);
         var assignCount2 = await CountAuditAsync(store, "guardian.assign", link.Id, ct);
-        Assert.Equal(1, createCount2);
         Assert.Equal(1, assignCount2);
+        // Still no guardian.create row.
+        Assert.Equal(0, await CountAuditAsync(store, "guardian.create", link.Id, ct));
+    }
+
+    // ── ADR 0038 §F — the accept seam writes TWO audit rows in one commit ──
+    // The standing is minted on the accept: the guardian.create row (the
+    // standing-holder's GU seam's shape, byte-identical to what
+    // CreateGuardianLinkAsync writes) + the guardian.accept row (the
+    // consent event). Together they answer "who holds standing" AND "when
+    // was the standing minted."
+
+    [Fact]
+    public async Task AcceptGuardianLink_WritesCreateAndAcceptAuditRows()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-accept-audit-assigning";
+        const string assignedGuardian = "ga-accept-audit-assigned";
+        const string child = "ga-accept-audit-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        var pending = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Pending, pending.Status);
+
+        // The accept: the standing is minted — two audit rows in one commit.
+        var accepted = await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        Assert.Equal(GuardianLinkStatus.Active, accepted.Status);
+        Assert.Equal(assignedGuardian, accepted.ResolvedBy);
+        Assert.NotNull(accepted.ResolvedAt);
+
+        // (a) one guardian.create row, ActorId = the ASSIGNED guardian (the
+        //     standing-holder, the GU seam's shape — byte-identical to what
+        //     CreateGuardianLinkAsync writes).
+        var createRow = await LastAuditAsync(store, "guardian.create", pending.Id, ct);
+        Assert.Equal(assignedGuardian, createRow.ActorId);
+        Assert.Equal(assignedGuardian, createRow.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Guardian, createRow.Via);
+        Assert.Equal(AccessOutcome.Allow, createRow.Outcome);
+        Assert.Equal(pending.Id, createRow.TargetId);
+        Assert.Equal("guardian-link", createRow.TargetKind);
+
+        // (b) one guardian.accept row, ActorId = the ASSIGNED guardian (the
+        //     one who consented — the ADR 0038 §F consent event).
+        var acceptRow = await LastAuditAsync(store, "guardian.accept", pending.Id, ct);
+        Assert.Equal(assignedGuardian, acceptRow.ActorId);
+        Assert.Equal(assignedGuardian, acceptRow.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Guardian, acceptRow.Via);
+        Assert.Equal(AccessOutcome.Allow, acceptRow.Outcome);
+        Assert.Equal(pending.Id, acceptRow.TargetId);
+        Assert.Equal("guardian-link", acceptRow.TargetKind);
+
+        // (c) the guardian.assign row (the conferral event) is still on the
+        //     row from the earlier assign — the full audit trail is
+        //     legible: who conferred (the conferrer), who holds standing
+        //     (the assignee), when the standing was minted (the accept row).
+        var assignRow = await LastAuditAsync(store, "guardian.assign", pending.Id, ct);
+        Assert.Equal(assigningGuardian, assignRow.ActorId);
+    }
+
+    // ── ADR 0038 §F — the read seam: the assignee's pending requests ──
+
+    [Fact]
+    public async Task GetPendingGuardianRequestsForAssignee_ReturnsOnlyAssigneesPendingRows()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-read-assigning";
+        const string assignedGuardian = "ga-read-assigned";
+        const string otherGuardian  = "ga-read-other";
+        const string child          = "ga-read-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+        await userInfo.AssignGuardianLinkAsync(child, assignedGuardian, assigningGuardian);
+
+        // The assigned guardian's read: exactly one row (their pending
+        // request for this child).
+        var rows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
+        Assert.Single(rows);
+        Assert.Equal(child, rows[0].ChildId);
+        Assert.Equal(assigningGuardian, rows[0].AssignedById);
+        Assert.Equal(GuardianLinkStatus.Pending, rows[0].Status);
+
+        // The assigning guardian's read: zero rows (they are not the
+        // assignee of this request — they are the conferrer; their row is
+        // Active from CreateGuardianLinkAsync, not Pending).
+        var otherRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assigningGuardian);
+        Assert.Empty(otherRows);
+
+        // A third account's read: zero rows (the ADR 0012/0013 "a
+        // non-guardian learns nothing" shape applied to the identity axis).
+        var strangerRows = await userInfo.GetPendingGuardianRequestsForAssigneeAsync("stranger");
+        Assert.Empty(strangerRows);
+
+        // After the assignee accepts: the read returns zero rows (the row is
+        // no longer Pending).
+        await userInfo.AcceptGuardianLinkAsync(child, assignedGuardian);
+        var afterAccept = await userInfo.GetPendingGuardianRequestsForAssigneeAsync(assignedGuardian);
+        Assert.Empty(afterAccept);
     }
 
     // ── Shared harness ────────────────────────────────────────────────────────

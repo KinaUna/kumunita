@@ -250,9 +250,11 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // kinds — announcement / community.post / page.child; ADR 0105
         // (M9) adds message.new — the direct-messaging nudge kind; ADR 0141
         // adds the two GU guardian-facing kinds — guardian.group_invite /
-        // guardian.community_invite).
+        // guardian.community_invite; ADR 0038 §F adds the acceptance-lane
+        // kind — guardian.assign, the assigned guardian's "a guardian has
+        // asked you to become a co-guardian" nudge).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(19, vm.AllKinds.Count);
+        Assert.Equal(20, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

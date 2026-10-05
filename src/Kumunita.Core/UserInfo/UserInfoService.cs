@@ -3361,37 +3361,136 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
 
         await using var session = store.OpenSession(new SessionOptions());
 
-        // S·6 — idempotent formation: a duplicate (GuardianId, ChildId) Active row
-        // is a no-op — the row is left as-is and returned (not a throw), no
-        // second pair of audit rows (the G-A·4 precedent, inherited).
+        // One row per (GuardianId, ChildId) pair — the business key (the
+        // M1DocTypes unique index). The ADR 0038 §F acceptance lane reworks
+        // this seam: the assigned guardian's standing is now CONFIRMED, not
+        // conferred — the row lands PENDING and the standing is minted only
+        // on Accept (the guardian.create row is deferred to the accept seam).
+        //
+        // Idempotency (the G-A·4 precedent, re-shaped for the state machine):
+        //   · Pending   → no-op (a fresh request is already awaiting this
+        //                 guardian; nothing changes, no new audit row).
+        //   · Declined  → the conferrer re-acts: the row flips back to
+        //                 Pending (a deliberate new act — the row's
+        //                 ResolvedAt/ResolvedBy are cleared, a fresh
+        //                 guardian.assign audit row + notification are
+        //                 emitted).
+        //   · Active /  → no-op (the pair already holds, or has already
+        //     Dissolved   left, standing; re-assignment is not a lane).
         var existing = await session.Query<GuardianLink>()
             .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
 
-        if (existing is not null)
+        if (existing is not null &&
+            existing.Status is GuardianLinkStatus.Pending or
+                           GuardianLinkStatus.Active or
+                           GuardianLinkStatus.Dissolved)
         {
             // No mutation, no audit (a no-op is a no-op — the contract, not an
             // error). Return the existing row as-is.
             return existing;
         }
 
-        var link = new GuardianLink
+        GuardianLink link;
+        if (existing is not null)
         {
-            Id = Guid.NewGuid().ToString("N"),
-            GuardianId = guardianId,
-            ChildId = childId,
-            Status = GuardianLinkStatus.Active,
-            CreatedAt = now
-        };
+            // The Declined case — the conferrer re-acts over the existing row.
+            // The unique index keeps this ONE row (not a second one); the
+            // state machine re-enters Pending.
+            link = existing;
+            link.Status = GuardianLinkStatus.Pending;
+            link.ResolvedAt = null;
+            link.ResolvedBy = null;
+            link.AssignedById = assignedById;
+        }
+        else
+        {
+            link = new GuardianLink
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GuardianId = guardianId,
+                ChildId = childId,
+                Status = GuardianLinkStatus.Pending,
+                CreatedAt = now,
+                AssignedById = assignedById
+            };
+        }
         session.Store(link);
 
-        // S·5 — the two complementary audit rows, written in the SAME session
-        // (S·1 — one SaveChangesAsync, no partial write):
+        // The conferral audit row (the GA-AR verb): ActorId = the ASSIGNING
+        // guardian (the conferrer). The standing-holder's guardian.create row
+        // is deliberately deferred to AcceptGuardianLinkAsync (ADR 0038 §F) —
+        // the standing is conferred by the assignee's consent, not by the
+        // conferrer's act.
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = assignedById,
+            EffectivePrincipalId = assignedById,
+            Action = "guardian.assign",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        // The assignee's notification (the ADR 0038 §F "no email notification"
+        // deferral is superseded: the accept/decline lane needs a reachable
+        // surface). Silent when services is null (the test-harness precedent).
+        await EmitGuardianAssignNotificationAsync(
+            session, childId, guardianId, assignedById).ConfigureAwait(false);
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
+    public async Task<GuardianLink> AcceptGuardianLinkAsync(
+        string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // The acceptee identifies with the row by the (guardianId, childId)
+        // pair — the row's GuardianId field IS the assignee's identity (it was
+        // written by the conferrer, not the assignee; the assignee is simply
+        // the account the conferrer named). A standing gate is not possible:
+        // the assignee holds no standing YET — that is exactly what the accept
+        // confers. The precondition is the row's PENDING state.
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (link is null || link.Status != GuardianLinkStatus.Pending)
+        {
+            // Missing / already-resolved / already-active / dissolved — in
+            // every case the accept is refused, not a no-op (the lane's
+            // honesty: a second accept over an Active row is a bug the caller
+            // must surface, the GroupInvitation.AcceptAsync C-M2b·3 shape).
+            throw new InvalidOperationException(
+                $"No pending guardian request for ({guardianId}, {childId}).");
+        }
+
+        link.Status = GuardianLinkStatus.Active;
+        link.ResolvedAt = now;
+        link.ResolvedBy = guardianId;
+        session.Store(link);
+
+        // The standing is minted NOW — the two complementary audit rows, in
+        // the SAME session (C3, no partial write):
         //
         // (1) guardian.create — the GU seam's shape, byte-identical to what
-        //     CreateGuardianLinkAsync writes (S·2): ActorId = the ASSIGNED
-        //     guardian (the standing-holder).
+        //     CreateGuardianLinkAsync writes: ActorId = the ASSIGNED guardian
+        //     (the standing-holder).
         session.Store(new Authorization.AccessAudit
         {
             Id = Guid.NewGuid().ToString("N"),
@@ -3405,15 +3504,83 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             Outcome = Authorization.AccessOutcome.Allow
         });
 
-        // (2) guardian.assign — the GA-AR conferral verb: ActorId = the
-        //     ASSIGNING guardian (the conferrer, S·5).
+        // (2) guardian.accept — the ADR 0038 §F consent event: ActorId = the
+        //     ASSIGNED guardian (the one who consented).
         session.Store(new Authorization.AccessAudit
         {
             Id = Guid.NewGuid().ToString("N"),
             At = now,
-            ActorId = assignedById,
-            EffectivePrincipalId = assignedById,
-            Action = "guardian.assign",
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.accept",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GuardianLink>> GetPendingGuardianRequestsForAssigneeAsync(
+        string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        await using var session = store.QuerySession();
+        var rows = await session
+            .Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId
+                        && l.Status == GuardianLinkStatus.Pending)
+            .OrderBy(l => l.CreatedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        return rows;
+    }
+
+    /// <inheritdoc />
+    public async Task<GuardianLink> DeclineGuardianLinkAsync(
+        string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Same identity-with-the-row shape as the accept seam (the assignee
+        // names the (guardianId, childId) pair; the precondition is PENDING).
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (link is null || link.Status != GuardianLinkStatus.Pending)
+        {
+            throw new InvalidOperationException(
+                $"No pending guardian request for ({guardianId}, {childId}).");
+        }
+
+        link.Status = GuardianLinkStatus.Declined;
+        link.ResolvedAt = now;
+        link.ResolvedBy = guardianId;
+        session.Store(link);
+
+        // The decline audit row: ActorId = the assigned guardian (the one who
+        // refused). No guardian.create row — the standing was never minted.
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.decline",
             TargetKind = "guardian-link",
             TargetId = link.Id,
             Via = Authorization.AccessVia.Guardian,
@@ -3653,6 +3820,47 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             linkPath: linkPath,
             acceptPath: linkPath,
             declinePath: linkPath,
+            ct: System.Threading.CancellationToken.None)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The ADR 0038 §F acceptance-lane emission: the assigned guardian (the
+    /// recipient) gets an inbox row + (best-effort) staged email with
+    /// <see cref="Notifications.Notification.LinkPath"/> =
+    /// <c>/me/children</c> (their Index page, where the pending-requests
+    /// card shows the Accept / Decline buttons). The <paramref name
+    /// "conferrerId"/> is the UGC snippet (the conferring guardian's display
+    /// name — a curation fact, not content the G·1 rule hides from the
+    /// assignee) appended to the localized template. Silent when
+    /// <paramref name="services"/> is null (the 181 pre-ADR 0083
+    /// direct-construction test harnesses).
+    /// </summary>
+    private async Task EmitGuardianAssignNotificationAsync(
+        IDocumentSession session,
+        string childId,
+        string assigneeId,
+        string conferrerId)
+    {
+        var ns = services?.GetService<Notifications.NotificationService>();
+        if (ns is null) return;
+
+        var conferrerProfile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == conferrerId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        var body = string.IsNullOrWhiteSpace(conferrerProfile?.DisplayName)
+            ? conferrerId
+            : conferrerProfile!.DisplayName;
+
+        var linkPath = "/me/children";
+        await ns.EmitAsync(
+            session,
+            assigneeId,
+            Notifications.NotificationKinds.GuardianAssign,
+            $"notification:guardian.assign:{childId}:{assigneeId}",
+            body,
+            linkPath: linkPath,
             ct: System.Threading.CancellationToken.None)
             .ConfigureAwait(false);
     }

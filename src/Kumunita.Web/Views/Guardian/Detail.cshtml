@@ -319,14 +319,18 @@
         </form>
 
         @*
-            GA (ADR 0038) — the "other guardians" list: the child's active
-            GuardianLink rows (not the guardian's child rows — the
-            ActiveChildrenAsync read inverted), each resolved to a
+            GA (ADR 0038 §F) — the "other guardians" list: the child's
+            active-or-pending GuardianLink rows (not the guardian's child
+            rows — the ActiveChildrenAsync read inverted), each resolved to a
             display name via the existing GetProfileAsync (a read, not a
             decision; G-A·3 — the assigned guardian's standing is
             identical in kind to the creator's). The list is the
             standing itself — a non-guardian's page is a 404 (the
-            Detail route already gates on ActiveLinkAsync).
+            Detail route already gates on ActiveLinkAsync). ADR 0038 §F:
+            a row that is still Pending shows a "pending" badge next to
+            the assignee's name — the conferrer sees the state change
+            live (the assignee's accept or decline is visible here on the
+            very next read, G·2/C4).
         *@
         <h2 class="mt-4"><kw-l key="guardian.otherGuardians.title">Other guardians</kw-l></h2>
         @if (Model.GuardianItems.Count == 0)
@@ -338,7 +342,13 @@
             <ul class="list-group mb-3">
                 @foreach (var g in Model.GuardianItems)
                 {
-                    <li class="list-group-item">@g.DisplayName</li>
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <span>@g.DisplayName</span>
+                        @if (g.IsPending)
+                        {
+                            <span class="badge bg-warning text-dark"><kw-l key="guardian.pending">Pending</kw-l></span>
+                        }
+                    </li>
                 }
             </ul>
         }

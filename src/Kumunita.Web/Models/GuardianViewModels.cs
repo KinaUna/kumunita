@@ -22,15 +22,21 @@ public sealed record ChildAccountItem(string ChildId, string DisplayName, bool B
 
 /// <summary>
 /// One <b>assigned guardian row</b> on the child's <c>Detail</c> "other
-/// guardians" list (GA, ADR 0038). The <see cref="ChildAccountItem"/> shape
-/// mirrored: <see cref="SubjectId"/> is the assigned guardian's
+/// guardians" list (GA, ADR 0038 §F). The <see cref="ChildAccountItem"/>
+/// shape mirrored: <see cref="SubjectId"/> is the assigned guardian's
 /// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>; <see
 /// cref="DisplayName"/> is resolved via <see
 /// cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/> (a read,
 /// not a decision; G-A·3 — the assigned guardian's standing is identical in
-/// kind to the creator's, no content read).
+/// kind to the creator's, no content read); <see cref="IsPending"/> is the
+/// ADR 0038 §F acceptance-lane state — <c>true</c> when the row is
+/// <see cref="Kumunita.Core.UserInfo.GuardianLinkStatus.Pending"/> (the
+/// assignee has not yet accepted; the conferrer sees a "pending" badge),
+/// <c>false</c> when the row is <see cref="Kumunita.Core.UserInfo
+/// .GuardianLinkStatus.Active"/> (the assignee accepted — the conferrer sees
+/// no badge).
 /// </summary>
-public sealed record GuardianItem(string SubjectId, string DisplayName);
+public sealed record GuardianItem(string SubjectId, string DisplayName, bool IsPending);
 
 /// <summary>
 /// One <b>pending group invitation row</b> on the child's <c>Detail</c> curation
@@ -130,3 +136,61 @@ public sealed class AssignGuardianForm
     [Display(Name = "Email of the guardian to assign")]
     public string? Email { get; set; }
 }
+
+/// <summary>
+/// GA (ADR 0038 §F): the <b>accept-a-guardian-assignment</b> form model,
+/// bound via <c>[FromForm]</c> on <c>GuardianController.Accept</c>.
+/// <see cref="GuardianConsent"/> is the assignee's consent to the
+/// child-account terms — the same confirmation + data-processing
+/// obligations the creating guardian accepts on the
+/// <c>AddChildForm</c> before creation (the "like when a guardian creates a
+/// new child account" the ADR 0038 §F acceptance lane mirrors): the accept
+/// is refused until the assignee checks the box. The assignee's own
+/// <c>SubjectId</c> is minted by the controller from
+/// <c>KumunitaPrincipal.SubjectId(User)</c> (the <c>AddChildForm</c>
+/// precedent — the guardian is never form-bound); the <b>child</b> is the
+/// route's <c>{childId}</c>.
+/// </summary>
+public sealed class AcceptGuardianForm
+{
+    [Required]
+    [Display(Name = "Guardian consent")]
+    public bool GuardianConsent { get; set; }
+}
+
+/// <summary>
+/// One <b>pending guardian-assignment request row</b> on the assignee's
+/// <c>/me/children</c> Index page (GA, ADR 0038 §F). <see cref
+/// "ChildId"/> is the supervised child's
+/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/> (the route's
+/// <c>{childId}</c> the accept / decline POSTs post to); <see
+/// cref="ChildDisplayName"/> is the child's display name (a curation fact,
+/// resolved through the same profile read the <see cref
+/// "ChildAccountItem"/> list uses — G·1 held: no content); <see
+/// cref="ConferrerDisplayName"/> is the assigning guardian's display name
+/// (the UGC snippet the <c>guardian.assign</c> notification carries — the
+/// assignee already knows the name from the notification, the page repeats
+/// it so the pending list is legible without the inbox); <see cref
+/// "RequestedAt"/> is the row's <see cref="Kumunita.Core.UserInfo
+/// .GuardianLink.CreatedAt"/> (ISO-8601) — the row's Status / resolution
+/// stamps never reach the model (the list shows only <em>pending</em>
+/// rows, the <see cref="PendingInvitationItem"/> precedent).
+/// </summary>
+public sealed record PendingGuardianRequestItem(
+    string ChildId, string ChildDisplayName, string ConferrerDisplayName, string RequestedAt);
+
+/// <summary>
+/// The <b>index</b> view model for <c>/me/children</c> (GU ADR 0028,
+/// extended by GA ADR 0038 §F): <see cref="Children"/> — the
+/// guardian's active <c>ChildAccountItem</c> list (the GU pin,
+/// unchanged); <see cref="PendingRequests"/> — the guardian's own
+/// <see cref="PendingGuardianRequestItem"/> rows (the rows where
+/// <see cref="Kumunita.Core.UserInfo.GuardianLink.GuardianId"/> = the
+/// assignee, <see cref="Kumunita.Core.UserInfo.GuardianLinkStatus
+/// .Pending"/> = the state, the assignee has not yet acted). A
+/// non-assignee sees an empty <see cref="PendingRequests"/> list — the
+/// same as the GU list (a non-guardian sees an empty card, nothing else).
+/// </summary>
+public sealed record GuardianIndexModel(
+    IReadOnlyList<ChildAccountItem> Children,
+    IReadOnlyList<PendingGuardianRequestItem> PendingRequests);
