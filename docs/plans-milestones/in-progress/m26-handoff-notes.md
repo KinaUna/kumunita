@@ -127,3 +127,50 @@
   (`EventService.ListUpcomingAsync` / `ListPastAsync` /
   `ListGroupEventsAsync`) + the `Event*_*` group tests. Note the same Marten
   nullable-key limit will apply to any nullable event key. See `m26-u05.md`.
+
+## U5 — Core events
+
+- **Landed:** `SortSpec? sort = null` added to the 3 event seams
+  (`EventService.ListUpcomingAsync` / `ListPastAsync` /
+  `ListGroupEventsAsync`) — the shared ordering lives in a single private
+  helper `OrderByEventSort` (`src/Kumunita.Core/Events/EventService.cs`),
+  mirroring U4's `OrderByPostSort` shape, taking a `defaultAscending` flag so
+  each sub-surface keeps its **own** pinned direction (U2 §2.2 rows 4–6:
+  `start`/`created`/`title`). The `IEventService` seams gained the matching
+  parameter (deliverable 2 — a real edit here, unlike U4, since
+  `IEventService` exists). **`null` path is byte-for-byte the pinned line per
+  sub-surface:** upcoming / group = `OrderBy(Start)` **asc**, past =
+  `OrderByDescending(Start)` **desc** (C-SORT·2; the upcoming-asc/past-desc
+  split is preserved, not collapsed). `CanSeeAsync` / `CanSeeGroupFeedAsync` /
+  `HasMore` untouched (C-SORT·4).
+- **Tests:** `tests/Kumunita.Core.Tests/Events/EventSortTests.cs` — all 8
+  pinned `Event*_*` names pass: `EventUpcoming_SortSpecNull_CurrentOrderAsc`,
+  `EventPast_SortSpecNull_CurrentOrderDesc`, `EventUpcoming_SortCreatedAsc`,
+  `EventUpcoming_SortCreatedDesc`, `EventUpcoming_SortTitle_Ordinal`,
+  `EventPast_SortTitle_Ordinal`, `EventUpcoming_InvalidKey_DefaultOrder`,
+  `EventUpcoming_StableTieBreakBy_Id`.
+- **Tie-breaker pin (C-SORT·5):** `Queryable.ThenBy(..., e => e.Id)` present
+  on every non-null sort path (the fully-qualified form — U4's carry-forward
+  (1), the unqualified form is ambiguous on Marten's `IAsyncQueryable`).
+- **U4 carry-forward (3) confirmed, NOT a drift:** U2 §2.2 rows 4–6 keys
+  (`Start`/`Created`/`Title`) are all **non-null** in the `Event` model, so
+  the Marten 9.31.2 `?? sentinel` limit (U4's `BadLinqExpressionException`)
+  does not apply here — no sentinel forms used, no documented deviation.
+- **Parameter order (user-confirmed deviation from Part 2 §2.3 literal text):**
+  the 3 event seams already have a positional `CancellationToken ct` that ~27
+  existing call sites pass positionally (3 in `EventController.cs`, 1 in
+  `IcsFeedTests.cs`, ~23 NSubstitute stubs in `Kumunita.Web.Tests`).
+  §2.3's literal "before `ct`" ordering would break all of those (far outside
+  this Core unit's ≤3-file scope) and defeat §2.3's own "a new caller compiles
+  unchanged" intent; U4's `PostService` precedent has no `ct` at all (so the
+  clause never applied there). Per the user's call, `sort` is placed **after**
+  `ct` (the trailing param): `..., int page, CancellationToken ct = default,
+  SortSpec? sort = null`. **Part 2 (§2.2/§2.3) is unchanged** — this ordering
+  choice is recorded here and in the `OrderByEventSort` doc-comment. Downstream
+  units (U6–U9) with a positional `ct` seam should follow the same trailing-
+  `sort` convention.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Core.Tests` suite 1265 total, 0 failed (8 new + existing; U4 was
+  1257).
+- **Handoff to U6:** additive `SortSpec? sort = null` on the 4 project seams
+  + the `Project*_*`/`Todo*_*` tests. See `m26-u06.md`.

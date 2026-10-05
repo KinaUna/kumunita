@@ -2,6 +2,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -70,6 +71,60 @@ public sealed class EventService : IEventService
         _notifications = notifications;
     }
 
+    /// <summary>
+    /// M26 (C-SORT·2/5) — the event-feed ordering for the three event seams
+    /// (upcoming / past / group): a <c>null</c> spec keeps the pinned
+    /// <c>OrderBy(Start)</c> / <c>OrderByDescending(Start)</c> line
+    /// **byte-for-byte** per sub-surface (C-SORT·2 — the upcoming-asc vs
+    /// past-desc split is preserved via <paramref name="defaultAscending"/>);
+    /// a non-null spec applies the closed event allowlist
+    /// (U2 §2.2 rows 4–6: <c>start</c> / <c>created</c> / <c>title</c>) and
+    /// ends with the <c>.ThenBy(e => e.Id)</c> tie-breaker (C-SORT·5).
+    /// <para>
+    /// The <c>ThenBy</c> is invoked fully-qualified as
+    /// <c>Queryable.ThenBy(…)</c> — on Marten's
+    /// <c>IAsyncQueryable</c>/<c>IOrderedAsyncQueryable</c> the unqualified
+    /// <c>.ThenBy(…)</c> form is ambiguous (CS0411, the U4 carry-forward), so
+    /// the fully-qualified <c>System.Linq.Queryable</c> overload is the one
+    /// that resolves.
+    /// </para>
+    /// <para>
+    /// All three keys (<see cref="Event.Start"/> / <see cref="Event.Created"/>
+    /// / <see cref="Event.Title"/>) are **non-null** in the
+    /// <see cref="Event"/> model (U2 §2.2 rows 4–6), so U4's Marten
+    /// 9.31.2 <c>?? sentinel</c> limit does not apply here — no sentinel
+    /// forms are used.
+    /// </para>
+    /// </summary>
+    private static IQueryable<Event> OrderByEventSort(IQueryable<Event> q, SortSpec? sort, bool defaultAscending)
+    {
+        if (sort is null)
+            // ← the pinned line, verbatim per sub-surface (C-SORT·2):
+            // upcoming / group = OrderBy(Start) asc, past = OrderByDescending(Start) desc.
+            return defaultAscending
+                ? q.OrderBy(e => e.Start)
+                : q.OrderByDescending(e => e.Start);
+
+        // C-SORT·5 — the .ThenBy(e => e.Id) tie-breaker on every non-null sort
+        // path (U2 §2.2 rows 4–6: start/created direct non-null, title
+        // non-null with OrdinalIgnoreCase).
+        return sort.Key switch
+        {
+            "start" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(e => e.Start), e => e.Id)
+                : Queryable.ThenBy(q.OrderBy(e => e.Start), e => e.Id),
+            "created" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(e => e.Created), e => e.Id)
+                : Queryable.ThenBy(q.OrderBy(e => e.Created), e => e.Id),
+            "title" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(e => e.Title, StringComparer.OrdinalIgnoreCase), e => e.Id)
+                : Queryable.ThenBy(q.OrderBy(e => e.Title, StringComparer.OrdinalIgnoreCase), e => e.Id),
+            _ => defaultAscending
+                ? Queryable.ThenBy(q.OrderBy(e => e.Start), e => e.Id)
+                : Queryable.ThenBy(q.OrderByDescending(e => e.Start), e => e.Id), // C-SORT·1 — unreachable (Parse already fell back); the default is pinned anyway
+        };
+    }
+
     // --- Read lanes (U03) -------------------------------------------------------
 
     /// <summary>
@@ -88,7 +143,8 @@ public sealed class EventService : IEventService
     /// <see cref="AccessAudit"/> row with <c>TargetKind = "event"</c> via the
     /// <see cref="EventToAuditableResource"/>, U02).
     /// </summary>
-    public async Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null)
     {
         if (page < 1) page = 1;
 
@@ -99,7 +155,8 @@ public sealed class EventService : IEventService
             .Where(e => e.Start >= nowUtc); // upcoming lane: not yet started (the ListPastAsync mirror, <c>Start &lt; nowUtc</c>).
         if (componentId is not null)
             q = q.Where(e => e.ComponentId == componentId);
-        var candidates = await q.OrderBy(e => e.Start).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByEventSort(q, sort, defaultAscending: true)
+            .Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return runs **before** any
         // decision (no audit row) and reports no further page (ADR 0090 D1).
@@ -138,7 +195,8 @@ public sealed class EventService : IEventService
     /// no-decision early return (C-M7·5) + <c>HasMore</c> signal (ADR 0090
     /// D1 / D3).
     /// </summary>
-    public async Task<EventPage> ListPastAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<EventPage> ListPastAsync(string? componentId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null)
     {
         if (page < 1) page = 1;
 
@@ -149,7 +207,8 @@ public sealed class EventService : IEventService
             .Where(e => e.Start < nowUtc);
         if (componentId is not null)
             q = q.Where(e => e.ComponentId == componentId);
-        var candidates = await q.OrderByDescending(e => e.Start).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByEventSort(q, sort, defaultAscending: false)
+            .Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return runs **before** any
         // decision (no audit row) and reports no further page (ADR 0090 D1).
@@ -1568,17 +1627,18 @@ public sealed class EventService : IEventService
     /// <see cref="ListUpcomingAsync"/> 0-candidate shape). **No audience
     /// evaluation of any kind** (GE·1/GE·8 — membership is the sole decision).
     /// </summary>
-    public async Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page, CancellationToken ct = default)
+    public async Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null)
     {
         if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group events feed requires a groupId.", nameof(groupId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
-        var candidates = await session
+        IQueryable<Event> q = session
             .Query<Event>()
-            .Where(e => e.GroupId == groupId && !e.IsDeleted && !e.IsDraft)
-            .OrderBy(e => e.Start)
+            .Where(e => e.GroupId == groupId && !e.IsDeleted && !e.IsDraft);
+        var candidates = await OrderByEventSort(q, sort, defaultAscending: true)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync(ct)
