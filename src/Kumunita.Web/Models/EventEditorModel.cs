@@ -497,7 +497,17 @@ public sealed record EventIndexViewModel(
     // The view uses this to render the Upcoming/Past toggle's active state and
     // the correct empty-state key; it is a *display* echo of the ?past= query
     // selector, never an access input.
-    bool Past = false);
+    bool Past = false,
+    // M26 U11 (D-SORT·5) — the one shared sort control (the U10 reference,
+    // reused — no per-surface fork, C-SORT·1): the closed event-feed
+    // allowlist (U2 §2.2 rows 4–5: start/created/title, all non-null in the
+    // Event model) + the per-sub-surface default direction (upcoming start
+    // asc, past start desc). <c>null</c> would render nothing (the no-sort
+    // pin — the _Pager null ⇒ no partial precedent); this surface always
+    // sets it. Default null (positional default must be a compile-time
+    // constant) so the existing shape-pinning Web test keeps compiling
+    // unchanged.
+    SortViewModel? Sort = null);
 
 /// <summary>
 /// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read

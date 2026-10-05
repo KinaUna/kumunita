@@ -354,6 +354,23 @@ public sealed record GroupDetailViewModel(
     /// <summary>The group-events section's pager (M7, ADR 0090 D5) — null on a
     /// single page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
     public PagedViewModel? PagerEvents { get; init; }
+
+    // ── M26 U11 (D-SORT·5) — the two list sections' sort controls ──────────────
+    // The detail page renders **two** list surfaces (the group posts + the
+    // group events), each with its own closed allowlist (U2 §2.2 rows 2–3 vs
+    // row 6). The _Sort partial (one shared control — no per-surface fork,
+    // C-SORT·1) renders nothing when the VM field is null (the no-sort pin,
+    // the _Pager null ⇒ no partial precedent). Object-initializer properties
+    // (not positional params) so the existing shape-pinning Web test keeps
+    // compiling unchanged.
+    /// <summary>The group-posts section's sort control (M26 U11) — the closed
+    /// post-feed allowlist (U2 §2.2 row 2: created desc, modified desc, title asc).</summary>
+    public SortViewModel? SortPosts { get; init; }
+
+    /// <summary>The group-events section's sort control (M26 U11) — the closed
+    /// group-events allowlist (U2 §2.2 row 6: start asc, created desc — no
+    /// title; F9, no dead options on the section's _Sort link set).</summary>
+    public SortViewModel? SortEvents { get; init; }
 }
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route

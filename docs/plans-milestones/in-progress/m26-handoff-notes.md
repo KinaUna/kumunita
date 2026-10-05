@@ -446,3 +446,43 @@
   `Options` (and its own `ForRoute` base) + adds its own `sort`/`dir` pairs to
   its existing `Pager`'s `FilterParams`. Do not create a per-surface partial.
   See `m26-u11.md`.
+
+## U11 — Web posts + events
+
+- **Landed (Web unit):** the U10 `_Sort` pattern applied to the **remaining
+  post feeds** (all-sections `PostsController.AllSections` + group posts
+  `GroupsController.Detail`) + the **events** surfaces (upcoming + past
+  `EventController.Index` + group events `GroupsController.Detail`) — 5
+  surfaces wired; **reuse, not fork** (the one shared `SortViewModel` +
+  `_Sort` partial, C-SORT·1). Each surface passes **its own** closed
+  allowlist (`Options`) + its own pager-carry `sort`/`dir` pair (C-SORT·8) —
+  the group detail page's **two** sections (posts + events) each parse the
+  same `?sort=`/`?dir=` request params against **their own** allowlist +
+  default, so a surface-unknown key (e.g. `title` on the group events section)
+  falls back to that surface's default order.
+- **Per-surface `Options` (U2 §2.2):** the all-sections + group posts
+  surfaces share the post-feed allowlist (row 1–3: `created` desc, `modified`
+  desc, `title` asc); the upcoming/past event feed surfaces share the event-
+  feed allowlist (row 4–5: `start` — asc on upcoming, desc on past — `created`
+  desc, `title` asc); the group events section offers **only**
+  `start` asc + `created` desc (row 6 — F9, no `title` dead option on the
+  section's link set).
+- **Pager-carry (C-SORT·8):** each surface's `Pager` `FilterParams` gains **its
+  own** `sort`/`dir` pairs (only when the request carried a non-blank
+  `?sort=`); an unsorted read keeps `FilterParams` byte-identical to pre-M26
+  (C-SORT·2). The `null`/no-sort pin is unchanged (a `null` `Sort` renders
+  nothing).
+- **Tests:** `tests/Kumunita.Web.Tests/PostEventSortWebTests.cs` — all 15
+  pinned names pass: `AllFeed_*` (3), `GroupPostFeed_*` (3),
+  `EventUpcoming_*` (3), `EventPast_*` (3), `EventGroup_*` (3). The
+  C-SORT·1 surface-unknown-key fallback (e.g. `?sort=title` on the group
+  events section falls back to its own default `start`-asc, not to a
+  `title` order the section doesn't offer) is carried by the same
+  `SortKeys.Parse` call the U10 reference pins
+  (`CommunityFeed_SortParam_DefaultsWhenAbsent`). The existing
+  `CommunityFeed_*` (U10) + `GroupsDetailViewModelTests` shape pin (renamed
+  to `…_TwentyFour_Projected_Fields`, +2 for the new `SortPosts`/`SortEvents`)
+  still pass.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Web.Tests` suite **867** total, **0 failed** (15 new + existing;
+  U10 was 852).

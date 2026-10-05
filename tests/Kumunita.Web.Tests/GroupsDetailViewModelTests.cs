@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_TwentyTwo_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_TwentyFour_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -112,6 +112,14 @@ public sealed class GroupsDetailViewModelTests
                 // the owner ∪ GlobalAdmin approve/decline surface.
                 "PendingJoinRequests",
                 "ResidentCandidates",
+                // M26 U11 (D-SORT·5) — the two list sections' sort controls
+                // (the U10 _Sort reference, reused): each section's own
+                // closed allowlist (the group posts row 2 set, the group
+                // events row 6 set) — the group detail's section-scoped
+                // sort controls (one shared _Sort partial, no per-surface
+                // fork, C-SORT·1).
+                "SortEvents",
+                "SortPosts",
             },
             fields.ToArray());
     }

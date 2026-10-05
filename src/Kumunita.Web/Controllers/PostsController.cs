@@ -310,15 +310,9 @@ public sealed class PostsController(
         if (page <= 1 && !hasMore)
             return null;
 
-        var filterParams = new Dictionary<string, string>();
-        if (HasSortParam(sort, dir))
-        {
-            filterParams["sort"] = sort!.Trim().ToLowerInvariant();
-            filterParams["dir"] = string.IsNullOrWhiteSpace(dir) ? "desc" : dir.Trim().ToLowerInvariant();
-        }
-
         return PagedViewModel.ForRoute(
-            $"/community/{componentId}", page, 30, hasMore, filterParams);
+            $"/community/{componentId}", page, 30, hasMore,
+            SortViewModel.SortFilterParams(sort, dir));
     }
 
     // ── All-sections feed (GET /community) ────────────────────────────────
@@ -344,9 +338,15 @@ public sealed class PostsController(
     /// </para>
     /// </summary>
     [HttpGet("/community")]
-    public async Task<IActionResult> AllSections(int page = 1)
+    public async Task<IActionResult> AllSections(int page = 1, string? sort = null, string? dir = null)
     {
         var actor = SubjectId(User) ?? string.Empty;
+
+        // M26 U11 (C-SORT·3) — same Web-only sort mapping as the Index reference
+        // surface (U10); the allowlist is the same post-feed set (created/modified/title).
+        var feedSort = HasSortParam(sort, dir)
+            ? SortKeys.Parse(sort, dir, PostFeedAllowedKeys, "created", defaultDir: true)
+            : null;
 
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
         // The viewer's posting reach is the same rule the composer's POST gate uses
@@ -359,19 +359,32 @@ public sealed class PostsController(
 
         if (components.Count == 0)
         {
+            // M26 U11 (D-SORT·5) — the sort control is offered even on the
+            // empty-feed shape (the same U10 Index precedent): the closed
+            // allowlist is a surface property, not a data property, and the
+            // control's links are well-formed (an empty page) when clicked.
             return View("Index", new FeedViewModel
             {
                 ComponentName = "Community",
                 Items = [],
                 Total = 0,
                 CanPost = false, // no communities at all, so no posting right to offer
+                Sort = SortViewModel.ForRoute(
+                    "/community",
+                    currentKey: feedSort?.Key,
+                    currentDir: feedSort is { } empty ? (empty.Descending ? "desc" : "asc") : null,
+                    options: [
+                        ("created", "desc"),
+                        ("modified", "desc"),
+                        ("title", "asc"),
+                    ]),
             });
         }
 
         var componentIds = components.Select(c => c.Id).ToList();
         var nameByComponentId = components.ToDictionary(c => c.Id, c => c.Name);
 
-        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page);
+        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page, sort: feedSort);
 
         // ADR 0051 — the all-sections feed shows each post + its section name in
         // the viewer's current language when a translation exists, else the
@@ -429,9 +442,27 @@ public sealed class PostsController(
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on
             // a single page so the _Pager partial renders nothing. No filter
             // form on this surface (D9) — the links carry ?page=N only.
+            // M26 U11 (C-SORT·8) — the pager-carry rule (the U10 Index
+            // reference, reused): when the request carried a sort (a non-blank
+            // ?sort=), the sort/dir pairs join the pager's FilterParams so
+            // prev/next preserve the sort. An unsorted read leaves the
+            // FilterParams empty — byte-identical to pre-M26 (C-SORT·2).
             Pager = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/community", page, 30, feed.HasMore)
+                ? PagedViewModel.ForRoute("/community", page, 30, feed.HasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
+            // M26 U11 (D-SORT·5) — the one shared sort control (the U10
+            // reference, reused — no fork): the closed post-feed allowlist
+            // (created desc, modified desc, title asc — design §2.2 row 1).
+            Sort = SortViewModel.ForRoute(
+                "/community",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } fs ? (fs.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
         });
     }
 
