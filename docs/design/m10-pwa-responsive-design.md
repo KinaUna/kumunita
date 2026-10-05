@@ -142,8 +142,11 @@ M10 creates **no** service seam, adapter, or document. The contracts it
 2. **The service-worker contract** (§SW): `wwwroot/sw.js` intercepts
    **only** same-origin `GET` fetch events whose `request.url` path is
    on the **closed allowlist** below and whose request carries **no**
-   `Authorization` header; every other request falls through to
-   `event.respondWith(fetch(event.request))` untouched. The cache name
+   `Authorization` header; every other request falls through **untouched**
+   (the amended rule — a `return` without calling `event.respondWith()`, so
+   the request never routes through the worker's own `fetch`; see the
+   drift log for the M10 close amendment and the `/admin/setup` form bug it
+   fixes). The cache name
    is versioned (`kumunita-shell-v1`) and `activate` clears every
    other cache name. This contract is what C-M10·2 pins and what U02's
    `ServiceWorker_Allowlist_Matches_Design_Doc_Verbatim` test
@@ -322,12 +325,22 @@ the resident who wanted it.
 **The contract.** `wwwroot/sw.js` is a same-origin `wwwroot/` asset
 (`script-src 'self'` compliant — C-M10·3). It intercepts a `fetch`
 event **only when all four** of the following hold; every other event
-falls through **untouched** — the exact fall-through line U02 must ship
-(and the drift-guard pins):
+falls through **untouched** — the amended fall-through (the drift-guard
+pins this rule; see the drift log for the M10 close amendment and the
+`/admin/setup` form-submission bug it fixes):
 
 ```js
-event.respondWith(fetch(event.request));
+return; // untouched — do NOT call event.respondWith() on the fall-through path
 ```
+
+The original shipped form was `event.respondWith(fetch(event.request))`;
+that line claimed the response and routed the request through the
+worker's own `fetch()`, which rejects a form submission's FetchEvent
+promise (surfaced by the browser as a CSP `form-action 'self'`
+violation — e.g. the first-boot `/admin/setup` POST). The amendment
+returns without responding, leaving the request in the browser's native
+path — the truest "untouched" pass-through, and it can never touch the
+cache.
 
 The four gates:
 
@@ -896,6 +909,34 @@ carries the per-unit entries):
   `m10-pwa-handoff-notes.md` `## Summary` is the last line the
   handoff note receives; the unit plans U00–U06 all hold their own
   files under `done/`.
+- **Fall-through amendment (2026-10-05) — the §SW fall-through line is
+  a `return` without `event.respondWith()`, not
+  `event.respondWith(fetch(event.request))`.** The original shipped
+  line claimed the response for *every* request that failed the four
+  gates and routed it through the worker's own `fetch()`. For a form
+  submission (a `POST` — gate 2 refuses it, so it lands on the
+  fall-through), the worker-side `fetch(request)` fails; the
+  `FetchEvent`'s promise rejects ("the FetchEvent for … resulted in a
+  network error response"), and the browser surfaces the failed
+  worker-mediated form submission as a CSP `form-action 'self'`
+  violation — reproducible on the first-boot **`/admin/setup`** form
+  (the `/admin/setup` POST is the one real-world form post observed
+  through the active SW; `POST /language` in the U06 spec is a GET-then-
+  redirect-able path that the worker's `fetch` happened to serve). The
+  contract's stated intent was always *"falls through untouched"*, and
+  the truest form of "untouched" is that the worker does not put itself
+  in the request path at all: a bare `return` (no `event.respondWith`)
+  leaves the request in the browser's native path, which passes
+  `form-action 'self'` because it is genuinely same-origin and never
+  routes through the worker. This is the **safe direction** for the
+  privacy pin (C-M10·2) — the SW touches *less* of the request, still
+  never caches a signed-in route, and the `SignedIn_Route_Not_In_
+  ServiceWorker_Cache` negative pin and the offline-shell pin are both
+  unaffected (they assert on the allowlist + the two HTML-page
+  strategies, not the fall-through mechanism). `sw.js`'s file header,
+  the ADR 0107 D2 text, and this §SW contract statement are amended
+  in step; no test string-pins the fall-through line (verified against
+  `PwaManifestTests` — it string-pins only the `ALLOWLIST` array).
 
 ## §the three acceptance tests (template)
 

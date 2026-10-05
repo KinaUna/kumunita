@@ -14,10 +14,10 @@
  *
  * **Every other request falls through untouched** (C-M10·2 — the worker's
  * cache can never hold a resident's feed, a conversation, an inbox, or a
- * board). The exact fall-through line is a drift-guard pin of the design
- * doc §SW:
- *
- *   event.respondWith(fetch(event.request));
+ * board). The amended §SW fall-through (see the drift log) is a `return`
+ * without calling `event.respondWith()` — leaving the request in the
+ * browser's native path (never routed through the worker's own `fetch`,
+ * which would break form submissions).
  *
  * Caching (locked, refined for the M11 nav-layout-lag fix): the two HTML
  * pages (`/`, `/about`) are **network-first** — a fresh server render (which
@@ -80,9 +80,17 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (!isAllowlistedShellRequest(event)) {
-    // The exact fall-through line (design doc §SW — the C-M10·2 pin):
-    // pass-through, never a cache-lookup-then-fallback.
-    event.respondWith(fetch(event.request));
+    // The amended §SW fall-through (design doc §SW — the C-M10·2 pin; see
+    // the drift log): pass through **untouched** — never a
+    // cache-lookup-then-fallback. Do NOT call `event.respondWith()` here:
+    // `event.respondWith(fetch(event.request))` would claim the response and
+    // route the request through the worker's own `fetch`, which breaks form
+    // submissions (a worker-side `fetch(request)` that fails rejects the
+    // FetchEvent's promise → "network error response", surfaced by the
+    // browser as a CSP `form-action 'self'` violation — e.g. the /admin/setup
+    // first-boot form). Returning without responding leaves the request in
+    // the browser's native path, which is the truest "untouched" pass-through
+    // and never touches the cache.
     return;
   }
 
