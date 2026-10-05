@@ -19,6 +19,39 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.38.0", "2026-10-05", new List<string>
+        {
+            "Guardian's event gate — a guardian now decides a supervised child's event attendance: an event the child wants to attend reaches the guardian, who approves it, denies it, or sets it to auto-allow (three postures, the strictest the default); the child's own everyday RSVP is untouched (ADR 0144).",
+        }),
+        new("0.37.0", "2026-10-05", new List<string>
+        {
+            "Guardian deletes a child account — a guardian can now delete a supervised child's account (the sixth guardian supervisory action). It reuses the same deletion core as the self-serve / admin lane — pseudonymized audit, memberships and profile removed — and is audited under the guardian's standing (ADR 0143).",
+        }),
+        new("0.36.0", "2026-10-04", new List<string>
+        {
+            "Delete account — you can leave the platform (or a GlobalAdmin can remove a resident): the Identity account is deleted, the memberships and profile go with it, and the audit trail is pseudonymized so it stays an accountability record; the last GlobalAdmin can never be locked out, and a GlobalAdmin deleting themselves is gated (ADR 0142).",
+        }),
+        new("0.35.0", "2026-10-04", new List<string>
+        {
+            "Guardian approvals — a guardian now settles a supervised child's community membership (approve or decline, so an admin's add no longer lands unreviewed) and can decline a group invitation sent to the child; the invite notifications deep-link to the manage-child page where the buttons live (ADR 0141).",
+        }),
+        new("0.34.0", "2026-10-04", new List<string>
+        {
+            "Guardian community control — where \"removing a child from a community\" used to be a silent no-op for a mandatory community, a guardian can now block a supervised child's access to a community and hide it from them (a per-community restriction, not a membership change); the confusing add/remove-community forms on the manage-child view are gone (ADR 0140).",
+            "Guardian consent, made real — adding a child to a guardian-managed account now requires explicit consent, and a newly assigned guardian must accept (with consent) or decline before the assignment takes effect (ADR 0038 §F).",
+        }),
+        new("0.33.0", "2026-10-04", new List<string>
+        {
+            "Messaging controls — you now decide for yourself whether you take 1:1 messages (an opt-in, under the instance's master toggle), and a guardian can place a ceiling on a supervised child's messaging; the ceiling always wins over the child's own opt-in (ADR 0139).",
+        }),
+        new("0.32.0", "2026-10-05", new List<string>
+        {
+            "Documents, organized — shared documents can now carry tags (the same tag vocabulary as posts, pages, events, and to-dos) and live in folders (a Page-style folder tree), so a community can group contracts, minutes, and notices without any new authorization model (ADR 0137).",
+        }),
+        new("0.31.0", "2026-10-05", new List<string>
+        {
+            "Per-community administration — a GlobalAdmin can now add and remove members and assign moderators within a single community from the /admin surface, reusing the existing membership and moderator lanes (ADR 0062).",
+        }),
         new("0.30.0", "2026-10-04", new List<string>
         {
             "Change password — you can now change your own account password (current → new → confirm) from your account menu. After saving you're signed out and asked to sign in again with the new password (ADR 0138).",

@@ -252,9 +252,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // adds the two GU guardian-facing kinds — guardian.group_invite /
         // guardian.community_invite; ADR 0038 §F adds the acceptance-lane
         // kind — guardian.assign, the assigned guardian's "a guardian has
-        // asked you to become a co-guardian" nudge).
+        // asked you to become a co-guardian" nudge; ADR 0144 adds the two
+        // guardian event-attendance kinds — guardian.event_request (the
+        // child's RSVP was routed to the guardian) / guardian.event_rsvp
+        // (the child's own attendance stands, the guardian's veto window)).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(20, vm.AllKinds.Count);
+        Assert.Equal(22, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }
