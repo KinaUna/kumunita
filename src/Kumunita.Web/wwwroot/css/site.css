@@ -496,6 +496,12 @@ html[data-kmb-theme='dark'] {
     background-color: var(--kmb-tint-a) !important;
     color: var(--kmb-ink) !important;
   }
+  /* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
+     the token flip re-points --bs-dark-rgb to near-white, so the dark ink
+     would render on the amber fill — unreadable. Restore the real dark ink. */
+  html:not([data-kmb-theme='light']) .badge.text-dark {
+    color: #17251d !important;
+  }
   /* .card.text-bg-light (the admin dashboard's count cards): the fill
      re-resolves to the dark surface via the --bs-light token, but the text
      stays Bootstrap's hard-coded black — unreadable on the dark fill.
@@ -507,7 +513,8 @@ html[data-kmb-theme='dark'] {
      makes it a near-white chip with white text — a glaring bright block in
      dark mode. Re-point it to a subtle dark chip with light text, matching
      the .badge.text-bg-light patch above. */
-  html:not([data-kmb-theme='light']) .badge.text-bg-dark {
+  html:not([data-kmb-theme='light']) .badge.text-bg-dark,
+  html:not([data-kmb-theme='light']) .badge.bg-dark {
     background-color: var(--kmb-tint-a) !important;
     color: var(--kmb-ink) !important;
     border-color: var(--kmb-border);
@@ -688,6 +695,12 @@ html[data-kmb-theme='dark'] .badge.text-bg-light {
   background-color: var(--kmb-tint-a) !important;
   color: var(--kmb-ink) !important;
 }
+/* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
+   the token flip re-points --bs-dark-rgb to near-white, so the dark ink
+   would render on the amber fill — unreadable. Restore the real dark ink. */
+html[data-kmb-theme='dark'] .badge.text-dark {
+  color: #17251d !important;
+}
 /* .card.text-bg-light (the admin dashboard's count cards): dark fill +
    Bootstrap's hard-coded black text — flip the text to the light ink. */
 html[data-kmb-theme='dark'] .card.text-bg-light {
@@ -695,7 +708,8 @@ html[data-kmb-theme='dark'] .card.text-bg-light {
 }
 /* .badge.text-bg-dark (the "mandatory" community chip): re-point the
    near-white chip with white text to a subtle dark chip with light text. */
-html[data-kmb-theme='dark'] .badge.text-bg-dark {
+html[data-kmb-theme='dark'] .badge.text-bg-dark,
+html[data-kmb-theme='dark'] .badge.bg-dark {
   background-color: var(--kmb-tint-a) !important;
   color: var(--kmb-ink) !important;
   border-color: var(--kmb-border);
