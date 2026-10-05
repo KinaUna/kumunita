@@ -1632,6 +1632,16 @@ public sealed class EventController : Controller
         {
             return new ForbidResult();
         }
+        catch (InvalidOperationException ex)
+        {
+            // The lane — a supervised child in the GuardianApproves posture
+            // whose own self-lane was refused (the request was stored + the
+            // guardian notified). A user-presentable error, not a 500:
+            // surface the refusal and land back on the event page (the GU
+            // group-invitation self-lane refusal shape).
+            TempData["error"] = ex.Message;
+            return Redirect($"/events/{id}");
+        }
         return Redirect($"/events/{id}");
     }
 

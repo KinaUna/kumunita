@@ -2587,6 +2587,15 @@ public sealed class GroupsController(
         {
             return NotFound();
         }
+        catch (InvalidOperationException ex)
+        {
+            // The lane — a supervised child in the GuardianApproves posture
+            // whose own self-lane was refused (the request was stored + the
+            // guardian notified). A user-presentable error, not a 500 (the
+            // same shape as the community-event <c>Rsvp</c> lane).
+            TempData["error"] = ex.Message;
+            return Redirect($"/groups/{id}/events/{eventId}");
+        }
 
         return Redirect($"/groups/{id}/events/{eventId}");
     }

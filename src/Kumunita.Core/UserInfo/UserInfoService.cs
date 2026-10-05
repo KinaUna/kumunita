@@ -2191,6 +2191,56 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetChildEventRsvpModeAsync(string childId, EventRsvpMode mode, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // The lane — the guardian's event-attendance policy over a supervised
+        // child. Mirrors SetChildMessagingRestrictionAsync exactly (the
+        // guardian write-lane shape): standing gate first (G·2/G·3), then the
+        // mode write, then one audit row — all in one session / one
+        // SaveChangesAsync (C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // Load the child's profile (missing → bad state, not a no-op — the
+        // SuspendChildAsync pin).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Set the mode (enforcement parity — the EventService RSVP gate reads
+        // this exact field to decide how the child's own RsvpAsync write is
+        // treated: refused / allowed-and-notified / allowed outright).
+        profile.EventRsvpMode = mode;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.event_rsvp_mode",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetChildCommunityBlockAsync(string childId, string communityId, bool blocked, string guardianId)
     {
         if (string.IsNullOrWhiteSpace(childId))

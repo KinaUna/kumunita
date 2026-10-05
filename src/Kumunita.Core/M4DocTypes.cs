@@ -73,5 +73,19 @@ public static class M4DocTypes
         // name is required (unlike M3DocTypes' AnnouncementTranslation edge case).
         opts.Schema.For<EventTranslation>()
                .UniqueIndex(t => t.EventId, t => t.LanguageCode);
+
+        // GuardianEventRequest (the lane's pending-approval row — a supervised
+        // child's standing request for a guardian to approve/deny their event
+        // attendance, the GU group-invitation request-row re-expressed over
+        // events). One row per (event, child) pair; the (EventId, ChildId)
+        // **unique** index enforces exactly one pending request per child per
+        // event at the DB layer (a re-request over a resolved row supersedes it
+        // — the GuardianLink "a re-assignment writes a fresh row" precedent).
+        //
+        // The auto-derived name (mt_doc_guardianeventrequest_uidx_event_idchild_id,
+        // ~46 chars) is under Postgres's 64-char NAMEDATALEN limit, so no explicit
+        // name is required.
+        opts.Schema.For<GuardianEventRequest>()
+               .UniqueIndex(r => r.EventId, r => r.ChildId);
     }
 }

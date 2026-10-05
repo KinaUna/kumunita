@@ -178,6 +178,44 @@ public static class NotificationKinds
     /// </summary>
     public const string GuardianAssign = "guardian.assign";
 
+    // ── The lane — the guardian's event-attendance lanes ────────────────────
+
+    /// <summary>
+    /// The lane (<see cref="Kumunita.Core.UserInfo.EventRsvpMode
+    /// .GuardianApproves"/> posture) — a supervised child asked to attend an
+    /// event (their own RSVP self-lane was refused and a
+    /// <see cref="Kumunita.Core.Events.GuardianEventRequest"/> row was stored
+    /// instead). The recipient is the child's <b>guardian</b> (one row per
+    /// active <c>GuardianLink</c>), not the child. The notification's
+    /// <see cref="Kumunita.Core.Notifications.Notification.LinkPath"/> points
+    /// at the child's manage-child page (where the pending event-attendance
+    /// list + the approve/deny buttons live); <c>AcceptPath</c> /
+    /// <c>DeclinePath</c> point at the same page (the inbox button + the email
+    /// link both deep-link there, the <see cref="GuardianGroupInvite"/>
+    /// shape). Opt-OUT default (the resident-facing posture, like
+    /// <see cref="GuardianGroupInvite"/>).
+    /// </summary>
+    public const string GuardianEventRequest = "guardian.event_request";
+
+    /// <summary>
+    /// The lane (<see cref="Kumunita.Core.UserInfo.EventRsvpMode
+    /// .GuardianNotifies"/> posture) — a supervised child attended / changed
+    /// their attendance on an event through their own (allowed) RSVP
+    /// self-lane, and every active guardian is told (the auto-approve + veto
+    /// posture: the child's attendance already stands; the notification is
+    /// the guardian's window to <see
+    /// cref="Kumunita.Core.Events.IEventService.GuardianVetoEventRsvpAsync" />
+    /// it). The recipient is the child's <b>guardian</b> (one row per active
+    /// <c>GuardianLink</c>), not the child. The notification's
+    /// <see cref="Kumunita.Core.Notifications.Notification.LinkPath"/> points
+    /// at the event detail page (where the child's current RSVP is shown);
+    /// no <c>AcceptPath</c> / <c>DeclinePath</c> (the veto is a form-POST on
+    /// the manage-child page, not a one-click — the ADR 0038 §F shape).
+    /// Opt-OUT default (the resident-facing posture, like
+    /// <see cref="GuardianGroupInvite"/>).
+    /// </summary>
+    public const string GuardianEventRsvp = "guardian.event_rsvp";
+
     public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
     {
         Announcement, PageChild,
@@ -199,5 +237,6 @@ public static class NotificationKinds
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
         GuardianGroupInvite, GuardianCommunityInvite, GuardianAssign,
+        GuardianEventRequest, GuardianEventRsvp,
     ];
 }

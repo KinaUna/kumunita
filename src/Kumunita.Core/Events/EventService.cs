@@ -1085,6 +1085,94 @@ public sealed class EventService : IEventService
         if (@event is null || @event.IsDeleted)
             throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to RSVP to.");
 
+        // The lane — the guardian's event-attendance gate. A <b>supervised</b>
+        // child (an active <see cref="GuardianLink"/>) is gated by their
+        // guardian's <see cref="Profile.EventRsvpMode"/> posture:
+        //   · <see cref="EventRsvpMode.GuardianApproves"/> — the self-lane is
+        //     <b>refused</b>: a <see cref="GuardianEventRequest"/> row is
+        //     stored (the child's desired status), the active guardian(s) are
+        //     notified, and the write throws a user-presentable error (the GU
+        //     group-invitation self-lane refusal shape; the Web surfaces
+        //     <c>TempData["error"]</c> and redirects back to the event).
+        //   · <see cref="EventRsvpMode.GuardianNotifies"/> — the self-lane is
+        //     allowed; the active guardian(s) are notified after the write
+        //     (auto-approve + the window to veto).
+        //   · <see cref="EventRsvpMode.ChildDecides"/> — the self-lane is
+        //     allowed outright, no notification.
+        // An <b>unsupervised</b> actor (no active link) is never gated — the
+        // lane reduces to today's unconditional RSVP regardless of the stored
+        // mode. Fail-protective: a supervised child with a missing profile
+        // still requires guardian approval.
+        var activeLinks = await session.Query<GuardianLink>()
+            .Where(l => l.ChildId == actorId && l.Status == GuardianLinkStatus.Active)
+            .ToListAsync(ct).ConfigureAwait(false);
+        var supervised = activeLinks.Count > 0;
+        var guardianIds = activeLinks.Select(l => l.GuardianId).ToHashSet(StringComparer.Ordinal);
+        var childProfile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == actorId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var mode = childProfile?.EventRsvpMode
+            ?? (supervised ? EventRsvpMode.GuardianApproves : EventRsvpMode.ChildDecides);
+        var supervisedApproves = supervised && mode == EventRsvpMode.GuardianApproves;
+        var supervisedNotifies = supervised && mode == EventRsvpMode.GuardianNotifies;
+
+        if (supervisedApproves)
+        {
+            // The <see cref="EventRsvpMode.GuardianApproves"/> posture: refuse
+            // the self-lane, store / refresh the request row to the child's
+            // current desired status (a fresh act — the <see cref
+            // "GuardianLink"/> "writes a fresh row, not a revival" precedent),
+            // notify the active guardian(s) (the
+            // <see cref="NotificationKinds.GuardianEventRequest"/> kind, the GU
+            // <c>guardian.group_invite</c> fan-out shape), then throw the
+            // user-presentable refusal.
+            var requestedAt = DateTimeOffset.UtcNow;
+            var request = await session.Query<GuardianEventRequest>()
+                .Where(r => r.EventId == eventId && r.ChildId == actorId)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (request is null)
+            {
+                request = new GuardianEventRequest
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    EventId = eventId,
+                    ChildId = actorId,
+                    DesiredStatus = status,
+                    Status = GuardianEventRequestStatus.Pending,
+                    RequestedAt = requestedAt
+                };
+            }
+            else
+            {
+                request.DesiredStatus = status;
+                request.Status = GuardianEventRequestStatus.Pending;
+                request.RequestedAt = requestedAt;
+                request.ResolvedAt = null;
+                request.ResolvedBy = null;
+            }
+            session.Store(request);
+
+            if (_notifications is not null)
+            {
+                var childName = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? actorId : childProfile!.DisplayName;
+                foreach (var guardianId in guardianIds)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: guardianId,
+                        kind: NotificationKinds.GuardianEventRequest,
+                        idempotencyKey: $"notification:{NotificationKinds.GuardianEventRequest}:{eventId}:{actorId}:{guardianId}",
+                        body: $"{childName} is asking to attend an event ({status}).",
+                        linkPath: $"/me/children/{actorId}",
+                        ct: ct).ConfigureAwait(false);
+                }
+            }
+
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+            throw new InvalidOperationException(
+                "Your attendance on this event requires your guardian's approval — the request has been sent to your guardian.");
+        }
+
         // Last-write-wins upsert (the (EventId, UserId) unique-index business
         // key): load the actor's existing row; mutate Status/At, else create.
         // One SaveChangesAsync (C3). No audit row (the pin above).
@@ -1116,6 +1204,31 @@ public sealed class EventService : IEventService
         // here too keeps the idiom uniform.
         session.Store(rsvp);
 
+        // The lane — the <see cref="EventRsvpMode.GuardianNotifies"/> posture:
+        // the self-lane was allowed, so now every active guardian is told the
+        // child attended / changed their attendance (auto-approve + the window
+        // to <see cref="VetoEventRsvpAsync"/>). The recipient is the guardian
+        // (one row per active <see cref="GuardianLink"/>), the LinkPath points
+        // at the event detail page (where the child's current RSVP is shown).
+        // The idempotency key is per-(guardian, event, child) (the
+        // <see cref="NotificationService"/> dedups on it; a re-RSVP within the
+        // same window refreshes the child's row, not the guardian's inbox).
+        if (supervisedNotifies && _notifications is not null)
+        {
+            var notifiedName = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? actorId : childProfile!.DisplayName;
+            foreach (var guardianId in guardianIds)
+            {
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: guardianId,
+                    kind: NotificationKinds.GuardianEventRsvp,
+                    idempotencyKey: $"notification:{NotificationKinds.GuardianEventRsvp}:{eventId}:{actorId}:{guardianId}",
+                    body: $"{notifiedName} RSVP'd {status} (you may veto it on the manage-child page).",
+                    linkPath: $"/events/{@event.Id}",
+                    ct: ct).ConfigureAwait(false);
+            }
+        }
+
         // M6 (ADR 0076, plan U04) — the F3 event-rsvp emitter. The **event's**
         // author is the recipient (the RSVPing resident is the *sender*). The
         // UGC snippet is the RSVP status + the resident's display name (ADR
@@ -1143,6 +1256,289 @@ public sealed class EventService : IEventService
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return rsvp;
+    }
+
+    // ─── The lane — the guardian's event-attendance lanes ────────────────────
+    // The GU standing gate re-expressed over events (the ADR 0028 G·2/G·3
+    // deny-by-default; the ADR 0038 §F conferral shape). A non-guardian /
+    // dissolved link is a <see cref="UnauthorizedAccessException"/> (the Web's
+    // 404 — the actor learns nothing). The <see cref="GuardianLink"/> document
+    // is the standing's relationship row; the <see cref
+    // "Kumunita.Core.UserInfo.IUserInfoService"/> service is the resolver — but
+    // for the lane's three guardian seams the standing is a simple active-link
+    // existence check (the same read <see cref="RsvpAsync"/> performs for the
+    // gate), so <see cref="GuardianEventLinkAsync"/> queries the
+    // <see cref="GuardianLink"/> row directly (EventService already reads
+    // <see cref="GuardianLink"/> / <see cref="Profile"/> for the gate above —
+    // no new frozen-surface seam, ADR 0006 §A). ───
+
+    /// <summary>
+    /// The lane's standing gate: an <b>active</b> <see cref="GuardianLink"/>
+    /// for the (guardian, child) pair, or <see cref
+    /// "UnauthorizedAccessException"/> (the GU G·2/G·3 deny-by-default).
+    /// </summary>
+    private static async Task<GuardianLink> GuardianEventLinkAsync(
+        IDocumentSession session, string guardianId, string childId, CancellationToken ct)
+    {
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId
+                        && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (link is null)
+            throw new UnauthorizedAccessException(
+                $"No active GuardianLink for {guardianId} over {childId}; no standing to act on the child's event attendance.");
+        return link;
+    }
+
+    /// <inheritdoc cref="IEventService.ApproveEventRsvpAsync"/>
+    /// <summary>
+    /// The lane — the guardian's <b>approval</b> of a supervised child's
+    /// event-attendance request (the GU <see cref="Kumunita.Core.UserInfo
+    /// .IUserInfoService.ApproveGroupInvitationAsync" /> / <see cref
+    /// "Kumunita.Core.UserInfo.IUserInfoService.RejectGroupInvitationAsync" />
+    /// pair re-expressed over events): standing gate first (G·2/G·3), then the
+    /// request-row resolution (Pending → Approved), then the child's
+    /// <see cref="EventRsvp" /> write (the request's
+    /// <see cref="GuardianEventRequest.DesiredStatus"/>), then one
+    /// <c>guardian.event_rsvp_approve</c> audit row (<see
+    /// cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) — all in one
+    /// session / one <c>SaveChangesAsync</c> (C3). The approval is a standing
+    /// the GU lane confers, not a content read: the child's
+    /// <see cref="EventRsvp" /> is written on their behalf, but the lane never
+    /// reads the child's content (the ADR 0028 G·1 cardinal rule).
+    /// </summary>
+    public async Task<GuardianEventRequest> ApproveEventRsvpAsync(
+        string eventId, string childId, string guardianId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
+        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var now = DateTimeOffset.UtcNow;
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
+
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null || @event.IsDeleted)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to approve.");
+
+        var request = await session.Query<GuardianEventRequest>()
+            .Where(r => r.EventId == eventId && r.ChildId == childId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (request is null)
+            throw new KeyNotFoundException(
+                $"No event-attendance request for {childId} on event {eventId}; nothing to approve.");
+        if (request.Status != GuardianEventRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Request {request.Id} is already {request.Status}; only a Pending request can be approved.");
+
+        // Resolve the request row (Pending → Approved) + write the child's
+        // RSVP with the request's DesiredStatus (the last-write-wins upsert
+        // the self-lane would have used).
+        request.Status = GuardianEventRequestStatus.Approved;
+        request.ResolvedAt = now;
+        request.ResolvedBy = guardianId;
+        session.Store(request);
+
+        var rsvp = await session.Query<EventRsvp>()
+            .Where(r => r.EventId == eventId && r.UserId == childId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (rsvp is null)
+        {
+            rsvp = new EventRsvp
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = eventId,
+                UserId = childId,
+                Status = request.DesiredStatus,
+                At = now
+            };
+        }
+        else
+        {
+            rsvp.Status = request.DesiredStatus;
+            rsvp.At = now;
+        }
+        session.Store(rsvp);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.event_rsvp_approve",
+            TargetKind = "event",
+            TargetId = eventId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return request;
+    }
+
+    /// <inheritdoc cref="IEventService.DenyEventRsvpAsync"/>
+    /// <summary>
+    /// The lane — the guardian's <b>denial</b> of a supervised child's
+    /// event-attendance request (the GU <see cref="Kumunita.Core.UserInfo
+    /// .IUserInfoService.RejectGroupInvitationAsync" /> shape verbatim):
+    /// standing gate first (G·2/G·3), then the request-row resolution
+    /// (Pending → Denied) + one <c>guardian.event_rsvp_deny</c> audit row
+    /// (<see cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) — all in
+    /// one session / one <c>SaveChangesAsync</c> (C3). A denial writes <b>no</b>
+    /// <see cref="EventRsvp"/> row (the child did not attend; the self-lane
+    /// refusal left no content behind).
+    /// </summary>
+    public async Task<GuardianEventRequest> DenyEventRsvpAsync(
+        string eventId, string childId, string guardianId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
+        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var now = DateTimeOffset.UtcNow;
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
+
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null || @event.IsDeleted)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to deny.");
+
+        var request = await session.Query<GuardianEventRequest>()
+            .Where(r => r.EventId == eventId && r.ChildId == childId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (request is null)
+            throw new KeyNotFoundException(
+                $"No event-attendance request for {childId} on event {eventId}; nothing to deny.");
+        if (request.Status != GuardianEventRequestStatus.Pending)
+            throw new InvalidOperationException(
+                $"Request {request.Id} is already {request.Status}; only a Pending request can be denied.");
+
+        request.Status = GuardianEventRequestStatus.Denied;
+        request.ResolvedAt = now;
+        request.ResolvedBy = guardianId;
+        session.Store(request);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.event_rsvp_deny",
+            TargetKind = "event",
+            TargetId = eventId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return request;
+    }
+
+    /// <inheritdoc cref="IEventService.VetoEventRsvpAsync"/>
+    /// <summary>
+    /// The lane — the guardian's <b>veto</b> (removal) of a supervised child's
+    /// existing <see cref="EventRsvp" /> (the <see
+    /// cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies" />
+    /// posture's window to undo an auto-approved attendance — the
+    /// <see cref="Kumunita.Core.UserInfo.Profile.MessagingRestricted" /> veto
+    /// shape): standing gate first (G·2/G·3), then the child's
+    /// <see cref="EventRsvp" /> deletion + one <c>guardian.event_rsvp_veto</c>
+    /// audit row (<see cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>)
+    /// — all in one session / one <c>SaveChangesAsync</c> (C3). A veto over
+    /// nothing (no <see cref="EventRsvp"/> row) is a
+    /// <see cref="KeyNotFoundException"/> (the Web's user-presentable 404).
+    /// </summary>
+    public async Task VetoEventRsvpAsync(
+        string eventId, string childId, string guardianId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
+        if (string.IsNullOrEmpty(guardianId)) throw new UnauthorizedAccessException("A guardian id is required.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var now = DateTimeOffset.UtcNow;
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardianEventLinkAsync(session, guardianId, childId, ct).ConfigureAwait(false);
+
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null || @event.IsDeleted)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to veto.");
+
+        var rsvp = await session.Query<EventRsvp>()
+            .Where(r => r.EventId == eventId && r.UserId == childId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (rsvp is null)
+            throw new KeyNotFoundException(
+                $"No RSVP for {childId} on event {eventId}; nothing to veto.");
+
+        session.Delete(rsvp);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.event_rsvp_veto",
+            TargetKind = "event",
+            TargetId = eventId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IEventService.GetPendingEventRsvpRequestsAsync"/>
+    /// <summary>
+    /// The lane — the guardian's read of a supervised child's
+    /// <b>pending</b> event-attendance requests (a read, not a decision — the
+    /// <see cref="GetMyRsvpAsync"/> posture: no <see cref
+    /// "IAuthorizationService" /> call, no audit row). The standing gate
+    /// (an active <see cref="GuardianLink" /> over the child) is the Web
+    /// layer's (the Detail GET's <c>ActiveLinkAsync</c> check — a non-guardian
+    /// learns nothing; this read itself is a plain query). Ordered by
+    /// <see cref="GuardianEventRequest.RequestedAt"/> descending.
+    /// </summary>
+    public async Task<IReadOnlyList<GuardianEventRequest>> GetPendingEventRsvpRequestsAsync(
+        string childId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
+
+        await using var session = _store.QuerySession();
+        return await session.Query<GuardianEventRequest>()
+            .Where(r => r.ChildId == childId && r.Status == GuardianEventRequestStatus.Pending)
+            .OrderByDescending(r => r.RequestedAt)
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IEventService.GetChildRsvpsAsync"/>
+    /// <summary>
+    /// The lane — the guardian's read of a supervised child's <b>existing</b>
+    /// <see cref="EventRsvp"/> rows (a read, not a decision — the
+    /// <see cref="GetMyRsvpAsync"/> posture: no <see cref
+    /// "IAuthorizationService" /> call, no audit row). The standing gate
+    /// (an active <see cref="GuardianLink" /> over the child) is the Web
+    /// layer's (the Detail GET's <c>ActiveLinkAsync</c> check — a non-guardian
+    /// learns nothing; this read itself is a plain query). Ordered by
+    /// <see cref="EventRsvp.At"/> descending.
+    /// </summary>
+    public async Task<IReadOnlyList<EventRsvp>> GetChildRsvpsAsync(
+        string childId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(childId)) throw new KeyNotFoundException("A child id is required.");
+
+        await using var session = _store.QuerySession();
+        return await session.Query<EventRsvp>()
+            .Where(r => r.UserId == childId)
+            .OrderByDescending(r => r.At)
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     // ─── Group events lane (ADR 0089) — the ADR 0013 membership lane applied to

@@ -307,6 +307,170 @@
             }
         </div>
 
+        @* ── The lane — event attendance (the guardian's three postures) ──
+           The EventRsvpMode radio group (the SetChildMessaging toggle idiom,
+           over a mode instead of a bool) + the mode's live list:
+             · GuardianApproves → the child's pending requests (approve/deny)
+             · GuardianNotifies → the child's existing RSVPs (veto)
+           Exposed on ViewData (the MessagingRestricted precedent — the
+           MembershipEditorModel is a pinned record; the U07 pin forbids
+           adding a field). *@
+        @{
+            var _eventRsvpMode = (Kumunita.Core.UserInfo.EventRsvpMode)(ViewData["EventRsvpMode"] ?? Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves);
+            var _pendingRequests = (System.Collections.IEnumerable)(ViewData["PendingEventRsvpRequests"] ?? System.Array.Empty<Kumunita.Web.Models.EventRsvpRequestItem>());
+            var _childRsvps = (System.Collections.IEnumerable)(ViewData["ChildEventRsvps"] ?? System.Array.Empty<Kumunita.Web.Models.EventRsvpVetoItem>());
+            var _pendingList = _pendingRequests as System.Collections.Generic.IEnumerable<Kumunita.Web.Models.EventRsvpRequestItem>
+                ?? System.Array.Empty<Kumunita.Web.Models.EventRsvpRequestItem>();
+            var _rsvpList = _childRsvps as System.Collections.Generic.IEnumerable<Kumunita.Web.Models.EventRsvpVetoItem>
+                ?? System.Array.Empty<Kumunita.Web.Models.EventRsvpVetoItem>();
+            string confirmApprove = "Approve this child's attendance on this event?";
+            string confirmDeny = "Deny this child's attendance on this event? They will not be attending.";
+            string confirmVeto = "Remove this child's attendance on this event? Their RSVP will be deleted.";
+            if (Translation is not null)
+            {
+                var effLang2 = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+                confirmApprove = await Translation.GetAsync("guardian.eventrsvp.approve_confirm", effLang2);
+                confirmDeny   = await Translation.GetAsync("guardian.eventrsvp.deny_confirm", effLang2);
+                confirmVeto   = await Translation.GetAsync("guardian.eventrsvp.veto_confirm", effLang2);
+            }
+        }
+        <h2 class="mt-4"><kw-l key="guardian.eventrsvp.title">Event attendance</kw-l></h2>
+        <p class="text-muted">
+            <kw-l key="guardian.eventrsvp.description">Choose how this child's event attendance is handled. "Guardian approves" means you must approve or deny each one; "Guardian notifies" means the child attends freely and you are told (and can remove it afterwards); "Child decides" means the child decides for themselves.</kw-l>
+        </p>
+
+        @* The mode selector — one form + submit button per mode (the
+           SetChildMessaging "two forms, two buttons" idiom verbatim, over a
+           mode instead of a bool; the server gate is the SetEventRsvpMode
+           action's ActiveLinkAsync standing check + the Core seam's audit
+           row). The current mode's button is the *active* state — the
+           other two are the alternatives the guardian can switch to. *@
+        <div class="d-flex flex-column gap-2 mb-3">
+            @if (_eventRsvpMode == Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves)
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="rsvp-approves-active" checked disabled />
+                    <label class="form-check-label" for="rsvp-approves-active"><kw-l key="guardian.eventrsvp.mode_approves_active">Currently: Guardian approves — I approve or deny every event the child wants to attend.</kw-l></label>
+                </div>
+                <div class="d-flex gap-2">
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="GuardianNotifies" />
+                        <button type="submit" class="btn btn-outline-primary"><kw-l key="guardian.eventrsvp.switch_to_notifies">Switch to Guardian notifies</kw-l></button>
+                    </form>
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="ChildDecides" />
+                        <button type="submit" class="btn btn-outline-secondary"><kw-l key="guardian.eventrsvp.switch_to_childdecides">Switch to Child decides</kw-l></button>
+                    </form>
+                </div>
+            }
+            else if (_eventRsvpMode == Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies)
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="rsvp-notifies-active" checked disabled />
+                    <label class="form-check-label" for="rsvp-notifies-active"><kw-l key="guardian.eventrsvp.mode_notifies_active">Currently: Guardian notifies — the child attends freely; I'm told and can remove any of their attendance afterwards.</kw-l></label>
+                </div>
+                <div class="d-flex gap-2">
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="GuardianApproves" />
+                        <button type="submit" class="btn btn-outline-primary"><kw-l key="guardian.eventrsvp.switch_to_approves">Switch to Guardian approves</kw-l></button>
+                    </form>
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="ChildDecides" />
+                        <button type="submit" class="btn btn-outline-secondary"><kw-l key="guardian.eventrsvp.switch_to_childdecides">Switch to Child decides</kw-l></button>
+                    </form>
+                </div>
+            }
+            else
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="rsvp-childdecides-active" checked disabled />
+                    <label class="form-check-label" for="rsvp-childdecides-active"><kw-l key="guardian.eventrsvp.mode_childdecides_active">Currently: Child decides — the child chooses their own attendance; no approval and no notification.</kw-l></label>
+                </div>
+                <div class="d-flex gap-2">
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="GuardianApproves" />
+                        <button type="submit" class="btn btn-outline-primary"><kw-l key="guardian.eventrsvp.switch_to_approves">Switch to Guardian approves</kw-l></button>
+                    </form>
+                    <form method="post" action="@Url.Action("SetEventRsvpMode", "Guardian", new { childId = Model.ChildId })">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="mode" value="GuardianNotifies" />
+                        <button type="submit" class="btn btn-outline-primary"><kw-l key="guardian.eventrsvp.switch_to_notifies">Switch to Guardian notifies</kw-l></button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        @* The GuardianApproves posture's live list — the child's pending
+           event-attendance requests, each with an approve / deny button
+           (the ApproveInvitation / RejectInvitation idiom verbatim). *@
+        @if (_eventRsvpMode == Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves)
+        {
+            <h3 class="h6 mt-3"><kw-l key="guardian.eventrsvp.pending_title">Pending attendance requests</kw-l></h3>
+            @if (!_pendingList.Any())
+            {
+                <p class="text-muted"><kw-l key="guardian.eventrsvp.pending_empty">No pending attendance requests.</kw-l></p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var req in _pendingList)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold"><kw-l key="guardian.eventrsvp.desired">@(req.DesiredStatus.ToString())</kw-l></span>
+                                <span class="text-muted small d-block">Requested @req.RequestedAt</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <form method="post" action="@Url.Action("ApproveEventRsvp", "Guardian", new { childId = Model.ChildId, eventId = req.EventId })" data-confirm="@confirmApprove">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-success"><kw-l key="guardian.eventrsvp.approve">Approve</kw-l></button>
+                                </form>
+                                <form method="post" action="@Url.Action("DenyEventRsvp", "Guardian", new { childId = Model.ChildId, eventId = req.EventId })" data-confirm="@confirmDeny">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.eventrsvp.deny">Deny</kw-l></button>
+                                </form>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+
+        @* The GuardianNotifies posture's live list — the child's existing
+           RSVPs, each with a veto button (the MessagingRestricted veto
+           shape). *@
+        @if (_eventRsvpMode == Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies)
+        {
+            <h3 class="h6 mt-3"><kw-l key="guardian.eventrsvp.rsvps_title">This child's current attendance</kw-l></h3>
+            @if (!_rsvpList.Any())
+            {
+                <p class="text-muted"><kw-l key="guardian.eventrsvp.rsvps_empty">No current attendance to veto.</kw-l></p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var rsvp in _rsvpList)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-semibold"><kw-l key="guardian.eventrsvp.desired">@(rsvp.Status.ToString())</kw-l></span>
+                                <span class="text-muted small d-block">Attended @rsvp.At</span>
+                            </div>
+                            <form method="post" action="@Url.Action("VetoEventRsvp", "Guardian", new { childId = Model.ChildId, eventId = rsvp.EventId })" data-confirm="@confirmVeto">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.eventrsvp.veto">Remove</kw-l></button>
+                            </form>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+
         @*
             Count-aware steering (ADR 0028 §F amendment, 2026-10-05). Both
             lanes below POST to the same Dissolve action — the standing over

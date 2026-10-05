@@ -43,10 +43,17 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("me/children")]
-public sealed class GuardianController(IUserInfoService userInfo, IIdentityService identity, IDocumentStore store) : Controller
+public sealed class GuardianController(IUserInfoService userInfo, IIdentityService identity, IDocumentStore store, Kumunita.Core.Events.IEventService? events = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>The lane's event-attendance seams (nullable — the five pre-lane
+    /// constructor call sites that pass no events still compile; the DI
+    /// registration passes the live <c>EventService</c>). Null-safe: the four
+    /// lane actions 404 when it is absent (the <see cref="SetChildMessaging"/>
+    /// idiom).</summary>
+    private readonly Kumunita.Core.Events.IEventService? _events = events;
 
     /// <summary>
     /// The guardian's <b>own</b> active child list (G·2 — the active
@@ -207,6 +214,40 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         ViewData["ChildDisplayName"] = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? null : childProfile!.DisplayName;
         ViewData["ChildEmail"] = string.IsNullOrWhiteSpace(childProfile?.Email) ? null : childProfile!.Email;
 
+        // The lane — the guardian's event-attendance policy over this child
+        // (Profile.EventRsvpMode, read through the same profile read as
+        // MessagingRestricted above) + the child's <b>pending</b> event-
+        // attendance requests (the GuardianApproves posture's approve/deny
+        // list) + the child's <b>existing</b> RSVPs (the GuardianNotifies
+        // posture's veto list). Exposed on ViewData — the
+        // MessagingRestricted precedent (the MembershipEditorModel is a
+        // pinned 5-field record; the U07 pin forbids adding a field).
+        // Null-safe — a missing profile degrades to the default
+        // GuardianApproves posture (the lane's most-protective default).
+        ViewData["EventRsvpMode"] = childProfile?.EventRsvpMode ?? Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves;
+
+        if (_events is not null)
+        {
+            var childNameForEvents = string.IsNullOrWhiteSpace(childProfile?.DisplayName) ? childId : childProfile!.DisplayName;
+            var pendingRequests = await _events.GetPendingEventRsvpRequestsAsync(childId);
+            ViewData["PendingEventRsvpRequests"] = pendingRequests.Select(r => new EventRsvpRequestItem(
+                r.EventId,
+                childNameForEvents,
+                r.DesiredStatus,
+                r.RequestedAt.ToString("O")));
+
+            var childRsvps = await _events.GetChildRsvpsAsync(childId);
+            ViewData["ChildEventRsvps"] = childRsvps.Select(r => new EventRsvpVetoItem(
+                r.EventId,
+                r.Status,
+                r.At.ToString("O")));
+        }
+        else
+        {
+            ViewData["PendingEventRsvpRequests"] = System.Array.Empty<EventRsvpRequestItem>();
+            ViewData["ChildEventRsvps"] = System.Array.Empty<EventRsvpVetoItem>();
+        }
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
@@ -260,6 +301,181 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         catch (UnauthorizedAccessException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// <b>Set the child's event-attendance policy</b> (POST
+    /// <c>me/children/{childId}/eventrsvp</c>) — the lane's guardian-side
+    /// control (the <see cref="SetChildMessaging"/> idiom verbatim, over a mode
+    /// instead of a bool): writes <c>Profile.EventRsvpMode</c> through the
+    /// frozen <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> seam.
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
+    /// (the default) = the child's own RSVP self-lane is refused (the
+    /// guardian approves / denies each attendance);
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies"/> =
+    /// the child RSVPs freely and the guardian is notified + may veto;
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.ChildDecides"/> = the
+    /// child decides for themselves (no gate, no notification, no veto).
+    /// <para>
+    /// <b>Standing gate:</b> the actor must hold an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over this child (the
+    /// <see cref="SetChildMessaging"/> standing — a non-guardian → 404).
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/eventrsvp")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetEventRsvpMode(string childId, Kumunita.Core.UserInfo.EventRsvpMode mode)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        var link = await ActiveLinkAsync(subject, childId);
+        if (link is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.SetChildEventRsvpModeAsync(childId, mode, subject);
+            TempData["info"] = mode switch
+            {
+                Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves => "You must approve or deny every event attendance for this child.",
+                Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies => "This child RSVPs freely; you are notified and can veto each attendance.",
+                _ => "This child decides their own event attendance."
+            };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// <b>Approve</b> a child's event-attendance request (POST
+    /// <c>me/children/{childId}/eventrsvp/{eventId}/approve</c>) — the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
+    /// posture's resolve lane (the <see cref="ApproveInvitation"/> /
+    /// <see cref="RejectInvitation"/> idiom verbatim, over events): writes the
+    /// child's <c>EventRsvp</c> with the request's desired status through the
+    /// frozen <see cref="Kumunita.Core.Events.IEventService
+    /// .ApproveEventRsvpAsync"/> seam. <c>UnauthorizedAccessException</c>
+    /// (no active link) → 404; <c>KeyNotFoundException</c> (no request) → 404;
+    /// <c>InvalidOperationException</c> (already resolved) → the page's error
+    /// surface.
+    /// </summary>
+    [HttpPost("{childId}/eventrsvp/{eventId}/approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveEventRsvp(string childId, string eventId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+            return NotFound();
+
+        // The standing gate lives in the Core seam (the GU G·2/G·3 deny-by-
+        // default — the <see cref="ApproveInvitation"/> precedent: the
+        // controller does not re-check standing; <see cref
+        // "UnauthorizedAccessException"/> from the seam is the 404).
+        try
+        {
+            await _events.ApproveEventRsvpAsync(eventId, childId, subject);
+            TempData["info"] = "Attendance approved — the child's RSVP has been recorded.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// <b>Deny</b> a child's event-attendance request (POST
+    /// <c>me/children/{childId}/eventrsvp/{eventId}/deny</c>) — the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
+    /// posture's resolve lane: the request row moves Pending → Denied, <b>no</b>
+    /// <c>EventRsvp</c> row is written. The same standing / failure shape as
+    /// <see cref="ApproveEventRsvp"/>.
+    /// </summary>
+    [HttpPost("{childId}/eventrsvp/{eventId}/deny")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DenyEventRsvp(string childId, string eventId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+            return NotFound();
+
+        try
+        {
+            await _events.DenyEventRsvpAsync(eventId, childId, subject);
+            TempData["info"] = "Attendance denied — the child's request was not approved.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// <b>Veto</b> (remove) a child's existing event attendance (POST
+    /// <c>me/children/{childId}/eventrsvp/{eventId}/veto</c>) — the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies"/>
+    /// posture's window to undo an auto-approved attendance: deletes the
+    /// child's <c>EventRsvp</c> row through the frozen <see
+    /// cref="Kumunita.Core.Events.IEventService.VetoEventRsvpAsync"/> seam.
+    /// The same standing / failure shape as <see cref="ApproveEventRsvp"/>.
+    /// </summary>
+    [HttpPost("{childId}/eventrsvp/{eventId}/veto")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VetoEventRsvp(string childId, string eventId)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId) || string.IsNullOrEmpty(eventId) || _events is null)
+            return NotFound();
+
+        try
+        {
+            await _events.VetoEventRsvpAsync(eventId, childId, subject);
+            TempData["info"] = "Attendance vetoed — the child's RSVP has been removed.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (KeyNotFoundException)
+        {
+            TempData["error"] = "This child has no attendance to veto on that event.";
+            return RedirectToAction(nameof(Detail), new { childId });
         }
         catch (InvalidOperationException ex)
         {

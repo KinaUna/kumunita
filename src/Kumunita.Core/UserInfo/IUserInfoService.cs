@@ -317,6 +317,35 @@ public interface IUserInfoService
     /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
     Task SetChildMessagingRestrictionAsync(string childId, bool restricted, string guardianId);
 
+    /// <summary>
+    /// The lane — the <b>guardian's event-attendance policy</b> over a
+    /// supervised child (the <see cref="SetChildMessagingRestrictionAsync"/>
+    /// guardian-scope shape verbatim, over a mode instead of a bool): sets
+    /// <see cref="Profile.EventRsvpMode"/> to
+    /// <paramref name="mode"/>. <see
+    /// cref="EventRsvpMode.GuardianApproves"/> = the child's own RSVP
+    /// self-lane is refused (the guardian must approve / deny each attendance
+    /// — the lane's stated default); <see cref
+    /// "EventRsvpMode.GuardianNotifies"/> = the child's own RSVP self-lane is
+    /// allowed and every such write notifies the guardian(s), who may veto
+    /// (remove) it afterwards; <see cref="EventRsvpMode.ChildDecides"/> = the
+    /// child decides for themselves (no gate, no notification, no veto — the
+    /// unsupervised-resident behavior). One <c>SaveChangesAsync</c>. The
+    /// standing gate is an <b>active</b> <see cref="GuardianLink"/> for the
+    /// exact (guardian, child) pair (G·2/G·3 deny-by-default); the audit row
+    /// is <c>guardian.event_rsvp_mode</c>, <c>TargetKind</c> "profile",
+    /// <see cref="Authorization.AccessVia.Guardian"/> (the
+    /// <c>guardian.messaging_restrict</c> shape).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No profile for the child
+    /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
+    Task SetChildEventRsvpModeAsync(string childId, EventRsvpMode mode, string guardianId);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

@@ -503,6 +503,52 @@ public static class KnownTranslationKeys
                 "You must consent to the child-account terms before accepting.",
             ["guardian.decline"] = "Decline",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Event attendance",
+            ["guardian.eventrsvp.description"] =
+                "Choose how this child's event attendance is handled.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Currently: Guardian approves — I approve or deny every event the child wants to attend.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Currently: Guardian notifies — the child attends freely; I'm told and can remove any of their attendance afterwards.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Currently: Child decides — the child chooses their own attendance; no approval and no notification.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Switch to Guardian approves",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Switch to Guardian notifies",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Switch to Child decides",
+            ["guardian.eventrsvp.pending_title"] = "Pending attendance requests",
+            ["guardian.eventrsvp.pending_empty"] = "No pending attendance requests.",
+            ["guardian.eventrsvp.desired"] = "Wants to attend",
+            ["guardian.eventrsvp.approve"] = "Approve",
+            ["guardian.eventrsvp.deny"] = "Deny",
+            ["guardian.eventrsvp.rsvps_title"] = "This child's current attendance",
+            ["guardian.eventrsvp.rsvps_empty"] = "No current attendance to remove.",
+            ["guardian.eventrsvp.veto"] = "Remove",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Approve this child's attendance on this event?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Deny this child's attendance on this event? They will not be attending.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Remove this child's attendance on this event? Their RSVP will be deleted.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Attendance request from your child",
+            ["notifications.preference.guardian.event_request.label"] =
+                "When your child asks to attend an event",
+            ["notification.guardian.event_request.subject"] =
+                "Your child is asking to attend an event",
+            ["notification.guardian.event_request.body"] =
+                "Your child is asking to attend an event: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Your child attended an event",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "When your child attends an event",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Your child attended an event",
+            ["notification.guardian.event_rsvp.body"] =
+                "Your child attended an event: ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             // The "guardian.assign" notification: the assigned guardian
             // (the assignee) gets an inbox row + (best-effort) email when an
@@ -2786,6 +2832,52 @@ public static class KnownTranslationKeys
                 "Du musst den Bedingungen für Kinderkonten zustimmen, bevor du akzeptierst.",
             ["guardian.decline"] = "Ablehnen",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Event-Teilnahme",
+            ["guardian.eventrsvp.description"] =
+                "Lege fest, wie die Event-Teilnahme dieses Kindes gehandhabt wird.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Aktuell: Vormund genehmigt — Ich genehmige oder lehne jedes Event ab, an dem das Kind teilnehmen möchte.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Aktuell: Vormund wird informiert — Das Kind nimmt frei teil; ich werde informiert und                 kann jede Teilnahme danach rückgängig machen.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Aktuell: Kind entscheidet — Das Kind wählt seine Teilnahme selbst; keine Genehmigung und keine Benachrichtigung.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Auf „Vormund genehmigt“ umstellen",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Auf „Vormund wird informiert“ umstellen",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Auf „Kind entscheidet“ umstellen",
+            ["guardian.eventrsvp.pending_title"] = "Ausstehende Teilnahmeanfragen",
+            ["guardian.eventrsvp.pending_empty"] = "Keine ausstehenden Teilnahmeanfragen.",
+            ["guardian.eventrsvp.desired"] = "Möchte teilnehmen",
+            ["guardian.eventrsvp.approve"] = "Genehmigen",
+            ["guardian.eventrsvp.deny"] = "Ablehnen",
+            ["guardian.eventrsvp.rsvps_title"] = "Aktuelle Teilnahme dieses Kindes",
+            ["guardian.eventrsvp.rsvps_empty"] = "Keine aktuelle Teilnahme zum Entfernen.",
+            ["guardian.eventrsvp.veto"] = "Entfernen",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Dieses Kind für dieses Event zur Teilnahme genehmigen?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Dieses Kind für dieses Event ablehnen? Es wird nicht teilnehmen.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Die Teilnahme dieses Kindes an diesem Event entfernen? Ihre Anmeldung wird gelöscht.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Teilnehmungsanfrage von deinem Kind",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Wenn dein Kind an einem Event teilnehmen möchte",
+            ["notification.guardian.event_request.subject"] =
+                "Dein Kind möchte an einem Event teilnehmen",
+            ["notification.guardian.event_request.body"] =
+                "Dein Kind möchte an einem Event teilnehmen: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Dein Kind hat an einem Event teilgenommen",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Wenn dein Kind an einem Event teilnimmt",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Dein Kind hat an einem Event teilgenommen",
+            ["notification.guardian.event_rsvp.body"] =
+                "Dein Kind hat an einem Event teilgenommen: ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
                 "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
@@ -4948,6 +5040,52 @@ public static class KnownTranslationKeys
             ["guardian.accept.consent.required"] =
                 "Tu dois accepter les conditions du compte enfant avant d'accepter.",
             ["guardian.decline"] = "Refuser",
+
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Participation aux événements",
+            ["guardian.eventrsvp.description"] =
+                "Choisis comment la participation de cet enfant aux événements est gérée.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Actuellement : le tuteur approuve — J'approuve ou refuse chaque événement auquel l'enfant veut participer.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Actuellement : le tuteur est informé — L'enfant participe librement ; je suis prévenu(e) et peux retirer toute participation par la suite.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Actuellement : l'enfant décide — L'enfant choisit sa propre participation ; aucune approbation et aucune notification.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Passer à « le tuteur approuve »",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Passer à « le tuteur est informé »",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Passer à « l'enfant décide »",
+            ["guardian.eventrsvp.pending_title"] = "Demandes de participation en attente",
+            ["guardian.eventrsvp.pending_empty"] = "Aucune demande de participation en attente.",
+            ["guardian.eventrsvp.desired"] = "Veut participer",
+            ["guardian.eventrsvp.approve"] = "Approuver",
+            ["guardian.eventrsvp.deny"] = "Refuser",
+            ["guardian.eventrsvp.rsvps_title"] = "Participation actuelle de cet enfant",
+            ["guardian.eventrsvp.rsvps_empty"] = "Aucune participation actuelle à retirer.",
+            ["guardian.eventrsvp.veto"] = "Retirer",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Approuver la participation de cet enfant à cet événement ?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Refuser la participation de cet enfant à cet événement ? Il ne participera pas.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Retirer la participation de cet enfant à cet événement ? Son inscription sera supprimée.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Demande de participation de ton enfant",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Quand ton enfant veut participer à un événement",
+            ["notification.guardian.event_request.subject"] =
+                "Ton enfant veut participer à un événement",
+            ["notification.guardian.event_request.body"] =
+                "Ton enfant veut participer à un événement : ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Ton enfant a participé à un événement",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Quand ton enfant participe à un événement",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Ton enfant a participé à un événement",
+            ["notification.guardian.event_rsvp.body"] =
+                "Ton enfant a participé à un événement : ",
 
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
@@ -7115,6 +7253,52 @@ public static class KnownTranslationKeys
             ["guardian.accept.consent.required"] =
                 "Du skal acceptere betingelserne for barnes konto, før du accepterer.",
             ["guardian.decline"] = "Afvis",
+
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Deltagelse i arrangementer",
+            ["guardian.eventrsvp.description"] =
+                "Vælg, hvordan dette barns deltagelse i arrangementer håndteres.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "I øjeblikket: Værge godkender — Jeg godkender eller afviser hvert arrangement, barnet vil deltage i.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "I øjeblikket: Værge underrettes — Barnet deltager frit; jeg underrettes og kan fjerne enhver deltagelse bagefter.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "I øjeblikket: Barnet bestemmer — Barnet vælger selv sin deltagelse; ingen godkendelse og ingen underretning.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Skift til \"Værge godkender\"",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Skift til \"Værge underrettes\"",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Skift til \"Barnet bestemmer\"",
+            ["guardian.eventrsvp.pending_title"] = "Ventende deltagelsesanmodninger",
+            ["guardian.eventrsvp.pending_empty"] = "Ingen ventende deltagelsesanmodninger.",
+            ["guardian.eventrsvp.desired"] = "Vil deltage",
+            ["guardian.eventrsvp.approve"] = "Godkend",
+            ["guardian.eventrsvp.deny"] = "Afvis",
+            ["guardian.eventrsvp.rsvps_title"] = "Dette barns nuværende deltagelse",
+            ["guardian.eventrsvp.rsvps_empty"] = "Ingen nuværende deltagelse at fjerne.",
+            ["guardian.eventrsvp.veto"] = "Fjern",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Godkende dette barns deltagelse i dette arrangement?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Afvis dette barns deltagelse i dette arrangement? Det vil ikke deltage.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Fjern dette barns deltagelse i dette arrangement? Deltagelsen vil blive slettet.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Deltagelsesanmodning fra dit barn",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Når dit barn vil deltage i et arrangement",
+            ["notification.guardian.event_request.subject"] =
+                "Dit barn vil deltage i et arrangement",
+            ["notification.guardian.event_request.body"] =
+                "Dit barn vil deltage i et arrangement: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Dit barn har deltaget i et arrangement",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Når dit barn deltager i et arrangement",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Dit barn har deltaget i et arrangement",
+            ["notification.guardian.event_rsvp.body"] =
+                "Dit barn har deltaget i et arrangement: ",
 
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
