@@ -411,3 +411,38 @@
 - **Handoff to U10:** the Web `_Sort` foundation (`SortViewModel` +
   `_Sort` partial + the pager-carry rule) + the community-feed reference
   surface + the Web tests. See `m26-u10.md`.
+
+## U10 — Web _Sort foundation
+
+- **Landed (Web unit):** `SortViewModel`
+  (`src/Kumunita.Web/Models/SortViewModel.cs` — the §2.4 shape:
+  `BaseUrl`/`CurrentKey`/`CurrentDir`/`Options`/`CarriedParams` + a
+  `ForRoute` builder) + the one shared `_Sort` partial
+  (`src/Kumunita.Web/Views/Shared/_Sort.cshtml` — a **link set** over the
+  surface's allowed keys × asc/desc, the `_Pager` `PagerLink` shape: carried
+  filter pairs then the toggled `sort=`/`dir=`; labels via
+  `<kw-l key="sort.{key}">` placeholder keys — the set U16 closes). `null`
+  model renders nothing (the no-sort pin).
+- **Pager-carry rule (C-SORT·8):** when the request carried `?sort=` (a
+  non-blank key), the `sort`/`dir` pairs join the existing `Pager`'s
+  `FilterParams` (`PostsController.BuildFeedPager`) so prev/next preserve the
+  sort; an unsorted read keeps `FilterParams` empty (byte-identical,
+  C-SORT·2). `Pager`/`HasMore` behavior otherwise untouched.
+- **Reference surface:** the community post feed
+  (`PostsController.Index`) — the `?sort=`/`?dir=` params are read Web-only
+  (C-SORT·3), parsed via `SortKeys.Parse` against the closed allowlist
+  `{created, modified, title}` (created desc default), threaded into
+  `PostService.ListFeedAsync`'s `SortSpec`, and `FeedViewModel` gained a
+  `SortViewModel? Sort` field; `Views/Posts/Index.cshtml` renders
+  `<partial name="_Sort" model="Model.Sort" />` above the `_Pager`.
+- **Tests:** `tests/Kumunita.Web.Tests/SortControlTests.cs` — the 3 pinned
+  `CommunityFeed_*` tests all pass: `CommunityFeed_SortControl_Renders_AllowedKeys`
+  (F9), `CommunityFeed_Pager_Carries_Sort_And_Dir` (C-SORT·8/F8),
+  `CommunityFeed_SortParam_DefaultsWhenAbsent` (F1).
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0 errors);
+  `Kumunita.Web.Tests` suite **852** total, **0 failed** (3 new + existing).
+- **U11–U15 reuse this, do not fork:** the `SortViewModel`/`_Sort` are the
+  **only** control — each later surface just passes **its own** allowed-key
+  `Options` (and its own `ForRoute` base) + adds its own `sort`/`dir` pairs to
+  its existing `Pager`'s `FilterParams`. Do not create a per-surface partial.
+  See `m26-u11.md`.

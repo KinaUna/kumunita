@@ -1,0 +1,38 @@
+@model Kumunita.Web.Models.SortViewModel
+@using System.Text
+@functions {
+    // The link shape mirrors _Pager's PagerLink exactly (M7 D7, C-SORT·8):
+    // BaseUrl + carried filter pairs (page, existing filters) + the toggled
+    // sort=/dir= pair. The sort/dir values enter the link exactly the way
+    // the M7 filters do.
+    string SortLink(string key, string dir)
+    {
+        var sb = new StringBuilder(Model.BaseUrl);
+        sb.Append('?');
+        var first = true;
+        foreach (var (k, v) in Model.CarriedParams)
+        {
+            if (!first) sb.Append('&');
+            sb.Append(Uri.EscapeDataString(k));
+            sb.Append('=');
+            sb.Append(Uri.EscapeDataString(v));
+            first = false;
+        }
+        if (!first) sb.Append('&');
+        sb.Append("sort=");
+        sb.Append(Uri.EscapeDataString(key));
+        sb.Append('&');
+        sb.Append("dir=");
+        sb.Append(Uri.EscapeDataString(dir));
+        return sb.ToString();
+    }
+}
+<div class="sort-control d-flex flex-wrap align-items-center gap-1 mt-2" role="group" aria-label="Sort order">
+    @foreach (var (key, dir) in Model.Options)
+    {
+        var isCurrent = string.Equals(Model.CurrentKey, key, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Model.CurrentDir, dir, StringComparison.OrdinalIgnoreCase);
+        <a class="sort-link badge @(isCurrent ? "bg-primary text-white" : "bg-secondary text-white")"
+           href="@SortLink(key, dir)"><kw-l key="sort.@key">@key</kw-l></a>
+    }
+</div>
