@@ -232,3 +232,66 @@
   1265).
 - **Handoff to U7:** additive `SortSpec? sort = null` on the 3 misc-list
   seams (announcements, documents, inventory) + their tests. See `m26-u07.md`.
+
+## U7 — Core misc lists
+
+- **Landed:** `SortSpec? sort = null` added to the 3 misc-list seams
+  (`AnnouncementService.ListVisiblePagedAsync` — allowlist `created`/
+  `modified`/`title`; `DocumentService.ListAsync` — + `size` → `SizeBytes`
+  (non-null `long`); `InventoryService.ListItemsAsync` — + `name` → `Name`
+  (non-null)) + the 2 real interface signatures
+  (`IAnnouncementService.ListVisiblePagedAsync`,
+  `IInventoryService.ListItemsAsync` — `DocumentService` has **no**
+  interface; `DocumentController` injects the concrete class directly, so
+  deliverable 2 is 2 files, not 3). The shared ordering lives in a new
+  `src/Kumunita.Core/Query/MiscSortSupport.OrderByMiscSort<T,TCreated,
+  TModified,TSize>(…)` static helper — one generic method for all 3
+  surfaces (the U6 selector technique; each call site passes its own
+  `created`/`modified`/`title`/`size-or-name`/`id` selectors + the
+  surface's closed `allowedKeys` set, which guards each branch so an
+  out-of-allowlist key (e.g. "size" on an inventory call) falls to the
+  default branch). `null` keeps each pinned `OrderByDescending(Created)`
+  **byte-for-byte** (C-SORT·2); every non-null path applies
+  `Queryable.ThenBy(…, x => x.Id)` (C-SORT·5; the fully-qualified form —
+  U4/U5/U6 carry-forward (1)). `CanSeeAsync` / `HasMore` / `Skip`/`Take` /
+  document access control (ADR 0122) / the inventory owner-kind/component
+  filters untouched (C-SORT·4). Trailing-`sort` param convention (U5/U6)
+  followed — announcements and inventory already have a positional
+  `CancellationToken ct`, so `sort` is the trailing param; `ListAsync` has
+  no `ct` at all, so `sort` is appended directly after `page`.
+- **Tests:** `tests/Kumunita.Core.Tests/MiscList/MiscListSortTests.cs` —
+  all 15 pinned tests pass: `Announcement_SortSpecNull_CurrentOrder`,
+  `Announcement_SortModifiedDesc_NullsFirst`, `Announcement_SortTitle_
+  Ordinal`, `Announcement_InvalidKey_DefaultOrder`,
+  `Announcement_StableTieBreakBy_Id`, `Document_SortSpecNull_CurrentOrder`,
+  `Document_SortSize`, `Document_SortModifiedAsc_NullsLast`,
+  `Document_InvalidKey_DefaultOrder`, `Document_StableTieBreakBy_Id`,
+  `Inventory_SortSpecNull_CurrentOrder`, `Inventory_SortName_Ordinal`,
+  `Inventory_SortModifiedDesc_NullsFirst`,
+  `Inventory_InvalidKey_DefaultOrder`, `Inventory_StableTieBreakBy_Id`.
+- **documents-`size` + inventory-`name` pins:** `size` →
+  `Document.SizeBytes` (`long`, non-null) — ordered directly, no
+  sentinel/drift (`Document_SortSize` pins 10 < 100 < 1000). `name` →
+  `InventoryItem.Name` (non-null `string`) — `OrdinalIgnoreCase`
+  (`Inventory_SortName_Ordinal` pins Alpha < Bolt < Ladder, case-
+  insensitive). Both confirmed non-null in the model before implementation.
+- **`modified` null-ordering — MARTEN DRIFT (U7, the C-5 carry-forward, as
+  expected):** the `modified` (nullable date) key orders on the **raw
+  nullable column** — the `?? MinValue` sentinel is rejected by Marten
+  9.31.2's Linq parser (`BadLinqExpressionException`); Postgres supplies its
+  default null-ordering (nulls-**last** in asc, nulls-**first** in desc).
+  `Announcement_SortModifiedDesc_NullsFirst` and
+  `Inventory_SortModifiedDesc_NullsFirst` pin nulls-first desc;
+  `Document_SortModifiedAsc_NullsLast` pins nulls-last asc. **Part 2
+  (§2.2/§2.3) is unchanged** — recorded here and in the `MiscSortSupport`
+  doc-comment.
+- **Frozen-filter non-change (C-SORT·4, named non-decision):** document
+  access control (ADR 0122 — the `CanSeeAsync` / `HiddenCount` /
+  `Total`/`HasMore` shape) and the inventory `ownerKind`/`componentId`
+  filters are byte-for-byte untouched; the sort replaces only the `OrderBy`
+  line.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0
+  errors); `Kumunita.Core.Tests` suite 1292 total, 0 failed (15 new +
+  existing; U6 was 1277).
+- **Handoff to U8:** additive `SortSpec? sort = null` on the 4 tag/people
+  seams + their tests. See `m26-u08.md`.

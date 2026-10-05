@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -70,16 +71,28 @@ public sealed class DocumentService
     /// adapter). <see cref="DocumentListResult.HiddenCount"/> counts only the
     /// candidates that call evaluated.
     /// </summary>
-    public async Task<DocumentListResult> ListAsync(string actorId, int page)
+    public async Task<DocumentListResult> ListAsync(string actorId, int page, SortSpec? sort = null)
     {
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
-        var candidates = await session
-            .Query<Document>()
-            .OrderByDescending(d => d.Created)
+        IQueryable<Document> q = session
+            .Query<Document>();
+        // M26 U7 (design doc §2.2 row 12, closed allowlist
+        // created/modified/title/size; size → the non-null SizeBytes long):
+        // null keeps the pinned OrderByDescending(Created) byte-for-byte
+        // (C-SORT·2); non-null applies the allowlist + the ThenBy(Id)
+        // tie-breaker (C-SORT·5) via the shared MiscSortSupport helper.
+        if (sort is null)
+            q = q.OrderByDescending(d => d.Created); // ← the pinned line, verbatim
+        else
+            q = MiscSortSupport.OrderByMiscSort<Document, DateTimeOffset, DateTimeOffset?, long>(q, sort,
+                new HashSet<string> { "created", "modified", "title", "size" },
+                d => d.Created, d => d.Modified, d => d.Title,
+                sizeKey: "size", d => d.SizeBytes, nameKey: "", d => string.Empty, d => d.Id);
+        var candidates = await q
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
             .ToListAsync()

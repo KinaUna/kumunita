@@ -51,7 +51,7 @@ public interface IAnnouncementService
     /// <see cref="AnnouncementService.ListVisiblePagedAsync"/> for the full
     /// contract.
     /// </summary>
-    Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default);
+    Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default, Kumunita.Core.Query.SortSpec? sort = null);
 
     /// <summary>
     /// A single caller-visible <see cref="Announcement"/> by id — the
