@@ -370,3 +370,44 @@
   trailing `sort` param).
 - **Handoff to U9:** additive `SortSpec? sort = null` on the search seam
   + the `Search*_*` tests. See `m26-u09.md`.
+
+## U9 — Core search
+
+- **Landed:** `SortSpec? sort = null` added to the search seam —
+  `SearchService.SearchSurfaceAsync` (+ `ISearchService`) — applied
+  **in-memory over the `visible` hit list**, before the `Skip/Take`, only
+  when non-null (design §2.3 row 18 — the U8 in-memory pattern, **not**
+  the U4–U7 Marten drifts: plain `Enumerable.ThenBy`, the `?? ""`
+  sentinel on the nullable `SearchHit.Title` works as pinned). The 10
+  per-surface `OrderByDescending(...Created)` candidate queries are
+  untouched (they produce the pinned default order, which `null` now
+  keeps byte-for-byte — C-SORT·2); the closed allowlist is
+  `created`/`title` only (M8 frozen — **relevance is not a sort key**),
+  `.ThenBy(h => h.Id)` tie-breaker on every non-null path (C-SORT·5);
+  an out-of-allowlist key falls back to the pinned created/**desc**
+  default regardless of the spec's own direction (the U8
+  `defaultDir` shape — my first draft applied `sort.Descending` to the
+  fallback branch and `Search_InvalidKey_DefaultOrder` only passed by
+  luck). Trailing-`sort` param (after the existing `ct`) — Web call
+  sites + the Web NSub substitute pins compile unchanged. `HasMore` /
+  `MaxPerSurface` / the group scope + the `CanSeeAsync` gate are
+  byte-for-byte untouched (C-SORT·4).
+- **Tests:** `tests/Kumunita.Core.Tests/Search/SearchSortTests.cs`
+  (namespace `Kumunita.Core.Tests.SearchSort` — `…Tests.Search` would
+  have shadowed the core `Kumunita.Core.Search` namespace in the
+  sibling `SearchServiceTests`) — all 6 pinned tests pass over the
+  announcements surface (the simplest visible set — the flat predicate,
+  no `CanSeeAsync`, no groups): `Search_SortSpecNull_CurrentOrderDesc`,
+  `Search_SortCreatedAsc`, `Search_SortTitle_Ordinal`,
+  `Search_InvalidKey_DefaultOrder`, `Search_StableTieBreakBy_Id`,
+  `Search_RelevanceNotASortKey`.
+- **Relevance-untouched pin:** the `Search_RelevanceNotASortKey` test
+  pins that a `relevance` request invents **no** order — it falls back
+  to the surface default (created, desc, identical to `sort = null`);
+  the allowlist offers exactly `created` + `title`.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green (0
+  errors); `Kumunita.Core.Tests` suite **1316** total, **0 failed**
+  (6 new + existing; U8 was 1310).
+- **Handoff to U10:** the Web `_Sort` foundation (`SortViewModel` +
+  `_Sort` partial + the pager-carry rule) + the community-feed reference
+  surface + the Web tests. See `m26-u10.md`.
