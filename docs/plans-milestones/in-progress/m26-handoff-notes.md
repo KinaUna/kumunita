@@ -35,3 +35,29 @@
   confirmed against the models, the Web `_Sort` contract + pager-carry rule,
   the pinned test names, the U17 acceptance gate, and the drift-guard.
   See `m26-u02.md`.
+
+## U2 — design doc Part 2
+
+- **`SortSpec`/`SortKeys` shape (locked, §2.1):** namespace
+  `Kumunita.Core.Query`; `record SortSpec(string Key, bool Descending)`
+  (lowercase key, resolved direction) + pure static
+  `SortKeys.Parse(key, dir, IReadOnlySet<string> allowedKeys, defaultKey,
+  defaultDir)`; **no DI registration** (U3 confirms zero new
+  `AddKumunitaCore` lines).
+- **Allowlists: 18/18 locked (§2.2)** against the actual models, with 3
+  model-confirmed corrections (locked in §2.8): C-1 tag→posts default is
+  **asc** (`TagService.cs:531` is `OrderBy`, not `OrderByDescending`); C-2
+  people surfaces have **no `created` key** (`Profile` has no `Created`
+  field — `name`/`DisplayName` only); C-3 todos have **no `priority` key**
+  (`TodoItem` has no `Priority` property — `status` instead).
+- **Seam pins (§2.3):** all 18 current `OrderBy…` lines pinned with
+  file:line; additive `SortSpec? sort = null`, `null` = byte-for-byte
+  unchanged order; `.ThenBy(x => x.Id)` tie-breaker on all.
+- **Test files (pinned counts):** Core **13** (1 parser + 12 group files,
+  names per §2.5); Web **9** (1 + 8 surface groups, names per §2.6).
+- **U17 gate (§2.7):** closed-loop (sorted ≡ unsorted authorization,
+  hidden stays hidden) / handoff (unknown `?sort=` → default, no error) /
+  part-vs-whole (pager carries `?sort=`/`?dir=` across all 18 surfaces).
+- **Handoff to U3:** add the pure Core `SortSpec` + `SortKeys.Parse` in
+  `Kumunita.Core.Query` + the 6 pinned `SortSpecTests` (no Postgres, no DI).
+  See `m26-u03.md`.
