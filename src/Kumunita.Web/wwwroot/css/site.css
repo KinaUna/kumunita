@@ -2511,13 +2511,20 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   margin: 0;
   padding: 0;
 }
-.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 1.5rem; }
+.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 2.75rem; }
+/* A branch's own row (summary) stays flush at every depth — the
+   chevron/title never shift when the branch opens. The separator line
+   moves from the wrapper <li> (zero padding/border) onto the summary
+   itself, so a closed branch shows no blank bordered strip and the
+   separator sits exactly at the child-row boundary when open. */
+.airy-page-list li:has(> .kmb-page-branch) { padding: 0; border-bottom: 0; }
+.airy-page-list .kmb-page-branch > summary { border-bottom: 1px solid var(--kmb-border-soft); }
 /* Depth cue: the old flat list encoded tree depth as 1.25rem of extra
-   padding-left per level — keep that visual language, now carried by
-   each branch's own summary row (a branch's children are never rendered
-   unless it is open, so indenting only *open* branches' rows is safe
-   and unambiguous; no :has() needed). */
-.airy-page-list .kmb-page-branch[open] > summary { padding-left: 2.75rem; }
+   padding-left per level — keep that visual language, now carried by the
+   child rows (2.75rem = the 1.5rem row padding + 1.25rem per level).
+   An inner branch's own summary stays flush; its children indent
+   relative to the parent's 2.75rem, so a nested branch reads slightly
+   further in — a consistent, if non-cumulative, depth signal. */
 
 /* C: directory — the cards grid (the "bigger avatars" overview). */
 .dir-cards {
@@ -2558,7 +2565,8 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   .airy-group-grid { grid-template-columns: 1fr; }
   .airy-page-list li { padding: 0.75rem 1rem; }
   .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
-  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 1rem; }
+  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 2.25rem; }
+  .airy-page-list li:has(> .kmb-page-branch) { padding: 0; }
   /* U05 · post/reply card — M10 (ADR 0107) §Responsive U05 row:
      the .rc-body rendered body's long code spans / unbroken URLs
      overflow the card → truncate (overflow-wrap: anywhere). The
