@@ -166,11 +166,69 @@ public sealed class AdminController(
     [HttpGet]
     public async Task<IActionResult> Communities()
     {
-        var (_, _, communityRows) = await BuildAccountDataAsync();
-        return View(new AdminCommunitiesViewModel
-        {
-            Communities = communityRows
-        });
+        var (accounts, _, communityRows) = await BuildAccountDataAsync();
+
+        // The add-picker candidates for every community panel (the
+        // CommunityController.Manage shape): non-blocked profiles, not the
+        // actor themself — per community, minus its explicit members.
+        var adminSubject = AdminSubjectId(User);
+        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: false);
+        var candidatePool = profiles
+            .Where(p => !p.Blocked && p.SubjectId != adminSubject)
+            .ToList();
+
+        var communities = communityRows
+            .Select(c =>
+            {
+                // The per-community member list (the "manage users" panel,
+                // ADR 0012's admin-side read): the explicit ComponentMembership
+                // rows are exactly the accounts whose CommunityIds contain
+                // this community's id — the inverse of the per-account "set of
+                // communities" surface. Each member is annotated with whether
+                // that account holds the Moderator role with a scope
+                // assignment on this community. Both data sets are already
+                // loaded by BuildAccountDataAsync (AccountRow.Roles +
+                // AccountRow.ComponentIds).
+                var memberRows = accounts
+                    .Where(a => a.CommunityIds.Contains(c.Id))
+                    .Select(a => new AdminCommunitiesViewModel.MemberRow
+                    {
+                        UserId      = a.SubjectId,
+                        DisplayName = a.DisplayName,
+                        IsModerator = a.Roles.Contains(Roles.Moderator)
+                                     && a.ComponentIds.Contains(c.Id),
+                        Roles           = a.Roles,
+                        ModeratorScopes = a.Roles.Contains(Roles.Moderator)
+                                         ? a.ComponentIds : []
+                    })
+                    .OrderBy(r => r.DisplayName ?? "", StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var memberIds = memberRows.Select(r => r.UserId).ToHashSet(StringComparer.Ordinal);
+                var candidateRows = candidatePool
+                    .Where(p => !memberIds.Contains(p.SubjectId))
+                    .Select(p => new AdminCommunitiesViewModel.CandidateRow
+                    {
+                        UserId      = p.SubjectId,
+                        DisplayName = p.DisplayName
+                    })
+                    .OrderBy(r => r.DisplayName ?? "", StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                return new AdminCommunitiesViewModel.CommunityRowWithMembers
+                {
+                    Id              = c.Id,
+                    Name            = c.Name,
+                    Description     = c.Description,
+                    SortOrder       = c.SortOrder,
+                    Enabled         = c.Enabled,
+                    ModeratorAccess = c.ModeratorAccess,
+                    Mandatory       = c.Mandatory,
+                    Members         = memberRows,
+                    Candidates      = candidateRows
+                };
+            })
+            .ToList();
+
+        return View(new AdminCommunitiesViewModel { Communities = communities });
     }
 
     // ── /admin/platform — the platform links + the platform pages table ───
@@ -468,6 +526,144 @@ public sealed class AdminController(
         catch (ArgumentException)
         {
             return RedirectToAction(nameof(Communities));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Communities));
+    }
+
+    // ── /admin/communities — per-community user management ("manage users") ──
+    // The inverse of the per-account "set of communities" surface (the
+    // Manage page): from the community's side, grant/revoke its member
+    // (the posting right, the ComponentMembership row) and its moderator
+    // (the standing-moderator scope, ADR 0003). ADR 0012's add/remove-
+    // member lanes are reused verbatim (the same audited Core surface the
+    // /community/manage page uses; the GlobalAdmin standing carries —
+    // this page is [Authorize(Roles=GlobalAdmin)]).
+    //
+    // The moderator lanes follow the Manage page's **set-lane shape**
+    // (ADR 0030): the form renders the target's *complete* desired role
+    // set + scope set at GET time (already loaded by
+    // BuildAccountDataAsync — no database read in the POST path) and the
+    // action passes the full set straight through to
+    // IIdentityService.SetRoleAsync.
+
+    // POST /admin/AddCommunityUser — grant the member (posting right).
+    // ADR 0012's add lane; the GlobalAdmin standing carries.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddCommunityUser([FromForm] string componentId, [FromForm] string userId)
+    {
+        if (string.IsNullOrEmpty(componentId) || string.IsNullOrEmpty(userId))
+            return RedirectToAction(nameof(Communities));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await userInfo.AddCommunityMemberAsync(componentId, userId, admin, KumunitaPrincipal.RoleSet(User));
+            TempData["info"] = "User added to the community.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to add a community user.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        catch (ArgumentException)
+        {
+            TempData["error"] = "Unknown community or user.";
+        }
+        return RedirectToAction(nameof(Communities));
+    }
+
+    // POST /admin/RemoveCommunityUser — revoke the member (posting right).
+    // ADR 0012's remove lane (Core refuses mandatory communities with a
+    // surfaced message; the view hides the button there anyway).
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveCommunityUser([FromForm] string componentId, [FromForm] string userId)
+    {
+        if (string.IsNullOrEmpty(componentId) || string.IsNullOrEmpty(userId))
+            return RedirectToAction(nameof(Communities));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await userInfo.RemoveCommunityMemberAsync(componentId, userId, admin, KumunitaPrincipal.RoleSet(User));
+            TempData["info"] = "User removed from the community.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to remove a community user.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        catch (ArgumentException)
+        {
+            TempData["error"] = "Unknown community or user.";
+        }
+        return RedirectToAction(nameof(Communities));
+    }
+
+    // POST /admin/SetCommunityModerator / UnsetCommunityModerator — the
+    // moderator scope (the standing-moderator lane, ADR 0003). The form
+    // submits the target's complete desired role set + scope set (the
+    // Manage-page set-lane shape — ADR 0030): the Unset variant carries
+    // the same set minus Moderator and minus this community's scope.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetCommunityModerator([FromForm] CommunityModeratorFormViewModel model)
+    {
+        if (string.IsNullOrEmpty(model.ComponentId) || string.IsNullOrEmpty(model.UserId))
+            return RedirectToAction(nameof(Communities));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.SetRoleAsync(
+                targetSubjectId: model.UserId,
+                adminSubjectId: admin,
+                roles: model.RoleNames,
+                componentIds: model.ComponentIds);
+            TempData["info"] = "User is now a moderator of the community.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to set a community moderator.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Communities));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UnsetCommunityModerator([FromForm] CommunityModeratorFormViewModel model)
+    {
+        if (string.IsNullOrEmpty(model.ComponentId) || string.IsNullOrEmpty(model.UserId))
+            return RedirectToAction(nameof(Communities));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.SetRoleAsync(
+                targetSubjectId: model.UserId,
+                adminSubjectId: admin,
+                roles: model.RoleNames,
+                componentIds: model.ComponentIds);
+            TempData["info"] = "User no longer moderates the community.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to unset a community moderator.";
         }
         catch (InvalidOperationException ex)
         {

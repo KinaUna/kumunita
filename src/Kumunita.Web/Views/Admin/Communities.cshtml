@@ -73,6 +73,7 @@ else
                                 <span class="badge text-bg-secondary ms-1" title="Standing moderator scope is ON for this community.">mod scope</span>
                             }
                         </div>
+                        <a href="#" data-edit-toggle="#users-@c.Id" class="btn btn-sm btn-outline-secondary">Users</a>
                         <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
                     </div>
                     <div class="card-body py-2">
@@ -109,6 +110,114 @@ else
                                     @(c.Enabled ? "Disable" : "Re-enable")
                                 </button>
                             </form>
+                        </div>
+                    </div>
+                    @* User management — the ADR 0012 per-community lanes from the
+                       admin side (the inverse of the per-account "set of
+                       communities" surface): the member list (each with a
+                       "Make moderator" / "Un-moderate" toggle), a member
+                       remove, and the add-picker (non-member accounts). *@
+                    <div id="users-@c.Id" style="display:none" class="border-top bg-light">
+                        <div class="p-3">
+                            <h6 class="small mb-2">Members @(c.Mandatory ? "(mandatory — everyone in the neighborhood is a member; removal is not offered)" : "")</h6>
+                            @if (c.Members.Count == 0)
+                            {
+                                <div class="text-muted small">No explicit members — add one below.</div>
+                            }
+                            <ul class="list-group mb-2">
+                                @foreach (var m in c.Members)
+                                {
+                                    // The moderator lane's set-lane shape (ADR 0030, the
+                                    // Manage-page pattern): the form submits the
+                                    // target's *complete* desired role set + scope
+                                    // set, computed here at render time from the
+                                    // already-loaded member state — no database
+                                    // read in the POST path.
+                                    var baseRoles = m.Roles.Where(r => r != "Moderator").ToList();
+                                    // Make-moderator: current roles + Moderator;
+                                    // Un-moderate: current roles minus Moderator.
+                                    var makeRoleNames  = m.IsModerator ? baseRoles : baseRoles.Append("Moderator").ToList();
+                                    var unsetRoleNames = baseRoles;
+                                    // Make-moderator: current scopes + this community;
+                                    // Un-moderate: current scopes minus this community.
+                                    var makeScopes  = m.ModeratorScopes.Contains(c.Id)
+                                        ? m.ModeratorScopes.ToList()
+                                        : m.ModeratorScopes.Append(c.Id).ToList();
+                                    var unsetScopes = m.ModeratorScopes.Where(s => s != c.Id).ToList();
+                                    <li class="list-group-item py-1 d-flex align-items-center justify-content-between gap-2">
+                                        <span>
+                                            @(m.DisplayName ?? m.UserId)
+                                            @if (m.IsModerator)
+                                            {
+                                                <span class="badge text-bg-secondary">moderator</span>
+                                            }
+                                        </span>
+                                        <span class="d-flex gap-1">
+                                            @if (m.IsModerator)
+                                            {
+                                                <form method="post" asp-action="UnsetCommunityModerator" class="d-inline-flex">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="componentId" value="@c.Id" />
+                                                    <input type="hidden" name="userId" value="@m.UserId" />
+                                                    @foreach (var r in unsetRoleNames)
+                                                    {
+                                                        <input type="hidden" name="roleNames" value="@r" />
+                                                    }
+                                                    @foreach (var s in unsetScopes)
+                                                    {
+                                                        <input type="hidden" name="componentIds" value="@s" />
+                                                    }
+                                                    <button class="btn btn-sm btn-outline-secondary" type="submit">Un-moderate</button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <form method="post" asp-action="SetCommunityModerator" class="d-inline-flex">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="componentId" value="@c.Id" />
+                                                    <input type="hidden" name="userId" value="@m.UserId" />
+                                                    @foreach (var r in makeRoleNames)
+                                                    {
+                                                        <input type="hidden" name="roleNames" value="@r" />
+                                                    }
+                                                    @foreach (var s in makeScopes)
+                                                    {
+                                                        <input type="hidden" name="componentIds" value="@s" />
+                                                    }
+                                                    <button class="btn btn-sm btn-outline-primary" type="submit">Make moderator</button>
+                                                </form>
+                                            }
+                                            @if (!c.Mandatory)
+                                            {
+                                                <form method="post" asp-action="RemoveCommunityUser" class="d-inline-flex">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="componentId" value="@c.Id" />
+                                                    <input type="hidden" name="userId" value="@m.UserId" />
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="Remove @(m.DisplayName ?? m.UserId) from the community">Remove</button>
+                                                </form>
+                                            }
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                            @if (c.Candidates.Count > 0)
+                            {
+                                <form method="post" asp-action="AddCommunityUser" class="d-flex gap-2 align-items-end">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="componentId" value="@c.Id" />
+                                    <div class="flex-grow-1">
+                                        <label class="form-label small mb-1" for="add-user-@c.Id">Add a member</label>
+                                        <select name="userId" id="add-user-@c.Id" class="form-select form-select-sm" required>
+                                            <option value="" disabled selected>Pick a resident…</option>
+                                            @foreach (var cand in c.Candidates)
+                                            {
+                                                <option value="@cand.UserId">@(cand.DisplayName ?? cand.UserId)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" type="submit">Add</button>
+                                </form>
+                            }
                         </div>
                     </div>
                     @* Edit form — toggled by the Edit button in the card header; uses the
