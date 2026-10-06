@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.39.0", "2026-10-06", new List<string>
+        {
+            "Sorting — feeds, lists, and search results now offer a sort control (posts, events, projects, announcements, documents, inventory, tags, people find, and search): choose what to sort by and the direction, carried through the pager links like M7's filters; an unchosen sort behaves exactly as before, and sorting never changes what you can see (ADR 0145).",
+        }),
         new("0.38.0", "2026-10-05", new List<string>
         {
             "Guardian's event gate — a guardian now decides a supervised child's event attendance: an event the child wants to attend reaches the guardian, who approves it, denies it, or sets it to auto-allow (three postures, the strictest the default); the child's own everyday RSVP is untouched (ADR 0144).",
