@@ -2399,6 +2399,27 @@ public static class KnownTranslationKeys
             ["translations.bulk.export_title"] = "Download this language's UI strings as a CSV file",
             ["common.delete"]          = "Delete",
             ["pages.delete_confirm"]   = "Delete this page?",
+
+            // ── M26 U16 (the _Sort partial's closed sort.* set, the documents.*/
+            // a11y.* precedent) — the label-only kw-l set the one shared
+            // Views/Shared/_Sort.cshtml partial emits: exactly the eight sort
+            // keys the U10–U15 surfaces' closed allowlists offer (created /
+            // modified / title everywhere; size on documents; name on
+            // inventory + people-find; start on events; due + status on todos).
+            // No sort.label / sort.asc / sort.desc keys — the partial renders
+            // per-option links (not direction toggles) and its group
+            // aria-label stays hardcoded (the a11y.* attribute precedent:
+            // value-free simple attributes are out of kw-l's reach here).
+            // sort.priority is NOT a key — U12's drift pause: TodoItem has no
+            // Priority property, so no surface offers it.
+            ["sort.created"]          = "Created",
+            ["sort.modified"]         = "Modified",
+            ["sort.title"]            = "Title",
+            ["sort.size"]             = "Size",
+            ["sort.name"]             = "Name",
+            ["sort.start"]            = "Start date",
+            ["sort.due"]              = "Due date",
+            ["sort.status"]           = "Status",
             ["admin.help.reset_one"]   =
                 "Reset \"{0}\" to its seeded text? This overwrites any hand-edited copy.",
             ["admin.help.reset_all"]   =
@@ -4615,6 +4636,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "ALLE {0} Seed-Hilfeseiten auf den Seed-Text zurücksetzen? Damit werden alle " +
                 "manuellen Änderungen auf jeder Seite überschrieben.",
+
+            // ── M26 U16 — der geschlossene sort.*-Satz der geteilten
+            // _Sort-Partial (Label-only; die acht Sortschlüssel der
+            // erlaubten Listen der U10–U15-Oberflächen) ──
+            ["sort.created"]          = "Erstellt",
+            ["sort.modified"]         = "Geändert",
+            ["sort.title"]            = "Titel",
+            ["sort.size"]             = "Größe",
+            ["sort.name"]             = "Name",
+            ["sort.start"]            = "Beginn",
+            ["sort.due"]              = "Fällig",
+            ["sort.status"]           = "Status",
         };
 
     /// <summary>
@@ -6830,6 +6863,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "Réinitialiser TOUTES les {0} pages d'aide seedées au texte seedé ? Cela écrase tout " +
                 "le contenu modifié manuellement sur chaque page.",
+
+            // ── M26 U16 — le jeu fermé sort.* du partiel _Sort partagé
+            // (labels only ; les huit clés de tri des listes autorisées des
+            // surfaces U10–U15) ──
+            ["sort.created"]          = "Créé",
+            ["sort.modified"]         = "Modifié",
+            ["sort.title"]            = "Titre",
+            ["sort.size"]             = "Taille",
+            ["sort.name"]             = "Nom",
+            ["sort.start"]            = "Date de début",
+            ["sort.due"]              = "Échéance",
+            ["sort.status"]           = "Statut",
         };
 
     /// <summary>
@@ -9025,6 +9070,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "Nulstil ALLE {0} seeded hjælpesider til seedteksten? Dette overskriver al manuelt " +
                 "redigeret tekst på hver side.",
+
+            // ── M26 U16 — det lukkede sort.*-sæt fra den delte _Sort-partial
+            // (labels kun; de otte sortnøgler fra U10–U15-overfladernes
+            // tilladte lister) ──
+            ["sort.created"]          = "Oprettet",
+            ["sort.modified"]         = "Ændret",
+            ["sort.title"]            = "Titel",
+            ["sort.size"]             = "Størrelse",
+            ["sort.name"]             = "Navn",
+            ["sort.start"]            = "Startdato",
+            ["sort.due"]              = "Frist",
+            ["sort.status"]           = "Status",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

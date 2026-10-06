@@ -746,3 +746,55 @@
   request invents **no** order — it falls back to the pinned
   created-desc default (the U9 `Search_RelevanceNotASortKey`
   Core pin's Web twin, `Search_SortControl_Excludes_Relevance`).
+
+## U16 — i18n sort.*
+
+- **Landed (label-only, no logic change):** the closed `sort.*` kw-l set
+  registered in `KnownTranslationKeys.cs` (en floor + de/fr/da rows, the
+  same seeder path as `documents.*`/`a11y.*` — **8 keys**: `sort.created`,
+  `sort.modified`, `sort.title`, `sort.size`, `sort.name`, `sort.start`,
+  `sort.due`, `sort.status`) — exactly the union of the U10–U15
+  surfaces' closed allowlists the `_Sort` partial emits
+  (`<kw-l key="sort.@key">`).
+- **Coverage:** en/de/fr/da all present + non-empty (the existing
+  `KnownTranslationKeys_ParityTests` De/Fr/Da full-parity pins cover the
+  new keys automatically).
+- **English floor:** a missing de/fr/da row degrades to the en
+  `EnValues` text (provider floor, ADR 0015 D1) — a resident never sees a
+  blank label (M·1).
+- **Test passed:** `SortKwL_Resolves_En_De_Fr_Da`
+  (`tests/Kumunita.Web.Tests/SortKwL_Resolves_En_De_Fr_Da.cs`, + a
+  `ClosedSet_Has_Exactly_8_Keys` closure pin); Web suite 910/0 failed,
+  Core suite 1316/0 failed, build green.
+- **Drift pause — see `## U16 — Drift pause`:** the brief's example key
+  list (`sort.label`/`sort.asc`/`sort.desc`/`sort.priority`) is NOT the
+  closed set — the shipped partial emits none of those four; the closed
+  set was aligned to the partial + the U10–U15 shipped allowlists, not
+  silently expanded.
+
+## U16 — Drift pause
+
+- **`sort.label` / `sort.asc` / `sort.desc` — NOT registered; aligned to
+  the shipped partial, mirroring U12's `priority` case, not a silent add.**
+  The U16 brief's deliverable text lists them as an *e.g.* example set
+  ("e.g. `sort.label`, `sort.asc`, `sort.desc`, …"). The shipped `_Sort`
+  partial renders **per-option links** (`<kw-l key="sort.@key">@key</kw-l>`
+  over `Model.Options` — one link per allowed key, no asc/desc toggle
+  links) and its group `aria-label="Sort order"` stays **hardcoded**
+  (the registry's own kw-l exclusion: value-free `aria-label` attributes
+  are out of scope, the `a11y.*` precedent — and the `_Sort` control's
+  logic is frozen for this unit, carry-forward 1). Registering keys no
+  view emits would make the registry a lie (the registry doc's PG-lane
+  precedent) — so the closed set is the 8 keys above, pinned as closed by
+  `ClosedSet_Has_Exactly_8_Keys` (no 9th `sort.*` key may appear without
+  a surface that renders it).
+- **`sort.priority` — NOT registered; carried from U12's drift pause**
+  (`TodoItem` has no `Priority` property, no surface offers it — the
+  frozen Part-2 allowlist `created`/`modified`/`title`/`due`/`status`
+  wins). The `ClosedSet_Has_Exactly_8_Keys` pin asserts its absence.
+- **No key was added or removed to force-fit the brief:** the drift-pause
+  guard (the U12/U15 precedent) applied — the closed set matches what the
+  partial + the U10–U15 shipped allowlists actually use
+  (`sort.due` / `sort.status` / `sort.size` / `sort.name` / `sort.start`
+  included, `sort.priority` / `sort.label` / `sort.asc` / `sort.desc`
+  excluded).
