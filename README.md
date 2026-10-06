@@ -30,7 +30,8 @@ document management (a shared repository for official documents, contracts, etc.
 **M24 is done** — storage metrics (an admin view of storage: total used space, available space, user-content used space, and space used per user; ADR 0134).
 **M25 is done** — upload limits (admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains; ADR 0135).
 **Documents organization is done** — tags + folders on the M21 document repository (a Page-style folder forest + the TG tag convention; ADR 0137).
-**M26 is next** — sorting (feeds, lists & search results are sortable by various properties in increasing or decreasing order)
+**M26 is done** — sorting (feeds, lists & search results are sortable by various properties in increasing or decreasing order; ADR 0145).
+**M27 is next** — user-scoped portability (a resident exports / backs up their own data; imports resolve conflicts per entity)
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -272,8 +273,8 @@ stays trivial and the authorization rules can grow freely.
 - **M24** — Storage metrics: an admin view of storage — total used space, available space, user-content used space, and space used per user. **Done.** (ADR 0134)
 - **M25** — Upload limits: admin-set limits on the size of an individual file and on the total content a user may add; residents see how much space they are using and how much of their quota remains. **Done.** (ADR 0135)
 - **Documents organization** — tags + folders on the M21 document repository (a Page-style folder forest + the TG tag convention). **Done.** (ADR 0137)
-- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **In progress.**
-- **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Planned.**
+- **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Done** (ADR 0145).
+- **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **In progress** (next).
 - **M28** — Guardian time limits: for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week. A child-scoped schedule on the GU guardian-controls lane (ADR 0028), distinct from the per-resident M20 notification quiet times (these gate the child's whole platform access, not just notifications). **Planned.**
 
 ## Deferred (future, by design)

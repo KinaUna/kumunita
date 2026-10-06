@@ -798,3 +798,28 @@
   (`sort.due` / `sort.status` / `sort.size` / `sort.name` / `sort.start`
   included, `sort.priority` / `sort.label` / `sort.asc` / `sort.desc`
   excluded).
+
+## U17 — ADR 0145 + docs sync
+
+- **(a) ADR 0145** (`docs/adr/0145-sorting.md`) authored — **Status: Accepted**,
+  the decision tier (the design doc is the reference tier). Decision: a pure
+  Core `SortSpec(string Key, bool Descending)` + `SortKeys.Parse` (HTTP-free,
+  no DI registration) in `Kumunita.Core.Query`, the per-surface **closed
+  allowlists**, the additive default-preserving `SortSpec?` seam, the one
+  shared Web `_Sort` control + the M7 `FilterParams` pager-carry, and the
+  **closed 8-key** `sort.*` kw-l set × en/de/fr/da. Records the 8 invariants
+  (C-SORT·1–8), the 12 FACES (F1–F12), the **18-surface catalog** (locked
+  allowlists incl. C-1/C-2/C-3 corrections), and the 6 named non-decisions.
+- **(b) ADR index** (`docs/adr/README.md`): appended the
+  `| 0145 | Sorting: the one canonical sort contract | Accepted |` row after
+  0144.
+- **(c) OPS/README sync:** `docs/OPS.md` notes sort is a **per-request**
+  `?sort=`/`?dir=` param (no operator config, no env var, no `AccessAudit`
+  row); `README.md` M26 roadmap line → **Done** (ADR 0145), M27 → **In
+  progress (next)**.
+- **(d) `Milestones.cs` read-only confirm:** **unchanged** — M26 is
+  `StatusNext`, M27 `StatusPlanned`; U18 owns the flip (M26 → `StatusDone`,
+  M27 → `StatusNext`). Not touched here.
+- **(e) Both suites green:** build green; `Kumunita.Web.Tests` **910 / 0
+  failed** (incl. `SortKwL_Resolves_En_De_Fr_Da` +
+  `ClosedSet_Has_Exactly_8_Keys`), `Kumunita.Core.Tests` **1316 / 0 failed**.
