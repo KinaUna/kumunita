@@ -434,6 +434,11 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .navbar-brand {
     color: var(--kmb-cream) !important;
   }
+  /* Toggler icon: Bootstrap's .navbar-light sets it to a dark stroke; flip it
+     to the cream text colour so it reads against the dark surface. */
+  html:not([data-kmb-theme='light']) .navbar {
+    --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+  }
   html:not([data-kmb-theme='light']) .navbar-light .nav-link:hover,
   html:not([data-kmb-theme='light']) .navbar-light .nav-link:focus {
     color: var(--bs-primary-text-emphasis) !important;
@@ -637,6 +642,11 @@ html[data-kmb-theme='dark'] .bg-white {
 }
 html[data-kmb-theme='dark'] .navbar-brand {
   color: var(--kmb-cream) !important;
+}
+/* Toggler icon: flip Bootstrap's dark .navbar-light stroke to cream so it
+   reads against the dark surface (same fix as the auto dark scope). */
+html[data-kmb-theme='dark'] .navbar {
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 html[data-kmb-theme='dark'] .navbar-light .nav-link:hover,
 html[data-kmb-theme='dark'] .navbar-light .nav-link:focus {
