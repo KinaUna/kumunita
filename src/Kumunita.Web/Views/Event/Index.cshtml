@@ -35,12 +35,8 @@
             </div>
         </header>
 
-        @* ADR 0109 (EV-PAST) — the "Past" option: an Upcoming / Past toggle on
-           the feed surface (the calendar's events-view-toggle idiom). The links
-           are plain GETs that carry the current community filter (?componentId)
-           so the selection survives the switch; the server re-renders and the
-           authorization re-runs per request (C-M3·2 — past is a selector, never
-           an access input). *@
+        @* ADR 0109 (EV-PAST) — Upcoming / Past toggle + the community filter
+           form, placed below the feed list. *@
         @{
             string FeedToggleHref(bool showPast)
             {
@@ -49,29 +45,6 @@
                     href += (showPast ? "&" : "?") + "componentId=" + Uri.EscapeDataString(Model.CurrentComponentId);
                 return href;
             }
-        }
-        <div class="btn-group btn-group-sm mb-4 events-feed-toggle" role="group" aria-label="@ariaTimeRange">
-            <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><kw-l key="events.upcoming">Upcoming</kw-l></a>
-            <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><kw-l key="events.past">Past</kw-l></a>
-        </div>
-
-        @if (Model.Components.Count > 0)
-        {
-            <form method="get" action="/events" class="mb-4">
-                <div class="d-flex gap-2 align-items-end">
-                    <div>
-                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
-                        <select class="form-select" id="component-filter" name="componentId">
-                            <option value=""><kw-l key="events.all_communities">All communities</kw-l></option>
-                            @foreach (var (id, name) in Model.Components)
-                            {
-                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
-                            }
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
-                </div>
-            </form>
         }
 
         @if (Model.MyEvents.Count > 0)
@@ -158,5 +131,36 @@
                 <partial name="_Pager" model="Model.Pager" />
             }
         </div>
+
+        @* ADR 0109 (EV-PAST) — the "Past" option: an Upcoming / Past toggle on
+           the feed surface (the calendar's events-view-toggle idiom). The links
+           are plain GETs that carry the current community filter (?componentId)
+           so the selection survives the switch; the server re-renders and the
+           authorization re-runs per request (C-M3·2 — past is a selector, never
+           an access input). Placed below the feed list. *@
+        <div class="btn-group btn-group-sm mt-4 events-feed-toggle" role="group" aria-label="@ariaTimeRange">
+            <a class="btn btn-outline-secondary @(!Model.Past ? "active" : null)" href="@FeedToggleHref(false)" aria-pressed="@(!Model.Past ? "true" : "false")"><kw-l key="events.upcoming">Upcoming</kw-l></a>
+            <a class="btn btn-outline-secondary @(Model.Past ? "active" : null)" href="@FeedToggleHref(true)" aria-pressed="@(Model.Past ? "true" : "false")"><kw-l key="events.past">Past</kw-l></a>
+        </div>
+
+        @if (Model.Components.Count > 0)
+        {
+            <form method="get" action="/events" class="mt-4 mb-0">
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value=""><kw-l key="events.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+                </div>
+            </form>
+        }
+
     </div>
 </div>
