@@ -17,7 +17,7 @@
 
 <h2 class="mt-1"><kw-l key="settings.messaging.title">Messaging</kw-l></h2>
 <p class="text-muted">
-    <kw-l key="settings.messaging.description">Choose whether you can use direct 1:1 messaging with other residents. Your choice is saved on your account and takes effect immediately.</kw-l>
+    <kw-l key="settings.messaging.description">Choose whether other residents can send you direct 1:1 messages. Your choice is saved on your account and takes effect immediately.</kw-l>
 </p>
 
 @* The instance master-gate notice — the per-user opt-in is meaningful even
@@ -54,7 +54,7 @@
                        @(Model.OptIn ? "checked" : null)
                        @(Model.Restricted ? "disabled" : null) />
                 <label class="form-check-label" for="messagingOptIn">
-                    <kw-l key="settings.messaging.optin">Allow me to use direct 1:1 messaging</kw-l>
+                    <kw-l key="settings.messaging.optin">Let others send me direct 1:1 messages</kw-l>
                 </label>
             </div>
         </div>

@@ -2244,10 +2244,10 @@ public static class KnownTranslationKeys
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
             ["settings.messaging.title"]           = "Messaging",
-            ["settings.messaging.description"]     = "Choose whether you can use direct 1:1 messaging with other residents. Your choice is saved on your account and takes effect immediately.",
+            ["settings.messaging.description"]     = "Choose whether other residents can send you direct 1:1 messages. Your choice is saved on your account and takes effect immediately.",
             ["settings.messaging.instance_off"]    = "Messaging is currently turned off on this instance by an administrator. You can opt in now and messaging will be available to you as soon as it is turned on.",
             ["settings.messaging.restricted"]      = "Messaging has been restricted on your account by a guardian. Contact them to change this.",
-            ["settings.messaging.optin"]           = "Allow me to use direct 1:1 messaging",
+            ["settings.messaging.optin"]           = "Let others send me direct 1:1 messages",
             ["settings.messaging.save"]            = "Save messaging preference",
             ["guardian.messaging.title"]           = "Messaging",
             ["guardian.messaging.description"]     = "Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.",
@@ -4496,10 +4496,10 @@ public static class KnownTranslationKeys
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
             ["settings.messaging.title"]           = "Messaging",
-            ["settings.messaging.description"]     = "Wähle, ob du 1:1-Direktnachrichten mit anderen Bewohnern nutzen kannst. Deine Auswahl wird auf deinem Konto gespeichert und wirkt sofort.",
+            ["settings.messaging.description"]     = "Wähle, ob andere Bewohner dir direkte 1:1-Nachrichten senden dürfen. Deine Auswahl wird auf deinem Konto gespeichert und wirkt sofort.",
             ["settings.messaging.instance_off"]    = "Direktnachrichten sind derzeit von einem Administrator auf dieser Instanz deaktiviert. Du kannst dich jetzt anmelden, und die Funktion steht dir zur Verfügung, sobald sie wieder aktiviert wird.",
             ["settings.messaging.restricted"]      = "Direktnachrichten wurden auf deinem Konto durch einen Betreuer eingeschränkt. Wende dich an sie, um dies zu ändern.",
-            ["settings.messaging.optin"]           = "Erlaube mir die Nutzung von 1:1-Direktnachrichten",
+            ["settings.messaging.optin"]           = "Erlaube anderen, mir direkte 1:1-Nachrichten zu senden",
             ["settings.messaging.save"]            = "Messaging-Einstellung speichern",
             ["guardian.messaging.title"]           = "Messaging",
             ["guardian.messaging.description"]     = "Wähle, ob dieses Kind 1:1-Direktnachrichten nutzen darf. Bei Einschränkung kann das Kind keine Nachrichten senden oder erhalten — diese Auswahl hat Vorrang vor seiner eigenen Opt-in. Bei Erlaubnis entscheidet das Kind selbst auf seiner eigenen Messaging-Einstellungsseite.",
@@ -6740,10 +6740,10 @@ public static class KnownTranslationKeys
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
             ["settings.messaging.title"]           = "Messagerie",
-            ["settings.messaging.description"]     = "Choisis si tu peux utiliser la messagerie directe 1:1 avec les autres résidents. Ton choix est enregistré sur ton compte et prend effet immédiatement.",
+            ["settings.messaging.description"]     = "Choisis si d'autres résidents peuvent t'envoyer des messages directs 1:1. Ton choix est enregistré sur ton compte et prend effet immédiatement.",
             ["settings.messaging.instance_off"]    = "La messagerie est actuellement désactivée sur cette instance par un administrateur. Tu peux t'inscrire maintenant et la messagerie sera disponible dès qu'elle sera activée.",
             ["settings.messaging.restricted"]      = "La messagerie a été restreinte sur ton compte par un tuteur. Contacte-le pour changer cela.",
-            ["settings.messaging.optin"]           = "Autoriser la messagerie directe 1:1",
+            ["settings.messaging.optin"]           = "Autoriser d'autres résidents à m'envoyer des messages directs 1:1",
             ["settings.messaging.save"]            = "Enregistrer la préférence de messagerie",
             ["guardian.messaging.title"]           = "Messagerie",
             ["guardian.messaging.description"]     = "Choisis si cet enfant peut utiliser la messagerie directe 1:1. Si restreinte, l'enfant ne peut ni envoyer ni recevoir de messages — ce choix prime sur son propre opt-in ; si autorisée, l'enfant décide par lui-même sur sa page de réglages de messagerie.",
@@ -8975,10 +8975,10 @@ public static class KnownTranslationKeys
             // loft (startværdier på da, til revidering af en oversætter;
             // ADR 0015 leverandørens bundløsning løser dem). ──
             ["settings.messaging.title"]           = "Beskeder",
-            ["settings.messaging.description"]     = "Vælg, om du kan bruge direkte 1:1-beskeder med andre beboere. Dit valg gemmes på din konto og gælder straks.",
+            ["settings.messaging.description"]     = "Vælg, om andre beboere kan sende dig direkte 1:1-beskeder. Dit valg gemmes på din konto og gælder straks.",
             ["settings.messaging.instance_off"]    = "Direkte beskeder er i øjeblikket slået fra på denne instans af en administrator. Du kan tilmelde dig nu, og beskeder vil være tilgængelige, så snart de slås til.",
             ["settings.messaging.restricted"]      = "Beskeder er blevet begrænset på din konto af en værgmand. Kontakt dem for at ændre det.",
-            ["settings.messaging.optin"]           = "Tillad mig at bruge direkte 1:1-beskeder",
+            ["settings.messaging.optin"]           = "Lad andre sende mig direkte 1:1-beskeder",
             ["settings.messaging.save"]            = "Gem beskedindstilling",
             ["guardian.messaging.title"]           = "Beskeder",
             ["guardian.messaging.description"]     = "Vælg, om dette barn kan bruge direkte 1:1-beskeder. Ved begrænsning kan barnet hverken sende eller modtage beskeder — dette valg har forrang over dets eget opt-in; ved tilladelse vælger barnet selv på sin egen beskedindstillingsside.",
