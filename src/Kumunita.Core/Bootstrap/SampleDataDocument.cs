@@ -91,6 +91,15 @@ internal sealed class SampleDataDocument
     /// carries the full en/de/fr/da set. Dev-only — this document only ever materializes under
     /// the Development ∧ first-boot gate.</summary>
     public bool EnableDanish { get; set; } = true;
+
+    /// <summary>When <c>true</c>, the seeder turns 1:1 resident messaging ON for the demo
+    /// (ADR 0139, the M9 amendment): it flips the instance master gate (<c>LocaleSettings.
+    /// MessagingEnabled</c>, the GlobalAdmin's <c>/admin/messaging</c> shape — shipped
+    /// OFF by default) AND pre-opts-in every sample resident (<c>Profile.MessagingOptIn</c>,
+    /// the per-account opt-in that also defaults OFF), so the demo neighborhood can exercise
+    /// the Messages surface end-to-end out of the box. Dev-only — like <see cref="EnableDanish"/>
+    /// this only ever materializes under the Development ∧ first-boot gate.</summary>
+    public bool EnableMessaging { get; set; } = true;
 }
 
 /// <summary>A demo resident account (the EF/<c>identity</c> side + the <c>mt</c>

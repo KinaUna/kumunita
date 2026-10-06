@@ -1,6 +1,7 @@
 {
   "version": 1,
   "enableDanish": true,
+  "enableMessaging": true,
   "mandatoryComponents": [
     "safety",
     "maintenance",
