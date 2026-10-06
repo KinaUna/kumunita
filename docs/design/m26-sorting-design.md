@@ -789,3 +789,73 @@ implementation choice):
 - The **C-SORT·6 milestone contract**: M25 `StatusDone` / M26
   `StatusNext` at start (**confirmed at U1**); M26 `StatusDone` + M27
   `StatusNext` at close (U18).
+
+---
+
+## M26 — Closed (recorded)
+
+**Recorded:** 2026-10-06 (U18 close unit). M26 is **shipped**; the close
+satisfies the C-SORT·6 single-in-progress contract and unblocks **M27
+(user-scoped portability)** (M26 `StatusDone` / M27 `StatusNext`).
+
+- **The 6 named non-decisions** (pinned in the Understanding block above,
+  §*What M26 is not*): (1) **The people catalog** — not paged today, so not
+  a sortable feed/list (M26 does not page it). (2) **The events calendar
+  day/week/month views** — display-only temporal layouts; position is the
+  content. (3) **Kanban column order** — the card order within a column is
+  user-set content (the `Order` field), not a list sort. (4) **The
+  bookmarks list** — personal, grouped, not paged (the M17
+  `BookmarkListResult.Groups` shape); a personal read, not a community
+  feed/list. (5) **Any relevance scoring** — M8 search relevance is frozen;
+  M26 sorts the *surface's* date/title keys, never invents a relevance
+  score. (6) **Any `AccessAudit` / `AccessAction` / schema /
+  bounded-context change** — sorting is a read-order surface over the
+  existing content lanes; no new doc, no new context, no new audit row.
+
+- **The M7 seam reuse (C-SORT·8 + the M7 `FilterParams` mechanism).**
+  The `_Sort` control rides the M7 `FilterParams` pager-carry: the
+  `?sort=` / `?dir=` parameters travel alongside the existing `?page=` on
+  every paged surface, and the one shared Web `_Sort` partial renders the
+  closed 8-key `sort.*` kw-l set (`sort.name` / `sort.title` / `sort.due`
+  / `sort.status` / `sort.size` / `sort.start` / `sort.modified` /
+  `sort.created`) × en/de/fr/da. The `SortSpec(string Key, bool
+  Descending)` + `SortKeys.Parse` pair lives in `Kumunita.Core.Query` —
+  pure Core, HTTP-free, no DI registration (the §2.1 pin). M26 is a
+  *read-order* surface; it does not touch any write seam, the M7 pager, or
+  the M8 search-relevance ranking — only the surface's own date/title keys.
+
+- **The test count (honest "Closed" basis, U17).** Core
+  `Kumunita.Core.Tests`: **Total 1316, Errors 0, Failed 0, Skipped 0**
+  (including the per-surface pinned sort suites U2–U9 + the U17 gate's
+  `ClosedSet_Has_Exactly_8_Keys` closure pin). Web `Kumunita.Web.Tests`:
+  **Total 910, Errors 0, Failed 0, Skipped 0** (including U10–U16's
+  per-lane Web sort tests + U17's `SortKwL_Resolves_En_De_Fr_Da`
+  kw-l-resolution pin). **Both suites green** at close (U18 exit run).
+
+- **The ADR pointer.** `docs/adr/0145-sorting.md` — the decision record
+  for this lane (Status: **Accepted**); the ADR index
+  (`docs/adr/README.md`) carries the 0145 row appended after 0144. The
+  8 invariants (C-SORT·1–8), the 12 FACES (F1–F12), the **18-surface
+  catalog** (locked allowlists incl. the C-1/C-2/C-3 corrections), and the
+  6 named non-decisions above are the ADR's normative core; the design
+  doc is the reference tier.
+
+- **The `Milestones.cs` flip (U18).** M26 `StatusNext` → `StatusDone`; M27
+  `StatusPlanned` → `StatusNext`; the order is **unchanged** (`…"M23",
+  "M22","M24","M25","M26","M27","M28"` — the "named lane, not a
+  renumber" precedent). `MilestonesTests.cs` is re-pinned to match: M26
+  added to `Shipped_Milestones_Are_Marked_Done`, and the single-in-
+  progress test is re-pointed to **M27**
+  (`M27_Is_The_Single_InProgress_Milestone`).
+
+- **The M27 handoff (C-SORT·6) — a closed-loop artifact.** M27 (user-
+  scoped portability) starts **only after** M26 `StatusDone` **and** M27
+  `StatusNext`. The M26 lane is a *read-order* surface over the existing
+  content lanes; M27 is a *user-scoped export/import* surface over the
+  same content lanes — the two do not collide on the seams named above.
+  The M7 `FilterParams` carry rule stays frozen for any M27 surface that
+  wants to page-sort an import-resolution list. M27's own register + unit
+  plans follow the same sealed-unit shape as this one (the register at
+  `docs/plans-milestones/plan-m27-*.md`, the unit plans in
+  `docs/plans-milestones/in-progress/`, the close moving them to
+  `docs/plans-milestones/done/m27/`).

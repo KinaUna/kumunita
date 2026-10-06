@@ -823,3 +823,37 @@
 - **(e) Both suites green:** build green; `Kumunita.Web.Tests` **910 / 0
   failed** (incl. `SortKwL_Resolves_En_De_Fr_Da` +
   `ClosedSet_Has_Exactly_8_Keys`), `Kumunita.Core.Tests` **1316 / 0 failed**.
+
+## U18 — close
+
+- **(a) The `Milestones.cs` flip (C-SORT·6 close):** M26 `StatusNext` →
+  `StatusDone`; M27 `StatusPlanned` → `StatusNext`; the **order of
+  `Milestones.All` is unchanged** (`…"M23","M22","M24","M25","M26","M27",
+  "M28"` — no renumber). `MilestonesTests.cs` re-pointed to match: M26 added
+  to the `Shipped_Milestones_Are_Marked_Done` done-list, and the
+  single-in-progress test re-pointed to **M27**
+  (`M27_Is_The_Single_InProgress_Milestone`, asserting M27 is the single
+  `StatusNext` and M26 is `StatusDone`); the two-test shape + the order
+  assertion are preserved.
+- **(b) The design-doc "Closed" section:** `## M26 — Closed (recorded)`
+  appended **last** to `docs/design/m26-sorting-design.md` — the M7
+  `FilterParams` seam reuse (the `_Sort` rides the M7 mechanism), the 6
+  named non-decisions, the total M26 test count (Core **1316** / Web
+  **910**, both green), the ADR 0145 pointer, and the M27-handoff note.
+- **(c) The moves to `done/m26/`:** `plan-m26-sorting.md`,
+  `m26-handoff-notes.md`, and all 18 unit plans `m26-u01.md`…`m26-u18.md`
+  moved to `docs/plans-milestones/done/m26/` (the `done/<lane>/` convention,
+  like `done/m25/`); `in-progress/` no longer holds the M26 files. `.tmp/`
+  scratch cleaned up (mirroring the M25 close).
+- **(d) The handoff to M27 (user-scoped portability — the next
+  milestone):** M27 now begins with the same single-in-progress contract —
+  M26 is `StatusDone`, M27 is `StatusNext`, exactly one milestone in
+  progress (per C-SORT·6). M27's own register + unit plans follow the same
+  sealed-unit shape as this one (register at
+  `docs/plans-milestones/plan-m27-*.md`, unit plans in
+  `docs/plans-milestones/in-progress/`, the close moving them to
+  `docs/plans-milestones/done/m27/`).
+- **(e) Exit run green:** build green; `Kumunita.Web.Tests` passes
+  **including the re-pointed `MilestonesTests`**; `Kumunita.Core.Tests`
+  passes; the M26 files are in `done/m26/` and `in-progress/` no longer
+  holds them.

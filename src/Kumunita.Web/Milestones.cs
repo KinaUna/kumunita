@@ -65,8 +65,8 @@ public static class Milestones
         new("M22", "Onboarding — a guided walk-through that walks a new user through account setup", StatusDone),
         new("M24", "Storage metrics — an admin view of storage: total used space, available space, user-content used space, and space used per user", StatusDone),
         new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusDone),
-        new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order", StatusNext),
-        new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusPlanned),
+        new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order", StatusDone),
+        new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusNext),
         new("M28", "Guardian time limits — for a child's account, a parent/guardian sets when the child may use the platform: allow or block certain hours of each day and days of the week", StatusPlanned),
     };
 
