@@ -604,9 +604,17 @@ public sealed class ProjectsController : Controller
     }
 
     [HttpGet("/projects/todos")]
-    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, bool blockedOnly = false, int page = 1, string? sort = null, string? dir = null)
+    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, bool blockedOnly = false, bool assignedToMe = false, int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
+
+        // "Assigned to me" — the actor-scoped assignee filter: a *filter, never
+        // a gate* (the same discipline as <c>assigneeId</c>, C-M5·6). When the
+        // viewer ticks it, the feed narrows to the to-dos whose
+        // <see cref="TodoItem.AssigneeId"/> is the actor's own subject id
+        // (the <c>ClaimTodoAsync</c> shape, the claimer becomes the assignee).
+        // It wins over an explicit <c>assigneeId</c> when both arrive.
+        string? effectiveAssigneeId = assignedToMe ? actorId : assigneeId;
 
         // M26 U12 (C-SORT·3) — the todos surface's own allowlist (row 7:
         // created/modified/title/due/status — the U6 locked set, **no**
@@ -623,7 +631,7 @@ public sealed class ProjectsController : Controller
         int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            todosPage = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            todosPage = await projects.ListTodosAsync(componentId, effectiveAssigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             todos = todosPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -694,6 +702,7 @@ public sealed class ProjectsController : Controller
         if (assigneeId is not null) todoFilterParams["assigneeId"] = assigneeId;
         if (unassignedOnly) todoFilterParams["unassignedOnly"] = "true";
         if (blockedOnly) todoFilterParams["blockedOnly"] = "true";
+        if (assignedToMe) todoFilterParams["assignedToMe"] = "true";
         foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
             todoFilterParams[k] = v;
 
@@ -701,10 +710,11 @@ public sealed class ProjectsController : Controller
             Todos: rows,
             Components: await SeedComponentPickerAsync(),
             CurrentComponentId: componentId,
-            CurrentAssigneeId: assigneeId,
+            CurrentAssigneeId: effectiveAssigneeId,
             UnassignedOnly: unassignedOnly,
             CurrentPage: page,
             BlockedOnly: blockedOnly,
+            AssignedToMe: assignedToMe,
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
             // single page so the _Pager partial renders nothing. The filters are
             // carried across prev/next (D7) via FilterParams.
