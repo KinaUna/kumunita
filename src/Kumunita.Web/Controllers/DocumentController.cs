@@ -369,7 +369,7 @@ public sealed class DocumentController(
     // ── GET /documents/new — the compose form (D5) ─────────────────────────
     [HttpGet("/documents/new")]
     [Authorize]
-    public IActionResult New()
+    public IActionResult New([Bind] DocumentUploadViewModel? form = null)
     {
         // D5 — the upload standing gate (Web boundary). A non-eligible actor
         // gets 404 (not 403 — the form's existence is not leaked to a
@@ -397,7 +397,7 @@ public sealed class DocumentController(
         if (form.Audience is null || !form.Audience.IsValid)
         {
             ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
-            return View(form);
+            return View("New", form);
         }
 
         // D3 — guards-before-write (the ADR 0011 / AttachmentController.Upload

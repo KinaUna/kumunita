@@ -442,6 +442,33 @@ public sealed class DocumentControllerTests(PostgresFixture fixture) : IClassFix
     }
 
     /// <summary>
+    /// <c>POST /documents</c> with a **malformed audience** (a mode of
+    /// <c>null</c> — <see cref="AudienceEditorModel.IsValid"/> false) is a
+    /// <b>form error</b> (re-render of the <c>New</c> view with the bound
+    /// form + an <c>Audience.Mode</c> error), not a 404 — the M2
+    /// mode-required pin, the PostComposeViewModel precedent. The guard
+    /// fires before any media write.
+    /// </summary>
+    [Fact]
+    public async Task Upload_MalformedAudience_Renders_ErrorView()
+    {
+        var (controller, media, _, _) = BuildUploadController(roles: new[] { "GlobalAdmin" });
+
+        var form = ValidUploadForm(TestFile("bylaws.pdf", "application/pdf", Pdf));
+        form.Audience = new AudienceEditorModel { Mode = null, Grants = "[]" };
+        var result = await controller.Upload(form);
+
+        // A form error re-renders the view (not a 404).
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("New", view.ViewName);
+        Assert.Same(form, view.ViewData.Model);
+        Assert.NotEmpty(controller.ModelState["Audience.Mode"]!.Errors);
+        // No media write (the guard fires before PutAsync).
+        await media.DidNotReceiveWithAnyArgs().PutAsync(
+            Arg.Any<byte[]>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
     /// GATE-6 / C-M21·7 / §1.a A2 — <c>POST /documents</c> happy path for a
     /// **GlobalAdmin**: the guards pass, one <see cref="IMediaStore
     /// .PutAsync"/> write (store-first, orphan-safe — D3), then one
