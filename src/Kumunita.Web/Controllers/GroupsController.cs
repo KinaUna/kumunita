@@ -1,6 +1,7 @@
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
@@ -288,10 +289,28 @@ public sealed class GroupsController(
     /// </para>
     /// </summary>
     [HttpGet("{id}")]
-    public async Task<IActionResult> Detail(string id, int page = 1)
+    public async Task<IActionResult> Detail(string id, int page = 1, string? sort = null, string? dir = null)
     {
         if (string.IsNullOrEmpty(id))
             return NotFound();
+
+        // M26 U11 (C-SORT·3) — the group detail page renders **two** list
+        // surfaces (the group posts + the group events, the M2/U5 precedent).
+        // Each surface has its own closed allowlist (U2 §2.2 rows 2–3 vs
+        // row 6: posts = created/modified/title, events = start/created) and
+        // its own default direction (posts created desc, events start asc) —
+        // so each surface parses the **same** ?sort=/?dir= request params
+        // against its **own** allowlist + default. A surface-unknown key
+        // (e.g. ?sort=title&dir=asc on the group events) falls back to that
+        // surface's default order (SortKeys.Parse's out-of-allowlist rule).
+        // The _Sort partial on each section then offers only **its** allowlist
+        // (F9 — no dead options on either section).
+        var postSort = !string.IsNullOrWhiteSpace(sort)
+            ? SortKeys.Parse(sort, dir, GroupPostFeedAllowedKeys, "created", defaultDir: true)
+            : null;
+        var eventSort = !string.IsNullOrWhiteSpace(sort)
+            ? SortKeys.Parse(sort, dir, GroupEventFeedAllowedKeys, "start", defaultDir: false)
+            : null;
 
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))
@@ -352,7 +371,12 @@ public sealed class GroupsController(
         //    stays the authoritative deny). The Detail page is member-scoped
         //    by its owner ∪ member gate, so every viewer here is a member
         //    and sees the feed + the "New post" button. ──
-        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses the
+        // platform default. Passed to the seam (the Skip/Take window) and the
+        // pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort, pageSize: pageSize);
 
         var groupPosts = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -381,7 +405,7 @@ public sealed class GroupsController(
         //    same live membership read as CanPost. The detail page is
         //    member-scoped by its owner ∪ member gate, so every viewer here is a
         //    member and sees the feed + the button. ──
-        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: page);
+        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: page, sort: eventSort, pageSize: pageSize);
 
         var groupEvents = new List<GroupEventListItem>(eventFeed.Visible.Count);
         foreach (var ev in eventFeed.Visible)
@@ -499,12 +523,48 @@ public sealed class GroupsController(
             // one-page no-render pin: null on a single page so the _Pager
             // partial renders nothing). The group is the route (D9) — no
             // filter form; the links carry ?page=N only.
+            // M26 U11 (C-SORT·8) — each section's pager carries **its own**
+            // sort/dir pairs (the U10 Index precedent, the U5 per-surface
+            // allowlist rule): a request with ?sort=title on the group
+            // posts section is preserved across its prev/next, and a
+            // request with ?sort=start on the group events section is
+            // preserved across its prev/next. An unsorted read leaves
+            // both sections' FilterParams empty (byte-identical, C-SORT·2).
             PagerPosts = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, feed.HasMore)
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, pageSize, feed.HasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
             PagerEvents = (eventFeed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, eventFeed.HasMore)
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, pageSize, eventFeed.HasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
+            // M26 U11 (D-SORT·5) — the two list sections' sort controls
+            // (the U10 _Sort precedent, one shared partial; each section
+            // passes its own closed allowlist — F9, no dead options):
+            // the group posts surface (U2 §2.2 row 2: created desc,
+            // modified desc, title asc) and the group events surface
+            // (U2 §2.2 row 6: start asc, created desc — **no** title,
+            // that key is not in the group events allowlist). A surface-
+            // unknown ?sort= key on the group events (e.g. ?sort=title)
+            // falls back to its default (start asc) and the _Sort link
+            // set correctly omits title for that section.
+            SortPosts = SortViewModel.ForRoute(
+                $"/groups/{group.Id}",
+                currentKey: postSort?.Key,
+                currentDir: postSort is { } ps ? (ps.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
+            SortEvents = SortViewModel.ForRoute(
+                $"/groups/{group.Id}",
+                currentKey: eventSort?.Key,
+                currentDir: eventSort is { } es ? (es.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("start", "asc"),
+                    ("created", "desc"),
+                ]),
         });
     }
 
@@ -519,6 +579,18 @@ public sealed class GroupsController(
     // method). A non-visible/denied group ⇒ (null, _) and the action 404s
     // (consistent failure shape across routes; no re-gate in any route).
     private sealed record ActorGroup(string Actor, Kumunita.Core.UserInfo.Group Group);
+
+    // M26 U11 (C-SORT·1) — the group detail page's two closed sort allowlists
+    // (U2 §2.2: row 2 = the group posts feed, row 6 = the group events feed).
+    // Each section's SortViewModel.Options + the SortKeys.Parse call use **its
+    // own** set — F9 (the _Sort link set offers exactly that surface's keys,
+    // no dead options; the group events section has no `title` key, the group
+    // posts section has no `start` key).
+    private static readonly IReadOnlySet<string> GroupPostFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title" };
+
+    private static readonly IReadOnlySet<string> GroupEventFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "start", "created" };
 
     private async Task<ActorGroup?> TryResolveWriteSurface(string id)
     {
@@ -2586,6 +2658,15 @@ public sealed class GroupsController(
         catch (UnauthorizedAccessException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane — a supervised child in the GuardianApproves posture
+            // whose own self-lane was refused (the request was stored + the
+            // guardian notified). A user-presentable error, not a 500 (the
+            // same shape as the community-event <c>Rsvp</c> lane).
+            TempData["error"] = ex.Message;
+            return Redirect($"/groups/{id}/events/{eventId}");
         }
 
         return Redirect($"/groups/{id}/events/{eventId}");

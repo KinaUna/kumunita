@@ -282,7 +282,8 @@
                              data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-title="@row.Title"
-                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
+                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })"
+                             data-event-id="@row.Id">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
                             <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
                         </div>
@@ -338,7 +339,8 @@
                              data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-title="@row.Title"
-                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
+                         data-href="@Url.Action("Detail", "Event", new { id = row.Id })"
+                         data-event-id="@row.Id">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
                             <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
                         </div>
@@ -346,6 +348,49 @@
                 </div>
             </div>
         }
+
+        @* The event-details modal — clicking a chip/block on the calendar
+           opens this with the event's body (one hidden <template> per event,
+           the pool below; the body is rendered server-side through the same
+           MarkdownRenderer the detail page uses). events-calendar-detail.ts
+           intercepts the chip/block click, fills the modal, and opens it via
+           the Bootstrap Modal (the ADR 0071 convention the quick-create modal
+           above also uses); the "Open full page" link targets the chip's own
+           data-href (the detail page, re-authorized per request server-side).
+           No JS → the chips keep their plain-link behavior. *@
+        <div class="modal fade" id="event-detail-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="event-detail-modal-title"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-muted small mb-3" id="event-detail-modal-when"></div>
+                        <div class="rc-body" id="event-detail-modal-body"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <a class="btn btn-outline-secondary" href="#" id="event-detail-modal-full" target="_blank" rel="noopener">
+                            <kw-l key="common.open_full_page">Open full page</kw-l>
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @* The per-event body pool (one <template> per event in the window —
+           the single source of truth for the modal's body content; the
+           chip/block instances carry only data-event-id, and the module
+           clones the matching template's content on click). Hidden; the
+           templates never render on their own. *@
+        <div class="events-detail-body-pool" hidden>
+            @foreach (var row in Model.Events)
+            {
+                <template data-event-id="@row.Id">
+                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(row.Body))</div>
+                </template>
+            }
+        </div>
 
         @* ADR 0081 — the "New event" quick-create modal (the ADR 0071 Bootstrap
            modal convention). The default Start/End is the anchor day at 09:00
@@ -427,6 +472,13 @@
          clicked, re-points the modal's Start/End inputs to that date + hour
          (30-minute snap) and opens the Bootstrap modal. -->
     <script type="module" src="~/js/lib/events-calendar-new.js"></script>
+    <!-- Click a chip/block → open the event-details modal: a delegated click
+         listener on #events-calendar that intercepts clicks on .event-chip /
+         .event-block, fills the #event-detail-modal (title + when + body from
+         the hidden per-event <template> pool), and opens it via the
+         Bootstrap Modal (the ADR 0071 convention). Falls back to a plain
+         navigation when no Bootstrap bundle is present. -->
+    <script type="module" src="~/js/lib/events-calendar-detail.js"></script>
     <!-- The calendar's browser full-screen channel (client/lib/
          calendar-fullscreen.ts, the board's ⛶ sibling): #events-calendar
          becomes the Fullscreen API element; the :fullscreen rules in

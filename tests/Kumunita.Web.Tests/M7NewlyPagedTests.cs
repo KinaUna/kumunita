@@ -4,6 +4,7 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
@@ -80,8 +81,7 @@ public class M7NewlyPagedTests
         }).ToList();
 
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisiblePagedAsync(
-            null, Arg.Any<IReadOnlySet<string>>(), page, Arg.Any<CancellationToken>())
+        announcements.ListVisiblePagedAsync( null, Arg.Any<IReadOnlySet<string>>(), page, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new AnnouncementPage(Items: items, HasMore: true));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -106,7 +106,9 @@ public class M7NewlyPagedTests
         // The route + page size.
         Assert.Equal("/announcements", model.Pager.BaseUrl);
         Assert.Equal(page, model.Pager.CurrentPage);
-        Assert.Equal(30, model.Pager.PageSize);
+        // Anonymous read (no subject) → the platform default page size (the
+        // resident's items-per-page preference is unset; PageSizer.Default).
+        Assert.Equal(Kumunita.Core.Query.PageSizer.Default, model.Pager.PageSize);
         // D9 — no filter form: the links carry ?page=N only.
         Assert.Empty(model.Pager.FilterParams);
     }
@@ -152,9 +154,9 @@ public class M7NewlyPagedTests
         }).ToList();
 
         var tags = Substitute.For<ITagService>();
-        tags.ListPostsByTagPagedAsync(slug, actorId, page, Arg.Any<CancellationToken>())
+        tags.ListPostsByTagPagedAsync(slug, actorId, page, Arg.Any<SortSpec?>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TagPostPage(Items: posts, HasMore: true));
-        tags.ListPagesByTagPagedAsync(slug, actorId, page, Arg.Any<CancellationToken>())
+        tags.ListPagesByTagPagedAsync(slug, actorId, page, Arg.Any<SortSpec?>(), Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TagPagePage(Items: pages, HasMore: true));
         // No tag in the readable set → tag is null → SeedTranslationFormAsync
         // is not called (no real store needed).
@@ -234,7 +236,7 @@ public class M7NewlyPagedTests
         var iEvents = Substitute.For<IEventService>();
         // page: 1 is the floor (the default) — the filter submission did not
         // carry a page number (D7).
-        iEvents.ListUpcomingAsync(componentId, subjectId, 1, Arg.Any<CancellationToken>())
+        iEvents.ListUpcomingAsync( componentId, subjectId, 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(Items: events, HasMore: true));
         iEvents.ListMineAsync(subjectId, Arg.Any<CancellationToken>())
             .Returns(new List<Event>());
@@ -265,8 +267,7 @@ public class M7NewlyPagedTests
         var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
 
         // D7 — the seam received page: 1 (the floor), not a carried page.
-        await iEvents.Received(1).ListUpcomingAsync(
-            componentId, subjectId, 1, Arg.Any<CancellationToken>());
+        await iEvents.Received(1).ListUpcomingAsync( componentId, subjectId, 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
         // The VM's pager reflects page 1 (the filter submission landed on
         // page 1, not the viewer's previous page).
         Assert.NotNull(model.Pager);

@@ -95,6 +95,16 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="unassigned-filter" name="unassignedOnly" value="true" checked="@(Model.UnassignedOnly ? "checked" : null)" />
                     <label class="form-check-label" for="unassigned-filter"><kw-l key="projects.todo.filter_unassigned">Unassigned only</kw-l></label>
                 </div>
+                @* "Assigned to me" — the actor-scoped assignee filter (a
+                   filter, never a gate — C-M5·6): narrows the candidate set
+                   to the to-dos assigned to the viewing actor (the
+                   ClaimTodoAsync shape). The controller resolves it to the
+                   actor's own subject id; it never changes the audience
+                   decision. *@
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="assigned-to-me-filter" name="assignedToMe" value="true" checked="@(Model.AssignedToMe ? "checked" : null)" />
+                    <label class="form-check-label" for="assigned-to-me-filter"><kw-l key="projects.todo.filter_assigned_to_me">Assigned to me</kw-l></label>
+                </div>
                 @* ADR 0087 — the "waiting on" feed filter (D6, the D8 key):
                    narrows the candidate set to to-dos with a blocker; it
                    never narrows the audience decision. *@
@@ -106,6 +116,14 @@
             </div>
         </form>
 
+        @* The shared sort control (the _Sort partial) sits at the TOP of
+           the feed — above the list — so the sort options are the first
+           thing the viewer sees (it renders nothing when the VM field is
+           null, the no-sort pin). *@
+        @if (Model.Sort is not null)
+        {
+            <partial name="_Sort" model="Model.Sort" />
+        }
         <div class="airy-ann-list">
             @if (Model.Todos.Count == 0)
             {
@@ -492,7 +510,8 @@
 
             @* M7 (ADR 0090 D5) — the to-do feed's shared pager (F2 one-page
                no-render pin): the <c>_Pager</c> partial renders nothing when the
-               VM field is null (a one-page feed). *@
+               VM field is null (a one-page feed). (The sort control now lives
+               at the TOP of the feed, above the list.) *@
             @if (Model.Pager is not null)
             {
                 <partial name="_Pager" model="Model.Pager" />

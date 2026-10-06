@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Query;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Search;
 using Kumunita.Web.Controllers;
@@ -95,9 +96,7 @@ public class SearchControllerTests
         await search.DidNotReceiveWithAnyArgs().SearchAsync(
             Arg.Any<string>(), Arg.Any<SearchScope>(), Arg.Any<string?>(),
             Arg.Any<CancellationToken>());
-        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchScope>(),
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync( Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchScope>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -132,9 +131,7 @@ public class SearchControllerTests
         Assert.Null(model.Pager);
 
         await search.Received(1).SearchAsync("community", SearchScope.Community, null, Arg.Any<CancellationToken>());
-        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchScope>(),
-            Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await search.DidNotReceiveWithAnyArgs().SearchSurfaceAsync( Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SearchScope>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -157,7 +154,7 @@ public class SearchControllerTests
     public async Task Search_Index_SingleSurface_RendersPager_WithPageAndQInLinks()
     {
         var search = Substitute.For<ISearchService>();
-        search.SearchSurfaceAsync("posts", "the", SearchScope.Community, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        search.SearchSurfaceAsync( "posts", "the", SearchScope.Community, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new SearchSurfacePage("posts", new List<SearchHit> { PostHit("post-1") }, 1, HasMore: true));
         var controller = Build(search, IsAuthenticated: true, subjectId: "subj-resident-001");
 
@@ -168,12 +165,13 @@ public class SearchControllerTests
         Assert.False(model.IsAll);
         Assert.NotNull(model.Pager);
 
-        // The pager's shape: the /search base route, page 1, the M8 page
-        // size (SearchService.PageSize = 20), HasNext mirroring the seam's
+        // The pager's shape: the /search base route, page 1, the page size
+        // (the resident's items-per-page preference — unset here, so the
+        // platform default; PageSizer.Default), HasNext mirroring the seam's
         // HasMore (D1 — the sole paging signal), no previous (page 1, D5).
         Assert.Equal("/search", model.Pager!.BaseUrl);
         Assert.Equal(1, model.Pager.CurrentPage);
-        Assert.Equal(SearchService.PageSize, model.Pager.PageSize);
+        Assert.Equal(Kumunita.Core.Query.PageSizer.Default, model.Pager.PageSize);
         Assert.True(model.Pager.HasNext);
         Assert.False(model.Pager.HasPrevious);
 
@@ -185,9 +183,7 @@ public class SearchControllerTests
         Assert.Equal("posts", model.Pager.FilterParams["surface"]);
         Assert.Equal("community", model.Pager.FilterParams["scope"]);
 
-        await search.Received(1).SearchSurfaceAsync(
-            "posts", "the", SearchScope.Community, "subj-resident-001", 1,
-            Arg.Any<CancellationToken>());
+        await search.Received(1).SearchSurfaceAsync( "posts", "the", SearchScope.Community, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -341,7 +337,7 @@ public class SearchControllerTests
     public async Task Search_Index_PageFloor_FloorsToOne()
     {
         var search = Substitute.For<ISearchService>();
-        search.SearchSurfaceAsync("posts", "q", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>())
+        search.SearchSurfaceAsync( "posts", "q", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new SearchSurfacePage("posts", new List<SearchHit> { PostHit("post-1") }, 1, HasMore: true));
         var controller = Build(search, IsAuthenticated: true, subjectId: "subj-1");
 
@@ -354,9 +350,7 @@ public class SearchControllerTests
             Assert.Equal(1, model.Page);
             // The service received the floored page (1), not the raw input —
             // Received(1) with the exact floored arg is the precise pin.
-            await search.Received(1).SearchSurfaceAsync(
-                "posts", "q", SearchScope.Community, "subj-1", 1,
-                Arg.Any<CancellationToken>());
+            await search.Received(1).SearchSurfaceAsync( "posts", "q", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
             search.ClearReceivedCalls();
         }
     }
@@ -554,8 +548,7 @@ public class SearchControllerTests
     public async Task Search_Surface_Projects_Accepted()
     {
         var search = Substitute.For<ISearchService>();
-        search.SearchSurfaceAsync(SearchService.ProjectsSurface, "proj",
-            SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>())
+        search.SearchSurfaceAsync( SearchService.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new SearchSurfacePage(
                 "projects",
                 new List<SearchHit>
@@ -574,9 +567,7 @@ public class SearchControllerTests
         Assert.Equal("projects", model.Pager!.FilterParams["surface"]);
         Assert.Equal("proj", model.Pager.FilterParams["q"]);
 
-        await search.Received(1).SearchSurfaceAsync(
-            SearchService.ProjectsSurface, "proj", SearchScope.Community,
-            "subj-1", 1, Arg.Any<CancellationToken>());
+        await search.Received(1).SearchSurfaceAsync( SearchService.ProjectsSurface, "proj", SearchScope.Community, "subj-1", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>

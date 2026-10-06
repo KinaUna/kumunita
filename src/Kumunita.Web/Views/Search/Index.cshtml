@@ -105,6 +105,14 @@
                             }
                         </h2>
                     </div>
+                    @* The shared sort control (the _Sort partial) sits at the TOP
+                       of the section — above the list — so the sort options are
+                       the first thing the viewer sees (it renders nothing when
+                       the VM field is null, the no-sort pin). *@
+                    @if (!Model.IsAll && Model.Sort is not null)
+                    {
+                        <partial name="_Sort" model="Model.Sort" />
+                    }
                     <ul class="list-unstyled">
                         @foreach (var h in hits)
                         {
@@ -121,6 +129,10 @@
                             </li>
                         }
                     </ul>
+                    @* (The sort control now lives at the TOP of the section,
+                       above the list. The `all` shape has neither — its
+                       Sort is null, and the search-box answer has no
+                       pager.) *@
                     @if (!Model.IsAll && Model.Pager is not null)
                     {
                         <partial name="_Pager" model="Model.Pager" />

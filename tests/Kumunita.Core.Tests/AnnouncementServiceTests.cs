@@ -1903,8 +1903,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
 
     /// <summary>
     /// The admin toggle reads as **on** when no settings row exists (the
-    /// <c>true</c> floor — the <c>IsSignupOpen</c> / <c>NotifyAdminsOnSignup</c>
-    /// precedent, ADR 0004 §B.1 additive field).
+    /// <c>true</c> floor — the <c>NotifyAdminsOnSignup</c> precedent, ADR 0004 §B.1
+    /// additive field).
     /// </summary>
     [Fact]
     public async Task AreAnnouncementCommentsEnabled_DefaultOn()

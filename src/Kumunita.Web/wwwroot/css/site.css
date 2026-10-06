@@ -434,6 +434,11 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .navbar-brand {
     color: var(--kmb-cream) !important;
   }
+  /* Toggler icon: Bootstrap's .navbar-light sets it to a dark stroke; flip it
+     to the cream text colour so it reads against the dark surface. */
+  html:not([data-kmb-theme='light']) .navbar {
+    --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+  }
   html:not([data-kmb-theme='light']) .navbar-light .nav-link:hover,
   html:not([data-kmb-theme='light']) .navbar-light .nav-link:focus {
     color: var(--bs-primary-text-emphasis) !important;
@@ -496,6 +501,12 @@ html[data-kmb-theme='dark'] {
     background-color: var(--kmb-tint-a) !important;
     color: var(--kmb-ink) !important;
   }
+  /* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
+     the token flip re-points --bs-dark-rgb to near-white, so the dark ink
+     would render on the amber fill — unreadable. Restore the real dark ink. */
+  html:not([data-kmb-theme='light']) .badge.text-dark {
+    color: #17251d !important;
+  }
   /* .card.text-bg-light (the admin dashboard's count cards): the fill
      re-resolves to the dark surface via the --bs-light token, but the text
      stays Bootstrap's hard-coded black — unreadable on the dark fill.
@@ -507,7 +518,8 @@ html[data-kmb-theme='dark'] {
      makes it a near-white chip with white text — a glaring bright block in
      dark mode. Re-point it to a subtle dark chip with light text, matching
      the .badge.text-bg-light patch above. */
-  html:not([data-kmb-theme='light']) .badge.text-bg-dark {
+  html:not([data-kmb-theme='light']) .badge.text-bg-dark,
+  html:not([data-kmb-theme='light']) .badge.bg-dark {
     background-color: var(--kmb-tint-a) !important;
     color: var(--kmb-ink) !important;
     border-color: var(--kmb-border);
@@ -631,6 +643,11 @@ html[data-kmb-theme='dark'] .bg-white {
 html[data-kmb-theme='dark'] .navbar-brand {
   color: var(--kmb-cream) !important;
 }
+/* Toggler icon: flip Bootstrap's dark .navbar-light stroke to cream so it
+   reads against the dark surface (same fix as the auto dark scope). */
+html[data-kmb-theme='dark'] .navbar {
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28242, 246, 242, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+}
 html[data-kmb-theme='dark'] .navbar-light .nav-link:hover,
 html[data-kmb-theme='dark'] .navbar-light .nav-link:focus {
   color: var(--bs-primary-text-emphasis) !important;
@@ -688,6 +705,12 @@ html[data-kmb-theme='dark'] .badge.text-bg-light {
   background-color: var(--kmb-tint-a) !important;
   color: var(--kmb-ink) !important;
 }
+/* .badge.text-dark (the draft/pending chips on amber, "pending" on light):
+   the token flip re-points --bs-dark-rgb to near-white, so the dark ink
+   would render on the amber fill — unreadable. Restore the real dark ink. */
+html[data-kmb-theme='dark'] .badge.text-dark {
+  color: #17251d !important;
+}
 /* .card.text-bg-light (the admin dashboard's count cards): dark fill +
    Bootstrap's hard-coded black text — flip the text to the light ink. */
 html[data-kmb-theme='dark'] .card.text-bg-light {
@@ -695,7 +718,8 @@ html[data-kmb-theme='dark'] .card.text-bg-light {
 }
 /* .badge.text-bg-dark (the "mandatory" community chip): re-point the
    near-white chip with white text to a subtle dark chip with light text. */
-html[data-kmb-theme='dark'] .badge.text-bg-dark {
+html[data-kmb-theme='dark'] .badge.text-bg-dark,
+html[data-kmb-theme='dark'] .badge.bg-dark {
   background-color: var(--kmb-tint-a) !important;
   color: var(--kmb-ink) !important;
   border-color: var(--kmb-border);
@@ -2511,13 +2535,20 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   margin: 0;
   padding: 0;
 }
-.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 1.5rem; }
+.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 2.75rem; }
+/* A branch's own row (summary) stays flush at every depth — the
+   chevron/title never shift when the branch opens. The separator line
+   moves from the wrapper <li> (zero padding/border) onto the summary
+   itself, so a closed branch shows no blank bordered strip and the
+   separator sits exactly at the child-row boundary when open. */
+.airy-page-list li:has(> .kmb-page-branch) { padding: 0; border-bottom: 0; }
+.airy-page-list .kmb-page-branch > summary { border-bottom: 1px solid var(--kmb-border-soft); }
 /* Depth cue: the old flat list encoded tree depth as 1.25rem of extra
-   padding-left per level — keep that visual language, now carried by
-   each branch's own summary row (a branch's children are never rendered
-   unless it is open, so indenting only *open* branches' rows is safe
-   and unambiguous; no :has() needed). */
-.airy-page-list .kmb-page-branch[open] > summary { padding-left: 2.75rem; }
+   padding-left per level — keep that visual language, now carried by the
+   child rows (2.75rem = the 1.5rem row padding + 1.25rem per level).
+   An inner branch's own summary stays flush; its children indent
+   relative to the parent's 2.75rem, so a nested branch reads slightly
+   further in — a consistent, if non-cumulative, depth signal. */
 
 /* C: directory — the cards grid (the "bigger avatars" overview). */
 .dir-cards {
@@ -2558,7 +2589,8 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   .airy-group-grid { grid-template-columns: 1fr; }
   .airy-page-list li { padding: 0.75rem 1rem; }
   .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
-  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 1rem; }
+  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 2.25rem; }
+  .airy-page-list li:has(> .kmb-page-branch) { padding: 0; }
   /* U05 · post/reply card — M10 (ADR 0107) §Responsive U05 row:
      the .rc-body rendered body's long code spans / unbroken URLs
      overflow the card → truncate (overflow-wrap: anywhere). The
@@ -2624,7 +2656,14 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
    overlap rule so the ring wins the cascade (equal specificity, later wins). */
 .event-chip,
 .event-block {
-  background: color-mix(in srgb, var(--event-color, color-mix(in srgb, var(--kmb-ink) 8%, #fff)) 18%, #fff);
+  /* The tint mixes over the theme's surface (var(--kmb-surface, #fff)) —
+     #fff in light, the Forest dark card surface in dark — so the author's
+     color stays a soft tint on the *current* surface and the theme's ink
+     text (var(--kmb-ink) / --bs-secondary-color, which already flip with the
+     theme) keeps enough contrast on both. A flat #fff base would stay light
+     in dark mode while the text flips light → near-invisible (worst for
+     light author colors, whose tint is closest to pure white). */
+  background: color-mix(in srgb, var(--event-color, color-mix(in srgb, var(--kmb-ink) 8%, var(--kmb-surface, #fff))) 18%, var(--kmb-surface, #fff));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-chip);
 }
@@ -2638,7 +2677,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
    positioning, so it never traps the pointer). */
 .event-chip-overlap {
   box-shadow: 0 0 0 2px var(--kmb-amber-soft);
-  background: color-mix(in srgb, var(--kmb-amber-soft) 14%, #fff);
+  background: color-mix(in srgb, var(--kmb-amber-soft) 14%, var(--kmb-surface, #fff));
 }
 
 /* EV-DWM (ADR 0064, U03) — the Day/Week/Month toggle in the calendar
@@ -2868,7 +2907,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   text-overflow: ellipsis;
 }
 .event-block.event-chip-overlap {
-  background: color-mix(in srgb, var(--kmb-amber-soft) 18%, #fff);
+  background: color-mix(in srgb, var(--kmb-amber-soft) 18%, var(--kmb-surface, #fff));
   border-color: var(--kmb-amber-soft);
 }
 

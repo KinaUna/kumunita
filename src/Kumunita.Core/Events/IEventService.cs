@@ -1,3 +1,4 @@
+using Kumunita.Core.Query;
 using Marten;
 
 namespace Kumunita.Core.Events;
@@ -41,7 +42,8 @@ public interface IEventService
     /// (C-M7·5).
     /// </para>
     /// </summary>
-    Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+    Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// The <b>past events</b> lane (ADR 0109, the <c>EV-PAST</c> lane) — the
@@ -72,7 +74,8 @@ public interface IEventService
     /// precedent).
     /// </para>
     /// </summary>
-    Task<EventPage> ListPastAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+    Task<EventPage> ListPastAsync(string? componentId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set
@@ -182,7 +185,8 @@ public interface IEventService
     /// **Zero** candidates ⇒ an empty result, **no** row (a non-member's empty feed
     /// is the same shape, distinguished only by the audit row).
     /// </summary>
-    Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page, CancellationToken ct = default);
+    Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page,
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// One group event, **fail-closed** (ADR 0089 GE·1/GE·4): <c>null</c> for a
@@ -302,6 +306,141 @@ public interface IEventService
     /// same posture as a profile edit).
     /// </summary>
     Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default);
+
+    /// <summary>
+    /// The lane — the guardian's <b>approval</b> of a supervised child's
+    /// event-attendance request (the <see cref="RsvpStatus"/> the child asked
+    /// for, stored on the <see cref="GuardianEventRequest"/>). The child's
+    /// own <see cref="RsvpAsync"/> self-lane was refused (the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
+    /// posture) and a <see cref="GuardianEventRequest"/> row was stored
+    /// instead; this seam resolves it: the child's <see cref="EventRsvp"/>
+    /// row is written with the request's <see cref="GuardianEventRequest
+    /// .DesiredStatus"/>, the request row moves <see
+    /// cref="GuardianEventRequestStatus.Pending"/> →
+    /// <see cref="GuardianEventRequestStatus.Approved"/>, and one
+    /// <c>guardian.event_rsvp_approve</c> audit row (<see
+    /// cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) is written —
+    /// the GU <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .ApproveGroupInvitationAsync"/> / <see cref
+    /// "Kumunita.Core.UserInfo.IUserInfoService.RejectGroupInvitationAsync" />
+    /// pair re-expressed over events.
+    /// <para>
+    /// **Standing gate:** the actor must hold an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the request's
+    /// child (the GU G·2/G·3 deny-by-default; a non-guardian / dissolved link
+    /// is a <see cref="UnauthorizedAccessException"/> — the Web's 404).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, or
+    /// there is no <see cref="GuardianEventRequest"/> for this (event, child)
+    /// pair — the 404 "absent" observable (no leak).</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no active
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the request's
+    /// child — the GU deny-by-default (the Web's 404).</exception>
+    /// <exception cref="InvalidOperationException">The request is not
+    /// <see cref="GuardianEventRequestStatus.Pending"/> (already resolved — a
+    /// re-approval over a resolved row is refused; the
+    /// <see cref="GuardianEventRequest"/> state-machine pin).</exception>
+    Task<GuardianEventRequest> ApproveEventRsvpAsync(
+        string eventId, string childId, string guardianId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The lane — the guardian's <b>denial</b> of a supervised child's
+    /// event-attendance request: the request row moves <see
+    /// cref="GuardianEventRequestStatus.Pending"/> →
+    /// <see cref="GuardianEventRequestStatus.Denied"/>, <b>no</b>
+    /// <see cref="EventRsvp"/> row is written (the child did not attend), and
+    /// one <c>guardian.event_rsvp_deny</c> audit row (<see
+    /// cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) is written —
+    /// the GU <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .RejectGroupInvitationAsync"/> shape verbatim (a self-lane refusal,
+    /// no content write).
+    /// <para>
+    /// **Standing gate:** the actor must hold an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the request's
+    /// child (the GU G·2/G·3 deny-by-default; a non-guardian / dissolved link
+    /// is a <see cref="UnauthorizedAccessException"/> — the Web's 404).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, or
+    /// there is no <see cref="GuardianEventRequest"/> for this (event, child)
+    /// pair — the 404 "absent" observable (no leak).</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no active
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the request's
+    /// child — the GU deny-by-default (the Web's 404).</exception>
+    /// <exception cref="InvalidOperationException">The request is not
+    /// <see cref="GuardianEventRequestStatus.Pending"/> (already resolved — a
+    /// re-denial over a resolved row is refused; the
+    /// <see cref="GuardianEventRequest"/> state-machine pin).</exception>
+    Task<GuardianEventRequest> DenyEventRsvpAsync(
+        string eventId, string childId, string guardianId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The lane — the guardian's <b>veto</b> (removal) of a supervised
+    /// child's <b>existing</b> <see cref="EventRsvp"/> row, in the
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies" />
+    /// posture (auto-approve + veto): the child's own <see cref="RsvpAsync"
+    /// /> self-lane wrote the row freely, the guardian was notified, and now
+    /// the guardian removes it (a hard ceiling over the child's own choice —
+    /// the <see cref="Kumunita.Core.UserInfo.Profile
+    /// .MessagingRestricted" /> veto shape). The child's <see
+    /// cref="EventRsvp"/> row is deleted (a fresh self-RSVP re-creates it —
+    /// the veto is one-time over that row, not a standing ban; the lane's
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode" />
+    /// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianApproves"/>
+    /// posture is the standing-ban shape). One
+    /// <c>guardian.event_rsvp_veto</c> audit row (<see
+    /// cref="Kumunita.Core.Authorization.AccessVia.Guardian"/>) is written.
+    /// <para>
+    /// **Standing gate:** the actor must hold an <b>active</b>
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the child (the
+    /// GU G·2/G·3 deny-by-default; a non-guardian / dissolved link is a
+    /// <see cref="UnauthorizedAccessException"/> — the Web's 404).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The event id is not found, or
+    /// the child has no <see cref="EventRsvp"/> row for it — the 404
+    /// "absent" observable (no leak; a veto over nothing is a no-op that the
+    /// Web surfaces as a user-presentable error).</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor has no active
+    /// <see cref="Kumunita.Core.UserInfo.GuardianLink"/> over the child — the
+    /// GU deny-by-default (the Web's 404).</exception>
+    Task VetoEventRsvpAsync(string eventId, string childId, string guardianId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The lane — the guardian's read of a supervised child's <b>pending</b>
+    /// event-attendance requests (the <see cref
+    /// "GuardianEventRequestStatus.Pending"/> rows where
+    /// <see cref="GuardianEventRequest.ChildId"/> =
+    /// <paramref name="childId"/>, the <see cref="GuardianApproves"/> posture's
+    /// approve/deny list). A read, not a decision (the
+    /// <see cref="GetMyRsvpAsync"/> posture): no
+    /// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/> call, no
+    /// audit row; the standing gate (an active <see cref
+    /// "Kumunita.Core.UserInfo.GuardianLink" /> over the child) is the
+    /// Web layer's responsibility (the Detail GET's
+    /// <c>ActiveLinkAsync</c> check — a non-guardian learns nothing).
+    /// Ordered by <see cref="GuardianEventRequest.RequestedAt"/> descending
+    /// (most recent first — the pending-requests card's shape).
+    /// </summary>
+    Task<IReadOnlyList<GuardianEventRequest>> GetPendingEventRsvpRequestsAsync(
+        string childId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The lane — the guardian's read of a supervised child's <b>existing</b>
+    /// <see cref="EventRsvp"/> rows (the <see cref
+    /// "Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies"/> posture's
+    /// veto list: every event the child currently has an RSVP on). A read, not
+    /// a decision (the <see cref="GetMyRsvpAsync"/> posture): no
+    /// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/> call,
+    /// no audit row; the standing gate (an active <see cref
+    /// "Kumunita.Core.UserInfo.GuardianLink" /> over the child) is the Web
+    /// layer's responsibility. Ordered by <see cref="EventRsvp.At"/> descending
+    /// (most recent first).
+    /// </summary>
+    Task<IReadOnlyList<EventRsvp>> GetChildRsvpsAsync(
+        string childId, CancellationToken ct = default);
 
     // --- Translation lanes (ADR 0059 — the "follow-on lane" ADR 0054 deferred) --
     //

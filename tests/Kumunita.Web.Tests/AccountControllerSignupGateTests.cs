@@ -13,8 +13,9 @@ namespace Kumunita.Web.Tests;
 
 /// <summary>
 /// Verifies the <see cref="AccountController.Signup"/> gate (ADR 0050) — the
-/// admin-settled instance value (<c>IsSignupOpenAsync</c>, the <c>true</c>
-/// floor) that flips the self-service sign-up surface between <b>open</b> (the
+/// admin-settled instance value (<c>IsSignupOpenAsync</c>, the <c>false</c>
+/// floor — a fresh instance ships invitation-only) that flips the self-service
+/// sign-up surface between <b>open</b> (the
 /// form + the <c>RegisterAsync</c> write) and <b>invitation-only</b> (the static
 /// <c>SignupClosed</c> notice, and the write refused).
 /// <list type="bullet">

@@ -116,6 +116,18 @@ public sealed class FeedViewModel
     /// no viewer-facing total (C-M7·7 — banned).
     /// </summary>
     public PagedViewModel? Pager { get; set; }
+
+    /// <summary>
+    /// M26 U10 (D-SORT·5) — the one shared sort control: the <c>_Sort</c>
+    /// partial's model. The <see cref="Kumunita.Web.Models.SortViewModel"/>
+    /// carries the surface's <b>closed</b> allowlist (F9 — the control offers
+    /// exactly those keys, no dead options); <c>null</c> renders nothing (the
+    /// no-sort pin — the <c>_Pager</c> null ⇒ no partial precedent). This
+    /// reference surface (the community post feed) always sets it; U11–U15
+    /// reuse the same partial per-surface with their own allowed-key
+    /// <see cref="Kumunita.Web.Models.SortViewModel.Options"/>.
+    /// </summary>
+    public SortViewModel? Sort { get; set; }
 }
 
 /// <summary>

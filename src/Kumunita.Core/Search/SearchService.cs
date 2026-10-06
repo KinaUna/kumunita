@@ -6,6 +6,7 @@ using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -174,9 +175,11 @@ public sealed class SearchService : ISearchService
 
     public async Task<SearchSurfacePage> SearchSurfaceAsync(
         string surface, string q, SearchScope scope, string actorId, int page,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
         var query = (q ?? string.Empty).Trim();
         if (query.Length == 0)
             return new SearchSurfacePage(surface, Array.Empty<SearchHit>(), page, false);
@@ -211,10 +214,36 @@ public sealed class SearchService : ISearchService
         };
         await session.SaveChangesAsync(ct);
 
+        // M26 (design §2.2 row 18, §2.3 row 18) — the SearchHit ordering
+        // applies **in-memory over `visible`**, before the Skip/Take, and
+        // **only** when `sort` is non-null (C-SORT·2 — `null` keeps the
+        // per-surface `OrderByDescending(Created)` byte-for-byte, the pinned
+        // per-surface order is exactly the `visible` list's existing order).
+        if (sort is not null)
+        {
+            visible = sort.Key switch
+            {
+                "created" => (sort.Descending
+                    ? visible.OrderByDescending(h => h.Created)
+                    : visible.OrderBy(h => h.Created))
+                    .ThenBy(h => h.Id).ToList(),
+                "title" => (sort.Descending
+                    ? visible.OrderByDescending(h => h.Title ?? "", StringComparer.OrdinalIgnoreCase)
+                    : visible.OrderBy(h => h.Title ?? "", StringComparer.OrdinalIgnoreCase))
+                    .ThenBy(h => h.Id).ToList(),
+                // C-SORT·1 / F4 — a key outside the closed allowlist (`created` +
+                // `title` only — relevance is NOT a sort key, M8 frozen) falls back
+                // to the surface's **pinned default** (created, desc) — the
+                // spec's own direction is meaningless for an out-of-allowlist key
+                // (the U8 `TagPeopleSortSupport` `defaultDir` shape, unchanged).
+                _ => visible.OrderByDescending(h => h.Created).ThenBy(h => h.Id).ToList(),
+            };
+        }
+
         // ADR 0090 D1/D3 — HasMore is the sole paging signal, over the *visible*
         // set (never the candidate count — C-M8·4 / C-M7·7).
-        var hasMore = visible.Count > page * PageSize;
-        var hits = visible.Skip((page - 1) * PageSize).Take(PageSize).ToList();
+        var hasMore = visible.Count > page * ps;
+        var hits = visible.Skip((page - 1) * ps).Take(ps).ToList();
         return new SearchSurfacePage(surface, hits, page, hasMore);
     }
 

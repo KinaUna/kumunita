@@ -323,6 +323,14 @@
                     }
                 </div>
 
+                @* The shared sort control (the _Sort partial) sits at the TOP
+                   of the section — above the list — so the sort options are
+                   the first thing the viewer sees (it renders nothing when
+                   the VM field is null, the no-sort pin). *@
+                @if (Model.SortPosts is not null)
+                {
+                    <partial name="_Sort" model="Model.SortPosts" />
+                }
                 @if (Model.GroupPosts.Count == 0)
                 {
                     <p class="text-muted">
@@ -344,24 +352,21 @@
                             string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
                                 ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
                                 : string.Empty;
-                            <li class="list-group-item d-flex justify-content-between align-items-start">
-                                <div class="pe-3">
-                                    <a href="@($"/groups/{Model.GroupId}/posts/{p.Id}")"
-                                       class="text-decoration-none fw-semibold">
-                                        @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
-                                    </a>
-                                    <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
-                                </div>
-                                <div class="text-end text-muted small">
-                                    <div class="d-flex align-items-center justify-content-end gap-1">
-                                        <span class="d-inline-flex align-items-center">
-                                            <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
-                                                 data-avatar-fallback>
-                                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
-                                        </span>
-                                        <span>@p.AuthorDisplayName</span>
-                                    </div>
-                                    <div><kw-dt dt="@p.Created" format="g"></kw-dt></div>
+                            <li class="list-group-item">
+                                <a href="@($"/groups/{Model.GroupId}/posts/{p.Id}")"
+                                   class="text-decoration-none fw-semibold">
+                                    @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
+                                </a>
+                                <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
+                                <div class="airy-post-meta">
+                                    <span class="d-inline-flex align-items-center">
+                                        <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                             data-avatar-fallback>
+                                        <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                    </span>
+                                    <span>@p.AuthorDisplayName</span>
+                                    <span>·</span>
+                                    <span><kw-dt dt="@p.Created" format="g"></kw-dt></span>
                                 </div>
                             </li>
                         }
@@ -372,7 +377,8 @@
                        is never viewer-facing). *@
                     @* M7 (ADR 0090 D5) — the group-posts section pager (F2
                        one-page no-render pin): the <c>_Pager</c> partial renders
-                       nothing when the VM field is null. *@
+                       nothing when the VM field is null. (The sort control now
+                       lives at the TOP of the section, above the list.) *@
                     @if (Model.PagerPosts is not null)
                     {
                         <partial name="_Pager" model="Model.PagerPosts" />
@@ -389,6 +395,14 @@
                     }
                 </div>
 
+                @* The shared sort control (the _Sort partial) sits at the TOP
+                   of the section — above the list — so the sort options are
+                   the first thing the viewer sees (it renders nothing when
+                   the VM field is null, the no-sort pin). *@
+                @if (Model.SortEvents is not null)
+                {
+                    <partial name="_Sort" model="Model.SortEvents" />
+                }
                 @if (Model.GroupEvents.Count == 0)
                 {
                     <p class="text-muted">
@@ -438,7 +452,8 @@
                        is never viewer-facing). *@
                     @* M7 (ADR 0090 D5) — the group-events section pager (F2
                        one-page no-render pin): the <c>_Pager</c> partial renders
-                       nothing when the VM field is null. *@
+                       nothing when the VM field is null. (The sort control now
+                       lives at the TOP of the section, above the list.) *@
                     @if (Model.PagerEvents is not null)
                     {
                         <partial name="_Pager" model="Model.PagerEvents" />

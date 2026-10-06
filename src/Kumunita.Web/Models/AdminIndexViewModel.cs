@@ -50,7 +50,7 @@ public sealed class AdminIndexViewModel
     /// reserved slot for a future picker UI — the Core API already carries
     /// it, so a later form can surface it without a schema change.
     /// </summary>
-    public sealed class CommunityRow
+    public class CommunityRow
     {
         public string Id { get; init; } = string.Empty;
         public string Name { get; init; } = string.Empty;

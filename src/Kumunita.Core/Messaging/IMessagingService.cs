@@ -69,14 +69,14 @@ public interface IMessagingService
     /// participants — non-leaky (D3/D4, C-M9·1).
     /// </para>
     /// </summary>
-    Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page);
+    Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page, int? pageSize = null);
 
     /// <summary>
     /// List the actor's conversations, newest-activity-first, with the
     /// <c>HasMore</c> paging signal (the ADR 0090 record-return shape).
     /// <paramref name="page"/> floors to 1.
     /// </summary>
-    Task<ConversationList> ListConversationsAsync(string actorId, int page);
+    Task<ConversationList> ListConversationsAsync(string actorId, int page, int? pageSize = null);
 
     /// <summary>
     /// Send one plain-text message to the conversation (D7 — cap ≤

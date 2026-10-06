@@ -69,7 +69,9 @@ public interface ISearchService
     /// <param name="actorId">The acting account (the Web layer guarantees a non-empty value; anonymous group scope degrades to community-only per D3).</param>
     /// <param name="page">The page (floored to 1).</param>
     /// <param name="ct">Cancellation.</param>
+    /// <param name="sort">The resolved sort (M26, design §2.2 row 18). <c>null</c> = the pinned per-surface <c>OrderByDescending(Created)</c> is preserved exactly (C-SORT·2). Non-null applies the closed allowlist (<c>created</c> / <c>title</c>) + the <c>.ThenBy(Id)</c> tie-breaker (C-SORT·5).</param>
     Task<SearchSurfacePage> SearchSurfaceAsync(
         string surface, string q, SearchScope scope, string actorId, int page,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        Kumunita.Core.Query.SortSpec? sort = null, int? pageSize = null);
 }

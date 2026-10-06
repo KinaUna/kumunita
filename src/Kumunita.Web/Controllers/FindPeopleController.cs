@@ -1,3 +1,4 @@
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -29,7 +30,13 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("people")]
-public sealed class FindPeopleController(IProfileFindService find) : Controller
+public sealed class FindPeopleController(
+    IProfileFindService find,
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    IUserInfoService? userInfo = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -55,7 +62,9 @@ public sealed class FindPeopleController(IProfileFindService find) : Controller
     public async Task<IActionResult> Index(
         [FromQuery] string? bio = null,
         [FromQuery] string? tag = null,
-        [FromQuery] int page = 1)
+        [FromQuery] int page = 1,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null)
     {
         var viewer = SubjectId(User) ?? string.Empty;
 
@@ -71,8 +80,24 @@ public sealed class FindPeopleController(IProfileFindService find) : Controller
             // Trim before the service call (the D4 substring engine) and the
             // view model (the U05 test Face 2 pin: trimmed query).
             var trimmed = bio.Trim();
-            var result = await find.FindPeopleByBioAsync(trimmed, viewer, page);
-            return View("Bio", new FindPeopleBioViewModel(trimmed, result, page));
+            // M26 U14 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+            // Web-only: parse against the by-bio find's closed allowlist
+            // (U2 §2.2 row 17 — <c>name</c> only, correction C-2) — or null
+            // when the viewer chose no sort (C-SORT·2, F1 — the seam keeps
+            // its current unsorted order exactly).
+            var bioSort = ParsePeopleSort(sort, dir);
+            // The resident's items-per-page preference (FeedPaging resolves
+            // Profile.PageSize → PageSizer default/clamp); a no-actor read or
+            // a missing seam uses the platform default.
+            int pageSize = await FeedPaging.PageSizeAsync(userInfo, viewer);
+            var result = await find.FindPeopleByBioAsync(trimmed, viewer, page, sort: bioSort, pageSize: pageSize);
+            // M26 U14 (D-SORT·5) — the one shared sort control (the U10
+            // _Sort reference, reused verbatim — C-SORT·1): the closed row 17
+            // allowlist (<c>name</c> → <c>DisplayName</c>, asc).
+            return View("Bio", new FindPeopleBioViewModel(trimmed, result, page, pageSize)
+            {
+                Sort = PeopleSortViewModel("/people", bioSort, sort, dir),
+            });
         }
         // The default index: the two find forms (no results yet).
         return View(new FindPeopleIndexViewModel());
@@ -95,10 +120,70 @@ public sealed class FindPeopleController(IProfileFindService find) : Controller
     [HttpGet("tag/{slug}")]
     public async Task<IActionResult> ByTag(
         [FromRoute] string slug,
-        [FromQuery] int page = 1)
+        [FromQuery] int page = 1,
+        [FromQuery] string? sort = null,
+        [FromQuery] string? dir = null)
     {
         var viewer = SubjectId(User) ?? string.Empty;
-        var result = await find.FindPeopleByTagAsync(slug, viewer, page);
-        return View("Tag", new FindPeopleTagViewModel(slug, result, page));
+        // M26 U14 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against the by-tag find's closed allowlist (U2 §2.2
+        // row 16 — <c>name</c> only, correction C-2) — or null when the
+        // viewer chose no sort (C-SORT·2, F1 — the seam keeps its current
+        // unsorted order exactly; the frozen <c>CanSeeAsync</c> gate /
+        // <c>HasMore</c> / <c>Skip</c>/<c>Take</c> are untouched, C-SORT·4).
+        var tagSort = ParsePeopleSort(sort, dir);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read or
+        // a missing seam uses the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, viewer);
+        var result = await find.FindPeopleByTagAsync(slug, viewer, page, sort: tagSort, pageSize: pageSize);
+        // M26 U14 (D-SORT·5) — the one shared sort control (the U10
+        // _Sort reference, reused verbatim — C-SORT·1): the closed row 16
+        // allowlist (<c>name</c> → <c>DisplayName</c>, asc).
+        return View("Tag", new FindPeopleTagViewModel(slug, result, page, pageSize)
+        {
+            Sort = PeopleSortViewModel($"/people/tag/{Uri.EscapeDataString(slug.Trim())}", tagSort, sort, dir),
+        });
     }
+
+    // M26 U14 (C-SORT·1) — the people-find surfaces' closed sort allowlist
+    // (U2 §2.2 rows 16/17 — <c>name</c> → <c>Profile.DisplayName</c>
+    // (<c>OrdinalIgnoreCase</c>) only, correction C-2 — <c>Profile</c> has
+    // no <c>Created</c>; the Core's <c>OrderByPeopleSort</c> call site's own
+    // <c>defaultDir: false</c> (the pinned asc default), so the Web parse
+    // matches the seam exactly).
+    private static readonly IReadOnlySet<string> PeopleFindAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "name" };
+
+    // M26 U14 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (?dir= alone is not a sort
+    // choice; C-SORT·2, F1).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U14 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // people-find's closed allowlist (the pinned <b>asc</b> <c>name</c>
+    // default — rows 16/17) — or null when the viewer chose no sort.
+    private static SortSpec? ParsePeopleSort(string? sort, string? dir)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, PeopleFindAllowedKeys, "name", defaultDir: false)
+            : null;
+
+    // M26 U14 (D-SORT·5 / C-SORT·8) — the one shared sort control (the U10
+    // _Sort reference, reused verbatim — C-SORT·1) for the people-find
+    // surfaces: the closed row 16/17 allowlist (<c>name</c> →
+    // <c>DisplayName</c>, asc) + <c>CarriedParams</c> carrying the
+    // sort/dir pairs only when the request carried them (U11's
+    // <c>SortViewModel.SortFilterParams</c> helper, reused — not
+    // re-derived) so the "Older" next-link keeps the sort across windows
+    // (C-SORT·8); an unsorted read carries nothing (C-SORT·2).
+    private static SortViewModel PeopleSortViewModel(string baseUrl, SortSpec? sort, string? sortParam, string? dirParam)
+        => SortViewModel.ForRoute(
+            baseUrl,
+            currentKey: sort?.Key,
+            currentDir: sort is { } s ? (s.Descending ? "desc" : "asc") : null,
+            options: [
+                ("name", "asc"),
+            ],
+            carriedParams: SortViewModel.SortFilterParams(sortParam, dirParam));
 }

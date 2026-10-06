@@ -2,6 +2,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -114,12 +115,22 @@ public sealed class PostsController(
     /// §2.3 row 1 (unauth) is the <see cref="AuthorizeAttribute"/>.
     /// </summary>
     [HttpGet("/community/{componentId}")]
-    public async Task<IActionResult> Index([FromRoute] string componentId, int page = 1)
+    public async Task<IActionResult> Index([FromRoute] string componentId, int page = 1,
+        string? sort = null, string? dir = null)
     {
         if (string.IsNullOrEmpty(componentId))
             return NotFound();
 
         var actor = SubjectId(User) ?? string.Empty;
+
+        // M26 U10 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is Web-only:
+        // read the query params, parse against the surface's closed allowlist
+        // (the Core SortKeys.Parse), pass the resolved SortSpec? to the seam.
+        // A null pair (the viewer chose no sort) → null SortSpec → the seam's
+        // current hardcoded order exactly (C-SORT·2, F1).
+        var feedSort = HasSortParam(sort, dir)
+            ? SortKeys.Parse(sort, dir, PostFeedAllowedKeys, "created", defaultDir: true)
+            : null;
 
         // §2.3 row 2 — the missing/disabled-component 404. The
         // <see cref="IUserInfoService.GetComponentsAsync(bool)"/>
@@ -156,7 +167,12 @@ public sealed class PostsController(
                 return NotFound();
         }
 
-        var feed = await posts.ListFeedAsync(componentId, actor, page: page);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses the
+        // platform default. Passed to the seam (the Skip/Take window) and the
+        // pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListFeedAsync(componentId, actor, page: page, sort: feedSort, pageSize: pageSize);
 
         // Whether the current viewer holds a posting right on *this* community —
         // the exact rule the composer's POST gate enforces (AccessibleComponentsAsync
@@ -253,13 +269,55 @@ public sealed class PostsController(
             // viewer with no reachable communities renders no pill directory;
             // a GlobalAdmin still sees every enabled community.
             Communities = accessibleLinks,
-            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on
-            // a single page so the _Pager partial renders nothing. No filter
-            // form on this surface (D9) — the links carry ?page=N only.
-            Pager = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/community/{componentId}", page, 30, feed.HasMore)
-                : null,
+            // M26 U10 (C-SORT·8) — the pager-carry rule: when the request
+            // carried a sort (a non-blank ?sort=), the sort/dir pairs join the
+            // pager's FilterParams so prev/next preserve the sort across HasMore
+            // windows. An unsorted read leaves the FilterParams empty —
+            // byte-identical to pre-M26 (C-SORT·2).
+            Pager = BuildFeedPager(componentId, page, pageSize, feed.HasMore, sort, dir),
+            // M26 U10 (D-SORT·5) — the one shared sort control. Non-null here
+            // because this surface offers sorting; the _Sort partial renders
+            // the link set over the closed allowlist (created/modified/title).
+            // A null Sort (a no-sort surface, U11–U15) would render nothing
+            // (the _Pager null ⇒ no partial precedent).
+            Sort = SortViewModel.ForRoute(
+                $"/community/{componentId}",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
         });
+    }
+
+    // M26 U10 (C-SORT·1) — the community post feed's closed sort allowlist
+    // (design §2.2 row 1: created/modified/title; surface default created desc).
+    private static readonly IReadOnlySet<string> PostFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title" };
+
+    // M26 U10 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified one (a non-blank key). ?dir= alone (no key) is not
+    // a sort choice; the seam sees null → the default order (C-SORT·2, F1).
+    private static bool HasSortParam(string? sort, string? dir)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U10 (C-SORT·8) — build the pager's FilterParams: the existing
+    // page/filters (none on this surface, D9) + the sort/dir pairs only when
+    // the request carried them (a non-blank ?sort=). The existing Pager/HasMore
+    // behavior is otherwise untouched (the one-page no-render null is
+    // preserved). The pairs echo the request's own values (the way the M7
+    // filters ride along) so prev/next preserve the sort across windows.
+    private static PagedViewModel? BuildFeedPager(
+        string componentId, int page, int pageSize, bool hasMore, string? sort, string? dir)
+    {
+        if (page <= 1 && !hasMore)
+            return null;
+
+        return PagedViewModel.ForRoute(
+            $"/community/{componentId}", page, pageSize, hasMore,
+            SortViewModel.SortFilterParams(sort, dir));
     }
 
     // ── All-sections feed (GET /community) ────────────────────────────────
@@ -285,9 +343,15 @@ public sealed class PostsController(
     /// </para>
     /// </summary>
     [HttpGet("/community")]
-    public async Task<IActionResult> AllSections(int page = 1)
+    public async Task<IActionResult> AllSections(int page = 1, string? sort = null, string? dir = null)
     {
         var actor = SubjectId(User) ?? string.Empty;
+
+        // M26 U11 (C-SORT·3) — same Web-only sort mapping as the Index reference
+        // surface (U10); the allowlist is the same post-feed set (created/modified/title).
+        var feedSort = HasSortParam(sort, dir)
+            ? SortKeys.Parse(sort, dir, PostFeedAllowedKeys, "created", defaultDir: true)
+            : null;
 
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
         // The viewer's posting reach is the same rule the composer's POST gate uses
@@ -300,19 +364,33 @@ public sealed class PostsController(
 
         if (components.Count == 0)
         {
+            // M26 U11 (D-SORT·5) — the sort control is offered even on the
+            // empty-feed shape (the same U10 Index precedent): the closed
+            // allowlist is a surface property, not a data property, and the
+            // control's links are well-formed (an empty page) when clicked.
             return View("Index", new FeedViewModel
             {
                 ComponentName = "Community",
                 Items = [],
                 Total = 0,
                 CanPost = false, // no communities at all, so no posting right to offer
+                Sort = SortViewModel.ForRoute(
+                    "/community",
+                    currentKey: feedSort?.Key,
+                    currentDir: feedSort is { } empty ? (empty.Descending ? "desc" : "asc") : null,
+                    options: [
+                        ("created", "desc"),
+                        ("modified", "desc"),
+                        ("title", "asc"),
+                    ]),
             });
         }
 
         var componentIds = components.Select(c => c.Id).ToList();
         var nameByComponentId = components.ToDictionary(c => c.Id, c => c.Name);
 
-        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page);
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page, sort: feedSort, pageSize: pageSize);
 
         // ADR 0051 — the all-sections feed shows each post + its section name in
         // the viewer's current language when a translation exists, else the
@@ -370,9 +448,27 @@ public sealed class PostsController(
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on
             // a single page so the _Pager partial renders nothing. No filter
             // form on this surface (D9) — the links carry ?page=N only.
+            // M26 U11 (C-SORT·8) — the pager-carry rule (the U10 Index
+            // reference, reused): when the request carried a sort (a non-blank
+            // ?sort=), the sort/dir pairs join the pager's FilterParams so
+            // prev/next preserve the sort. An unsorted read leaves the
+            // FilterParams empty — byte-identical to pre-M26 (C-SORT·2).
             Pager = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/community", page, 30, feed.HasMore)
+                ? PagedViewModel.ForRoute("/community", page, pageSize, feed.HasMore,
+                    SortViewModel.SortFilterParams(sort, dir))
                 : null,
+            // M26 U11 (D-SORT·5) — the one shared sort control (the U10
+            // reference, reused — no fork): the closed post-feed allowlist
+            // (created desc, modified desc, title asc — design §2.2 row 1).
+            Sort = SortViewModel.ForRoute(
+                "/community",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } fs ? (fs.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
         });
     }
 

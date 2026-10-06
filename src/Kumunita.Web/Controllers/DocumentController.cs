@@ -1,6 +1,7 @@
 using Kumunita.Core.Documents;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
+using Kumunita.Core.Query;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Marten;
@@ -44,7 +45,12 @@ public sealed class DocumentController(
     // keeps compiling and resolves the flash to the raw key floor; DI always
     // supplies the live ITranslationProvider + ILocalizationService in the app.
     ILocalizationService? localization = null,
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    Kumunita.Core.UserInfo.IUserInfoService? userInfo = null) : Controller
 {
     /// <summary>
     /// Resolves a <c>documents.*</c> kw-l key to the operator's effective
@@ -68,15 +74,27 @@ public sealed class DocumentController(
     // ── GET /documents — the repository feed (D4, C-M21·3) ────────────────
     [HttpGet("/documents")]
     [Authorize]
-    public async Task<IActionResult> Index(int page = 1)
+    public async Task<IActionResult> Index(int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = KumunitaPrincipal.SubjectId(User);
         if (actorId is null) return Unauthorized();
 
+        // M26 U13 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against the documents' closed allowlist (row 12:
+        // created/modified/title + this surface's own `size` key), or null
+        // when the viewer chose no sort (C-SORT·2, F1 — the seam keeps its
+        // pinned Created-desc order).
+        var feedSort = ParseSort(sort, dir, DocumentFeedAllowedKeys);
+
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read or a
+        // missing seam uses the platform default. Passed to the seam (the
+        // Skip/Take window).
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         // One CanSeeAsync (aggregate row) over the candidate set — the service's
         // C-M21·3 shape. The view model never carries the hidden count (F1:
         // the feed does not leak "how many you cannot see").
-        var result = await documents.ListAsync(actorId, page);
+        var result = await documents.ListAsync(actorId, page, sort: feedSort, pageSize: pageSize);
         var vm = new DocumentIndexViewModel(
             Visible: result.Visible,
             HasMore: result.HasMore,
@@ -84,8 +102,44 @@ public sealed class DocumentController(
             // D5 — the upload standing, resolved once at the boundary (the
             // view (U04) shows/hides the "Upload" link without re-resolving).
             CanUpload: KumunitaPrincipal.IsGlobalAdmin(User) || KumunitaPrincipal.IsModerator(User));
-        return View("Index", vm);
+
+        // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort
+        // reference, reused verbatim — C-SORT·1): the closed documents
+        // allowlist (U2 §2.2 row 12 — created/modified/title/size), no dead
+        // options (F9 — the `size` key is only on this surface).
+        var sortVm = SortViewModel.ForRoute(
+            "/documents",
+            currentKey: feedSort?.Key,
+            currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+            options: [
+                ("created", "desc"),
+                ("modified", "desc"),
+                ("title", "asc"),
+                ("size", "desc"),
+            ]);
+
+        return View("Index", vm with { Sort = sortVm });
     }
+
+    // M26 U13 (C-SORT·1) — the documents feed's closed sort allowlist
+    // (U2 §2.2 row 12: created/modified/title/size; surface default created
+    // desc; `size` → the non-null SizeBytes long — this surface's own key,
+    // F9).
+    private static readonly IReadOnlySet<string> DocumentFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title", "size" };
+
+    // M26 U13 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (?dir= alone is not a sort
+    // choice; C-SORT·2, F1).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U13 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // surface's closed allowlist — or null when the viewer chose no sort.
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: true)
+            : null;
 
     // ── GET /documents/{id} — the detail (D7, C-M21·4) ─────────────────────
     [HttpGet("/documents/{id}")]
@@ -325,7 +379,7 @@ public sealed class DocumentController(
     // ── GET /documents/new — the compose form (D5) ─────────────────────────
     [HttpGet("/documents/new")]
     [Authorize]
-    public IActionResult New()
+    public IActionResult New([Bind] DocumentUploadViewModel? form = null)
     {
         // D5 — the upload standing gate (Web boundary). A non-eligible actor
         // gets 404 (not 403 — the form's existence is not leaked to a
@@ -353,7 +407,7 @@ public sealed class DocumentController(
         if (form.Audience is null || !form.Audience.IsValid)
         {
             ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
-            return View(form);
+            return View("New", form);
         }
 
         // D3 — guards-before-write (the ADR 0011 / AttachmentController.Upload

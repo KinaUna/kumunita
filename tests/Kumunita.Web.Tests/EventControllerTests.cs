@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Query;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
@@ -270,7 +271,7 @@ public class EventControllerTests
     public async Task Index_PassesComponentFilterAndPage_Verbatim_ToService()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( "component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001", componentId: "component-A") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -288,7 +289,7 @@ public class EventControllerTests
         Assert.Single(model.Events);
         Assert.Equal("Community A", model.Events[0].ComponentDisplayName);
         Assert.Equal("Ada", model.Events[0].AuthorDisplayName);
-        await events.Received(1).ListUpcomingAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>());
+        await events.Received(1).ListUpcomingAsync( "component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -303,7 +304,7 @@ public class EventControllerTests
     public async Task Index_When_AuthorProfileMissing_FallsBackToSubjectId()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-ghost-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -333,7 +334,7 @@ public class EventControllerTests
     public async Task Index_SurfacesMyEvents_WithDisplayNames()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-feed", authorId: "subj-author-001") }, false));
         events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
             .Returns(new List<Event> { SampleEvent("ev-mine", authorId: "subj-resident-001", componentId: "component-A") });
@@ -369,7 +370,7 @@ public class EventControllerTests
     public async Task Index_When_MyEventsEmpty_FeedUnchanged_And_MyEventsEmpty()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001") }, false));
         // ListMineAsync left un-stubbed — NSubstitute auto-returns an empty
         // IReadOnlyList<Event> (the "no section" case).
@@ -401,7 +402,7 @@ public class EventControllerTests
     public async Task Index_When_ListMineDenies_Returns_403()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event>(), false));
         events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<Event>>(new UnauthorizedAccessException("An actor is required to read their events.")));
@@ -429,7 +430,7 @@ public class EventControllerTests
     public async Task Index_Past_RoutesToListPastAsync_AndSetsPastFlag()
     {
         var events = Substitute.For<IEventService>();
-        events.ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListPastAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-past", authorId: "subj-author-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -446,10 +447,10 @@ public class EventControllerTests
         Assert.Single(model.Events);
         Assert.Equal("ev-past", model.Events[0].Id);
         Assert.Equal("Ada", model.Events[0].AuthorDisplayName);
-        await events.Received(1).ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+        await events.Received(1).ListPastAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
         // The upcoming lane is not called on the Past path.
         await events.DidNotReceive()
-            .ListUpcomingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+            .ListUpcomingAsync( Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -467,7 +468,7 @@ public class EventControllerTests
         var fullPage = Enumerable.Range(0, 30)
             .Select(i => SampleEvent($"ev-p{i}", authorId: "subj-author-001", componentId: "component-A"))
             .ToList();
-        events.ListPastAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>())
+        events.ListPastAsync( "component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(fullPage, true));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -485,7 +486,7 @@ public class EventControllerTests
         var pager = model.Pager!;
         Assert.Equal("component-A", pager.FilterParams["componentId"]);
         Assert.Equal("true", pager.FilterParams["past"]);
-        await events.Received(1).ListPastAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>());
+        await events.Received(1).ListPastAsync( "component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -498,7 +499,7 @@ public class EventControllerTests
     public async Task Index_Default_StillRoutesToListUpcomingAsync()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("ev-up", authorId: "subj-author-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
@@ -513,9 +514,9 @@ public class EventControllerTests
         var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
         Assert.False(model.Past);
         Assert.Single(model.Events);
-        await events.Received(1).ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+        await events.Received(1).ListUpcomingAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
         await events.DidNotReceive()
-            .ListPastAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+            .ListPastAsync( Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -530,7 +531,7 @@ public class EventControllerTests
     public async Task Index_Past_When_ListPastDenies_Returns_403()
     {
         var events = Substitute.For<IEventService>();
-        events.ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+        events.ListPastAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(Task.FromException<EventPage>(new UnauthorizedAccessException($"Actor may not read events.")));
 
         var controller = Build(events, subjectId: "subj-resident-001");
@@ -538,7 +539,7 @@ public class EventControllerTests
         var result = await controller.Index(componentId: null, page: 1, past: true);
 
         Assert.IsType<ForbidResult>(result);
-        await events.Received(1).ListPastAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>());
+        await events.Received(1).ListPastAsync( null, "subj-resident-001", 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     // ── Composer (GET/POST /events/new) ────────────────────────────────────────
@@ -1939,7 +1940,7 @@ public class EventControllerTests
         // event; the pin is the serve-shape headers, not the VEVENT set (the
         // Core composition pin owns that).
         var feedEvents = Substitute.For<IEventService>();
-        feedEvents.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        feedEvents.ListUpcomingAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("feed-cache", authorId: "subj-author-001") }, false));
         var feedController = Build(feedEvents, subjectId: "subj-resident-001");
 
@@ -2031,7 +2032,7 @@ public class EventControllerTests
 
         // The serve Content-Type (the File(...) second arg).
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("feed-route", authorId: "subj-author-001") }, false));
         var controller = Build(events, subjectId: "subj-resident-001");
 
@@ -2052,7 +2053,7 @@ public class EventControllerTests
     public async Task CalendarFeed_Content_Disposition_Filename_Is_Kumunita_Events_Ics()
     {
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(new List<Event> { SampleEvent("feed-filename", authorId: "subj-author-001") }, false));
         var controller = Build(events, subjectId: "subj-resident-001");
 

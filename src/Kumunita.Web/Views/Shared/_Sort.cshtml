@@ -1,0 +1,51 @@
+@model Kumunita.Web.Models.SortViewModel
+@using System.Text
+@functions {
+    // The link shape mirrors _Pager's PagerLink exactly (M7 D7, C-SORT·8):
+    // BaseUrl + carried filter pairs (page, existing filters) + the toggled
+    // sort=/dir= pair. The sort/dir values enter the link exactly the way
+    // the M7 filters do.
+    string SortLink(string key, string dir)
+    {
+        var sb = new StringBuilder(Model.BaseUrl);
+        sb.Append('?');
+        var first = true;
+        foreach (var (k, v) in Model.CarriedParams)
+        {
+            if (!first) sb.Append('&');
+            sb.Append(Uri.EscapeDataString(k));
+            sb.Append('=');
+            sb.Append(Uri.EscapeDataString(v));
+            first = false;
+        }
+        if (!first) sb.Append('&');
+        sb.Append("sort=");
+        sb.Append(Uri.EscapeDataString(key));
+        sb.Append('&');
+        sb.Append("dir=");
+        sb.Append(Uri.EscapeDataString(dir));
+        return sb.ToString();
+    }
+}
+<div class="sort-control d-flex flex-wrap align-items-center gap-1 mt-2" role="group" aria-label="Sort order">
+    @foreach (var (key, defaultDir) in Model.Options)
+    {
+        // Toggle design (one badge per criterion): the active criterion is the
+        // one whose key matches CurrentKey. Clicking it flips the direction
+        // (asc ⇄ desc); clicking an inactive criterion selects it at its
+        // default direction. The active badge carries the ↑ (asc) / ↓ (desc)
+        // indicator so the current order is visible at a glance.
+        var isActive = Model.CurrentKey is not null
+            && string.Equals(Model.CurrentKey, key, StringComparison.OrdinalIgnoreCase);
+        var activeDir = Model.CurrentDir ?? defaultDir;
+        var nextDir = isActive
+            ? (string.Equals(activeDir, "asc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc")
+            : defaultDir;
+        bool asc = string.Equals(activeDir, "asc", StringComparison.OrdinalIgnoreCase);
+        string indicator = isActive ? (asc ? "↑" : "↓") : string.Empty;
+        string title = isActive ? (asc ? "Sorted ascending — click for descending" : "Sorted descending — click for ascending") : "Sort by this field";
+        <a class="sort-link badge @(isActive ? "bg-primary text-white" : "bg-secondary text-white")"
+           href="@SortLink(key, nextDir)"
+           title="@title"><kw-l key="sort.@key">@key</kw-l>@(string.IsNullOrEmpty(indicator) ? string.Empty : " " + indicator)</a>
+    }
+</div>

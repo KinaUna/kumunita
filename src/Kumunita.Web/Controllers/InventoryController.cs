@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Inventory;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -85,14 +86,25 @@ public sealed class InventoryController : Controller
     /// *read* lookups (never access decisions).
     /// </summary>
     [HttpGet("/inventory")]
-    public async Task<IActionResult> List(string? ownerKind, string? componentId, int page = 1)
+    public async Task<IActionResult> List(string? ownerKind, string? componentId, int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // M26 U13 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against the inventory's closed allowlist (row 13:
+        // created/modified + this surface's own `name` key), or null when the
+        // viewer chose no sort (C-SORT·2, F1 — the seam keeps its pinned
+        // Created-desc order).
+        var feedSort = ParseSort(sort, dir, InventoryFeedAllowedKeys);
+
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         ItemPage pageResult;
         try
         {
-            pageResult = await inventory.ListItemsAsync(ownerKind, componentId, actorId, page, HttpContext.RequestAborted);
+            pageResult = await inventory.ListItemsAsync(ownerKind, componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize);
         }
         catch (UnauthorizedAccessException)
         {
@@ -125,6 +137,26 @@ public sealed class InventoryController : Controller
         var filterParams = new Dictionary<string, string>();
         if (ownerKind is not null) filterParams["ownerKind"] = ownerKind;
         if (componentId is not null) filterParams["componentId"] = componentId;
+        // M26 U13 (C-SORT·8) — the sort/dir pairs join the frozen filter set
+        // only when the request carried a non-blank ?sort= (an unsorted read
+        // keeps the pre-M26 pairs byte-identical, C-SORT·2; the frozen
+        // ownerKind/componentId filters are untouched, C-SORT·4).
+        foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+            filterParams[k] = v;
+
+        // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort
+        // reference, reused verbatim — C-SORT·1): the closed inventory
+        // allowlist (U2 §2.2 row 13 — created/modified/name), no dead
+        // options (F9 — the `name` key is only on this surface).
+        var sortVm = SortViewModel.ForRoute(
+            "/inventory",
+            currentKey: feedSort?.Key,
+            currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+            options: [
+                ("created", "desc"),
+                ("modified", "desc"),
+                ("name", "asc"),
+            ]);
 
         var vm = new InventoryListViewModel(
             Items: rows,
@@ -133,12 +165,32 @@ public sealed class InventoryController : Controller
             CurrentComponentId: componentId,
             CurrentPage: page,
             Pager: (pageResult.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/inventory", page, 30, pageResult.HasMore,
+                ? PagedViewModel.ForRoute("/inventory", page, pageSize, pageResult.HasMore,
                     filterParams.Count > 0 ? filterParams : null)
                 : null);
+        vm = vm with { Sort = sortVm };
 
         return View(vm);
     }
+
+    // M26 U13 (C-SORT·1) — the inventory list's closed sort allowlist
+    // (U2 §2.2 row 13: created/modified/name; surface default created desc;
+    // `name` → the non-null Name string — this surface's own key, F9).
+    private static readonly IReadOnlySet<string> InventoryFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "name" };
+
+    // M26 U13 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (?dir= alone is not a sort
+    // choice; C-SORT·2, F1).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U13 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // surface's closed allowlist — or null when the viewer chose no sort.
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: true)
+            : null;
 
     /// <summary>
     /// <c>GET /inventory/{id}</c> — the detail (one item's full body +

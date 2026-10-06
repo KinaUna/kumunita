@@ -36,6 +36,14 @@
         </header>
 
         <div class="airy-ann-list">
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the list — above the items — so the sort options are the first
+               thing the viewer sees (it renders nothing when the VM field is
+               null, the no-sort pin). *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             @if (Model.Visible.Count == 0)
             {
                 <div class="p-4 text-muted">
@@ -67,6 +75,8 @@
                 </div>
             }
 
+            @* (The sort control now lives at the TOP of the list, above
+               the items.) *@
             @if (Model.HasMore)
             {
                 <nav aria-label="pagination" class="mt-3">

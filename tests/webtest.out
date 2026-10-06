@@ -1,0 +1,196 @@
+xUnit.net v3 In-Process Runner v4.0.0+8bf043c053 (64-bit .NET 10.0.12)
+  Discovering: Kumunita.Web.Tests
+  Discovered:  Kumunita.Web.Tests
+  Starting:    Kumunita.Web.Tests
+[testcontainers.org 00:00:00.29] Connected to Docker:
+  Host: npipe://./pipe/docker_engine
+  Server Version: 29.8.2
+  Kernel Version: 6.6.87.2-microsoft-standard-WSL2
+  API Version: 1.56
+  Operating System: Docker Desktop
+  Total Memory: 47.00 GB
+  Labels: 
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli
+[testcontainers.org 00:00:00.53] Docker container 6bdec5743462 created
+[testcontainers.org 00:00:00.58] Start Docker container 6bdec5743462
+[testcontainers.org 00:00:00.96] Wait for Docker container 6bdec5743462 to complete readiness checks
+[testcontainers.org 00:00:02.02] Docker container 6bdec5743462 ready
+[testcontainers.org 00:00:02.43] Docker container 8e85e68ea551 created
+[testcontainers.org 00:00:02.44] Start Docker container 8e85e68ea551
+[testcontainers.org 00:00:02.45] Docker container 07f7b19b42c6 created
+[testcontainers.org 00:00:02.45] Docker container 9ad719721f82 created
+[testcontainers.org 00:00:02.46] Start Docker container 07f7b19b42c6
+[testcontainers.org 00:00:02.46] Start Docker container 9ad719721f82
+[testcontainers.org 00:00:02.46] Docker container 61149a16ca01 created
+[testcontainers.org 00:00:02.46] Docker container 6dab051498b5 created
+[testcontainers.org 00:00:02.47] Start Docker container 61149a16ca01
+[testcontainers.org 00:00:02.48] Start Docker container 6dab051498b5
+[testcontainers.org 00:00:02.48] Docker container 688ebed74731 created
+[testcontainers.org 00:00:02.48] Docker container 1c6069941337 created
+[testcontainers.org 00:00:02.49] Start Docker container 688ebed74731
+[testcontainers.org 00:00:02.49] Start Docker container 1c6069941337
+[testcontainers.org 00:00:02.49] Docker container 7dff316eb8a6 created
+[testcontainers.org 00:00:02.50] Docker container ea8476013b68 created
+[testcontainers.org 00:00:02.50] Docker container 2835c97bee0e created
+[testcontainers.org 00:00:02.51] Docker container 3d0d209b89d4 created
+[testcontainers.org 00:00:02.51] Start Docker container 7dff316eb8a6
+[testcontainers.org 00:00:02.51] Start Docker container ea8476013b68
+[testcontainers.org 00:00:02.51] Start Docker container 2835c97bee0e
+[testcontainers.org 00:00:02.51] Docker container 390026cca46a created
+[testcontainers.org 00:00:02.52] Docker container 62ac4eaa2c96 created
+[testcontainers.org 00:00:02.52] Start Docker container 3d0d209b89d4
+[testcontainers.org 00:00:02.53] Start Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:02.53] Start Docker container 390026cca46a
+[testcontainers.org 00:00:02.53] Docker container 3be4ea8f5177 created
+[testcontainers.org 00:00:02.53] Docker container 5bc52f2b0fab created
+[testcontainers.org 00:00:02.53] Docker container 4cb5b03e2d93 created
+[testcontainers.org 00:00:02.54] Start Docker container 3be4ea8f5177
+[testcontainers.org 00:00:02.54] Start Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:02.55] Start Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:02.98] Wait for Docker container 8e85e68ea551 to complete readiness checks
+[testcontainers.org 00:00:02.99] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 8e85e68ea551
+[testcontainers.org 00:00:03.03] Wait for Docker container 9ad719721f82 to complete readiness checks
+[testcontainers.org 00:00:03.04] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 9ad719721f82
+[testcontainers.org 00:00:03.08] Wait for Docker container 07f7b19b42c6 to complete readiness checks
+[testcontainers.org 00:00:03.09] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 07f7b19b42c6
+[testcontainers.org 00:00:03.21] Wait for Docker container 688ebed74731 to complete readiness checks
+[testcontainers.org 00:00:03.22] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 688ebed74731
+[testcontainers.org 00:00:03.25] Wait for Docker container 6dab051498b5 to complete readiness checks
+[testcontainers.org 00:00:03.27] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 6dab051498b5
+[testcontainers.org 00:00:03.32] Wait for Docker container 7dff316eb8a6 to complete readiness checks
+[testcontainers.org 00:00:03.33] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 7dff316eb8a6
+[testcontainers.org 00:00:03.51] Wait for Docker container 2835c97bee0e to complete readiness checks
+[testcontainers.org 00:00:03.52] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 2835c97bee0e
+[testcontainers.org 00:00:03.56] Wait for Docker container ea8476013b68 to complete readiness checks
+[testcontainers.org 00:00:03.57] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container ea8476013b68
+[testcontainers.org 00:00:03.63] Wait for Docker container 61149a16ca01 to complete readiness checks
+[testcontainers.org 00:00:03.65] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 61149a16ca01
+[testcontainers.org 00:00:03.70] Wait for Docker container 1c6069941337 to complete readiness checks
+[testcontainers.org 00:00:03.72] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 1c6069941337
+[testcontainers.org 00:00:03.76] Wait for Docker container 390026cca46a to complete readiness checks
+[testcontainers.org 00:00:03.78] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 390026cca46a
+[testcontainers.org 00:00:03.86] Wait for Docker container 62ac4eaa2c96 to complete readiness checks
+[testcontainers.org 00:00:03.88] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:03.91] Wait for Docker container 3d0d209b89d4 to complete readiness checks
+[testcontainers.org 00:00:03.93] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3d0d209b89d4
+[testcontainers.org 00:00:04.04] Wait for Docker container 3be4ea8f5177 to complete readiness checks
+[testcontainers.org 00:00:04.06] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3be4ea8f5177
+[testcontainers.org 00:00:04.12] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 8e85e68ea551
+[testcontainers.org 00:00:04.14] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 9ad719721f82
+[testcontainers.org 00:00:04.14] Wait for Docker container 5bc52f2b0fab to complete readiness checks
+[testcontainers.org 00:00:04.16] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:04.19] Wait for Docker container 4cb5b03e2d93 to complete readiness checks
+[testcontainers.org 00:00:04.21] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:04.21] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 07f7b19b42c6
+[testcontainers.org 00:00:04.32] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 688ebed74731
+[testcontainers.org 00:00:04.37] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 6dab051498b5
+[testcontainers.org 00:00:04.43] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 7dff316eb8a6
+[testcontainers.org 00:00:04.66] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 2835c97bee0e
+[testcontainers.org 00:00:04.74] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container ea8476013b68
+[testcontainers.org 00:00:04.86] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 61149a16ca01
+[testcontainers.org 00:00:04.92] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 1c6069941337
+[testcontainers.org 00:00:04.93] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 390026cca46a
+[testcontainers.org 00:00:05.04] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:05.07] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3d0d209b89d4
+[testcontainers.org 00:00:05.21] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3be4ea8f5177
+[testcontainers.org 00:00:05.27] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 8e85e68ea551
+[testcontainers.org 00:00:05.27] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 9ad719721f82
+[testcontainers.org 00:00:05.29] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:05.34] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 07f7b19b42c6
+[testcontainers.org 00:00:05.34] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:05.46] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 688ebed74731
+[testcontainers.org 00:00:05.49] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 6dab051498b5
+[testcontainers.org 00:00:05.53] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 7dff316eb8a6
+[testcontainers.org 00:00:05.76] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 2835c97bee0e
+[testcontainers.org 00:00:05.84] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container ea8476013b68
+[testcontainers.org 00:00:05.95] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 61149a16ca01
+[testcontainers.org 00:00:06.01] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 1c6069941337
+[testcontainers.org 00:00:06.04] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 390026cca46a
+[testcontainers.org 00:00:06.13] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:06.16] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3d0d209b89d4
+[testcontainers.org 00:00:06.30] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3be4ea8f5177
+[testcontainers.org 00:00:06.36] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 9ad719721f82
+[testcontainers.org 00:00:06.36] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 8e85e68ea551
+[testcontainers.org 00:00:06.38] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:06.43] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:06.43] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 07f7b19b42c6
+[testcontainers.org 00:00:06.54] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 688ebed74731
+[testcontainers.org 00:00:06.58] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 6dab051498b5
+[testcontainers.org 00:00:06.61] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 7dff316eb8a6
+[testcontainers.org 00:00:06.84] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 2835c97bee0e
+[testcontainers.org 00:00:06.92] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container ea8476013b68
+[testcontainers.org 00:00:07.04] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 61149a16ca01
+[testcontainers.org 00:00:07.09] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 1c6069941337
+[testcontainers.org 00:00:07.12] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 390026cca46a
+[testcontainers.org 00:00:07.21] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:07.26] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3d0d209b89d4
+[testcontainers.org 00:00:07.38] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3be4ea8f5177
+[testcontainers.org 00:00:07.46] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 8e85e68ea551
+[testcontainers.org 00:00:07.46] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 9ad719721f82
+[testcontainers.org 00:00:07.47] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:07.52] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 07f7b19b42c6
+[testcontainers.org 00:00:07.52] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:07.57] Docker container 9ad719721f82 ready
+[testcontainers.org 00:00:07.57] Docker container 8e85e68ea551 ready
+[testcontainers.org 00:00:07.63] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 688ebed74731
+[testcontainers.org 00:00:07.63] Docker container 07f7b19b42c6 ready
+[testcontainers.org 00:00:07.67] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 6dab051498b5
+[testcontainers.org 00:00:07.71] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 7dff316eb8a6
+[testcontainers.org 00:00:07.75] Docker container 688ebed74731 ready
+[testcontainers.org 00:00:07.79] Docker container 6dab051498b5 ready
+[testcontainers.org 00:00:07.82] Docker container 7dff316eb8a6 ready
+[testcontainers.org 00:00:07.93] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 2835c97bee0e
+[testcontainers.org 00:00:08.01] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container ea8476013b68
+[testcontainers.org 00:00:08.03] Docker container 2835c97bee0e ready
+[testcontainers.org 00:00:08.10] Docker container ea8476013b68 ready
+[testcontainers.org 00:00:08.13] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 61149a16ca01
+[testcontainers.org 00:00:08.18] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 1c6069941337
+[testcontainers.org 00:00:08.22] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 390026cca46a
+[testcontainers.org 00:00:08.23] Docker container 61149a16ca01 ready
+[testcontainers.org 00:00:08.28] Docker container 1c6069941337 ready
+[testcontainers.org 00:00:08.30] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:08.31] Docker container 390026cca46a ready
+[testcontainers.org 00:00:08.35] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3d0d209b89d4
+[testcontainers.org 00:00:08.42] Docker container 62ac4eaa2c96 ready
+[testcontainers.org 00:00:08.46] Docker container 3d0d209b89d4 ready
+[testcontainers.org 00:00:08.47] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 3be4ea8f5177
+[testcontainers.org 00:00:08.58] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:08.58] Docker container 3be4ea8f5177 ready
+[testcontainers.org 00:00:08.64] Execute "pg_isready --host localhost --dbname kumunita --username kumunita" at Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:08.71] Docker container 5bc52f2b0fab ready
+[testcontainers.org 00:00:08.77] Docker container 4cb5b03e2d93 ready
+[testcontainers.org 00:00:08.87] Stop Docker container 2835c97bee0e
+[testcontainers.org 00:00:08.93] Stop Docker container 07f7b19b42c6
+[testcontainers.org 00:00:08.98] Stop Docker container 61149a16ca01
+[testcontainers.org 00:00:09.04] Stop Docker container 1c6069941337
+[testcontainers.org 00:00:09.50] Stop Docker container 6dab051498b5
+[testcontainers.org 00:00:09.90] Stop Docker container 9ad719721f82
+[testcontainers.org 00:00:10.07] Stop Docker container 7dff316eb8a6
+[testcontainers.org 00:00:10.11] Stop Docker container 3d0d209b89d4
+[testcontainers.org 00:00:10.36] Stop Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:10.40] Stop Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:11.00] Delete Docker container 2835c97bee0e
+[testcontainers.org 00:00:11.00] Delete Docker container 07f7b19b42c6
+[testcontainers.org 00:00:11.04] Delete Docker container 6dab051498b5
+[testcontainers.org 00:00:11.04] Delete Docker container 1c6069941337
+[testcontainers.org 00:00:11.04] Delete Docker container 61149a16ca01
+[testcontainers.org 00:00:11.46] Stop Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:11.79] Delete Docker container 3d0d209b89d4
+[testcontainers.org 00:00:11.87] Delete Docker container 7dff316eb8a6
+[testcontainers.org 00:00:12.40] Delete Docker container 9ad719721f82
+[testcontainers.org 00:00:12.48] Delete Docker container 4cb5b03e2d93
+[testcontainers.org 00:00:12.56] Stop Docker container 688ebed74731
+[testcontainers.org 00:00:12.64] Delete Docker container 62ac4eaa2c96
+[testcontainers.org 00:00:12.71] Stop Docker container 8e85e68ea551
+[testcontainers.org 00:00:12.93] Delete Docker container 5bc52f2b0fab
+[testcontainers.org 00:00:13.30] Stop Docker container 3be4ea8f5177
+[testcontainers.org 00:00:13.50] Delete Docker container 688ebed74731
+[testcontainers.org 00:00:13.96] Delete Docker container 8e85e68ea551
+[testcontainers.org 00:00:14.30] Stop Docker container ea8476013b68
+[testcontainers.org 00:00:14.43] Delete Docker container 3be4ea8f5177
+[testcontainers.org 00:00:15.24] Delete Docker container ea8476013b68
+[testcontainers.org 00:00:15.42] Stop Docker container 390026cca46a
+[testcontainers.org 00:00:16.27] Delete Docker container 390026cca46a
+  Finished:    Kumunita.Web.Tests (ID = '4540fd125a5bb03bc2d328f9fdd03576649d4b9bd420e746d86e202a665aa695')
+=== TEST EXECUTION SUMMARY ===
+   Kumunita.Web.Tests  Total: 919, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0, Time: 17.067s

@@ -63,6 +63,16 @@ catalog (`Σ SizeBytes` per `CreatedById`). It is a **read** — a page view emi
 `/admin/storage/export` route in v1), so there is nothing to audit, back up, or
 rotate for it. Non-`GlobalAdmin`s get **403**.
 
+**Sorting (M26, ADR 0145).** A paged list/search surface's order is a
+**per-request query param** (`?sort=<key>` + `?dir=asc|desc`, parsed against
+the surface's closed allowlist) — **not** an operator config knob. It adds
+**no env var** and **no new surface to provision**: the `?sort=`/`?dir=`
+pair is read Web-only from the request, resolved to a pure `SortSpec`,
+threaded into the paged seam, and carried on the pager links (the ADR 0090
+D7 `FilterParams` mechanism). An absent/unknown pair preserves the surface's
+current order (C-SORT·2). There is nothing to audit, back up, or rotate
+for it — a sorted read emits **no `AccessAudit` row** (C-SORT·4).
+
 ## Instance inventory
 
 Keep one row per neighborhood. This is your map.

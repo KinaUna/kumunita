@@ -187,6 +187,7 @@ public static class KnownTranslationKeys
             ["projects.todo.claim"]          = "Claim",
             ["projects.todo.addressed_to"]   = "Addressed to",
             ["projects.todo.filter_unassigned"] = "Unassigned only",
+            ["projects.todo.filter_assigned_to_me"] = "Assigned to me",
             ["projects.todo.add_subtask"]    = "Add subtask",
             ["projects.todo.delete"]         = "Delete",
             ["projects.todo.parent"]         = "Parent",
@@ -301,6 +302,7 @@ public static class KnownTranslationKeys
             ["common.filter"]   = "Filter",
             ["common.full_page"]    = "Full page",
             ["common.exit_full_page"] = "Exit full page",
+            ["common.open_full_page"] = "Open full page",
             ["common.fullscreen"]   = "Full screen",
             ["common.exit_fullscreen"] = "Exit full screen",
             ["common.name"]         = "Name",
@@ -373,6 +375,21 @@ public static class KnownTranslationKeys
                 "Their memberships are preserved, and their own controls come " +
                 "back on the next read.",
             ["guardian.dissolve"]            = "Dissolve guardianship",
+            // Count-aware steering (ADR 0028 §G·6): a <b>co-guardian</b> (this
+            // child has ≥2 active guardians) sees this heading + hint + button
+            // instead of the "Hand over the account" lane — removing yourself
+            // ends your standing over the child, the other guardian(s)
+            // continue, and the child keeps their account. The POST is the
+            // <b>same</b> <c>Dissolve</c> action as the sole-guardian hand-over
+            // lane (the standing over the child ends either way); only the
+            // framing differs (a co-guardian is not handing anything over —
+            // the other guardian is still there).
+            ["guardian.remove_myself"]       = "Remove myself as guardian",
+            ["guardian.remove_myself_hint"]  =
+                "You are one of several guardians of this child. Removing yourself " +
+                "ends your standing over their account; the other guardian(s) " +
+                "continue, and their account is preserved.",
+            ["guardian.remove_myself_submit"] = "Remove myself",
             ["guardian.suspended"]           = "Suspended",
             ["guardian.unsuspend"]           = "Un-suspend",
             ["guardian.suspend"]             = "Suspend",
@@ -488,6 +505,52 @@ public static class KnownTranslationKeys
                 "You must consent to the child-account terms before accepting.",
             ["guardian.decline"] = "Decline",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Event attendance",
+            ["guardian.eventrsvp.description"] =
+                "Choose how this child's event attendance is handled.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Currently: Guardian approves — I approve or deny every event the child wants to attend.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Currently: Guardian notifies — the child attends freely; I'm told and can remove any of their attendance afterwards.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Currently: Child decides — the child chooses their own attendance; no approval and no notification.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Switch to Guardian approves",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Switch to Guardian notifies",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Switch to Child decides",
+            ["guardian.eventrsvp.pending_title"] = "Pending attendance requests",
+            ["guardian.eventrsvp.pending_empty"] = "No pending attendance requests.",
+            ["guardian.eventrsvp.desired"] = "Wants to attend",
+            ["guardian.eventrsvp.approve"] = "Approve",
+            ["guardian.eventrsvp.deny"] = "Deny",
+            ["guardian.eventrsvp.rsvps_title"] = "This child's current attendance",
+            ["guardian.eventrsvp.rsvps_empty"] = "No current attendance to remove.",
+            ["guardian.eventrsvp.veto"] = "Remove",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Approve this child's attendance on this event?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Deny this child's attendance on this event? They will not be attending.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Remove this child's attendance on this event? Their RSVP will be deleted.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Attendance request from your child",
+            ["notifications.preference.guardian.event_request.label"] =
+                "When your child asks to attend an event",
+            ["notification.guardian.event_request.subject"] =
+                "Your child is asking to attend an event",
+            ["notification.guardian.event_request.body"] =
+                "Your child is asking to attend an event: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Your child attended an event",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "When your child attends an event",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Your child attended an event",
+            ["notification.guardian.event_rsvp.body"] =
+                "Your child attended an event: ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             // The "guardian.assign" notification: the assigned guardian
             // (the assignee) gets an inbox row + (best-effort) email when an
@@ -577,6 +640,21 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Save",
             ["settings.dateformat_flash_set"]    = "Date & time format set — it takes effect on the next request.",
             ["settings.dateformat_flash_reset"]  = "Date & time format reset — the platform default will be used.",
+
+            // ── settings — items per page (the resident's page-size
+            // preference, additive on the platform default) ────────────────
+            ["settings.pagesize_title"]        = "Items per page",
+            ["settings.pagesize_lede"]         =
+                "Choose how many items each list shows per page (feeds, events, projects and the rest). " +
+                "Your choice is saved on your account — it takes effect the next time you load a list, and " +
+                "never affects other residents.",
+            ["settings.pagesize_label"]        = "Items per page",
+            ["settings.pagesize_default_marker"] = "— platform default",
+            ["settings.pagesize_reset_confirm"]  = "Reset your items-per-page to the platform default?",
+            ["settings.pagesize_reset"]        = "Reset to platform default",
+            ["settings.pagesize_save"]         = "Save",
+            ["settings.pagesize_flash_set"]    = "Items per page set to \"{0}\" — it takes effect on the next request.",
+            ["settings.pagesize_flash_reset"]  = "Items per page reset — the platform default will be used.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -1211,6 +1289,11 @@ public static class KnownTranslationKeys
             ["directory.detail_no_contact"] =
                 "This resident hasn't shared a contact method with you (yet). You can " +
                 "still see their profile page.",
+            // M9 amendment (ADR 0139) — the "Send a message" affordance on a
+            // directory card / the detail page: rendered only when *both*
+            // parties' messaging standing is on (the two-sided gate the
+            // DirectoryController computes). One key, used on both surfaces.
+            ["directory.send_message"] = "Send a message",
 
             // ── community (Manage page) ──────────────────────────────────────
             ["community.manage_back"] = "← Back to the feed",
@@ -1905,6 +1988,7 @@ public static class KnownTranslationKeys
             ["message.compose.send"] = "Send",
             ["message.unread"] = "unread",
             ["message.disabled"] = "Direct messaging is turned off on this instance.",
+            ["message.compose.disabled"] = "This resident has turned off direct messaging, so you can't send them a new message.",
             ["message.other"] = "the other person",
             ["message.sent_to"] = "Sent to {0}.",
             ["message.load_earlier"] = "Load earlier messages",
@@ -2146,6 +2230,9 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Your date & time format",
             ["onboarding.step_email"]       = "Your email & notification language",
             ["onboarding.step_contact"]     = "Your contact details & who can see them",
+            // M9 amendment (ADR 0139) — the messaging opt-in step, linking into
+            // the /settings/messaging page that owns Profile.MessagingOptIn.
+            ["onboarding.step_messaging"]   = "Whether you can use direct messaging",
             ["onboarding.visit"]            = "Go to this setting",
             ["onboarding.finish"]           = "I'm all set — finish setup",
             ["onboarding.skip"]             = "Skip for now",
@@ -2157,10 +2244,10 @@ public static class KnownTranslationKeys
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
             ["settings.messaging.title"]           = "Messaging",
-            ["settings.messaging.description"]     = "Choose whether you can use direct 1:1 messaging with other residents. Your choice is saved on your account and takes effect immediately.",
+            ["settings.messaging.description"]     = "Choose whether other residents can send you direct 1:1 messages. Your choice is saved on your account and takes effect immediately.",
             ["settings.messaging.instance_off"]    = "Messaging is currently turned off on this instance by an administrator. You can opt in now and messaging will be available to you as soon as it is turned on.",
             ["settings.messaging.restricted"]      = "Messaging has been restricted on your account by a guardian. Contact them to change this.",
-            ["settings.messaging.optin"]           = "Allow me to use direct 1:1 messaging",
+            ["settings.messaging.optin"]           = "Let others send me direct 1:1 messages",
             ["settings.messaging.save"]            = "Save messaging preference",
             ["guardian.messaging.title"]           = "Messaging",
             ["guardian.messaging.description"]     = "Choose whether this child can use direct 1:1 messaging. When restricted, the child cannot send or receive messages and the choice wins over their own opt-in; when allowed, the child decides for themselves on their own messaging settings page.",
@@ -2277,6 +2364,10 @@ public static class KnownTranslationKeys
                 "Restrict messaging for this child? They will no longer be able to send or receive direct " +
                 "messages, regardless of their own opt-in.",
             ["guardian.handover_confirm"]    = "Hand over this account to the child? This dissolves your guardianship over it.",
+            ["guardian.remove_myself_confirm"] =
+                "Remove yourself as this child's guardian? You will no longer be " +
+                "able to manage their account. They keep their account, and " +
+                "their other guardian(s) continue.",
             ["guardian.delete_child_confirm"] =
                 "Delete this child account permanently? This removes their sign-in, profile, " +
                 "and memberships, and cannot be undone.",
@@ -2334,6 +2425,27 @@ public static class KnownTranslationKeys
             ["translations.bulk.export_title"] = "Download this language's UI strings as a CSV file",
             ["common.delete"]          = "Delete",
             ["pages.delete_confirm"]   = "Delete this page?",
+
+            // ── M26 U16 (the _Sort partial's closed sort.* set, the documents.*/
+            // a11y.* precedent) — the label-only kw-l set the one shared
+            // Views/Shared/_Sort.cshtml partial emits: exactly the eight sort
+            // keys the U10–U15 surfaces' closed allowlists offer (created /
+            // modified / title everywhere; size on documents; name on
+            // inventory + people-find; start on events; due + status on todos).
+            // No sort.label / sort.asc / sort.desc keys — the partial renders
+            // per-option links (not direction toggles) and its group
+            // aria-label stays hardcoded (the a11y.* attribute precedent:
+            // value-free simple attributes are out of kw-l's reach here).
+            // sort.priority is NOT a key — U12's drift pause: TodoItem has no
+            // Priority property, so no surface offers it.
+            ["sort.created"]          = "Created",
+            ["sort.modified"]         = "Modified",
+            ["sort.title"]            = "Title",
+            ["sort.size"]             = "Size",
+            ["sort.name"]             = "Name",
+            ["sort.start"]            = "Start date",
+            ["sort.due"]              = "Due date",
+            ["sort.status"]           = "Status",
             ["admin.help.reset_one"]   =
                 "Reset \"{0}\" to its seeded text? This overwrites any hand-edited copy.",
             ["admin.help.reset_all"]   =
@@ -2460,6 +2572,7 @@ public static class KnownTranslationKeys
             ["projects.todo.claim"]          = "Übernehmen",
             ["projects.todo.addressed_to"]   = "Adressiert an",
             ["projects.todo.filter_unassigned"] = "Nur nicht zugewiesene",
+            ["projects.todo.filter_assigned_to_me"] = "Mir zugewiesen",
             ["projects.todo.add_subtask"]    = "Unteraufgabe hinzufügen",
             ["projects.todo.delete"]         = "Löschen",
             ["projects.todo.parent"]         = "Elternaufgabe",
@@ -2572,6 +2685,7 @@ public static class KnownTranslationKeys
             ["common.filter"]   = "Filter",
             ["common.full_page"]    = "Vollseite",
             ["common.exit_full_page"] = "Vollseite beenden",
+            ["common.open_full_page"] = "Vollseite öffnen",
             ["common.fullscreen"]   = "Vollbild",
             ["common.exit_fullscreen"] = "Vollbild beenden",
             ["common.name"]         = "Name",
@@ -2645,6 +2759,14 @@ public static class KnownTranslationKeys
                 "Die Mitgliedschaften bleiben erhalten, und die eigenen " +
                 "Einstellmöglichkeiten kommen beim nächsten Lesen zurück.",
             ["guardian.dissolve"]            = "Vormundschaft auflösen",
+            // Count-aware steering (ADR 0028 §G·6) — de.
+            ["guardian.remove_myself"]       = "Ich nehme meine Vormundstellung zurück",
+            ["guardian.remove_myself_hint"]  =
+                "Du bist einer von mehreren Vormündern dieses Kindes. " +
+                "Wenn du deine Vormundstellung zurücknimmst, enden deine " +
+                "Befugnisse über das Konto; die übrigen Vormünder bleiben " +
+                "dabei, und das Konto bleibt erhalten.",
+            ["guardian.remove_myself_submit"] = "Ich nehme mich zurück",
             ["guardian.suspended"]           = "Gesperrt",
             ["guardian.unsuspend"]           = "Wieder aktivieren",
             ["guardian.suspend"]             = "Sperren",
@@ -2759,6 +2881,52 @@ public static class KnownTranslationKeys
                 "Du musst den Bedingungen für Kinderkonten zustimmen, bevor du akzeptierst.",
             ["guardian.decline"] = "Ablehnen",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Event-Teilnahme",
+            ["guardian.eventrsvp.description"] =
+                "Lege fest, wie die Event-Teilnahme dieses Kindes gehandhabt wird.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Aktuell: Vormund genehmigt — Ich genehmige oder lehne jedes Event ab, an dem das Kind teilnehmen möchte.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Aktuell: Vormund wird informiert — Das Kind nimmt frei teil; ich werde informiert und                 kann jede Teilnahme danach rückgängig machen.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Aktuell: Kind entscheidet — Das Kind wählt seine Teilnahme selbst; keine Genehmigung und keine Benachrichtigung.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Auf „Vormund genehmigt“ umstellen",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Auf „Vormund wird informiert“ umstellen",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Auf „Kind entscheidet“ umstellen",
+            ["guardian.eventrsvp.pending_title"] = "Ausstehende Teilnahmeanfragen",
+            ["guardian.eventrsvp.pending_empty"] = "Keine ausstehenden Teilnahmeanfragen.",
+            ["guardian.eventrsvp.desired"] = "Möchte teilnehmen",
+            ["guardian.eventrsvp.approve"] = "Genehmigen",
+            ["guardian.eventrsvp.deny"] = "Ablehnen",
+            ["guardian.eventrsvp.rsvps_title"] = "Aktuelle Teilnahme dieses Kindes",
+            ["guardian.eventrsvp.rsvps_empty"] = "Keine aktuelle Teilnahme zum Entfernen.",
+            ["guardian.eventrsvp.veto"] = "Entfernen",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Dieses Kind für dieses Event zur Teilnahme genehmigen?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Dieses Kind für dieses Event ablehnen? Es wird nicht teilnehmen.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Die Teilnahme dieses Kindes an diesem Event entfernen? Ihre Anmeldung wird gelöscht.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Teilnehmungsanfrage von deinem Kind",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Wenn dein Kind an einem Event teilnehmen möchte",
+            ["notification.guardian.event_request.subject"] =
+                "Dein Kind möchte an einem Event teilnehmen",
+            ["notification.guardian.event_request.body"] =
+                "Dein Kind möchte an einem Event teilnehmen: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Dein Kind hat an einem Event teilgenommen",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Wenn dein Kind an einem Event teilnimmt",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Dein Kind hat an einem Event teilgenommen",
+            ["notification.guardian.event_rsvp.body"] =
+                "Dein Kind hat an einem Event teilgenommen: ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
                 "Ein Vormund hat dich gebeten, Co-Vormund zu werden",
@@ -2840,6 +3008,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Speichern",
             ["settings.dateformat_flash_set"]    = "Datum- und Zeitformat gesetzt — es wirkt ab der nächsten Anfrage.",
             ["settings.dateformat_flash_reset"]  = "Datum- und Zeitformat zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
+
+            ["settings.pagesize_title"]        = "Einträge pro Seite",
+            ["settings.pagesize_lede"]         =
+                "Lege fest, wie viele Einträge jede Liste pro Seite zeigt (Feeds, Veranstaltungen, Projekte und der Rest). " +
+                "Deine Auswahl wird auf deinem Konto gespeichert — sie wirkt ab dem nächsten Laden einer Liste und " +
+                "betrifft nie andere Bewohner.",
+            ["settings.pagesize_label"]        = "Einträge pro Seite",
+            ["settings.pagesize_default_marker"] = "— Plattform-Voreinstellung",
+            ["settings.pagesize_reset_confirm"]  = "Einträge pro Seite auf die Plattform-Voreinstellung zurücksetzen?",
+            ["settings.pagesize_reset"]        = "Auf Plattform-Voreinstellung zurücksetzen",
+            ["settings.pagesize_save"]         = "Speichern",
+            ["settings.pagesize_flash_set"]    = "Einträge pro Seite auf \"{0}\" gesetzt — es wirkt ab der nächsten Anfrage.",
+            ["settings.pagesize_flash_reset"]  = "Einträge pro Seite zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -3431,6 +3612,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-Mail",
             ["directory.detail_contact_phone"] = "Telefon",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Nachricht senden",
             ["directory.detail_no_contact"] =
                 "Diese:r Anwohner:in hat dir (noch) keine Kontaktmöglichkeit geteilt. Du " +
                 "kannst aber immer noch die Profilseite sehen.",
@@ -4073,6 +4256,7 @@ public static class KnownTranslationKeys
             ["message.compose.send"] = "Senden",
             ["message.unread"] = "ungelesen",
             ["message.disabled"] = "Direktnachrichten sind auf dieser Instanz deaktiviert.",
+            ["message.compose.disabled"] = "Diese Person hat Direktnachrichten deaktiviert, daher kannst du keine neue Nachricht senden.",
             ["message.other"] = "die andere Person",
             ["message.sent_to"] = "Gesendet an {0}.",
             ["message.load_earlier"] = "Frühere Nachrichten laden",
@@ -4299,6 +4483,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Dein Datums- und Zeitformat",
             ["onboarding.step_email"]       = "Deine E-Mail- und Benachrichtigungssprache",
             ["onboarding.step_contact"]     = "Deine Kontaktdaten & wer sie sehen kann",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Ob Du Direktnachrichten nutzen kannst",
             ["onboarding.visit"]            = "Zu dieser Einstellung",
             ["onboarding.finish"]           = "Alles klar — Einrichtung abschließen",
             ["onboarding.skip"]             = "Jetzt überspringen",
@@ -4310,10 +4496,10 @@ public static class KnownTranslationKeys
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
             ["settings.messaging.title"]           = "Messaging",
-            ["settings.messaging.description"]     = "Wähle, ob du 1:1-Direktnachrichten mit anderen Bewohnern nutzen kannst. Deine Auswahl wird auf deinem Konto gespeichert und wirkt sofort.",
+            ["settings.messaging.description"]     = "Wähle, ob andere Bewohner dir direkte 1:1-Nachrichten senden dürfen. Deine Auswahl wird auf deinem Konto gespeichert und wirkt sofort.",
             ["settings.messaging.instance_off"]    = "Direktnachrichten sind derzeit von einem Administrator auf dieser Instanz deaktiviert. Du kannst dich jetzt anmelden, und die Funktion steht dir zur Verfügung, sobald sie wieder aktiviert wird.",
             ["settings.messaging.restricted"]      = "Direktnachrichten wurden auf deinem Konto durch einen Betreuer eingeschränkt. Wende dich an sie, um dies zu ändern.",
-            ["settings.messaging.optin"]           = "Erlaube mir die Nutzung von 1:1-Direktnachrichten",
+            ["settings.messaging.optin"]           = "Erlaube anderen, mir direkte 1:1-Nachrichten zu senden",
             ["settings.messaging.save"]            = "Messaging-Einstellung speichern",
             ["guardian.messaging.title"]           = "Messaging",
             ["guardian.messaging.description"]     = "Wähle, ob dieses Kind 1:1-Direktnachrichten nutzen darf. Bei Einschränkung kann das Kind keine Nachrichten senden oder erhalten — diese Auswahl hat Vorrang vor seiner eigenen Opt-in. Bei Erlaubnis entscheidet das Kind selbst auf seiner eigenen Messaging-Einstellungsseite.",
@@ -4426,6 +4612,10 @@ public static class KnownTranslationKeys
                 "Messaging für dieses Kind einschränken? Es kann dann keine direkten Nachrichten mehr " +
                 "senden oder empfangen, unabhängig von seiner eigenen Opt-in.",
             ["guardian.handover_confirm"]    = "Dieses Konto an das Kind übergeben? Damit löst du deine Vormundschaft über es auf.",
+            ["guardian.remove_myself_confirm"] =
+                "Nimmst du deine Vormundstellung für dieses Kind zurück? Du " +
+                "kannst das Konto danach nicht mehr verwalten. Es bleibt " +
+                "erhalten, und die übrigen Vormünder bleiben dabei.",
             ["guardian.delete_child_confirm"] =
                 "Dieses Kind-Konto dauerhaft löschen? Damit werden Anmeldung, Profil und " +
                 "Mitgliedschaften entfernt — das kann nicht rückgängig gemacht werden.",
@@ -4492,6 +4682,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "ALLE {0} Seed-Hilfeseiten auf den Seed-Text zurücksetzen? Damit werden alle " +
                 "manuellen Änderungen auf jeder Seite überschrieben.",
+
+            // ── M26 U16 — der geschlossene sort.*-Satz der geteilten
+            // _Sort-Partial (Label-only; die acht Sortschlüssel der
+            // erlaubten Listen der U10–U15-Oberflächen) ──
+            ["sort.created"]          = "Erstellt",
+            ["sort.modified"]         = "Geändert",
+            ["sort.title"]            = "Titel",
+            ["sort.size"]             = "Größe",
+            ["sort.name"]             = "Name",
+            ["sort.start"]            = "Beginn",
+            ["sort.due"]              = "Fällig",
+            ["sort.status"]           = "Status",
         };
 
     /// <summary>
@@ -4581,6 +4783,7 @@ public static class KnownTranslationKeys
             ["common.filter"]   = "Filtrer",
             ["common.full_page"]    = "Page entière",
             ["common.exit_full_page"] = "Quitter la page entière",
+            ["common.open_full_page"] = "Ouvrir la page complète",
             ["common.fullscreen"]   = "Plein écran",
             ["common.exit_fullscreen"] = "Quitter le plein écran",
             ["common.name"]         = "Nom",
@@ -4664,6 +4867,7 @@ public static class KnownTranslationKeys
             ["projects.todo.claim"]          = "Prendre en charge",
             ["projects.todo.addressed_to"]   = "Adressée à",
             ["projects.todo.filter_unassigned"] = "Non assignées uniquement",
+            ["projects.todo.filter_assigned_to_me"] = "Assignées à moi",
             ["projects.todo.add_subtask"]    = "Ajouter une sous-tâche",
             ["projects.todo.delete"]         = "Supprimer",
             ["projects.todo.parent"]         = "Tâche parente",
@@ -4800,7 +5004,14 @@ public static class KnownTranslationKeys
                 "adhesions sont conservées, et ses propres réglages reviennent " +
                 "à la prochaine lecture.",
             ["guardian.dissolve"]            = "Dissoudre la tutelle",
-            ["guardian.suspended"]           = "Suspendé",
+            // Count-aware steering (ADR 0028 §G·6) — fr.
+            ["guardian.remove_myself"]       = "Retirer ma tutelle",
+            ["guardian.remove_myself_hint"]  =
+                "Vous êtes l'un des tuteurs de cet enfant. Retirer votre " +
+                "tutelle met fin à vos droits sur le compte ; les autres " +
+                "tuteurs restent en place, et le compte est conservé.",
+            ["guardian.remove_myself_submit"] = "Me retirer",
+            ["guardian.suspended"]           = "Suspendu",
             ["guardian.unsuspend"]           = "Réactiver",
             ["guardian.suspend"]             = "Suspendre",
             ["guardian.delete_child"]        = "Supprimer le compte de l'enfant",
@@ -4911,6 +5122,52 @@ public static class KnownTranslationKeys
                 "Tu dois accepter les conditions du compte enfant avant d'accepter.",
             ["guardian.decline"] = "Refuser",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Participation aux événements",
+            ["guardian.eventrsvp.description"] =
+                "Choisis comment la participation de cet enfant aux événements est gérée.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "Actuellement : le tuteur approuve — J'approuve ou refuse chaque événement auquel l'enfant veut participer.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "Actuellement : le tuteur est informé — L'enfant participe librement ; je suis prévenu(e) et peux retirer toute participation par la suite.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "Actuellement : l'enfant décide — L'enfant choisit sa propre participation ; aucune approbation et aucune notification.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Passer à « le tuteur approuve »",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Passer à « le tuteur est informé »",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Passer à « l'enfant décide »",
+            ["guardian.eventrsvp.pending_title"] = "Demandes de participation en attente",
+            ["guardian.eventrsvp.pending_empty"] = "Aucune demande de participation en attente.",
+            ["guardian.eventrsvp.desired"] = "Veut participer",
+            ["guardian.eventrsvp.approve"] = "Approuver",
+            ["guardian.eventrsvp.deny"] = "Refuser",
+            ["guardian.eventrsvp.rsvps_title"] = "Participation actuelle de cet enfant",
+            ["guardian.eventrsvp.rsvps_empty"] = "Aucune participation actuelle à retirer.",
+            ["guardian.eventrsvp.veto"] = "Retirer",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Approuver la participation de cet enfant à cet événement ?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Refuser la participation de cet enfant à cet événement ? Il ne participera pas.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Retirer la participation de cet enfant à cet événement ? Son inscription sera supprimée.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Demande de participation de ton enfant",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Quand ton enfant veut participer à un événement",
+            ["notification.guardian.event_request.subject"] =
+                "Ton enfant veut participer à un événement",
+            ["notification.guardian.event_request.body"] =
+                "Ton enfant veut participer à un événement : ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Ton enfant a participé à un événement",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Quand ton enfant participe à un événement",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Ton enfant a participé à un événement",
+            ["notification.guardian.event_rsvp.body"] =
+                "Ton enfant a participé à un événement : ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
                 "Un tuteur t'a demandé de devenir co-tuteur",
@@ -4992,6 +5249,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Enregistrer",
             ["settings.dateformat_flash_set"]    = "Format de date et d'heure réglé — il prend effet à la prochaine requête.",
             ["settings.dateformat_flash_reset"]  = "Format de date et d'heure réinitialisé — le défaut de la plateforme sera utilisé.",
+
+            ["settings.pagesize_title"]        = "Éléments par page",
+            ["settings.pagesize_lede"]         =
+                "Choisissez le nombre d'éléments affichés par page (flux, événements, projets, etc.). " +
+                "Votre choix est enregistré sur votre compte — il prend effet au prochain chargement d'une liste, " +
+                "sans jamais affecter les autres résidents.",
+            ["settings.pagesize_label"]        = "Éléments par page",
+            ["settings.pagesize_default_marker"] = "— défaut de la plateforme",
+            ["settings.pagesize_reset_confirm"]  = "Réinitialiser les éléments par page au défaut de la plateforme ?",
+            ["settings.pagesize_reset"]        = "Réinitialiser au défaut de la plateforme",
+            ["settings.pagesize_save"]         = "Enregistrer",
+            ["settings.pagesize_flash_set"]    = "Éléments par page réglés sur \"{0}\" — cela prend effet à la prochaine requête.",
+            ["settings.pagesize_flash_reset"]  = "Éléments par page réinitialisés — le défaut de la plateforme sera utilisé.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -5583,6 +5853,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-mail",
             ["directory.detail_contact_phone"] = "Téléphone",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Envoyer un message",
             ["directory.detail_no_contact"] =
                 "Cet habitant ne t'a pas (encore) partagé de moyen de contact. Tu " +
                 "peux toujours voir sa page de profil.",
@@ -6194,6 +6466,7 @@ public static class KnownTranslationKeys
             ["message.compose.send"] = "Envoyer",
             ["message.unread"] = "non lu",
             ["message.disabled"] = "La messagerie directe est désactivée sur cette instance.",
+            ["message.compose.disabled"] = "Cette personne a désactivé la messagerie directe, vous ne pouvez donc pas lui envoyer de nouveau message.",
             ["message.other"] = "l'autre personne",
             ["message.sent_to"] = "Envoyé à {0}.",
             ["message.load_earlier"] = "Charger les messages antérieurs",
@@ -6454,6 +6727,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Ton format de date et d'heure",
             ["onboarding.step_email"]       = "Ta langue des e-mails et des notifications",
             ["onboarding.step_contact"]     = "Tes coordonnées et qui peut les voir",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Si tu peux utiliser la messagerie directe",
             ["onboarding.visit"]            = "Aller à ce réglage",
             ["onboarding.finish"]           = "Tout est prêt — terminer la configuration",
             ["onboarding.skip"]             = "Passer pour l'instant",
@@ -6465,10 +6740,10 @@ public static class KnownTranslationKeys
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
             ["settings.messaging.title"]           = "Messagerie",
-            ["settings.messaging.description"]     = "Choisis si tu peux utiliser la messagerie directe 1:1 avec les autres résidents. Ton choix est enregistré sur ton compte et prend effet immédiatement.",
+            ["settings.messaging.description"]     = "Choisis si d'autres résidents peuvent t'envoyer des messages directs 1:1. Ton choix est enregistré sur ton compte et prend effet immédiatement.",
             ["settings.messaging.instance_off"]    = "La messagerie est actuellement désactivée sur cette instance par un administrateur. Tu peux t'inscrire maintenant et la messagerie sera disponible dès qu'elle sera activée.",
             ["settings.messaging.restricted"]      = "La messagerie a été restreinte sur ton compte par un tuteur. Contacte-le pour changer cela.",
-            ["settings.messaging.optin"]           = "Autoriser la messagerie directe 1:1",
+            ["settings.messaging.optin"]           = "Autoriser d'autres résidents à m'envoyer des messages directs 1:1",
             ["settings.messaging.save"]            = "Enregistrer la préférence de messagerie",
             ["guardian.messaging.title"]           = "Messagerie",
             ["guardian.messaging.description"]     = "Choisis si cet enfant peut utiliser la messagerie directe 1:1. Si restreinte, l'enfant ne peut ni envoyer ni recevoir de messages — ce choix prime sur son propre opt-in ; si autorisée, l'enfant décide par lui-même sur sa page de réglages de messagerie.",
@@ -6582,6 +6857,10 @@ public static class KnownTranslationKeys
                 "Restreindre la messagerie pour cet enfant ? Il ne pourra plus envoyer ni recevoir de " +
                 "messages directs, quelle que soit son propre opt-in.",
             ["guardian.handover_confirm"]    = "Transférer ce compte à l'enfant ? Cela dissout ta tutelle sur ce compte.",
+            ["guardian.remove_myself_confirm"] =
+                "Retirer ta tutelle sur ce compte ? Tu ne pourras plus gérer " +
+                "le compte. Le compte est conservé, et les autres tuteurs " +
+                "restent en place.",
             ["guardian.delete_child_confirm"] =
                 "Supprimer définitivement ce compte d'enfant ? Cette opération " +
                 "retire la connexion, le profil et les adhésions, et ne peut pas " +
@@ -6650,6 +6929,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "Réinitialiser TOUTES les {0} pages d'aide seedées au texte seedé ? Cela écrase tout " +
                 "le contenu modifié manuellement sur chaque page.",
+
+            // ── M26 U16 — le jeu fermé sort.* du partiel _Sort partagé
+            // (labels only ; les huit clés de tri des listes autorisées des
+            // surfaces U10–U15) ──
+            ["sort.created"]          = "Créé",
+            ["sort.modified"]         = "Modifié",
+            ["sort.title"]            = "Titre",
+            ["sort.size"]             = "Taille",
+            ["sort.name"]             = "Nom",
+            ["sort.start"]            = "Date de début",
+            ["sort.due"]              = "Échéance",
+            ["sort.status"]           = "Statut",
         };
 
     /// <summary>
@@ -6739,6 +7030,7 @@ public static class KnownTranslationKeys
             ["common.filter"]   = "Filtrér",
             ["common.full_page"]    = "Hele siden",
             ["common.exit_full_page"] = "Afslut hele siden",
+            ["common.open_full_page"] = "Åbn hele siden",
             ["common.fullscreen"]   = "Fuldskærm",
             ["common.exit_fullscreen"] = "Afslut fuldskærm",
             ["common.name"]         = "Navn",
@@ -6822,6 +7114,7 @@ public static class KnownTranslationKeys
             ["projects.todo.claim"]          = "Tag på dig",
             ["projects.todo.addressed_to"]   = "Rettet til",
             ["projects.todo.filter_unassigned"] = "Kun ikke tildelte",
+            ["projects.todo.filter_assigned_to_me"] = "Tildelt til mig",
             ["projects.todo.add_subtask"]    = "Tilføj delopgave",
             ["projects.todo.delete"]         = "Slet",
             ["projects.todo.parent"]         = "Forældreopgave",
@@ -6958,6 +7251,13 @@ public static class KnownTranslationKeys
                 "Medlemskaberne bevares, og barnets egne kontroller kommer " +
                 "tilbage ved næste læsning.",
             ["guardian.dissolve"]            = "Afløs værgemodet",
+            // Count-aware steering (ADR 0028 §G·6) — da.
+            ["guardian.remove_myself"]       = "Fjern mig selv som værgemand",
+            ["guardian.remove_myself_hint"]  =
+                "Du er en af flere værgemænd for dette barn. Når du fjerner " +
+                "dig selv som værgemand, ophører dine rettigheder over " +
+                "kontoen; de øvrige værgemænd bliver ved, og kontoen bevares.",
+            ["guardian.remove_myself_submit"] = "Fjern mig selv",
             ["guardian.suspended"]           = "Suspendert",
             ["guardian.unsuspend"]           = "Genopret",
             ["guardian.suspend"]             = "Suspendér",
@@ -7067,6 +7367,52 @@ public static class KnownTranslationKeys
                 "Du skal acceptere betingelserne for barnes konto, før du accepterer.",
             ["guardian.decline"] = "Afvis",
 
+            // ── The lane — event attendance (the guardian's three postures) ──
+            ["guardian.eventrsvp.title"] = "Deltagelse i arrangementer",
+            ["guardian.eventrsvp.description"] =
+                "Vælg, hvordan dette barns deltagelse i arrangementer håndteres.",
+            ["guardian.eventrsvp.mode_approves_active"] =
+                "I øjeblikket: Værge godkender — Jeg godkender eller afviser hvert arrangement, barnet vil deltage i.",
+            ["guardian.eventrsvp.mode_notifies_active"] =
+                "I øjeblikket: Værge underrettes — Barnet deltager frit; jeg underrettes og kan fjerne enhver deltagelse bagefter.",
+            ["guardian.eventrsvp.mode_childdecides_active"] =
+                "I øjeblikket: Barnet bestemmer — Barnet vælger selv sin deltagelse; ingen godkendelse og ingen underretning.",
+            ["guardian.eventrsvp.switch_to_approves"] = "Skift til \"Værge godkender\"",
+            ["guardian.eventrsvp.switch_to_notifies"] = "Skift til \"Værge underrettes\"",
+            ["guardian.eventrsvp.switch_to_childdecides"] = "Skift til \"Barnet bestemmer\"",
+            ["guardian.eventrsvp.pending_title"] = "Ventende deltagelsesanmodninger",
+            ["guardian.eventrsvp.pending_empty"] = "Ingen ventende deltagelsesanmodninger.",
+            ["guardian.eventrsvp.desired"] = "Vil deltage",
+            ["guardian.eventrsvp.approve"] = "Godkend",
+            ["guardian.eventrsvp.deny"] = "Afvis",
+            ["guardian.eventrsvp.rsvps_title"] = "Dette barns nuværende deltagelse",
+            ["guardian.eventrsvp.rsvps_empty"] = "Ingen nuværende deltagelse at fjerne.",
+            ["guardian.eventrsvp.veto"] = "Fjern",
+            ["guardian.eventrsvp.approve_confirm"] =
+                "Godkende dette barns deltagelse i dette arrangement?",
+            ["guardian.eventrsvp.deny_confirm"] =
+                "Afvis dette barns deltagelse i dette arrangement? Det vil ikke deltage.",
+            ["guardian.eventrsvp.veto_confirm"] =
+                "Fjern dette barns deltagelse i dette arrangement? Deltagelsen vil blive slettet.",
+
+            // ── notification kinds (the lane) ────────────────────────────────
+            ["notifications.kind.guardian.event_request"] =
+                "Deltagelsesanmodning fra dit barn",
+            ["notifications.preference.guardian.event_request.label"] =
+                "Når dit barn vil deltage i et arrangement",
+            ["notification.guardian.event_request.subject"] =
+                "Dit barn vil deltage i et arrangement",
+            ["notification.guardian.event_request.body"] =
+                "Dit barn vil deltage i et arrangement: ",
+            ["notifications.kind.guardian.event_rsvp"] =
+                "Dit barn har deltaget i et arrangement",
+            ["notifications.preference.guardian.event_rsvp.label"] =
+                "Når dit barn deltager i et arrangement",
+            ["notification.guardian.event_rsvp.subject"] =
+                "Dit barn har deltaget i et arrangement",
+            ["notification.guardian.event_rsvp.body"] =
+                "Dit barn har deltaget i et arrangement: ",
+
             // ── notification kind (GA ADR 0038 §F) ──────────────────────────
             ["notifications.kind.guardian.assign"] =
                 "En værgemand har bedt dig om at blive medværgemand",
@@ -7148,6 +7494,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Gem",
             ["settings.dateformat_flash_set"]    = "Dato- og tidsformat indstillet — det træder i kraft ved næste anmodning.",
             ["settings.dateformat_flash_reset"]  = "Dato- og tidsformat nulstillet — platformstandarden bruges.",
+
+            ["settings.pagesize_title"]        = "Elementer pr. side",
+            ["settings.pagesize_lede"]         =
+                "Vælg, hvor mange elementer hver liste viser pr. side (flok, begivenheder, projekter m.m.). " +
+                "Dit valg gemmes på din konto — det træder i kraft ved næste indlæsning af en liste, og " +
+                "betræffes aldrig andre beboere.",
+            ["settings.pagesize_label"]        = "Elementer pr. side",
+            ["settings.pagesize_default_marker"] = "— platformstandard",
+            ["settings.pagesize_reset_confirm"]  = "Nulstil elementer pr. side til platformstandarden?",
+            ["settings.pagesize_reset"]        = "Nulstil til platformstandard",
+            ["settings.pagesize_save"]         = "Gem",
+            ["settings.pagesize_flash_set"]    = "Elementer pr. side indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
+            ["settings.pagesize_flash_reset"]  = "Elementer pr. side nulstillet — platformstandarden bruges.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -7734,6 +8093,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-mail",
             ["directory.detail_contact_phone"] = "Telefon",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Send en besked",
             ["directory.detail_no_contact"] =
                 "Denne beboer har (endnu) ikke delt en kontaktmulighed med dig. Du " +
                 "kan stadig se deres profilside.",
@@ -8339,6 +8700,7 @@ public static class KnownTranslationKeys
             ["message.compose.placeholder"] = "Skriv en besked…",
             ["message.compose.send"] = "Send",
             ["message.unread"] = "ulæst",
+            ["message.compose.disabled"] = "Denne person har slået direkte beskeder fra, så du kan ikke sende dem en ny besked.",
             ["message.disabled"] = "Direkte beskeder er slået fra på denne instans.",
             ["message.other"] = "den anden person",
             ["message.sent_to"] = "Sendt til {0}.",
@@ -8600,6 +8962,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Dit dato- og tidsformat",
             ["onboarding.step_email"]       = "Dit e-mail- og beskedssprog",
             ["onboarding.step_contact"]     = "Dine kontaktoplysninger og hvem der kan se dem",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Om du kan bruge direkte beskeder",
             ["onboarding.visit"]            = "Gå til denne indstilling",
             ["onboarding.finish"]           = "Alt er klar — afslut opsætningen",
             ["onboarding.skip"]             = "Spring over for nu",
@@ -8611,10 +8975,10 @@ public static class KnownTranslationKeys
             // loft (startværdier på da, til revidering af en oversætter;
             // ADR 0015 leverandørens bundløsning løser dem). ──
             ["settings.messaging.title"]           = "Beskeder",
-            ["settings.messaging.description"]     = "Vælg, om du kan bruge direkte 1:1-beskeder med andre beboere. Dit valg gemmes på din konto og gælder straks.",
+            ["settings.messaging.description"]     = "Vælg, om andre beboere kan sende dig direkte 1:1-beskeder. Dit valg gemmes på din konto og gælder straks.",
             ["settings.messaging.instance_off"]    = "Direkte beskeder er i øjeblikket slået fra på denne instans af en administrator. Du kan tilmelde dig nu, og beskeder vil være tilgængelige, så snart de slås til.",
             ["settings.messaging.restricted"]      = "Beskeder er blevet begrænset på din konto af en værgmand. Kontakt dem for at ændre det.",
-            ["settings.messaging.optin"]           = "Tillad mig at bruge direkte 1:1-beskeder",
+            ["settings.messaging.optin"]           = "Lad andre sende mig direkte 1:1-beskeder",
             ["settings.messaging.save"]            = "Gem beskedindstilling",
             ["guardian.messaging.title"]           = "Beskeder",
             ["guardian.messaging.description"]     = "Vælg, om dette barn kan bruge direkte 1:1-beskeder. Ved begrænsning kan barnet hverken sende eller modtage beskeder — dette valg har forrang over dets eget opt-in; ved tilladelse vælger barnet selv på sin egen beskedindstillingsside.",
@@ -8726,6 +9090,10 @@ public static class KnownTranslationKeys
                 "Begræns beskeder for dette barn? Det vil ikke længere kunne sende eller modtage " +
                 "direkte beskeder, uanset dets eget opt-in.",
             ["guardian.handover_confirm"]    = "Overtag dette konto til barnet? Dette ophæver din forældremyndighed over det.",
+            ["guardian.remove_myself_confirm"] =
+                "Fjerner du dig selv som værgemand for dette barn? Du kan " +
+                "derefter ikke administrere kontoen. Kontoen bevares, og de " +
+                "øvrige værgemænd bliver ved.",
             ["guardian.delete_child_confirm"] =
                 "Slet denne barnkonto permanent? Dette fjerner login, profil og " +
                 "medlemskaber, og det kan ikke fortrydes.",
@@ -8788,6 +9156,18 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "Nulstil ALLE {0} seeded hjælpesider til seedteksten? Dette overskriver al manuelt " +
                 "redigeret tekst på hver side.",
+
+            // ── M26 U16 — det lukkede sort.*-sæt fra den delte _Sort-partial
+            // (labels kun; de otte sortnøgler fra U10–U15-overfladernes
+            // tilladte lister) ──
+            ["sort.created"]          = "Oprettet",
+            ["sort.modified"]         = "Ændret",
+            ["sort.title"]            = "Titel",
+            ["sort.size"]             = "Størrelse",
+            ["sort.name"]             = "Navn",
+            ["sort.start"]            = "Startdato",
+            ["sort.due"]              = "Frist",
+            ["sort.status"]           = "Status",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

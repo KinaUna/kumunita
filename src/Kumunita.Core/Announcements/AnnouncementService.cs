@@ -1,6 +1,7 @@
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -111,34 +112,47 @@ public sealed class AnnouncementService : IAnnouncementService
     /// vacuously satisfied). The non-paged <see cref="ListVisibleAsync"/> is
     /// unmodified (the banner + admin surfaces keep the whole-list read).
     /// </summary>
-    public async Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default)
+    public async Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         ArgumentNullException.ThrowIfNull(roles);
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
 
         await using var session = _store.QuerySession();
-        var candidates = await session
+        IQueryable<Announcement> q = session
             .Query<Announcement>()
             .Where(a => !a.IsDraft &&
                         ((a.CommunityId == null &&
                           (a.Scope == AnnouncementScope.Public ||
                            (authed && a.Scope == AnnouncementScope.Community)))
                          || (a.CommunityId != null &&
-                             (admin || communities.Contains(a.CommunityId!)))))
-            .OrderByDescending(a => a.Created)
+                             (admin || communities.Contains(a.CommunityId!)))));
+        // M26 U7 (design doc §2.2 row 11, closed allowlist
+        // created/modified/title) — null keeps the pinned
+        // OrderByDescending(Created) byte-for-byte (C-SORT·2); non-null
+        // applies the allowlist + the ThenBy(Id) tie-breaker (C-SORT·5) via
+        // the shared MiscSortSupport helper.
+        if (sort is null)
+            q = q.OrderByDescending(a => a.Created); // ← the pinned line, verbatim
+        else
+            q = MiscSortSupport.OrderByMiscSort<Announcement, DateTimeOffset, DateTimeOffset?, string>(q, sort,
+                new HashSet<string> { "created", "modified", "title" },
+                a => a.Created, a => a.Modified, a => a.Title,
+                sizeKey: "", a => string.Empty, nameKey: "", a => string.Empty, a => a.Id);
+        var candidates = await q
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
         var items = candidates
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToList();
 
         // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
         // set filled the page (design doc §7.6).
-        return new AnnouncementPage(Items: items, HasMore: items.Count == PageSize);
+        return new AnnouncementPage(Items: items, HasMore: items.Count == ps);
     }
 
     /// <summary>
@@ -1162,7 +1176,7 @@ public sealed class AnnouncementService : IAnnouncementService
             .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None)
             .ConfigureAwait(false);
         // The <c>true</c> floor: a missing singleton reads as "comments on"
-        // (the IsSignupOpen / NotifyAdminsOnSignup precedent).
+        // (the NotifyAdminsOnSignup precedent).
         return settings is null || settings.AnnouncementCommentsEnabled;
     }
 

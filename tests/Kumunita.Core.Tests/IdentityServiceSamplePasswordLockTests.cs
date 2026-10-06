@@ -60,9 +60,9 @@ public sealed class IdentityServiceSamplePasswordLockTests(PostgresFixture fixtu
         var boot = await BootAsync(sampleDataEnabled: false);
 
         // A fresh instance has no LocaleSettings row at all (the seeder has
-        // not run in this scratch DB); the floor is `false` (the deliberate
-        // inverse of the IsSignupOpenAsync `true` floor — a real instance
-        // never blocks a password change).
+        // not run in this scratch DB); the floor is `false` — a real instance
+        // never blocks a password change (the same `false`-floor posture as the
+        // IsSignupOpenAsync floor, ADR 0050 as amended 2026-10-05).
         Assert.False(await boot.Identity.IsSamplePasswordChangeLockedAsync());
 
         // A read is a read — no audit row is committed for the floor probe.

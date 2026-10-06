@@ -182,6 +182,34 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileAvatarAsync"/> pin).</exception>
     Task SetProfileTimezoneAsync(string subjectId, string? timezone, string actorBy);
 
+    // ── Page-size addition (the *single* user-override write lane for the
+    // resident's items-per-page preference; the exact shape of
+    // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's
+    /// <see cref="Profile.PageSize"/> items-per-page preference — the user's
+    /// <b>override</b> of the platform default
+    /// (<see cref="Kumunita.Core.Query.PageSizer.Default"/> = 10; a <c>null</c> value means
+    /// "reset to the platform default"). Mirrors
+    /// <see cref="SetProfileTimezoneAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary
+    /// (the owner is the actor); this lane writes <c>Profile.PageSize</c>
+    /// only. One session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// The value is clamped to <see cref="Query.PageSizer.Min"/>…
+    /// <see cref="Query.PageSizer.Max"/> on the read path
+    /// (<see cref="Query.PageSizer.Resolve"/>); this lane stores what it's
+    /// given (the ADR 0019 "store, resolve on read" posture — a page size is
+    /// never a fail-closed gate). Strong consistency (invariant C4): the new
+    /// value is live on the very next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task SetProfilePageSizeAsync(string subjectId, int? pageSize, string actorBy);
+
     // ── Date format addition (ADR 0020; the *single* user-override write
     // lane for the resident's personal date-time format — the exact shape of
     // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──
@@ -316,6 +344,35 @@ public interface IUserInfoService
     /// <exception cref="InvalidOperationException">No profile for the child
     /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
     Task SetChildMessagingRestrictionAsync(string childId, bool restricted, string guardianId);
+
+    /// <summary>
+    /// The lane — the <b>guardian's event-attendance policy</b> over a
+    /// supervised child (the <see cref="SetChildMessagingRestrictionAsync"/>
+    /// guardian-scope shape verbatim, over a mode instead of a bool): sets
+    /// <see cref="Profile.EventRsvpMode"/> to
+    /// <paramref name="mode"/>. <see
+    /// cref="EventRsvpMode.GuardianApproves"/> = the child's own RSVP
+    /// self-lane is refused (the guardian must approve / deny each attendance
+    /// — the lane's stated default); <see cref
+    /// "EventRsvpMode.GuardianNotifies"/> = the child's own RSVP self-lane is
+    /// allowed and every such write notifies the guardian(s), who may veto
+    /// (remove) it afterwards; <see cref="EventRsvpMode.ChildDecides"/> = the
+    /// child decides for themselves (no gate, no notification, no veto — the
+    /// unsupervised-resident behavior). One <c>SaveChangesAsync</c>. The
+    /// standing gate is an <b>active</b> <see cref="GuardianLink"/> for the
+    /// exact (guardian, child) pair (G·2/G·3 deny-by-default); the audit row
+    /// is <c>guardian.event_rsvp_mode</c>, <c>TargetKind</c> "profile",
+    /// <see cref="Authorization.AccessVia.Guardian"/> (the
+    /// <c>guardian.messaging_restrict</c> shape).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair — the actor
+    /// has no standing (the Web surfaces a 404, the GU deny-by-default pin).</exception>
+    /// <exception cref="InvalidOperationException">No profile for the child
+    /// (bad state, not a no-op — the <see cref="SuspendChildAsync"/> pin).</exception>
+    Task SetChildEventRsvpModeAsync(string childId, EventRsvpMode mode, string guardianId);
 
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────

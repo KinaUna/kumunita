@@ -2037,6 +2037,31 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetProfilePageSizeAsync(string subjectId, int? pageSize, string actorBy)
+    {
+        // The resident's items-per-page override write lane. Mirrors
+        // SetProfileTimezoneAsync exactly (the C-MED·8 single write-lane shape):
+        // the self-scope check happens at the Web boundary (the owner is the
+        // actor); this lane writes Profile.PageSize only. One session, one
+        // SaveChangesAsync (C3); no audit row (a Profile field write — the
+        // UpsertProfileAsync shape, "not an access decision"). Fail closed on a
+        // missing profile (never load-or-create, the SetProfileTimezoneAsync pin).
+        // Strong consistency (C4): the new value is live on the very next
+        // GetProfileAsync call. The value is stored as-is (clamped on the read
+        // path by PageSizer.Resolve — the ADR 0019 "store, resolve on read"
+        // posture; a page size is never a fail-closed gate).
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.PageSize = pageSize;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)
     {
         // ADR 0020 — the user's date-format override write lane. Mirrors
@@ -2182,6 +2207,56 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
             ActorId = guardianId,
             EffectivePrincipalId = guardianId,
             Action = "guardian.messaging_restrict",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetChildEventRsvpModeAsync(string childId, EventRsvpMode mode, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        // The lane — the guardian's event-attendance policy over a supervised
+        // child. Mirrors SetChildMessagingRestrictionAsync exactly (the
+        // guardian write-lane shape): standing gate first (G·2/G·3), then the
+        // mode write, then one audit row — all in one session / one
+        // SaveChangesAsync (C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // Load the child's profile (missing → bad state, not a no-op — the
+        // SuspendChildAsync pin).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Set the mode (enforcement parity — the EventService RSVP gate reads
+        // this exact field to decide how the child's own RsvpAsync write is
+        // treated: refused / allowed-and-notified / allowed outright).
+        profile.EventRsvpMode = mode;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.event_rsvp_mode",
             TargetKind = "profile",
             TargetId = childId,
             Via = Authorization.AccessVia.Guardian,

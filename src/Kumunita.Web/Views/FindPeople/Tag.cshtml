@@ -46,6 +46,14 @@
                 </div>
             </header>
 
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the list — above the profiles — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             <div class="dir-cards">
                 @foreach (var p in Model.Result.Profiles)
                 {
@@ -76,10 +84,21 @@
                 }
             </div>
 
+            // C-SORT·8 — when the request carried a sort (a non-blank
+            // ?sort=), the "Older" next-link keeps the sort/dir pairs
+            // (read from the Sort control's CarriedParams — the same
+            // value the controller pinned); an unsorted read keeps the
+            // pre-M26 ?page=N-only link byte-identical (C-SORT·2).
+            var _carry = Model.Sort?.CarriedParams;
+            var _sortCarry = _carry is not null
+                && _carry.TryGetValue("sort", out var _sv)
+                && _carry.TryGetValue("dir", out var _dv)
+                ? $"&sort={Uri.EscapeDataString(_sv)}&dir={Uri.EscapeDataString(_dv)}"
+                : "";
             @if (Model.Result.HasMore)
             {
                 <nav aria-label="pagination" class="mt-3">
-                    <a class="page-link" href="/people/tag/@Uri.EscapeDataString(Model.Slug)?page=@(Model.Page + 1)" rel="next">
+                    <a class="page-link" href="/people/tag/@Uri.EscapeDataString(Model.Slug)?page=@(Model.Page + 1)@_sortCarry" rel="next">
                         <kw-l key="pagination.next">Older</kw-l>
                     </a>
                 </nav>

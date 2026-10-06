@@ -55,7 +55,7 @@ public interface IInventoryService
     /// <c>hiddenCount</c>, <c>TargetId</c> null) is the C-M3·3 shape
     /// (C-M16·2 — one row, Allow **and** Deny).
     /// </summary>
-    Task<ItemPage> ListItemsAsync(string? ownerKind, string? componentId, string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
+    Task<ItemPage> ListItemsAsync(string? ownerKind, string? componentId, string actorId, int page, CancellationToken ct = default, Kumunita.Core.Query.SortSpec? sort = null, int? pageSize = null); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
     /// One item's detail (design doc §Seams, verbatim): one

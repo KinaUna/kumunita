@@ -46,6 +46,12 @@ public sealed record AnnouncementIndexViewModel(IReadOnlyList<AnnouncementRow> A
     /// .ListVisiblePagedAsync"/> seam's <c>HasMore</c> (D1); no filter form
     /// (D9) so the links carry <c>?page=N</c> only.</summary>
     public PagedViewModel? Pager { get; init; }
+
+    /// <summary>M26 U13 (D-SORT·5) — the one shared sort control (the U10
+    /// _Sort reference, reused verbatim — C-SORT·1): the closed announcements
+    /// allowlist (U2 §2.2 row 11 — created/modified/title). A null
+    /// <c>Sort</c> renders nothing (the no-sort pin, C-SORT·2).</summary>
+    public SortViewModel? Sort { get; init; }
 }
 
 /// <summary>The /announcements/{id} detail view (the full-body read

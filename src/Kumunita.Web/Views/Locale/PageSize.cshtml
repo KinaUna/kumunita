@@ -1,0 +1,68 @@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Items per page";
+    // The reset form's data-confirm (the ADR 0072 attribute idiom — the
+    // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
+    // wrap an attribute). The en floor is the server fallback (a null provider
+    // — a non-HTTP render — degrades to en).
+    string confirmReset = "Reset your items-per-page to the platform default?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmReset = await Translation.GetAsync("settings.pagesize_reset_confirm", effLang);
+    }
+}
+
+@* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
+   the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+
+@if (Model.PageSize is var ps && ps is not null)
+{
+    <h2 class="mt-1"><kw-l key="settings.pagesize_title">Items per page</kw-l></h2>
+    <p class="text-muted">
+        <kw-l key="settings.pagesize_lede">Choose how many items each list shows per page (feeds, events, projects and the rest). Your choice is saved on your account — it takes effect the next time you load a list, and never affects other residents.</kw-l>
+    </p>
+
+    <form method="post" action="/settings/pagesize">
+        @Html.AntiForgeryToken()
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-8">
+                <label for="pageSizeId" class="form-label"><kw-l key="settings.pagesize_label">Items per page</kw-l></label>
+                <select class="form-select" name="pageSize" id="pageSizeId">
+                    @foreach (var option in ps.Options)
+                    {
+                        var selected = option == ps.Selected;
+                        <option value="@option" selected="@(selected ? "selected" : null)">
+                            @option
+                            @if (option == ps.Default)
+                            {
+                                <span class="text-muted small"><kw-l key="settings.pagesize_default_marker">— platform default</kw-l></span>
+                            }
+                        </option>
+                    }
+                </select>
+                <div class="form-text small">
+                    <kw-l key="settings.timezone_default_note">The platform default is </kw-l><strong>@ps.Default</strong><kw-l key="settings.timezone_default_tail">. If you reset your preference, the platform default is used.</kw-l>
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <button type="submit" class="btn btn-primary"><kw-l key="settings.pagesize_save">Save</kw-l></button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" action="/settings/pagesize" class="mt-3"
+          data-confirm="@confirmReset">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="clear" value="1" />
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.pagesize_reset">Reset to platform default</kw-l></button>
+    </form>
+}

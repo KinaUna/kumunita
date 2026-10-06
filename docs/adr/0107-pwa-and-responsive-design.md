@@ -102,7 +102,10 @@ doc §SW, **narrower** than this ADR's prose: the fonts + the logo
 images are deliberately *not* allowlisted in M10, the drift log's
 entry (b)). **Every other request — all signed-in pages, all `POST`s,
 `HEAD`/`OPTIONS`, any request carrying an `Authorization` header —
-passes through untouched** (`event.respondWith(fetch(event.request))`).
+passes through untouched** (the amended rule — a `return` without calling
+`event.respondWith()`, so the request never routes through the worker's
+own `fetch`; the original `event.respondWith(fetch(event.request))` form
+broke form submissions — see the design doc drift log).
 This is the privacy pin (C-M10·2): the SW's cache partition can never
 hold a resident's feed, a conversation, an inbox, or a board. The
 negative pin (a signed-in route is not in the cache after a visit) is

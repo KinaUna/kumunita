@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
@@ -98,12 +99,12 @@ public sealed class M23FindPeopleTests
         var b = Profile(ResidentB, "Bob", false);
         var tag = new Tag { Id = "tag-gardening", Slug = "gardening", Name = "Gardening", LanguageCode = "en", CreatedBy = ResidentA };
         var page = new ProfileTagPage(new[] { a, b }, tag, HasMore: true);
-        find.FindPeopleByTagAsync("gardening", Viewer, 2).Returns(page);
+        find.FindPeopleByTagAsync("gardening", Viewer, 2, null, Arg.Any<int?>()).Returns(page);
 
         var result = await controller.ByTag("gardening", 2);
 
         // The Web boundary supplies the signed-in subject (never a form value).
-        await find.Received(1).FindPeopleByTagAsync("gardening", Viewer, 2);
+        await find.Received(1).FindPeopleByTagAsync("gardening", Viewer, 2, null, Arg.Any<int?>());
 
         var vm = Assert.IsType<FindPeopleTagViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("gardening", vm.Slug);
@@ -130,11 +131,11 @@ public sealed class M23FindPeopleTests
 
         var a = Profile(ResidentA, "Alice", true);
         var page = new ProfileBioPage(new[] { a }, HasMore: false);
-        find.FindPeopleByBioAsync("baker", Viewer, 1).Returns(page);
+        find.FindPeopleByBioAsync("baker", Viewer, 1, null, Arg.Any<int?>()).Returns(page);
 
         var result = await controller.Index(bio: "  baker  ", page: 1);
 
-        await find.Received(1).FindPeopleByBioAsync("baker", Viewer, 1);
+        await find.Received(1).FindPeopleByBioAsync("baker", Viewer, 1, null, Arg.Any<int?>());
 
         var vm = Assert.IsType<FindPeopleBioViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("baker", vm.Query);       // trimmed (the M8 D4 substring engine)
@@ -162,7 +163,7 @@ public sealed class M23FindPeopleTests
         Assert.NotNull(vm);
         // The U03 service is the gate; a blank query must not reach it (no
         // decision, no row — the M3 0-candidate shape).
-        await find.DidNotReceiveWithAnyArgs().FindPeopleByBioAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>());
+        await find.DidNotReceiveWithAnyArgs().FindPeopleByBioAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
     }
 
     /// <summary>
@@ -179,7 +180,7 @@ public sealed class M23FindPeopleTests
 
         // The U03 "missing tag ⇒ empty page, no row" shape: empty profiles,
         // null tag, no more.
-        find.FindPeopleByTagAsync("definitely-not-a-tag", Viewer, 1)
+        find.FindPeopleByTagAsync("definitely-not-a-tag", Viewer, 1, null, Arg.Any<int?>())
             .Returns(new ProfileTagPage(Array.Empty<Profile>(), null, false));
 
         var result = await controller.ByTag("definitely-not-a-tag", 1);
@@ -208,7 +209,7 @@ public sealed class M23FindPeopleTests
         Assert.Equal("/people/tag/gardening", redirect.Url);
         // The redirect short-circuits before any find call (no decision, no
         // row on the index surface).
-        await find.DidNotReceiveWithAnyArgs().FindPeopleByTagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>());
+        await find.DidNotReceiveWithAnyArgs().FindPeopleByTagAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
     }
 
     // ── Face 4 — the paging idiom (ADR 0090 D6) ───────────────────────────
@@ -226,7 +227,7 @@ public sealed class M23FindPeopleTests
         var (controller, find) = BuildController();
 
         // A full first page (the U03 PageSize = 30 slice) → HasMore true.
-        find.FindPeopleByBioAsync("a", Viewer, 1)
+        find.FindPeopleByBioAsync("a", Viewer, 1, null, Arg.Any<int?>())
             .Returns(new ProfileBioPage(Enumerable.Range(0, 30).Select(i => Profile($"subj-{i}", $"P{i}", false)).ToList(), true));
         var first = await controller.Index(bio: "a", page: 1);
         var vm1 = Assert.IsType<FindPeopleBioViewModel>(Assert.IsType<ViewResult>(first).Model);
@@ -234,7 +235,7 @@ public sealed class M23FindPeopleTests
         Assert.Equal(1, vm1.Page);
 
         // The final page (the remainder, fewer than PageSize) → HasMore false.
-        find.FindPeopleByBioAsync("a", Viewer, 2)
+        find.FindPeopleByBioAsync("a", Viewer, 2, null, Arg.Any<int?>())
             .Returns(new ProfileBioPage(new[] { Profile(ResidentA, "Alice", true) }, false));
         var last = await controller.Index(bio: "a", page: 2);
         var vm2 = Assert.IsType<FindPeopleBioViewModel>(Assert.IsType<ViewResult>(last).Model);

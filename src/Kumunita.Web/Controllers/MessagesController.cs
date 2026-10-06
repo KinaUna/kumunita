@@ -116,20 +116,30 @@ public sealed class MessagesController(
             return View(new MessagesIndexViewModel { Disabled = true });
 
         var pageNum = page is > 0 ? page.Value : 1;
-        var list = await _messaging.ListConversationsAsync(actorId, pageNum);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(_userInfo, actorId);
+        var list = await _messaging.ListConversationsAsync(actorId, pageNum, pageSize: pageSize);
 
         // The new-conversation picker: every non-blocked resident except the
         // actor themself (the directory's catalog read — verifiedOnly: false,
         // the CommunityController picker pattern; self-open has no 1:1 use).
+        // A resident who has **not** enabled messaging (opt-in off, or a
+        // guardian's restriction on) is not a candidate — the recipient's own
+        // standing is the gate (the DirectoryController.D1 two-sided shape:
+        // the resident's own standing read off the profile, never the
+        // IsMessagingAllowedForAsync viewer half).
         var candidates = (await _userInfo.GetProfilesAsync(verifiedOnly: false))
-            .Where(p => !p.Blocked && p.SubjectId != actorId)
+            .Where(p => !p.Blocked && p.SubjectId != actorId
+                        && p.MessagingOptIn && !p.MessagingRestricted)
             .Select(p => new PickerCandidate(p.SubjectId, p.DisplayName))
             .OrderBy(c => c.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         PagedViewModel? pager = null;
         if (list.HasMore || pageNum > 1)
-            pager = PagedViewModel.ForRoute("/messages", pageNum, MessagingService.PageSize, list.HasMore);
+            pager = PagedViewModel.ForRoute("/messages", pageNum, pageSize, list.HasMore);
 
         return View(new MessagesIndexViewModel
         {
@@ -214,10 +224,14 @@ public sealed class MessagesController(
             return NotFound();
 
         var pageNum = page is > 0 ? page.Value : 1;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(_userInfo, actorId);
         ConversationDetail detail;
         try
         {
-            detail = await _messaging.GetConversationAsync(id, actorId, pageNum);
+            detail = await _messaging.GetConversationAsync(id, actorId, pageNum, pageSize: pageSize);
         }
         catch (KeyNotFoundException)
         {
@@ -253,7 +267,7 @@ public sealed class MessagesController(
         PagedViewModel? pager = null;
         if (detail.HasMore || pageNum > 1)
             pager = PagedViewModel.ForRoute($"/messages/{detail.Conversation.Id}", pageNum,
-                MessagingService.ThreadPageSize, detail.HasMore);
+                pageSize, detail.HasMore);
 
         // The service returns the window newest-first (its own contract);
         // the thread renders it chronologically — oldest first, the **latest
@@ -265,6 +279,34 @@ public sealed class MessagesController(
             chronological = chronological.Reverse().ToList();
         }
 
+        // The recipient's own messaging standing (the DirectoryController.D1
+        // two-sided shape read on the *other* participant, never the viewer
+        // half): when the other resident has opted out (or a guardian has
+        // restricted them), the composer is rendered disabled on this thread —
+        // they can read the exchange they were already part of, but cannot
+        // send a new message. Best-effort: a profile read failure degrades to
+        // "not enabled" (fail closed — the floor is "cannot send"), which
+        // matches the IsMessagingAllowedForAsync fail-closed convention.
+        bool otherMessagingEnabled = false;
+        if (detail.Conversation is { } detailConv
+            && !string.IsNullOrEmpty(detailConv.OtherParticipantId))
+        {
+            try
+            {
+                var other = await _userInfo.GetProfileAsync(detailConv.OtherParticipantId);
+                otherMessagingEnabled = other is not null
+                    && other.MessagingOptIn
+                    && !other.MessagingRestricted;
+            }
+            catch (Exception ex) when (ex is not UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex,
+                    "Thread recipient standing read failed for {RecipientId}; degrading to composer-disabled.",
+                    detailConv.OtherParticipantId);
+                otherMessagingEnabled = false;
+            }
+        }
+
         return View(new MessagesThreadViewModel
         {
             Conversation = detail.Conversation,
@@ -273,6 +315,7 @@ public sealed class MessagesController(
             ActorDisplayName = actorDisplayName,
             Page = pageNum,
             Pager = pager,
+            RecipientMessagingEnabled = otherMessagingEnabled,
         });
     }
 
@@ -439,5 +482,15 @@ public sealed class MessagesController(
 
         /// <summary>true when the instance toggle is off — the disabled state.</summary>
         public bool Disabled { get; init; }
+
+        /// <summary>
+        /// The *other* participant's messaging standing (their own
+        /// <c>MessagingOptIn</c> on ∧ <c>MessagingRestricted</c> off, the
+        /// DirectoryController.D1 two-sided shape). <c>false</c> → the
+        /// composer renders disabled on this thread (the recipient can no
+        /// longer receive new messages, so the write form is inert). The
+        /// floor when absent is <c>false</c> (fail closed — cannot send).
+        /// </summary>
+        public bool RecipientMessagingEnabled { get; init; }
     }
 }

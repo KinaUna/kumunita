@@ -39,6 +39,43 @@ public sealed record ChildAccountItem(string ChildId, string DisplayName, bool B
 public sealed record GuardianItem(string SubjectId, string DisplayName, bool IsPending);
 
 /// <summary>
+/// One <b>pending event-attendance request</b> on the child's <c>Detail</c>
+/// curation page (the lane's <see
+/// cref="Kumunita.Core.Events.GuardianEventRequest" />
+/// <see cref="Kumunita.Core.Events.GuardianEventRequestStatus.Pending" />
+/// row, the <see cref="PendingInvitationItem" /> group-invitation
+/// precedent re-expressed over events): the event id the child asked about,
+/// the child's display name (the curation fact the guardian already sees —
+/// the <see cref="ChildAccountItem" /> precedent, not a G·1 content read),
+/// the attendance the child asked for (<see cref="Kumunita.Core.Events
+/// .RsvpStatus"/>), and the request's creation instant. The approve / deny
+/// buttons POST to the <c>ApproveEventRsvp</c> / <c>DenyEventRsvp</c> lanes
+/// keyed by (childId, EventId).
+/// </summary>
+public sealed record EventRsvpRequestItem(
+    string EventId,
+    string ChildName,
+    Kumunita.Core.Events.RsvpStatus DesiredStatus,
+    string RequestedAt);
+
+/// <summary>
+/// One <b>existing child event-attendance row</b> on the child's
+/// <c>Detail</c> curation page (the lane's
+/// <see cref="Kumunita.Core.Events.EventRsvp" /> row, the
+/// <see cref="Kumunita.Core.UserInfo.EventRsvpMode.GuardianNotifies" />
+/// posture's veto list): the event id, the child's current
+/// <see cref="Kumunita.Core.Events.RsvpStatus"/>, and the last write's
+/// instant. The veto button POSTs to the <c>VetoEventRsvp</c> lane keyed by
+/// (childId, EventId) — a hard ceiling that removes the child's RSVP
+/// (the <see cref="Kumunita.Core.UserInfo.Profile
+/// .MessagingRestricted" /> veto shape).
+/// </summary>
+public sealed record EventRsvpVetoItem(
+    string EventId,
+    Kumunita.Core.Events.RsvpStatus Status,
+    string At);
+
+/// <summary>
 /// One <b>pending group invitation row</b> on the child's <c>Detail</c> curation
 /// view (GU, ADR 0028). <see cref="GroupId"/> is the route's <c>{groupId}</c> the
 /// approve POST posts to; <see cref="GroupName"/> is the display label (resolved

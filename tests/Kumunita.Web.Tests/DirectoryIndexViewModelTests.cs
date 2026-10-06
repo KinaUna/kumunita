@@ -19,7 +19,7 @@ namespace Kumunita.Web.Tests;
 public sealed class DirectoryIndexViewModelTests
 {
     [Fact]
-    public void VisibleProfile_Has_Exactly_Four_Projected_Fields()
+    public void VisibleProfile_Has_Exactly_Five_Projected_Fields()
     {
         var fields = typeof(VisibleProfile)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -27,11 +27,15 @@ public sealed class DirectoryIndexViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // The pin: SubjectId + DisplayName + Verified + Address — and *nothing else*.
-        // Address is the one privacy-aware field on the list, deliberately added for the
-        // neighbor-surface "who lives where" shape. No Email, No Phone, No ContactVisibility,
-        // No HouseholdId.
-        Assert.Equal(new[] { "Address", "DisplayName", "SubjectId", "Verified" }, fields.ToArray());
+        // The pin: SubjectId + DisplayName + Verified + Address + CanMessage —
+        // and *nothing else*. Address is the one privacy-aware field on the list,
+        // deliberately added for the neighbor-surface "who lives where" shape.
+        // CanMessage (M9 amendment, ADR 0139) is the two-sided "Send a message"
+        // gate the DirectoryController computes — a plain bool, no contact/audience
+        // fields. No Email, No Phone, No ContactVisibility, No HouseholdId.
+        Assert.Equal(
+            new[] { "Address", "CanMessage", "DisplayName", "SubjectId", "Verified" },
+            fields.ToArray());
     }
 
     [Fact]

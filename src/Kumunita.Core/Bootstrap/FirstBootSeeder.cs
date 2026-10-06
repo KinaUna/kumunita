@@ -1223,10 +1223,11 @@ public static class FirstBootSeeder
              "you read what the child writes.\n\n" +
              "**What you can do.** You can suspend and un-suspend the account, " +
              "decide which groups and communities the child belongs to, approve a " +
-             "group invitation the child received, invite another guardian to " +
-             "share the controls, and delete the account when the child is done " +
-             "with it. You can also hand the account over when the child is ready " +
-             "to run it on their own.\n\n" +
+             "group invitation the child received, approve or deny the child's " +
+             "event attendance (or let the child choose, your call), invite " +
+             "another guardian to share the controls, and delete the account when " +
+             "the child is done with it. You can also hand the account over when " +
+             "the child is ready to run it on their own.\n\n" +
              "**What you can't do.** You can't read the child's posts, replies, or " +
              "profile. Those are the child's, and they stay the child's.\n\n" +
              "**To add one.** Open **Account → Children**, fill in the child's " +
@@ -1242,6 +1243,17 @@ public static class FirstBootSeeder
              "**To approve a group invitation.** On the child's page, find the " +
              "invitation under **Pending group invitations** and click " +
              "**Approve**.\n\n" +
+             "**To manage event attendance.** On the child's page, under " +
+             "**Event attendance**, pick one of three ways to handle it: " +
+             "**Guardian approves** (the default) — the child can't RSVP to an " +
+             "event on their own; each request shows up under **Pending " +
+             "attendance requests** for you to **Approve** or **Deny**. " +
+             "**Guardian notifies** — the child RSVPs freely, you get a " +
+             "notification each time, and the list of their current attendance " +
+             "lets you **Remove** any of it afterwards. **Child decides** — the " +
+             "child chooses for themselves, with no approval and no " +
+             "notification. Switch whichever way you like; the change is live " +
+             "on the next request.\n\n" +
              "**To invite another guardian.** On the child's page, open " +
              "**Assign a guardian**, enter their email, and click **Assign**. " +
              "They are then asked to **accept** — agreeing to the same " +
@@ -1280,9 +1292,17 @@ public static class FirstBootSeeder
              "**Group invitations.** You'll see an invitation under **Invitations**. " +
              "You can always **Decline**. To **Accept**, your parent has to approve " +
              "it first — ask them to approve it for you.\n\n" +
+             "**Attending events.** How you RSVP to events depends on how your " +
+             "parent set your account up. If they chose **Guardian approves**, " +
+             "you can't RSVP on your own — you ask, and your parent approves or " +
+             "denies it. If they chose **Guardian notifies**, you RSVP freely and " +
+             "your parent is told (and can remove your attendance later). If they " +
+             "chose **Child decides**, you RSVP on your own with no approval " +
+             "needed.\n\n" +
              "**When you're ready to take over.** When your parent hands the " +
              "account over, your own controls come back: you can accept group " +
-             "invitations yourself and manage your own groups and communities.\n"),
+             "invitations yourself and RSVP to events yourself and manage your " +
+             "own groups and communities.\n"),
             ("admins", "Admins",
              "## Admins\n\n" +
              "An **admin** (the platform's global admin) is the resident who keeps " +
@@ -1807,11 +1827,12 @@ public static class FirstBootSeeder
              "was das Kind schreibt.\n\n" +
              "**Was du kannst.** Du kannst das Konto sperren und wieder aktivieren, " +
              "entscheiden, in welchen Gruppen und Gemeinschaften das Kind ist, " +
-             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, " +
-             "einen weiteren Vormund einladen, mit dem du die Kontrollen teilst, " +
-             "und das Konto löschen, wenn das Kind damit fertig ist. Und du " +
-             "kannst das Konto übergeben, wenn das Kind bereit ist, es selbst " +
-             "zu führen.\n\n" +
+             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, die " +
+             "Event-Teilnahme des Kindes genehmigen oder ablehnen (oder dem Kind " +
+             "die Wahl lassen — deine Entscheidung), einen weiteren Vormund " +
+             "einladen, mit dem du die Kontrollen teilst, und das Konto löschen, " +
+             "wenn das Kind damit fertig ist. Und du kannst das Konto " +
+             "übergeben, wenn das Kind bereit ist, es selbst zu führen.\n\n" +
              "**Was du nicht kannst.** Du kannst die Beiträge, Antworten und das " +
              "Profil des Kindes nicht lesen. Das sind des Kindes, und es bleibt " +
              "des Kindes.\n\n" +
@@ -1830,6 +1851,17 @@ public static class FirstBootSeeder
              "**Eine Gruppeneinladung genehmigen.** Auf der Seite des Kindes " +
              "findest du die Einladung unter **Ausstehende Gruppeneinladungen** " +
              "und klickst auf **Genehmigen**.\n\n" +
+             "**Event-Teilnahme verwalten.** Auf der Seite des Kindes, unter " +
+             "**Event-Teilnahme**, wählst du, wie es gehandhabt wird: **Vormund " +
+             "genehmigt** (die Voreinstellung) — das Kind kann nicht selbst " +
+             "eine Teilnahme bestätigen; jede Anfrage erscheint unter " +
+             "**Ausstehende Teilnahmeanfragen**, die du **Genehmigen** oder " +
+             "**Ablehnen** kannst. **Vormund wird informiert** — das Kind " +
+             "bestätigt frei seine Teilnahme, du erhältst jedes Mal eine " +
+             "Benachrichtigung und kannst jede seiner Teilnahmen nachträglich " +
+             "**Entfernen**. **Kind entscheidet** — das Kind wählt selbst, ohne " +
+             "Genehmigung und ohne Benachrichtigung. Wechsle wann immer du " +
+             "willst; die Änderung ist bei der nächsten Anfrage wirksam.\n\n" +
              "**Einen weiteren Vormund einladen.** Auf der Seite des Kindes " +
              "öffnest du **Vormund zuweisen**, gibst dessen E-Mail ein und klickst " +
              "auf **Zuweisen**. Die Person wird dann gebeten, die Einladung " +
@@ -1877,10 +1909,20 @@ public static class FirstBootSeeder
              "**Einladungen**. Du kannst sie immer **Ablehnen**. Um sie " +
              "**Anzunehmen**, müssen deine Eltern sie erst genehmigen — bitte sie, " +
              "sie für dich zu genehmigen.\n\n" +
+             "**An Events teilnehmen.** Wie du an Events teilnimmst, hängt davon " +
+             "ab, wie deine Eltern dein Konto eingerichtet haben. Wenn sie " +
+             "**Vormund genehmigt** gewählt haben, kannst du nicht selbst " +
+             "teilnehmen — du fragst, und deine Eltern genehmigen oder " +
+             "ablehnen. Wenn sie **Vormund wird informiert** gewählt haben, " +
+             "bestätigst du frei deine Teilnahme und deine Eltern werden " +
+             "benachrichtigt (und können deine Teilnahme später entfernen). " +
+             "Wenn sie **Kind entscheidet** gewählt haben, nimmst du selbst " +
+             "Teilnahme ohne Genehmigung.\n\n" +
              "**Wenn du bereit bist, es selbst zu übernehmen.** Wenn deine Eltern " +
              "dir das Konto übergeben, kommen deine eigenen Kontrollen zurück: Du " +
-             "kannst Gruppeneinladungen selbst annehmen und deine eigenen Gruppen " +
-             "und Gemeinschaften verwalten.\n"),
+             "kannst Gruppeneinladungen selbst annehmen, selbst an Events " +
+             "teilnehmen und deine eigenen Gruppen und Gemeinschaften " +
+             "verwalten.\n"),
             ("admins", "Administratoren",
              "## Administratoren\n\n" +
              "Ein **Administrator** (der globale Admin der Plattform) ist die " +
@@ -2458,10 +2500,12 @@ public static class FirstBootSeeder
              "écrit.\n\n" +
              "**Ce que tu peux faire.** Tu peux suspendre et réactiver le compte, " +
              "décider de quels groupes et communautés l'enfant fait partie, " +
-             "approuver une invitation de groupe que l'enfant a reçue, inviter " +
-             "un autre tuteur pour partager les contrôles, et supprimer le " +
-             "compte quand l'enfant en a fini. Et tu peux transférer le " +
-             "compte quand l'enfant est prêt à le conduire seul.\n\n" +
+             "approuver une invitation de groupe que l'enfant a reçue, approuver " +
+             "ou refuser la participation de l'enfant aux événements (ou " +
+             "laisser l'enfant choisir, c'est ton choix), inviter un autre tuteur " +
+             "pour partager les contrôles, et supprimer le compte quand l'enfant " +
+             "en a fini. Et tu peux transférer le compte quand l'enfant est prêt " +
+             "à le conduire seul.\n\n" +
              "**Ce que tu ne peux pas faire.** Tu ne peux pas lire les " +
              "publications, les réponses ou le profil de l'enfant. Ce sont ceux de " +
              "l'enfant, et ils restent ceux de l'enfant.\n\n" +
@@ -2479,6 +2523,17 @@ public static class FirstBootSeeder
              "**Approuver une invitation de groupe.** Sur la page de l'enfant, " +
              "trouve l'invitation sous **Invitations de groupe en attente** et " +
              "clique sur **Approuver**.\n\n" +
+             "**Gérer la participation aux événements.** Sur la page de " +
+             "l'enfant, sous **Participation aux événements**, choisis comment " +
+             "elle est gérée : **Le tuteur approuve** (le défaut) — l'enfant ne " +
+             "peut pas confirmer sa participation tout seul ; chaque demande " +
+             "apparaît sous **Demandes de participation en attente** pour que tu " +
+             "puisses **Approuver** ou **Refuser**. **Le tuteur est informé** — " +
+             "l'enfant confirme librement, tu reçois une notification à chaque " +
+             "fois et tu peux **Retirer** l'une de ses participations " +
+             "ensuite. **L'enfant décide** — l'enfant choisit lui-même, sans " +
+             "approbation ni notification. Change quand tu veux ; la " +
+             "modification est active à la prochaine demande.\n\n" +
              "**Inviter un autre tuteur.** Sur la page de l'enfant, ouvre " +
              "**Assigner un tuteur**, entre son e-mail et clique sur **Assigner**. " +
              "La personne est alors invitée à **accepter** — en confirmant les " +
@@ -2521,10 +2576,20 @@ public static class FirstBootSeeder
              "**Invitations**. Tu peux toujours **Refuser**. Pour l'**Accepter**, " +
              "ton parent doit d'abord l'approuver — demande-lui de l'approuver " +
              "pour toi.\n\n" +
-             "**Quand tu es prêt à prendre la main.** Quand ton parent te transfère " +
-             "le compte, tes propres contrôles reviennent : tu peux accepter les " +
-             "invitations de groupe toi-même et gérer tes propres groupes et " +
-             "communautés.\n"),
+             "**Participer aux événements.** Comment tu confirmes ta " +
+             "participation dépend de la façon dont ton parent a réglé ton " +
+             "compte. S'il a choisi **Le tuteur approuve**, tu ne peux pas " +
+             "confirmer ta participation tout seul — tu demandes, et ton " +
+             "parent approuve ou refuse. S'il a choisi **Le tuteur est " +
+             "informé**, tu confirmes librement et ton parent est prévenu " +
+             "(et peut retirer ta participation plus tard). S'il a choisi " +
+             "**L'enfant décide**, tu confirmes ta participation sans " +
+             "approbation.\n\n" +
+             "**Quand tu es prêt à prendre la main.** Quand ton parent te " +
+             "transfère le compte, tes propres contrôles reviennent : tu peux " +
+             "accepter les invitations de groupe toi-même, confirmer ta " +
+             "participation aux événements toi-même, et gérer tes propres " +
+             "groupes et communautés.\n"),
             ("admins", "Administrateurs",
              "## Administrateurs\n\n" +
              "Un **administrateur** (l'administrateur global de la plateforme) " +
@@ -3080,10 +3145,12 @@ public static class FirstBootSeeder
              "skriver.\n\n" +
              "**Hvad du kan.** Du kan suspendere og genoprette kontoen, bestemme, " +
              "hvilke grupper og fællesskaber barnet tilhører, godkende en " +
-             "gruppeinvitation, barnet har modtaget, invitere en anden " +
-             "værgemand, så I deler kontrollerne, og slette kontoen, når barnet " +
-             "er færdig med den. Og du kan give kontoen videre, når barnet er " +
-             "klar til at drive den selv.\n\n" +
+             "gruppeinvitation, barnet har modtaget, godkende eller afvise " +
+             "barnets deltagelse i begivenheder (eller lade barnet selv vælge — " +
+             "det er dit valg), invitere en anden værgemand, så I deler " +
+             "kontrollerne, og slette kontoen, når barnet er færdig med den. Og " +
+             "du kan give kontoen videre, når barnet er klar til at drive den " +
+             "selv.\n\n" +
              "**Hvad du ikke kan.** Du kan ikke læse barnets indlæg, svar eller " +
              "profil. De er barnets, og de forbliver barnets.\n\n" +
              "**For at tilføje en.** Åbn **Konto → Børn**, udfyld barnets " +
@@ -3099,6 +3166,16 @@ public static class FirstBootSeeder
              "**Godkend en gruppeinvitation.** På barnets side finder du " +
              "invitationen under **Afventende gruppeinvitationer** og klikker " +
              "på **Godkend**.\n\n" +
+             "**Styr på deltagelse i begivenheder.** På barnets side, under " +
+             "**Deltagelse i begivenheder**, vælger du, hvordan det håndteres: " +
+             "**Værge godkender** (standard) — barnet kan ikke selv bekræfte " +
+             "sin deltagelse; hver anmodning vises under **Afventende " +
+             "deltagelsesanmodninger**, som du kan **Godkende** eller **Afvise**. " +
+             "**Værge underrettes** — barnet bekræfter frit sin deltagelse, du " +
+             "får en meddelelse hver gang, og du kan **Fjerne** en af dets " +
+             "deltagelser bagefter. **Barnet bestemmer** — barnet vælger selv, " +
+             "uden godkendelse og uden meddelelse. Skift når du vil; ændringen " +
+             "træder i kraft ved næste anmodning.\n\n" +
              "**Inviter en anden værgemand.** På barnets side åbner du **Tildel " +
              "en værgemand**, indtaster e-mailen og klikker på **Tildel**. " +
              "Personen bedes derefter **acceptere** — og dermed bekræfte de " +
@@ -3135,10 +3212,18 @@ public static class FirstBootSeeder
              "**Indladelser**. Du kan altid klikke på **Afvis**. For at " +
              "klikke på **Acceptér**, skal dine forældre først godkende den — " +
              "bed dem godkende den for dig.\n\n" +
+             "**Deltagelse i begivenheder.** Hvordan du deltager i begivenheder " +
+             "afhænger af, hvordan dine forældre har indstillet din konto. Hvis " +
+             "de har valgt **Værge godkender**, kan du ikke selv bekræfte din " +
+             "deltagelse — du beder om det, og dine forældre godkender eller " +
+             "afviser. Hvis de har valgt **Værge underrettes**, bekræfter du " +
+             "frit din deltagelse, og dine forældre får en meddelelse (og kan " +
+             "fjerne din deltagelse bagefter). Hvis de har valgt **Barnet " +
+             "bestemmer**, deltager du selv uden godkendelse.\n\n" +
              "**Når du er klar til at overtage.** Når dine forældre giver kontoen " +
              "videre til dig, kommer dine egne kontroller tilbage: Du kan selv " +
-             "acceptere gruppeinvitationer og styre dine egne grupper og " +
-             "fællesskaber.\n\n" +
+             "acceptere gruppeinvitationer, selv deltage i begivenheder og styre " +
+             "dine egne grupper og fællesskaber.\n\n" +
              "**Flere voksne.** Mere end én voksen kan have kontrol over din " +
              "konto — for eksempel en mor og en far, en bedsteforælder eller en " +
              "anden værgemand. Du behøver ikke gøre noget for det; du skriver " +

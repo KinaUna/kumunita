@@ -13,7 +13,8 @@ namespace Kumunita.Web.Tests;
 /// sign-up gate control plane (open vs. invitation-only). The pin:
 /// <list type="bullet">
 /// <item><b>Index</b> — the view model carries the current gate
-/// (<c>IsSignupOpenAsync</c>, the <c>true</c> floor).</item>
+/// (<c>IsSignupOpenAsync</c>, the <c>false</c> floor — a fresh instance ships
+/// invitation-only).</item>
 /// <item><b>Save (open)</b> — calls
 /// <c>SetSignupOpenAsync(true, actor)</c> and redirects to Index.</item>
 /// <item><b>Save (invitation-only)</b> — calls

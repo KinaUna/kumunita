@@ -52,6 +52,16 @@ public sealed class OnboardingViewModel
     public bool HasEmailLanguage { get; init; }
 
     /// <summary>
+    /// M9 amendment (ADR 0139) — step hint: the resident has opted in to direct
+    /// messaging (<see cref="Kumunita.Core.UserInfo.Profile.MessagingOptIn"/>, the
+    /// per-resident control). <c>true</c> ⇒ the "✓" hint (messaging is on for them);
+    /// <c>false</c> (the default, the ADR 0105 privacy-sensitive default-<c>false</c>
+    /// convention) ⇒ the neutral "–" hint. Links into <c>/settings/messaging</c>,
+    /// which owns the <c>MessagingOptIn</c> write.
+    /// </summary>
+    public bool HasMessaging { get; init; }
+
+    /// <summary>
     /// Step hint: the UI-language preference (the per-request
     /// <see cref="Kumunita.Web.Security.LocaleCookie"/> read — a plain BCP-47
     /// string, <b>not</b> a <c>Profile</c> field, the thin-token rule

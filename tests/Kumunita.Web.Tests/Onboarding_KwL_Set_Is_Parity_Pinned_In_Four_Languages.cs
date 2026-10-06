@@ -53,6 +53,10 @@ public class Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages
         "onboarding.step_dateformat",
         "onboarding.step_email",
         "onboarding.step_contact",
+        // M9 amendment (ADR 0139) — the messaging opt-in step, added when the
+        // walk-through gained the /settings/messaging step (a deliberate growth
+        // of the closed set, not a drift: this pin is updated in the same change).
+        "onboarding.step_messaging",
         "onboarding.visit",
         "onboarding.finish",
         "onboarding.skip",
@@ -61,10 +65,10 @@ public class Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages
         "onboarding.banner.action",
     };
 
-    [Fact(DisplayName = "GATE-6 / C-M22·6 — the closed onboarding.* set is exactly 15 keys")]
-    public void ClosedSet_Has_Exactly_15_Keys()
+    [Fact(DisplayName = "GATE-6 / C-M22·6 — the closed onboarding.* set is exactly 16 keys")]
+    public void ClosedSet_Has_Exactly_16_Keys()
     {
-        Assert.Equal(15, ClosedSet.Length);
+        Assert.Equal(16, ClosedSet.Length);
         Assert.Equal(ClosedSet.Length, new HashSet<string>(ClosedSet).Count);
     }
 
@@ -93,13 +97,13 @@ public class Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages
         }
     }
 
-    [Fact(DisplayName = "GATE-6 / C-M22·6 — the onboarding.* set is closed (no 16th key in the registry)")]
-    public void Onboarding_Set_Is_Closed_No_Key_Beyond_The_15()
+    [Fact(DisplayName = "GATE-6 / C-M22·6 — the onboarding.* set is closed (no 17th key in the registry)")]
+    public void Onboarding_Set_Is_Closed_No_Key_Beyond_The_Set()
     {
-        // The closed set is exactly the 15 keys above — no onboarding.* key
-        // beyond them may be registered (a 16th key is a D7-set drift that the
-        // register's §drift-guard forbids: U03 authors exactly the keys its
-        // surface renders, no more).
+        // The closed set is exactly the 16 keys above — no onboarding.* key
+        // beyond them may be registered (a key not in the set is a D7-set drift
+        // that the register's §drift-guard forbids: authors emit exactly the
+        // keys their surface renders, no more).
         var onboardingKeysInRegistry = KnownTranslationKeys.AllKeys
             .Where(k => k.StartsWith("onboarding.", System.StringComparison.Ordinal))
             .ToList();

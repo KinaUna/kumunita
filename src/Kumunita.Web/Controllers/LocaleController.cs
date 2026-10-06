@@ -1,3 +1,4 @@
+using System.Linq;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
@@ -136,6 +137,21 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// <c>GET /settings/pagesize</c> — the resident's items-per-page settings
+    /// section on its own linkable page (the ADR 0080 one-section-per-page
+    /// shape; the ADR 0019 time-zone section verbatim). The model is the full
+    /// <see cref="LocaleSettingsViewModel"/>; the view renders only the
+    /// items-per-page section (the picker of the
+    /// <see cref="Kumunita.Core.Query.PageSizer"/> range, pre-selected at the
+    /// resident's saved override or the platform default).
+    /// </summary>
+    [HttpGet("/settings/pagesize")]
+    public async Task<IActionResult> SettingsPageSize()
+    {
+        return View("PageSize", await BuildModel());
+    }
+
+    /// <summary>
     /// <c>GET /settings/quiet</c> — the resident's quiet-hours section (ADR
     /// 0121, D7) on its own linkable page (ADR 0080, the ADR 0019 time-zone
     /// section verbatim). The model is the full
@@ -232,6 +248,22 @@ public sealed class LocaleController(
                 defaultTz: await localization.GetDefaultTimezoneAsync()),
             DateFormat = BuildDateFormatSection(subject, currentDf,
                 defaultFmt: await localization.GetDefaultDateFormatAsync()),
+
+            // The items-per-page section: the resident's saved override (or
+            // null = platform default), pre-selected; the picker offers the
+            // PageSizer Min..Max range in steps of 5.
+            PageSize = subject is null
+                ? null
+                : new LocaleSettingsViewModel.PageSizeSettings
+                {
+                    Options = Enumerable.Range(
+                        Kumunita.Core.Query.PageSizer.Min,
+                        (Kumunita.Core.Query.PageSizer.Max - Kumunita.Core.Query.PageSizer.Min) / 5 + 1)
+                        .Select(n => n * 5).ToList(),
+                    Current = profile?.PageSize,
+                    Selected = Kumunita.Core.Query.PageSizer.Resolve(profile?.PageSize),
+                    Default = Kumunita.Core.Query.PageSizer.Default,
+                },
 
             // ADR 0061 — the email & notification language section: the
             // actor's saved outbound-language override (or null = instance
@@ -477,6 +509,56 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// <c>POST /settings/pagesize</c> — the items-per-page section save (the
+    /// ADR 0019 time-zone save verbatim, the "preference if present" shape).
+    /// With a <c>pageSize</c> form value:
+    /// <see cref="IUserInfoService.SetProfilePageSizeAsync"/> (sets the
+    /// override; the self-scope check is this page's <c>[Authorize]</c> gate +
+    /// the actor being the subject). With <c>clear=1</c>: the same lane with a
+    /// <c>null</c> value (the "reset to platform default" action — the next
+    /// paged read resolves to <see cref="Kumunita.Core.Query.PageSizer.Default"/>).
+    /// The change is live on the very next request (data, not config — no
+    /// rebuild / restart). A missing profile (a pre-bootstrap edge) fails
+    /// closed: the lane throws <c>KeyNotFoundException</c> and we surface the
+    /// error + redirect (the <c>SetProfileTimezoneAsync</c> pin).
+    /// </summary>
+    [HttpPost("/settings/pagesize")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SavePageSize(string? pageSize, string? clear)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+            return RedirectToAction(nameof(SettingsPageSize));
+
+        try
+        {
+            if (clear == "1")
+            {
+                // null ⇒ clear (the lane stores + saves, so the clear persists
+                // — the next paged read resolves to the platform default).
+                await userInfo.SetProfilePageSizeAsync(subject, null, subject);
+                TempData["info"] = await FlashAsync("settings.pagesize_flash_reset");
+            }
+            else if (int.TryParse(pageSize, out var value) && value > 0)
+            {
+                // Stored as-is (clamped to the PageSizer range on the read path
+                // — the ADR 0019 "store, resolve on read" posture).
+                await userInfo.SetProfilePageSizeAsync(subject, value, subject);
+                TempData["info"] = await FlashAsync("settings.pagesize_flash_set", value);
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            // A pre-bootstrap edge (no profile row). Fail closed + surface the
+            // error; the lane never load-or-creates (the
+            // SetProfileTimezoneAsync pin), so nothing is half-written.
+            TempData["error"] = "Your profile is not available — sign out and back in.";
+        }
+
+        return RedirectToAction(nameof(SettingsPageSize));
+    }
+
+    /// <summary>
     /// <c>POST /settings/email-language</c> — the email &amp; notification
     /// language section save (ADR 0061). With a <c>code</c> form value:
     /// <see cref="IUserInfoService.SetProfileEmailLanguageAsync"/> (sets the
@@ -607,6 +689,13 @@ public sealed class LocaleController(
         /// catalog list (<see cref="Languages"/>) as its picker.</summary>
         public EmailLanguageSettings? EmailLanguage { get; init; }
 
+        /// <summary>The items-per-page section — the resident's
+        /// <see cref="Kumunita.Core.UserInfo.Profile.PageSize"/> preference
+        /// for how many items every paged list shows per page. <c>null</c>
+        /// when the caller has no subject (the public quick picker renders the
+        /// language section only).</summary>
+        public PageSizeSettings? PageSize { get; init; }
+
         // ── M20 (ADR 0121, D7) — the quiet-hours section (the 5th resident
         // section). Flat fields (the ADR 0019 time-zone section's shape,
         // flattened so the view binds directly). A missing schedule (the
@@ -713,6 +802,35 @@ public sealed class LocaleController(
             /// this to reveal the "Custom…" text box instead of a lambda in the
             /// Razor markup.</summary>
             public bool CurrentIsPreset { get; init; } = true;
+        }
+
+        /// <summary>The items-per-page section of the settings page — the
+        /// resident's <see cref="Kumunita.Core.UserInfo.Profile.PageSize"/>
+        /// preference for how many items every paged list shows per page. The
+        /// picker offers a closed list of choices (the
+        /// <see cref="Kumunita.Core.Query.PageSizer"/> range);
+        /// <see cref="PageSizeSettings.Selected"/> is the value pre-selected
+        /// (the saved override if set, else the platform default).</summary>
+        public sealed class PageSizeSettings
+        {
+            /// <summary>The closed list of page-size choices the picker offers
+            /// (the <see cref="Kumunita.Core.Query.PageSizer.Min"/>…
+            /// <see cref="Kumunita.Core.Query.PageSizer.Max"/> range in steps
+            /// of 5, plus the platform default — the same "closed allowlist"
+            /// shape the sort control uses).</summary>
+            public List<int> Options { get; init; } = new();
+
+            /// <summary>The resident's saved override, or <c>null</c> (no
+            /// override — the platform default applies).</summary>
+            public int? Current { get; init; }
+
+            /// <summary>The value pre-selected in the picker (the override if
+            /// set, else the platform default).</summary>
+            public int Selected { get; init; } = Kumunita.Core.Query.PageSizer.Default;
+
+            /// <summary>The platform default (the "default" marker in the
+            /// picker).</summary>
+            public int Default { get; init; } = Kumunita.Core.Query.PageSizer.Default;
         }
     }
 

@@ -339,18 +339,23 @@ public sealed class IdentityService(
     /// <inheritdoc />
     public async Task<bool> IsSignupOpenAsync()
     {
-        // ADR 0050 read seam: the instance gate (LocaleSettings.IsSignupOpen) with
-        // the `true` floor — a missing singleton or an unset value both yield
-        // `true`, so a fresh instance ships with sign-up open (the development
-        // circle keeps working until an admin tightens it). A read (no audit row),
-        // the same shape as the LocaleSettings reads the Localization lane does.
+        // ADR 0050 read seam (amended 2026-10-05): the instance gate
+        // (LocaleSettings.IsSignupOpen) with the `false` floor — a missing
+        // singleton or an unset value both yield `false`, so a fresh instance
+        // ships **invitation-only** (an admin sets up the platform before any
+        // resident can self-register, then opens the gate explicitly). A read (no
+        // audit row), the same shape as the LocaleSettings reads the Localization
+        // lane does.
         using var session = documentStore.QuerySession();
         var settings = await session.LoadAsync<Localization.LocaleSettings>(
             Localization.LocaleSettings.SingletonId, CancellationToken.None);
 
-        // `true` floor: a null settings row (never seen — but defensively) keeps the
-        // gate open; only an explicit `false` closes sign-up.
-        return settings is null || settings.IsSignupOpen;
+        // `false` floor: a null settings row (never seen — but defensively) keeps
+        // the gate closed; only an explicit `true` opens sign-up. The admin is
+        // created by the seeder (not this lane) and first-boot completion is a
+        // separate check, so the closed floor cannot lock the platform's own
+        // accounts out.
+        return settings is not null && settings.IsSignupOpen;
     }
 
     /// <inheritdoc />

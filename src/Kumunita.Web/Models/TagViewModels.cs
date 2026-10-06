@@ -126,6 +126,27 @@ public sealed class TagByTagViewModel
     /// <summary>The blog-pages section's pager (M7, ADR 0090 D5) — null on a
     /// single page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
     public PagedViewModel? PagerPages { get; set; }
+
+    // ── M26 U14 (D-SORT·5) — the two sections' sort controls (C-SORT·1) ─────
+    // The by-tag page renders **two** sortable sections (the posts + the blog
+    // pages) — each carries its **own** <see cref="SortViewModel"/> (the
+    // U10 _Sort reference, reused verbatim; C-SORT·1/F9 — each section offers
+    // its own closed allowlist: row 14 posts / row 15 pages, both
+    // created/modified/title but with **different** <c>created</c> defaults:
+    // posts **asc** (the U8 correction C-1 pinned line), pages **asc** (the
+    // pinned <c>.OrderBy(p => p.Created)</c> — C-SORT·2, the current order
+    // preserved exactly)). Renders nothing when a field is null (the
+    // no-sort pin — the <c>_Pager</c> null ⇒ no partial precedent).
+    /// <summary>The posts section's sort control (M26 U14, D-SORT·5) — the
+    /// closed row 14 allowlist; never null on a rendered by-tag page (the
+    /// no-sort pin is the <c>CurrentKey</c>/<c>CurrentDir</c> null pair, not
+    /// a null field — the U10 _Sort reference).</summary>
+    public SortViewModel? SortPosts { get; set; }
+
+    /// <summary>The blog-pages section's sort control (M26 U14, D-SORT·5) —
+    /// the closed row 15 allowlist (<c>created</c> default **asc** — the
+    /// pinned current order, C-SORT·2).</summary>
+    public SortViewModel? SortPages { get; set; }
 }
 
 /// <summary>

@@ -110,7 +110,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // ── Direction C: the event detail's linked-to-dos section ─────────────
         var detailProjects = Substitute.For<IProjectService>();
-        detailProjects.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>())
+        detailProjects.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem> { todo }, false));
         var detailEvents = Substitute.For<IEventService>();
         detailEvents.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
@@ -123,7 +123,7 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(todoId, row.TodoId);
         Assert.Equal(todo.Title, row.Title);
         Assert.Equal($"/projects/todos/{todoId}", row.LinkPath);
-        await detailProjects.Received(1).ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>());
+        await detailProjects.Received(1).ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>());
     }
 
     /// <summary>

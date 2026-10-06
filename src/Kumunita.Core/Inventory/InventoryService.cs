@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -72,9 +73,10 @@ public sealed class InventoryService : IInventoryService
     /// ordered by <see cref="InventoryItem.Created"/> descending (the newest
     /// first — the post feed shape); paged.
     /// </summary>
-    public async Task<ItemPage> ListItemsAsync(string? ownerKind, string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<ItemPage> ListItemsAsync(string? ownerKind, string? componentId, string actorId, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<InventoryItem> q = session.Query<InventoryItem>()
@@ -83,7 +85,19 @@ public sealed class InventoryService : IInventoryService
             q = q.Where(i => i.OwnerKind == ownerKind);
         if (componentId is not null)
             q = q.Where(i => i.ComponentId == componentId);
-        var candidates = await q.OrderByDescending(i => i.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        // M26 U7 (design doc §2.2 row 13, closed allowlist
+        // created/modified/name; name → the non-null Name string): null keeps
+        // the pinned OrderByDescending(Created) byte-for-byte (C-SORT·2);
+        // non-null applies the allowlist + the ThenBy(Id) tie-breaker
+        // (C-SORT·5) via the shared MiscSortSupport helper.
+        if (sort is null)
+            q = q.OrderByDescending(i => i.Created); // ← the pinned line, verbatim
+        else
+            q = MiscSortSupport.OrderByMiscSort<InventoryItem, DateTimeOffset, DateTimeOffset?, string>(q, sort,
+                new HashSet<string> { "created", "modified", "name" },
+                i => i.Created, i => i.Modified, i => i.Name,
+                sizeKey: "", i => string.Empty, nameKey: "name", i => i.Name, i => i.Id);
+        var candidates = await q.Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return reports no further page
         // (ADR 0090 D1) and runs **before** any decision (no audit row).
@@ -92,7 +106,7 @@ public sealed class InventoryService : IInventoryService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 / C-M16·2 — one **aggregate**
         // audit row (TargetKind "inventory", visibleCount / hiddenCount),

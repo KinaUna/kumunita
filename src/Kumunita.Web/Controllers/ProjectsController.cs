@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
@@ -549,16 +550,88 @@ public sealed class ProjectsController : Controller
     /// can pick up and claim. Author + assignee + component + group display
     /// names are *read* lookups (never access decisions).
     /// </summary>
+    // M26 U12 (C-SORT·1) — the projects surfaces' closed sort allowlists
+    // (design §2.2 rows 7–10). The todos surface (row 7) resolves one
+    // extra pair of keys (`due`/`status`) the Core `OrderByTodoSort` switch
+    // recognizes; boards / projects / goals (rows 8–10) share the
+    // identical `created`/`modified`/`title` set. All surface defaults are
+    // `created` desc (the pinned pre-M26 order).
+    private static readonly IReadOnlySet<string> TodoFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title", "due", "status" };
+    private static readonly IReadOnlySet<string> ProjectFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "modified", "title" };
+
+    // M26 U12 (C-SORT·3) — the sort param is "carried" only when the request
+    // actually specified a non-blank ?sort= key (the U10/U11 rule, U10's
+    // PostsController.HasSortParam, which is private to that controller).
+    private static bool HasSortParam(string? sort)
+        => !string.IsNullOrWhiteSpace(sort);
+
+    // M26 U12 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // surface's closed allowlist — or null when the viewer chose no sort
+    // (C-SORT·2, F1).
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => HasSortParam(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: true)
+            : null;
+
+    // M26 U12 (C-SORT·8) — the boards feed pager's FilterParams: the frozen
+    // M7 community filter + the sort/dir pairs only when the request carried
+    // them (the U10/U11 pager-carry rule, U11's SortFilterParams helper —
+    // reused, not re-derived).
+    private static IReadOnlyDictionary<string, string> BuildBoardFilterParams(
+        string? componentId, string? sort, string? dir)
+    {
+        var p = new Dictionary<string, string>();
+        if (componentId is not null) p["componentId"] = componentId;
+        foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+            p[k] = v;
+        return p.Count > 0 ? p : null;
+    }
+
+    // M26 U12 (C-SORT·8) — the landing (goals + projects) pager's
+    // FilterParams: the same frozen M7 community filter + the sort/dir pairs
+    // (each section's own pager carries its own copy — both sections read
+    // the request's single ?sort=/?dir= pair, so both pagers carry it).
+    private static IReadOnlyDictionary<string, string> BuildLandingFilterParams(
+        string? componentId, string? sort, string? dir)
+    {
+        var p = new Dictionary<string, string>();
+        if (componentId is not null) p["componentId"] = componentId;
+        foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+            p[k] = v;
+        return p.Count > 0 ? p : null;
+    }
+
     [HttpGet("/projects/todos")]
-    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, bool blockedOnly = false, int page = 1)
+    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, bool blockedOnly = false, bool assignedToMe = false, int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // "Assigned to me" — the actor-scoped assignee filter: a *filter, never
+        // a gate* (the same discipline as <c>assigneeId</c>, C-M5·6). When the
+        // viewer ticks it, the feed narrows to the to-dos whose
+        // <see cref="TodoItem.AssigneeId"/> is the actor's own subject id
+        // (the <c>ClaimTodoAsync</c> shape, the claimer becomes the assignee).
+        // It wins over an explicit <c>assigneeId</c> when both arrive.
+        string? effectiveAssigneeId = assignedToMe ? actorId : assigneeId;
+
+        // M26 U12 (C-SORT·3) — the todos surface's own allowlist (row 7:
+        // created/modified/title/due/status — the U6 locked set, **no**
+        // `priority`; the unit brief's `priority` key is frozen Part 2 C-3
+        // removed, see the U12 drift-pause handoff note).
+        var feedSort = ParseSort(sort, dir, TodoFeedAllowedKeys);
+
         IReadOnlyList<TodoItem> todos;
         TodoPage todosPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            todosPage = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            todosPage = await projects.ListTodosAsync(componentId, effectiveAssigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             todos = todosPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -620,28 +693,52 @@ public sealed class ProjectsController : Controller
 
         // M7 (ADR 0090 D7/D9) — the to-do feed's active filters carried across
         // prev/next as FilterParams (non-default values only, so a plain feed's
-        // pager links stay clean).
+        // pager links stay clean). The M26 U12 (C-SORT·8) sort/dir pairs join
+        // the same set **only** when the request carried them (C-SORT·3) — an
+        // unsorted read keeps the pre-M26 pairs byte-identical (C-SORT·2). The
+        // frozen M7 filters (C-SORT·4) are untouched.
         var todoFilterParams = new Dictionary<string, string>();
         if (componentId is not null) todoFilterParams["componentId"] = componentId;
         if (assigneeId is not null) todoFilterParams["assigneeId"] = assigneeId;
         if (unassignedOnly) todoFilterParams["unassignedOnly"] = "true";
         if (blockedOnly) todoFilterParams["blockedOnly"] = "true";
+        if (assignedToMe) todoFilterParams["assignedToMe"] = "true";
+        foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+            todoFilterParams[k] = v;
 
         var vm = new TodoIndexViewModel(
             Todos: rows,
             Components: await SeedComponentPickerAsync(),
             CurrentComponentId: componentId,
-            CurrentAssigneeId: assigneeId,
+            CurrentAssigneeId: effectiveAssigneeId,
             UnassignedOnly: unassignedOnly,
             CurrentPage: page,
             BlockedOnly: blockedOnly,
+            AssignedToMe: assignedToMe,
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
             // single page so the _Pager partial renders nothing. The filters are
             // carried across prev/next (D7) via FilterParams.
             Pager: (todosPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects/todos", page, 30, todosPage.HasMore,
+                ? PagedViewModel.ForRoute("/projects/todos", page, pageSize, todosPage.HasMore,
                     todoFilterParams.Count > 0 ? todoFilterParams : null)
-                : null);
+                : null,
+            // M26 U12 (D-SORT·5) — the one shared sort control (the U10
+            // _Sort reference, reused verbatim — C-SORT·1). The todos
+            // surface's closed allowlist (row 7): created/modified/title +
+            // its own due/status keys (F9 — the Core `OrderByTodoSort`
+            // switch resolves exactly those five). Renders nothing when the
+            // VM field is null (the no-sort pin).
+            Sort: SortViewModel.ForRoute(
+                "/projects/todos",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                    ("due", "asc"),
+                    ("status", "asc"),
+                ]));
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1824,15 +1921,24 @@ public sealed class ProjectsController : Controller
     /// names are *read* lookups (never access decisions).
     /// </summary>
     [HttpGet("/projects/boards")]
-    public async Task<IActionResult> BoardsIndex(string? componentId, int page = 1)
+    public async Task<IActionResult> BoardsIndex(string? componentId, int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // M26 U12 (C-SORT·3) — the boards surface's closed allowlist
+        // (row 8: created/modified/title).
+        var feedSort = ParseSort(sort, dir, ProjectFeedAllowedKeys);
+
         IReadOnlyList<KanbanBoard> boards;
         BoardPage boardsPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            boardsPage = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            boardsPage = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             boards = boardsPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -1876,10 +1982,25 @@ public sealed class ProjectsController : Controller
             // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
             // single page so the _Pager partial renders nothing. The community
             // filter is carried across prev/next (D7) as a FilterParams pair.
+            // The M26 U12 (C-SORT·8) sort/dir pairs join the same set only when
+            // the request carried them (C-SORT·3); an unsorted read stays
+            // byte-identical to pre-M26 (C-SORT·2).
             Pager: (boardsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects/boards", page, 30, boardsPage.HasMore,
-                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
-                : null);
+                ? PagedViewModel.ForRoute("/projects/boards", page, pageSize, boardsPage.HasMore,
+                    BuildBoardFilterParams(componentId, sort, dir))
+                : null,
+            // M26 U12 (D-SORT·5) — the one shared sort control (the U10
+            // _Sort reference, reused verbatim — C-SORT·1). The boards
+            // surface's closed allowlist (row 8: created/modified/title).
+            Sort: SortViewModel.ForRoute(
+                "/projects/boards",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]));
 
         return View("BoardIndex", vm);
     }
@@ -2999,23 +3120,37 @@ public sealed class ProjectsController : Controller
     /// </para>
     /// </summary>
     [HttpGet("/projects")]
-    public async Task<IActionResult> ProjectsIndex(string? componentId, int page = 1)
+    public async Task<IActionResult> ProjectsIndex(string? componentId, int page = 1, string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
+
+        // M26 U12 (C-SORT·3) — the landing's **two** sections (goals +
+        // standalone projects) each parse the same ?sort=/?dir= request
+        // params against **their own** allowlist (rows 9–10 — the identical
+        // created/modified/title set), mirroring the U11 group-detail
+        // dual-section rule: a surface-unknown key falls back to that
+        // section's default order.
+        var goalsSort = ParseSort(sort, dir, ProjectFeedAllowedKeys);
+        var projectsSort = ParseSort(sort, dir, ProjectFeedAllowedKeys);
 
         IReadOnlyList<ProjectGoal> goals;
         IReadOnlyList<Project> standaloneProjects;
         GoalPage goalsPage;
         ProjectPage projectsPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            goalsPage = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            goalsPage = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted, sort: goalsSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             goals = goalsPage.Items;
             // The landing's projects section is the **standalone** feed
             // (the `goalId == null` filter — the D8 / design doc §5 pin;
             // a goal's projects are the goal detail's (U06) surface, not
             // this page's).
-            projectsPage = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            projectsPage = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted, sort: projectsSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             standaloneProjects = projectsPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -3092,15 +3227,48 @@ public sealed class ProjectsController : Controller
             // M7 (ADR 0090 D5) — the two paged sections' pagers (F2 one-page
             // no-render pin): each null on a single page so the _Pager partial
             // renders nothing. The community filter is carried across prev/next
-            // (D7) as a FilterParams pair on each.
+            // (D7) as a FilterParams pair on each. The M26 U12 (C-SORT·8)
+            // sort/dir pairs join **each section's own** FilterParams only when
+            // the request carried them (C-SORT·3); an unsorted read stays
+            // byte-identical to pre-M26 (C-SORT·2). **Dual-pager key split** —
+            // the two sections' `BaseUrl` is the *same* `/projects` (confirmed
+            // against the pre-M26 code: both `PagedViewModel.ForRoute("/projects", …)`),
+            // so the same `sort`/`dir` query keys ride each section's own
+            // pager without a collision (the brief's "if the split is by
+            // BaseUrl" branch does not apply — both sections read the request's
+            // single `?sort=`/`?dir=` pair, the U11 dual-section idiom).
             PagerGoals: (goalsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects", page, 30, goalsPage.HasMore,
-                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
+                ? PagedViewModel.ForRoute("/projects", page, pageSize, goalsPage.HasMore,
+                    BuildLandingFilterParams(componentId, sort, dir))
                 : null,
             PagerProjects: (projectsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects", page, 30, projectsPage.HasMore,
-                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
-                : null);
+                ? PagedViewModel.ForRoute("/projects", page, pageSize, projectsPage.HasMore,
+                    BuildLandingFilterParams(componentId, sort, dir))
+                : null,
+            // M26 U12 (D-SORT·5) — the one shared sort control (the U10
+            // _Sort reference, reused verbatim — C-SORT·1), **per section**:
+            // the goals section (row 9) and the projects section (row 10)
+            // each pass their own closed allowlist (the identical
+            // created/modified/title set). Renders nothing when a field
+            // is null (the no-sort pin).
+            SortGoals: SortViewModel.ForRoute(
+                "/projects",
+                currentKey: goalsSort?.Key,
+                currentDir: goalsSort is { } g ? (g.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]),
+            SortProjects: SortViewModel.ForRoute(
+                "/projects",
+                currentKey: projectsSort?.Key,
+                currentDir: projectsSort is { } ps ? (ps.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("modified", "desc"),
+                    ("title", "asc"),
+                ]));
 
         return View("ProjectsIndex", vm);
     }

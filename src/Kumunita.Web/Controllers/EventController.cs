@@ -4,6 +4,7 @@ using System.Text.Json;
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
+using Kumunita.Core.Query;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
@@ -63,6 +64,13 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class EventController : Controller
 {
+    // M26 U11 (C-SORT·1) — the event feed's closed sort allowlist (U2 §2.2
+    // rows 4–5: start/created/title — all non-null in the Event model; F9,
+    // the control offers exactly these keys on both sub-surfaces). The
+    // per-sub-surface default direction is upcoming=asc, past=desc (U5 rule).
+    private static readonly IReadOnlySet<string> EventFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "start", "created", "title" };
+
     private readonly IEventService events;
     private readonly IUserInfoService userInfo;
     private readonly ILocalizationService localization;
@@ -324,12 +332,30 @@ public sealed class EventController : Controller
     /// </para>
     /// </summary>
     [HttpGet("/events")]
-    public async Task<IActionResult> Index(string? componentId, int page = 1, bool past = false)
+    public async Task<IActionResult> Index(string? componentId, int page = 1, bool past = false,
+        string? sort = null, string? dir = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // M26 U11 (C-SORT·3) — the Web-only ?sort=/?dir= → SortSpec mapping
+        // (U5 Core seam precedent). The **upcoming** and **past** sub-surfaces
+        // are the **same** closed allowlist (U2 §2.2 rows 4–5: start/created/
+        // title) with a **per-sub-surface** default direction (upcoming start
+        // asc, past start desc). A ?sort= key outside the allowlist (or no
+        // ?sort= at all) falls back to the sub-surface's default direction
+        // (SortKeys.Parse's out-of-allowlist rule; C-SORT·2 — an unsorted
+        // read keeps the pinned Start-order line verbatim).
+        var feedSort = !string.IsNullOrWhiteSpace(sort)
+            ? SortKeys.Parse(sort, dir, EventFeedAllowedKeys, "start", defaultDir: !past)
+            : null;
+
         IReadOnlyList<Event> events;
         bool hasMore;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default. Passed to the seam (the Skip/Take window)
+        // and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
             // ADR 0109 (EV-PAST) — the "Past" option is an additive read lane on
@@ -337,8 +363,8 @@ public sealed class EventController : Controller
             // most-recent-first); the default (false) keeps ListUpcomingAsync
             // verbatim (the ADR 0097 additive-surface precedent).
             var pageResult = past
-                ? await this.events.ListPastAsync(componentId, actorId, page, HttpContext.RequestAborted)
-                : await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+                ? await this.events.ListPastAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize)
+                : await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             events = pageResult.Items;
             hasMore = pageResult.HasMore;
         }
@@ -438,6 +464,24 @@ public sealed class EventController : Controller
             pagerFilters["componentId"] = componentId;
         if (past)
             pagerFilters["past"] = "true";
+        // M26 U11 (C-SORT·8) — the pager-carry rule (the U10 Index precedent,
+        // reused; the U5 per-surface allowlist rule): the sort/dir pairs join
+        // this surface's FilterParams so prev/next preserve the sort across
+        // HasMore windows. An unsorted read leaves them out (byte-identical
+        // to pre-M26, C-SORT·2).
+        var sortFilterParams = SortViewModel.SortFilterParams(sort, dir);
+        foreach (var (k, v) in sortFilterParams)
+            pagerFilters[k] = v;
+
+        // M26 U11 (D-SORT·5) — the sort control's carried params (the _Sort
+        // partial's links also preserve the current filters — the _Pager
+        // FilterParams shape, so a sort click on the Past view lands on the
+        // Past view's sort, not the Upcoming view's).
+        var sortCarried = new Dictionary<string, string>();
+        if (componentId is not null)
+            sortCarried["componentId"] = componentId;
+        if (past)
+            sortCarried["past"] = "true";
 
         var vm = new EventIndexViewModel(
             Events: rows,
@@ -452,10 +496,25 @@ public sealed class EventController : Controller
             // single page so the _Pager partial renders nothing. The community
             // filter + the Past selector are carried across prev/next (D7).
             Pager: (hasMore || page > 1)
-                ? PagedViewModel.ForRoute("/events", page, 30, hasMore,
+                ? PagedViewModel.ForRoute("/events", page, pageSize, hasMore,
                     pagerFilters.Count > 0 ? pagerFilters : null)
                 : null,
-            Past: past);
+            Past: past,
+            // M26 U11 (D-SORT·5) — the one shared sort control (the U10
+            // reference, reused — no fork): the closed event-feed allowlist
+            // (U2 §2.2 rows 4–5: start/created/title, all non-null in the
+            // Event model). The per-sub-surface default direction is
+            // upcoming=asc, past=desc (the Options list's first entry shows
+            // start with **that** surface's default dir — the U5 rule).
+            Sort: SortViewModel.ForRoute(
+                "/events",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } f ? (f.Descending ? "desc" : "asc") : null,
+                options: past
+                    ? [( "start", "desc"), ("created", "desc"), ("title", "asc")]
+                    : [("start", "asc"), ("created", "desc"), ("title", "asc")],
+                carriedParams: sortCarried)
+        );
 
         return View(vm);
     }
@@ -1631,6 +1690,16 @@ public sealed class EventController : Controller
         catch (UnauthorizedAccessException)
         {
             return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane — a supervised child in the GuardianApproves posture
+            // whose own self-lane was refused (the request was stored + the
+            // guardian notified). A user-presentable error, not a 500:
+            // surface the refusal and land back on the event page (the GU
+            // group-invitation self-lane refusal shape).
+            TempData["error"] = ex.Message;
+            return Redirect($"/events/{id}");
         }
         return Redirect($"/events/{id}");
     }

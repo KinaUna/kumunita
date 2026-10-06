@@ -126,6 +126,43 @@ M2 `GetProfilesAsync` / M3b `Moderate` ADD precedent); the ADR 0006-E
   child can always reach it. No guardian may hold a child's account with no
   recourse.
 
+### F. Amendment (2026-10-05) — count-aware standing: remove-myself vs. dissolve vs. delete
+
+The independence lane (§D·5, `Dissolve`) and the ADR 0143 delete lane are the
+two terminal actions over a child's account, and both were reachable from a
+single undifferentiated "manage this child" surface. That conflated two
+deliberately different acts, and left one incoherent case: **a sole guardian
+removing themselves** would dissolve the only standing over the child, leaving
+an account that has a supervisor on paper but none in fact — a silent gap the
+product never intended. (G·6, the "remove yourself" rule, 2026-10-05.)
+
+The steering now branches on the child's **active** guardian count (the
+standing the G·2 rule confers — `Pending` rows count for no one, so a child
+with one active + one pending guardian is still *sole*):
+
+- **A co-guardian** (≥2 active guardians) is shown a **"Remove myself as
+  guardian"** lane — the same `Dissolve` seam, reframed. The child **keeps
+  their account**, the other guardian(s) **keep their standing**, and only
+  the acting guardian's link moves `Active → Dissolved`. This is the lane's
+  one allowed "step back" path; the "hand over" framing is *not* shown here,
+  because nothing is being handed over (the other guardian is still there).
+- **A sole guardian** (exactly 1 active guardian — this one) cannot simply
+  step down. They are steered to the two existing terminal lanes:
+  **hand the account over** to the child (the dissolve seam — the child keeps
+  the account and comes of age), or **delete the account** entirely
+  (ADR 0143). The delete lane is shown *only* to a sole guardian: a
+  co-guardian has no standing to remove an account another active guardian
+  still supervises.
+
+This is a **surface + framing** amendment, not a new seam: the `Dissolve`
+and `DeleteChild` actions, their standing gates, and their audit rows are
+unchanged. The new read is the child's active `GuardianLink` count
+(`ActiveGuardianCountAsync`), exposed to the `Detail` view on `ViewData`
+(the M9 `MessagingRestricted` precedent — the `MembershipEditorModel` is a
+pinned record, so the flag rides view-data rather than a new model field).
+The G·5 safety valve is unaffected (a GlobalAdmin may always dissolve or
+delete, audited `Via: Admin`).
+
 ### E. Audit — additive verbs, all `Allow`, all C3
 
 `guardian.create`, `guardian.suspend`, `guardian.unsuspend`, `guardian.dissolve`

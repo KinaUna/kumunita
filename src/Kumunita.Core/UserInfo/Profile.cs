@@ -271,6 +271,117 @@ public sealed class Profile
     /// delta-detected, idempotent, no re-seed, no EF migration.
     /// </summary>
     public IReadOnlyList<string> BlockedCommunityIds { get; set; } = [];
+
+    /// <summary>
+    /// The <b>guardian's event-attendance policy</b> over a supervised child
+    /// (the lane's <see cref="EventRsvpMode"/> — one of three guardian
+    /// postures the guardian may select). This is a <b>per-child preference
+    /// the guardian sets</b>, not a per-resident field. The stored default is
+    /// <see cref="EventRsvpMode.GuardianApproves"/> (the lane's
+    /// most-protective posture); an <b>unsupervised</b> resident is
+    /// effectively <see cref="EventRsvpMode.ChildDecides"/> — the gate only
+    /// consults this field once an active <see cref="GuardianLink"/> exists,
+    /// so a resident with no guardian RSVPs freely regardless of the stored
+    /// value. Written only
+    /// by the <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/> lane
+    /// (a guardian with an active <see cref="GuardianLink"/> — the
+    /// <see cref="IUserInfoService.SetChildMessagingRestrictionAsync"/> /
+    /// <see cref="Profile.MessagingRestricted"/> precedent: a guardian action
+    /// that writes a single value on the profile, one active-link standing
+    /// gate, one audit row). Read by the
+    /// <see cref="Kumunita.Core.Events.EventService"/> RSVP gate to decide
+    /// whether a supervised child's own <c>RsvpAsync</c> write is refused
+    /// (the guardian must call the approval lane), allowed-and-notified, or
+    /// allowed outright. An *additive* field (ADR 0004 §B.1), like
+    /// <see cref="MessagingRestricted"/> / <see cref="BlockedCommunityIds"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public EventRsvpMode EventRsvpMode { get; set; } = EventRsvpMode.GuardianApproves;
+
+    /// <summary>
+    /// The resident's <b>items-per-page preference</b> for every paged list
+    /// surface (the community / all-sections / group post feeds, events,
+    /// projects, boards, to-dos, goals, announcements, tag-by-tag posts &amp;
+    /// pages, search, find-people, inventory, documents, and messaging).
+    /// Nullable: <c>null</c> means the resident has not set a value, so the
+    /// platform default (<see cref="Kumunita.Core.Query.PageSizer.Default"/> =
+    /// 10) applies — the "preference if present" shape, the same resolution
+    /// order as <see cref="TimeZone"/> / <see cref="DateFormat"/>. Written
+    /// only by the owner-scope
+    /// <see cref="IUserInfoService.SetProfilePageSizeAsync"/> lane (the
+    /// <see cref="SetProfileTimezoneAsync"/> single-write-lane shape — the
+    /// self-scope check happens at the Web boundary); read by every feed
+    /// controller per request, clamped to
+    /// <see cref="Kumunita.Core.Query.PageSizer.Min"/>…
+    /// <see cref="Kumunita.Core.Query.PageSizer.Max"/> before being passed to
+    /// the paged Core seam. An *additive* field (ADR 0004 §B.1), like
+    /// <see cref="TimeZone"/>: delta-detected, idempotent, no re-seed, no EF
+    /// migration.
+    /// </summary>
+    public int? PageSize { get; set; }
+}
+
+/// <summary>
+/// The <b>guardian's event-attendance policy</b> over a supervised child's
+/// RSVPs — the lane's <see cref="Profile.EventRsvpMode"/> field (one of three
+/// mutually exclusive postures a guardian may select, the <see cref
+/// "Kumunita.Core.UserInfo.Profile.MessagingRestricted"/> /
+/// <see cref="Kumunita.Core.Authorization.AccessVia"/> closed-vocabulary
+/// shape). The <see cref="Kumunita.Core.Events.EventService"/> RSVP gate
+/// reads this to decide how the child's own <c>RsvpAsync</c> write is
+/// treated, and whether the guardian holds a standing to approve / deny /
+/// veto the child's attendance on their behalf.
+/// </summary>
+public enum EventRsvpMode
+{
+    /// <summary>
+    /// The most-protective posture and the <b>default for a supervised
+    /// child</b> (the lane's stated default — the consent wording the
+    /// creating / accepting guardian already agreed to: "you must approve or
+    /// deny all group and event invitations"): the child's own <see
+    /// cref="Kumunita.Core.Events.IEventService.RsvpAsync"/> self-lane is
+    /// <b>refused</b> (a supervised child with an active <see cref
+    /// "GuardianLink"/> gets a user-presentable refusal, the GU group-invitation
+    /// self-lane precedent); the child's only path to an RSVP is for their
+    /// guardian to call the approval lane (the
+    /// <see cref="IUserInfoService"/>'s sibling
+    /// <see cref="Kumunita.Core.Events.IEventService
+    /// .GuardianApproveEventRsvpAsync"/>). The guardian is <b>notified</b>
+    /// when the child asks (via the
+    /// <see cref="Kumunita.Core.Events.GuardianEventRequest"/> row the child's
+    /// refused self-RSVP creates) so they can act.
+    /// </summary>
+    GuardianApproves,
+
+    /// <summary>
+    /// A middle posture: the child's own <see
+    /// cref="Kumunita.Core.Events.IEventService.RsvpAsync"/> self-lane is
+    /// <b>allowed</b> (the RSVP lands exactly as an unsupervised resident's
+    /// would); every such write is <b>notified</b> to the child's active
+    /// guardian(s) (the
+    /// <see cref="Kumunita.Core.Notifications.NotificationKinds
+    /// .GuardianEventRsvp"/> kind — inbox + email), and the guardian retains a
+    /// standing to <b>veto</b> (remove) any of the child's existing RSVPs via
+    /// the <see cref="Kumunita.Core.Events.IEventService
+    /// .GuardianVetoEventRsvpAsync"/> lane (a hard ceiling over the child's
+    /// own choice, the <see cref="MessagingRestricted"/> shape).
+    /// </summary>
+    GuardianNotifies,
+
+    /// <summary>
+    /// The least-restrictive posture (and the <b>effective</b> posture for
+    /// any resident with <b>no</b> active guardian — the gate only consults
+    /// this field once an active <see cref="GuardianLink"/> exists, so an
+    /// unsupervised resident always RSVPs freely regardless of the stored
+    /// value): the child's own <see
+    /// cref="Kumunita.Core.Events.IEventService.RsvpAsync"/> self-lane is
+    /// <b>allowed outright</b>, with <b>no</b> notification to any guardian and
+    /// <b>no</b> standing for a guardian to veto (a guardian who wants a
+    /// ceiling can switch this child to <see cref="GuardianApproves"/> or
+    /// <see cref="GuardianNotifies"/> via
+    /// <see cref="IUserInfoService.SetChildEventRsvpModeAsync"/>).
+    /// </summary>
+    ChildDecides
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

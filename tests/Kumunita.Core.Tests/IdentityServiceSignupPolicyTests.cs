@@ -16,8 +16,8 @@ namespace Kumunita.Core.Tests;
 /// ADR 0050 — the admin-managed sign-up gate (open vs. invitation-only). The
 /// gate is an additive field on the <see cref="LocaleSettings"/> singleton
 /// (the same doc the ADR 0019 / ADR 0020 platform-default lanes use), read via
-/// <see cref="IdentityService.IsSignupOpenAsync"/> (the <c>true</c> floor — a
-/// fresh instance ships with sign-up open) and written via
+/// <see cref="IdentityService.IsSignupOpenAsync"/> (the <c>false</c> floor — a
+/// fresh instance ships **invitation-only**) and written via
 /// <see cref="IdentityService.SetSignupOpenAsync"/> (exactly one
 /// <see cref="AccessAudit"/> row, <c>Via = Admin</c>, action
 /// <c>signup.set-open</c>, <c>TargetKind</c> "signup").
@@ -33,16 +33,19 @@ namespace Kumunita.Core.Tests;
 /// </summary>
 public class IdentityServiceSignupPolicyTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
-    // ── The `true` floor — a fresh instance ships with sign-up open ───────
+    // ── The `false` floor — a fresh instance ships invitation-only ─────────
+    // (Amended 2026-10-05, ADR 0050 §Amendments: the floor flipped from the
+    // original `true` to `false`, so a GlobalAdmin sets up the platform before
+    // any resident can self-register.)
 
     [Fact]
-    public async Task IsSignupOpen_FreshInstance_FloorsToTrue_NoAuditRow()
+    public async Task IsSignupOpen_FreshInstance_FloorsToFalse_NoAuditRow()
     {
         var (svc, store) = await BuildAsync();
 
         // A fresh instance has no LocaleSettings row at all (the seeder has not
-        // run in this scratch DB); the floor is `true`.
-        Assert.True(await svc.IsSignupOpenAsync());
+        // run in this scratch DB); the floor is `false` — sign-up invitation-only.
+        Assert.False(await svc.IsSignupOpenAsync());
 
         // A read is a read — no audit row is committed for the floor probe.
         var audits = await AuditRows(store);

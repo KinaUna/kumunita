@@ -400,7 +400,8 @@ public sealed class AccountController(
             return Redirect("/profile/edit");
 
         // ADR 0050 — the sign-up gate (the admin-settled instance value, the
-        // `true` floor). Closed → the invitation-only notice instead of the form;
+        // `false` floor — a fresh instance ships invitation-only). Closed → the
+        // invitation-only notice instead of the form;
         // the gate is authoritative (an authenticated admin still creates accounts
         // through the Guardian / admin lanes, not this self-service surface).
         if (!await identity.IsSignupOpenAsync())
@@ -568,9 +569,10 @@ public sealed class AccountController(
         // with a real password.
         var showSetupLink = !await identity.IsFirstBootSetupCompleteAsync();
 
-        // ADR 0050 — the sign-up gate (the `true` floor): when closed, the view
-        // suppresses the "No account yet? Sign up." affordance (a closed gate has
-        // no self-service signup surface to point at).
+        // ADR 0050 — the sign-up gate (the `false` floor — a fresh instance ships
+        // invitation-only): when closed, the view suppresses the "No account yet?
+        // Sign up." affordance (a closed gate has no self-service signup surface
+        // to point at).
         var signupOpen = await identity.IsSignupOpenAsync();
 
         return View(new LoginViewModel

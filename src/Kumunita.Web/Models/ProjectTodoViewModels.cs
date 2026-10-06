@@ -98,11 +98,22 @@ public sealed record TodoIndexViewModel(
     // ADR 0087 D6 — the "blocked only" feed filter (a filter, never a gate —
     // C-TBD·2); the toggle link toggles this.
     bool BlockedOnly = false,
+    // The "assigned to me" feed filter (a filter, never a gate — C-M5·6):
+    // when set, the feed shows only the to-dos assigned to the viewing
+    // actor (the controller resolves it to the actor's own subject id, the
+    // <c>ClaimTodoAsync</c> shape). The toggle checkbox reflects this.
+    bool AssignedToMe = false,
     // M7 (ADR 0090 D5) — the pager (the F2 one-page no-render pin: null on a
     // single page). Carries the <c>componentId</c> / <c>assigneeId</c> /
     // <c>unassignedOnly</c> / <c>blockedOnly</c> filters (D7) as
     // <see cref="PagedViewModel.FilterParams"/>.
-    PagedViewModel? Pager = null);
+    PagedViewModel? Pager = null,
+    // M26 U12 (D-SORT·5) — the one shared sort control (the U10 _Sort
+    // reference, reused verbatim — C-SORT·1). The todos surface's closed
+    // allowlist (row 7: created/modified/title + its own due/status keys);
+    // <c>null</c> (a no-sort surface) renders nothing (the C-SORT·2 pin —
+    // the _Pager null ⇒ no partial precedent).
+    SortViewModel? Sort = null);
 
 /// <summary>
 /// One <see cref="BoardItemPlacement"/> of the to-do, enriched with the

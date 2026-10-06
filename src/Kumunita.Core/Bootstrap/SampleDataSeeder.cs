@@ -236,6 +236,7 @@ public static class SampleDataSeeder
                 timeZone: account.TimeZone,
                 dateFormat: account.DateFormat,
                 elevatedRole: account.Role,
+                messagingOptIn: doc.EnableMessaging,
                 logger: logger, ct: ct);
             usersByEmail[account.Email] = user;
         }
@@ -818,6 +819,25 @@ public static class SampleDataSeeder
             }
         }
 
+        // ── Enable 1:1 resident messaging for the demo (ADR 0139, the M9 amendment) ─────
+        // The gate is two-sided (the ADR 0139 composition table): the instance MASTER gate
+        // (LocaleSettings.MessagingEnabled, shipped OFF by default) AND each resident's own
+        // opt-in (Profile.MessagingOptIn, also OFF by default — set on every account above
+        // via EnsureUserAsync's `messagingOptIn:`). This flips the master gate on, so the
+        // demo neighborhood can exercise the Messages surface end-to-end out of the box.
+        // Dev-only, same as EnableDanish: this session runs only under the
+        // SampleData__Enabled ∧ first-boot gate. Load-or-Create (idempotent; FirstBootSeeder
+        // normally already materialized the singleton).
+        if (doc.EnableMessaging)
+        {
+            var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
+            if (settings is null)
+                settings = new LocaleSettings { Id = LocaleSettings.SingletonId, MessagingEnabled = true };
+            else
+                settings.MessagingEnabled = true;
+            session.Store(settings);
+        }
+
         // ── Guardian links (ADR 0028 §B) — a guardian account supervising a child ────
         // One `Active` row per (guardian, child) pair + its `guardian.create` audit (the
         // CreateGuardianLinkAsync formation shape, G·4): the guardian acts under their own
@@ -1067,6 +1087,7 @@ public static class SampleDataSeeder
                 timeZone: account.TimeZone,
                 dateFormat: account.DateFormat,
                 elevatedRole: account.Role,
+                messagingOptIn: doc.EnableMessaging,
                 logger: logger, ct: ct);
             usersByEmail[account.Email] = user;
         }
@@ -1924,6 +1945,10 @@ public static class SampleDataSeeder
     /// branch, which needs no component target). <paramref name="timeZone"/> /
     /// <paramref name="dateFormat"/> are the resident overrides of the platform defaults
     /// (ADR 0019 / ADR 0020); left null the instance default applies.
+    /// <paramref name="messagingOptIn"/> sets the resident's own 1:1 messaging opt-in
+    /// (<see cref="Profile.MessagingOptIn"/> — the ADR 0139 per-account half of the M9 gate,
+    /// which defaults OFF); when true the sample account participates in messaging, under
+    /// the instance's master gate (<c>LocaleSettings.MessagingEnabled</c>, flipped separately).
     /// </para>
     /// </summary>
     private static async Task<User> EnsureUserAsync(
@@ -1937,6 +1962,7 @@ public static class SampleDataSeeder
         string? timeZone = null,
         string? dateFormat = null,
         string? elevatedRole = null,
+        bool messagingOptIn = false,
         ILogger logger = default!,
         CancellationToken ct = default)
     {
@@ -2002,6 +2028,11 @@ public static class SampleDataSeeder
             profile.TimeZone = timeZone;
         if (dateFormat is not null)
             profile.DateFormat = dateFormat;
+        // ADR 0139 — the per-account 1:1 messaging opt-in (the resident's own half of the
+        // M9 gate, default OFF). Only ever set ON for the demo; we never force it OFF
+        // (a resident's explicit opt-out choice made in-app must survive a warm re-run).
+        if (messagingOptIn)
+            profile.MessagingOptIn = true;
         session.Store(profile);
         await session.SaveChangesAsync();
 

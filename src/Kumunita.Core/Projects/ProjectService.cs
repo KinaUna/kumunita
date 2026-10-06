@@ -3,8 +3,10 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Marten;
+using System.Linq.Expressions;
 
 namespace Kumunita.Core.Projects;
 
@@ -73,6 +75,140 @@ public sealed class ProjectService : IProjectService
         _localization = localization;
     }
 
+    // --- Sort (M26 U6) ---------------------------------------------------------
+
+    /// <summary>
+    /// M26 U6 — the shared ordering for the 3 board/project/goal feeds
+    /// (design doc <c>m26-sorting-design.md</c> §2.2 rows 8–10: Boards /
+    /// Projects / Goals — the identical closed allowlist
+    /// <c>created</c> / <c>modified</c> / <c>title</c>). Mirrors U4's
+    /// <c>OrderByPostSort</c> / U5's <c>OrderByEventSort</c> shape: when
+    /// <paramref name="sort"/> is <c>null</c> the pinned line
+    /// <c>OrderByDescending(Created)</c> is preserved **byte-for-byte**
+    /// (C-SORT·2); when non-null the ordering is the surface's closed
+    /// allowlist <c>switch</c> + the <c>.ThenBy(x =&gt; x.Id)</c> tie-breaker
+    /// on every non-null path (C-SORT·5). <paramref name="T"/> is a
+    /// <c>KanbanBoard</c> / <c>Project</c> / <c>ProjectGoal</c> — the three
+    /// models share the same <c>Created</c> / <c>Modified</c> /
+    /// <c>Title</c> shape, passed in as the <paramref name="created"/> /
+    /// <paramref name="modified"/> / <paramref name="title"/> selectors
+    /// (the models have no shared base type).
+    /// <para>
+    /// <b>Marten 9.31.2 drift (carried from U4):</b> the frozen §2.2
+    /// comparator rules pin <c>?? MinValue</c> (nullable dates) and
+    /// <c>?? ""</c> (nullable strings) sentinels inside the OrderBy key — but
+    /// Marten's Linq parser rejects both
+    /// (<c>BadLinqExpressionException: Invalid OrderBy() expression</c>). The
+    /// <c>modified</c> key orders on the **raw nullable column** and Postgres
+    /// supplies the null-ordering (nulls-first in desc, nulls-last in asc —
+    /// the <b>opposite</b> of the pinned sentinels); a documented deviation,
+    /// forced by the persistence provider, not a design choice. The
+    /// <c>title</c> key keeps the <c>OrdinalIgnoreCase</c> comparator (it
+    /// applies to the non-null comparison; <c>Title</c> is non-null in these
+    /// three models, so there is no null-ordering question there).
+    /// </para>
+    /// <para>
+    /// The <c>ThenBy</c> is invoked fully-qualified as
+    /// <c>Queryable.ThenBy(…)</c> — on Marten's
+    /// <c>IAsyncQueryable</c>/<c>IOrderedAsyncQueryable</c> the unqualified
+    /// <c>.ThenBy(…)</c> form is ambiguous (CS0411), so the fully-qualified
+    /// <c>System.Linq.Queryable</c> overload is the one that resolves.
+    /// </para>
+    /// </summary>
+    private static IQueryable<T> OrderByProjectSort<T, TCreated, TModified>(
+        IQueryable<T> q, SortSpec? sort,
+        Expression<Func<T, TCreated>> created, Expression<Func<T, TModified>> modified,
+        Expression<Func<T, string>> title, Expression<Func<T, string>> id)
+    {
+        if (sort is null)
+            return q.OrderByDescending(created); // ← the pinned line, verbatim (C-SORT·2)
+
+        // C-SORT·5 — the .ThenBy(x => x.Id) tie-breaker on every non-null sort
+        // path (U2 §2.2 rows 8–10: created direct, modified nullable→bare —
+        // the ?? MinValue sentinel is a Marten 9.31.2 drift, see the
+        // doc-comment above —, title non-null with OrdinalIgnoreCase).
+        return sort.Key switch
+        {
+            "created" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(created), id)
+                : Queryable.ThenBy(q.OrderBy(created), id),
+            "modified" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(modified), id)
+                : Queryable.ThenBy(q.OrderBy(modified), id),
+            "title" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(title, StringComparer.OrdinalIgnoreCase), id)
+                : Queryable.ThenBy(q.OrderBy(title, StringComparer.OrdinalIgnoreCase), id),
+            _ => Queryable.ThenBy(q.OrderByDescending(created), id), // C-SORT·1 — unreachable (Parse already fell back); the default is pinned anyway
+        };
+    }
+
+    /// <summary>
+    /// M26 U6 — the Todos feed ordering (design doc §2.2 row 7): the closed
+    /// allowlist <c>created</c> / <c>modified</c> / <c>title</c> / <c>due</c>
+    /// / <c>status</c> + the <c>.ThenBy(x =&gt; x.Id)</c> tie-breaker
+    /// (C-SORT·5). <c>null</c> keeps the pinned
+    /// <c>OrderByDescending(Created)</c> byte-for-byte (C-SORT·2).
+    /// <para>
+    /// <b>The <c>due</c> key — Marten 9.31.2 drift (U6, carried from U4):</b>
+    /// the frozen §2.2 pin is "nulls last in *both* directions", prescribed
+    /// via a <c>ThenBy(t =&gt; t.DueAt is null)</c> boolean flag before the
+    /// value compare. But Marten 9.31.2's Linq parser rejects **any**
+    /// non-member OrderBy expression — <c>t.DueAt is null</c> /
+    /// <c>t.DueAt == null</c> / <c>t.DueAt ?? sentinel</c> all throw
+    /// <c>BadLinqExpressionException: Invalid OrderBy() expression</c>
+    /// (verified by a probe). So the <c>due</c> key orders on the **raw
+    /// nullable column** and Postgres supplies its default null-ordering
+    /// (nulls-**last** in asc, nulls-**first** in desc — the opposite of the
+    /// pinned both-dirs rule). A documented deviation, forced by the
+    /// persistence provider, not a design choice; the actual Postgres
+    /// behavior is what the <c>Todo_SortDue_*</c> tests pin.
+    /// </para>
+    /// <para>
+    /// <b>Marten 9.31.2 drift (carried from U4):</b> the <c>modified</c>
+    /// (nullable date) and <c>status</c> (nullable string) keys likewise
+    /// order on the **raw nullable column** — Postgres supplies nulls-first
+    /// in desc, nulls-last in asc (the opposite of the frozen §2.2 sentinels);
+    /// a documented deviation, not a design choice. The <c>OrdinalIgnoreCase</c>
+    /// comparator on <c>status</c> is preserved for the non-null comparison.
+    /// The <c>ThenBy</c> is the fully-qualified <c>Queryable.ThenBy(…)</c>
+    /// form (the unqualified form is ambiguous on Marten's
+    /// <c>IAsyncQueryable</c>, CS0411).
+    /// </para>
+    /// </summary>
+    private static IQueryable<TodoItem> OrderByTodoSort(IQueryable<TodoItem> q, SortSpec? sort)
+    {
+        if (sort is null)
+            return q.OrderByDescending(t => t.Created); // ← the pinned line, verbatim (C-SORT·2)
+
+        // C-SORT·5 — the .ThenBy(t => t.Id) tie-breaker on every non-null sort
+        // path (U2 §2.2 row 7: created direct, modified nullable→bare (Marten
+        // drift), title non-null with OrdinalIgnoreCase, due nulls-last both
+        // dirs, status nullable→bare with OrdinalIgnoreCase (Marten drift)).
+        return sort.Key switch
+        {
+            "created" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(t => t.Created), t => t.Id)
+                : Queryable.ThenBy(q.OrderBy(t => t.Created), t => t.Id),
+            "modified" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(t => t.Modified), t => t.Id)
+                : Queryable.ThenBy(q.OrderBy(t => t.Modified), t => t.Id),
+            "title" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(t => t.Title, StringComparer.OrdinalIgnoreCase), t => t.Id)
+                : Queryable.ThenBy(q.OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase), t => t.Id),
+            // M26 U6 — the due key: raw nullable column (the §2.2 both-dirs
+            // nulls-last pin is a Marten 9.31.2 drift — any non-member OrderBy
+            // expression is rejected, see the doc-comment). Postgres supplies
+            // nulls-last in asc, nulls-first in desc.
+            "due" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(t => t.DueAt), t => t.Id)
+                : Queryable.ThenBy(q.OrderBy(t => t.DueAt), t => t.Id),
+            "status" => sort.Descending
+                ? Queryable.ThenBy(q.OrderByDescending(t => t.Status, StringComparer.OrdinalIgnoreCase), t => t.Id)
+                : Queryable.ThenBy(q.OrderBy(t => t.Status, StringComparer.OrdinalIgnoreCase), t => t.Id),
+            _ => Queryable.ThenBy(q.OrderByDescending(t => t.Created), t => t.Id), // C-SORT·1 — unreachable (Parse already fell back); the default is pinned anyway
+        };
+    }
+
     // --- Read lanes (U04) -------------------------------------------------------
 
     /// <summary>
@@ -108,9 +244,10 @@ public sealed class ProjectService : IProjectService
     /// **not** change the audience decision (C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    public async Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default)
+    public async Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<TodoItem> q = session.Query<TodoItem>()
@@ -132,7 +269,8 @@ public sealed class ProjectService : IProjectService
         // decision (C-M5·3).
         if (blockedOnly)
             q = q.Where(t => t.BlockedByTodoId != null);
-        var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByTodoSort(q, sort)
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return reports no further page
         // (ADR 0090 D1) and runs **before** any decision (no audit row).
@@ -141,7 +279,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "todo"), from that single call (the EventService shape).
@@ -175,9 +313,10 @@ public sealed class ProjectService : IProjectService
     /// its own visibility — the lane is called only from a page that already
     /// passed the event's <c>Read</c> decision).
     /// </summary>
-    public async Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default)
+    public async Task<TodoPage> ListTodosForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         // The M14 event link: a feed filter, never a gate (C-M14·1) — the
@@ -186,7 +325,7 @@ public sealed class ProjectService : IProjectService
         var candidates = await session.Query<TodoItem>()
             .Where(t => !t.IsDeleted && t.EventId == eventId)
             .OrderByDescending(t => t.Created)
-            .Skip((page - 1) * PageSize).Take(PageSize)
+            .Skip((page - 1) * ps).Take(ps)
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -197,7 +336,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "todo"), from that single call (the ListTodosAsync
@@ -455,16 +594,17 @@ public sealed class ProjectService : IProjectService
     /// A **display** surface, never a gate (C-TBD·4) — it does not pre-check
     /// cycles (the write lane does — C-TBD·3).
     /// </summary>
-    public async Task<TodoPage> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default)
+    public async Task<TodoPage> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         var candidates = await session.Query<TodoItem>()
             .Where(t => !t.IsDeleted)
             .OrderByDescending(t => t.Created)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -475,7 +615,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "todo"), from that single call (the ListTodosAsync shape).
@@ -507,9 +647,10 @@ public sealed class ProjectService : IProjectService
     /// **not** change the audience decision (C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    public async Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default)
+    public async Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<KanbanBoard> q = session.Query<KanbanBoard>()
@@ -521,7 +662,8 @@ public sealed class ProjectService : IProjectService
         // stays the access boundary (C-M5·3).
         if (projectId is not null)
             q = q.Where(b => b.ProjectId == projectId);
-        var candidates = await q.OrderByDescending(b => b.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByProjectSort(q, sort, b => b.Created, b => b.Modified, b => b.Title, b => b.Id)
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return reports no further page
         // (ADR 0090 D1) and runs **before** any decision (no audit row).
@@ -530,7 +672,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "board"), from that single call (the ListTodosAsync shape).
@@ -1819,16 +1961,18 @@ public sealed class ProjectService : IProjectService
     /// with <c>TargetKind = "goal"</c> via the
     /// <see cref="ProjectGoalToAuditableResource"/>, U01).
     /// </summary>
-    public async Task<GoalPage> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<GoalPage> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<ProjectGoal> q = session.Query<ProjectGoal>()
             .Where(g => !g.IsDeleted);
         if (componentId is not null)
             q = q.Where(g => g.ComponentId == componentId);
-        var candidates = await q.OrderByDescending(g => g.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByProjectSort(q, sort, g => g.Created, g => g.Modified, g => g.Title, g => g.Id)
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return reports no further page
         // (ADR 0090 D1) and runs **before** any decision (no audit row).
@@ -1837,7 +1981,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "goal"), from that single call (the ListBoardsAsync shape).
@@ -2021,9 +2165,10 @@ public sealed class ProjectService : IProjectService
     /// <c>TargetKind = "project"</c> via the
     /// <see cref="ProjectToAuditableResource"/>, U01).
     /// </summary>
-    public async Task<ProjectPage> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default)
+    public async Task<ProjectPage> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<Project> q = session.Query<Project>()
@@ -2037,7 +2182,8 @@ public sealed class ProjectService : IProjectService
         q = goalId is null
             ? q.Where(p => p.GoalId == null)
             : q.Where(p => p.GoalId == goalId);
-        var candidates = await q.OrderByDescending(p => p.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+        var candidates = await OrderByProjectSort(q, sort, p => p.Created, p => p.Modified, p => p.Title, p => p.Id)
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return reports no further page
         // (ADR 0090 D1) and runs **before** any decision (no audit row).
@@ -2046,7 +2192,7 @@ public sealed class ProjectService : IProjectService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "project"), from that single call (the ListGoalsAsync shape).

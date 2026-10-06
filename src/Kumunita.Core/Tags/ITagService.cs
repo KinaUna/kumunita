@@ -1,5 +1,6 @@
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Query;
 using Marten;
 
 namespace Kumunita.Core.Tags;
@@ -95,7 +96,9 @@ public interface ITagService
     /// <see cref="TagService.ListPostsByTagPagedAsync"/> for the full
     /// contract.
     /// </summary>
-    Task<TagPostPage> ListPostsByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default);
+    Task<TagPostPage> ListPostsByTagPagedAsync(
+        string slug, string actorId, int page,
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null);
 
     /// <summary>
     /// The by-tag blog-page results, **paged** (ADR 0090 D6, M7 U01 — the
@@ -110,7 +113,9 @@ public interface ITagService
     /// <see cref="TagService.ListPagesByTagPagedAsync"/> for the full
     /// contract.
     /// </summary>
-    Task<TagPagePage> ListPagesByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default);
+    Task<TagPagePage> ListPagesByTagPagedAsync(
+        string slug, string actorId, int page,
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null);
 
     /// <summary>
     /// Autocomplete (F9 / F10): the C-TG·2 base query filtered by
