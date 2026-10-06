@@ -99,6 +99,24 @@ public sealed class IdentityService(
 
     /// <inheritdoc />
     public async Task<ThinPrincipal> RegisterAsync(string displayName, string email, string password)
+        => await RegisterCoreAsync(displayName, email, password, requiresPassword: false);
+
+    /// <inheritdoc />
+    public async Task<ThinPrincipal> RegisterChildAccountAsync(string displayName, string email)
+        => await RegisterCoreAsync(displayName, email, password: null, requiresPassword: true);
+
+    /// <summary>
+    /// Shared body of <see cref="RegisterAsync"/> (the self-serve lane, the credential
+    /// set at signup) and <see cref="RegisterChildAccountAsync"/> (ADR 0146, the GU
+    /// add-a-child lane, the credential **not** set — the child owns it, set at the
+    /// verify link). <paramref name="password"/> null ⇒ the account is created
+    /// password-less (the child lane; the credential is set later by
+    /// <see cref="VerifyAndSetPasswordAsync"/>). <paramref name="requiresPassword"/>
+    /// selects the verification email's body (the child body names "set your password"
+    /// — <c>email.verify_child_body</c>).
+    /// </summary>
+    private async Task<ThinPrincipal> RegisterCoreAsync(
+        string displayName, string email, string? password, bool requiresPassword)
     {
         if (await userManager.FindByEmailAsync(email) is not null)
             throw new InvalidOperationException($"An account with email '{email}' already exists.");
@@ -113,7 +131,12 @@ public sealed class IdentityService(
             UserName = email
         };
         await userManager.CreateAsync(user);
-        await userManager.AddPasswordAsync(user, password);   // unverified: no login yet
+        // ADR 0146 — the credential is optional: the self-serve lane sets it at signup;
+        // the child lane leaves the account password-less (the child sets it at the
+        // verify link — the guardian never held it, the ADR 0028 "supervision rides the
+        // link, not the password" shape).
+        if (password is not null)
+            await userManager.AddPasswordAsync(user, password);   // unverified: no login yet
 
         // 2. The mt-side rows — Profile (self-only, unverified), the single-use verify
         //    token (attempt 1), and the one staged OutboxEmail — in ONE session, one commit.
@@ -130,7 +153,7 @@ public sealed class IdentityService(
         session.Store(token);
         var verifyLink = VerificationLink(token.Id);
         var (verifySubject, verifyBody) = await BuildVerificationEmailAsync(
-            displayName, verifyLink, preferredLanguage: null);
+            displayName, verifyLink, preferredLanguage: null, requiresPassword: requiresPassword);
         await mailer.StageAsync(session,
                     idempotencyKey: $"verify:{user.Id}:1",
                     recipient: email,
@@ -185,8 +208,14 @@ public sealed class IdentityService(
             session.Store(token);
             var resendName = profile?.DisplayName ?? user.Email ?? "there";
             var resendLink = VerificationLink(token.Id);
+            // ADR 0146 — a password-less account (the child lane) gets the
+            // "set your password" body; a credential-bearing account gets the
+            // classic "confirm" body. The User object's PasswordHash is the
+            // single-source read (no extra EF query needed).
+            var requiresPassword = string.IsNullOrEmpty(user.PasswordHash);
             var (resendSubject, resendBody) = await BuildVerificationEmailAsync(
-                resendName, resendLink, preferredLanguage: profile?.EmailLanguage);
+                resendName, resendLink, preferredLanguage: profile?.EmailLanguage,
+                requiresPassword: requiresPassword);
             await mailer.StageAsync(session,
                 idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
                 recipient: email,
@@ -253,6 +282,73 @@ public sealed class IdentityService(
 
         // Member is implicit on a verified resident (no EF role needed for the base standing).
         logger.LogInformation("Verified resident {UserId}.", token.UserId);
+        return profile;
+    }
+
+    /// <inheritdoc />
+    public async Task<Profile> VerifyAndSetPasswordAsync(string tokenValue, string password)
+    {
+        // ADR 0146 — the child-account activation handoff. The token is the
+        // same single-use <c>KindVerify</c> row the child lane staged (the
+        // <c>RegisterChildAccountAsync</c> shape), so the resolution is
+        // identical to <see cref="VerifyWithTokenAsync"/>; the difference is
+        // the credential write: the child sets their own password here
+        // (the guardian never held it — the ADR 0028 "supervision rides the
+        // link, not the password" shape). The credential write + the verified
+        // flip + the token consumption + the audit row land in one commit
+        // (the <c>CompleteSeedAdminSetupAsync</c> shape: a credential
+        // write that also flips <c>Verified</c>).
+        var token = await FindTokenAsync(
+            tokenValue, kind: IdentityToken.KindVerify, subjectId: null);
+        if (token is null)
+            throw new InvalidOperationException("Verification token is invalid, already used, or expired.");
+
+        var user = await userManager.FindByIdAsync(token.UserId)
+            ?? throw new InvalidOperationException($"No account for verification token user {token.UserId}.");
+
+        // The credential: set the child's own password (the ADR 0138
+        // ChangePasswordAsync credential-write shape — a fresh hash, the
+        // security stamp rotated so no stale session survives).
+        var pwResult = await userManager.AddPasswordAsync(user, password);
+        if (!pwResult.Succeeded)
+            throw new InvalidOperationException(
+                "Failed to set the account password: " +
+                string.Join("; ", pwResult.Errors.Select(e => e.Description)));
+
+        // Same session: flip verified, consume the token, append the audit row
+        // (via: Owner — the resident activating their own account), one commit.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var profile = (await session.LoadAsync<Profile>(token.UserId)) ?? new Profile
+        {
+            SubjectId = token.UserId,
+            Email = user.Email,
+            DisplayName = user.UserName ?? user.Email ?? string.Empty
+        };
+        profile.Verified = true;
+        session.Store(profile);
+
+        token.ConsumedAt = DateTimeOffset.UtcNow;
+        session.Store(token);
+
+        var now = DateTimeOffset.UtcNow;
+        session.Store(AuditRow(now, token.UserId, token.UserId, "verify", AccountKind, token.UserId,
+            Authorization.AccessVia.Owner, Authorization.AccessOutcome.Allow));
+
+        // ADR 0077 — notify the GlobalAdmins (inbox + best-effort email) that a
+        // resident verified their account. Same best-effort / gated / no-admin
+        // shape as the RegisterAsync emitter (the account.verified kind).
+        await EmitAccountNotificationAsync(
+            session, NotificationKinds.AccountVerified, token.UserId,
+            $"{profile.DisplayName} <{user.Email}>");
+
+        await session.SaveChangesAsync();
+
+        // The credential write rotated nothing yet (a fresh account, no prior
+        // sessions) — the stamp rotation is belt-and-braces, matching the
+        // ChangePasswordAsync lane.
+        await userManager.UpdateSecurityStampAsync(user);
+
+        logger.LogInformation("Verified resident {UserId} (password set at the verify link).", token.UserId);
         return profile;
     }
 
@@ -1318,6 +1414,17 @@ public sealed class IdentityService(
         "If you didn't create this account, you can ignore this message.";
 
     /// <summary>
+    /// ADR 0146 — the child-account verification body (the no-provider fallback):
+    /// names the one remaining step — <b>setting your own password</b> — that the
+    /// self-serve body does not (the child's guardian set up the account but never
+    /// held the credential, so the child owns it from the start).
+    /// </summary>
+    private static string VerificationChildBody(string displayName, string verifyLink) =>
+        $"Hi {displayName},\n\nYour Kumunita account is ready. Open this one-time link to " +
+        $"confirm the account and set your password (it also signs you in):\n\n{verifyLink}\n\n" +
+        "If you didn't create this account, you can ignore this message.";
+
+    /// <summary>
     /// ADR 0061 — the verification email's subject + body, resolved through the
     /// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> when one is
     /// available (per-recipient preferred language → instance default →
@@ -1325,16 +1432,29 @@ public sealed class IdentityService(
     /// test sites that construct <see cref="IdentityService"/> directly without a
     /// provider. The body template's <c>{0}</c>/<c>{1}</c> placeholders are the
     /// resident's display name and the one-time verify link (ADR 0061 / the
-    /// <c>email.verify_body</c> registry entry).
+    /// <c>email.verify_body</c> registry entry). ADR 0146 — <c>requiresPassword</c>
+    /// selects the child body (<c>email.verify_child_body</c>) when the account has
+    /// no password to set at the verify link (the child lane, the guardian never
+    /// held the credential).
     /// </summary>
     private async Task<(string Subject, string Body)> BuildVerificationEmailAsync(
-        string displayName, string verifyLink, string? preferredLanguage)
+        string displayName, string verifyLink, string? preferredLanguage, bool requiresPassword = false)
     {
+        string bodyKey = requiresPassword ? "email.verify_child_body" : "email.verify_body";
+        string fallbackBody = requiresPassword
+            ? VerificationChildBody(displayName, verifyLink)
+            : VerificationBody(displayName, verifyLink);
+
         if (translationProvider is null)
-            return ("Verify your Kumunita account", VerificationBody(displayName, verifyLink));
+            return ("Verify your Kumunita account", fallbackBody);
 
         string subject = await translationProvider.GetAsync("email.verify_subject", preferredLanguage);
-        string bodyTemplate = await translationProvider.GetAsync("email.verify_body", preferredLanguage);
+        string bodyTemplate = await translationProvider.GetAsync(bodyKey, preferredLanguage);
+        // A missing <c>email.verify_child_body</c> entry (a provider without the key)
+        // would surface the raw key — fall back to the standard body rather than the
+        // literal key.
+        if (string.IsNullOrWhiteSpace(bodyTemplate) || bodyTemplate == bodyKey)
+            bodyTemplate = requiresPassword ? fallbackBody : VerificationBody(displayName, verifyLink);
         string body = string.Format(bodyTemplate, displayName, verifyLink);
         return (subject, body);
     }

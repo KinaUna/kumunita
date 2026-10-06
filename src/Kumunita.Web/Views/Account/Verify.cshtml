@@ -12,6 +12,38 @@
             <div class="alert alert-danger">@Model.Error</div>
             <a class="btn btn-primary" asp-action="Signup"><kw-l key="account.verify_again">Sign up again</kw-l></a>
         }
+        else if (Model.RequiresPassword)
+        {
+            @*
+                ADR 0146 — the child-account handoff: the guardian created this account
+                without holding the child's credential (the ADR 0028 "supervision rides
+                the link, not the password" shape), so the child sets their own password
+                here, at the confirmation link. The hidden Id round-trips the one-time
+                token row id back to the POST (the form posts to the same link).
+            *@
+            <p class="text-muted">
+                <kw-l key="account.verify_set_password_lede">Set the password for this account — you're the one who will use it.</kw-l>
+            </p>
+            <form asp-action="Verify" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Id" />
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label"><kw-l key="common.password">Password</kw-l></label>
+                    <input asp-for="Password" class="form-control" minlength="8" required />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="ConfirmPassword" class="form-label"><kw-l key="account.confirm_password">Confirm password</kw-l></label>
+                    <input asp-for="ConfirmPassword" class="form-control" />
+                    <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary"><kw-l key="account.verify_set_password_submit">Set my password & sign in</kw-l></button>
+            </form>
+        }
         else
         {
             <div class="alert alert-secondary">
@@ -20,3 +52,7 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

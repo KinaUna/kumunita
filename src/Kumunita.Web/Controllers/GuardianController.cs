@@ -912,15 +912,18 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
     /// <summary>
     /// <b>Add a child account</b> (POST <c>me/children</c>) — the GU formation lane
-    /// (G·4, one commit): <see cref="IIdentityService.RegisterAsync"/> (the usual M1
-    /// signup — unverified account + profile + the verification email staged on the
-    /// durable outbox) then
+    /// (G·4, one commit): <see cref="IIdentityService.RegisterChildAccountAsync"/>
+    /// (the ADR 0146 child lane — unverified account **without a password** + profile
+    /// + the verification email staged on the durable outbox that tells the child to
+    /// set <b>their own</b> password when they click the link) then
     /// <see cref="IUserInfoService.CreateGuardianLinkAsync"/> in the <b>same
     /// request</b>. A created-but-unlinked account can never exist. The child's
     /// <see cref="Kumunita.Core.Identity.ThinPrincipal.SubjectId"/> is the
     /// <c>childId</c>; the actor's <c>SubjectId</c> is the <c>guardianId</c>. The
     /// add-a-child form is rendered inline on the <see cref="Index"/> page (U08);
-    /// this POST is its one-commit write.
+    /// this POST is its one-commit write. **The guardian does not set the child's
+    /// password** — the ADR 0028 "supervision rides the link, not the password"
+    /// shape (ADR 0146).
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -955,10 +958,12 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            // (1) the usual M1 signup — unverified account + profile + the
-            //     verification email staged on the durable outbox (M1's lane; this
-            //     surface does not verify). Returns the thin principal.
-            var child = await identity.RegisterAsync(displayName, form.Email!, form.Password!);
+            // (1) the ADR 0146 child lane — unverified account WITHOUT a password +
+            //     profile + the verification email staged on the durable outbox that
+            //     tells the child to set their own password when they click the link
+            //     (the guardian never holds the credential — ADR 0028 "supervision
+            //     rides the link, not the password"). Returns the thin principal.
+            var child = await identity.RegisterChildAccountAsync(displayName, form.Email!);
 
             // (2) the GU formation seam — the (guardian, child) Active row, in the
             //     same request (G·4, one commit; C3).
@@ -978,7 +983,7 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             return NotFound();
         }
 
-        TempData["info"] = "Child account created. They'll need to verify their email to sign in.";
+        TempData["info"] = "Child account created. Ask them to open the confirmation link in their email to set their password and sign in.";
         return RedirectToAction(nameof(Index));
     }
 

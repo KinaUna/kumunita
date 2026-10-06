@@ -405,7 +405,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "Email address",
             ["guardian.password"]            = "Password",
             ["guardian.child_email_hint"]    =
-                "The child verifies their own email to sign in — the usual sign-up flow.",
+                "The child opens the confirmation link in their email to set their own password and sign in — you don't need (or set) their password.",
             ["guardian.consent.intro"]       =
                 "By creating this profile, you confirm that you are the legal " +
                 "guardian of this child. As their guardian, you maintain full " +
@@ -1387,6 +1387,11 @@ public static class KnownTranslationKeys
             ["account.verify_pending"] =
                 "We're confirming your account — you'll be signed in in a moment.",
             ["account.verify_again"] = "Sign up again",
+            // ADR 0146 — the child-account handoff (the confirmation surface
+            // collects the child's own password before activating the account).
+            ["account.verify_set_password_lede"] =
+                "Set the password for this account — you're the one who will use it.",
+            ["account.verify_set_password_submit"] = "Set my password & sign in",
             ["account.resend_title"] = "Resend confirmation email",
             ["account.resend_lede"] =
                 "Enter the email you signed up with and we'll send a fresh verification link.",
@@ -1836,6 +1841,13 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Hi {0},\n\nYour Kumunita account is set to verify on its first sign-in. " +
                 "Open this one-time link to confirm the account (it also signs you in):\n\n{1}\n\n" +
+                "If you didn't create this account, you can ignore this message.",
+            // ADR 0146 — the child lane's body: the one remaining step is to
+            // set the child's own password (the guardian set up the account
+            // but never held the credential).
+            ["email.verify_child_body"] =
+                "Hi {0},\n\nYour Kumunita account is ready. Open this one-time link to " +
+                "confirm the account and set your password (it also signs you in):\n\n{1}\n\n" +
                 "If you didn't create this account, you can ignore this message.",
             ["email.reminder_subject"] = "Reminder: {0}",
             ["email.reminder_body"] = "**{0}** is coming up: {1}{2}.",
@@ -2784,7 +2796,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "E-Mail-Adresse",
             ["guardian.password"]            = "Passwort",
             ["guardian.child_email_hint"]    =
-                "Das Kind bestätigt seine eigene E-Mail zur Anmeldung — der gewöhnliche Anmeldevorgang.",
+                "Das Kind öffnet den Bestätigungslink in seiner E-Mail, um sein eigenes Passwort festzulegen und sich anzumelden — du brauchst sein Passwort nicht (und setzt es nicht).",
             ["guardian.consent.intro"]       =
                 "Mit der Erstellung dieses Profils bestätigst du, dass du die " +
                 "gesetzliche Vertretung dieses Kindes bist. Als sein " +
@@ -3708,6 +3720,12 @@ public static class KnownTranslationKeys
             ["account.verify_pending"] =
                 "Wir bestätigen dein Konto — in einem Moment bist du angemeldet.",
             ["account.verify_again"] = "Erneut registrieren",
+            // ADR 0146 — die Handübergabe für ein Kind-Konto (die
+            // Bestätigungsseite nimmt das Passwort des Kindes selbst ab,
+            // bevor das Konto aktiviert wird).
+            ["account.verify_set_password_lede"] =
+                "Lege das Passwort für dieses Konto fest — du bist der, der es verwenden wird.",
+            ["account.verify_set_password_submit"] = "Mein Passwort festlegen & anmelden",
             ["account.resend_title"] = "Bestätigungs-E-Mail neu senden",
             ["account.resend_lede"] =
                 "Gib die E-Mail ein, mit der du dich registriert hast, und wir senden dir einen frischen Bestätigungslink.",
@@ -4128,6 +4146,14 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Hallo {0},\n\nDein Kumunita-Konto wird bei der ersten Anmeldung verifiziert. " +
                 "Öffne diesen einmaligen Link, um das Konto zu bestätigen (dabei wirst du auch angemeldet):\n\n{1}\n\n" +
+                "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
+            // ADR 0146 — der Kind-Konto-Text: der eine verbleibende Schritt ist,
+            // das eigene Passwort zu setzen (die Sorgeberechtigte hat das Konto
+            // angelegt, aber nie das Passwort gehalten).
+            ["email.verify_child_body"] =
+                "Hallo {0},\n\nDein Kumunita-Konto ist bereit. Öffne diesen einmaligen " +
+                "Link, um das Konto zu bestätigen und dein Passwort zu setzen (dabei wirst du " +
+                "auch angemeldet):\n\n{1}\n\n" +
                 "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
             ["email.reminder_subject"] = "Erinnerung: {0}",
             ["email.reminder_body"] = "**{0}** steht bevor: {1}{2}.",
@@ -5028,7 +5054,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "Adresse e-mail",
             ["guardian.password"]            = "Mot de passe",
             ["guardian.child_email_hint"]    =
-                "L'enfant vérifie son propre e-mail pour se connecter — le flux d'inscription habituel.",
+                "L'enfant ouvre le lien de confirmation dans son e-mail pour définir son propre mot de passe et se connecter — tu n'as pas besoin (ni à définir) son mot de passe.",
             ["guardian.consent.intro"]       =
                 "En créant ce profil, tu confirmes être le représentant " +
                 "légal de cet enfant. En tant que tel, tu conserves le " +
@@ -5942,6 +5968,12 @@ public static class KnownTranslationKeys
 
             // ── reply-report-target lane (ADR 0023) ─────────────────────────
             ["moderation.queue_reply_by"] = "réponse de",
+            // ADR 0146 — la prise de relais du compte-enfant (la page de
+            // confirmation collecte le mot de passe de l'enfant avant
+            // d'activer le compte).
+            ["account.verify_set_password_lede"] =
+                "Définis le mot de passe de ce compte — c'est toi qui va t'en servir.",
+            ["account.verify_set_password_submit"] = "Définir mon mot de passe & me connecter",
             ["moderation.resolve_reply_label"] = "Réponse (cible de ce signalement)",
             ["moderation.resolve_reply_by"] = "Réponse de",
 
@@ -6373,6 +6405,15 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Bonjour {0},\n\nTon compte Kumunita est à vérifier lors de ta première connexion. " +
                 "Ouvre ce lien à usage unique pour confirmer le compte (il te connecte aussi) :\n\n{1}\n\n" +
+                "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
+            // ADR 0146 — le texte du compte-enfant : la seule étape restante
+            // est de définir le propre mot de passe de l'enfant (le
+            // représentant légal a créé le compte mais ne l'a jamais
+            // détenu).
+            ["email.verify_child_body"] =
+                "Bonjour {0},\n\nTon compte Kumunita est prêt. Ouvre ce lien à usage " +
+                "unique pour confirmer le compte et définir ton mot de passe (il te " +
+                "connecte aussi) :\n\n{1}\n\n" +
                 "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
             ["email.reminder_subject"] = "Rappel : {0}",
             ["email.reminder_body"] = "**{0}** arrive : {1}{2}.",
@@ -7276,7 +7317,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "E-mailadresse",
             ["guardian.password"]            = "Adgangskode",
             ["guardian.child_email_hint"]    =
-                "Barnet bekræfter sin egen e-mail for at logge ind — den sædvanlige tilmeldingsproces.",
+                "Barnet åbner bekræftelseslinket i sin e-mail for at sætte sit eget adgangskode og logge ind — du behøver (eller sætter) ikke barnets adgangskode.",
             ["guardian.consent.intro"]       =
                 "Ved at oprette denne profil bekræfter du, at du er dette " +
                 "barns værgemand. Som dets værgemand har du fuldstændig " +
@@ -8176,6 +8217,11 @@ public static class KnownTranslationKeys
             ["moderation.assign_pick"] = "Vælg en moderator …",
             ["moderation.assign_submit"] = "Tildel",
             ["moderation.cancel"] = "Annuller",
+            // ADR 0146 — overdragelsen af barnets konto (bekræftelsessiden
+            // indsamler barnets egen adgangskode, før kontoen aktiveres).
+            ["account.verify_set_password_lede"] =
+                "Sæt adgangskoden til denne konto — det er dig, der skal bruge den.",
+            ["account.verify_set_password_submit"] = "Sæt min adgangskode & log ind",
             ["moderation.unlock_submit"] = "Lås op",
             ["moderation.resolve_header"] = "Løs (luk denne rapport)",
             ["moderation.resolve_submit"] = "Løs",
@@ -8590,6 +8636,14 @@ public static class KnownTranslationKeys
 
             // ── settings (sektionen « Sprog til e-mail og beskeder » under /settings/language) ──
             ["settings.email_title"] = "Sprog til e-mail og beskeder",
+            // ADR 0146 — barnet-kontoteksten: det eneste resterende trin er
+            // at sætte barnets egen adgangskode (værgeren oprettede kontoen,
+            // men beholdte aldrig adgangskoden).
+            ["email.verify_child_body"] =
+                "Hej {0},\n\nDin Kumunita-konto er klar. Åbn dette engangsklink for at " +
+                "bekræfte kontoen og sætte dit adgangskode (den logger dig også " +
+                "ind):\n\n{1}\n\n" +
+                "Hvis du ikke har oprettet denne konto, kan du ignorere denne besked.",
             ["settings.email_lede"] =
                 "Vælg det sprog, platformen skriver til dig på — kontoer og arrangementspåmindelser. " +
                 "Dit valg gemmes på din konto.",

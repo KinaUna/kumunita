@@ -42,6 +42,21 @@ public interface IIdentityService
     Task<ThinPrincipal> RegisterAsync(string displayName, string email, string password);
 
     /// <summary>
+    /// ADR 0146 — <b>child-account formation</b> (the GU add-a-child lane): create an
+    /// *unverified* account **with no password**, bootstrap its <see cref="Profile"/>,
+    /// create a fresh <see cref="IdentityToken"/> (kind <see cref="IdentityToken.KindVerify"/>,
+    /// idempotency <c>verify:{userId}:1</c>), and stage a verification email that tells the
+    /// <b>child</b> to set <b>their own</b> password when they click the link (the
+    /// <see cref="email.verify_child_body"/> body). The guardian never holds the child's
+    /// credential — supervision rides the <c>GuardianLink</c>, not the password (ADR 0028
+    /// "the parent does not need the child's credentials to supervise"). The account
+    /// cannot sign in until the child activates it via
+    /// <see cref="VerifyAndSetPasswordAsync"/>. ADR 0006-E compatible ADD (the
+    /// <c>RegisterAsync</c> shape, minus the credential).
+    /// </summary>
+    Task<ThinPrincipal> RegisterChildAccountAsync(string displayName, string email);
+
+    /// <summary>
     /// Resend signup verification for an existing *unverified* account (the resident
     /// retries signup and gets the "account already exists" error — their email was
     /// lost or never arrived): mints a fresh <see cref="IdentityToken"/> (kind
@@ -74,6 +89,18 @@ public interface IIdentityService
     /// (<c>via: Owner</c> — the resident verifying their own account).
     /// </summary>
     Task<Profile> VerifyWithTokenAsync(string tokenValue);
+
+    /// <summary>
+    /// ADR 0146 — consume a child-account verification link <b>and set the account's
+    /// password</b> (the child sets their own credential at the handoff — the guardian
+    /// never held it). Set the password, set <see cref="Profile.Verified"/>, mark the
+    /// token consumed, audit (<c>via: Owner</c> — the resident activating their own
+    /// account; the <c>password.change</c> lane's <c>via: Owner</c> shape), and rotate
+    /// the security stamp. The account is now sign-in-ready. ADR 0006-E compatible ADD
+    /// (the <c>VerifyWithTokenAsync</c> shape + the <c>ChangePasswordAsync</c> credential
+    /// write).
+    /// </summary>
+    Task<Profile> VerifyAndSetPasswordAsync(string tokenValue, string password);
 
     /// <summary>
     /// The admin manual-verify valve (OPS §7 safety valve — the unverified-signup pile-up

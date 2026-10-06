@@ -22,6 +22,7 @@ public static class WhatsNew
         new("0.39.0", "2026-10-06", new List<string>
         {
             "Sorting — feeds, lists, and search results now offer a sort control (posts, events, projects, announcements, documents, inventory, tags, people find, and search): choose what to sort by and the direction, carried through the pager links like M7's filters; an unchosen sort behaves exactly as before, and sorting never changes what you can see (ADR 0145).",
+            "Child accounts are yours, not your parent's — when a guardian adds a child account they no longer set the child's password; the child sets their own when they open the confirmation link, and the guardian keeps their usual controls (suspend, memberships, invitations) without ever holding the credential (ADR 0146).",
         }),
         new("0.38.0", "2026-10-05", new List<string>
         {
