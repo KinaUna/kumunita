@@ -662,9 +662,316 @@ public sealed class UserPortabilityService(
         return list.Cast<object>().ToList();
     }
 
+    // ── U04 (classify) — the 4 non-M11 in-scope docs' reference fields ────
+    // The drift-guard entry 1 docs (the design doc §2.3 "or the doc's own
+    // definition for the four non-M11 docs") — the reference fields the
+    // U04 classifier resolves against the target. The in-M11 docs use the
+    // frozen <see cref="PortabilityDocTypes"/> reference map (verbatim).
+    private static readonly Dictionary<string, IReadOnlyList<PortabilityReferenceField>> NonM11RefFields =
+        new(StringComparer.Ordinal)
+        {
+            ["InventoryItem"]  = new[]
+            {
+                new PortabilityReferenceField("ComponentId", "Component"),
+                new PortabilityReferenceField("AuthorId", PortabilityReferenceField.PrincipalTarget),
+                new PortabilityReferenceField("CurrentHolderId", PortabilityReferenceField.PrincipalTarget),
+            },
+            ["Document"]       = new[]
+            {
+                new PortabilityReferenceField("MediaId", "MediaObject"),
+                new PortabilityReferenceField("OwnerId", PortabilityReferenceField.PrincipalTarget),
+                new PortabilityReferenceField("FolderId", "DocumentFolder"),
+                new PortabilityReferenceField("TagIds", "Tag", IsArray: true),
+            },
+            ["DocumentFolder"] = new[]
+            {
+                new PortabilityReferenceField("ParentId", "DocumentFolder"),
+            },
+            ["Bookmark"]       = new[]
+            {
+                new PortabilityReferenceField("OwnerId", PortabilityReferenceField.PrincipalTarget),
+                new PortabilityReferenceField("TargetId", "Post|Event|TodoItem|Announcement|Page"),
+            },
+        };
+
     /// <inheritdoc />
-    public Task<UserPortabilityImportPlan> ClassifyAsync(string residentSubjectId, Stream archive, CancellationToken ct = default)
-        => throw new NotImplementedException("M27 U04 — the clean/duplicate/conflict classification (no writes, C-M27·5).");
+    /// <summary>
+    /// U04 (classify) — the <c>clean</c>/<c>duplicate</c>/<c>conflict</c>
+    /// classification over the uploaded resident archive (the design doc
+    /// §2.4 contract, verbatim) + the per-entity reference-availability
+    /// report. **Read-only** (C-M27·5 — the pre-write pin): the
+    /// <see cref="Marten.IDocumentStore"/> is opened as a
+    /// <c>QuerySession</c> (read-only), the <c>userManager.Users</c> read is
+    /// the principal source (read-only), and **no**
+    /// <c>session.Store</c> / <c>SaveChangesAsync</c> is called — a
+    /// <c>conflict</c> entity is only ever <em>reported</em>, never
+    /// applied (C-M27·4 — the resident's per-entity choice is the only
+    /// apply path, owned by U06's <see cref="ResolveAsync"/>).
+    /// </summary>
+    public async Task<UserPortabilityImportPlan> ClassifyAsync(
+        string residentSubjectId, Stream archive, CancellationToken ct = default)
+    {
+        // ── JSON options (the M11 PortabilityValidate pattern) ────────────
+        var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+        // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
+        var nameToType = new Dictionary<string, Type>(
+            PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
+        nameToType["InventoryItem"]  = typeof(Kumunita.Core.Inventory.InventoryItem);
+        nameToType["Document"]       = typeof(Kumunita.Core.Documents.Document);
+        nameToType["DocumentFolder"] = typeof(Kumunita.Core.Documents.DocumentFolder);
+        nameToType["Bookmark"]       = typeof(Kumunita.Core.Bookmarks.Bookmark);
+
+        // ── Read the archive (the M11 KumunitaArchive reader) ─────────────
+        var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+
+        // ── Pre-pass: the target id sets (the M11 validate pre-pass, over
+        //    the target store — read-only) ─────────────────────────────────
+        await using var session = documentStore.QuerySession();
+
+        // The in-scope types' target rows (the <c>duplicate</c> match set) +
+        // their id sets (the <c>conflict</c> reference-resolution target).
+        var targetRowsByType = new Dictionary<string, IReadOnlyList<object>>(StringComparer.Ordinal);
+        var typeSetById = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var (type, _) in UserScopeInventory.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+            var docType = nameToType[type];
+            var targetRows = await QueryAllRowsAsync(session, docType, ct).ConfigureAwait(false);
+            targetRowsByType[type] = targetRows;
+            var idSet = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var row in targetRows)
+                if (ReadId(row) is string id && id.Length > 0)
+                    idSet.Add(id);
+            typeSetById[type] = idSet;
+        }
+
+        // Referenced doc types that are not in-scope (e.g. <c>Announcement</c>
+        // — the <c>Bookmark.TargetId</c> multi-kind union) — their id sets.
+        foreach (var type in ReferencedDocTypes())
+        {
+            if (typeSetById.ContainsKey(type))
+                continue;
+            var docType = nameToType[type];
+            var idSet = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var row in (await QueryAllRowsAsync(session, docType, ct).ConfigureAwait(false)))
+                if (ReadId(row) is string id && id.Length > 0)
+                    idSet.Add(id);
+            typeSetById[type] = idSet;
+        }
+
+        // The principal set (the target's users — the resident is the anchor,
+        // so their <c>→ principal</c> references always resolve).
+        var principalIds = new HashSet<string>(StringComparer.Ordinal);
+        var userList = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions
+            .ToListAsync(userManager.Users, ct).ConfigureAwait(false);
+        foreach (var u in userList)
+            if (u.Id is string id && id.Length > 0)
+                principalIds.Add(id);
+
+        // The language set (the <c>→ LanguageCatalog</c> references).
+        var languageCodes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in (await QueryAllRowsAsync(
+                session, typeof(Kumunita.Core.Localization.LanguageCatalog), ct).ConfigureAwait(false)))
+            if (ReadId(row) is string lc && lc.Length > 0)
+                languageCodes.Add(lc);
+
+        // ── Classify each in-scope entity (the §2.4 contract) ─────────────
+        var entities = new List<UserPortabilityEntityClassification>();
+        foreach (var (type, _) in UserScopeInventory.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // The archive's rows for this type (the in-scope entities to
+            // classify). A type not in the archive contributes no entities.
+            if (!data.Docs.TryGetValue(type, out var json))
+                continue;
+            var docType = nameToType[type];
+            var listType = typeof(List<>).MakeGenericType(docType);
+            if (JsonSerializer.Deserialize(json, listType, jsonOpts) is not System.Collections.IEnumerable archiveRows)
+                continue;
+
+            var targetRows = targetRowsByType[type];
+            foreach (var archiveRow in archiveRows)
+            {
+                if (archiveRow is null)
+                    continue;
+                var entityId = ReadId(archiveRow) ?? "";
+
+                // (b) duplicate — the U02 business-key match.
+                var duplicate = targetRows
+                    .FirstOrDefault(t => t is not null && MatchBusinessKey(type, archiveRow, t));
+                if (duplicate is not null)
+                {
+                    entities.Add(new UserPortabilityEntityClassification(
+                        Kind: type,
+                        EntityId: entityId,
+                        Status: UserPortabilityEntityStatus.Duplicate,
+                        AbsentReferences: [],
+                        DuplicateId: ReadId(duplicate)));
+                    continue;
+                }
+
+                // (c) conflict — the M11 referential-integrity loop over
+                //     the target (the §2.4 conflict reason shape).
+                var absent = ResolveAbsentReferences(
+                    type, archiveRow, typeSetById, principalIds, languageCodes);
+                entities.Add(new UserPortabilityEntityClassification(
+                    Kind: type,
+                    EntityId: entityId,
+                    Status: absent.Count > 0
+                        ? UserPortabilityEntityStatus.Conflict
+                        : UserPortabilityEntityStatus.Clean,
+                    AbsentReferences: absent,
+                    DuplicateId: null));
+            }
+        }
+
+        // ── The no-write pin (C-M27·5) — no session.Store / SaveChanges ───
+        // was called; the classification is read-only (the QuerySession +
+        // the userManager.Users read are the only I/O, both read-only).
+        return new UserPortabilityImportPlan(Ok: true, Entities: entities, Failures: []);
+    }
+
+    // ── U04 (classify) helpers (pure, over the POCO set) ──────────────────
+
+    /// <summary>The doc types referenced by the in-scope types' reference
+    /// fields (the M11 reference map + the 4 non-M11 docs' own fields) — the
+    /// <c>conflict</c> reference-resolution target set.</summary>
+    private static IEnumerable<string> ReferencedDocTypes()
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (type, _) in UserScopeInventory.Entries)
+        {
+            foreach (var rf in GetReferenceFields(type))
+            {
+                if (rf.Target == PortabilityReferenceField.PrincipalTarget)
+                    continue;
+                if (rf.Target == PortabilityReferenceField.LanguageCatalogTarget)
+                    continue;
+                if (rf.Target.Contains('|', StringComparison.Ordinal))
+                {
+                    foreach (var part in rf.Target.Split('|'))
+                        if (part.Length > 0)
+                            set.Add(part);
+                    continue;
+                }
+                set.Add(rf.Target);
+            }
+        }
+        return set;
+    }
+
+    /// <summary>The reference fields for a type (the M11 reference map, or
+    /// the 4 non-M11 docs' own fields).</summary>
+    private static IReadOnlyList<PortabilityReferenceField> GetReferenceFields(string type)
+    {
+        if (PortabilityDocTypes.ByType.TryGetValue(type, out var entry))
+            return entry.ReferenceFields;
+        if (NonM11RefFields.TryGetValue(type, out var fields))
+            return fields;
+        return [];
+    }
+
+    /// <summary>The per-entity absent-reference report (the §2.4 (c)
+    /// <c>conflict</c> reason — the M11 referential-integrity loop over the
+    /// target, restructured into the
+    /// <see cref="UserPortabilityAbsentReference"/> shape).</summary>
+    private static List<UserPortabilityAbsentReference> ResolveAbsentReferences(
+        string type, object row,
+        Dictionary<string, HashSet<string>> typeSetById,
+        HashSet<string> principalIds,
+        HashSet<string> languageCodes)
+    {
+        var absent = new List<UserPortabilityAbsentReference>();
+        var rowType = row.GetType();
+        foreach (var rf in GetReferenceFields(type))
+        {
+            var value = ReadFieldValue(rowType, rf.Field, row);
+            if (value is null)
+                continue;  // a null field is a satisfied reference.
+
+            HashSet<string>? targetSet = rf.Target switch
+            {
+                PortabilityReferenceField.PrincipalTarget => principalIds,
+                PortabilityReferenceField.LanguageCatalogTarget => languageCodes,
+                _ when rf.Target.Contains('|', StringComparison.Ordinal) => null,  // multi-kind
+                _ when typeSetById.TryGetValue(rf.Target, out var ts) => ts,
+                _ => null,
+            };
+
+            if (rf.IsArray)
+            {
+                if (value is not System.Collections.IList list)
+                    continue;
+                foreach (var item in list)
+                {
+                    if (item is not string id || id.Length == 0)
+                        continue;
+                    if (!RefResolves(id, rf, targetSet, typeSetById))
+                        absent.Add(new UserPortabilityAbsentReference(rf.Target, rf.Field, id));
+                }
+            }
+            else
+            {
+                if (value is not string id || id.Length == 0)
+                    continue;
+                if (!RefResolves(id, rf, targetSet, typeSetById))
+                    absent.Add(new UserPortabilityAbsentReference(rf.Target, rf.Field, id));
+            }
+        }
+        return absent;
+    }
+
+    /// <summary>Resolves one reference value against the field's target set
+    /// (the M11 <c>ReferenceResolves</c> pattern; the multi-kind union for
+    /// the 4 non-M11 docs' own fields).</summary>
+    private static bool RefResolves(
+        string id, PortabilityReferenceField rf,
+        HashSet<string>? directTarget,
+        Dictionary<string, HashSet<string>> typeSetById)
+    {
+        if (rf.Target.Contains('|', StringComparison.Ordinal))
+        {
+            foreach (var part in rf.Target.Split('|'))
+            {
+                if (part.Length == 0)
+                    continue;
+                if (typeSetById.TryGetValue(part, out var set) && set.Contains(id))
+                    return true;
+            }
+            return true;  // a sentinel — treated as satisfied
+        }
+        return directTarget is not null && directTarget.Contains(id);
+    }
+
+    /// <summary>Reads one reference field's value off a row (the M11
+    /// <c>ReadFieldValue</c> pattern — reflection on the property name,
+    /// not per-type code).</summary>
+    private static object? ReadFieldValue(Type rowType, string fieldName, object row)
+    {
+        var prop = rowType.GetProperty(fieldName, BindingFlags.Public | BindingFlags.Instance);
+        if (prop is null)
+            return null;  // an absent field is a satisfied reference.
+        return prop.GetValue(row);
+    }
+
+    /// <summary>The row's identity (the <c>Id</c> or <c>SubjectId</c> property,
+    /// the M11 validate id-set convention — <c>Profile</c> is keyed by
+    /// <c>SubjectId</c>, the rest by <c>Id</c>).</summary>
+    private static string? ReadId(object row)
+    {
+        var t = row.GetType();
+        var idProp = t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)
+            ?? t.GetProperty("SubjectId", BindingFlags.Public | BindingFlags.Instance);
+        if (idProp is null)
+            return null;
+        if (idProp.PropertyType == typeof(string))
+            return idProp.GetValue(row) as string;
+        if (idProp.PropertyType == typeof(Guid))
+            return (idProp.GetValue(row) as Guid?)?.ToString("N");
+        return idProp.GetValue(row)?.ToString();
+    }
 
     /// <inheritdoc />
     public Task<UserPortabilityImportResult> ResolveAsync(
