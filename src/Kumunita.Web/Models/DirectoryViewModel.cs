@@ -65,21 +65,36 @@ public sealed class DirectoryViewModel
         /// else the base <c>Tag.Name</c>). Same <c>Visibility</c> gate as <see cref="Bio"/>;
         /// null ⇒ the gate denied (a denied viewer renders no tags) or empty ⇒ the resident
         /// set none (the "No tags set." shape).</summary>
-        IReadOnlyList<string>? TagNames = null);
+        IReadOnlyList<string>? TagNames = null,
+        /// <summary>Whether the signed-in <b>viewer</b> may send this resident a message
+        /// (the M9 amendment per-actor gate, ADR 0139 <c>IsMessagingAllowedForAsync</c>:
+        /// instance on ∧ viewer opted in ∧ not guardian-restricted). Computed by
+        /// <see cref="Kumunita.Web.Controllers.DirectoryController"/> and carried here so the
+        /// view can render the "Send a message" button; <c>false</c> (default) ⇒ no button.
+        /// Never <c>true</c> for a self-view (no self-conversations, ADR 0105 D1).</summary>
+        bool CanMessage = false);
 }
 
 /// <summary>
-/// One directory row. Four fields — the low-entropy shape the list model exposes.
+/// One directory row. The low-entropy shape the list model exposes:
 /// <c>SubjectId</c> (string, mirrors
 /// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>), <c>DisplayName</c>, the
-/// <c>Verified</c> badge, and the <c>Address</c> — the one privacy-aware row field
-/// added (the directory is a *neighbor* surface, so the address is part of "who is here").
+/// <c>Verified</c> badge, the <c>Address</c> — the one privacy-aware row field
+/// added (the directory is a *neighbor* surface, so the address is part of "who is here") —
+/// and <c>CanMessage</c>, whether the viewer may send this resident a message.
 /// <c>Address</c> is projected only when the profile's <c>ContactVisibility</c> is non-null
 /// (the author opted in); it is otherwise <c>null</c>. No email, no phone, no
-/// contact/audience fields other than this — those only surface on the detail row,
+/// contact/audience fields other than these — those only surface on the detail row,
 /// behind the <see cref="Profile.ContactVisibility"/> opt-in + one <c>CanAsync</c> decision
 /// (the detail is the enforce-gate surface; the list approximation is "the author opted in,"
 /// since the list is a pure catalog read by pin and does not run a per-viewer decision). See
 /// <see cref="DirectoryViewModel.Detail"/> for the enforce-gate shape.
 /// </summary>
-public sealed record VisibleProfile(string SubjectId, string DisplayName, bool Verified, string? Address = null);
+/// <param name="CanMessage">Whether the signed-in <b>viewer</b> may send this resident a
+/// message (the M9 amendment per-actor gate, ADR 0139
+/// <c>IsMessagingAllowedForAsync</c>: instance on ∧ viewer opted in ∧ not
+/// guardian-restricted). Computed by
+/// <see cref="Kumunita.Web.Controllers.DirectoryController"/> and carried here so the view
+/// can render the "Send a message" button; <c>false</c> (default) ⇒ no button. Never
+/// <c>true</c> for a self-view (no self-conversations, ADR 0105 D1).</param>
+public sealed record VisibleProfile(string SubjectId, string DisplayName, bool Verified, string? Address = null, bool CanMessage = false);

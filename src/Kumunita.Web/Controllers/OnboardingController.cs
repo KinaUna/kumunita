@@ -120,6 +120,12 @@ public sealed class OnboardingController(
             HasTimezone = !string.IsNullOrWhiteSpace(profile?.TimeZone),
             HasDateFormat = !string.IsNullOrWhiteSpace(profile?.DateFormat),
             HasEmailLanguage = !string.IsNullOrWhiteSpace(profile?.EmailLanguage),
+            // M9 amendment (ADR 0139) — the messaging opt-in hint, off the
+            // owner-scope Profile read (Profile.MessagingOptIn, the per-resident
+            // control). The walk-through links into /settings/messaging (the
+            // page that owns the MessagingOptIn write); it never writes it
+            // itself (C-M22·4, "links into the surface, never re-implements").
+            HasMessaging = profile?.MessagingOptIn ?? false,
             UiLanguageCode = uiLanguage,
         });
     }

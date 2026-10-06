@@ -46,6 +46,10 @@
         // contact details + visibility ride the /profile/edit editor too
         // (UpsertProfileAsync owns contact + the audience visibility).
         ("onboarding.step_contact",     Model.HasDisplayName, "/profile/edit"),
+        // M9 amendment (ADR 0139) — the messaging opt-in step: links into
+        // /settings/messaging (the page that owns Profile.MessagingOptIn).
+        // The "set" hint is HasMessaging (the owner-scope opt-in read).
+        ("onboarding.step_messaging",   Model.HasMessaging,   "/settings/messaging"),
     };
 }
 <ol class="list-group kmb-onboarding-steps">

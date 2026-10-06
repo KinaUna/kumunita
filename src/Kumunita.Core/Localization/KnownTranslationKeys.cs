@@ -1289,6 +1289,11 @@ public static class KnownTranslationKeys
             ["directory.detail_no_contact"] =
                 "This resident hasn't shared a contact method with you (yet). You can " +
                 "still see their profile page.",
+            // M9 amendment (ADR 0139) — the "Send a message" affordance on a
+            // directory card / the detail page: rendered only when *both*
+            // parties' messaging standing is on (the two-sided gate the
+            // DirectoryController computes). One key, used on both surfaces.
+            ["directory.send_message"] = "Send a message",
 
             // ── community (Manage page) ──────────────────────────────────────
             ["community.manage_back"] = "← Back to the feed",
@@ -2224,6 +2229,9 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Your date & time format",
             ["onboarding.step_email"]       = "Your email & notification language",
             ["onboarding.step_contact"]     = "Your contact details & who can see them",
+            // M9 amendment (ADR 0139) — the messaging opt-in step, linking into
+            // the /settings/messaging page that owns Profile.MessagingOptIn.
+            ["onboarding.step_messaging"]   = "Whether you can use direct messaging",
             ["onboarding.visit"]            = "Go to this setting",
             ["onboarding.finish"]           = "I'm all set — finish setup",
             ["onboarding.skip"]             = "Skip for now",
@@ -3603,6 +3611,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-Mail",
             ["directory.detail_contact_phone"] = "Telefon",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Nachricht senden",
             ["directory.detail_no_contact"] =
                 "Diese:r Anwohner:in hat dir (noch) keine Kontaktmöglichkeit geteilt. Du " +
                 "kannst aber immer noch die Profilseite sehen.",
@@ -4471,6 +4481,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Dein Datums- und Zeitformat",
             ["onboarding.step_email"]       = "Deine E-Mail- und Benachrichtigungssprache",
             ["onboarding.step_contact"]     = "Deine Kontaktdaten & wer sie sehen kann",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Ob Du Direktnachrichten nutzen kannst",
             ["onboarding.visit"]            = "Zu dieser Einstellung",
             ["onboarding.finish"]           = "Alles klar — Einrichtung abschließen",
             ["onboarding.skip"]             = "Jetzt überspringen",
@@ -5839,6 +5851,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-mail",
             ["directory.detail_contact_phone"] = "Téléphone",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Envoyer un message",
             ["directory.detail_no_contact"] =
                 "Cet habitant ne t'a pas (encore) partagé de moyen de contact. Tu " +
                 "peux toujours voir sa page de profil.",
@@ -6710,6 +6724,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Ton format de date et d'heure",
             ["onboarding.step_email"]       = "Ta langue des e-mails et des notifications",
             ["onboarding.step_contact"]     = "Tes coordonnées et qui peut les voir",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Si tu peux utiliser la messagerie directe",
             ["onboarding.visit"]            = "Aller à ce réglage",
             ["onboarding.finish"]           = "Tout est prêt — terminer la configuration",
             ["onboarding.skip"]             = "Passer pour l'instant",
@@ -8074,6 +8090,8 @@ public static class KnownTranslationKeys
             ["directory.detail_contact_address"] = "Adresse",
             ["directory.detail_contact_email"] = "E-mail",
             ["directory.detail_contact_phone"] = "Telefon",
+            // M9 amendment (ADR 0139) — "Send a message" (two-sided gate).
+            ["directory.send_message"] = "Send en besked",
             ["directory.detail_no_contact"] =
                 "Denne beboer har (endnu) ikke delt en kontaktmulighed med dig. Du " +
                 "kan stadig se deres profilside.",
@@ -8940,6 +8958,8 @@ public static class KnownTranslationKeys
             ["onboarding.step_dateformat"]  = "Dit dato- og tidsformat",
             ["onboarding.step_email"]       = "Dit e-mail- og beskedssprog",
             ["onboarding.step_contact"]     = "Dine kontaktoplysninger og hvem der kan se dem",
+            // M9 amendment (ADR 0139) — the messaging opt-in step.
+            ["onboarding.step_messaging"]   = "Om du kan bruge direkte beskeder",
             ["onboarding.visit"]            = "Gå til denne indstilling",
             ["onboarding.finish"]           = "Alt er klar — afslut opsætningen",
             ["onboarding.skip"]             = "Spring over for nu",

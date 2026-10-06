@@ -34,7 +34,7 @@ public sealed class DirectoryDetailViewModelTests
     /// <c>ContactVisibility</c> (F2 "two independent gates").
     /// </summary>
     [Fact]
-    public void Detail_Has_Exactly_Eight_Fields()
+    public void Detail_Has_Exactly_Nine_Fields()
     {
         var fields = typeof(DirectoryViewModel.Detail)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -45,11 +45,15 @@ public sealed class DirectoryDetailViewModelTests
         // M2: DisplayName, Verified, ShowContactBlock, Address, Email, Phone.
         // M23 (ADR 0123): + Bio, TagNames (the extended-profile surface, on the
         // profile's Visibility gate — independent of ShowContactBlock).
+        // M9 amendment (ADR 0139): + CanMessage (the two-sided "Send a message"
+        // gate the DirectoryController computes — a plain bool, no contact/audience
+        // field).
         Assert.Equal(
             new[]
             {
                 "Address",
                 "Bio",
+                "CanMessage",
                 "DisplayName",
                 "Email",
                 "Phone",

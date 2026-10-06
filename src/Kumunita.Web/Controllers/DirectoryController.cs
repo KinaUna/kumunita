@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Messaging;
 using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -64,13 +65,54 @@ public sealed class DirectoryController(
     // controller with only DirectoryService keeps compiling — the bio/tags
     // gate is a no-op (not shown) when a seam is absent; DI always supplies
     // all four in the app.
+    //
+    // M9 amendment (ADR 0139) — the per-actor messaging gate's read seam
+    // (IMessagingService.IsMessagingAllowedForAsync): computed per directory
+    // row so the "Send a message" button renders only when the *viewer* may
+    // message that resident. Optional (default null) so the existing
+    // test-construction sites that build this controller without the seam
+    // keep compiling — CanMessage floors to false (no button) when it is
+    // absent; DI always supplies the live IMessagingService in the app.
     Kumunita.Core.Authorization.IAuthorizationService? authz = null,
     IDocumentStore? store = null,
     ILocalizationService? localization = null,
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    IMessagingService? messaging = null) : Controller
 {
+    private readonly IMessagingService? _messaging = messaging;
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// M9 amendment (ADR 0139) — the signed-in <b>viewer's</b> own messaging
+    /// standing (a single gate read, so the list surface can apply it to every
+    /// row without re-reading per resident). The per-actor gate
+    /// (<see cref="IMessagingService.IsMessagingAllowedForAsync"/>) reads only
+    /// the <i>viewer's</i> opt-in + guardian ceiling over the instance master
+    /// gate — the recipient never participates in the decision (messaging is
+    /// the sender's standing, not an access check on the target — the same
+    /// "no per-target <c>IAuthorizationService</c>" posture as the M9 nav +
+    /// <see cref="MessagesController"/>). <c>false</c> floors for: a missing
+    /// principal, a messaging seam absent from this construction (the test
+    /// floor — no button), or a gate read failure (fail closed, the ADR 0105
+    /// opt-in default-<c>false</c> convention). The caller still excludes the
+    /// self-view (no self-conversations, ADR 0105 D1).
+    /// </summary>
+    private async Task<bool> ViewerMessagingAllowedAsync(string viewerSubjectId)
+    {
+        if (string.IsNullOrWhiteSpace(viewerSubjectId))
+            return false;   // missing principal
+        if (_messaging is null)
+            return false;   // no seam ⇒ fail closed (the test-construction floor)
+        try
+        {
+            return await _messaging.IsMessagingAllowedForAsync(viewerSubjectId);
+        }
+        catch
+        {
+            return false;   // a gate read failure degrades to "no button" (never an error)
+        }
+    }
 
     /// <summary>
     /// M23 (ADR 0123 D1/D2/D6) — resolve the profile's <c>TagIds</c> to
@@ -129,6 +171,22 @@ public sealed class DirectoryController(
 
         var list = await directory.ListAsync(subject);
 
+        // M9 amendment (ADR 0139) — the "Send a message" button on each card.
+        // It renders only when *both* parties' messaging standing is on (the
+        // user's rule: "enabled by the current user and the user the card is
+        // for"): the <b>viewer's</b> own gate — instance on ∧ viewer opted in
+        // ∧ not guardian-restricted (the single
+        // <see cref="ViewerMessagingAllowedAsync"/> read, the
+        // <see cref="IMessagingService.IsMessagingAllowedForAsync"/> shape —
+        // read <b>once</b> since it is the same for every row) — AND the
+        // <b>recipient's</b> own standing, read straight off the Profile this
+        // list already carries (no extra service call per row): their
+        // <c>MessagingOptIn</c> on ∧ <c>MessagingRestricted</c> off. A
+        // self-view never shows the button (no self-conversations, ADR 0105
+        // D1). <c>false</c> floors when the messaging seam is absent (the
+        // test-construction floor) or the gate read fails (fail closed).
+        var viewerAllowed = await ViewerMessagingAllowedAsync(subject);
+
         var model = new DirectoryViewModel
         {
             // Project every Profile to the VisibleProfile row shape. The address is the
@@ -144,7 +202,11 @@ public sealed class DirectoryController(
                     p.SubjectId,
                     p.DisplayName,
                     p.Verified,
-                    p.ContactVisibility is not null ? p.Address : null))
+                    p.ContactVisibility is not null ? p.Address : null,
+                    // The recipient half of the two-sided gate (their own opt-in on ∧
+                    // not guardian-restricted), ANDed with the viewer's gate read once
+                    // above, and never for the self-row (no self-conversations).
+                    viewerAllowed && p.SubjectId != subject && p.MessagingOptIn && !p.MessagingRestricted))
                 .ToList(),
         };
 
@@ -219,7 +281,21 @@ public sealed class DirectoryController(
                 : (await authz.CanAsync(
                     viewer, AccessAction.Read, new ProfileToAuditableResource(p))).Allowed);
 
-        return View(await ProjectDetail(detail, showBioTags));
+        // M9 amendment (ADR 0139) — the "Send a message" button: rendered only
+        // when *both* parties' messaging standing is on (the user's rule: "enabled
+        // by the current user and the user the card is for") — the viewer's own
+        // gate (instance on ∧ viewer opted in ∧ not guardian-restricted, the single
+        // <see cref="ViewerMessagingAllowedAsync"/> read) AND the recipient's own
+        // standing read off this profile (their MessagingOptIn on ∧ Messaging-
+        // Restricted off) — and never on a self-view (no self-conversations,
+        // ADR 0105 D1). <c>false</c> floors when the messaging seam is absent
+        // (the test-construction floor) or the gate read fails (fail closed).
+        var canMessage = viewer != p.SubjectId
+            && await ViewerMessagingAllowedAsync(viewer)
+            && p.MessagingOptIn
+            && !p.MessagingRestricted;
+
+        return View(await ProjectDetail(detail, showBioTags, canMessage));
     }
 
     /// <summary>
@@ -243,7 +319,7 @@ public sealed class DirectoryController(
     /// U8 pin extended for M23) — nothing more.
     /// </remarks>
     private async Task<DirectoryViewModel.Detail> ProjectDetail(
-        Kumunita.Core.UserInfo.DirectoryDetail detail, bool showBioTags)
+        Kumunita.Core.UserInfo.DirectoryDetail detail, bool showBioTags, bool canMessage)
     {
         var p = detail.Profile!;
         return new DirectoryViewModel.Detail(
@@ -266,6 +342,10 @@ public sealed class DirectoryController(
             // The tag display names — the ADR 0005 display-name resolution (the
             // current-language name, falling back to the base Name), the same
             // shape the ADR 0044 tag-chip surface uses.
-            TagNames: showBioTags ? await ResolveTagDisplayNamesAsync(p.TagIds) : null);
+            TagNames: showBioTags ? await ResolveTagDisplayNamesAsync(p.TagIds) : null,
+            // M9 amendment (ADR 0139) — the two-sided "Send a message" gate
+            // (computed by the Detail action; a self-view or either party's
+            // standing off floors to false — no button).
+            CanMessage: canMessage);
     }
 }
