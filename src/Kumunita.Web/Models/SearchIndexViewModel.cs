@@ -55,6 +55,16 @@ public sealed record SearchIndexViewModel(
     public bool IsAll => string.Equals(Surface, "all", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// M26 U15 (D-SORT·5) — the one shared sort control (the U10 <c>_Sort</c>
+    /// reference, reused verbatim — C-SORT·1): the closed search allowlist
+    /// (U2 §2.2 row 18 — <c>created</c>/<c>title</c> only; **no** relevance
+    /// key, M8 frozen). <c>null</c> on the <c>surface=all</c> shape (no
+    /// pager, the search-box answer) — the <c>_Sort</c> partial renders
+    /// nothing, the <c>all</c>-shape markup is unchanged.
+    /// </summary>
+    public SortViewModel? Sort { get; init; }
+
+    /// <summary>
     /// The detail href for a hit — the page surface resolves through
     /// <see cref="PageHrefs"/> (path-derived), group-scope hits use their
     /// <c>/groups/{groupId}/posts|events/{id}</c> route, and every other

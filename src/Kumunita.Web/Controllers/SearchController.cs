@@ -1,4 +1,5 @@
 using Kumunita.Core.Pages;
+using Kumunita.Core.Query;
 using Kumunita.Core.Search;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -88,9 +89,15 @@ public sealed class SearchController : Controller
     /// <param name="scope"><c>community</c> (default) / <c>groups</c> (D3 — anonymous
     /// degrades to community-only, the service's silent lane).</param>
     /// <param name="page">The page (floored to 1); meaningful only on a single-surface view.</param>
+    /// <param name="sort">The sort key (M26 U15, C-SORT·3 — Web-only); parsed against the
+    /// closed <c>created</c>/<c>title</c> allowlist, or <c>null</c> when the viewer chose
+    /// no sort (C-SORT·2, F1 — the seam keeps its pinned Created-desc order exactly).</param>
+    /// <param name="dir"><c>asc</c> / <c>desc</c> (M26 U15, C-SORT·3); blank/unknown falls
+    /// back to the resolved key's default direction.</param>
     [HttpGet("/search")]
     public async Task<IActionResult> Index(
-        string? q, string? surface, string? scope, int? page)
+        string? q, string? surface, string? scope, int? page,
+        string? sort = null, string? dir = null)
     {
         var query = (q ?? string.Empty).Trim();
         var isSignedIn = User.Identity?.IsAuthenticated == true;
@@ -115,6 +122,14 @@ public sealed class SearchController : Controller
         PagedViewModel? pager = null;
         var scopeWire = effectiveScope == SearchScope.Groups ? "groups" : "community";
 
+        // M26 U15 (C-SORT·3) — the ?sort=/?dir= → SortSpec mapping is
+        // Web-only: parse against the search surface's closed allowlist
+        // (U2 §2.2 row 18 — `created`/`title` only; relevance is **not** a
+        // sort key, M8 frozen), or null when the viewer chose no sort
+        // (C-SORT·2, F1 — the seam keeps its pinned Created-desc order).
+        var feedSort = ParseSort(sort, dir, SearchFeedAllowedKeys);
+        SortViewModel? sortVm = null;
+
         if (surfaceName == "all")
         {
             // D1 — the search-box answer: top MaxPerSurface per surface, no
@@ -128,13 +143,16 @@ public sealed class SearchController : Controller
         else
         {
             // D1 — the paged single-surface read. A blank q never reaches the
-            // service (no decision, no audit row).
+            // service (no decision, no audit row). The resolved SortSpec
+            // threads into the seam (the U9 Core seam — `null` keeps the
+            // per-surface `OrderByDescending(Created)` byte-for-byte).
             SearchSurfacePage sp = string.IsNullOrEmpty(query)
                 ? new SearchSurfacePage(surfaceName, Array.Empty<SearchHit>(), 1, false)
                 : await _search.SearchSurfaceAsync(
                     surfaceName, query, effectiveScope,
                     KumunitaPrincipal.SubjectId(User) ?? string.Empty,
-                    pageNum, HttpContext.RequestAborted);
+                    pageNum, HttpContext.RequestAborted,
+                    sort: feedSort);
             sections = new Dictionary<string, IReadOnlyList<SearchHit>>
             {
                 [surfaceName] = sp.Hits,
@@ -142,16 +160,40 @@ public sealed class SearchController : Controller
             // ADR 0090 D5/D7 — the pager: null on a one-page surface (the F2
             // no-render pin); the links carry q + surface + scope (D7 filter
             // preservation), page first (the _Pager's PagerLink shape).
+            // M26 U15 (C-SORT·8) — the sort/dir pairs join the pager's
+            // FilterParams **only** when the request carried a non-blank
+            // ?sort= (U11's SortViewModel.SortFilterParams helper, reused —
+            // not re-derived); an unsorted read keeps the pre-M26 pairs
+            // byte-identical (C-SORT·2).
             if (sp.HasMore || pageNum > 1)
             {
+                var filterParams = new Dictionary<string, string>
+                {
+                    ["q"] = query,
+                    ["surface"] = surfaceName,
+                    ["scope"] = scopeWire,
+                };
+                foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
+                    filterParams[k] = v;
                 pager = PagedViewModel.ForRoute("/search", sp.Page, SearchService.PageSize, sp.HasMore,
-                    new Dictionary<string, string>
-                    {
-                        ["q"] = query,
-                        ["surface"] = surfaceName,
-                        ["scope"] = scopeWire,
-                    });
+                    filterParams);
             }
+
+            // M26 U15 (D-SORT·5) — the one shared sort control (the U10 _Sort
+            // reference, reused verbatim — C-SORT·1): the closed search
+            // allowlist (U2 §2.2 row 18 — created/`title` only; **no**
+            // relevance key, M8 frozen), no dead options (F9). The control
+            // only exists on the single-surface shape (the `all` shape has
+            // no pager and the seam's SortSpec applies per surface — a
+            // cross-surface control would be a dead option).
+            sortVm = SortViewModel.ForRoute(
+                "/search",
+                currentKey: feedSort?.Key,
+                currentDir: feedSort is { } s ? (s.Descending ? "desc" : "asc") : null,
+                options: [
+                    ("created", "desc"),
+                    ("title", "asc"),
+                ]);
         }
 
         var pageHrefs = await PageHrefsForAsync(sections);
@@ -163,8 +205,28 @@ public sealed class SearchController : Controller
             Page: surfaceName == "all" ? 1 : pageNum,
             Sections: sections,
             PageHrefs: pageHrefs,
-            Pager: pager));
+            Pager: pager)
+        {
+            Sort = sortVm,
+        });
     }
+
+    // M26 U15 (C-SORT·1) — the search surface's closed sort allowlist (U2
+    // §2.2 row 18): `created` + the surface's `title` key only (→
+    // `SearchHit.Title ?? ""`, the U9 in-memory ordering). The Core seam's
+    // own switch (`SearchService.SearchSurfaceAsync`) resolves exactly
+    // these two keys — everything else, incl. `name` and `relevance`,
+    // falls back to the pinned created-desc default (C-SORT·1 / F4).
+    private static readonly IReadOnlySet<string> SearchFeedAllowedKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "created", "title" };
+
+    // M26 U15 (C-SORT·3) — parse the request's ?sort=/?dir= against the
+    // search surface's closed allowlist — or null when the viewer chose
+    // no sort (C-SORT·2, F1).
+    private static SortSpec? ParseSort(string? sort, string? dir, IReadOnlySet<string> allowedKeys)
+        => !string.IsNullOrWhiteSpace(sort)
+            ? SortKeys.Parse(sort, dir, allowedKeys, "created", defaultDir: true)
+            : null;
 
     /// <summary>
     /// Resolve the <c>/pages/{**path}</c> hrefs for the page-surface hits —

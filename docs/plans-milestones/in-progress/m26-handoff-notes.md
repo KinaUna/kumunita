@@ -668,3 +668,81 @@
   own `defaultDir: false` — no brief-vs-locked-Part-2 mismatch.
 - **Handoff to U15:** apply the U10 `_Sort` pattern to the search
   surface + its Web tests. See `m26-u15.md`.
+
+## U15 — Web search
+
+- **Landed (Web unit):** the U10 `_Sort` pattern applied to the
+  **search** surface — the paged single-surface read
+  (`/search?surface=<one>`, `SearchController.Index` →
+  `SearchIndexViewModel` → `Views/Search/Index.cshtml`) — reusing the
+  one shared `SortViewModel` + `_Sort` partial verbatim (C-SORT·1, no
+  fork). The `?sort=`/`?dir=` params are read Web-only (C-SORT·3),
+  parsed via the same `SortKeys.Parse` call against the closed
+  `created`/`title` allowlist (created desc default — the U2 §2.2
+  row 18 set, the U9-locked Core switch's exact key set), and the
+  resolved `SortSpec?` threads into `ISearchService.SearchSurfaceAsync`
+  (the U9 seam — a `null` pair keeps the per-surface
+  `OrderByDescending(Created)` byte-for-byte, C-SORT·2). The `Sort`
+  field (nullable `SortViewModel`) is **only** set on the
+  single-surface shape — the `all` shape has no pager (the
+  search-box answer, D1) and the seam's `SortSpec` applies per
+  surface, so a cross-surface control would be a dead option (F9);
+  the view renders the partial above the `_Pager` under the existing
+  `!Model.IsAll` guard (the U13/U14 `Model.Sort is not null`
+  convention).
+- **Options pin + pager split:** `Options` = exactly `created`
+  (desc) + `title` (asc) — **no** relevance key (M8 frozen — the
+  `Search_SortControl_Excludes_Relevance` pin), **no** `name` key
+  (the Core switch does not resolve it — see the drift pause below).
+  The pager (single-surface shape only) carries **its own**
+  `sort`/`dir` pair via U11's `SortViewModel.SortFilterParams`
+  helper (reused, not re-derived) alongside the frozen
+  `q`/`surface`/`scope` pairs (C-SORT·4); an unsorted read keeps the
+  pre-M26 pairs byte-identical (C-SORT·2).
+- **Tests:** `tests/Kumunita.Web.Tests/SearchSortWebTests.cs` — all
+  4 pinned names pass: `Search_SortControl_Renders_AllowedKeys`,
+  `Search_Pager_Carries_Sort_And_Dir`,
+  `Search_SortParam_DefaultsWhenAbsent`,
+  `Search_SortControl_Excludes_Relevance`. The frozen scope-degrade
+  gate (D3/F6) + the `CanSeeAsync`/audit-row gates + `HasMore` /
+  `MaxPerSurface` are byte-for-byte unchanged (C-SORT·4); the
+  existing `SearchControllerTests` controller-level pins (which
+  invoke `Index` without sort params → `feedSort = null` → the seam's
+  pinned order stays byte-for-byte) still pass unchanged.
+- **Exit verified:** `dotnet build Kumunita.slnx -c Debug` green
+  (0 errors); `Kumunita.Web.Tests` suite **908** total, **0 failed**
+  (4 new + existing; U14 was 904).
+- **One drift pause this unit** — see `## U15 — Drift pause` below
+  (the brief's `title`/`name` wording vs the U9-locked Core
+  allowlist).
+
+## U15 — Drift pause
+
+- **`name` key — NOT offered; logged as a brief-vs-locked-Core mismatch,
+  mirroring U12's `priority` case, not a silent change.** The U15 brief
+  (`m26-u15.md`) is itself consistent with the locked Core: its
+  *Understanding* names the `Options` as "the date/title keys only" and
+  its *Rules* say "the search `Options` are the date/title keys only".
+  But the brief's *Entry reads* cross-reference (U2 §2.2, register
+  `plan-m26-sorting.md`) and the U9 Core deliverable note both carry
+  the alternative wording "`created` + the surface's `title`/`name`
+  key". The **locked Core** (U9 — frozen Part 2) resolves **exactly
+  two keys** in `SearchService.SearchSurfaceAsync`: `created` and
+  `title` (→ `SearchHit.Title ?? ""`); the `people` surface's hit
+  stores its display name **in** `Title` (a single `SearchHit` shape
+  across all ten surfaces — `name` is the people-*find* surfaces' own
+  key, U8's `TagPeopleSortSupport`, not this seam's). Per the
+  drift-pause guard, the control offers **only** the keys the Core
+  `OrderBy…` support actually resolves — `created` + `title` — and a
+  `?sort=name` request falls back to the surface default (`created`,
+  desc, the C-SORT·1/F4 rule, pinned by
+  `Search_SortParam_DefaultsWhenAbsent`). No Core change was made —
+  adding a `name` branch to the frozen Part-2 switch would be a
+  silent Part-2 edit, out of U15's scope. The U2 §2.2 register
+  cross-reference (the "`title`/`name`" wording) is the stale piece;
+  it does not change the locked behavior.
+- **Relevance non-change (named non-decision, M8 frozen):** the
+  `Options` never include a relevance key and a `?sort=relevance`
+  request invents **no** order — it falls back to the pinned
+  created-desc default (the U9 `Search_RelevanceNotASortKey`
+  Core pin's Web twin, `Search_SortControl_Excludes_Relevance`).
