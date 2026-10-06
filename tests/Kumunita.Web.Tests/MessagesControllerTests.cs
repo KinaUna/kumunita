@@ -138,10 +138,15 @@ public class MessagesControllerTests
         messaging.ListConversationsAsync(Actor, 1, Arg.Any<int?>())
             .Returns(new ConversationList(new[] { convo }, HasMore: false));
 
+        // Anna has opted into messaging (MessagingOptIn on, no guardian
+        // restriction) — the ADR 0139 two-sided gate's recipient half — so she
+        // is a valid new-conversation candidate. Ben is the actor (excluded by
+        // id) and would additionally be excluded by his own opt-in (the
+        // floor default false).
         userInfo.GetProfilesAsync(false).Returns(new[]
         {
             new Profile { SubjectId = Actor,   DisplayName = "Ben"  },
-            new Profile { SubjectId = OtherId, DisplayName = "Anna" },
+            new Profile { SubjectId = OtherId, DisplayName = "Anna", MessagingOptIn = true },
         });
 
         var action = await controller.Index(null);
@@ -157,6 +162,61 @@ public class MessagesControllerTests
         Assert.Null(model.Pager);   // HasMore = false, page = 1 → null pager
 
         await messaging.Received(1).ListConversationsAsync(Actor, 1, Arg.Any<int?>());
+    }
+
+    // ── 2b — the recipient half of the two-sided gate (ADR 0139) on the
+    //       new-conversation picker: a resident who has NOT enabled messaging
+    //       (opt-in off, or guardian-restricted) is not a candidate ───────
+
+    /// <summary>
+    /// <c>GET /messages</c> with messaging on: the new-conversation picker
+    /// lists a resident <b>only when that resident's own messaging standing is
+    /// on</b> (their <c>MessagingOptIn</c> on ∧ <c>MessagingRestricted</c> off —
+    /// the ADR 0139 two-sided gate's recipient half, the DirectoryController
+    /// "Send a message" button affordance shape). A resident who has opted
+    /// out (the default <c>false</c> floor) or a guardian-restricted resident
+    /// is <b>excluded</b> from <c>Candidates</c>, so the picker never offers a
+    /// resident the actor cannot reach.
+    /// </summary>
+    [Fact]
+    public async Task Messages_Index_Picker_Excludes_MessagingDisabled_Resident()
+    {
+        var (controller, messaging, userInfo) = BuildMessaging(true);
+        // No existing conversations — this test pins the picker, not the list
+        // (an empty ConversationList, so the action's pager logic reads a real
+        // object rather than NSubstitute's null).
+        messaging.ListConversationsAsync(Actor, 1, Arg.Any<int?>())
+            .Returns(new ConversationList([], HasMore: false));
+
+        // Three other residents, three messaging postures:
+        //   OptedIn  (MessagingOptIn = true)              → a candidate.
+        //   OptedOut (MessagingOptIn = false, the floor)  → NOT a candidate.
+        //   Restricted (opt-in on, but guardian-restricted) → NOT a candidate.
+        const string OptedIn     = "subj-resident-optin";
+        const string OptedOut    = "subj-resident-optout";
+        const string Restricted  = "subj-resident-restricted";
+        userInfo.GetProfilesAsync(false).Returns(new[]
+        {
+            new Profile { SubjectId = Actor,      DisplayName = "Ben"  },
+            new Profile { SubjectId = OptedIn,    DisplayName = "Carol", MessagingOptIn = true },
+            new Profile { SubjectId = OptedOut,   DisplayName = "Dave" },                       // opt-in off (the default)
+            new Profile { SubjectId = Restricted, DisplayName = "Erin",  MessagingOptIn = true, MessagingRestricted = true },
+        });
+
+        var action = await controller.Index(null);
+        var view   = Assert.IsType<ViewResult>(action);
+        var model  = Assert.IsType<MessagesController.MessagesIndexViewModel>(view.ViewData.Model);
+
+        Assert.False(model.Disabled);
+        // Exactly one candidate — the opted-in resident. The opted-out and
+        // guardian-restricted residents are both excluded.
+        var ids = model.Candidates.Select(c => c.SubjectId).ToHashSet();
+        Assert.Equal([OptedIn], ids.ToArray());
+        Assert.Contains(OptedIn, ids);
+        Assert.DoesNotContain(OptedOut, ids);
+        Assert.DoesNotContain(Restricted, ids);
+        // The actor themself is never a candidate (no self-conversations).
+        Assert.DoesNotContain(Actor, ids);
     }
 
     // ── 3 — C-M9·1: non-participant → 404, no MarkRead, no view ────────

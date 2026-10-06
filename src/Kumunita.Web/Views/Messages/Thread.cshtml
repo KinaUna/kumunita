@@ -124,16 +124,42 @@
         @* ── The composer ───────────────────────────────────────────────── *@
         @if (Model.Conversation is { } conv)
         {
-            <form method="post" action="/messages/@conv.Id/send" class="mt-3">
-                @Html.AntiForgeryToken()
-                <textarea class="form-control mb-2" name="body" rows="3"
-                          placeholder="@composePlaceholder" required
-                          maxlength="@Kumunita.Core.Messaging.MessagingService.MaxBodyChars"
-                          aria-label="@composePlaceholder"></textarea>
-                <div class="d-flex justify-content-end">
-                    <button type="submit" class="btn btn-primary"><kw-l key="message.compose.send">Send</kw-l></button>
+            if (Model.RecipientMessagingEnabled)
+            {
+                <form method="post" action="/messages/@conv.Id/send" class="mt-3">
+                    @Html.AntiForgeryToken()
+                    <textarea class="form-control mb-2" name="body" rows="3"
+                              placeholder="@composePlaceholder" required
+                              maxlength="@Kumunita.Core.Messaging.MessagingService.MaxBodyChars"
+                              aria-label="@composePlaceholder"></textarea>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary"><kw-l key="message.compose.send">Send</kw-l></button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                @* The recipient has disabled messaging (opt-in off, or a
+                   guardian's restriction): the write form is inert — the
+                   resident can still read the exchange they were part of,
+                   but the composer is disabled (the ADR 0139 two-sided
+                   gate's recipient half, the DirectoryController button
+                   affordance shape). The fields are disabled — not merely
+                   hidden — so the surface is still visible as "why not". *@
+                <div class="alert alert-secondary mt-3" role="status">
+                    <kw-l key="message.compose.disabled">This resident has turned off direct messaging, so you can't send them a new message.</kw-l>
                 </div>
-            </form>
+                <form method="post" action="/messages/@conv.Id/send" class="mt-3" aria-disabled="true">
+                    @Html.AntiForgeryToken()
+                    <textarea class="form-control mb-2" name="body" rows="3"
+                              placeholder="@composePlaceholder" disabled
+                              maxlength="@Kumunita.Core.Messaging.MessagingService.MaxBodyChars"
+                              aria-label="@composePlaceholder"></textarea>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary" disabled><kw-l key="message.compose.send">Send</kw-l></button>
+                    </div>
+                </form>
+            }
         }
     </div>
 </div>
