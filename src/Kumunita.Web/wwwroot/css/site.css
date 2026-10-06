@@ -2656,7 +2656,14 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
    overlap rule so the ring wins the cascade (equal specificity, later wins). */
 .event-chip,
 .event-block {
-  background: color-mix(in srgb, var(--event-color, color-mix(in srgb, var(--kmb-ink) 8%, #fff)) 18%, #fff);
+  /* The tint mixes over the theme's surface (var(--kmb-surface, #fff)) —
+     #fff in light, the Forest dark card surface in dark — so the author's
+     color stays a soft tint on the *current* surface and the theme's ink
+     text (var(--kmb-ink) / --bs-secondary-color, which already flip with the
+     theme) keeps enough contrast on both. A flat #fff base would stay light
+     in dark mode while the text flips light → near-invisible (worst for
+     light author colors, whose tint is closest to pure white). */
+  background: color-mix(in srgb, var(--event-color, color-mix(in srgb, var(--kmb-ink) 8%, var(--kmb-surface, #fff))) 18%, var(--kmb-surface, #fff));
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-chip);
 }
@@ -2670,7 +2677,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
    positioning, so it never traps the pointer). */
 .event-chip-overlap {
   box-shadow: 0 0 0 2px var(--kmb-amber-soft);
-  background: color-mix(in srgb, var(--kmb-amber-soft) 14%, #fff);
+  background: color-mix(in srgb, var(--kmb-amber-soft) 14%, var(--kmb-surface, #fff));
 }
 
 /* EV-DWM (ADR 0064, U03) — the Day/Week/Month toggle in the calendar
@@ -2900,7 +2907,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   text-overflow: ellipsis;
 }
 .event-block.event-chip-overlap {
-  background: color-mix(in srgb, var(--kmb-amber-soft) 18%, #fff);
+  background: color-mix(in srgb, var(--kmb-amber-soft) 18%, var(--kmb-surface, #fff));
   border-color: var(--kmb-amber-soft);
 }
 
