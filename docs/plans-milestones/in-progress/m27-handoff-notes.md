@@ -408,3 +408,156 @@ are `NotImplementedException` until U03–U06; no other new warnings.
 locked in code; U02 owns the resident-scope **filter** over the M11
 `PortabilityDocTypes` inventory + the per-kind **business-key** matchers
 (the design doc §2.2 / §2.3 tables are the copy source, verbatim).
+
+## U02 — scope filter + business keys
+
+**Date:** 2026-10-06
+**Status:** COMPLETE. All three deliverables authored; `m27-u02.md` moved to
+`done/`. Build green.
+
+**Exit checklist (from the unit plan):**
+
+- [x] `dotnet build Kumunita.slnx -c Debug` green. — **PASS** (`Build
+  succeeded with 82 warning(s) in 13.3s`, exit 0; no new errors).
+- [x] No new test (U03's export pins are the first M27 tests). — **PASS**
+  (no test files touched).
+- [x] No new authorization surface (the `IAuthorizationService` surface
+  count is unchanged — the C-M27·7 pin). — **PASS** (no `AccessAction` /
+  `AccessVia` / `Decide()` branch added; the two U02 methods are pure,
+  static, session-free compositions over the two U02 data registries).
+- [x] The filter returns exactly the resident's rows for a seeded
+  two-resident fixture (a U09 test precondition). — **by construction**
+  (the U09 test pins it; the filter's membership rule is the locked §2.2
+  seat test, fail-closed on out-of-closed-set types + null ownership
+  values).
+
+**(a) The D1 inventory + ownership fields (verbatim from design doc §2.2,
+as shipped in `UserScopeInventory.Entries` — 29 in-scope doc families):**
+- `Post` → `AuthorId` (M11 ref map) — the resident's authored posts
+- `PostReply` → `AuthorId` (M11 ref map) — the resident's authored replies
+- `PostTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added translations (ADR 0022)
+- `ReplyTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added translations (ADR 0022)
+- `AnnouncementComment` → `AuthorId` (M11 ref map) — the resident's comments on announcements
+- `Event` → `AuthorId` (M11 ref map) — the resident's authored events
+- `EventRsvp` → `UserId` (M11 ref map) — the resident's own RSVPs
+- `EventTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added event translations (ADR 0059)
+- `ProjectGoal` → `AuthorId` (M11 ref map) — the resident's authored goals
+- `Project` → `AuthorId` (M11 ref map) — the resident's authored projects
+- `TodoItem` → `AuthorId` (M11 ref map) — the resident's authored to-dos
+- `KanbanBoard` → `AuthorId` (M11 ref map) — the resident's authored boards
+- `TodoTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added to-do translations (ADR 0088)
+- `BoardTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added board translations (ADR 0088)
+- `ProjectTranslation` → `AuthorId` (nullable) (M11 ref map) — the resident's user-added project translations (ADR 0088)
+- `TodoComment` → `AuthorId` (M11 ref map) — the resident's comments on to-dos
+- `Conversation` → `ParticipantA` ∪ `ParticipantB` (M11 ref map) — conversations the resident participates in
+- `Message` → `ConversationId` → `Conversation` (the resident is a participant) (M11 ref map, via `Conversation`) — indirect basis
+- `Page` → `AuthorId` (M11 ref map) — the resident's authored pages (blog)
+- `Tag` → `CreatedBy` (`Tag.cs` — drift guard entry 1) — the tags the resident created
+- `InventoryItem` → `AuthorId` (`InventoryItem.cs` — drift guard entry 1) — the inventory items the resident created
+- `Document` → `OwnerId` (`Document.cs` — drift guard entry 1) — the documents the resident uploaded
+- `DocumentFolder` → `OwnerId` (`DocumentFolder.cs` — drift guard entry 1) — the document folders the resident created
+- `Bookmark` → `OwnerId` (`Bookmark.cs` — drift guard entry 1) — the resident's bookmarks
+- `Profile` → `SubjectId` (the resident's own) (`Profile.cs`) — the resident's own bio + tags (M23) + display identity
+- `Group` → `OwnerId` ∪ member (in `GroupMembership.UserId`) (M11 ref map — drift guard entry 2) — the groups the resident created or is a member of
+- `GroupMembership` → `UserId` (M11 ref map) — the resident's own membership rows
+- `GroupInvitation` → `UserId` (M11 ref map) — invitations the resident received
+- `GroupJoinRequest` → `UserId` (M11 ref map) — join-requests the resident submitted
+
+**(b) The per-kind business keys (verbatim from design doc §2.3, as
+shipped in `UserBusinessKeys.ByType` — 14 kinds):**
+- `Post` → `(AuthorId, Created, Title, Body)`
+- `PostReply` → `(PostId, AuthorId, Created, Body)`
+- `Event` → `(AuthorId, Created, Title)`
+- `TodoItem` → `(AuthorId, Created, Title)`
+- `KanbanBoard` → `(AuthorId, Created, Title)`
+- `Page` → `(AuthorId, Created, Title)`
+- `Tag` → `Slug`
+- `Document` → `(OwnerId, Created, Title)`
+- `Conversation` → `(ParticipantA, ParticipantB)`
+- `Message` → `(ConversationId, SenderId, Created)`
+- `InventoryItem` → `(AuthorId, Created, Name)`
+- `Bookmark` → `(OwnerId, TargetKind, TargetId)`
+- `Profile` → `SubjectId`
+- `Group` → `Name`
+
+**(c) The excluded list (verbatim from design doc §2.2 "Excluded", as
+shipped in `UserScopeInventory.Excluded` — 22 rows):**
+- `IdentityToken` — Credential material (C-M11·2 / C-M27·2, the M11 "Excluded" set, unchanged)
+- `OutboxEmail` — Operational state (a fresh instance re-derives; the M11 "Excluded" set, unchanged)
+- `EmailDeadLetter` — Operational state (the M11 "Excluded" set, unchanged)
+- `AccessAudit` — Operational state (a log, not resident content; the M11 "Excluded" set, unchanged)
+- `AuditPurgeSummary` — Operational state (the M11 "Excluded" set, unchanged)
+- `LocaleSettings` / `LanguageCatalog` — Operator instance-identity (travels via `config.json` in M11; the resident does not own it — D1 "out of scope")
+- `Notification` / `NotificationPreference` / `NotificationSubscription` — Per-resident read state (the M6 operational state; system-generated, not authored by the resident)
+- `DelegationGrant` / `GuardianLink` / `ModeratorAssignment` / `ComponentMembership` — Identity-graph / authorization state (the M11 identity graph; not the resident's authored content)
+- `Report` — Moderation state (a report is a moderation action, not the resident's authored content)
+- `Announcement` / `AnnouncementTranslation` — Operator/GlobalAdmin content (authored by GlobalAdmin/Translator, not by a plain resident)
+- `CommunityTranslation` / `TranslationResource` / `GroupTranslation` / `TagTranslation` — Operator/Translator-managed translations (not the resident's authored content)
+- `KanbanLane` / `BoardItemPlacement` — Sub-entities of the resident's board (travel with the in-scope board via the M11 apply order, not as independently-scoped resident content)
+
+Plus the C-M27·3 pin itself (not a type row): the *other residents'*
+authored rows (their `Post` / `Message` / `Document` / `Bookmark` / any
+other in-scope-type content) are excluded by the `ScopeFilter` ownership
+test, not by a type row — the same type travels, scoped to this resident's
+rows (the U09 two-resident fixture pins exactly that).
+
+**(d) The `IAuthorizationService` surface count is unchanged** (C-M27·7 —
+the zero-new-authorization-surface pin; U02 added no `AccessAction`, no
+`AccessVia`, no `Decide()` branch — the two new methods are pure, static,
+session-free).
+
+**(e) Compile warnings:** the four CS9113 "parameter is unread" warnings
+on `UserPortabilityService`'s ctor params (`documentStore` /
+`userInfoService` / `mediaStore` / `userManager`) — the expected U01-shell
+warnings, still present because the three interface bodies are still
+`NotImplementedException` until U03–U06. **No new warnings** introduced by
+the U02 files (`UserScopeInventory.cs`, `UserBusinessKeys.cs`, or the two
+new static methods in `UserPortabilityService.cs`).
+
+**Shipped shapes (the code the U03–U06 units call):**
+- `UserScopeInventory.Entries` — `IReadOnlyDictionary<string,
+  UserScopeEntry>` (`Type` → `OwnershipFields` (closed list) +
+  `ScopeBasis` + `Note`, verbatim §2.2); `UserScopeInventory.Excluded` —
+  `IReadOnlyList<(string Type, string Reason)>` (verbatim §2.2);
+  `UserScopeInventory.IsInScope(string)` — the closed-membership test.
+- `UserBusinessKeys.ByType` — `IReadOnlyDictionary<string,
+  UserBusinessKey>` (`Type` → `Fields` (closed list, §2.3 order));
+  `UserBusinessKeys.Matches(string type, object? a, object? b)` — the
+  pure duplicate matcher (case-sensitive `Equals` over every locked
+  field; fail-closed default — `false` for an out-of-closed-set type, a
+  null argument, or a candidate lacking a locked field name).
+- `UserPortabilityService.ScopeFilter(string type, IReadOnlyList<object>
+  docs, string residentSubjectId, IReadOnlySet<string>?
+  inScopeConversationIds = null, IReadOnlySet<string>? residentGroupIds =
+  null)` — the pure resident-scope filter (C-M27·3): a row is in scope
+  iff the resident holds at least one of its kind's locked ownership
+  seats — the direct principal fields by value equality (a `null`
+  ownership value on the nullable translation variants is NOT in scope),
+  the `Conversation` union by either seat, the `Message` indirect basis
+  via its `ConversationId` ∈ `inScopeConversationIds`, the `Group`
+  owner-or-member union via its `OwnerId` or its `Id` ∈
+  `residentGroupIds` (the two row-based seat sets are resolved by U03
+  over the archive's own `Conversation` / `GroupMembership` arrays and
+  passed in, keeping the filter a pure POCO test).
+- `UserPortabilityService.MatchBusinessKey(string type, object? a,
+  object? b)` — the D4 duplicate detector (delegates to
+  `UserBusinessKeys.Matches`).
+
+**Drift note (anticipated, resolved in favor of the source — no pause
+needed):** the unit plan's Deliverables prose said
+`Message`→`SenderId` ∪ participant and `Post`→`(AuthorId, Created,
+Title?, Body-hash)`; the design doc §2.2/§2.3 + the U00 handoff (the
+locked source) say `Message`→`ConversationId`→`Conversation` (the
+resident is a participant) and `Post`→`(AuthorId, Created, Title, Body)`.
+**The locked source won** — the shipped code uses
+`Message`→`ConversationId`→`Conversation` (indirect basis, via
+`inScopeConversationIds`) and `Post`→`(AuthorId, Created, Title, Body)`
+(the field value compared directly, no re-invented hash). No other
+contradiction found; no "## U02 — Drift pause" section needed.
+
+**U03 entry point:** the seam + the POCO shapes + the manifest marker +
+the resident-scope **filter** + the per-kind **business-key** matchers
+are locked in code; U03 owns the resident-scoped **export** (the M11
+archive loop, the resident-scope marker set on the manifest, the one
+`portability.export` audit row) — the `ScopeFilter` / `MatchBusinessKey`
+compositions are ready to call.

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
@@ -182,6 +183,227 @@ public sealed class UserPortabilityService(
     IMediaStore mediaStore,
     Microsoft.AspNetCore.Identity.UserManager<User> userManager) : IUserPortabilityService
 {
+    /// <summary>
+    /// The U02 resident-scope filter (C-M27·3) — the <em>pure</em>
+    /// composition over the U02 <see cref="UserScopeInventory"/>
+    /// registry, driving off the POCO set directly. U03's
+    /// <see cref="ExportAsync"/> calls this per in-scope doc-type array
+    /// (the M11 <c>docs/{Type}.json</c> shape, filtered to this
+    /// resident's rows only — the C-M27·3 ownership-not-read pin).
+    /// <para>
+    /// **The closed membership rule (the design doc §2.2, verbatim):**
+    /// a doc type <c>T</c>'s rows are returned iff
+    /// <see cref="UserScopeInventory.IsInScope"/> holds (an
+    /// out-of-closed-set type — including every <see
+    /// cref="UserScopeInventory.Excluded"/> row — contributes
+    /// <em>zero</em> rows, the C-M27·5 fail-closed default at the
+    /// filter level); and each row <c>r</c> of <c>T</c> is in scope iff
+    /// the resident holds <em>at least one</em> of <c>T</c>'s locked
+    /// ownership seats, resolved per <see cref="UserScopeEntry.
+    /// OwnershipFields"/>:
+    /// <list type="bullet">
+    /// <item>a <em>direct</em> principal field (<c>AuthorId</c> /
+    ///     <c>OwnerId</c> / <c>UserId</c> / <c>SubjectId</c> /
+    ///     <c>CreatedBy</c>) — the property value must equal
+    ///     <paramref name="residentSubjectId"/>; the nullable
+    ///     translation variants (<c>PostTranslation</c> /
+    ///     <c>ReplyTranslation</c> / <c>EventTranslation</c> /
+    ///     <c>TodoTranslation</c> / <c>BoardTranslation</c> /
+    ///     <c>ProjectTranslation</c>) — a <c>null</c> ownership value is
+    ///     <em>not</em> in scope (the row is a system/operator-added
+    ///     translation, not the resident's), so only a non-null value
+    ///     equal to the resident qualifies;</item>
+    /// <item><c>Conversation</c> — the two-principal union:
+    ///     <c>ParticipantA</c> ∪ <c>ParticipantB</c> (either seat
+    ///     held, <em>not</em> both — a row with the resident in either
+    ///     seat is in scope);</item>
+    /// <item><c>Message</c> — the <em>indirect</em> basis
+    ///     (<see cref="UserScopeEntry.OwnershipFields"/> is empty,
+    ///     <see cref="UserScopeEntry.ScopeBasis"/> says
+    ///     "M11 ref map (via Conversation)"): the row's
+    ///     <c>ConversationId</c> must be in
+    ///     <paramref name="inScopeConversationIds"/> (the
+    ///     <c>Conversation</c> rows the resident participates in,
+    ///     resolved by U03 over the archive's own doc set — this method
+    ///     takes it as a parameter so the filter stays a pure POCO
+    ///     test, no doc-type cross-lookup of its own);</item>
+    /// <item><c>Group</c> — the owner-or-member union:
+    ///     <c>OwnerId</c> == the resident, <em>or</em> the resident
+    ///     holds a <c>GroupMembership</c> row with
+    ///     <c>UserId</c> == the resident for this <c>GroupId</c> (the
+    ///     row-based seat, resolved by U03 over the archive's own
+    ///     <c>GroupMembership</c> set — passed in as
+    ///     <paramref name="residentGroupIds"/>).</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// **Ordering + identity are preserved** — the returned list is a
+    /// new list, in the input order, of the input's <em>own</em>
+    /// instances (no copy, no clone — the archive's POCOs travel
+    /// through the M11 archive writer as-is, the C-M27·1 format
+    /// pin unchanged).
+    /// </para>
+    /// </summary>
+    /// <param name="type">The doc type name (the <see
+    ///     cref="UserScopeInventory.Entries"/> closed set).</param>
+    /// <param name="docs">The input row set (the archive's
+    ///     <c>docs/{Type}.json</c> array, already deserialized to POCOs
+    ///     by the M11 <see cref="KumunitaArchive"/> reader — U03's
+    ///     export loop feeds the target instance's rows here, per
+    ///     type).</param>
+    /// <param name="residentSubjectId">The resident's own
+    ///     <c>subjectId</c> (the scope anchor — the C-M27·3
+    ///     ownership test value).</param>
+    /// <param name="inScopeConversationIds">The <c>ConversationId</c>
+    ///     set the resident participates in (the
+    ///     <c>Conversation</c> rows where the resident holds a
+    ///     <c>ParticipantA</c>/<c>ParticipantB</c> seat) — <c>Message</c>
+    ///     rows are in scope iff their <c>ConversationId</c> is in this
+    ///     set. U03 resolves this over the archive's own
+    ///     <c>Conversation</c> doc array before calling; <c>null</c>
+    ///     (or empty) means "no conversations in scope", so
+    ///     <c>Message</c> rows contribute nothing (the fail-closed
+    ///     default).</param>
+    /// <param name="residentGroupIds">The <c>GroupId</c> set where the
+    ///     resident holds a <c>GroupMembership</c> row
+    ///     (<c>UserId</c> == the resident) — a <c>Group</c> row is in
+    ///     scope iff its <c>OwnerId</c> == the resident <em>or</em> its
+    ///     <c>Id</c> is in this set. U03 resolves this over the
+    ///     archive's own <c>GroupMembership</c> doc array before
+    ///     calling; <c>null</c> (or empty) means "no membership rows",
+    ///     so a <c>Group</c> row's only in-scope path is its
+    ///     <c>OwnerId</c> (the fail-closed default).</param>
+    /// <returns>A new list (the input order preserved) of the input's
+    ///     own instances that are in the resident's scope — empty for
+    ///     an out-of-closed-set <paramref name="type"/>, an empty
+    ///     input, or no matching rows.</returns>
+    public static IReadOnlyList<object> ScopeFilter(
+        string type,
+        IReadOnlyList<object> docs,
+        string residentSubjectId,
+        IReadOnlySet<string>? inScopeConversationIds = null,
+        IReadOnlySet<string>? residentGroupIds = null)
+    {
+        if (!UserScopeInventory.IsInScope(type))
+            return [];
+
+        if (UserScopeInventory.Entries[type] is not { } entry)
+            return [];
+
+        var inScope = new List<object>(docs.Count);
+        foreach (var doc in docs)
+        {
+            if (doc is null)
+                continue;
+            if (ScopeRowHoldsSeat(doc, entry, residentSubjectId,
+                    inScopeConversationIds, residentGroupIds))
+                inScope.Add(doc);
+        }
+        return inScope;
+    }
+
+    /// <summary>
+    /// One row's seat test (the <see cref="ScopeFilter"/> loop body) —
+    /// <c>true</c> iff the row holds at least one of its kind's locked
+    /// ownership seats for the resident (the §2.2 rule, resolved per
+    /// seat in the <see cref="UserScopeEntry.OwnershipFields"/> order,
+    /// the two union kinds' row-based seats resolved via the
+    /// <paramref name="inScopeConversationIds"/> /
+    /// <paramref name="residentGroupIds"/> parameters the
+    /// <see cref="ScopeFilter"/> doc-comment defines).
+    /// </summary>
+    private static bool ScopeRowHoldsSeat(
+        object doc,
+        UserScopeEntry entry,
+        string residentSubjectId,
+        IReadOnlySet<string>? inScopeConversationIds,
+        IReadOnlySet<string>? residentGroupIds)
+    {
+        var type = doc.GetType();
+
+        // The two union / indirect kinds, by their locked §2.2 seat
+        // names (the <see cref="UserScopeEntry.OwnershipFields"/>
+        // values are the exact locked names — the "ConversationId"
+        // indirect-basis seat + the "GroupMembership.UserId" row-based
+        // seat are the only two that are not plain principal fields on
+        // the doc itself).
+        if (entry.Type == "Message")
+        {
+            // The indirect basis — the ConversationId → Conversation
+            // link (the resident is a participant), not a direct
+            // field on the Message.
+            var conversationId = (string?)type.GetProperty("ConversationId",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(doc);
+            return conversationId is not null
+                && inScopeConversationIds is not null
+                && inScopeConversationIds.Contains(conversationId);
+        }
+        if (entry.Type == "Group")
+        {
+            // The owner-or-member union — OwnerId (direct) ∪
+            // GroupMembership.UserId (the row-based seat, resolved by
+            // the caller over the archive's GroupMembership array).
+            var ownerId = (string?)type.GetProperty("OwnerId",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(doc);
+            if (ownerId == residentSubjectId)
+                return true;
+            var groupId = (string?)type.GetProperty("Id",
+                BindingFlags.Public | BindingFlags.Instance)?.GetValue(doc);
+            return groupId is not null
+                && residentGroupIds is not null
+                && residentGroupIds.Contains(groupId);
+        }
+
+        // Every other in-scope kind — a direct principal field
+        // (AuthorId / OwnerId / UserId / SubjectId / CreatedBy, or the
+        // Conversation two-principal union's two seats). A null field
+        // value (the nullable translation variants' AuthorId) is NOT
+        // in scope — only a non-null value equal to the resident
+        // qualifies.
+        foreach (var field in entry.OwnershipFields)
+        {
+            var prop = type.GetProperty(field, BindingFlags.Public | BindingFlags.Instance);
+            if (prop is null)
+                continue;
+            var value = prop.GetValue(doc);
+            if (value is string s && s == residentSubjectId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The U02 business-key matcher (the D4 <c>duplicate</c> detector)
+    /// — the <em>pure</em> composition over the U02 <see
+    /// cref="UserBusinessKeys"/> registry, driving off the POCO set
+    /// directly. U04's <see cref="ClassifyAsync"/> classifier calls this
+    /// per in-scope entity (the design doc §2.4 rule (b): a
+    /// <c>duplicate</c> entity is one whose business key matches an
+    /// existing entity in the target — the §2.3 locked keys).
+    /// <para>
+    /// **The fail-closed default (C-M27·5):** <c>false</c> for any
+    /// <paramref name="type"/> outside the closed §2.3 set, for a null
+    /// argument, or for a candidate whose runtime type lacks the
+    /// kind's locked field name (a malformed / out-of-scope candidate
+    /// is <em>never</em> a duplicate — the §2.4 rule (a) <c>clean</c>
+    /// classification proceeds on "no match"). No session, no write —
+    /// a pure <c>bool</c> over the two POCOs, the plan's locked
+    /// <c>bool Matches(string type, object a, object b)</c> shape.
+    /// </para>
+    /// </summary>
+    /// <param name="type">The doc type name (the <see
+    ///     cref="UserBusinessKeys.ByType"/> closed set — the 14 §2.3
+    ///     kinds).</param>
+    /// <param name="a">The candidate entity (the archive's row).</param>
+    /// <param name="b">The existing entity in the target (the match
+    ///     against which <paramref name="a"/> is compared).</param>
+    /// <returns><c>true</c> iff every field in the kind's locked
+    ///     business-key set is equal between the two candidates
+    ///     (case-sensitive <see cref="object.Equals(object)"/>);
+    ///     <c>false</c> otherwise (the fail-closed default).</returns>
+    public static bool MatchBusinessKey(string type, object? a, object? b) =>
+        UserBusinessKeys.Matches(type, a, b);
+
     /// <inheritdoc />
     public Task<Stream> ExportAsync(string residentSubjectId, CancellationToken ct = default)
         => throw new NotImplementedException("M27 U03 — the resident-scoped export (the M11 archive + the D2 resident-scope marker).");
