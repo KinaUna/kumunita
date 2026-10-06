@@ -561,3 +561,39 @@ are locked in code; U03 owns the resident-scoped **export** (the M11
 archive loop, the resident-scope marker set on the manifest, the one
 `portability.export` audit row) — the `ScopeFilter` / `MatchBusinessKey`
 compositions are ready to call.
+
+## U03 — export
+
+**Date:** 2026-10-06
+**Status:** COMPLETE. Both deliverables authored (`UserPortabilityService.ExportAsync` body filled + `UserPortabilityExportTests.cs` authored); `m27-u03.md` moved to `done/`. Build green. The 4 export pins discovered + passing (U11 records).
+
+**Exit checklist (from the unit plan):**
+
+- [x] `dotnet build Kumunita.slnx -c Debug` green. — **PASS** (`Build succeeded with 9 warning(s) in 4.5s`, exit 0; no new errors).
+- [x] The export pins discovered (pass/red status recorded for U11's gate). — **PASS** (all 4 green, `Total: 4, Errors: 0, Failed: 0, Skipped: 0`).
+- [x] No new authorization surface (the C-M27·7 pin). — **PASS** (no `AccessAction` / `AccessVia` / `Decide()` branch added; the service emits one `AccessAudit` row `Via = Owner`).
+- [x] No new document, no new `*DocTypes` surface, no migration (D7). — **PASS** (no new doc type, no `*DocTypes` surface, no migration; the 4 non-M11 types are resolved locally in the `nameToType` dict, NOT added to the frozen `PortabilityDocTypes` table).
+- [x] `ClassifyAsync` / `ResolveAsync` **stay** `NotImplementedException` until U04/U06. — **PASS** (both unchanged).
+
+**(a) The `ExportAsync` loop note:** the U02 `ScopeFilter` is applied per in-scope doc-type array (the `PortabilityExportDocuments` per-type query + serialize pattern, filtered to the resident's rows via `ScopeFilter`). The M11 `MediaExport` pattern is reused at the resident scope (the `MediaObject` catalog filtered to the media ids referenced by the in-scope rows). The M11 `PrincipalsExport` no-secret principal shape is reused verbatim (the `PortabilityPrincipal` POCO, only the resident's own account). The M11 `ManifestFinalize` is called + the D2 marker set. The M11 `KumunitaArchive.WriteAsync` is the archive writer (verbatim).
+
+**(b) The D2 marker field (verbatim):**
+```csharp
+manifest.Scope = "resident";
+manifest.ResidentSubjectId = residentSubjectId;
+```
+Every existing `PortabilityManifest` field (`Format` / `GeneratedAt` / `CommunityName` / `DocCounts` / `MediaManifest`) is **unchanged**; the `Format` authority stays `kumunita/portability/1` (C-M27·1).
+
+**(c) The one-audit-row shape:** `TargetKind = "portability"`, `TargetId = "portability"`, `Action = "portability.export"`, `Via = Authorization.AccessVia.Owner`, `Outcome = Authorization.AccessOutcome.Allow`, `ActorId = residentSubjectId`, `EffectivePrincipalId = residentSubjectId` — the **service** emits it (the controller adds none, the ADR 0105 `messaging.toggle` shape). Emitted after the archive is built (a failed build throws before this point, so no audit row for a refused export).
+
+**(d) The `IAuthorizationService` surface count is unchanged** (C-M27·7 — the zero-new-authorization-surface pin; U03 added no `AccessAction`, no `AccessVia`, no `Decide()` branch — the service emits one `AccessAudit` row via the frozen `documentStore.OpenSession()` seam, no new authorization surface).
+
+**(e) The 4 export pins + pass/red status:**
+- `Export_SelfScoped_OtherResidentsAbsent` — **PASS** (C-M27·3: another resident's Post is absent from the archive).
+- `Export_NoSecret_NoCredentialMaterial` — **PASS** (C-M27·2: the `PortabilityPrincipal` POCO has no credential field + a byte-scan witness over the archive finds none).
+- `Export_D2Marker_Present` — **PASS** (D2: the manifest carries `Scope = "resident"` + `ResidentSubjectId`, format authority unchanged).
+- `Export_PlainM11Archive_StillDeserializes` — **PASS** (C-M27·1: a plain M11 archive without the resident marker still deserializes; `Scope` + `ResidentSubjectId` are `null`).
+
+**(f) Compile warnings:** no new warnings introduced by the U03 files. The 4 CS9113 "parameter is unread" warnings from the U01 shell are **gone** (the `ExportAsync` body now consumes all 4 ctor params: `documentStore` / `userInfoService` / `mediaStore` / `userManager`). The remaining 9 warnings are pre-existing (CS8604 / CS8600 / CS8602 / CS8714 / xUnit1051 / xUnit2017 / CS0219 in other files).
+
+**U04 entry point:** the export path is complete (the resident-scoped `*.kumunita` archive + the one `portability.export` audit row). U04 owns the `ClassifyAsync` body — the `clean` / `duplicate` / `conflict` classification over the M11 validate-then-classify pattern, reusing the U02 `MatchBusinessKey` + the M11 `PortabilityDocTypes` reference map for the absent-reference report. The `ScopeFilter` / `MatchBusinessKey` compositions are ready to call; the `PortabilityExportDocuments` / `MediaExport` / `PrincipalsExport` / `ManifestFinalize` / `KumunitaArchive` partials are the frozen M11 machinery U04–U06 reuse.

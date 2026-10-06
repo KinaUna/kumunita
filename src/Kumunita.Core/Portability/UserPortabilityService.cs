@@ -1,4 +1,7 @@
+using System.Collections;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
@@ -405,8 +408,259 @@ public sealed class UserPortabilityService(
         UserBusinessKeys.Matches(type, a, b);
 
     /// <inheritdoc />
-    public Task<Stream> ExportAsync(string residentSubjectId, CancellationToken ct = default)
-        => throw new NotImplementedException("M27 U03 — the resident-scoped export (the M11 archive + the D2 resident-scope marker).");
+    public async Task<Stream> ExportAsync(string residentSubjectId, CancellationToken ct = default)
+    {
+        // ── JSON options (the M11 PortabilityExportDocuments pattern) ─────
+        var jsonOpts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
+        // The 4 non-M11 types (drift-guard entry 1) are resolved locally;
+        // they are NOT added to the frozen PortabilityDocTypes table.
+        var nameToType = new Dictionary<string, Type>(PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
+        nameToType["InventoryItem"]    = typeof(Kumunita.Core.Inventory.InventoryItem);
+        nameToType["Document"]         = typeof(Kumunita.Core.Documents.Document);
+        nameToType["DocumentFolder"]   = typeof(Kumunita.Core.Documents.DocumentFolder);
+        nameToType["Bookmark"]         = typeof(Kumunita.Core.Bookmarks.Bookmark);
+
+        // ── Pre-query Conversation + GroupMembership (the seat sets) ──────
+        // Message (indirect basis) needs inScopeConversationIds; Group
+        // (owner-or-member union) needs residentGroupIds. Both are derived
+        // from the resident's own rows before the main loop.
+        await using var session = documentStore.QuerySession();
+
+        var allConversations = await QueryAllRowsAsync(session, typeof(Kumunita.Core.Messaging.Conversation), ct);
+        var inScopeConversations = ScopeFilter("Conversation", allConversations, residentSubjectId);
+        var inScopeConversationIds = inScopeConversations
+            .Select(r => (string?)r.GetType().GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(r))
+            .Where(id => id is not null)
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var allMemberships = await QueryAllRowsAsync(session, typeof(Kumunita.Core.UserInfo.GroupMembership), ct);
+        var inScopeMemberships = ScopeFilter("GroupMembership", allMemberships, residentSubjectId);
+        var residentGroupIds = inScopeMemberships
+            .Select(r => (string?)r.GetType().GetProperty("GroupId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(r))
+            .Where(id => id is not null)
+            .Select(id => id!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // ── Per-type doc export (the U02 scope filter over the M11 loop) ──
+        var docs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var docCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var mediaIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var (type, _) in UserScopeInventory.Entries)
+        {
+            ct.ThrowIfCancellationRequested();
+            var docType = nameToType[type];
+
+            // Conversation + GroupMembership were already queried above;
+            // reuse the filtered results to avoid a double query.
+            IReadOnlyList<object> inScopeRows;
+            if (type == "Conversation")
+            {
+                inScopeRows = inScopeConversations;
+            }
+            else if (type == "GroupMembership")
+            {
+                inScopeRows = inScopeMemberships;
+            }
+            else
+            {
+                var allRows = await QueryAllRowsAsync(session, docType, ct);
+                inScopeRows = ScopeFilter(type, allRows, residentSubjectId,
+                    inScopeConversationIds, residentGroupIds);
+            }
+
+            // Serialize using the value's own runtime type — the ScopeFilter
+            // output is a List<object> of the doc type's instances; the
+            // declared List<T> input type must match the concrete list
+            // element type (the M11 pattern serializes the raw List<T> from
+            // ToListAsync; here the filtered list is List<object>, so the
+            // runtime type is List<T> as well — GetType() resolves it).
+            docs[type] = JsonSerializer.SerializeToUtf8Bytes(inScopeRows, inScopeRows.GetType(), jsonOpts);
+            docCounts[type] = inScopeRows.Count;
+
+            // Collect media references from the in-scope rows (the
+            // resident's media scope: ImageIds / AttachmentIds /
+            // AvatarId / MediaId — the design doc §2.2 "minimal
+            // identity reference set").
+            foreach (var row in inScopeRows)
+            {
+                var rowType = row.GetType();
+                foreach (var propName in new[] { "ImageIds", "AttachmentIds" })
+                {
+                    if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
+                        is System.Collections.IEnumerable ids)
+                    {
+                        foreach (var id in ids)
+                            if (id is string s && s.Length > 0)
+                                mediaIds.Add(s);
+                    }
+                }
+                foreach (var propName in new[] { "AvatarId", "MediaId" })
+                {
+                    if (rowType.GetProperty(propName, BindingFlags.Public | BindingFlags.Instance)?.GetValue(row)
+                        is string singleId && singleId.Length > 0)
+                        mediaIds.Add(singleId);
+                }
+            }
+        }
+
+        // ── Resident media (the M11 MediaExport pattern, filtered) ───────
+        // Query the MediaObject catalog rows for the referenced media ids,
+        // then read the payload bytes (the same OpenReadAsync + size-check
+        // + manifest-entry pattern as the M11 MediaExport.ExportAsync).
+        var catalogDict = (await QueryAllRowsAsync(session, typeof(MediaObject), ct))
+            .Cast<MediaObject>()
+            .ToDictionary(o => o.Id, StringComparer.Ordinal);
+
+        var media = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var mediaManifest = new List<PortabilityMediaEntry>(mediaIds.Count);
+
+        foreach (var mediaId in mediaIds)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!catalogDict.TryGetValue(mediaId, out var obj))
+                continue;
+            if (string.IsNullOrWhiteSpace(obj.ContentType))
+                continue;
+
+            var byteStream = await mediaStore.OpenReadAsync(mediaId, ct);
+            using (byteStream)
+            {
+                using var buffer = new MemoryStream();
+                await byteStream.CopyToAsync(buffer, ct);
+                var bytes = buffer.ToArray();
+
+                if (bytes.LongLength != obj.SizeBytes)
+                    throw new InvalidOperationException(
+                        $"M27 media export — MediaObject '{mediaId}' payload is {bytes.LongLength} bytes " +
+                        $"but the catalog records {obj.SizeBytes}; refusing to ship a mismatched size_bytes.");
+
+                media[mediaId] = bytes;
+                mediaManifest.Add(new PortabilityMediaEntry
+                {
+                    Id = mediaId,
+                    SizeBytes = obj.SizeBytes,
+                    ContentType = obj.ContentType,
+                });
+            }
+        }
+
+        // Include the resident's MediaObject catalog rows in the docs
+        // section (the M11 docs/MediaObject.json shape, filtered to the
+        // resident's media — the design doc §2.2 "minimal identity
+        // reference set" pin).
+        if (mediaIds.Count > 0)
+        {
+            var mediaObjs = mediaIds
+                .Where(id => catalogDict.TryGetValue(id, out var o))
+                .Select(id => catalogDict[id])
+                .ToList();
+            docs["MediaObject"] = JsonSerializer.SerializeToUtf8Bytes(mediaObjs, typeof(List<MediaObject>), jsonOpts);
+            docCounts["MediaObject"] = mediaObjs.Count;
+        }
+
+        // ── No-secret principal (the M11 PortabilityPrincipal shape) ─────
+        // The C-M27·2 boundary: only the eight allowed §principals fields
+        // are read; PasswordHash / SecurityStamp / AccessToken / RefreshToken
+        // / RecoveryCode are never touched.
+        var user = await userManager.FindByIdAsync(residentSubjectId);
+        if (user is null)
+            throw new InvalidOperationException(
+                $"M27 export — no Identity account for resident '{residentSubjectId}'.");
+        var profile = await userInfoService.GetProfileAsync(residentSubjectId);
+        var principal = new PortabilityPrincipal
+        {
+            SubjectId = user.Id,
+            Username = user.UserName,
+            Email = user.Email,
+            NormalizedEmail = user.NormalizedEmail,
+            DisplayName = profile?.DisplayName,
+            Verified = profile?.Verified ?? false,
+            Blocked = profile?.Blocked ?? false,
+            Roles = (await userManager.GetRolesAsync(user)).ToList(),
+        };
+        var principals = KumunitaArchive.ToJson(new[] { principal });
+
+        // ── Config (the resident does not own it — an empty block) ───────
+        // The design doc §2.2 "Excluded" table: LocaleSettings /
+        // LanguageCatalog / CommunityName are operator instance-identity
+        // (travels via config.json in M11; the resident does not own it).
+        // An empty PortabilityConfig keeps the archive structurally valid.
+        var config = KumunitaArchive.ToJson(new PortabilityConfig());
+
+        // ── Manifest finalize + the D2 resident-scope marker ─────────────
+        var manifest = ManifestFinalize.Build(
+            null, // the resident does not own the community name
+            docCounts,
+            mediaManifest,
+            DateTimeOffset.UtcNow);
+        manifest.Scope = "resident";
+        manifest.ResidentSubjectId = residentSubjectId;
+
+        // ── The one AccessAudit row (Via = Owner, verb export) ───────────
+        // The service emits it; the controller adds none (the ADR 0105
+        // messaging.toggle shape). Emitted after the archive is built
+        // (a failed build throws before this point, so no audit row for a
+        // refused export).
+        await using var auditSession = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        auditSession.Store(new Authorization.AccessAudit
+        {
+            Id = System.Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = residentSubjectId,
+            EffectivePrincipalId = residentSubjectId,
+            Action = "portability.export",
+            TargetKind = "portability",
+            TargetId = "portability",
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow,
+        });
+        await auditSession.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // ── Write the archive ────────────────────────────────────────────
+        var stream = new MemoryStream();
+        await KumunitaArchive.WriteAsync(stream, manifest, docs, media, principals, config, ct);
+        stream.Position = 0;
+        return stream;
+    }
+
+    /// <summary>
+    /// Queries all rows of a doc type from the store (the M11
+    /// <see cref="PortabilityExportDocuments"/> reflection-dispatched
+    /// pattern: <c>IQuerySession.Query&lt;T&gt;()</c> →
+    /// <c>Marten.QueryableExtensions.ToListAsync&lt;T&gt;</c>), returning
+    /// the rows as a <c>List&lt;object&gt;</c> (the <see
+    /// cref="ScopeFilter"/> input shape).
+    /// </summary>
+    private static async Task<List<object>> QueryAllRowsAsync(
+        Marten.IQuerySession session, Type docType, CancellationToken ct)
+    {
+        var queryMethod = typeof(Marten.IQuerySession)
+            .GetMethod(nameof(Marten.IQuerySession.Query), Type.EmptyTypes)!;
+        var toListAsyncMethod = typeof(Marten.QueryableExtensions)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .First(m => m.Name == nameof(Marten.QueryableExtensions.ToListAsync)
+                        && m.IsGenericMethod
+                        && m.GetGenericArguments().Length == 1
+                        && m.GetParameters().Length >= 1
+                        && m.GetParameters()[0].ParameterType.IsGenericType
+                        && m.GetParameters()[0].ParameterType.GetGenericTypeDefinition()
+                           == typeof(System.Linq.IQueryable<>));
+
+        var queryable = queryMethod.MakeGenericMethod(docType).Invoke(session, null)!;
+        var listTask = toListAsyncMethod.MakeGenericMethod(docType)
+            .Invoke(null, new object?[] { queryable, ct })!;
+        await ((Task)listTask).ConfigureAwait(false);
+        var list = (IList)listTask.GetType().GetProperty("Result")!.GetValue(listTask)!;
+        return list.Cast<object>().ToList();
+    }
 
     /// <inheritdoc />
     public Task<UserPortabilityImportPlan> ClassifyAsync(string residentSubjectId, Stream archive, CancellationToken ct = default)
