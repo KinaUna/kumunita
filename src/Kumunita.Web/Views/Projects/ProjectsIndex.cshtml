@@ -50,6 +50,14 @@
            with U06). *@
         <section class="mb-5">
             <h2><kw-l key="pl.index.goals_heading">Goals</kw-l></h2>
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the section — above the list — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.SortGoals is not null)
+            {
+                <partial name="_Sort" model="Model.SortGoals" />
+            }
             <div class="airy-ann-list">
                 @if (Model.Goals.Count == 0)
                 {
@@ -84,20 +92,10 @@
                     </div>
                 }
 
-                @* M26 U12 (D-SORT·5) — the goals section's sort control (the
-                   U10 _Sort reference, reused): the closed goals allowlist
-                   (U2 §2.2 row 9 — created/modified/title). Renders nothing
-                   when the VM field is null (the no-sort pin — the _Pager
-                   null ⇒ no partial precedent). Placed above the section's
-                   pager so the viewer's sort choice stays beside the paging
-                   affordance. *@
-                @if (Model.SortGoals is not null)
-                {
-                    <partial name="_Sort" model="Model.SortGoals" />
-                }
                 @* M7 (ADR 0090 D5) — the goals section pager (F2 one-page
                    no-render pin): the <c>_Pager</c> partial renders nothing when
-                   the VM field is null. *@
+                   the VM field is null. (The sort control now lives at the
+                   TOP of the section, above the list.) *@
                 @if (Model.PagerGoals is not null)
                 {
                     <partial name="_Pager" model="Model.PagerGoals" />
@@ -110,6 +108,14 @@
            the same adjacent-unit relaxation). *@
         <section>
             <h2><kw-l key="pl.index.projects_heading">Projects</kw-l></h2>
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the section — above the list — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.SortProjects is not null)
+            {
+                <partial name="_Sort" model="Model.SortProjects" />
+            }
             <div class="airy-ann-list">
                 @if (Model.StandaloneProjects.Count == 0)
                 {
@@ -152,20 +158,10 @@
                     </div>
                 }
 
-                @* M26 U12 (D-SORT·5) — the standalone-projects section's sort
-                   control (the U10 _Sort reference, reused): the closed
-                   projects allowlist (U2 §2.2 row 10 — created/modified/
-                   title). Renders nothing when the VM field is null (the
-                   no-sort pin — the _Pager null ⇒ no partial precedent).
-                   Placed above the section's pager so the viewer's sort
-                   choice stays beside the paging affordance. *@
-                @if (Model.SortProjects is not null)
-                {
-                    <partial name="_Sort" model="Model.SortProjects" />
-                }
                 @* M7 (ADR 0090 D5) — the standalone-projects section pager
                    (F2 one-page no-render pin): the <c>_Pager</c> partial renders
-                   nothing when the VM field is null. *@
+                   nothing when the VM field is null. (The sort control now
+                   lives at the TOP of the section, above the list.) *@
                 @if (Model.PagerProjects is not null)
                 {
                     <partial name="_Pager" model="Model.PagerProjects" />

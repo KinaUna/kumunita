@@ -639,6 +639,21 @@ public static class KnownTranslationKeys
             ["settings.dateformat_flash_set"]    = "Date & time format set — it takes effect on the next request.",
             ["settings.dateformat_flash_reset"]  = "Date & time format reset — the platform default will be used.",
 
+            // ── settings — items per page (the resident's page-size
+            // preference, additive on the platform default) ────────────────
+            ["settings.pagesize_title"]        = "Items per page",
+            ["settings.pagesize_lede"]         =
+                "Choose how many items each list shows per page (feeds, events, projects and the rest). " +
+                "Your choice is saved on your account — it takes effect the next time you load a list, and " +
+                "never affects other residents.",
+            ["settings.pagesize_label"]        = "Items per page",
+            ["settings.pagesize_default_marker"] = "— platform default",
+            ["settings.pagesize_reset_confirm"]  = "Reset your items-per-page to the platform default?",
+            ["settings.pagesize_reset"]        = "Reset to platform default",
+            ["settings.pagesize_save"]         = "Save",
+            ["settings.pagesize_flash_set"]    = "Items per page set to \"{0}\" — it takes effect on the next request.",
+            ["settings.pagesize_flash_reset"]  = "Items per page reset — the platform default will be used.",
+
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
             ["admin.timezone_title"]    = "Platform default time zone",
@@ -2981,6 +2996,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_flash_set"]    = "Datum- und Zeitformat gesetzt — es wirkt ab der nächsten Anfrage.",
             ["settings.dateformat_flash_reset"]  = "Datum- und Zeitformat zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
 
+            ["settings.pagesize_title"]        = "Einträge pro Seite",
+            ["settings.pagesize_lede"]         =
+                "Lege fest, wie viele Einträge jede Liste pro Seite zeigt (Feeds, Veranstaltungen, Projekte und der Rest). " +
+                "Deine Auswahl wird auf deinem Konto gespeichert — sie wirkt ab dem nächsten Laden einer Liste und " +
+                "betrifft nie andere Bewohner.",
+            ["settings.pagesize_label"]        = "Einträge pro Seite",
+            ["settings.pagesize_default_marker"] = "— Plattform-Voreinstellung",
+            ["settings.pagesize_reset_confirm"]  = "Einträge pro Seite auf die Plattform-Voreinstellung zurücksetzen?",
+            ["settings.pagesize_reset"]        = "Auf Plattform-Voreinstellung zurücksetzen",
+            ["settings.pagesize_save"]         = "Speichern",
+            ["settings.pagesize_flash_set"]    = "Einträge pro Seite auf \"{0}\" gesetzt — es wirkt ab der nächsten Anfrage.",
+            ["settings.pagesize_flash_reset"]  = "Einträge pro Seite zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
+
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
             ["admin.timezone_lede"]     =
@@ -5201,6 +5229,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Enregistrer",
             ["settings.dateformat_flash_set"]    = "Format de date et d'heure réglé — il prend effet à la prochaine requête.",
             ["settings.dateformat_flash_reset"]  = "Format de date et d'heure réinitialisé — le défaut de la plateforme sera utilisé.",
+
+            ["settings.pagesize_title"]        = "Éléments par page",
+            ["settings.pagesize_lede"]         =
+                "Choisissez le nombre d'éléments affichés par page (flux, événements, projets, etc.). " +
+                "Votre choix est enregistré sur votre compte — il prend effet au prochain chargement d'une liste, " +
+                "sans jamais affecter les autres résidents.",
+            ["settings.pagesize_label"]        = "Éléments par page",
+            ["settings.pagesize_default_marker"] = "— défaut de la plateforme",
+            ["settings.pagesize_reset_confirm"]  = "Réinitialiser les éléments par page au défaut de la plateforme ?",
+            ["settings.pagesize_reset"]        = "Réinitialiser au défaut de la plateforme",
+            ["settings.pagesize_save"]         = "Enregistrer",
+            ["settings.pagesize_flash_set"]    = "Éléments par page réglés sur \"{0}\" — cela prend effet à la prochaine requête.",
+            ["settings.pagesize_flash_reset"]  = "Éléments par page réinitialisés — le défaut de la plateforme sera utilisé.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -7426,6 +7467,19 @@ public static class KnownTranslationKeys
             ["settings.dateformat_save"]         = "Gem",
             ["settings.dateformat_flash_set"]    = "Dato- og tidsformat indstillet — det træder i kraft ved næste anmodning.",
             ["settings.dateformat_flash_reset"]  = "Dato- og tidsformat nulstillet — platformstandarden bruges.",
+
+            ["settings.pagesize_title"]        = "Elementer pr. side",
+            ["settings.pagesize_lede"]         =
+                "Vælg, hvor mange elementer hver liste viser pr. side (flok, begivenheder, projekter m.m.). " +
+                "Dit valg gemmes på din konto — det træder i kraft ved næste indlæsning af en liste, og " +
+                "betræffes aldrig andre beboere.",
+            ["settings.pagesize_label"]        = "Elementer pr. side",
+            ["settings.pagesize_default_marker"] = "— platformstandard",
+            ["settings.pagesize_reset_confirm"]  = "Nulstil elementer pr. side til platformstandarden?",
+            ["settings.pagesize_reset"]        = "Nulstil til platformstandard",
+            ["settings.pagesize_save"]         = "Gem",
+            ["settings.pagesize_flash_set"]    = "Elementer pr. side indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
+            ["settings.pagesize_flash_reset"]  = "Elementer pr. side nulstillet — platformstandarden bruges.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",

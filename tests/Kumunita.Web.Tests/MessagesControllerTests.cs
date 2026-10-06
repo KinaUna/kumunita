@@ -107,7 +107,7 @@ public class MessagesControllerTests
         Assert.Null(model.Pager);
 
         await messaging.DidNotReceiveWithAnyArgs()
-            .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>());
+            .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
         await userInfo.DidNotReceiveWithAnyArgs()
             .GetProfilesAsync(Arg.Any<bool>());
     }
@@ -135,7 +135,7 @@ public class MessagesControllerTests
             Id: ConvoId, OtherParticipantId: OtherId, OtherDisplayName: "Anna",
             LastMessageBody: "Hi!", LastMessageAt: new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.Zero),
             UnreadCount: 1);
-        messaging.ListConversationsAsync(Actor, 1)
+        messaging.ListConversationsAsync(Actor, 1, Arg.Any<int?>())
             .Returns(new ConversationList(new[] { convo }, HasMore: false));
 
         userInfo.GetProfilesAsync(false).Returns(new[]
@@ -156,7 +156,7 @@ public class MessagesControllerTests
         Assert.Equal(1, model.Page);
         Assert.Null(model.Pager);   // HasMore = false, page = 1 → null pager
 
-        await messaging.Received(1).ListConversationsAsync(Actor, 1);
+        await messaging.Received(1).ListConversationsAsync(Actor, 1, Arg.Any<int?>());
     }
 
     // ── 3 — C-M9·1: non-participant → 404, no MarkRead, no view ────────
@@ -176,7 +176,7 @@ public class MessagesControllerTests
     {
         var (controller, messaging, _) = BuildMessaging(true);
 
-        messaging.GetConversationAsync(ConvoId, Actor, 1)
+        messaging.GetConversationAsync(ConvoId, Actor, 1, Arg.Any<int?>())
             .Returns(Task.FromException<ConversationDetail>(
                 new KeyNotFoundException("not a participant")));
 
@@ -187,7 +187,7 @@ public class MessagesControllerTests
             .MarkReadAsync(Arg.Any<string>(), Arg.Any<string>());
         // The toggle gate was read (the action reached the service call),
         // so GetConversationAsync was invoked once and threw.
-        await messaging.Received(1).GetConversationAsync(ConvoId, Actor, 1);
+        await messaging.Received(1).GetConversationAsync(ConvoId, Actor, 1, Arg.Any<int?>());
     }
 
     // ── 4 — thread renders with unread markers (D8 / F3) ───────────────
@@ -226,7 +226,7 @@ public class MessagesControllerTests
             Body = "Hi Ben", Created = new DateTimeOffset(2026, 9, 27, 9, 30, 0, TimeSpan.Zero),
             ReadBy = null,    // unread by the actor — the view renders the badge
         };
-        messaging.GetConversationAsync(ConvoId, Actor, 1)
+        messaging.GetConversationAsync(ConvoId, Actor, 1, Arg.Any<int?>())
             .Returns(new ConversationDetail(convo, new[] { otherMsg, actorMsg }, HasMore: false));
 
         var action = await controller.Thread(ConvoId, null);
@@ -335,7 +335,7 @@ public class MessagesControllerTests
         // And no list data was fetched at all (the disabled state is
         // decided by the gate read alone).
         await messaging.DidNotReceiveWithAnyArgs()
-            .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>());
+            .ListConversationsAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
         await userInfo.DidNotReceiveWithAnyArgs()
             .GetProfilesAsync(Arg.Any<bool>());
     }
@@ -359,7 +359,7 @@ public class MessagesControllerTests
         Assert.IsType<NotFoundResult>(action);
         await messaging.Received(1).IsMessagingAllowedForAsync(Actor);
         await messaging.DidNotReceiveWithAnyArgs()
-            .GetConversationAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>());
+            .GetConversationAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<int?>());
     }
 
     /// <summary>

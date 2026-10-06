@@ -1,5 +1,6 @@
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -217,12 +218,13 @@ public sealed class MessagingService : IMessagingService
     }
 
     /// <inheritdoc />
-    public async Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page)
+    public async Task<ConversationDetail> GetConversationAsync(string conversationId, string actorId, int page, int? pageSize = null)
     {
         if (string.IsNullOrWhiteSpace(conversationId))
             throw new ArgumentException("A conversation id is required.", nameof(conversationId));
         if (string.IsNullOrWhiteSpace(actorId))
             throw new ArgumentException("An acting resident id is required.", nameof(actorId));
+        int ps = PageSizer.ResolveOverride(pageSize, ThreadPageSize);
 
         await EnsureEnabledAsync().ConfigureAwait(false);
 
@@ -241,11 +243,11 @@ public sealed class MessagingService : IMessagingService
         var messages = await session.Query<Message>()
             .Where(m => m.ConversationId == convo.Id)
             .OrderByDescending(m => m.Created)
-            .Skip((p - 1) * ThreadPageSize)
-            .Take(ThreadPageSize)
+            .Skip((p - 1) * ps)
+            .Take(ps)
             .ToListAsync(ct)
             .ConfigureAwait(false);
-        var hasMore = messages.Count == ThreadPageSize;
+        var hasMore = messages.Count == ps;
 
         var other = actorId == convo.ParticipantA ? convo.ParticipantB : convo.ParticipantA;
         return new ConversationDetail(
@@ -261,10 +263,11 @@ public sealed class MessagingService : IMessagingService
     }
 
     /// <inheritdoc />
-    public async Task<ConversationList> ListConversationsAsync(string actorId, int page)
+    public async Task<ConversationList> ListConversationsAsync(string actorId, int page, int? pageSize = null)
     {
         if (string.IsNullOrWhiteSpace(actorId))
             throw new ArgumentException("An acting resident id is required.", nameof(actorId));
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await EnsureEnabledAsync().ConfigureAwait(false);
 
@@ -282,10 +285,10 @@ public sealed class MessagingService : IMessagingService
 
         var sorted = myConversations
             .OrderByDescending(c => c.LastMessageAt ?? c.Created)
-            .Skip((p - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((p - 1) * ps)
+            .Take(ps)
             .ToList();
-        var hasMore = sorted.Count == PageSize;
+        var hasMore = sorted.Count == ps;
 
         var items = new List<ConversationRef>(sorted.Count);
         foreach (var c in sorted)

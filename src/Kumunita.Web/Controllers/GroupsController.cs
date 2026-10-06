@@ -371,7 +371,12 @@ public sealed class GroupsController(
         //    stays the authoritative deny). The Detail page is member-scoped
         //    by its owner ∪ member gate, so every viewer here is a member
         //    and sees the feed + the "New post" button. ──
-        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses the
+        // platform default. Passed to the seam (the Skip/Take window) and the
+        // pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page, sort: postSort, pageSize: pageSize);
 
         var groupPosts = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -400,7 +405,7 @@ public sealed class GroupsController(
         //    same live membership read as CanPost. The detail page is
         //    member-scoped by its owner ∪ member gate, so every viewer here is a
         //    member and sees the feed + the button. ──
-        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: page, sort: eventSort);
+        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: page, sort: eventSort, pageSize: pageSize);
 
         var groupEvents = new List<GroupEventListItem>(eventFeed.Visible.Count);
         foreach (var ev in eventFeed.Visible)
@@ -526,11 +531,11 @@ public sealed class GroupsController(
             // preserved across its prev/next. An unsorted read leaves
             // both sections' FilterParams empty (byte-identical, C-SORT·2).
             PagerPosts = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, feed.HasMore,
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, pageSize, feed.HasMore,
                     SortViewModel.SortFilterParams(sort, dir))
                 : null,
             PagerEvents = (eventFeed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, eventFeed.HasMore,
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, pageSize, eventFeed.HasMore,
                     SortViewModel.SortFilterParams(sort, dir))
                 : null,
             // M26 U11 (D-SORT·5) — the two list sections' sort controls

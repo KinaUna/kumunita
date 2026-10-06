@@ -105,6 +105,14 @@
                             }
                         </h2>
                     </div>
+                    @* The shared sort control (the _Sort partial) sits at the TOP
+                       of the section — above the list — so the sort options are
+                       the first thing the viewer sees (it renders nothing when
+                       the VM field is null, the no-sort pin). *@
+                    @if (!Model.IsAll && Model.Sort is not null)
+                    {
+                        <partial name="_Sort" model="Model.Sort" />
+                    }
                     <ul class="list-unstyled">
                         @foreach (var h in hits)
                         {
@@ -121,20 +129,10 @@
                             </li>
                         }
                     </ul>
-                    @* M26 U15 (D-SORT·5) — the one shared sort control
-                       (the U10 _Sort reference, reused verbatim —
-                       C-SORT·1): the closed search allowlist (U2 §2.2
-                       row 18 — created/title only; no relevance key,
-                       M8 frozen). Renders nothing when the VM field is
-                       null (the no-sort pin — the U13/U14 guard
-                       precedent). Placed above the pager so the viewer's
-                       sort choice stays beside the paging affordance.
-                       The `all` shape has neither (its Sort is null —
-                       the search-box answer has no pager). *@
-                    @if (!Model.IsAll && Model.Sort is not null)
-                    {
-                        <partial name="_Sort" model="Model.Sort" />
-                    }
+                    @* (The sort control now lives at the TOP of the section,
+                       above the list. The `all` shape has neither — its
+                       Sort is null, and the search-box answer has no
+                       pager.) *@
                     @if (!Model.IsAll && Model.Pager is not null)
                     {
                         <partial name="_Pager" model="Model.Pager" />

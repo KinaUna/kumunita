@@ -107,6 +107,14 @@
         }
 
         <div class="airy-ann-list">
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the feed — above the list — so the sort options are the first
+               thing the viewer sees (it renders nothing when the VM field is
+               null, the no-sort pin). *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             @if (Model.Events.Count == 0)
             {
                 @if (Model.Past)
@@ -141,22 +149,10 @@
                 </div>
             }
 
-            @* M26 U11 (D-SORT·5) — the event feed's sort control (the U10
-               _Sort reference, reused): the closed event-feed allowlist
-               (U2 §2.2 rows 4–5 — start / created / title, all non-null in
-               the Event model). The per-sub-surface default direction is
-               upcoming start asc, past start desc (the U5 rule). Renders
-               nothing when the VM field is null (the no-sort pin — the
-               _Pager null ⇒ no partial precedent). Placed above the feed's
-               pager so the viewer's sort choice stays beside the paging
-               affordance. *@
-            @if (Model.Sort is not null)
-            {
-                <partial name="_Sort" model="Model.Sort" />
-            }
             @* M7 (ADR 0090 D5) — the event feed's shared pager (F2 one-page
                no-render pin): the <c>_Pager</c> partial renders nothing when the
-               VM field is null (a one-page feed). *@
+               VM field is null (a one-page feed). (The sort control now lives
+               at the TOP of the feed, above the list.) *@
             @if (Model.Pager is not null)
             {
                 <partial name="_Pager" model="Model.Pager" />

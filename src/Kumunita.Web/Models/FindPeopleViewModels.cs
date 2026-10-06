@@ -22,7 +22,8 @@ public sealed record FindPeopleIndexViewModel();
 public sealed record FindPeopleTagViewModel(
     string Slug,
     ProfileTagPage Result,
-    int Page)
+    int Page,
+    int PageSize)
 {
     /// <summary>The resolved tag's base display name (the ADR 0044
     /// <see cref="Kumunita.Core.Tags.Tag.Name"/> the U03 service surfaced);
@@ -46,7 +47,8 @@ public sealed record FindPeopleTagViewModel(
 public sealed record FindPeopleBioViewModel(
     string Query,
     ProfileBioPage Result,
-    int Page)
+    int Page,
+    int PageSize)
 {
     /// <summary>The by-bio find's sort control (M26 U14, D-SORT·5 — the
     /// U10 <c>_Sort</c> reference, reused verbatim, C-SORT·1): the closed

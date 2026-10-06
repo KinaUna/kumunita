@@ -116,7 +116,11 @@ public sealed class MessagesController(
             return View(new MessagesIndexViewModel { Disabled = true });
 
         var pageNum = page is > 0 ? page.Value : 1;
-        var list = await _messaging.ListConversationsAsync(actorId, pageNum);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(_userInfo, actorId);
+        var list = await _messaging.ListConversationsAsync(actorId, pageNum, pageSize: pageSize);
 
         // The new-conversation picker: every non-blocked resident except the
         // actor themself (the directory's catalog read — verifiedOnly: false,
@@ -129,7 +133,7 @@ public sealed class MessagesController(
 
         PagedViewModel? pager = null;
         if (list.HasMore || pageNum > 1)
-            pager = PagedViewModel.ForRoute("/messages", pageNum, MessagingService.PageSize, list.HasMore);
+            pager = PagedViewModel.ForRoute("/messages", pageNum, pageSize, list.HasMore);
 
         return View(new MessagesIndexViewModel
         {
@@ -214,10 +218,14 @@ public sealed class MessagesController(
             return NotFound();
 
         var pageNum = page is > 0 ? page.Value : 1;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(_userInfo, actorId);
         ConversationDetail detail;
         try
         {
-            detail = await _messaging.GetConversationAsync(id, actorId, pageNum);
+            detail = await _messaging.GetConversationAsync(id, actorId, pageNum, pageSize: pageSize);
         }
         catch (KeyNotFoundException)
         {
@@ -253,7 +261,7 @@ public sealed class MessagesController(
         PagedViewModel? pager = null;
         if (detail.HasMore || pageNum > 1)
             pager = PagedViewModel.ForRoute($"/messages/{detail.Conversation.Id}", pageNum,
-                MessagingService.ThreadPageSize, detail.HasMore);
+                pageSize, detail.HasMore);
 
         // The service returns the window newest-first (its own contract);
         // the thread renders it chronologically — oldest first, the **latest

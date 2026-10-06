@@ -71,11 +71,12 @@ public sealed class DocumentService
     /// adapter). <see cref="DocumentListResult.HiddenCount"/> counts only the
     /// candidates that call evaluated.
     /// </summary>
-    public async Task<DocumentListResult> ListAsync(string actorId, int page, SortSpec? sort = null)
+    public async Task<DocumentListResult> ListAsync(string actorId, int page, SortSpec? sort = null, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<Document> q = session
@@ -93,8 +94,8 @@ public sealed class DocumentService
                 d => d.Created, d => d.Modified, d => d.Title,
                 sizeKey: "size", d => d.SizeBytes, nameKey: "", d => string.Empty, d => d.Id);
         var candidates = await q
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -127,7 +128,7 @@ public sealed class DocumentService
 
         return new DocumentListResult(
             Visible: visible, HiddenCount: visibleSet.HiddenCount,
-            Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
+            Page: page, Total: candidateCount, HasMore: candidates.Count == ps);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Announcements;
+using Kumunita.Core.Query;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
@@ -68,14 +69,14 @@ public class AnnouncementControllerTests
     public async Task Index_When_Anonymous_PassesNullActorId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisiblePagedAsync(null, Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>())
+        announcements.ListVisiblePagedAsync( null, Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new AnnouncementPage(Items: new List<Announcement>(), HasMore: false));
         var controller = Build(announcements, IsAuthenticated: false);
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisiblePagedAsync(null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0), 1, Arg.Any<CancellationToken>());
-        await announcements.DidNotReceive().ListVisiblePagedAsync(Arg.Is<string>(x => x != null), Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await announcements.Received(1).ListVisiblePagedAsync( null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
+        await announcements.DidNotReceive().ListVisiblePagedAsync( Arg.Is<string>(x => x != null), Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     /// <summary>
@@ -89,14 +90,14 @@ public class AnnouncementControllerTests
     public async Task Index_When_Authenticated_PassesSubjectId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>())
+        announcements.ListVisiblePagedAsync( "subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new AnnouncementPage(Items: new List<Announcement>(), HasMore: false));
         var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisiblePagedAsync("subj-resident-001", Arg.Is<IReadOnlySet<string>>(s => s.Count == 1 && s.Contains(Roles.Member)), 1, Arg.Any<CancellationToken>());
-        await announcements.DidNotReceive().ListVisiblePagedAsync(null, Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await announcements.Received(1).ListVisiblePagedAsync( "subj-resident-001", Arg.Is<IReadOnlySet<string>>(s => s.Count == 1 && s.Contains(Roles.Member)), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
+        await announcements.DidNotReceive().ListVisiblePagedAsync( null, Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() );
     }
 
     // ── Read gate display-name fallback (null-safe) ──
@@ -115,7 +116,7 @@ public class AnnouncementControllerTests
     {
         const string author = "subj-anon-author-001";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(new AnnouncementPage(Items: new List<Announcement>
+        announcements.ListVisiblePagedAsync( "subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() ).Returns(new AnnouncementPage(Items: new List<Announcement>
         {
             new()
             {
@@ -155,7 +156,7 @@ public class AnnouncementControllerTests
         const string author = "subj-admin-001";
         const string display = "Kumunita Admin";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(new AnnouncementPage(Items: new List<Announcement>
+        announcements.ListVisiblePagedAsync( "subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() ).Returns(new AnnouncementPage(Items: new List<Announcement>
         {
             new()
             {
@@ -739,7 +740,7 @@ public class AnnouncementControllerTests
             {
                 const string author = "subj-mod-001";
                 var announcements = Substitute.For<IAnnouncementService>();
-                announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(
+                announcements.ListVisiblePagedAsync( "subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() ).Returns(
                     new AnnouncementPage(
                         Items: new List<Announcement>
                         {
@@ -787,7 +788,7 @@ public class AnnouncementControllerTests
             {
                 const string author = "subj-admin-001";
                 var announcements = Substitute.For<IAnnouncementService>();
-                announcements.ListVisiblePagedAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(
+                announcements.ListVisiblePagedAsync( Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() ).Returns(
                     new AnnouncementPage(
                         Items: new List<Announcement>
                         {

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Inventory;
+using Kumunita.Core.Query;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -106,7 +107,7 @@ public sealed class InventoryControllerTests
         };
         inventory.ListItemsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new ItemPage([shared, community], true));
 
         var controller = Build(inventory, subjectId: actor);
@@ -135,13 +136,13 @@ public sealed class InventoryControllerTests
         // C-M16·5 pin: a filter, never a gate — the audience decision is
         // the seam's, this is only a candidate-set narrowing).
         await inventory.Received(1).ListItemsAsync(
-            null, null, actor, 1, Arg.Any<CancellationToken>());
+            null, null, actor, 1, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
         var deniedInventory = Substitute.For<IInventoryService>();
         deniedInventory.ListItemsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(Task.FromException<ItemPage>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedInventory, subjectId: actor);
@@ -153,7 +154,7 @@ public sealed class InventoryControllerTests
         var singlePage = Substitute.For<IInventoryService>();
         singlePage.ListItemsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new ItemPage([shared], false));
         var singlePageController = Build(singlePage, subjectId: actor);
         var singlePageResult = await singlePageController.List(null, null, page: 1);
@@ -353,7 +354,7 @@ public sealed class InventoryControllerTests
         var listInventory = Substitute.For<IInventoryService>();
         listInventory.ListItemsAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(new ItemPage([created], false));
         var listController = Build(listInventory, subjectId: actor);
         var listResult = await listController.List(null, null, page: 1);

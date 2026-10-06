@@ -45,7 +45,12 @@ public sealed class DocumentController(
     // keeps compiling and resolves the flash to the raw key floor; DI always
     // supplies the live ITranslationProvider + ILocalizationService in the app.
     ILocalizationService? localization = null,
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    Kumunita.Core.UserInfo.IUserInfoService? userInfo = null) : Controller
 {
     /// <summary>
     /// Resolves a <c>documents.*</c> kw-l key to the operator's effective
@@ -81,10 +86,15 @@ public sealed class DocumentController(
         // pinned Created-desc order).
         var feedSort = ParseSort(sort, dir, DocumentFeedAllowedKeys);
 
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read or a
+        // missing seam uses the platform default. Passed to the seam (the
+        // Skip/Take window).
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         // One CanSeeAsync (aggregate row) over the candidate set — the service's
         // C-M21·3 shape. The view model never carries the hidden count (F1:
         // the feed does not leak "how many you cannot see").
-        var result = await documents.ListAsync(actorId, page, sort: feedSort);
+        var result = await documents.ListAsync(actorId, page, sort: feedSort, pageSize: pageSize);
         var vm = new DocumentIndexViewModel(
             Visible: result.Visible,
             HasMore: result.HasMore,

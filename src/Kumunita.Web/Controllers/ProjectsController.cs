@@ -616,9 +616,14 @@ public sealed class ProjectsController : Controller
 
         IReadOnlyList<TodoItem> todos;
         TodoPage todosPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            todosPage = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted, sort: feedSort); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            todosPage = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             todos = todosPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -704,7 +709,7 @@ public sealed class ProjectsController : Controller
             // single page so the _Pager partial renders nothing. The filters are
             // carried across prev/next (D7) via FilterParams.
             Pager: (todosPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects/todos", page, 30, todosPage.HasMore,
+                ? PagedViewModel.ForRoute("/projects/todos", page, pageSize, todosPage.HasMore,
                     todoFilterParams.Count > 0 ? todoFilterParams : null)
                 : null,
             // M26 U12 (D-SORT·5) — the one shared sort control (the U10
@@ -1916,9 +1921,14 @@ public sealed class ProjectsController : Controller
 
         IReadOnlyList<KanbanBoard> boards;
         BoardPage boardsPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            boardsPage = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted, sort: feedSort); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            boardsPage = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             boards = boardsPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -1966,7 +1976,7 @@ public sealed class ProjectsController : Controller
             // the request carried them (C-SORT·3); an unsorted read stays
             // byte-identical to pre-M26 (C-SORT·2).
             Pager: (boardsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects/boards", page, 30, boardsPage.HasMore,
+                ? PagedViewModel.ForRoute("/projects/boards", page, pageSize, boardsPage.HasMore,
                     BuildBoardFilterParams(componentId, sort, dir))
                 : null,
             // M26 U12 (D-SORT·5) — the one shared sort control (the U10
@@ -3117,15 +3127,20 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<Project> standaloneProjects;
         GoalPage goalsPage;
         ProjectPage projectsPage;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read
+        // uses the platform default. Passed to the seam (the Skip/Take
+        // window) and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
-            goalsPage = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted, sort: goalsSort); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            goalsPage = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted, sort: goalsSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             goals = goalsPage.Items;
             // The landing's projects section is the **standalone** feed
             // (the `goalId == null` filter — the D8 / design doc §5 pin;
             // a goal's projects are the goal detail's (U06) surface, not
             // this page's).
-            projectsPage = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted, sort: projectsSort); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            projectsPage = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted, sort: projectsSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             standaloneProjects = projectsPage.Items;
         }
         catch (UnauthorizedAccessException)
@@ -3213,11 +3228,11 @@ public sealed class ProjectsController : Controller
             // BaseUrl" branch does not apply — both sections read the request's
             // single `?sort=`/`?dir=` pair, the U11 dual-section idiom).
             PagerGoals: (goalsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects", page, 30, goalsPage.HasMore,
+                ? PagedViewModel.ForRoute("/projects", page, pageSize, goalsPage.HasMore,
                     BuildLandingFilterParams(componentId, sort, dir))
                 : null,
             PagerProjects: (projectsPage.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/projects", page, 30, projectsPage.HasMore,
+                ? PagedViewModel.ForRoute("/projects", page, pageSize, projectsPage.HasMore,
                     BuildLandingFilterParams(componentId, sort, dir))
                 : null,
             // M26 U12 (D-SORT·5) — the one shared sort control (the U10

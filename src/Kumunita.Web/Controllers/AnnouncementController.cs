@@ -180,7 +180,12 @@ public sealed class AnnouncementController(
         // created/modified/title), or null when the viewer chose no sort
         // (C-SORT·2, F1 — the seam keeps its pinned Created-desc order).
         var feedSort = ParseSort(sort, dir, AnnouncementFeedAllowedKeys);
-        var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page, sort: feedSort);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default. Passed to the seam (the Skip/Take window)
+        // and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, subjectId);
+        var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page, sort: feedSort, pageSize: pageSize);
         IReadOnlyList<Announcement> visible = paged.Items;
         bool hasMore = paged.HasMore;
 
@@ -250,7 +255,7 @@ public sealed class AnnouncementController(
         return View(new AnnouncementIndexViewModel(rows)
         {
             Pager = (hasMore || page > 1)
-                ? PagedViewModel.ForRoute("/announcements", page, 30, hasMore,
+                ? PagedViewModel.ForRoute("/announcements", page, pageSize, hasMore,
                     filterParams.Count > 0 ? filterParams : null)
                 : null,
             // M26 U13 (D-SORT·5) — the one shared sort control (the U10 _Sort

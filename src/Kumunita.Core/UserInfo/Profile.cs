@@ -297,6 +297,28 @@ public sealed class Profile
     /// delta-detected, idempotent, no re-seed, no EF migration.
     /// </summary>
     public EventRsvpMode EventRsvpMode { get; set; } = EventRsvpMode.GuardianApproves;
+
+    /// <summary>
+    /// The resident's <b>items-per-page preference</b> for every paged list
+    /// surface (the community / all-sections / group post feeds, events,
+    /// projects, boards, to-dos, goals, announcements, tag-by-tag posts &amp;
+    /// pages, search, find-people, inventory, documents, and messaging).
+    /// Nullable: <c>null</c> means the resident has not set a value, so the
+    /// platform default (<see cref="Kumunita.Core.Query.PageSizer.Default"/> =
+    /// 10) applies — the "preference if present" shape, the same resolution
+    /// order as <see cref="TimeZone"/> / <see cref="DateFormat"/>. Written
+    /// only by the owner-scope
+    /// <see cref="IUserInfoService.SetProfilePageSizeAsync"/> lane (the
+    /// <see cref="SetProfileTimezoneAsync"/> single-write-lane shape — the
+    /// self-scope check happens at the Web boundary); read by every feed
+    /// controller per request, clamped to
+    /// <see cref="Kumunita.Core.Query.PageSizer.Min"/>…
+    /// <see cref="Kumunita.Core.Query.PageSizer.Max"/> before being passed to
+    /// the paged Core seam. An *additive* field (ADR 0004 §B.1), like
+    /// <see cref="TimeZone"/>: delta-detected, idempotent, no re-seed, no EF
+    /// migration.
+    /// </summary>
+    public int? PageSize { get; set; }
 }
 
 /// <summary>

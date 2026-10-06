@@ -42,6 +42,14 @@
         </header>
 
         <div class="airy-ann-list">
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the feed — above the list — so the sort options are the first
+               thing the viewer sees (it renders nothing when the VM field is
+               null, the no-sort pin). *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             @if (Model.Announcements.Count == 0)
             {
                 <div class="p-4 text-muted">
@@ -137,20 +145,11 @@
                 </div>
             }
 
-            @* M26 U13 (D-SORT·5) — the announcements list's sort control
-               (the U10 _Sort reference, reused): the closed announcements
-               allowlist (U2 §2.2 row 11 — created/modified/title). Renders
-               nothing when the VM field is null (the no-sort pin — the _Pager
-               null ⇒ no partial precedent). Placed above the pager so the
-               viewer's sort choice stays beside the paging affordance. *@
-            @if (Model.Sort is not null)
-            {
-                <partial name="_Sort" model="Model.Sort" />
-            }
             @* M7 (ADR 0090 D5/D6) — the paged list's pager (F2 one-page
                no-render pin): the <c>_Pager</c> partial renders nothing when
                the VM field is null (a one-page surface). No filter form (D9)
-               — the links carry ?page=N only. *@
+               — the links carry ?page=N only. (The sort control now lives at
+               the TOP of the list, above the items.) *@
             @if (Model.Pager is not null)
             {
                 <partial name="_Pager" model="Model.Pager" />

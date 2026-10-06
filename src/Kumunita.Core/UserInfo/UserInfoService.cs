@@ -2037,6 +2037,31 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetProfilePageSizeAsync(string subjectId, int? pageSize, string actorBy)
+    {
+        // The resident's items-per-page override write lane. Mirrors
+        // SetProfileTimezoneAsync exactly (the C-MED·8 single write-lane shape):
+        // the self-scope check happens at the Web boundary (the owner is the
+        // actor); this lane writes Profile.PageSize only. One session, one
+        // SaveChangesAsync (C3); no audit row (a Profile field write — the
+        // UpsertProfileAsync shape, "not an access decision"). Fail closed on a
+        // missing profile (never load-or-create, the SetProfileTimezoneAsync pin).
+        // Strong consistency (C4): the new value is live on the very next
+        // GetProfileAsync call. The value is stored as-is (clamped on the read
+        // path by PageSizer.Resolve — the ADR 0019 "store, resolve on read"
+        // posture; a page size is never a fail-closed gate).
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.PageSize = pageSize;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)
     {
         // ADR 0020 — the user's date-format override write lane. Mirrors

@@ -167,7 +167,12 @@ public sealed class PostsController(
                 return NotFound();
         }
 
-        var feed = await posts.ListFeedAsync(componentId, actor, page: page, sort: feedSort);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses the
+        // platform default. Passed to the seam (the Skip/Take window) and the
+        // pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListFeedAsync(componentId, actor, page: page, sort: feedSort, pageSize: pageSize);
 
         // Whether the current viewer holds a posting right on *this* community —
         // the exact rule the composer's POST gate enforces (AccessibleComponentsAsync
@@ -269,7 +274,7 @@ public sealed class PostsController(
             // pager's FilterParams so prev/next preserve the sort across HasMore
             // windows. An unsorted read leaves the FilterParams empty —
             // byte-identical to pre-M26 (C-SORT·2).
-            Pager = BuildFeedPager(componentId, page, feed.HasMore, sort, dir),
+            Pager = BuildFeedPager(componentId, page, pageSize, feed.HasMore, sort, dir),
             // M26 U10 (D-SORT·5) — the one shared sort control. Non-null here
             // because this surface offers sorting; the _Sort partial renders
             // the link set over the closed allowlist (created/modified/title).
@@ -305,13 +310,13 @@ public sealed class PostsController(
     // preserved). The pairs echo the request's own values (the way the M7
     // filters ride along) so prev/next preserve the sort across windows.
     private static PagedViewModel? BuildFeedPager(
-        string componentId, int page, bool hasMore, string? sort, string? dir)
+        string componentId, int page, int pageSize, bool hasMore, string? sort, string? dir)
     {
         if (page <= 1 && !hasMore)
             return null;
 
         return PagedViewModel.ForRoute(
-            $"/community/{componentId}", page, 30, hasMore,
+            $"/community/{componentId}", page, pageSize, hasMore,
             SortViewModel.SortFilterParams(sort, dir));
     }
 
@@ -384,7 +389,8 @@ public sealed class PostsController(
         var componentIds = components.Select(c => c.Id).ToList();
         var nameByComponentId = components.ToDictionary(c => c.Id, c => c.Name);
 
-        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page, sort: feedSort);
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: page, sort: feedSort, pageSize: pageSize);
 
         // ADR 0051 — the all-sections feed shows each post + its section name in
         // the viewer's current language when a translation exists, else the
@@ -448,7 +454,7 @@ public sealed class PostsController(
             // prev/next preserve the sort. An unsorted read leaves the
             // FilterParams empty — byte-identical to pre-M26 (C-SORT·2).
             Pager = (feed.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/community", page, 30, feed.HasMore,
+                ? PagedViewModel.ForRoute("/community", page, pageSize, feed.HasMore,
                     SortViewModel.SortFilterParams(sort, dir))
                 : null,
             // M26 U11 (D-SORT·5) — the one shared sort control (the U10

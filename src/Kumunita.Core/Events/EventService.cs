@@ -144,9 +144,10 @@ public sealed class EventService : IEventService
     /// <see cref="EventToAuditableResource"/>, U02).
     /// </summary>
     public async Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null)
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         var nowUtc = DateTimeOffset.UtcNow;
@@ -156,7 +157,7 @@ public sealed class EventService : IEventService
         if (componentId is not null)
             q = q.Where(e => e.ComponentId == componentId);
         var candidates = await OrderByEventSort(q, sort, defaultAscending: true)
-            .Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return runs **before** any
         // decision (no audit row) and reports no further page (ADR 0090 D1).
@@ -165,7 +166,7 @@ public sealed class EventService : IEventService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "event"), from that single call (the PostService shape).
@@ -196,9 +197,10 @@ public sealed class EventService : IEventService
     /// D1 / D3).
     /// </summary>
     public async Task<EventPage> ListPastAsync(string? componentId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null)
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         var nowUtc = DateTimeOffset.UtcNow;
@@ -208,7 +210,7 @@ public sealed class EventService : IEventService
         if (componentId is not null)
             q = q.Where(e => e.ComponentId == componentId);
         var candidates = await OrderByEventSort(q, sort, defaultAscending: false)
-            .Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+            .Skip((page - 1) * ps).Take(ps).ToListAsync(ct).ConfigureAwait(false);
 
         // C-M7·5 (D8) — the 0-candidate early return runs **before** any
         // decision (no audit row) and reports no further page (ADR 0090 D1).
@@ -217,7 +219,7 @@ public sealed class EventService : IEventService
 
         // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
         // list filled the page (candidates is the pre-CanSeeAsync list).
-        var hasMore = candidates.Count == PageSize;
+        var hasMore = candidates.Count == ps;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "event"), from that single call (the ListUpcomingAsync shape).
@@ -1628,19 +1630,20 @@ public sealed class EventService : IEventService
     /// evaluation of any kind** (GE·1/GE·8 — membership is the sole decision).
     /// </summary>
     public async Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null)
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group events feed requires a groupId.", nameof(groupId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<Event> q = session
             .Query<Event>()
             .Where(e => e.GroupId == groupId && !e.IsDeleted && !e.IsDraft);
         var candidates = await OrderByEventSort(q, sort, defaultAscending: true)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
@@ -1657,8 +1660,8 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
 
         if (decision.Allowed)
-            // ADR 0090 D1 / design doc §7.4 — HasMore: candidates.Count == PageSize.
-            return new GroupEventFeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count, HasMore: candidates.Count == PageSize);
+            // ADR 0090 D1 / design doc §7.4 — HasMore: candidates.Count == ps.
+            return new GroupEventFeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count, HasMore: candidates.Count == ps);
 
         // GE2 — Deny: empty visible list, HiddenCount = the candidate count (the
         // aggregate Deny row **is** the audit evidence — GE·1/GE·5); never an

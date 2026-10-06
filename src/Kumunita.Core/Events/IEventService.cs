@@ -43,7 +43,7 @@ public interface IEventService
     /// </para>
     /// </summary>
     Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null);
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// The <b>past events</b> lane (ADR 0109, the <c>EV-PAST</c> lane) — the
@@ -75,7 +75,7 @@ public interface IEventService
     /// </para>
     /// </summary>
     Task<EventPage> ListPastAsync(string? componentId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null);
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set
@@ -186,7 +186,7 @@ public interface IEventService
     /// is the same shape, distinguished only by the audit row).
     /// </summary>
     Task<GroupEventFeedResult> ListGroupEventsAsync(string groupId, string actorId, int page,
-        CancellationToken ct = default, SortSpec? sort = null);
+        CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// One group event, **fail-closed** (ADR 0089 GE·1/GE·4): <c>null</c> for a

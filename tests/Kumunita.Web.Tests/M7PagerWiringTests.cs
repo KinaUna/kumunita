@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Events;
+using Kumunita.Core.Query;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
@@ -145,7 +146,7 @@ public class M7PagerWiringTests
         const int page = 2;
 
         var events = Substitute.For<IEventService>();
-        events.ListUpcomingAsync(componentId, subjectId, page, Arg.Any<CancellationToken>())
+        events.ListUpcomingAsync( componentId, subjectId, page, Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>() )
             .Returns(new EventPage(
                 Items: new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001", componentId: componentId) },
                 HasMore: true));

@@ -351,6 +351,11 @@ public sealed class EventController : Controller
 
         IReadOnlyList<Event> events;
         bool hasMore;
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default. Passed to the seam (the Skip/Take window)
+        // and the pager's PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         try
         {
             // ADR 0109 (EV-PAST) — the "Past" option is an additive read lane on
@@ -358,8 +363,8 @@ public sealed class EventController : Controller
             // most-recent-first); the default (false) keeps ListUpcomingAsync
             // verbatim (the ADR 0097 additive-surface precedent).
             var pageResult = past
-                ? await this.events.ListPastAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort)
-                : await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+                ? await this.events.ListPastAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize)
+                : await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
             events = pageResult.Items;
             hasMore = pageResult.HasMore;
         }
@@ -491,7 +496,7 @@ public sealed class EventController : Controller
             // single page so the _Pager partial renders nothing. The community
             // filter + the Past selector are carried across prev/next (D7).
             Pager: (hasMore || page > 1)
-                ? PagedViewModel.ForRoute("/events", page, 30, hasMore,
+                ? PagedViewModel.ForRoute("/events", page, pageSize, hasMore,
                     pagerFilters.Count > 0 ? pagerFilters : null)
                 : null,
             Past: past,

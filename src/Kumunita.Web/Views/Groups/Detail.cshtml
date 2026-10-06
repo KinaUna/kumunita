@@ -323,6 +323,14 @@
                     }
                 </div>
 
+                @* The shared sort control (the _Sort partial) sits at the TOP
+                   of the section — above the list — so the sort options are
+                   the first thing the viewer sees (it renders nothing when
+                   the VM field is null, the no-sort pin). *@
+                @if (Model.SortPosts is not null)
+                {
+                    <partial name="_Sort" model="Model.SortPosts" />
+                }
                 @if (Model.GroupPosts.Count == 0)
                 {
                     <p class="text-muted">
@@ -367,21 +375,10 @@
                     @* M7 (ADR 0090 D2) — the "N in this group; M shown to you"
                        hidden-count hint is removed (C-M7·7: the candidate count
                        is never viewer-facing). *@
-                    @* M26 U11 (D-SORT·5) — the group-posts section's sort
-                       control (the U10 _Sort reference, reused): the closed
-                       post-feed allowlist (created desc, modified desc,
-                       title asc). Renders nothing when the VM field is null
-                       (the no-sort pin — the _Pager null ⇒ no partial
-                       precedent). Placed above the section's pager so the
-                       viewer's sort choice stays beside the paging affordance.
-                       *@
-                    @if (Model.SortPosts is not null)
-                    {
-                        <partial name="_Sort" model="Model.SortPosts" />
-                    }
                     @* M7 (ADR 0090 D5) — the group-posts section pager (F2
                        one-page no-render pin): the <c>_Pager</c> partial renders
-                       nothing when the VM field is null. *@
+                       nothing when the VM field is null. (The sort control now
+                       lives at the TOP of the section, above the list.) *@
                     @if (Model.PagerPosts is not null)
                     {
                         <partial name="_Pager" model="Model.PagerPosts" />
@@ -398,6 +395,14 @@
                     }
                 </div>
 
+                @* The shared sort control (the _Sort partial) sits at the TOP
+                   of the section — above the list — so the sort options are
+                   the first thing the viewer sees (it renders nothing when
+                   the VM field is null, the no-sort pin). *@
+                @if (Model.SortEvents is not null)
+                {
+                    <partial name="_Sort" model="Model.SortEvents" />
+                }
                 @if (Model.GroupEvents.Count == 0)
                 {
                     <p class="text-muted">
@@ -445,22 +450,10 @@
                     @* M7 (ADR 0090 D2) — the "N in this group; M shown to you"
                        hidden-count hint is removed (C-M7·7: the candidate count
                        is never viewer-facing). *@
-                    @* M26 U11 (D-SORT·5) — the group-events section's sort
-                       control (the U10 _Sort reference, reused): the closed
-                       group-events allowlist (U2 §2.2 row 6 — start asc,
-                       created desc; F9, no `title` dead option on this
-                       section's link set). Renders nothing when the VM field
-                       is null (the no-sort pin — the _Pager null ⇒ no partial
-                       precedent). Placed above the section's pager so the
-                       viewer's sort choice stays beside the paging affordance.
-                       *@
-                    @if (Model.SortEvents is not null)
-                    {
-                        <partial name="_Sort" model="Model.SortEvents" />
-                    }
                     @* M7 (ADR 0090 D5) — the group-events section pager (F2
                        one-page no-render pin): the <c>_Pager</c> partial renders
-                       nothing when the VM field is null. *@
+                       nothing when the VM field is null. (The sort control now
+                       lives at the TOP of the section, above the list.) *@
                     @if (Model.PagerEvents is not null)
                     {
                         <partial name="_Pager" model="Model.PagerEvents" />

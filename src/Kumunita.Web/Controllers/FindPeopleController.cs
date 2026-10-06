@@ -30,7 +30,13 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("people")]
-public sealed class FindPeopleController(IProfileFindService find) : Controller
+public sealed class FindPeopleController(
+    IProfileFindService find,
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    IUserInfoService? userInfo = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -80,11 +86,15 @@ public sealed class FindPeopleController(IProfileFindService find) : Controller
             // when the viewer chose no sort (C-SORT·2, F1 — the seam keeps
             // its current unsorted order exactly).
             var bioSort = ParsePeopleSort(sort, dir);
-            var result = await find.FindPeopleByBioAsync(trimmed, viewer, page, sort: bioSort);
+            // The resident's items-per-page preference (FeedPaging resolves
+            // Profile.PageSize → PageSizer default/clamp); a no-actor read or
+            // a missing seam uses the platform default.
+            int pageSize = await FeedPaging.PageSizeAsync(userInfo, viewer);
+            var result = await find.FindPeopleByBioAsync(trimmed, viewer, page, sort: bioSort, pageSize: pageSize);
             // M26 U14 (D-SORT·5) — the one shared sort control (the U10
             // _Sort reference, reused verbatim — C-SORT·1): the closed row 17
             // allowlist (<c>name</c> → <c>DisplayName</c>, asc).
-            return View("Bio", new FindPeopleBioViewModel(trimmed, result, page)
+            return View("Bio", new FindPeopleBioViewModel(trimmed, result, page, pageSize)
             {
                 Sort = PeopleSortViewModel("/people", bioSort, sort, dir),
             });
@@ -122,11 +132,15 @@ public sealed class FindPeopleController(IProfileFindService find) : Controller
         // unsorted order exactly; the frozen <c>CanSeeAsync</c> gate /
         // <c>HasMore</c> / <c>Skip</c>/<c>Take</c> are untouched, C-SORT·4).
         var tagSort = ParsePeopleSort(sort, dir);
-        var result = await find.FindPeopleByTagAsync(slug, viewer, page, sort: tagSort);
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read or
+        // a missing seam uses the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, viewer);
+        var result = await find.FindPeopleByTagAsync(slug, viewer, page, sort: tagSort, pageSize: pageSize);
         // M26 U14 (D-SORT·5) — the one shared sort control (the U10
         // _Sort reference, reused verbatim — C-SORT·1): the closed row 16
         // allowlist (<c>name</c> → <c>DisplayName</c>, asc).
-        return View("Tag", new FindPeopleTagViewModel(slug, result, page)
+        return View("Tag", new FindPeopleTagViewModel(slug, result, page, pageSize)
         {
             Sort = PeopleSortViewModel($"/people/tag/{Uri.EscapeDataString(slug.Trim())}", tagSort, sort, dir),
         });

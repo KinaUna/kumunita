@@ -515,13 +515,14 @@ public sealed class TagService : ITagService
     /// </summary>
     public async Task<TagPostPage> ListPostsByTagPagedAsync(
         string slug, string actorId, int page,
-        SortSpec? sort = null, CancellationToken ct = default)
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
@@ -547,13 +548,13 @@ public sealed class TagService : ITagService
         var candidates = ordered.ToList();
 
         var items = candidates
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToList();
 
         // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
         // set filled the page (design doc §7.6).
-        return new TagPostPage(Items: items, HasMore: items.Count == PageSize);
+        return new TagPostPage(Items: items, HasMore: items.Count == ps);
     }
 
     /// <summary>
@@ -576,13 +577,14 @@ public sealed class TagService : ITagService
     /// </summary>
     public async Task<TagPagePage> ListPagesByTagPagedAsync(
         string slug, string actorId, int page,
-        SortSpec? sort = null, CancellationToken ct = default)
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
@@ -608,13 +610,13 @@ public sealed class TagService : ITagService
         var candidates = ordered.ToList();
 
         var items = candidates
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToList();
 
         // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
         // set filled the page (design doc §7.6).
-        return new TagPagePage(Items: items, HasMore: items.Count == PageSize);
+        return new TagPagePage(Items: items, HasMore: items.Count == ps);
     }
 
     /// <inheritdoc />

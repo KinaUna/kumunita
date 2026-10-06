@@ -112,10 +112,11 @@ public sealed class AnnouncementService : IAnnouncementService
     /// vacuously satisfied). The non-paged <see cref="ListVisibleAsync"/> is
     /// unmodified (the banner + admin surfaces keep the whole-list read).
     /// </summary>
-    public async Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default, SortSpec? sort = null)
+    public async Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null)
     {
         ArgumentNullException.ThrowIfNull(roles);
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
 
@@ -145,13 +146,13 @@ public sealed class AnnouncementService : IAnnouncementService
             .ConfigureAwait(false);
 
         var items = candidates
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToList();
 
         // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
         // set filled the page (design doc §7.6).
-        return new AnnouncementPage(Items: items, HasMore: items.Count == PageSize);
+        return new AnnouncementPage(Items: items, HasMore: items.Count == ps);
     }
 
     /// <summary>

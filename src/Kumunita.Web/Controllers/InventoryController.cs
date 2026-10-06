@@ -97,10 +97,14 @@ public sealed class InventoryController : Controller
         // Created-desc order).
         var feedSort = ParseSort(sort, dir, InventoryFeedAllowedKeys);
 
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read uses
+        // the platform default.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actorId);
         ItemPage pageResult;
         try
         {
-            pageResult = await inventory.ListItemsAsync(ownerKind, componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort);
+            pageResult = await inventory.ListItemsAsync(ownerKind, componentId, actorId, page, HttpContext.RequestAborted, sort: feedSort, pageSize: pageSize);
         }
         catch (UnauthorizedAccessException)
         {
@@ -161,7 +165,7 @@ public sealed class InventoryController : Controller
             CurrentComponentId: componentId,
             CurrentPage: page,
             Pager: (pageResult.HasMore || page > 1)
-                ? PagedViewModel.ForRoute("/inventory", page, 30, pageResult.HasMore,
+                ? PagedViewModel.ForRoute("/inventory", page, pageSize, pageResult.HasMore,
                     filterParams.Count > 0 ? filterParams : null)
                 : null);
         vm = vm with { Sort = sortVm };

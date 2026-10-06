@@ -28,11 +28,24 @@
     }
 }
 <div class="sort-control d-flex flex-wrap align-items-center gap-1 mt-2" role="group" aria-label="Sort order">
-    @foreach (var (key, dir) in Model.Options)
+    @foreach (var (key, defaultDir) in Model.Options)
     {
-        var isCurrent = string.Equals(Model.CurrentKey, key, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(Model.CurrentDir, dir, StringComparison.OrdinalIgnoreCase);
-        <a class="sort-link badge @(isCurrent ? "bg-primary text-white" : "bg-secondary text-white")"
-           href="@SortLink(key, dir)"><kw-l key="sort.@key">@key</kw-l></a>
+        // Toggle design (one badge per criterion): the active criterion is the
+        // one whose key matches CurrentKey. Clicking it flips the direction
+        // (asc ⇄ desc); clicking an inactive criterion selects it at its
+        // default direction. The active badge carries the ↑ (asc) / ↓ (desc)
+        // indicator so the current order is visible at a glance.
+        var isActive = Model.CurrentKey is not null
+            && string.Equals(Model.CurrentKey, key, StringComparison.OrdinalIgnoreCase);
+        var activeDir = Model.CurrentDir ?? defaultDir;
+        var nextDir = isActive
+            ? (string.Equals(activeDir, "asc", StringComparison.OrdinalIgnoreCase) ? "desc" : "asc")
+            : defaultDir;
+        bool asc = string.Equals(activeDir, "asc", StringComparison.OrdinalIgnoreCase);
+        string indicator = isActive ? (asc ? "↑" : "↓") : string.Empty;
+        string title = isActive ? (asc ? "Sorted ascending — click for descending" : "Sorted descending — click for ascending") : "Sort by this field";
+        <a class="sort-link badge @(isActive ? "bg-primary text-white" : "bg-secondary text-white")"
+           href="@SortLink(key, nextDir)"
+           title="@title"><kw-l key="sort.@key">@key</kw-l>@(string.IsNullOrEmpty(indicator) ? string.Empty : " " + indicator)</a>
     }
 </div>

@@ -176,9 +176,10 @@ public sealed class SearchService : ISearchService
     public async Task<SearchSurfacePage> SearchSurfaceAsync(
         string surface, string q, SearchScope scope, string actorId, int page,
         CancellationToken ct = default,
-        SortSpec? sort = null)
+        SortSpec? sort = null, int? pageSize = null)
     {
         if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
         var query = (q ?? string.Empty).Trim();
         if (query.Length == 0)
             return new SearchSurfacePage(surface, Array.Empty<SearchHit>(), page, false);
@@ -241,8 +242,8 @@ public sealed class SearchService : ISearchService
 
         // ADR 0090 D1/D3 — HasMore is the sole paging signal, over the *visible*
         // set (never the candidate count — C-M8·4 / C-M7·7).
-        var hasMore = visible.Count > page * PageSize;
-        var hits = visible.Skip((page - 1) * PageSize).Take(PageSize).ToList();
+        var hasMore = visible.Count > page * ps;
+        var hits = visible.Skip((page - 1) * ps).Take(ps).ToList();
         return new SearchSurfacePage(surface, hits, page, hasMore);
     }
 

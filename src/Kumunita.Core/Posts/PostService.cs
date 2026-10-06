@@ -140,11 +140,16 @@ public sealed class PostService
     /// that call evaluated.
     /// </summary>
     public async Task<FeedResult> ListFeedAsync(string componentId, string actorId, int page,
-        SortSpec? sort = null)
+        SortSpec? sort = null, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component feed requires a componentId.", nameof(componentId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
+
+        // The resident's items-per-page override (the Web resolves
+        // Profile.PageSize → PageSizer.Resolve and passes it); null ⇒ the
+        // class's historical PageSize constant (the pre-override behavior).
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
@@ -152,8 +157,8 @@ public sealed class PostService
             .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft);
 
         var candidates = await OrderByPostSort(q, sort)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -187,7 +192,7 @@ public sealed class PostService
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
         var visible = candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
 
-        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
+        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == ps);
     }
 
     /// <summary>
@@ -216,11 +221,13 @@ public sealed class PostService
     /// </summary>
     public async Task<FeedResult> ListAllFeedAsync(
             IReadOnlyCollection<string> componentIds, string actorId, int page,
-            SortSpec? sort = null)
+            SortSpec? sort = null, int? pageSize = null)
     {
         if (componentIds is null) throw new ArgumentNullException(nameof(componentIds));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
+
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         if (componentIds.Count == 0)
             return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
@@ -231,8 +238,8 @@ public sealed class PostService
             .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft);
 
         var candidates = await OrderByPostSort(q, sort)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -262,7 +269,7 @@ public sealed class PostService
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
         var visible = candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
 
-        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
+        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == ps);
     }
 
     /// <summary>
@@ -1218,11 +1225,13 @@ public sealed class PostService
     /// evaluation of any kind** (G·1/G·8 — membership is the sole decision).
     /// </summary>
     public async Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page,
-        SortSpec? sort = null)
+        SortSpec? sort = null, int? pageSize = null)
     {
         if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group feed requires a groupId.", nameof(groupId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
         if (page < 1) page = 1;
+
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
 
         await using var session = _store.QuerySession();
         IQueryable<Post> q = session
@@ -1230,8 +1239,8 @@ public sealed class PostService
             .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft);
 
         var candidates = await OrderByPostSort(q, sort)
-            .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Skip((page - 1) * ps)
+            .Take(ps)
             .ToListAsync()
             .ConfigureAwait(false);
 
@@ -1261,7 +1270,7 @@ public sealed class PostService
 
         if (decision.Allowed)
             // G1 — the paged candidates, as-is (membership is the sole decision; G·1).
-            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
+            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidateCount, HasMore: candidates.Count == ps);
 
         // G2 — Deny: empty visible list, HiddenCount = the candidate count (the
         // aggregate Deny row **is** the audit evidence — G·1/G·5); never a

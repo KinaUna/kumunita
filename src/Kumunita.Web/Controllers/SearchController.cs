@@ -70,10 +70,20 @@ public sealed class SearchController : Controller
     private readonly ISearchService _search;
     private readonly IPageService _pages;
 
-    public SearchController(ISearchService search, IPageService pages)
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    private readonly Kumunita.Core.UserInfo.IUserInfoService? _userInfo;
+
+    public SearchController(
+        ISearchService search,
+        IPageService pages,
+        Kumunita.Core.UserInfo.IUserInfoService? userInfo = null)
     {
         _search = search ?? throw new ArgumentNullException(nameof(search));
         _pages = pages ?? throw new ArgumentNullException(nameof(pages));
+        _userInfo = userInfo;
     }
 
     /// <summary>
@@ -146,13 +156,17 @@ public sealed class SearchController : Controller
             // service (no decision, no audit row). The resolved SortSpec
             // threads into the seam (the U9 Core seam — `null` keeps the
             // per-surface `OrderByDescending(Created)` byte-for-byte).
+            // The resident's items-per-page preference (FeedPaging resolves
+            // Profile.PageSize → PageSizer default/clamp); a no-actor read or
+            // a missing seam uses the platform default.
+            int pageSize = await FeedPaging.PageSizeAsync(_userInfo, KumunitaPrincipal.SubjectId(User));
             SearchSurfacePage sp = string.IsNullOrEmpty(query)
                 ? new SearchSurfacePage(surfaceName, Array.Empty<SearchHit>(), 1, false)
                 : await _search.SearchSurfaceAsync(
                     surfaceName, query, effectiveScope,
                     KumunitaPrincipal.SubjectId(User) ?? string.Empty,
                     pageNum, HttpContext.RequestAborted,
-                    sort: feedSort);
+                    sort: feedSort, pageSize: pageSize);
             sections = new Dictionary<string, IReadOnlyList<SearchHit>>
             {
                 [surfaceName] = sp.Hits,
@@ -175,7 +189,7 @@ public sealed class SearchController : Controller
                 };
                 foreach (var (k, v) in SortViewModel.SortFilterParams(sort, dir))
                     filterParams[k] = v;
-                pager = PagedViewModel.ForRoute("/search", sp.Page, SearchService.PageSize, sp.HasMore,
+                pager = PagedViewModel.ForRoute("/search", sp.Page, pageSize, sp.HasMore,
                     filterParams);
             }
 

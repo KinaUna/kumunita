@@ -34,7 +34,7 @@ public interface IProfileFindService
     /// shape).
     /// </summary>
     Task<ProfileTagPage> FindPeopleByTagAsync(
-        string slug, string actorId, int page, SortSpec? sort = null);
+        string slug, string actorId, int page, SortSpec? sort = null, int? pageSize = null);
 
     /// <summary>
     /// The bio-substring find: the actor-visible profiles whose <c>Bio</c>
@@ -45,7 +45,7 @@ public interface IProfileFindService
     /// "no decision, no row" shape).
     /// </summary>
     Task<ProfileBioPage> FindPeopleByBioAsync(
-        string q, string actorId, int page, SortSpec? sort = null);
+        string q, string actorId, int page, SortSpec? sort = null, int? pageSize = null);
 }
 
 /// <summary>

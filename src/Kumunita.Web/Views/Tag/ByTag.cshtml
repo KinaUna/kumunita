@@ -14,6 +14,14 @@
         @if (Model.Posts.Count > 0)
         {
             <h2 class="mt-4"><kw-l key="tags.bytag.posts_heading">Posts</kw-l></h2>
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the section — above the list — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.SortPosts is not null)
+            {
+                <partial name="_Sort" model="Model.SortPosts" />
+            }
             <ul class="list-group">
                 @foreach (var post in Model.Posts)
                 {
@@ -35,22 +43,12 @@
                 }
             </ul>
 
-            @* M26 U14 (D-SORT·5) — the posts section's sort control (the
-               U10 _Sort reference, reused): the closed row 14 allowlist
-               (created/modified/title — the <c>created</c> default is
-               <b>asc</b>, the pinned current order, C-SORT·2). Renders
-               nothing when the VM field is null (the no-sort pin). Placed
-               above the section's pager so the viewer's sort choice stays
-               beside the paging affordance. *@
-            @if (Model.SortPosts is not null)
-            {
-                <partial name="_Sort" model="Model.SortPosts" />
-            }
             @* M7 (ADR 0090 D5/D6) — the posts section's pager (F2 one-page
                no-render pin): the <c>_Pager</c> partial renders nothing when
                the VM field is null. The tag is the route (D9) — no filter
                form; the links carry ?page=N (plus the sort/dir pairs when
-               the request carried them, M26 U14 C-SORT·8). *@
+               the request carried them, M26 U14 C-SORT·8). (The sort control
+               now lives at the TOP of the section, above the list.) *@
             @if (Model.PagerPosts is not null)
             {
                 <partial name="_Pager" model="Model.PagerPosts" />
@@ -60,6 +58,14 @@
         @if (Model.Pages.Count > 0)
         {
             <h2 class="mt-4"><kw-l key="tags.bytag.pages_heading">Blog pages</kw-l></h2>
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the section — above the list — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.SortPages is not null)
+            {
+                <partial name="_Sort" model="Model.SortPages" />
+            }
             <ul class="list-group">
                 @foreach (var page in Model.Pages)
                 {
@@ -72,22 +78,13 @@
                 }
             </ul>
 
-            @* M26 U14 (D-SORT·5) — the blog-pages section's sort control
-               (the U10 _Sort reference, reused): the closed row 15
-               allowlist (created/modified/title — the <c>created</c>
-               default is <b>asc</b>, the C-SORT·2 tag-pages-asc pin).
-               Renders nothing when the VM field is null (the no-sort pin).
-               Placed above the section's pager so the viewer's sort choice
-               stays beside the paging affordance. *@
-            @if (Model.SortPages is not null)
-            {
-                <partial name="_Sort" model="Model.SortPages" />
-            }
             @* M7 (ADR 0090 D5/D6) — the blog-pages section's pager (F2
                one-page no-render pin): the <c>_Pager</c> partial renders
                nothing when the VM field is null. The tag is the route (D9) —
                no filter form; the links carry ?page=N (plus the sort/dir
-               pairs when the request carried them, M26 U14 C-SORT·8). *@
+               pairs when the request carried them, M26 U14 C-SORT·8). (The
+               sort control now lives at the TOP of the section, above the
+               list.) *@
             @if (Model.PagerPages is not null)
             {
                 <partial name="_Pager" model="Model.PagerPages" />

@@ -60,7 +60,12 @@ public sealed class TagController(
     ITagService tags,
     IPageService pages,
     ILocalizationService localization,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // The items-per-page preference seam (FeedPaging). Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling (a missing seam falls back to the platform page-size
+    // default); DI always supplies it in the app.
+    Kumunita.Core.UserInfo.IUserInfoService? userInfo = null) : Controller
 {
     private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -118,14 +123,20 @@ public sealed class TagController(
         var postsSort = ParseSort(sort, dir, TagFeedAllowedKeys);
         var pagesSort = ParseSort(sort, dir, TagFeedAllowedKeys);
 
+        // The resident's items-per-page preference (FeedPaging resolves
+        // Profile.PageSize → PageSizer default/clamp); a no-actor read or a
+        // missing seam uses the platform default. Passed to the seams (the
+        // Skip/Take window) and the pagers' PageSize.
+        int pageSize = await FeedPaging.PageSizeAsync(userInfo, actor);
+
         // M7 (ADR 0090 D6) — the two paged seams are the read (U01's D6 lane:
-        // the same readable-content filter + order, then a Skip/Take(30)
-        // window). <c>HasMore</c> (D1) is the sole paging signal.
-        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page, sort: postsSort);
+        // the same readable-content filter + order, then a Skip/Take window).
+        // <c>HasMore</c> (D1) is the sole paging signal.
+        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page, sort: postsSort, pageSize: pageSize);
         IReadOnlyList<Post> posts = pagedPosts.Items;
         bool postsHasMore = pagedPosts.HasMore;
 
-        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page, sort: pagesSort);
+        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page, sort: pagesSort, pageSize: pageSize);
         IReadOnlyList<Page> blogPages = pagedPages.Items;
         bool pagesHasMore = pagedPages.HasMore;
 
@@ -174,11 +185,11 @@ public sealed class TagController(
             // request's single <c>?sort=</c>/<c>?dir=</c> pair (each
             // parsed against its own allowlist, C-SORT·1).
             PagerPosts = (postsHasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, postsHasMore,
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, pageSize, postsHasMore,
                     SortViewModel.SortFilterParams(sort, dir))
                 : null,
             PagerPages = (pagesHasMore || page > 1)
-                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, pagesHasMore,
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, pageSize, pagesHasMore,
                     SortViewModel.SortFilterParams(sort, dir))
                 : null,
             // M26 U14 (D-SORT·5) — the one shared sort control (the U10

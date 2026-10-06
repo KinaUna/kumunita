@@ -73,5 +73,5 @@ public interface ISearchService
     Task<SearchSurfacePage> SearchSurfaceAsync(
         string surface, string q, SearchScope scope, string actorId, int page,
         CancellationToken ct = default,
-        Kumunita.Core.Query.SortSpec? sort = null);
+        Kumunita.Core.Query.SortSpec? sort = null, int? pageSize = null);
 }

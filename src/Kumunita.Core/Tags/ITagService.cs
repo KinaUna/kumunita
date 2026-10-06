@@ -98,7 +98,7 @@ public interface ITagService
     /// </summary>
     Task<TagPostPage> ListPostsByTagPagedAsync(
         string slug, string actorId, int page,
-        SortSpec? sort = null, CancellationToken ct = default);
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null);
 
     /// <summary>
     /// The by-tag blog-page results, **paged** (ADR 0090 D6, M7 U01 — the
@@ -115,7 +115,7 @@ public interface ITagService
     /// </summary>
     Task<TagPagePage> ListPagesByTagPagedAsync(
         string slug, string actorId, int page,
-        SortSpec? sort = null, CancellationToken ct = default);
+        SortSpec? sort = null, CancellationToken ct = default, int? pageSize = null);
 
     /// <summary>
     /// Autocomplete (F9 / F10): the C-TG·2 base query filtered by

@@ -46,6 +46,14 @@
                 </div>
             </header>
 
+            @* The shared sort control (the _Sort partial) sits at the TOP of
+               the list — above the profiles — so the sort options are the
+               first thing the viewer sees (it renders nothing when the VM
+               field is null, the no-sort pin). *@
+            @if (Model.Sort is not null)
+            {
+                <partial name="_Sort" model="Model.Sort" />
+            }
             <div class="dir-cards">
                 @foreach (var p in Model.Result.Profiles)
                 {
@@ -76,16 +84,6 @@
                 }
             </div>
 
-            @* M26 U14 (D-SORT·5) — the by-tag find's sort control (the
-               U10 _Sort reference, reused): the closed row 16 allowlist
-               (<c>name</c> → display name, asc — correction C-2). Renders
-               nothing when the VM field is null (the no-sort pin). Placed
-               above the "Older" next-link so the viewer's sort choice stays
-               beside the paging affordance. *@
-            @if (Model.Sort is not null)
-            {
-                <partial name="_Sort" model="Model.Sort" />
-            }
             // C-SORT·8 — when the request carried a sort (a non-blank
             // ?sort=), the "Older" next-link keeps the sort/dir pairs
             // (read from the Sort control's CarriedParams — the same
