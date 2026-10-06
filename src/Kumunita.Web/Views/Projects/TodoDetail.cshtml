@@ -630,6 +630,24 @@
                     </div>
                 }
 
+                @* ADR 0044 / 0147 — the to-do's tags (display names in the
+                   viewer's language, resolved by the controller from the
+                   access-scoped read seam — the <see cref="TodoDetailViewModel
+                   .Tags"/> field, the Posts/Detail.cshtml chip idiom). A label,
+                   never a gate (C-TG·1): each badge links to the by-tag view
+                   (/tags/{slug}); a broken reference is dropped upstream, never
+                   an error. Empty = no chips. *@
+                @if (Model.Tags is { Count: > 0 })
+                {
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                        @foreach (var tag in Model.Tags)
+                        {
+                            <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                               href="/tags/@tag.Slug">@tag.DisplayedName</a>
+                        }
+                    </div>
+                }
+
                 @* The body (the ADR 0025 shape — the BoardDetail / ProjectDetail
                    detail idiom): a read surface renders the Markdown as plain
                    text through the one MarkdownRenderer; editing lives in its

@@ -323,7 +323,14 @@ public static class ServiceCollectionExtensions
             // 0020) — the recipient's effective zone/format floor (the kw-dt /
             // EventReminderService resolution order).
             sp.GetRequiredService<Localization.ITranslationProvider>(),
-            sp.GetRequiredService<Localization.ILocalizationService>()));
+            sp.GetRequiredService<Localization.ILocalizationService>(),
+            // ADR 0044 / 0147 — the tag attach lane (the todo + board write
+            // lanes resolve the author's typed slugs to <c>Tag</c> ids via
+            // <c>ITagService.AttachToTodoAsync</c> /
+            // <c>AttachToBoardAsync</c>, then persist the resolved ids onto the
+            // doc — the <c>PostService._tags</c> shape). Optional (CS1736); the
+            // production wiring passes the registered instance so tags attach.
+            sp.GetRequiredService<Tags.ITagService>()));
 
         // M16 (ADR 0117, plan U02): the Inventory bounded context's service
         // seam (bounded context Kumunita.Core.Inventory — the "track where

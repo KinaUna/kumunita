@@ -197,7 +197,13 @@ public sealed record BoardDetailViewModel(
     IReadOnlyList<Kumunita.Core.Projects.BoardTranslation>? Translations = null,
     IReadOnlyList<LanguageOption>? Languages = null,
     bool CanTranslate = false,
-    string OriginalLanguageCode = "");
+    string OriginalLanguageCode = "",
+    // ADR 0044 / 0147 — the board's tags, resolved to display names in the
+    // viewer's language (the <see cref="Posts.PostDetailViewModel.Tags"/>
+    // shape). A "read, not a decision" surface: the board's single Read
+    // decision already ran; a dangling TagId simply drops (renders as
+    // nothing, not a 404). Empty = no chips.
+    IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null);
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +
@@ -291,6 +297,23 @@ public sealed class BoardEditorModel
     [BindNever]
     public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
 
+    /// <summary>The composer's **tag** input (ADR 0044 / 0147) — a
+    /// <see cref="string"/> form field (JSON array of labels or a CSV
+    /// fallback), parsed server-side by <see
+    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// client never posts a structured shape).</summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>The board's **current** tag slugs (the create/edit lane's
+    /// <c>tag-suggest.ts</c> <c>data-tag-suggest-initial</c> prefill).
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="TagIds"/> string,
+    /// not a slug list. Seeded server-side from the stored board's
+    /// <c>TagIds</c> → <c>Tag</c> slugs (the
+    /// <see cref="Posts.PostsController"/>
+    /// <c>SeedExistingTagSlugsAsync</c> shape).</summary>
+    [BindNever]
+    public IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
+
     /// <summary>
     /// true when the model is well-formed for a round-trip. <see
     /// cref="Title"/> is required (a board with no title is a malformed
@@ -354,6 +377,23 @@ public sealed class BoardUpdateModel
     /// <see cref="ProjectId"/>.</summary>
     [BindNever]
     public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
+
+    /// <summary>The edit form's **tag** input (ADR 0044 / 0147) — a
+    /// <see cref="string"/> form field (JSON array of labels or a CSV
+    /// fallback), parsed server-side by <see
+    /// cref="Kumunita.Web.Security.TagSlugs.Parse"/> (the M4 idiom — the
+    /// client never posts a structured shape).</summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>The board's **current** tag slugs (the edit lane's
+    /// <c>tag-suggest.ts</c> <c>data-tag-suggest-initial</c> prefill).
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="TagIds"/> string,
+    /// not a slug list. Seeded server-side from the stored board's
+    /// <c>TagIds</c> → <c>Tag</c> slugs (the
+    /// <see cref="Posts.PostsController"/>
+    /// <c>SeedExistingTagSlugsAsync</c> shape).</summary>
+    [BindNever]
+    public IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
 
     /// <summary>true when the model is well-formed for a round-trip.
     /// <see cref="Title"/> is required (a board with no title is a

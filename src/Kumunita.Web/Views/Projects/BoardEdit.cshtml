@@ -1,8 +1,15 @@
 @model Kumunita.Web.Models.BoardUpdateModel
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit board";
     string[] modes = { "Any", "All" };
+    // ADR 0044 / 0147 — the tag input's placeholder example (the
+    // tags.events_example registry key — the neighborhood-appropriate
+    // cleanup/social/garden set, the Event/Edit.cshtml idiom).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -130,6 +137,31 @@
                 </div>
             </div>
 
+            @* ADR 0044 / 0147 — the composer tag input (a free-text field +
+               autocomplete dropdown). `data-tag-suggest` is the self-wire
+               selector for client/lib/tag-suggest.ts (tsc-only, RE·3); the
+               module creates the chips, the dropdown, and the hidden
+               `TagIds` submission field around this input. The filter is
+               server-side via POST /api/tags/suggest (C-TG·2 / C-TG·4). The
+               edit lane pre-seeds the board's existing tag **slugs** as
+               starting chips (each removable; re-saving with fewer chips
+               detaches) — the <c>data-tag-suggest-initial</c> JSON array
+               (the <see cref="BoardUpdateModel.ExistingTagSlugs"/> field, the
+               PostsController.SeedExistingTagSlugsAsync idiom). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           data-tag-suggest-initial='@System.Text.Json.JsonSerializer.Serialize(Model.ExistingTagSlugs)'
+                           maxlength="64"
+                           placeholder="@tagsExample" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this board.</kw-l>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="projects.board.save">Save changes</kw-l></button>
                 <a href="/projects/boards" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
@@ -172,6 +204,7 @@
 
 @section Scripts {
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
     <partial name="_GrantPickerScripts" />
     @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
        _Layout.cshtml — SECURITY.md §6). *@

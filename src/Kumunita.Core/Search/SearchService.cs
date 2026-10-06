@@ -152,7 +152,7 @@ public sealed class SearchService : ISearchService
         {
             var projects = (await ProjectsAsync(session, query, actorId, ct)).Take(MaxPerSurface).ToList();
             if (projects.Count > 0) sections[ProjectsSurface] = projects;
-            var boards = (await BoardsAsync(session, query, actorId, ct)).Take(MaxPerSurface).ToList();
+            var boards = (await BoardsAsync(session, query, actorId, tagNames, ct)).Take(MaxPerSurface).ToList();
             if (boards.Count > 0) sections[BoardsSurface] = boards;
             var todos = (await TodosAsync(session, query, actorId, tagNames, ct)).Take(MaxPerSurface).ToList();
             if (todos.Count > 0) sections[TodosSurface] = todos;
@@ -203,7 +203,7 @@ public sealed class SearchService : ISearchService
             PagesSurface => await PagesAsync(session, query, actorId, tagNames, ct),
             AnnouncementsSurface => await AnnouncementsAsync(session, query, actorId, ct),
             ProjectsSurface => await ProjectsAsync(session, query, actorId, ct),
-            BoardsSurface => await BoardsAsync(session, query, actorId, ct),
+            BoardsSurface => await BoardsAsync(session, query, actorId, tagNames, ct),
             TodosSurface => await TodosAsync(session, query, actorId, tagNames, ct),
             InventorySurface => await InventoryAsync(session, query, actorId, ct),
             DocumentsSurface => await DocumentsAsync(session, query, actorId, ct),
@@ -478,10 +478,12 @@ public sealed class SearchService : ISearchService
 
     /// <summary>
     /// Boards (ADR 0124 — the <see cref="Projects.ProjectService"/> canonical predicate
-    /// <c>!IsDeleted</c>; <c>Title</c> + <c>Description</c> match, no TagIds on KanbanBoard).
-    /// Signed-in: <c>CanSeeAsync</c> + <c>"search:boards"</c> row. Anonymous: <c>[]</c>.
+    /// <c>!IsDeleted</c>; <c>Title</c> + <c>Description</c> + TagIds match — ADR 0044 /
+    /// 0147 added the tag surface to <see cref="KanbanBoard"/>). Signed-in:
+    /// <c>CanSeeAsync</c> + <c>"search:boards"</c> row. Anonymous: <c>[]</c>.
     /// </summary>
-    private async Task<List<SearchHit>> BoardsAsync(IDocumentSession session, string q, string? actorId, CancellationToken ct)
+    private async Task<List<SearchHit>> BoardsAsync(IDocumentSession session, string q, string? actorId,
+        IReadOnlyDictionary<string, string> tagNames, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(actorId)) return [];
 
@@ -490,7 +492,10 @@ public sealed class SearchService : ISearchService
             .OrderByDescending(b => b.Created)
             .ToListAsync(ct);
 
-        var matched = candidates.Where(b => Matches(b.Title, b.Description ?? string.Empty, q)).ToList();
+        // ADR 0044 / 0147 — boards now carry <c>TagIds</c>; match the query
+        // against <c>Title</c> + <c>Description</c> + the resolved tag names
+        // (the <see cref="TodosAsync"/> tag-aware shape).
+        var matched = candidates.Where(b => MatchsWithTags(b.Title, b.Description ?? string.Empty, q, b.TagIds, tagNames)).ToList();
         if (matched.Count == 0) return [];
 
         var vs = await _authz.CanSeeAsync(actorId, AccessAction.Read,
