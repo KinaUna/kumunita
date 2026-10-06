@@ -302,3 +302,109 @@ authority stays `kumunita/portability/1` (C-M27·1).
 
 **The `IAuthorizationService` surface count is unchanged** (C-M27·7 — the
 zero-new-authorization-surface pin).
+
+## U01 — service seam + manifest marker
+
+**Date:** 2026-10-06
+**Status:** COMPLETE. All three deliverables authored; `m27-u01.md` moved to
+`done/`. Build green.
+
+**Exit checklist (from the unit plan):**
+
+- [x] `dotnet build Kumunita.slnx -c Debug` green. — **PASS** (all projects
+  succeeded; the only new warnings are the expected CS9113 "parameter is
+  unread" on the shell's four ctor params, which U03–U06 consume).
+- [x] A plain M11 archive (no resident marker) still deserializes. — **PASS**
+  (the additive field is `string?` — nullable, so `System.Text.Json`
+  deserializes an archive whose `manifest.json` omits `scope` /
+  `residentSubjectId` to `null`; the U11 format-compat pin's precondition
+  holds by construction).
+- [x] No new test (U03's export pins are the first M27 tests). — **PASS**
+  (no test files touched).
+- [x] No new authorization surface (the `IAuthorizationService` surface count
+  is unchanged — the C-M27·7 pin). — **PASS** (no `AccessAction` /
+  `AccessVia` / `IAuthorizationService.Decide()` branch added; the service
+  shell's ctor composes only the frozen seams `IDocumentStore` /
+  `IUserInfoService` / `IMediaStore` / `UserManager<User>`).
+- [x] Handoff note: 5–6 lines. — **this section.**
+
+**(a) Seam signatures (verbatim from the design doc §2.1, as shipped):**
+```csharp
+public interface IUserPortabilityService
+{
+    Task<Stream> ExportAsync(string residentSubjectId, CancellationToken ct = default);
+    Task<UserPortabilityImportPlan> ClassifyAsync(
+        string residentSubjectId, Stream archive, CancellationToken ct = default);
+    Task<UserPortabilityImportResult> ResolveAsync(
+        string residentSubjectId,
+        UserPortabilityImportPlan plan,
+        IReadOnlyList<UserPortabilityEntityResolution> resolutions,
+        CancellationToken ct = default);
+}
+```
+
+**(b) `PortabilityManifest` additive field (verbatim from U00 (d), as
+shipped — `null` = a plain M11 whole-instance archive, per D2 / C-M27·1):**
+```csharp
+public string? Scope { get; set; }             // "resident" = M27 scope; null = plain M11 whole-instance
+public string? ResidentSubjectId { get; set; } // the subjectId this archive is scoped to
+```
+Every existing `PortabilityManifest` field (`Format` / `FormatVersion` /
+`GeneratedAt` / `CommunityName` / `DocCounts` / `MediaManifest`) is
+**unchanged**; the `Format` authority stays `kumunita/portability/1`.
+
+**(c) The three POCO record shapes (verbatim from the design doc §2.1, as
+shipped — field names/types/order unchanged; the design doc's `= []` /
+`""` / `default` / `= null` defaults were not valid C# record positional-
+parameter defaults, so all params ship as required positionals — the same
+shape as M11's `PortabilityImportResult(bool Ok,
+IReadOnlyList<string> Failures)`):**
+```csharp
+public sealed record UserPortabilityImportPlan(
+    bool Ok,
+    IReadOnlyList<UserPortabilityEntityClassification> Entities,
+    IReadOnlyList<string> Failures);
+
+public sealed record UserPortabilityEntityClassification(
+    string Kind,              // e.g. "Post", "Event", "Message"
+    string EntityId,          // the id in the archive
+    UserPortabilityEntityStatus Status,
+    IReadOnlyList<UserPortabilityAbsentReference> AbsentReferences,
+    string? DuplicateId);     // for Duplicate: the existing entity's id in the target
+
+public sealed record UserPortabilityEntityResolution(
+    string Kind,              // the entity kind (must match a classification entry)
+    string EntityId,          // the entity id (must match a classification entry)
+    UserPortabilityResolutionKind Resolution,
+    string? PickedTargetId,   // for AddElsewhere: the target the resident chose
+    string? AbsentRefKind,    // for AddElsewhere: the absent-reference kind being re-pointed
+    string? AbsentRefField);  // for AddElsewhere: the absent-reference field being re-pointed
+
+public sealed record UserPortabilityImportResult(
+    bool Ok,
+    int AppliedCount,
+    int DiscardedCount,
+    IReadOnlyList<string> Failures);
+```
+Plus the two enums (`UserPortabilityEntityStatus`: `Clean` / `Duplicate` /
+`Conflict`; `UserPortabilityResolutionKind`: `AddElsewhere` / `Discard`) +
+the `UserPortabilityAbsentReference(string Kind, string Field, string Value)`
+record, all verbatim from §2.1.
+
+**(d) The `IAuthorizationService` surface count is unchanged** (C-M27·7 —
+the zero-new-authorization-surface pin; U01 added no `AccessAction`, no
+`AccessVia`, no `Decide()` branch).
+
+**(e) Compile warnings:** the four CS9113 "parameter is unread" warnings on
+`UserPortabilityService`'s ctor params (`documentStore` / `userInfoService` /
+`mediaStore` / `userManager`) — expected and correct for a shell whose bodies
+are `NotImplementedException` until U03–U06; no other new warnings.
+
+**Registration:** `IUserPortabilityService` → `UserPortabilityService` in
+`src/Kumunita.Core/DependencyInjection.cs`, immediately after the existing
+`IPortabilityService` registration, same `AddTransient` shape.
+
+**U02 entry point:** the seam + the POCO shapes + the manifest marker are
+locked in code; U02 owns the resident-scope **filter** over the M11
+`PortabilityDocTypes` inventory + the per-kind **business-key** matchers
+(the design doc §2.2 / §2.3 tables are the copy source, verbatim).

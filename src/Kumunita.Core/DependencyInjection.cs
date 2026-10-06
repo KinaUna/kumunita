@@ -451,6 +451,23 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<IMediaFileStore>()));
 
+        // M27 (ADR 0148, plan U01): the Portability context's resident-lane
+        // service shell (the same Kumunita.Core.Portability bounded context
+        // as M11's operator lane — a lane on the shipped surface, not a new
+        // context; C-M27·7: zero new AccessAction / AccessVia /
+        // IAuthorizationService branch / Audience). The service composes
+        // only the frozen seams: IDocumentStore (Marten, the domain docs),
+        // IUserInfoService (the resident standing reads), IMediaStore (the
+        // content-addressed bytes), UserManager (Identity, the resident's
+        // own account). U01 ships signatures only (the bodies are U03–U06);
+        // the Web surface + U09–U11 tests target IUserPortabilityService
+        // verbatim.
+        services.AddTransient<IUserPortabilityService>(sp => new UserPortabilityService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IMediaStore>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>()));
+
         return services;
     }
 }
