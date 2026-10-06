@@ -1753,6 +1753,7 @@ public static class KnownTranslationKeys
             // ── events.mine (the EV-MINE "your upcoming events" section on /events — ADR 0065) ──
             ["events.mine.title"] = "Your upcoming events",
             ["events.mine.hint"] = "Events you've RSVPed to or organized.",
+            ["events.mine.show_more"] = "Show the {n} more events",
 
             // ── events.past (the EV-PAST toggle + empty state on /events — ADR 0109) ──
             ["events.upcoming"] = "Upcoming",
@@ -4051,6 +4052,7 @@ public static class KnownTranslationKeys
             // ── events.mine (der EV-MINE-Bereich „Deine Veranstaltungen“ auf /events — ADR 0065) ──
             ["events.mine.title"] = "Deine kommenden Veranstaltungen",
             ["events.mine.hint"] = "Veranstaltungen, die du bestätigt hast oder organisiert.",
+            ["events.mine.show_more"] = "Weitere {n} Veranstaltungen anzeigen",
 
             // ── events.past (der EV-PAST-Umschalter + Leerzustand auf /events — ADR 0109) ──
             ["events.upcoming"] = "Bevorstehend",
@@ -6294,6 +6296,7 @@ public static class KnownTranslationKeys
             // ── events.mine (la section « Tes prochains événements » sur /events — ADR 0065) ──
             ["events.mine.title"] = "Tes prochains événements",
             ["events.mine.hint"] = "Événements auxquels tu as répondu ou que tu as organisés.",
+            ["events.mine.show_more"] = "Afficher les {n} événements supplémentaires",
 
             // ── events.past (le basculement EV-PAST + état vide sur /events — ADR 0109) ──
             ["events.upcoming"] = "À venir",
@@ -8530,6 +8533,7 @@ public static class KnownTranslationKeys
             // ── events.mine (sektionen „Dine kommende arrangementer“ på /events — ADR 0065) ──
             ["events.mine.title"] = "Dine kommende arrangementer",
             ["events.mine.hint"] = "Arrangementer, du har svaret på eller arrangerer.",
+            ["events.mine.show_more"] = "Vis de {n} flere arrangementer",
 
             // ── events.past (skifteren EV-PAST + tom tilstand på /events — ADR 0109) ──
             ["events.upcoming"] = "Kommende",

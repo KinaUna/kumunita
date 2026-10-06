@@ -510,6 +510,11 @@
          on click. Self-guards: no-op on pages without #roadmap-list, and
          per-side no-op where a direction has no button (≤3 items). -->
     <script type="module" src="~/js/lib/roadmap-more.js"></script>
+    <!-- Events "your upcoming events" load-more (the EV-MINE section on
+         /events; see Event/Index.cshtml): reveals the hidden own-event rows
+         beyond the first five in batches of 5 on click. Self-guards: no-op
+         on pages without #events-mine-more-wrap (≤5 own events → no button). -->
+    <script type="module" src="~/js/lib/mine-more.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class
