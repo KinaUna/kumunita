@@ -538,3 +538,80 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   (ADR 0150 D5 — composable, not replaced); `LocaleSettings` doc untouched
   (ADR 0150 D6); the U03 host-`Configure` drift note is **resolved** (the
   `SiteContentDocTypes.Configure(opts);` line is in `Program.cs`).
+
+## U06 — Web: StaticPagesController + About view conditional rendering
+
+- **Date:** 2026-10-07
+- **2 deliverable files (both modified):**
+  1. `src/Kumunita.Web/Controllers/StaticPagesController.cs` (modified) —
+     the `ISiteContentService?` constructor param (optional, last, default
+     `null` — the harness at
+     `tests/Kumunita.Web.Tests/StaticPagesControllerHarness.cs` passes 5
+     positional args; the new 6th param is optional so no harness change is
+     needed). `FallThrough(bool)` is now `async Task<IActionResult>` (the
+     `Page()` method was already `async` and now `await`s the call site).
+     The `FallThrough` body reads the singleton via
+     `try { site = await _siteContent.GetAsync(); } catch { site = null; }`
+     (the ADR 0050 / ADR 0149 best-effort shape — a missing seam, missing
+     store/row, or read failure degrades to `null`; the view degrades to
+     the in-code fallback). Passes `Site: site` (PascalCase named arg — the
+     `HomeViewModel` record's primary-constructor parameter name is
+     `Site`, not `site`) through the `HomeViewModel` constructor. The
+     `Page(slug, …)` path (an admin-created `about` `Page` wins) is
+     **untouched** — only the product-story fallback view is wired to
+     `SiteContent`.
+  2. `src/Kumunita.Web/Views/StaticPages/About.cshtml` (modified) — the
+     hero eyebrow renders
+     `@(Model.Site?.AboutHeroEyebrow ?? "Private by default")` and the
+     hero lead renders
+     `@(Model.Site?.AboutHeroLead ?? "One home for everything your neighborhood does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.")`
+     (the `kw-l` wrap for those two is replaced by the server-resolved
+     `SiteContent` value; the `??` fallback is the exact `en` source text
+     — the in-code floor, SITE·3). The hero band (eyebrow + lead + the two
+     CTA buttons) is **always shown** (the hero is the page identity — it
+     is not one of the six toggle-able sections). The six non-hero sections
+     are each wrapped in their own `@if (Model.Site?.AboutShow* ?? true)
+     { … }`:
+     - Feature cards → `@if (Model.Site?.AboutShowFeatures ?? true)`
+     - Scope band → `@if (Model.Site?.AboutShowScope ?? true)`
+     - FIG-philosophy band → `@if (Model.Site?.AboutShowPhilosophy ?? true)`
+     - Code/docs band → `@if (Model.Site?.AboutShowProject ?? true)`
+     - "What's new" changelog → `@if (Model.Site?.AboutShowWhatsNew ?? true)`
+     - Contact CTA band → `@if (Model.Site?.AboutShowContactCta ?? true)`
+     A hidden section is **not in the DOM at all** (SITE·9, not
+     `display: none`). The `aria-label` attributes for the visible
+     sections are unchanged.
+- **8 `About` fields used (by name):** `AboutHeroEyebrow`,
+  `AboutHeroLead`, `AboutShowFeatures`, `AboutShowScope`,
+  `AboutShowPhilosophy`, `AboutShowProject`, `AboutShowWhatsNew`,
+  `AboutShowContactCta`.
+- **About hero is always shown** (the hero is the page identity; the two
+  CTAs stay; the hero text is server-resolved with the in-code `??`
+  fallback).
+- **Drift note (unit-series rule 7 — entry reads reveal a pre-existing
+  pin that the U06 plan intentionally overrides):**
+  `tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs`
+  `About_View_Wraps_All_D5_Keys` (an ADR 0042 D5 view-side pin from the LS
+  lane) asserts that all 13 `about.*` keys appear as `<kw-l key="…">` in
+  `About.cshtml`. The U06 plan (and the ADR 0150 D3 / SITE·4 pin)
+  intentionally replaces the `about.eyebrow` / `about.lead` `kw-l` wraps
+  with the server-resolved `SiteContent` value. The **registry entries**
+  stay (the ADR 0150 D3 pin — `KnownTranslationKeys.cs` is untouched);
+  only the *view's use* of those two keys is swapped. U06 updated the test
+  to reflect this override: the 2 hero keys are now exempted from the
+  "must be kw-l-wrapped" check (the remaining 11 D5 keys must still be
+  wrapped; the stray-key check is unchanged). The test file
+  `PublicLocaleAndAboutTests.cs` is a **third file** beyond the 2
+  deliverable files, but it is required to keep the acceptance gate green
+  — the U06 plan's "2 files" constraint was written before this
+  pre-existing pin was known to conflict.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green (all 4 projects
+  succeeded — warnings only, no errors).
+- **Web tests:** `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  green — **932 tests, 0 failed** (including the updated
+  `PublicLocaleAndAboutTests.About_View_Wraps_All_D5_Keys`, the
+  `StaticPagesControllerTests` pins, the `KwLRegistryConsistencyTests` /
+  `KnownTranslationKeys_ParityTests` pins, and the
+  `HomeControllerSiteContentTests` pins from U05).
+- **No Core change, no `HomeController` change, no `/admin/site` surface.**

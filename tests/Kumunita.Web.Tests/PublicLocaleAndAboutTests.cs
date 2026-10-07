@@ -308,7 +308,7 @@ public class PublicLocaleAndAboutTests
         });
     }
 
-    // ── (e) U05: the about view wraps exactly the 13 D5 keys ─────────────────
+    // ── (e) U05: the about view wraps the D5 keys (11 after the SITE lane) ─
 
     /// <summary>
     /// The ADR 0042 D5 closed contract: the 13 <c>about.*</c> keys are the
@@ -321,8 +321,24 @@ public class PublicLocaleAndAboutTests
     /// *view-side* half (every D5 key the contract names is wrapped in
     /// About.cshtml), so a future view edit that drops a wrap is caught
     /// immediately.
+    /// <para>
+    /// **ADR 0150 / SITE U06 override:** the SITE lane (the site-content
+    /// customization lane) intentionally replaces the <c>about.eyebrow</c>
+    /// and <c>about.lead</c> <c>&lt;kw-l&gt;</c> wraps in
+    /// <c>Views/StaticPages/About.cshtml</c> with the server-resolved
+    /// <see cref="Kumunita.Core.SiteContent.SiteContent.AboutHeroEyebrow"/>
+    /// / <see cref="Kumunita.Core.SiteContent.SiteContent.AboutHeroLead"/>
+    /// values (the admin-editable hero text, the SITE·3 byte-identical
+    /// in-code fallback when the singleton is absent). The two keys **stay
+    /// in the registry** (the ADR 0150 D3 / SITE·4 pin — the registry parity
+    /// tests are untouched); only the *view's use* of those two keys is
+    /// swapped. This test now pins the remaining 11 D5 keys (the view still
+    /// must wrap every D5 key it renders via <c>&lt;kw-l&gt;</c>), and
+    /// allows — but does not require — the two hero keys to be absent from
+    /// the view's <c>&lt;kw-l&gt;</c> set.
+    /// </para>
     /// </summary>
-    [Fact(DisplayName = "About.cshtml wraps all 13 ADR 0042 D5 about.* keys in kw-l")]
+    [Fact(DisplayName = "About.cshtml wraps the ADR 0042 D5 about.* keys it renders (11 after the SITE lane override)")]
     public void About_View_Wraps_All_D5_Keys()
     {
         var aboutView = ResolveAboutView();
@@ -349,8 +365,15 @@ public class PublicLocaleAndAboutTests
         Assert.True(d5Keys.Length == 13,
             "The D5 list length changed — update this test to match ADR 0042 D5.");
 
-        // Every D5 key must appear as kw-l key="…" in the view.
-        var missing = d5Keys
+        // The SITE lane (ADR 0150 / U06) intentionally replaced the
+        // about.eyebrow / about.lead kw-l wraps with the server-resolved
+        // SiteContent value (the admin-editable hero text). The remaining 11
+        // D5 keys must still be kw-l-wrapped in the view.
+        var siteLaneOverrideKeys = new[] { "about.eyebrow", "about.lead" };
+        var keysRequiredInView = d5Keys.Except(siteLaneOverrideKeys).ToArray();
+
+        // Every remaining D5 key must appear as kw-l key="…" in the view.
+        var missing = keysRequiredInView
             .Where(k => !Regex.IsMatch(text, $@"kw-l\b[^>]*\bkey=""{Regex.Escape(k)}"""))
             .ToList();
 
@@ -358,10 +381,11 @@ public class PublicLocaleAndAboutTests
             "D5 about.* key(s) not wrapped in kw-l in About.cshtml:\n" +
             string.Join("\n", missing.Select(k => $"  {k}")));
 
-        // The view must NOT wrap any about.* key beyond the 13 D5 keys —
-        // a stray wrap of an unregistered key would render the raw key to
-        // the resident (the PG-lane regression KwLRegistryConsistencyTests
-        // guards against, checked here for the about.* namespace specifically).
+        // The view must NOT wrap any about.* key beyond the D5 list (the
+        // SITE lane override keys are part of the D5 list, so the allowed
+        // set is unchanged — a stray wrap of an unregistered key would
+        // render the raw key to the resident; the PG-lane regression
+        // KwLRegistryConsistencyTests guards the registry side).
         var allAboutKeys = Regex
             .Matches(text, @"kw-l\b[^>]*\bkey=""(about\.[^""]+)""")
             .Select(m => m.Groups[1].Value)
