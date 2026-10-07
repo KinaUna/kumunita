@@ -195,3 +195,37 @@
   `AccountController.cs`, but the code→message switch — where the `blocked` case
   lives — is in `Views/Account/Login.cshtml`; a kw-l reference can only live in
   a view, so it is inevitably view-scanned by this test.)
+
+## U05 — kw-l keys × 4
+
+- **14 key names (the D7 closed set, design doc §2.7, verbatim):** 13
+  `guardian.timelimit.*` (`title`, `description`, `enabled`, `mode_label`,
+  `mode_blocked`, `mode_allowed`, `hours_label`, `days_label`, `save`, `clear`,
+  `flash_saved`, `flash_cleared`, `badge_set`) + the single
+  `account.time_limit.login_message` (the `?error=time-limit` login landing U04
+  referenced in `Views/Account/Login.cshtml`). A DISTINCT namespace — the M20
+  `settings.quiet.*` / `admin.quiet.*` keys are **unchanged** (C-M28·5 "M20
+  untouched" pin, D9).
+- **4-dict presence confirm:** all 14 keys added to **all four**
+  `KnownTranslationKeys` dicts (`EnValues` lines ~125–140, `DeValues` ~2584–2599,
+  `FrValues` ~4893–4908, `DaValues` ~7206–7221) — `en` canonical source text,
+  real `de`/`fr`/`da` translations (plain text only; the `kw-l` TagHelper
+  auto-escapes). Verified against the `en`/`de`/`fr`/`da` M20 quiet-lane tone
+  (mirrored shape, distinct namespace).
+- **New parity pin + status:** `tests/Kumunita.Web.Tests/GuardianTimeLimitKwLParityTests.cs`
+  (4 tests: `ClosedSet_Has_Exactly_14_Keys`,
+  `Every_Closed_M28_KwL_Key_Is_Present_NonEmpty_In_All_Four_Languages`,
+  `M28_KwL_Set_Is_Closed_No_Key_Beyond_The_Set`,
+  `M28_Namespace_Is_Distinct_From_M20_QuietLane`) — mirroring the
+  `Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages` shape. All green.
+- **U04 red resolved:** the `KwLRegistryConsistencyTests` ("Every kw-l key used
+  in a Razor view is registered in KnownTranslationKeys") that U04 left red on
+  `Account\Login.cshtml: account.time_limit.login_message` is now **GREEN**.
+  Full `Kumunita.Web.Tests` suite: **`Total: 947, Errors: 0, Failed: 0,
+  Skipped: 0`** (943 from U04 + the 4 new U05 parity tests). In-process
+  xunit.v3 runner.
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Error(s)**
+  (pre-existing warnings only; none in the two new/modified M28 files).
+- **No code beyond the keys + parity pin** (no Detail surface, no middleware,
+  no seams — U06 owns the Detail surface). **M20 lane untouched.** Handing off
+  to U06.

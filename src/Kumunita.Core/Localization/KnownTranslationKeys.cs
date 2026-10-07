@@ -115,6 +115,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.save"]            = "Save cadence",
             ["admin.quiet.flash_saved"]     = "Quiet-time cadence saved.",
 
+            // ── M28 (ADR 0151) — guardian time limits: the 13-key
+            // guardian.timelimit.* GU Detail section (D7) + the single
+            // account.time_limit.login_message login landing (referenced in
+            // U04's Login.cshtml ?error=time-limit case). U05 authors the
+            // COMPLETE 14-key closed set; U06 consumes, adds none. A DISTINCT
+            // namespace — NOT the M20 settings.quiet.* / admin.quiet.* keys
+            // (those are the notification lane's, unchanged — D9).
+            ["guardian.timelimit.title"]        = "Time limits",
+            ["guardian.timelimit.description"]  = "Choose when your child may use the platform. The schedule " +
+                "is saved on their account, applied in their own time zone — it " +
+                "takes effect on their next sign-in, and never affects you.",
+            ["guardian.timelimit.enabled"]      = "Enforce time limits for this child",
+            ["guardian.timelimit.mode_label"]   = "When may the child use the platform?",
+            ["guardian.timelimit.mode_blocked"] = "Blocked during the selected hours & days",
+            ["guardian.timelimit.mode_allowed"] = "Allowed only during the selected hours & days",
+            ["guardian.timelimit.hours_label"]  = "Hours of day",
+            ["guardian.timelimit.days_label"]   = "Days of week",
+            ["guardian.timelimit.save"]         = "Save time limits",
+            ["guardian.timelimit.clear"]        = "Clear time limits",
+            ["guardian.timelimit.flash_saved"]  = "Time limits saved — the child will be signed out outside the allowed window.",
+            ["guardian.timelimit.flash_cleared"] = "Time limits cleared — the child may now use the platform at any time.",
+            ["guardian.timelimit.badge_set"]    = "Time limits set",
+            ["account.time_limit.login_message"] = "You are outside your allowed hours. Please check back later.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
@@ -2550,6 +2574,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.save"]            = "Takt speichern",
             ["admin.quiet.flash_saved"]     = "Stumstunden-Takt gespeichert.",
 
+            // ── M28 (ADR 0151) — Betreuer-Nutzungslimits: der 13-Schlüssel-
+            // guardian.timelimit.* GU-Detail-Abschnitt (D7) + der einzelne
+            // account.time_limit.login_message Login-Landing (in U04s
+            // Login.cshtml ?error=time-limit Fall referenziert). U05 autorisiert
+            // den VOLLSTÄNDIGEN 14-Schlüssel-Satz; U06 konsumiert, fügt keine
+            // hinzu. ABGEGRENZTER Namensraum — NICHT die M20 settings.quiet.*
+            // / admin.quiet.* Schlüssel (die gehören der Benachrichtigungslane).
+            ["guardian.timelimit.title"]        = "Nutzungslimits",
+            ["guardian.timelimit.description"]  = "Wähle, wann dein Kind die Plattform nutzen darf. Der Plan " +
+                "wird auf seinem Konto gespeichert, in seiner eigenen Zeitzone " +
+                "angewendet — er wirkt bei seinem nächsten Anmelden und betrifft nie dich.",
+            ["guardian.timelimit.enabled"]      = "Nutzungslimits für dieses Kind durchsetzen",
+            ["guardian.timelimit.mode_label"]   = "Wann darf das Kind die Plattform nutzen?",
+            ["guardian.timelimit.mode_blocked"] = "Gesperrt während der gewählten Stunden & Tage",
+            ["guardian.timelimit.mode_allowed"] = "Nur erlaubt in den gewählten Stunden & Tagen",
+            ["guardian.timelimit.hours_label"]  = "Stunden des Tages",
+            ["guardian.timelimit.days_label"]   = "Wochentage",
+            ["guardian.timelimit.save"]         = "Nutzungslimits speichern",
+            ["guardian.timelimit.clear"]        = "Nutzungslimits entfernen",
+            ["guardian.timelimit.flash_saved"]  = "Nutzungslimits gespeichert — das Kind wird außerhalb des erlaubten Fensters abgemeldet.",
+            ["guardian.timelimit.flash_cleared"] = "Nutzungslimits entfernt — das Kind darf die Plattform jetzt jederzeit nutzen.",
+            ["guardian.timelimit.badge_set"]    = "Nutzungslimits gesetzt",
+            ["account.time_limit.login_message"] = "Du bist außerhalb deiner erlaubten Zeiten. Bitte melde dich später erneut an.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
 
@@ -4834,6 +4882,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.cadence_label"]   = "Revérifier les notifications retenues toutes les (minutes)",
             ["admin.quiet.save"]            = "Enregistrer la cadence",
             ["admin.quiet.flash_saved"]     = "Cadence des heures de silence enregistrée.",
+
+            // ── M28 (ADR 0151) — limites d'utilisation tuteur : la section GU
+            // Detail à 13 clés guardian.timelimit.* (D7) + la landing de
+            // connexion account.time_limit.login_message (référencée dans le
+            // cas ?error=time-limit de Login.cshtml, U04). U05 autorise le JEU
+            // COMPLET de 14 clés ; U06 consomme, n'en ajoute aucune. Espace de
+            // noms DISTINCT — PAS les clés M20 settings.quiet.* / admin.quiet.*
+            // (elles appartiennent à la lane de notification).
+            ["guardian.timelimit.title"]        = "Limites d'utilisation",
+            ["guardian.timelimit.description"]  = "Choisis quand ton enfant peut utiliser la plateforme. " +
+                "L'horaire est enregistré sur son compte, appliqué dans son " +
+                "propre fuseau horaire — il prend effet à sa prochaine connexion et ne t'affecte jamais.",
+            ["guardian.timelimit.enabled"]      = "Appliquer des limites d'utilisation à cet enfant",
+            ["guardian.timelimit.mode_label"]   = "Quand l'enfant peut-il utiliser la plateforme ?",
+            ["guardian.timelimit.mode_blocked"] = "Bloqué pendant les heures & jours sélectionnés",
+            ["guardian.timelimit.mode_allowed"] = "Autorisé seulement pendant les heures & jours sélectionnés",
+            ["guardian.timelimit.hours_label"]  = "Heures de la journée",
+            ["guardian.timelimit.days_label"]   = "Jours de la semaine",
+            ["guardian.timelimit.save"]         = "Enregistrer les limites",
+            ["guardian.timelimit.clear"]        = "Effacer les limites",
+            ["guardian.timelimit.flash_saved"]  = "Limites enregistrées — l'enfant sera déconnecté hors de la fenêtre autorisée.",
+            ["guardian.timelimit.flash_cleared"] = "Limites effacées — l'enfant peut maintenant utiliser la plateforme à tout moment.",
+            ["guardian.timelimit.badge_set"]    = "Limites définies",
+            ["account.time_limit.login_message"] = "Tu es en dehors de tes heures autorisées. Merci de revenir plus tard.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
@@ -7123,6 +7195,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.cadence_label"]   = "Genprøv tilbageholdte notifikationer hver (minut) gang",
             ["admin.quiet.save"]            = "Gem takt",
             ["admin.quiet.flash_saved"]     = "Stumtid-takt gemt.",
+
+            // ── M28 (ADR 0151) — tidsbegrænsninger for formynder: den 13-nøgle-
+            // GU-Detail-sektion guardian.timelimit.* (D7) + den enkelt login-
+            // landing account.time_limit.login_message (refererenced i U04s
+            // Login.cshtml ?error=time-limit tilfælde). U05 forfatter det FULDE
+            // 14-nøgle-sæt; U06 forbruger, tilføjer ingen. DISTinkt namespace —
+            // IKKE M20 settings.quiet.* / admin.quiet.* nøglerne (de tilhører
+            // notifikationssporet).
+            ["guardian.timelimit.title"]        = "Brugsgrænser",
+            ["guardian.timelimit.description"]  = "Vælg hvornår dit barn må bruge platformen. Tidsplanen " +
+                "gemmes på deres konto og anvendes i deres egen tidssone — den " +
+                "træder i kraft ved deres næste login og påvirker aldrig dig.",
+            ["guardian.timelimit.enabled"]      = "Gennemfør brugsgrænser for dette barn",
+            ["guardian.timelimit.mode_label"]   = "Hvornår må barnet bruge platformen?",
+            ["guardian.timelimit.mode_blocked"] = "Blokeret i de valgte timer & dage",
+            ["guardian.timelimit.mode_allowed"] = "Kun tilladt i de valgte timer & dage",
+            ["guardian.timelimit.hours_label"]  = "Timer på døgnet",
+            ["guardian.timelimit.days_label"]   = "Ugedage",
+            ["guardian.timelimit.save"]         = "Gem brugsgrænser",
+            ["guardian.timelimit.clear"]        = "Ryd brugsgrænser",
+            ["guardian.timelimit.flash_saved"]  = "Brugsgrænser gemt — barnet logges ud uden for det tilladte vindue.",
+            ["guardian.timelimit.flash_cleared"] = "Brugsgrænser ryddet — barnet må nu bruge platformen til enhver tid.",
+            ["guardian.timelimit.badge_set"]    = "Brugsgrænser sat",
+            ["account.time_limit.login_message"] = "Du er uden for dine tilladte timer. Tjek venligst ind senere.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
