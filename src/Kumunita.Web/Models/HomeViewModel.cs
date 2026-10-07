@@ -1,3 +1,5 @@
+using Kumunita.Core.SiteContent;
+
 namespace Kumunita.Web.Models;
 
 /// <summary>
@@ -5,13 +7,18 @@ namespace Kumunita.Web.Models;
 /// signed-in "what's new" surface (the /home page only; the About view
 /// ignores it). Null ⇒ no feed (signed-out visitor, or the feed seams are
 /// absent in a test construction) — the view renders hero + roadmap only,
-/// exactly as before the feed existed.
+/// exactly as before the feed existed. <see cref="Site"/> is the optional
+/// admin-settled landing-surface content (the <c>SiteContent</c> singleton,
+/// ADR 0150): null ⇒ the view degrades to the in-code fallback (the
+/// byte-identical shipped <c>kw-l</c> text + every section shown), so a
+/// missing singleton never blanks the page (SITE·1).
 /// </summary>
 public sealed record HomeViewModel(
     string CommunityName,
     string? SupportEmail,
     HomeFeed? Feed = null,
-    bool HideIntro = false);
+    bool HideIntro = false,
+    SiteContent? Site = null);
 
 /// <summary>
 /// The /home "what's new" feed (signed-in visitors only): the latest of

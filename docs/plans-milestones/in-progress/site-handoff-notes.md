@@ -467,3 +467,74 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
 - **Constraints held:** no re-shape of the 13-field set (ADR 0150 D1); no
   `kw-l` registry entry removed (ADR 0150 D3); `LocaleSettings` doc untouched
   (ADR 0150 D6); the test names are the §2.5 closed set (unit-series rule 3).
+
+## U05 — Web: HomeController + Home view conditional rendering
+
+- **Date:** 2026-10-07
+- **4 deliverable files (3 modified + 1 host line):**
+  1. `src/Kumunita.Web/Program.cs` (modified) — **the U03-deferred host
+     registration resolved.** Added `SiteContentDocTypes.Configure(opts);`
+     in the `AddMarten(opts => { … })` lambda, **immediately after**
+     `PageDocTypes.Configure(opts);`. One line only. `SiteContentDocTypes`
+     lives in the `Kumunita.Core` namespace (like every other `*DocTypes` —
+     confirmed in `SiteContentDocTypes.cs`, `namespace Kumunita.Core;`), so
+     the unqualified name resolves unchanged and no new `using` was needed.
+     This is what makes a pristine boot create the `mt_doc_sitecontent`
+     table (ADR 0004 §B.1 additive). **The U03 drift note is now resolved.**
+  2. `src/Kumunita.Web/Models/HomeViewModel.cs` (modified) — the
+     `HomeViewModel` record gains a new `SiteContent? Site = null` field
+     (the default `null` — a null/missing value degrades to the in-code
+     fallback, the byte-identical shipped `kw-l` text + every section shown;
+     SITE·1). Added `using Kumunita.Core.SiteContent;`.
+  3. `src/Kumunita.Web/Controllers/HomeController.cs` (modified) — the
+     `Index` action reads the `SiteContent` singleton via
+     `ISiteContentService.GetAsync()` (best-effort, the ADR 0050 / ADR 0149
+     shape). Injected `ISiteContentService? siteContent = null` as the **last**
+     optional constructor param (existing positional / test constructions are
+     unaffected), exposed as the internal `SiteContentService` property
+     (named `SiteContentService`, **not** `SiteContent`, to avoid the
+     type/namespace name collision). The read is in a `try/catch` that
+     degrades to `null` on a missing seam / store / row / read failure, then
+     passed through `new HomeViewModel(…, hideIntro, site)`. The ADR 0149
+     `HideHomeIntro` read is **untouched**. Added `using
+     Kumunita.Core.SiteContent;`.
+  4. `src/Kumunita.Web/Views/Home/Index.cshtml` (modified) — the hero
+     eyebrow + lead now render from the server-resolved `SiteContent` value
+     (`@(Model.Site?.HomeHeroEyebrow ?? "…")` /
+     `@(Model.Site?.HomeHeroLead ?? "…")`); the `kw-l` wrap on those **two**
+     hero keys is replaced by the server-resolved value (the `??` fallback is
+     the exact `en` source text — the in-code floor a null `Site` degrades to,
+     SITE·3; the other `kw-l` keys the view uses for the sections that are
+     shown stay — SITE·4). The three sections are conditionally rendered +
+     the ADR 0149 composability is wired.
+- **The `@if` wraps (pinned — the composability shape):**
+  - **The two intro sections (hero band + feature-cards band)** render when
+    **both** `!Model.HideIntro` **and** `(Model.Site?.HomeShowFeatures ?? true)`
+    are true — the ADR 0149 "they hide and show as a pair" shape, now
+    composable with the platform flag (SITE·5). The combined `@if
+    (!Model.HideIntro)` block was re-scoped to `@if (!Model.HideIntro &&
+    (Model.Site?.HomeShowFeatures ?? true))`.
+  - **The "What it is & how it works" CTA button** (inside the hero band) is
+    additionally wrapped in `@if (Model.Site?.HomeShowAboutButton ?? true)`
+    (the hero itself is **not** hideable by the platform — only its button +
+    text are governed by `SiteContent`; the button's `kw-l key="home.
+    about_link"` is untouched — SITE·4).
+  - **The "The plan" roadmap section** (`section.kmb-section-tint-a`) is
+    wrapped in `@if (Model.Site?.HomeShowRoadmap ?? true)` — governed **only**
+    by the platform flag; the ADR 0149 `Profile.HideHomeIntro` never reaches
+    this section (SITE·5).
+  - **The "What's new" feed** section is **untouched** (governed only by
+    `Model.Feed is { }` — the signed-in feed; the per-resident
+    `HideHomeIntro` never reached it, and still doesn't).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (`BUILD_EXIT=0`,
+  `Kumunita.Core` + `Kumunita.Core.Tests` + `Kumunita.Web` +
+  `Kumunita.Web.Tests` all succeeded — the Razor view compiles, so the
+  `@if` / attribute markup is valid).
+- **No Core change, no `StaticPagesController` change, no `/admin/site`
+  surface** (U05 scope held).
+- **Constraints held:** no re-shape of the 13-field set (ADR 0150 D1); no
+  `kw-l` registry entry removed (ADR 0150 D3 — only the *view's use* of the
+  two hero keys is swapped); ADR 0149 `Profile.HideHomeIntro` read untouched
+  (ADR 0150 D5 — composable, not replaced); `LocaleSettings` doc untouched
+  (ADR 0150 D6); the U03 host-`Configure` drift note is **resolved** (the
+  `SiteContentDocTypes.Configure(opts);` line is in `Program.cs`).

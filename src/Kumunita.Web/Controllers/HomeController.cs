@@ -5,6 +5,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.SiteContent;
 using Kumunita.Core.UserInfo;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -53,6 +54,11 @@ public class HomeController : Controller
     /// <param name="translationProvider">Optional — the translation read
     /// seam; when present, rows show the viewer's-language variant (the
     /// ADR 0022 floor) where one exists.</param>
+    /// <param name="siteContent">Optional — the admin-settled landing-surface
+    /// content read seam (the <see cref="Kumunita.Core.SiteContent.SiteContent"/>
+    /// singleton, ADR 0150). Null in test constructions; the view degrades to
+    /// the in-code fallback (the byte-identical shipped <c>kw-l</c> text +
+    /// every section shown), so the page always renders (SITE·1).</param>
     public HomeController(
         ILogger<HomeController> logger,
         IOptions<CommunityOptions> community,
@@ -62,7 +68,8 @@ public class HomeController : Controller
         IAuthorizationService? authz = null,
         ILocalizationService? localization = null,
         IUserInfoService? userInfo = null,
-        ITranslationProvider? translationProvider = null)
+        ITranslationProvider? translationProvider = null,
+        ISiteContentService? siteContent = null)
     {
         _logger = logger;
         _community = community.Value;
@@ -73,6 +80,7 @@ public class HomeController : Controller
         Localization = localization;
         UserInfo = userInfo;
         TranslationProvider = translationProvider;
+        SiteContentService = siteContent;
     }
 
     // The optional feed seams (internal so the tests can assert the
@@ -84,6 +92,7 @@ public class HomeController : Controller
     internal ILocalizationService? Localization { get; }
     internal IUserInfoService? UserInfo { get; }
     internal ITranslationProvider? TranslationProvider { get; }
+    internal ISiteContentService? SiteContentService { get; }
 
     public async Task<IActionResult> Index()
     {
@@ -110,7 +119,28 @@ public class HomeController : Controller
             }
         }
 
-        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed, hideIntro));
+        // SITE (ADR 0150) — the admin-settled landing-surface content read seam
+        // (the SiteContent singleton). Best-effort, the ADR 0050 / ADR 0149
+        // shape: a missing seam (a test construction with no service), a missing
+        // store, a missing row (a fresh boot before the seeder ran), or a read
+        // failure all degrade to null, and the view renders the in-code fallback
+        // (the byte-identical shipped kw-l text + every section shown). The page
+        // always renders — never a blank page, never an error (SITE·1). This is a
+        // *display* read only — it never gates anything.
+        Kumunita.Core.SiteContent.SiteContent? site = null;
+        if (SiteContentService is not null)
+        {
+            try
+            {
+                site = await SiteContentService.GetAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                site = null; // floor: the in-code fallback (the view degrades to shipped text)
+            }
+        }
+
+        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed, hideIntro, site));
     }
 
     // NOTE (ML-UI U7): GET /about moved to StaticPagesController.About — one
