@@ -159,3 +159,83 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   `View("About", new HomeViewModel(...))` when no `about` Page exists.
   U06 will add the `SiteContent` read to this seam.
 - **No code, no build.** The handoff-note skeleton is present.
+
+## U01 — design doc Part 1
+
+- **Date:** 2026-10-07
+- **Deliverable:** `docs/design/site-content-design.md` Part 1 created
+  (value chain, context, scope, invariants, FACES, frozen base).
+- **9 invariants pinned (by id):**
+  - **SITE·1** — the read is a public landing surface (world-readable,
+    not an access decision, not a claim; ADR 0001-B thin-token; ADR 0050
+    strong-consistency shape; a missing singleton degrades to the shipped
+    defaults — never a blank page).
+  - **SITE·2** — the write is the ADR 0050 single-write-lane shape (one
+    `SaveAsync` lane, one `AccessAudit` row per save, `Via = Admin`,
+    action `site.save`, `TargetKind` "site"; the lane upserts the
+    singleton; strong consistency — live on the very next render).
+  - **SITE·3** — the defaults are byte-identical to the shipped `kw-l`
+    text (the `FirstBootSeeder` seed + the in-code fallback; the
+    "seeded defaults match the shipped text" pin).
+  - **SITE·4** — the `kw-l` registry entries stay (the `home.*` /
+    `about.*` / `platform.*` keys are not removed / re-shaped / re-keyed;
+    the registry parity tests are untouched).
+  - **SITE·5** — the ADR 0149 `Profile.HideHomeIntro` is composable, not
+    replaced (the two intro sections render when **both** `!HideIntro`
+    and `HomeShowFeatures`; the feed + roadmap are governed only by the
+    platform flag).
+  - **SITE·6** — the `SiteContent` doc is a singleton (one row per
+    instance, `Id = "singleton"` sentinel — the `LocaleSettings` shape;
+    delta applied idempotently at boot; no EF migration; the
+    `LocaleSettings` doc is untouched).
+  - **SITE·7** — the `/admin/site` surface is the ADR 0050 shape (a
+    dedicated `AdminSiteController`, `GlobalAdmin`-gated, one
+    `AccessAudit` row per save; the `/admin/platform` page gains one
+    list-group row).
+  - **SITE·8** — the `Milestones.cs` / README / `MilestonesTests` trio
+    is untouched until the lane *ships* (U08 owns the close flip; the
+    M4 single-`StatusNext` pin stays intact).
+  - **SITE·9** — a11y: a hidden section is **not in the DOM at all**
+    (not `display: none`); the two heroes' eyebrow + lead stay the
+    first content in the DOM; the visible sections' `aria-label`
+    attributes are unchanged.
+- **10 FACES pinned (by id):**
+  - **SITE1** — a visitor loads `/` or `/about`; the page renders
+    regardless of whether the singleton exists; a missing singleton
+    degrades to the shipped defaults; world-readable, no `AccessAudit`
+    on the read. (Pinned by SITE·1, SITE·6.)
+  - **SITE2** — the admin saves a field group; exactly one
+    `AccessAudit` row; strong consistency (live on the very next
+    render); the lane upserts the singleton (no duplicate row). (Pinned
+    by SITE·2.)
+  - **SITE3** — a fresh instance renders `/` and `/about` with exactly
+    the shipped `kw-l` text; the `SiteContentSeederTests` pins assert
+    byte-identical defaults. (Pinned by SITE·3.)
+  - **SITE4** — the `kw-l` registry entries are untouched; the
+    `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests`
+    pins are green. (Pinned by SITE·4.)
+  - **SITE5** — ADR 0149 composability: `HideHomeIntro = true` hides
+    the two intro sections even if `HomeShowFeatures = true`; the
+    feed + roadmap are governed only by the platform flag. (Pinned by
+    SITE·5.)
+  - **SITE6** — the `SiteContent` doc is a singleton (one row,
+    `Id = "singleton"`); a second boot is idempotent; the
+    `LocaleSettings` doc is untouched. (Pinned by SITE·6.)
+  - **SITE7** — the admin navigates to `/admin/site`; the GET seeds
+    the form; the POST saves + writes one `AccessAudit` row; a
+    non-`GlobalAdmin` is denied. (Pinned by SITE·7.)
+  - **SITE8** — the close-flip trio is untouched through U01–U07;
+    U08 ships the flip (Milestones + README + WhatsNew + STATUS +
+    ARCHITECTURE + WhatsNewTests). (Pinned by SITE·8.)
+  - **SITE9** — a11y: the heroes' eyebrow + lead are the first content
+    in the DOM; a hidden section is not in the DOM at all; the visible
+    sections' `aria-label` attributes are unchanged. (Pinned by
+    SITE·9.)
+  - **SITE10** — the `SiteContent` field set is the complete admin
+    surface for the current scope (the 13 fields — no hidden fields,
+    no reserved fields; a future SITE-2 lane adds fields, it does not
+    re-shape the existing ones). (Pinned by the register's "one thing"
+    section.)
+- **No code, no build.** The design doc Part 1 is present with all
+  sections (value chain, context, scope, invariants SITE·1–SITE·9,
+  FACES SITE1–SITE10, frozen base).
