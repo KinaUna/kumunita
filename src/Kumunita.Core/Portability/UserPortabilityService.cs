@@ -62,10 +62,13 @@ public interface IUserPortabilityService
     /// <param name="residentSubjectId">The resident's own <c>subjectId</c> (the audit row's actor).</param>
     /// <param name="plan">The U04 classification output (the <c>clean</c>/<c>duplicate</c>/<c>conflict</c> set).</param>
     /// <param name="resolutions">The resident's per-entity decisions (the §2.5 apply contract).</param>
+    /// <param name="archive">The uploaded <c>*.kumunita</c> archive stream — the apply phase reads the entity rows from the archive (the M11 <c>PortabilityApplyDocuments</c> pattern: the <c>docs/{Type}.json</c> array bytes are the single source of truth for the apply). Optional for source compatibility with the U01 seam; the U08 Web resolve-POST (which re-uploads the archive on the resolve step) passes it. <c>null</c> → a fail-closed rejection (the apply reads from the archive, not the target store).</param>
+    /// <param name="ct">Cancellation.</param>
     Task<UserPortabilityImportResult> ResolveAsync(
         string residentSubjectId,
         UserPortabilityImportPlan plan,
         IReadOnlyList<UserPortabilityEntityResolution> resolutions,
+        Stream? archive = null,
         CancellationToken ct = default);
 }
 
@@ -974,10 +977,353 @@ public sealed class UserPortabilityService(
     }
 
     /// <inheritdoc />
-    public Task<UserPortabilityImportResult> ResolveAsync(
+    /// <summary>
+    /// U06 (resolve + apply) — the <c>clean</c>/<c>duplicate</c>/<c>conflict</c>
+    /// per-entity apply (the design doc §2.5 contract, verbatim) + the
+    /// <c>AddElsewhere</c> re-point + the <c>Discard</c> no-write + the
+    /// no-auto-merge pin (C-M27·4) + the fail-closed contract (C-M27·4).
+    /// The apply reads the entity rows from the uploaded archive (the M11
+    /// <see cref="PortabilityApplyDocuments"/> pattern: the
+    /// <c>docs/{Type}.json</c> array bytes are the single source of truth
+    /// for the apply). One commit (a single <c>SaveChangesAsync</c> — the
+    /// C-M27·4 "one commit" pin). One <c>portability.import.resolve</c>
+    /// <c>AccessAudit</c> row (<c>Via = Owner</c>).
+    /// </summary>
+    public async Task<UserPortabilityImportResult> ResolveAsync(
         string residentSubjectId,
         UserPortabilityImportPlan plan,
         IReadOnlyList<UserPortabilityEntityResolution> resolutions,
+        Stream? archive = null,
         CancellationToken ct = default)
-        => throw new NotImplementedException("M27 U06 — the fail-closed per-entity resolve apply (C-M27·4).");
+    {
+        // ── Fail-closed: the apply reads from the archive ──────────────────
+        // The §2.5 apply contract: the apply reads the entity rows from the
+        // uploaded archive. A null archive is a fail-closed rejection (the
+        // apply cannot proceed without the archive's rows).
+        if (archive is null)
+            return new UserPortabilityImportResult(false, 0, 0, ["archive.missing"]);
+
+        // ── Read the archive (the M11 KumunitaArchive reader) ─────────────
+        var data = await KumunitaArchive.ReadAsync(archive, ct).ConfigureAwait(false);
+
+        // ── The name → Type map (the M11 NameToType + the 4 non-M11 types) ─
+        var nameToType = new Dictionary<string, Type>(
+            PortabilityExportDocuments.NameToType, StringComparer.Ordinal);
+        nameToType["InventoryItem"]  = typeof(Kumunita.Core.Inventory.InventoryItem);
+        nameToType["Document"]       = typeof(Kumunita.Core.Documents.Document);
+        nameToType["DocumentFolder"] = typeof(Kumunita.Core.Documents.DocumentFolder);
+        nameToType["Bookmark"]       = typeof(Kumunita.Core.Bookmarks.Bookmark);
+
+        // ── Pre-pass: the standing check (the §2.5 (3) fail-closed rejection) ─
+        // For every AddElsewhere resolution, the resident must have standing
+        // over PickedTargetId (a group they are a member of, a tag they own,
+        // a component they are a member of, a page they authored). A
+        // PickedTargetId the resident has no standing over is a fail-closed
+        // rejection (the entity is not applied; the failure is recorded in
+        // UserPortabilityImportResult.Failures). The transaction has not
+        // started yet, so no rows are written (the C-M27·4 fail-closed pin).
+        await using var readSession = documentStore.QuerySession();
+        foreach (var res in resolutions)
+        {
+            if (res.Resolution != UserPortabilityResolutionKind.AddElsewhere)
+                continue;
+            if (res.PickedTargetId is null)
+                continue;
+            if (!await HasStandingAsync(readSession, res.AbsentRefKind, res.PickedTargetId,
+                    residentSubjectId, ct).ConfigureAwait(false))
+            {
+                return new UserPortabilityImportResult(
+                    false, 0, 0,
+                    [$"standing.denied:{res.Kind}:{res.EntityId}:{res.AbsentRefKind}:{res.PickedTargetId}"]);
+            }
+        }
+
+        // ── Pre-pass: read the archive's rows for each entity type ────────
+        // The apply reads the entity rows from the archive (the M11
+        // PortabilityApplyDocuments pattern: the docs/{Type}.json array
+        // bytes are the single source of truth for the apply).
+        var archiveRowsByType = new Dictionary<string, List<object>>(StringComparer.Ordinal);
+        foreach (var type in plan.Entities.Select(e => e.Kind).Distinct(StringComparer.Ordinal))
+        {
+            if (!data.Docs.TryGetValue(type, out var json))
+                continue;
+            var docType = nameToType[type];
+            var listType = typeof(List<>).MakeGenericType(docType);
+            var rows = (System.Collections.IList)JsonSerializer.Deserialize(json, listType,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+            archiveRowsByType[type] = rows.Cast<object>().ToList();
+        }
+
+        // ── The resolution lookup (the per-entity decision) ────────────────
+        // String key (the "Kind|EntityId" convention — no tuple comparer
+        // needed, the M11 "string key" convention).
+        var resolutionByEntity = new Dictionary<string, UserPortabilityEntityResolution>(
+            StringComparer.Ordinal);
+        foreach (var r in resolutions)
+            resolutionByEntity[$"{r.Kind}|{r.EntityId}"] = r;
+
+        // ── Apply the docs in the M11 dependency order (one commit) ────────
+        // The locked order (the design doc §2.5 (1)): the clean entities are
+        // applied in the M11 §inventory import order (parents before children
+        // — the D7 order; the uniform loop, not per-type code). The
+        // AddElsewhere entities are applied with the absent reference
+        // re-pointed to PickedTargetId (the §2.5 (3) rule). The duplicate +
+        // discarded + unresolved-conflict entities are not applied (the
+        // C-M27·4 no-auto-merge pin).
+        var appliedCount = 0;
+        var discardedCount = 0;
+
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        try
+        {
+            foreach (var entry in PortabilityDocTypes.InOrder())
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!UserScopeInventory.IsInScope(entry.Type))
+                    continue;
+                if (!archiveRowsByType.TryGetValue(entry.Type, out var rows))
+                    continue;
+
+                foreach (var row in rows)
+                {
+                    if (row is null)
+                        continue;
+                    var entityId = ReadId(row) ?? "";
+                    var cls = plan.Entities
+                        .FirstOrDefault(e => e.Kind == entry.Type && e.EntityId == entityId);
+                    if (cls is null)
+                        continue; // not in the plan (shouldn't happen)
+
+                    // (1) clean → apply (the M11 import order, the §2.5 (1) rule).
+                    if (cls.Status == UserPortabilityEntityStatus.Clean)
+                    {
+                        session.Store(row);
+                        appliedCount++;
+                        continue;
+                    }
+
+                    // (2) duplicate → not applied (the §2.5 (2) rule).
+                    if (cls.Status == UserPortabilityEntityStatus.Duplicate)
+                    {
+                        discardedCount++;
+                        continue;
+                    }
+
+                    // (3) conflict → the resident's decision.
+                    if (!resolutionByEntity.TryGetValue($"{entry.Type}|{entityId}", out var res))
+                    {
+                        // C-M27·4 no-auto-merge pin: a conflict entity the
+                        // resident did not resolve is not applied (there is
+                        // no default, no fallback, no auto-re-point).
+                        continue;
+                    }
+
+                    if (res.Resolution == UserPortabilityResolutionKind.Discard)
+                    {
+                        // §2.5 (3) Discard rule: not applied (no write).
+                        discardedCount++;
+                        continue;
+                    }
+
+                    if (res.Resolution == UserPortabilityResolutionKind.AddElsewhere)
+                    {
+                        // §2.5 (3) AddElsewhere rule: apply with the absent
+                        // reference re-pointed to PickedTargetId (the target
+                        // the resident chose). The re-point rule: the absent
+                        // reference field is re-pointed to PickedTargetId.
+                        if (res.AbsentRefField is not null && res.PickedTargetId is not null)
+                        {
+                            var prop = row.GetType().GetProperty(
+                                res.AbsentRefField, BindingFlags.Public | BindingFlags.Instance);
+                            if (prop is not null && prop.CanWrite)
+                                prop.SetValue(row, res.PickedTargetId);
+                        }
+                        session.Store(row);
+                        appliedCount++;
+                        continue;
+                    }
+                }
+            }
+
+            // One commit (the C-M27·4 "one commit" pin) — every doc type's
+            // rows are staged in a single session; one SaveChangesAsync
+            // commits them atomically (a mid-apply failure is the
+            // documented rollback path, never a silently-accepted
+            // half-import).
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // C-M27·4 fail-closed pin: a mid-apply failure is the
+            // documented rollback path (the transaction rolls back, no
+            // rows are written).
+            return new UserPortabilityImportResult(
+                false, 0, 0, [$"apply.failed:{ex.Message}"]);
+        }
+
+        // ── Apply the media (the M11 PortabilityApplyMedia pattern) ────────
+        // For each media byte in the archive, IMediaStore.PutAsync
+        // (idempotent — the C-MED·4 dedup: identical bytes → same id →
+        // no second volume file). The resident's own write lane for media
+        // (not a new bulk importer).
+        foreach (var (_, bytes) in data.Media)
+        {
+            ct.ThrowIfCancellationRequested();
+            await mediaStore.PutAsync(bytes, null, "application/octet-stream",
+                residentSubjectId, ct).ConfigureAwait(false);
+        }
+
+        // ── The one AccessAudit row (Via = Owner, verb import.resolve) ─────
+        // The service emits it; the controller adds none (the ADR 0105
+        // messaging.toggle shape). After a clean apply (a pre-pass failure
+        // returned the closed failure set before this point, so no audit row
+        // for a refused resolve — the same "no audit for a refused action"
+        // posture as the export lane).
+        await using var auditSession = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        auditSession.Store(new Authorization.AccessAudit
+        {
+            Id = System.Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = residentSubjectId,
+            EffectivePrincipalId = residentSubjectId,
+            Action = "portability.import.resolve",
+            TargetKind = "portability",
+            TargetId = "portability",
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow,
+        });
+        await auditSession.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new UserPortabilityImportResult(true, appliedCount, discardedCount, []);
+    }
+
+    // ── U06 (resolve) helpers — the resident standing check ─────────────
+
+    /// <summary>
+    /// The resident standing check (the §2.5 (3) fail-closed rejection —
+    /// the resident must have standing over the <c>PickedTargetId</c>: a
+    /// group they are a member of (or own), a tag they created, a
+    /// component they are a member of, a page they authored). A business
+    /// standing read, not an <c>AccessAction</c> (C-M27·7 — the frozen
+    /// <c>IAuthorizationService</c> surface is unchanged).
+    /// </summary>
+    private async Task<bool> HasStandingAsync(
+        Marten.IQuerySession session,
+        string? targetKind, string targetId, string residentSubjectId,
+        CancellationToken ct)
+    {
+        if (targetKind is null)
+            return false;
+
+        return targetKind switch
+        {
+            "Group" => await StandingGroupAsync(session, targetId, residentSubjectId, ct).ConfigureAwait(false),
+            "Tag" => await StandingTagAsync(session, targetId, residentSubjectId, ct).ConfigureAwait(false),
+            "Component" => await StandingComponentAsync(session, targetId, residentSubjectId, ct).ConfigureAwait(false),
+            "Page" => await StandingPageAsync(session, targetId, residentSubjectId, ct).ConfigureAwait(false),
+            _ => false, // an unknown target kind is a fail-closed rejection
+        };
+    }
+
+    /// <summary>
+    /// Group standing: the resident is a member (a <c>GroupMembership</c>
+    /// row with <c>UserId</c> = the resident + <c>GroupId</c> = the target)
+    /// or the owner (the <c>Group.OwnerId</c> = the resident).
+    /// </summary>
+    private static async Task<bool> StandingGroupAsync(
+        Marten.IQuerySession session, string groupId, string residentSubjectId, CancellationToken ct)
+    {
+        // The GroupMembership row (the resident is a member).
+        var memberships = await QueryAllRowsAsync(session, typeof(Kumunita.Core.UserInfo.GroupMembership), ct);
+        foreach (var m in memberships)
+        {
+            var t = m.GetType();
+            var gid = (string?)t.GetProperty("GroupId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(m);
+            var uid = (string?)t.GetProperty("UserId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(m);
+            if (gid == groupId && uid == residentSubjectId)
+                return true;
+        }
+        // The Group.OwnerId (the resident is the owner).
+        var groups = await QueryAllRowsAsync(session, typeof(Kumunita.Core.UserInfo.Group), ct);
+        foreach (var g in groups)
+        {
+            var t = g.GetType();
+            var gid = (string?)t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(g);
+            var oid = (string?)t.GetProperty("OwnerId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(g);
+            if (gid == groupId && oid == residentSubjectId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Tag standing: the resident created the tag (the <c>Tag.CreatedBy</c>
+    /// = the resident — the ADR 0044 translate-standing owner).
+    /// </summary>
+    private static async Task<bool> StandingTagAsync(
+        Marten.IQuerySession session, string tagId, string residentSubjectId, CancellationToken ct)
+    {
+        var tags = await QueryAllRowsAsync(session, typeof(Kumunita.Core.Tags.Tag), ct);
+        foreach (var tag in tags)
+        {
+            var t = tag.GetType();
+            var tid = (string?)t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(tag);
+            var cb = (string?)t.GetProperty("CreatedBy", BindingFlags.Public | BindingFlags.Instance)?.GetValue(tag);
+            if (tid == tagId && cb == residentSubjectId)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Component standing: the resident is a member (a
+    /// <c>ComponentMembership</c> row with <c>UserId</c> = the resident +
+    /// <c>ComponentId</c> = the target) or the component is mandatory
+    /// (the ADR 0012 implicit membership).
+    /// </summary>
+    private static async Task<bool> StandingComponentAsync(
+        Marten.IQuerySession session, string componentId, string residentSubjectId, CancellationToken ct)
+    {
+        // The ComponentMembership row (the resident is a member).
+        var memberships = await QueryAllRowsAsync(session, typeof(Kumunita.Core.UserInfo.ComponentMembership), ct);
+        foreach (var m in memberships)
+        {
+            var t = m.GetType();
+            var cid = (string?)t.GetProperty("ComponentId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(m);
+            var uid = (string?)t.GetProperty("UserId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(m);
+            if (cid == componentId && uid == residentSubjectId)
+                return true;
+        }
+        // The Component.Mandatory flag (the ADR 0012 implicit membership).
+        var components = await QueryAllRowsAsync(session, typeof(Kumunita.Core.UserInfo.Component), ct);
+        foreach (var c in components)
+        {
+            var t = c.GetType();
+            var cid = (string?)t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(c);
+            var mandatory = (bool)(t.GetProperty("Mandatory", BindingFlags.Public | BindingFlags.Instance)?.GetValue(c) ?? false);
+            var enabled = (bool)(t.GetProperty("Enabled", BindingFlags.Public | BindingFlags.Instance)?.GetValue(c) ?? true);
+            if (cid == componentId && mandatory && enabled)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Page standing: the resident authored the page (the
+    /// <c>Page.AuthorId</c> = the resident).
+    /// </summary>
+    private static async Task<bool> StandingPageAsync(
+        Marten.IQuerySession session, string pageId, string residentSubjectId, CancellationToken ct)
+    {
+        var pages = await QueryAllRowsAsync(session, typeof(Kumunita.Core.Pages.Page), ct);
+        foreach (var p in pages)
+        {
+            var t = p.GetType();
+            var pid = (string?)t.GetProperty("Id", BindingFlags.Public | BindingFlags.Instance)?.GetValue(p);
+            var aid = (string?)t.GetProperty("AuthorId", BindingFlags.Public | BindingFlags.Instance)?.GetValue(p);
+            if (pid == pageId && aid == residentSubjectId)
+                return true;
+        }
+        return false;
+    }
 }
