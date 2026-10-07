@@ -796,3 +796,25 @@ A fail-closed rejection (a `PickedTargetId` the resident has no standing over, a
 **(e) The `Via = Owner` + no-GlobalAdmin note (C-M27·6):** the gate is the **verified-resident self-lane** — `[Authorize]` (any signed-in resident), the actor is the resident's **own** `subjectId` (`KumunitaPrincipal.SubjectId(User)`), and there is **no** GlobalAdmin gate (C-M27·7 / the M11 `AdminPortabilityController` contrast): this is the resident's own data. The one `portability.import.resolve` `AccessAudit` row (`Via = Owner`, `TargetKind "portability"`) is emitted by the **service** (U06 `ResolveAsync`); the controller adds none. The reads (the `GET` resolve-review) emit **no** row.
 
 **(f) Compile warnings:** **none new** in `UserPortabilityController.cs`, `ResolveReview.cshtml`, or `KnownTranslationKeys.cs`. The full-solution build is green (0 errors; the pre-existing baseline — `Kumunita.Core` 9 / `Kumunita.Web` 12 / both test projects — is unchanged, matching the U03–U07 baselines).
+
+## U09 — acceptance tests (3)
+
+**Date:** 2026-10-07
+**Status:** COMPLETE. All three Core acceptance tests authored in one new
+deliverable file; `m27-u09.md` moved to `done/`. Build green (0 errors, no new
+warnings in the U09 file). **No gate recorded** (U11), **no Web pins authored**
+(U10), **no design-doc edits** (U11).
+
+**(a) The test file:** `tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs`
+(the `UserPortabilityAcceptanceTests` class; `PostgresFixture` harness + the
+same boot shape as U03/U04/U06).
+
+**(b) The three names (verbatim):** `M27_Acceptance_RoundTrip_ResidentFootprintRestored`
+/ `M27_Acceptance_NoSecret_SelfScoped` / `M27_Acceptance_PerEntityConflict_Resolve`.
+
+**(c) Pass/red counts (for U11's gate):** all three **pass** — xunit.v3
+in-process runner (`dotnet exec Kumunita.Core.Tests.dll -class
+Kumunita.Core.Tests.UserPortabilityAcceptanceTests`) reports
+`Total: 3, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0` (the ~20 s
+`postgres:18` Testcontainers start was the long pole; leftover Docker
+containers cleaned up after).
