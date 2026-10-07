@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.40.0", "2026-10-07", new List<string>
+        {
+            "My data — you can now move your own content out of the platform and back in again: export the posts, replies, events, projects, documents, pages, messages and images you created into one portable archive (your account stays yours — no passwords or tokens ever travel with it), and when you bring that archive into a community where some of its references don't exist, you choose for each one whether to add it somewhere you belong or to discard it — nothing is merged on your behalf (ADR 0148).",
+        }),
         new("0.39.0", "2026-10-06", new List<string>
         {
             "Sorting — feeds, lists, and search results now offer a sort control (posts, events, projects, announcements, documents, inventory, tags, people find, and search): choose what to sort by and the direction, carried through the pager links like M7's filters; an unchosen sort behaves exactly as before, and sorting never changes what you can see (ADR 0145).",
