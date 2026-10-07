@@ -818,3 +818,31 @@ Kumunita.Core.Tests.UserPortabilityAcceptanceTests`) reports
 `Total: 3, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0` (the ~20 s
 `postgres:18` Testcontainers start was the long pole; leftover Docker
 containers cleaned up after).
+
+## U10 — Web pins
+
+**Date:** 2026-10-07
+**Status:** COMPLETE. The seven Web-surface pins authored in one new
+deliverable file; `m27-u10.md` moved to `done/`. Build green (0 errors, no
+new warnings in the U10 file). **No gate recorded** (U11), **no design-doc
+edits** (U11), **no new authorization surface** (the C-M27·7 pin).
+
+**Exit checklist (from the unit plan):**
+
+- [x] `dotnet build Kumunita.slnx -c Debug` green. — **PASS** (`Build succeeded. 0 Error(s)`; a `Select-String` over `UserPortabilityControllerTests` returns nothing — **no new warnings** in the U10 file).
+- [x] The Web pins discovered (the pass/red status recorded for U11's gate). — **PASS** (all 7 methods green — the 6 `[Fact]` + `Web_KwL_KeysResolve` as a 7-case `[Theory]` = **13 test cases**, `Total: 13, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`, `Time: 0.620s`).
+- [x] **No gate recorded** (U11). — **PASS** (no gate section appended to the design doc; U11 owns the "run the record" step).
+- [x] **No new authorization surface** (the C-M27·7 pin — the pins assert the existing `AccessVia.Owner`, not a new value). — **PASS** (the pins assert the *surface* contract — a plain `[Authorize]` resident self-lane (no `GlobalAdmin` role gate, no audience decision) + exactly-once resident-scoped delegation; the audit row (if any) is the **service's** (`Via = Owner`, `TargetKind "portability"`, verb `portability.export` / `portability.import.resolve`), the controller adds none — C-M27·6; no `AccessAction` / `AccessVia` / `IAuthorizationService.Decide()` branch / `Audience` added).
+- [x] U00–U09 shipped code unchanged (the pins are test-only). — **PASS** (only the one new test file was authored; no source / view / registry / design doc touched).
+
+**(a) The test file (new):** `tests/Kumunita.Web.Tests/UserPortabilityControllerTests.cs` (the `UserPortabilityControllerTests` class; the M11 `AdminPortabilityControllerTests` Web-pin shape to mirror — the gate + the one-audit-row-per-write + the reads-emit-none; NSubstitute seam, **no** `PostgresFixture`).
+
+**(b) The 7 pin names (verbatim, the unit-plan list):** `Web_Export_ResidentGate` / `Web_Export_OneAuditRow_ViaOwner` / `Web_Import_OneAuditRow_ViaOwner` / `Web_ImportResolve_OneAuditRow_ViaOwner` / `Web_Reads_EmitNoAuditRow` / `Web_FailClosed_Render` / `Web_KwL_KeysResolve`.
+
+**(c) Pass/red counts (for U11's gate):** all **pass** — xunit.v3 in-process runner (`dotnet exec Kumunita.Web.Tests.dll -class Kumunita.Web.Tests.UserPortabilityControllerTests`) reports `Total: 13, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0, Time: 0.620s` (the `Web_KwL_KeysResolve` pin is a 7-case `[Theory]` — the 7 `myportability.*` keys × 4 languages — the other 6 pins are `[Fact]`; the design-doc §2.7 gate row is `UserPortabilityControllerTests (Web pins) | pass`). **No Postgres** (fast, < 1 s).
+
+**(d) Compile warnings:** **none new** in `UserPortabilityControllerTests.cs` (the pre-existing baseline — `Kumunita.Core` / `Kumunita.Web` / both test projects — is unchanged, matching the U03–U09 baselines). **Note:** the `& 'C:\Program Files\dotnet\dotnet.exe' <…>` call-operator form (single-quoted full path) is the working invocation on this machine — `& "…"` / bare-path forms both hit a `Unexpected token 'build'` parse error in the agent's terminal wrapper (the same shell-mangling trap the AGENTS.md §"Running PowerShell commands safely" warns about).
+
+**(e) The one-audit-row / reads-emit-none posture (C-M27·6), faithful to the shipped source:** the audit row is the **service's**, not the controller's (the M11 `AdminPortabilityControllerTests` contrast). The shipped `UserPortabilityService` emits the audit rows — `portability.export` in `ExportAsync` + `portability.import.resolve` in `ResolveAsync`, both `Via = Owner` / `TargetKind "portability"` — and the `ClassifyAsync` (import classify) read is **read-only** (C-M27·5, "no writes" → no audit row). The Web-surface pins therefore assert the surface's contract — **exactly-once**, resident-scoped delegation (the actor is the resident's own `Kumunita.Sub` `subjectId`, never another resident's) + the plain `[Authorize]` resident self-lane + the fail-closed render — NOT the Core audit-row content (that is the U09 Core acceptance test's pin, recorded in U11's gate). The `Web_Import_OneAuditRow_ViaOwner` pin asserts exactly-once, resident-scoped `ClassifyAsync` delegation (the import-lane action); the audit row it *may* turn into is the service's — the same "the audit row lives in the service, the controller adds none" posture the M11 test carries.
+
+**(f) The fail-closed render (C-M27·4):** `Web_FailClosed_Render` — a `plan.Ok = false` (the `UserPortabilityImportPlan` closed-failure set) renders `TempData["error"]` containing both the `myportability.status` kw-l key + the failure list, and does not write (the `ClassifyAsync` read ran but no `ResolveAsync` apply write — the instance unchanged). The `translationProvider` is `null` (the test floor) → the controller's `T()` returns the raw key `myportability.status` — the pin asserts the key + failure list render (the `_FlashToast` partial / the view renders it in the resident's language when the seam is present).
