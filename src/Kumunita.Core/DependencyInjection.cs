@@ -86,6 +86,19 @@ public static class ServiceCollectionExtensions
         // harnesses omit it). No factory needed.
         services.AddTransient<IIdentityService, IdentityService>();
 
+        // SITE (ADR 0150, plan U03): the landing-surface content seam — the
+        // SiteContent singleton's read + audited write lanes (the ADR 0050
+        // IsSignupOpen / SetSignupOpen single-write-lane shape, the
+        // LocaleSettings-parallel bounded context Kumunita.Core.SiteContent).
+        // The same "AddTransient with the store injected" shape as
+        // IUsageAnalyticsService / IPageService above: composes the
+        // host-registered Marten IDocumentStore (reads open a QuerySession,
+        // the audited write opens a write session — invariant C3). Core stays
+        // HTTP-free (ADR 0006-D): the Web gate (U07) is the only place the
+        // GlobalAdmin authorization is produced.
+        services.AddTransient<SiteContent.ISiteContentService>(sp => new SiteContent.SiteContentService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the

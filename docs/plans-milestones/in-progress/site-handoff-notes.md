@@ -319,3 +319,95 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   `WhatsNew.cs`).
 - **No code, no build.** The design doc Part 2 is present with all
   sub-sections (§2.1–§2.7); ADR 0150 is present (Status: Accepted).
+
+## U03 — Core: SiteContent doc + service + doc types + DI
+
+- **Date:** 2026-10-07
+- **5 deliverable files (4 new + 1 modified):**
+  1. `src/Kumunita.Core/SiteContent/SiteContent.cs` (new) — the `SiteContent`
+     singleton doc (`Id = "singleton"` sentinel, `SingletonId` const; the
+     `LocaleSettings` shape, ADR 0005 B).
+  2. `src/Kumunita.Core/SiteContent/ISiteContentService.cs` (new) — the read +
+     write seam interface.
+  3. `src/Kumunita.Core/SiteContent/SiteContentService.cs` (new) — the
+     implementation (the ADR 0050 single-write-lane shape).
+  4. `src/Kumunita.Core/SiteContent/SiteContentDocTypes.cs` (new) — the
+     `SiteContentDocTypes.Configure(StoreOptions)` surface (ADR 0004 §B.1).
+  5. `src/Kumunita.Core/DependencyInjection.cs` (modified) — the DI
+     registration (`AddKumunitaCore`, right after `IIdentityService`).
+- **13 `SiteContent` fields (by name, pinned — the ADR 0150 D1 ceiling):**
+  `HomeHeroEyebrow` (string, "A private home for one neighbourhood") ·
+  `HomeHeroLead` (string, "One quiet place for everything your street does —
+  the feed, the groups, and the notes that deserve better than a group chat.
+  Private, plain-language, and yours.") · `HomeShowAboutButton` (bool, true) ·
+  `HomeShowFeatures` (bool, true) · `HomeShowRoadmap` (bool, true) ·
+  `AboutHeroEyebrow` (string, "Private by default") · `AboutHeroLead` (string,
+  "One home for everything your neighborhood does — the feed, the groups, and
+  the notes that deserve better than a group chat. Private, plain-language, and
+  yours.") · `AboutShowFeatures` (bool, true) · `AboutShowScope` (bool, true) ·
+  `AboutShowPhilosophy` (bool, true) · `AboutShowProject` (bool, true) ·
+  `AboutShowWhatsNew` (bool, true) · `AboutShowContactCta` (bool, true).
+  The 4 text-field defaults are the **exact** `en` source text from
+  `KnownTranslationKeys.cs` (the `home.intro_eyebrow` / `home.intro_lead` /
+  `about.eyebrow` / `about.lead` keys), byte-identical (SITE·3); the 9
+  toggle-field defaults are `true`.
+- **`ISiteContentService` method signatures (pinned):**
+  - `Task<SiteContent> GetAsync(CancellationToken ct = default);` — the ADR
+    0050 `IsSignupOpenAsync` best-effort read (missing row / read failure →
+    the in-code fallback `new SiteContent()`; never throws, never null,
+    never audited — SITE·1).
+  - `Task SaveAsync(SiteContent content, string actorBy, CancellationToken ct
+    = default);` — the ADR 0050 `SetSignupOpenAsync` single audited write-lane
+    (one write session, the doc + exactly one `AccessAudit` row; strong
+    consistency; upserts the singleton — a missing row is a no-op, SITE·6).
+- **`SiteContentService` write-lane (the ADR 0050 shape, SITE·2):** composes
+  the host-registered `Marten.IDocumentStore`. `SaveAsync` opens
+  `store.OpenSession(new Marten.Services.SessionOptions())`, loads
+  `SiteContent` by `SiteContent.SingletonId` (a `null` row is a **no-op**
+  return — the lane never load-or-creates), applies all 13 fields from
+  `content`, stores the doc + one `AccessAudit` row
+  (`Via = AccessVia.Admin`, `Action = "site.save"`, `TargetKind = "site"`,
+  `TargetId = SiteContent.SingletonId`, `Outcome = AccessOutcome.Allow`,
+  `Id = Guid.NewGuid().ToString("N")`, `EffectivePrincipalId = actorBy` — the
+  real `AccessAudit` doc shape, the `signup.set-open` / `timezone.set-default`
+  precedent), then `SaveChangesAsync` (invariant C3). `GetAsync` opens a
+  `QuerySession`, loads by sentinel, returns `row ?? new SiteContent()`.
+- **`SiteContentDocTypes.Configure` call:** `opts.Schema.For<SiteContent.SiteContent>();`
+  (the type is fully qualified as `SiteContent.SiteContent` because the unqualified
+  name resolves to the *namespace* `Kumunita.Core.SiteContent` from the parent
+  `Kumunita.Core` namespace — the type and namespace share the name `SiteContent`).
+  Idempotent; ADR 0004 §B.1 additive, no EF migration.
+- **DI registration line (in `DependencyInjection.cs`):**
+  `services.AddTransient<SiteContent.ISiteContentService>(sp => new
+  SiteContent.SiteContentService(sp.GetRequiredService<Marten.IDocumentStore>()));`
+  (the `ISiteContentService` is fully qualified `SiteContent.ISiteContentService`
+  for the same namespace-collision reason as above.)
+- **Build:** `dotnet build` green (the workspace `build` task) — `Kumunita.Core`
+  + `Kumunita.Core.Tests` + `Kumunita.Web` + `Kumunita.Web.Tests` all succeeded
+  (warnings only, no errors).
+- **Drift note (unit-series rule 7 — entry reads reveal the register is out of
+  date):** the register / design doc name the `SiteContentDocTypes.Configure(opts)`
+  host call as part of "the schema bootstrap" in `DependencyInjection.cs`, and the
+  U03 plan deliverable #5 says the `Configure` call goes in `DependencyInjection.cs`.
+  In this repo **all** `*DocTypes.Configure` calls (`M1DocTypes` / `M3DocTypes` /
+  `MediaDocTypes` / `PageDocTypes` / `TagDocTypes` / `M4DocTypes` / …) live in the
+  `AddMarten(opts => { … })` lambda in `src/Kumunita.Web/Program.cs` (lines 107-130);
+  `DependencyInjection.cs` (Core, ADR 0006-D "Core carries no HTTP types") registers
+  services only and has **no** `StoreOptions` / `AddMarten` surface, so the `Configure`
+  call **cannot compile there**. U03 therefore ships the `SiteContentDocTypes.cs`
+  surface (deliverable #4) + the DI service registration (deliverable #5), and the
+  one-line host registration `SiteContentDocTypes.Configure(opts);` (immediately
+  after the `PageDocTypes.Configure(opts);` call in `Program.cs`) is **deferred to
+  the first unit permitted to touch `Kumunita.Web`** (U05, which wires `HomeController`
+  + the Home view and is the first Web-touching unit). Until that line lands, a
+  pristine boot's `ApplyAllConfiguredChangesToDatabaseAsync()` will not create the
+  `mt_doc_sitecontent` table — the `U03` Core service is correct and compiles, and
+  the U04 seeder / U08 tests must boot with `SiteContentDocTypes.Configure(opts)` in
+  their `AddMarten` lambda (the same idiom as every other `*DocTypes` test harness).
+- **No Web change, no view change, no admin surface** (U03 scope held — the
+  `Program.cs` `Configure` call is the sole deferred Web line, recorded above).
+- **Constraints held:** no re-shape of the 13-field set (ADR 0150 D1); no
+  `kw-l` registry entry removed (ADR 0150 D3); ADR 0149 `Profile.HideHomeIntro`
+  untouched (ADR 0150 D5); `LocaleSettings` doc untouched (ADR 0150 D6 — a new
+  doc, not a new field); no new `AccessAction` / `AccessVia` (the existing
+  `AccessVia.Admin` value is reused).
