@@ -20,6 +20,18 @@
                     case "blocked":
                         <kw-l key="account.login.error.blocked">Your account has been temporarily suspended. Contact an administrator.</kw-l>
                         break;
+                    case "time-limit":
+                        @* M28 (ADR 0151, D5) — TimeLimitMiddleware (the
+                           BlockedAccountMiddleware analog): the child is outside
+                           their guardian-set allowed window and has been signed
+                           out. The code is DISTINCT from "blocked" — a different
+                           message ("outside your allowed hours" vs "suspended").
+                           The kw-l key `account.time_limit.login_message` is the
+                           M28 §2.7 #14 key (U05 authors it into all four
+                           KnownTranslationKeys dicts); until then the <kw-l>
+                           element's en inner text is the provider floor. *@
+                        <kw-l key="account.time_limit.login_message">You are outside your allowed hours. Please check back later.</kw-l>
+                        break;
                     case "account-removed":
                         <kw-l key="account.login.error.removed">Your account has been removed. Contact an administrator.</kw-l>
                         break;

@@ -643,6 +643,16 @@ app.UseAuthentication();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
 
+// M28 — guardian time-limit enforcement (ADR 0151, D5): a child whose
+// guardian-set schedule window says "not now" (evaluated in the child's ADR
+// 0019 effective zone) is signed out and lands on /Account/Login?error=time-limit
+// before any handler runs. Registered AFTER BlockedAccountMiddleware (a
+// fully-blocked account hits the `blocked` landing first) and before
+// PrivilegedStampMiddleware / authorization (so the gate sees a current claim
+// set). C-M28·1 (sign-out, not a 403) + C-M28·5 (zero new authorization
+// surface — the verdict is the pure GuardianTimeLimitEvaluator.IsAllowedNow).
+app.UseMiddleware<TimeLimitMiddleware>();
+
 // M4 — privilege-revocation enforcement: re-reads the DB role set on every
 // request for principals carrying elevated roles, and signs them out if the
 // role set changed while the session was live. Registered after block

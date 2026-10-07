@@ -133,3 +133,65 @@
   pattern. (No seam/signature change; C-M28·5 = zero *new* surface, held.)
 - **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Warning
   (s), 0 Error(s)**. No compile warnings.
+
+## U04 — TimeLimitMiddleware + Program.cs + ?error=time-limit
+
+- **Middleware:** `src/Kumunita.Web/Security/TimeLimitMiddleware.cs` — the exact
+  `BlockedAccountMiddleware` shape (constructor takes only the
+  `RequestDelegate`; everything else resolved per-request from
+  `RequestServices`, the captive-dependency note). 5-step pipeline: (1) anonymous
+  → pass; (2) subject claim (`ClaimTypes.Subject` = `Kumunita.Sub`); (3)
+  `IUserInfoService.GetActiveTimeLimitAsync(subject)` → `null`/`Enabled==false`
+  → pass (the floor, C-M28·3); (4) the **child's** ADR 0019 effective zone via
+  the scoped `EffectiveTimezoneResolver.GetAsync()` (`Profile.TimeZone` →
+  platform default → `UTC` floor); (5) `GuardianTimeLimitEvaluator.IsAllowedNow(
+  schedule, now, zone)` → `true` → pass; `false` → `SignInManager.SignOutAsync()`
+  + `Redirect("/Account/Login?error=time-limit")`.
+- **Registration:** `Program.cs:654` — `app.UseMiddleware<TimeLimitMiddleware>();`
+  placed **after** `app.UseMiddleware<BlockedAccountMiddleware>();` (line 644)
+  and **before** `PrivilegedStampMiddleware` (line 651) — a fully-blocked
+  account hits the `blocked` landing first.
+- **Landing:** `?error=time-limit` → kw-l key **`account.time_limit.login_message`**
+  (design doc §2.7 #14; U05 authors it into all four `KnownTranslationKeys`
+  dicts). **Deviation (1, recorded):** the register's Deliverable #3 names
+  `AccountController.cs`, but the code→message `@switch` (D6 — "the mapping is
+  a table in the view") actually lives in `Views/Account/Login.cshtml` (where the
+  `?error=blocked` case is). U04 added the `case "time-limit":` there, mirroring
+  the `blocked` case verbatim (the controller's Login GET passes `Error` through
+  verbatim, unchanged). No controller edit needed.
+- **Zone note (C-M28·6):** the verdict runs in the **child's** effective zone
+  (the resolver reads THIS request's principal — never the guardian's zone);
+  `UTC` only when the child has no override + the platform has no default (the
+  resolver's floor). The test harness forces `Profile.TimeZone = "UTC"` so the
+  wall clock is `UTC` regardless of the machine's local time.
+- **C-M28·5 held:** the middleware calls only `GetActiveTimeLimitAsync` (the U03
+  read seam) + `IsAllowedNow` (the U02 pure fn) + `SignInManager.SignOutAsync`;
+  **no** `IAuthorizationService` call, **no** `Decide()` branch, **no**
+  `AccessAction`/`AccessVia`. **C-M28·1 held:** the effect is a **sign-out**
+  (not a 403/404). **M20 lane untouched** (no `NotificationQuietSchedule` /
+  `QuietScheduleEvaluator` / `settings.quiet.*` reference).
+- **3 tests + status (all PASS):** `F6_Restricted_SignsOutAndRedirects_TimeLimit`
+  (Blocked empty-window = always-restricted → signed out +
+  `/Account/Login?error=time-limit`), `F6_Allowed_PassesThrough` (Allowed
+  empty-window = always-allowed → pass), `F6_NoSchedule_PassesThrough` (null
+  floor, C-M28·3) — runner: `Total: 3, Errors: 0, Failed: 0`.
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Warning(s),
+  0 Error(s)**. No compile warnings (the new M28 files add none).
+- **⚠ Red test (U05 must resolve):** the full `Kumunita.Web.Tests` run is
+  `Total: 943, Errors: 0, Failed: 1` — the single failure is
+  **`KwLRegistryConsistencyTests`** ("Every kw-l key used in a Razor view is
+  registered in KnownTranslationKeys"). It scans every `kw-l key="…"` in the
+  `.cshtml` views and fails on `Account\Login.cshtml:
+  account.time_limit.login_message` — the M28 key U04 referenced in the view
+  (the `?error=blocked` precedent) but that is **not yet registered**. This is a
+  direct consequence of the register's "U04 references the key, U05 authors it"
+  split colliding with the 2026-09-17 PG-lane pin (a resident must never see a
+  raw key). **U05 resolves it** the moment it authors
+  `account.time_limit.login_message` into `KnownTranslationKeys.EnValues` (the
+  test checks `EnValues.ContainsKey`; once the key is in all four dicts per the
+  §2.7 closed set, this test + the 4-dict parity pin + the U05 closed-set pin
+  all go green together). The 3 F6 tests + all 942 other tests pass.
+  **Do NOT leave this red past U05.** (The register's Deliverable #3 names
+  `AccountController.cs`, but the code→message switch — where the `blocked` case
+  lives — is in `Views/Account/Login.cshtml`; a kw-l reference can only live in
+  a view, so it is inevitably view-scanned by this test.)
