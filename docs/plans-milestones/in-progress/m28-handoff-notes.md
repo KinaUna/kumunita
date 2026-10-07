@@ -44,3 +44,25 @@
   `Milestones.cs` / `MilestonesTests` reframe / `WhatsNew.cs` 0.43.0 row; U00
   touches none of them).
 - **No code, no build, no test** (a docs unit, per the unit plan).
+
+## U01 — doc + enum + M1DocTypes
+
+- **Doc fields (5, defaults):** `ChildId` (string, identity — the `GuardianLink.ChildId` analog),
+  `Enabled` (bool, default `false` = the floor, C-M28·3), `Mode`
+  (`TimeLimitMode`, default `Blocked` — the lean default), `Hours` (int[], 0–23,
+  empty = all), `DaysOfWeek` (int[], 0=Sun…6=Sat, empty = all), `Updated?`
+  (DateTimeOffset?, display-only). Mirrors `NotificationQuietSchedule`
+  verbatim (with `ChildId` in place of `RecipientId`).
+- **Enum values (2):** `TimeLimitMode.Blocked = 0` (restricted DURING the
+  window, the lean default), `TimeLimitMode.Allowed = 1` (restricted EXCEPT the
+  window, the allow-list). Closed two-value enum (the ADR 0120 D4 idiom).
+- **M1DocTypes line:** new registration at `M1DocTypes.cs:78` —
+  `opts.Schema.For<UserInfo.GuardianTimeLimitSchedule>().Identity(s => s.ChildId);`
+  added immediately after the `GuardianLink` line (`:69`); part of the GU
+  surface (no new `*DocTypes`, no EF migration, ADR 0004 §B.1).
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Warning(s),
+  0 Error(s)**. No compile warnings. (One intentional deviation from the
+  design doc §2.2 verbatim: the class doc-comment's forward reference to
+  `GuardianTimeLimitEvaluator.IsAllowedNow` (a U02 type, not yet authored) is
+  plain `<c>` text rather than `<see cref>` to keep the build warning-free;
+  the type/shape is identical. No other deviation.)
