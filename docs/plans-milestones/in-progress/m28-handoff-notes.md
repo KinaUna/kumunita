@@ -286,3 +286,28 @@
   the GlobalAdmin reaches the same `SetChildTimeLimitAsync` write seam — the
   standing is resolved by the seam, not a separate admin page). **M20 lane
   untouched.** Handing off to U07.
+
+## U07 — gate tests authored + suites run
+
+- **3 gate tests authored (all PASS):**
+  `Gate1_ClosedLoop_BlockedWindow_ContainingNow_RestrictsChild`
+  (F1 + C-M28·4 — Blocked window containing "now" → `IsAllowedNow` false →
+  `GetActiveTimeLimitAsync` sees the schedule),
+  `Gate2_Handoff_AllowedWindow_Then_Clear_Is_AlwaysAllowed`
+  (F2-in-window + F3 floor + C-M28·4 — Allowed window containing "now" →
+  allowed; clear → null → always allowed),
+  `Gate3_PartVsWhole_AllTwentySeamTestsPassTogether`
+  (C-M28·5 structural pin — frozen 4-method `IAuthorizationService` surface
+  unchanged; the part-vs-whole is BOTH suites green, not one test reflecting
+  over all 20 classes — a Core.Tests assembly cannot reference Web.Tests
+  types). Exact §2.8 names used (a different name is a drift pause, not a
+  silent rename). File: `tests/Kumunita.Core.Tests/M28AcceptanceGateTests.cs`.
+- **20 seam tests + 3 gate = 23 tests, ALL PASS (0 red):**
+  Core.Tests (U02 7 pure + U03 7 standing + U07 3 gate): `Total: 17,
+  Errors: 0, Failed: 0, Skipped: 0`. Web.Tests (U04 3 middleware + U06 3
+  surface + U05 4 parity): `Total: 10, Errors: 0, Failed: 0, Skipped: 0`.
+  20 seam (14 Core + 6 Web) + 3 gate = **23/23 green**.
+- **Drift:** none. No seam test red. No `## U# — Drift pause` sections in
+  the handoff note. All invariants C-M28·1–7 held.
+- **Gate NOT recorded into the design doc yet** (U08 owns the `### Run
+  result` §2.8 append). Handing off to U08.
