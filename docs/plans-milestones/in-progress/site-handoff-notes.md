@@ -411,3 +411,59 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   untouched (ADR 0150 D5); `LocaleSettings` doc untouched (ADR 0150 D6 — a new
   doc, not a new field); no new `AccessAction` / `AccessVia` (the existing
   `AccessVia.Admin` value is reused).
+
+## U04 — Core: FirstBootSeeder default + seeder pins
+
+- **Date:** 2026-10-07
+- **2 deliverable files (1 modified + 1 new):**
+  1. `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (modified) — added the
+     `SeedSiteContentAsync` method + its call in `SeedAsync`.
+  2. `tests/Kumunita.Core.Tests/SiteContentSeederTests.cs` (new) — the
+     `SiteContentSeederTests` class (the 3 pinned seeder pins).
+- **`SeedSiteContentAsync` method signature (pinned):**
+  `public static async Task SeedSiteContentAsync(IDocumentStore mt, ILogger
+  logger, CancellationToken ct)` — create-if-missing, idempotent,
+  never-overwrites (the `SeedLanguageCatalogAsync` / `SeedDefaultPagesAsync`
+  shape): a fresh boot stores exactly one `SiteContent.SiteContent` row
+  (`Id = SiteContent.SiteContent.SingletonId` = `"singleton"`) with the 4 text
+  fields read **from the registry** (`KnownTranslationKeys.EnValues["home.
+  intro_eyebrow"]` / `["home.intro_lead"]` / `["about.eyebrow"]` / `["about.
+  lead"]` — SITE·3, byte-identical, not retyped) + the 9 toggles all `true`;
+  an existing row is left untouched (never-overwrites — an admin's later edit
+  is honored on a warm re-run). Called from `SeedAsync` as step **4b**,
+  immediately after `SeedLanguageCatalogAsync` (step 4) and before
+  `SeedTranslationResourcesAsync` (step 5). No `AccessAudit` row (the seeder
+  is not a principal). **Public** so the Core test reaches it without
+  `InternalsVisibleTo` (the `SeedDefaultPagesAsync` precedent).
+- **3 seeder pins (by class + method, the §2.5 closed set — no other names):**
+  - `SiteContentSeederTests.FreshBoot_HasExactlyOneSiteContentRow` — exactly
+    one row, `Id = "singleton"`.
+  - `SiteContentSeederTests.FreshBoot_DefaultsMatchShippedKwLText` — the 4
+    text fields equal the `KnownTranslationKeys.EnValues` `en` strings
+    (`home.intro_eyebrow` / `home.intro_lead` / `about.eyebrow` /
+    `about.lead`) **and** all 9 toggles are `true`.
+  - `SiteContentSeederTests.SecondBoot_IsIdempotent_NoDuplicateRow_NoFieldChange`
+    — a second boot adds no duplicate row and leaves an admin's later edit
+    (simulated: `HomeHeroEyebrow = "Welcome to Maplewood"`,
+    `AboutShowPhilosophy = false`) untouched (never-overwrites).
+- **"defaults match the shipped `kw-l` text" assertion:** the 4 text-field
+  seeds are read from `KnownTranslationKeys.EnValues` (the `en` source text)
+  — the test asserts `row.HomeHeroEyebrow ==
+  KnownTranslationKeys.EnValues["home.intro_eyebrow"]` (etc.) — the same
+  single source both the seeder and the test read, so the match is exact
+  (SITE·3). All 9 toggle fields are asserted `true`.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (`BUILD_EXIT=0`,
+  `Kumunita.Core` + `Kumunita.Core.Tests` + `Kumunita.Web` +
+  `Kumunita.Web.Tests` all succeeded — warnings only, none from the new files).
+- **Core.Tests:** the 3 new `SiteContentSeederTests` pins **pass**; the
+  regression classes `LS_U04_SeederTests` + `PageServiceTests` **pass**
+  (combined run: `Total: 117, Errors: 0, Failed: 0, Skipped: 0`, `TEST_EXIT=0`).
+- **U03 drift note honored:** the test harness calls
+  `SiteContentDocTypes.Configure(opts)` inside its own `DocumentStore.For`
+  (the `AddMarten`) lambda — the same idiom as every other `*DocTypes` test
+  harness. `Program.cs` was **not** touched (the host `Configure` line stays
+  deferred to U05). The `SiteContent` type is referenced as
+  `SiteContent.SiteContent` (the U03 type/namespace collision idiom).
+- **Constraints held:** no re-shape of the 13-field set (ADR 0150 D1); no
+  `kw-l` registry entry removed (ADR 0150 D3); `LocaleSettings` doc untouched
+  (ADR 0150 D6); the test names are the §2.5 closed set (unit-series rule 3).
