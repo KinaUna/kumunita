@@ -846,3 +846,29 @@ edits** (U11), **no new authorization surface** (the C-M27·7 pin).
 **(e) The one-audit-row / reads-emit-none posture (C-M27·6), faithful to the shipped source:** the audit row is the **service's**, not the controller's (the M11 `AdminPortabilityControllerTests` contrast). The shipped `UserPortabilityService` emits the audit rows — `portability.export` in `ExportAsync` + `portability.import.resolve` in `ResolveAsync`, both `Via = Owner` / `TargetKind "portability"` — and the `ClassifyAsync` (import classify) read is **read-only** (C-M27·5, "no writes" → no audit row). The Web-surface pins therefore assert the surface's contract — **exactly-once**, resident-scoped delegation (the actor is the resident's own `Kumunita.Sub` `subjectId`, never another resident's) + the plain `[Authorize]` resident self-lane + the fail-closed render — NOT the Core audit-row content (that is the U09 Core acceptance test's pin, recorded in U11's gate). The `Web_Import_OneAuditRow_ViaOwner` pin asserts exactly-once, resident-scoped `ClassifyAsync` delegation (the import-lane action); the audit row it *may* turn into is the service's — the same "the audit row lives in the service, the controller adds none" posture the M11 test carries.
 
 **(f) The fail-closed render (C-M27·4):** `Web_FailClosed_Render` — a `plan.Ok = false` (the `UserPortabilityImportPlan` closed-failure set) renders `TempData["error"]` containing both the `myportability.status` kw-l key + the failure list, and does not write (the `ClassifyAsync` read ran but no `ResolveAsync` apply write — the instance unchanged). The `translationProvider` is `null` (the test floor) → the controller's `T()` returns the raw key `myportability.status` — the pin asserts the key + failure list render (the `_FlashToast` partial / the view renders it in the resident's language when the seam is present).
+
+## U11 — gate recorded
+
+**Date:** 2026-10-07
+**Status:** COMPLETE. U11 *ran* the two suites (per the AGENTS.md test-runner
+quirk: `dotnet build Kumunita.slnx -c Debug` green, then xunit.v3 in-process
+`dotnet exec <assembly.dll> -class <FQCN>`) and *recorded* the gate as
+`### Run result (M27 acceptance gate — 2026-10-07)` in the design doc §2.7.
+**No code, no build beyond the test run, no new tests** (U09/U10 own those).
+`m27-u11.md` moved to `done/`.
+
+**The gate (all pass — the M3/M4 author-not-run precedent did NOT fire; the
+Core runtime was present):**
+- **3 Core acceptance tests — all pass** (`Total: 3, Errors: 0, Failed: 0,
+  Skipped: 0, Not Run: 0`, Time: 15.374s): `M27_Acceptance_RoundTrip_ResidentFootprintRestored`
+  / `M27_Acceptance_NoSecret_SelfScoped` / `M27_Acceptance_PerEntityConflict_Resolve`.
+  Note: the *actual* authored names are the `M27_Acceptance_*` set (the §2.6
+  template prose above shows the illustrative `UserPortability*` names — the
+  gate records the real names from
+  `tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs`).
+- **7 Web pins — pass** (`UserPortabilityControllerTests`,
+  `Total: 13, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`, Time: 0.513s —
+  the 6 `[Fact]` + the 7-case `Web_KwL_KeysResolve` `[Theory]`).
+- **Drift pauses:** the two `## U00 — Drift pause` sections (#1 the ADR-index
+  backfill, #2 the four-docs-outside-the-frozen-set + the `Tag.CreatedBy`
+  field) — **both resolved** (Option A); **no drift still open**.

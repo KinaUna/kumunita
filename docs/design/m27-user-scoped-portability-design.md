@@ -645,6 +645,43 @@ One line per any `## U<m> — Drift pause` section in the handoff note
 (each resolved or still open).
 ```
 
+### Run result (M27 acceptance gate — 2026-10-07)
+
+> **Recorded by U11** (the "run the record" step, split from U09/U10 so the
+> test-authoring units stay atomic). **Runtime present** — both suites ran
+> green; no author-not-run gap (the M3/M4 precedent did not fire). Build:
+> `dotnet build Kumunita.slnx -c Debug` green (0 errors). Runner: xunit.v3
+> in-process (`dotnet exec <assembly.dll> -class <FQCN>`), per the AGENTS.md
+> test-runner quirk (VS Test Explorer / `dotnet test` discovery broken here).
+>
+> **Name note (source-of-truth):** the three Core acceptance tests authored
+> by U09 (and run green here) carry the `M27_Acceptance_*` names recorded in
+> the U09/U11 handoff entries, not the `UserPortability*` illustrative names
+> the §2.6 template prose above shows. The gate below records the **actual
+> run** — the exact names in
+> `tests/Kumunita.Core.Tests/UserPortabilityAcceptanceTests.cs`.
+
+| Test | Status |
+|---|---|
+| `M27_Acceptance_RoundTrip_ResidentFootprintRestored` (D8a, the "handoff") | **pass** (the xunit.v3 in-process run reports `Total: 3, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`) |
+| `M27_Acceptance_NoSecret_SelfScoped` (D8b, the "closed-loop") | **pass** (same `Total: 3, … Failed: 0` run) |
+| `M27_Acceptance_PerEntityConflict_Resolve` (D8c, the "part-vs-whole") | **pass** (same `Total: 3, … Failed: 0` run) |
+| `UserPortabilityControllerTests` (Web pins, 7) | **pass** (the 6 `[Fact]` pins + the 7-case `Web_KwL_KeysResolve` `[Theory]` = `Total: 13, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`) |
+
+**Drift pauses (one line each, the `## U<m> — Drift pause` sections in the
+handoff note — all **resolved**, none still open):**
+
+- **U00 — Drift pause #1** (the ADR index ran to `0145`, not `0147`; the
+  `0146`/`0147` ADR files were on disk but unindexed) — **resolved** (user
+  chose Option A: backfill the two index rows, then add `0148` after `0147`).
+- **U00 — Drift pause #2** (four in-scope docs — `InventoryItem` /
+  `Document` / `DocumentFolder` / `Bookmark` — are outside the M11 frozen
+  44-doc set, and `Tag`'s ownership field is `CreatedBy`) — **resolved**
+  (user chose Option A: keep all four in scope, sourced from each doc's own
+  definition + a note that they sit outside the frozen set; the `Tag` field
+  is `CreatedBy`. Both refinements are recorded in §2.8 drift-guard entries
+  1 + 2.)
+
 ### 2.8 Drift-guard (frozen once written)
 
 **The frozen pins** (the U01–U12 units copy verbatim from this doc):
