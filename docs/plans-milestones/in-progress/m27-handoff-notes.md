@@ -638,3 +638,70 @@ The resolve-review UI renders this as: *"This post references group `{Value}`, w
 - `UserPortabilityService.ReferencedDocTypes()` / `GetReferenceFields(type)` / `ResolveAbsentReferences(...)` / `RefResolves(...)` / `ReadFieldValue(...)` / `ReadId(...)` — the pure, POCO-over-the-target helpers (the M11 `PortabilityValidate` pattern restructured into the `UserPortabilityAbsentReference` shape — the `conflict` detector + the reference-availability report).
 
 **U05 entry point:** the classify path is complete (the resident-scoped `*.kumunita` archive → the `clean` / `duplicate` / `conflict` classification + the per-entity reference-availability report + the `UserPortabilityImportPlan` assembly, **no writes**). U05 owns the **`UserPortabilityEntityResolution`** POCO closed shape (the `ResolutionKind` set + the `AddElsewhere` re-point fields + the `Discard` no-write pin + the `UserPortabilityImportResult` closed-failure shape) — the `ResolveAsync` **input contract** (the `ClassifyAsync` output is the `UserPortabilityImportPlan` U05's resolve model keys on; the `conflict` reason shape — the `UserPortabilityAbsentReference` set — is the `AddElsewhere` re-point source). The `MatchBusinessKey` / `ScopeFilter` compositions + the `PortabilityExportDocuments` / `MediaExport` / `PrincipalsExport` / `ManifestFinalize` / `KumunitaArchive` / `PortabilityApplyDocuments` / `PortabilityApplyMedia` partials are the frozen M11 machinery U05–U06 reuse.
+
+## U05 — resolve model
+
+**Date:** 2026-10-07
+**Status:** COMPLETE. Both deliverables authored (`UserPortabilityResolveModelTests.cs` authored; the `UserPortabilityEntityResolution` / `UserPortabilityResolutionKind` / `UserPortabilityImportResult` closed shapes already shipped verbatim by U01 and confirmed to match the design doc §2.1 + the `AddElsewhere` re-point already keys off U04's `UserPortabilityAbsentReference` `{Kind, Field, Value}` shape verbatim — no re-invention); `m27-u05.md` moved to `done/`. Build green. The 4 resolve-model pins discovered + passing (U11 records).
+
+**Exit checklist (from the unit plan):**
+
+- [x] `dotnet build Kumunita.slnx -c Debug` green. — **PASS** (`Build succeeded with 78 warning(s) in 24.6s`, exit 0; **no new warnings** in `UserPortabilityService.cs` or `UserPortabilityResolveModelTests.cs`).
+- [x] The resolve-model pins discovered (pass/red status recorded for U11's gate). — **PASS** (all 4 green, `Total: 4, Errors: 0, Failed: 0, Skipped: 0`, via the xunit.v3 in-process runner `-class Kumunita.Core.Tests.UserPortabilityResolveModelTests`).
+- [x] **No new authorization surface** (C-M27·7 — the zero-new-authorization-surface pin). — **PASS** (no `AccessAction` / `AccessVia` / `Decide()` branch added; the resolve-model pins are pure reflection-over-the-POCO/enum shape asserts, no `IAuthorizationService` branch, no `AccessAudit` row).
+- [x] **No apply logic** (U06 owns `ResolveAsync`) — the `ResolveAsync` body is still `NotImplementedException`. — **PASS** (unchanged; line 982 still `throw new NotImplementedException("M27 U06 — the fail-closed per-entity resolve apply (C-M27·4).")`).
+- [x] **No auto-merge** (C-M27·4 — a `conflict` entity is only ever *reported* by U04 and *chosen* by the resident; there is no default, no fallback, no auto-re-point). — **PASS** (the `ResolveModel_ClosedResolutionKindSet` pin asserts exactly `{AddElsewhere, Discard}` — two members, no implicit/default member — and `ResolveModel_Discard_NoWritePin` pins the `Discard` no-write shape).
+- [x] No new document, no new `*DocTypes` surface, no migration (D7). — **PASS** (no new doc type, no `*DocTypes` surface, no migration; the resolve-model shapes are POCO/enum types in the `Kumunita.Core.Portability` context, not doc types).
+- [x] `ExportAsync` and `ClassifyAsync` stay as shipped. — **PASS** (both unchanged; the U03 export body + the U04 classify body are untouched).
+
+**(a) The `ResolutionKind` set (verbatim from the design doc §2.1, as shipped in the code by U01 — the locked closed set, 2 members):**
+```csharp
+public enum UserPortabilityResolutionKind
+{
+    AddElsewhere,
+    Discard
+}
+```
+No third/default member (the D4 no-auto-merge pin — a `conflict` entity the resident does not resolve is not applied, not auto-re-pointed to a computed default).
+
+**(b) The `AddElsewhere` re-point shape (verbatim from the design doc §2.1, as shipped in the code by U01 — the `conflict` reason U07's resolve-review renders):**
+```csharp
+public sealed record UserPortabilityEntityResolution(
+    string Kind,              // the entity kind (must match a classification entry)
+    string EntityId,          // the entity id (must match a classification entry)
+    UserPortabilityResolutionKind Resolution,
+    string? PickedTargetId,   // for AddElsewhere: the target the resident chose
+    string? AbsentRefKind,    // for AddElsewhere: the absent-reference kind being re-pointed
+    string? AbsentRefField);  // for AddElsewhere: the absent-reference field being re-pointed
+```
+The `AddElsewhere` re-point keys off U04's `UserPortabilityAbsentReference` `{Kind, Field, Value}` shape verbatim — `AbsentRefKind` carries the absent-ref's `Kind`, `AbsentRefField` carries the absent-ref's `Field`; the `Value` (the archive id that is absent) is replaced by the resident's picked target. `PickedTargetId` carries the resident's chosen target (a group they are a member of, a tag they own, a component they are a member of — the §2.5 standing check U06 enforces).
+
+**(c) The `Discard` no-write pin (the shape — the apply is U06's pin):** the `UserPortabilityResolutionKind.Discard` member is a first-class closed decision (explicit, not a fallback); a `Discard` resolution carries **no** re-point data — the three `AddElsewhere`-only fields (`PickedTargetId` / `AbsentRefKind` / `AbsentRefField`) are null. The no-write choice is a closed, explicit decision (the D4 no-auto-merge posture — it is *chosen*, not defaulted), and the shape that U06's `ResolveAsync` will apply (no write, counted in `UserPortabilityImportResult.DiscardedCount`).
+
+**(d) The `UserPortabilityImportResult` closed-failure set (verbatim from the design doc §2.1, as shipped in the code by U01 — the M11 `PortabilityImportResult(bool Ok, IReadOnlyList<string> Failures)` shape emulated, extended with the apply counts):**
+```csharp
+public sealed record UserPortabilityImportResult(
+    bool Ok,
+    int AppliedCount,
+    int DiscardedCount,
+    IReadOnlyList<string> Failures);
+```
+A fail-closed rejection (a `PickedTargetId` the resident has no standing over, a write error, a mid-apply failure — the D4 / §2.5 contract) is `Ok = false` + the closed `Failures` set, zero applied (the transaction rolls back, nothing is written).
+
+**(e) The `IAuthorizationService` surface count is unchanged** (C-M27·7 — the zero-new-authorization-surface pin; U05 added no `AccessAction`, no `AccessVia`, no `Decide()` branch — the resolve-model pins are pure reflection-over-the-POCO/enum shape asserts, no `IAuthorizationService` branch, no `AccessAudit` row).
+
+**(f) The 4 resolve-model pins + pass/red status (all PASS, U11 records the gate):**
+- `ResolveModel_ClosedResolutionKindSet` — **PASS** (the `UserPortabilityResolutionKind` closed set is exactly `{AddElsewhere, Discard}` — 2 members, no default/fallback; the D4 no-auto-merge pin).
+- `ResolveModel_AddElsewhere_RepointShape` — **PASS** (the `UserPortabilityEntityResolution` closed POCO shape — 6 positional fields, the locked types — + the `AddElsewhere` re-point fields key off U04's `UserPortabilityAbsentReference` `{Kind, Field, Value}` shape verbatim + the picked target id).
+- `ResolveModel_Discard_NoWritePin` — **PASS** (the `Discard` no-write pin — the shape: a `Discard` resolution carries no re-point data, the three `AddElsewhere`-only fields are null).
+- `ResolveModel_ImportResult_ClosedFailureSet` — **PASS** (the `UserPortabilityImportResult` closed-failure shape — 4 positional fields, the locked types; a fail-closed rejection is `Ok = false` + the closed `Failures` set, zero applied).
+
+**(g) Compile warnings:** no new warnings introduced by the U05 files (`UserPortabilityResolveModelTests.cs`). The 78 warnings are all pre-existing (xUnit1051 nullable-CancellationToken in other test files, CS8604 / CS8600 / CS8602 / CS8714 / xUnit2017 / CS0219 in other files). **No new warnings** in `UserPortabilityService.cs` (the resolve-model shapes were already shipped by U01 and are consumed verbatim by the U05 pins).
+
+**Shipped shapes (the code the U06 unit calls):**
+- `UserPortabilityEntityResolution` — the resident's per-entity decision (the closed POCO shape — `Kind` / `EntityId` / `Resolution` / `PickedTargetId` / `AbsentRefKind` / `AbsentRefField`; the `AddElsewhere` re-point keys off U04's `UserPortabilityAbsentReference` `{Kind, Field, Value}` shape verbatim).
+- `UserPortabilityResolutionKind` — the closed decision set (`AddElsewhere` / `Discard` — 2 members, no default/fallback).
+- `UserPortabilityImportResult` — the resolve output (the closed-failure shape — `Ok` / `AppliedCount` / `DiscardedCount` / `Failures`; the D4 no-auto-merge + the apply-failure set).
+- The `ResolveAsync` body **stays** `NotImplementedException` until U06 (the `UserPortabilityResolveModelTests` are shape pins — they assert the closed record/enum shapes, not behavior; the apply behavior is U06's).
+
+**U06 entry point:** the resolve-model shapes are locked (the `UserPortabilityEntityResolution` POCO + the `UserPortabilityResolutionKind` closed set + the `UserPortabilityImportResult` closed-failure shape). U06 owns the `ResolveAsync` body — the fail-closed per-entity resolve apply (the §2.5 contract: clean → apply in M11 import order; duplicate → not applied; conflict + `AddElsewhere` → apply with the absent ref re-pointed to `PickedTargetId` (the resident must have standing over it, else fail-closed); conflict + `Discard` → no write; conflict + **unresolved** → not applied (no-auto-merge pin). Mid-apply failure ⇒ transaction rolls back, **zero** new rows. One `portability.import.resolve` `AccessAudit` row (`Via = Owner`). The `MatchBusinessKey` / `ScopeFilter` compositions + the `PortabilityExportDocuments` / `MediaExport` / `PrincipalsExport` / `ManifestFinalize` / `KumunitaArchive` / `PortabilityApplyDocuments` / `PortabilityApplyMedia` partials are the frozen M11 machinery U06 reuses for the apply.
