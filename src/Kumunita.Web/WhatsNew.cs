@@ -19,6 +19,12 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.41.0", "2026-10-07", new List<string>
+        {
+            "Home, your way — if you've seen the intro enough, hide it: a new Home page setting turns off the two " +
+                "intro sections (what Kumunita is and what it does) so the home page opens straight on what's new; " +
+                "switch it off any time to see them again, and it's saved on your account only (ADR 0149).",
+        }),
         new("0.40.0", "2026-10-07", new List<string>
         {
             "My data — you can now move your own content out of the platform and back in again: export the posts, replies, events, projects, documents, pages, messages and images you created into one portable archive (your account stays yours — no passwords or tokens ever travel with it), and when you bring that archive into a community where some of its references don't exist, you choose for each one whether to add it somewhere you belong or to discard it — nothing is merged on your behalf (ADR 0148).",

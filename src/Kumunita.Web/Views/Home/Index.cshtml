@@ -25,6 +25,13 @@
     string ariaWhatsNew = await Translation.GetAsync("whatsnew.heading", effLang);
 }
 
+@* ADR 0149 D1 — the signed-in resident's hide-home-intro preference
+   (Model.HideIntro): when set, the two top intro sections ("Intro: what
+   Kumunita is and does" + "What Kumunita does") are omitted so a resident
+   lands straight on the "What's new" feed below. The default (and every
+   anonymous visitor) shows both, exactly as before. *@
+@if (!Model.HideIntro)
+{
 <!-- ══════════ 1. Intro: what Kumunita is and does ══════════ -->
 <section class="kmb-hero">
     <div class="container">
@@ -97,6 +104,7 @@
         </div>
     </div>
 </section>
+}
 
 <!-- ══════════ 3. What's new (signed-in visitors only) ══════════ -->
 @if (Model.Feed is { } feed)

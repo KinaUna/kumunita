@@ -88,7 +88,29 @@ public class HomeController : Controller
     public async Task<IActionResult> Index()
     {
         var feed = await BuildFeedAsync().ConfigureAwait(false);
-        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed));
+
+        // ADR 0149 D1 — the signed-in resident's hide-home-intro preference
+        // (Profile.HideHomeIntro): when set, the two top intro sections are
+        // omitted so a resident lands straight on the "What's new" feed. The
+        // read is best-effort and anonymous-safe: an anonymous visitor has no
+        // subject (floor = show the intro), a missing seam or a failed read
+        // degrades to the floor, and the page always renders. This is a
+        // *display* read only — it never gates anything.
+        bool hideIntro = false;
+        var subjectId = KumunitaPrincipal.SubjectId(User);
+        if (subjectId is not null && UserInfo is not null)
+        {
+            try
+            {
+                hideIntro = (await UserInfo.GetProfileAsync(subjectId).ConfigureAwait(false))?.HideHomeIntro ?? false;
+            }
+            catch
+            {
+                hideIntro = false; // floor: show the intro (never an error page)
+            }
+        }
+
+        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed, hideIntro));
     }
 
     // NOTE (ML-UI U7): GET /about moved to StaticPagesController.About — one

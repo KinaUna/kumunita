@@ -145,3 +145,4 @@ Decision / Consequences. New decisions take the next number.
 | 0146 | Child accounts: the child owns the password (the guardian never sets it; the child sets it at the confirmation link) | Accepted |
 | 0147 | Tags on to-dos and Kanban boards | Accepted |
 | 0148 | User-scoped portability (resident self-export + per-entity conflict-resolution import) | Accepted |
+| 0149 | Home intro sections: a per-resident "hide and show me the feed" preference | Accepted |

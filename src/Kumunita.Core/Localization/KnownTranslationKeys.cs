@@ -656,6 +656,19 @@ public static class KnownTranslationKeys
             ["settings.pagesize_flash_set"]    = "Items per page set to \"{0}\" — it takes effect on the next request.",
             ["settings.pagesize_flash_reset"]  = "Items per page reset — the platform default will be used.",
 
+            // ── settings — home page (the resident's hide-home-intro display
+            // preference, ADR 0149 D1) ─────────────────────────────────────
+            ["settings.home_title"]        = "Home page",
+            ["settings.home_lede"]         =
+                "The home page opens with two intro sections (what Kumunita is and what it does) " +
+                "before the feed. Turn this on to land straight on what's new. " +
+                "Your choice is saved on your account and never affects other residents.",
+            ["settings.home_label"]        = "Hide the intro sections and show me the feed right away",
+            ["settings.home_note"]         = "When off, the home page shows its intro sections as usual.",
+            ["settings.home_save"]         = "Save",
+            ["settings.home_flash_hide"]   = "Home page updated — the intro sections are now hidden and the feed shows first.",
+            ["settings.home_flash_show"]   = "Home page updated — the intro sections will show again.",
+
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
             ["admin.timezone_title"]    = "Platform default time zone",
@@ -3051,6 +3064,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_flash_set"]    = "Einträge pro Seite auf \"{0}\" gesetzt — es wirkt ab der nächsten Anfrage.",
             ["settings.pagesize_flash_reset"]  = "Einträge pro Seite zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
 
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Startseite",
+            ["settings.home_lede"]         =
+                "Die Startseite öffnet sich mit zwei Intro-Abschnitten (was Kumunita ist und was es kann) " +
+                "vor dem Feed. Aktiviere diese Option, um direkt zum Feed zu kommen. " +
+                "Deine Auswahl wird auf deinem Konto gespeichert und betrifft nie andere Bewohner.",
+            ["settings.home_label"]        = "Intro-Abschnitte ausblenden und mir sofort den Feed zeigen",
+            ["settings.home_note"]         = "Wenn aus, zeigt die Startseite ihre Intro-Abschnitte wie üblich.",
+            ["settings.home_save"]         = "Speichern",
+            ["settings.home_flash_hide"]   = "Startseite aktualisiert — die Intro-Abschnitte werden ausgeblendet, der Feed kommt zuerst.",
+            ["settings.home_flash_show"]   = "Startseite aktualisiert — die Intro-Abschnitte werden wieder gezeigt.",
+
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
             ["admin.timezone_lede"]     =
@@ -5319,6 +5344,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Enregistrer",
             ["settings.pagesize_flash_set"]    = "Éléments par page réglés sur \"{0}\" — cela prend effet à la prochaine requête.",
             ["settings.pagesize_flash_reset"]  = "Éléments par page réinitialisés — le défaut de la plateforme sera utilisé.",
+
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Page d'accueil",
+            ["settings.home_lede"]         =
+                "La page d'accueil s'ouvre avec deux sections d'introduction (ce qu'est Kumunita et ce qu'elle fait) " +
+                "avant le fil. Activez cette option pour arriver directement au fil. " +
+                "Votre choix est enregistré sur votre compte et n'affecte jamais les autres résidents.",
+            ["settings.home_label"]        = "Masquer les sections d'introduction et m'afficher directement le fil",
+            ["settings.home_note"]         = "Désactivé, la page d'accueil affiche ses sections d'introduction comme d'habitude.",
+            ["settings.home_save"]         = "Enregistrer",
+            ["settings.home_flash_hide"]   = "Page d'accueil mise à jour — les sections d'introduction sont masquées, le fil apparaît en premier.",
+            ["settings.home_flash_show"]   = "Page d'accueil mise à jour — les sections d'introduction réapparaîtront.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -7594,6 +7631,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Gem",
             ["settings.pagesize_flash_set"]    = "Elementer pr. side indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
             ["settings.pagesize_flash_reset"]  = "Elementer pr. side nulstillet — platformstandarden bruges.",
+
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Forside",
+            ["settings.home_lede"]         =
+                "Forsiden åbner med to introduktionssektioner (hvad Kumunita er og hvad den kan) " +
+                "før strømmen. Slå til for at lande direkte i strømmen. " +
+                "Dit valg gemmes på din konto og berører aldrig andre beboere.",
+            ["settings.home_label"]        = "Skjul introduktionssektionerne og vis strømmen med det samme",
+            ["settings.home_note"]         = "Er slukket, viser forsiden sine introduktionssektioner som sædvanlig.",
+            ["settings.home_save"]         = "Gem",
+            ["settings.home_flash_hide"]   = "Forside opdateret — introduktionssektionerne skjules, strømmen vises først.",
+            ["settings.home_flash_show"]   = "Forside opdateret — introduktionssektionerne vises igen.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",

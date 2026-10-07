@@ -10,7 +10,8 @@ namespace Kumunita.Web.Models;
 public sealed record HomeViewModel(
     string CommunityName,
     string? SupportEmail,
-    HomeFeed? Feed = null);
+    HomeFeed? Feed = null,
+    bool HideIntro = false);
 
 /// <summary>
 /// The /home "what's new" feed (signed-in visitors only): the latest of
