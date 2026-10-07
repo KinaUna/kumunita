@@ -67,6 +67,7 @@ public static class Milestones
         new("M25", "Upload limits — admin-set per-file size limit and per-user total content quota; residents see their own usage and how much of their quota remains", StatusDone),
         new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order", StatusDone),
         new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusDone),
+        new("SITE", "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide (ADR 0150)", StatusDone),
         new("M28", "Guardian time limits — for a child's account, a parent/guardian sets when the child may use the platform: allow or block certain hours of each day and days of the week", StatusNext),
     };
 

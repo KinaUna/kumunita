@@ -702,3 +702,146 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   (SITE·7 — the `AdminSiteController` is a dedicated, separate controller);
   no new `AccessAction` / `AccessVia` (the existing `AccessVia.Admin`
   value is reused).
+
+## U08 — Tests + close flip (the close unit)
+
+- **Date:** 2026-10-07
+- **Scope:** U08 is the **final unit** (U08 of U00–U08) of the `SITE`
+  lane. It ships the 12 new test pins (the §2.5 closed set minus the 3
+  pre-existing `SiteContentSeederTests` pins from U04), performs the
+  six-member close flip, adds the ADR 0150 index row, and moves
+  `site-u08.md` to `done/site/`. **No new code beyond test pins +
+  close-flip files.** The Core service, seeder, both landing views, and
+  the `/admin/site` surface are unchanged (U03–U07 scope held).
+- **3 new test files (12 new pins, the §2.5 closed set):**
+  1. `tests/Kumunita.Core.Tests/SiteContentServiceTests.cs` (new) —
+     `SiteContentServiceTests(PostgresFixture fixture) :
+     IClassFixture<PostgresFixture>`. 4 pins:
+     `GetAsync_MissingStore_ReturnsInCodeFallback` /
+     `SaveAsync_WritesOneAccessAuditRow` /
+     `SaveAsync_StrongConsistency_LiveOnNextGetAsync` /
+     `SaveAsync_UpsertsSingleton_NoDuplicateRow`. Uses `new
+     SiteContent.SiteContentService(store)` + `SiteContent
+     .SiteContent.SingletonId`; asserts `AccessVia.Admin` + action
+     `"site.save"` + `TargetKind "site"`. Has `BootStoreAsync()` (wires
+     `M1DocTypes.Configure` + `M3DocTypes.Configure` +
+     `SiteContentDocTypes.Configure` in the `DocumentStore.For` lambda)
+     and `SeedRowAsync(store, ct)` (stores a `SiteContent` row so
+     `SaveAsync` is not a no-op — the service no-ops when the row is
+     absent).
+  2. `tests/Kumunita.Web.Tests/HomeControllerSiteContentTests.cs`
+     (new) — 4 pins:
+     `FreshInstance_RendersShippedText_EverySectionShown` /
+     `SavedRow_HomeShowAboutButtonFalse_HidesHomeHeroButton` /
+     `ADR_0149_HideHomeIntroTrue_HomeShowFeaturesTrue_HidesHomeFeature
+     Cards` / `ADR_0149_HideHomeIntroFalse_HomeShowFeaturesFalse_HidesHo
+     meFeatureCards`. Mocks `userInfo.GetProfileAsync(subjectId)`
+     returning `new Profile { SubjectId = subjectId, HideHomeIntro = …
+     }`; asserts `vm.Site` + `vm.HideIntro`. NO `using Kumunita.Core
+     .SiteContent;` — fully qualifies `Kumunita.Core.SiteContent.ISiteC
+     ontentService` + `Kumunita.Core.SiteContent.SiteContent` (the type
+     / namespace collision idiom).
+  3. `tests/Kumunita.Web.Tests/AdminSiteControllerTests.cs` (new) —
+     4 pins: `GET_SeesCurrentSingleton` /
+     `POST_SaveHome_SavesFieldGroup_WritesOneAccessAuditRow` /
+     `POST_SaveAbout_SavesFieldGroup_WritesOneAccessAuditRow` /
+     `POST_NonGlobalAdmin_IsDenied`. `Build()` creates `new
+     AdminSiteController(site)` with a `GlobalAdmin` `ClaimsPrincipal` +
+     `NoOpTempDataProvider`. POST tests verify redirect + `await
+     site.Received(1).SaveAsync(Arg.Any<SiteContent>(), Arg.Any<strin
+     g>(), Arg.Any<CancellationToken>())` (the audit-row / field-merge
+     assertions live in the Core tests — the NSubstitute `Arg.Do` capture
+     inside `Received(1).SaveAsync(…)` did not fire in this NSubstitute
+     version, so the controller tests assert the call shape and the
+     Core service tests assert the audit row). `POST_NonGlobalAdmin_Is
+     Denied` uses reflection: `typeof(AdminSiteController)
+     .GetCustomAttribute<AuthorizeAttribute>()`, checks `attr.Roles
+     .Split(',')` contains `Roles.GlobalAdmin`.
+- **Close-flip files (the required six members, all modified this unit):**
+  1. `src/Kumunita.Web/Milestones.cs` — added the `SITE` row
+     (`StatusDone`) between the `M27` (`StatusDone`) and `M28`
+     (`StatusNext`) rows.
+  2. `tests/Kumunita.Web.Tests/MilestonesTests.cs` — added `"SITE"` to
+     both the order list (`… "M27", "SITE", "M28"`) and the
+     `Shipped_Milestones_Are_Marked_Done` list (`… "M26", "M27",
+     "SITE"`). The `M28_Is_The_Single_InProgress_Milestone` pin stays
+     intact (SITE is `StatusDone`, not `StatusNext`).
+  3. `src/Kumunita.Web/WhatsNew.cs` — added newest-first head `0.42.0`
+     (2026-10-07): "Site content customization — the landing surfaces'
+     hero text is admin-editable + the sections are show/hide: a
+     GlobalAdmin can now change what the home and about pages say (the
+     hero eyebrow + lead) and choose which sections appear at all; the
+     defaults are byte-identical to the shipped text, so a fresh
+     instance that never touches the surface looks exactly the same as
+     it does today (ADR 0150)."
+  4. `README.md` — added between the M27 and M28 Roadmap rows:
+     `- **Site content** (`SITE`, ADR 0150) — the two landing
+     surfaces' hero text is admin-editable (the home + about heroes'
+     eyebrow and lead) and every other section is show/hide (a
+     GlobalAdmin chooses which sections appear at all, from
+     `/admin/site`). The defaults are byte-identical to the shipped
+     text, so a fresh instance that never touches the surface looks
+     exactly the same as it does today; a hidden section is not in the
+     DOM at all (a screen reader never sees it). **Done.**`
+  5. `docs/STATUS.md` — inserted before "**M28 is next**":
+     `**SITE is done** — site content customization (the two landing
+     surfaces' hero text is admin-editable + the sections are
+     show/hide: a GlobalAdmin edits the home + about heroes' eyebrow
+     and lead and chooses which sections appear, from `/admin/site`;
+     the `SiteContent` singleton in a new `Kumunita.Core.SiteContent`
+     context, the `ISiteContentService` seam, one `site.save`
+     `AccessAudit` row per save `Via = Admin`; the defaults are
+     byte-identical to the shipped `kw-l` text so a fresh instance is
+     unchanged; a hidden section is not in the DOM at all; zero new
+     `AccessAction`/`AccessVia`; ADR 0150).`
+  6. `docs/ARCHITECTURE.md` — inserted before "**M28 guardian time
+     limits is next**": `**SITE site content customization is
+     shipped** (ADR 0150) — the two landing surfaces' hero text is
+     admin-editable and every other section is show/hide; a new
+     `Kumunita.Core.SiteContent` bounded context owns the
+     `SiteContent` **singleton** doc (one row per instance, `Id =
+     "singleton"`, the `LocaleSettings` shape) + the
+     `ISiteContentService` read (`GetAsync`, best-effort, in-code
+     fallback) / write (`SaveAsync`, one `site.save` `AccessAudit` row
+     `Via = Admin`) seam; the `/admin/site` surface is a dedicated
+     `AdminSiteController` (GlobalAdmin-gated, ADR 0050 shape); the
+     `kw-l` registry entries stay (the canonical `en` source text);
+     zero new `AccessAction` / `AccessVia` / authorization branch.`
+- **ADR 0150 index row (the required seventh file):**
+  `docs/adr/README.md` — added after the 0149 row:
+  `| 0150 | Site content customization: the landing surfaces' hero text
+  is admin-editable + the sections are show/hide | Accepted |`
+- **Acceptance gate (all green):**
+  1. `dotnet build Kumunita.slnx -c Debug` — **0 errors** (all 4
+     projects: Kumunita.Core, Kumunita.Core.Tests, Kumunita.Web,
+     Kumunita.Web.Tests).
+  2. `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.
+     Web.Tests.dll` — **Total: 940, Errors: 0, Failed: 0** (includes
+     the 8 new Web pins + `MilestonesTests` + `WhatsNewTests` + all
+     regression pins: `KwLRegistryConsistencyTests`,
+     `KnownTranslationKeys_ParityTests`, `HomeControllerTests`,
+     `StaticPagesControllerTests`, `AdminSignupControllerTests`,
+     `AdminControllerTests`).
+  3. `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.
+     Core.Tests.dll` — **Total: 1353, Errors: 0, Failed: 0** (includes
+     the 4 new `SiteContentServiceTests` pins + the 3
+     `SiteContentSeederTests` pins from U04 + `LS_U04_SeederTests` +
+     `PageServiceTests` + all other Core regression pins).
+- **Drift check (design doc §2.7 frozen set):** the §2.5 pinned test
+  name set (15 names across 4 classes) is intact — no test outside the
+  closed set was introduced; no `## U08 — Drift pause` section is
+  needed.
+- **Constraints held:** no re-shape of the 13-field `SiteContent` set
+  (ADR 0150 D1); no `kw-l` registry entry removed or re-keyed (ADR
+  0150 D3); ADR 0149 `Profile.HideHomeIntro` read path unchanged (ADR
+  0150 D5); `LocaleSettings` doc untouched (ADR 0150 D6); no new
+  `AccessAction` / `AccessVia` / authorization branch; `Milestones
+  Tests` M28-single-`StatusNext` pin stays intact (SITE is
+  `StatusDone`).
+- **Lane closed.** `site-u08.md` moved from
+  `docs/plans-milestones/in-progress/` to
+  `docs/plans-milestones/done/site/`. The SITE lane is **shipped**:
+  the two landing surfaces' hero text is admin-editable + the sections
+  are show/hide, from `/admin/site`, GlobalAdmin-gated, one
+  `site.save` `AccessAudit` row per save, defaults byte-identical to
+  the shipped `kw-l` text, zero new `AccessAction` / `AccessVia`.

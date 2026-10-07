@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.42.0", "2026-10-07", new List<string>
+        {
+            "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide: a GlobalAdmin can now change what the home and about pages say (the hero eyebrow + lead) and choose which sections appear at all; the defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0150).",
+        }),
         new("0.41.0", "2026-10-07", new List<string>
         {
             "Home, your way — if you've seen the intro enough, hide it: a new Home page setting turns off the two " +
