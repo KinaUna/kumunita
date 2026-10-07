@@ -147,3 +147,4 @@ Decision / Consequences. New decisions take the next number.
 | 0148 | User-scoped portability (resident self-export + per-entity conflict-resolution import) | Accepted |
 | 0149 | Home intro sections: a per-resident "hide and show me the feed" preference | Accepted |
 | 0150 | Site content customization: the landing surfaces' hero text is admin-editable + the sections are show/hide | Accepted |
+| 0151 | Guardian time limits: a per-child allow/block schedule that gates the child's platform access (guardian-set; mirrors ADR 0121's evaluator; the GU-lane inverse of the M20 quiet lane) | Accepted |
