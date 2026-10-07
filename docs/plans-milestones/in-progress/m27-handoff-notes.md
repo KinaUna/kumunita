@@ -872,3 +872,13 @@ Core runtime was present):**
 - **Drift pauses:** the two `## U00 — Drift pause` sections (#1 the ADR-index
   backfill, #2 the four-docs-outside-the-frozen-set + the `Tag.CreatedBy`
   field) — **both resolved** (Option A); **no drift still open**.
+
+## U12 — kw-l parity + C-M27·7 close
+
+**Date:** 2026-10-07
+**Status:** COMPLETE. A close/audit unit (not an authoring unit) — it verified the M27 `myportability.*` kw-l closed set is honest + complete and the C-M27·7 authorization surface is unchanged. **No defect found → nothing changed** (`KnownTranslationKeys.cs` + both Portability views untouched, per the hard rule that a close unit that finds nothing changes nothing). `m27-u12.md` moved to `done/`.
+
+- **kw-l key count (per language, all four dictionaries, `KnownTranslationKeys.cs`):** the 7-key `myportability.*` set is present in **all four** of `EnValues` / `DeValues` / `FrValues` / `DaValues` — **7 × 4** (`myportability.index.title` / `.export` / `.import` / `.import.resolve` / `.resolve.add_elsewhere` / `.resolve.discard` / `.status`), deliberately distinct from M11's admin `portability.*`. No missing en/de/fr/da entry.
+- **C-M27·7 (`IAuthorizationService` surface) — confirmed unchanged:** the interface still exposes exactly **8 methods** (the 4 ADR 0006-D frozen `CanAsync` / `CanSeeAsync` + the 4 ADR 0013 group-lane `CanSeeGroupAsync` / `CanSeeGroupFeedAsync`, each with its `IDocumentSession` overload). M27's `UserPortabilityController` uses only the `[Authorize]` verified-resident self-lane + `KumunitaPrincipal.SubjectId(User)` — no `AccessAction` / `AccessVia` / `Audience` / `Decide()` branch added. Surface count **unchanged**.
+- **Razor traps (the AGENTS.md doctrine scan over `Index.cshtml` + `ResolveReview.cshtml`):** none found. No un-awaited `async Task<string>` helper interpolated into a string, no `@(...)` producing a broken quoted-attribute value (the `value="@(conflict.AbsentKind ?? "")"` / `value="@(conflict.AbsentField ?? "")"` usages are plain value bindings — the correct idiom), no TagHelper-inside-an-attribute, no literal `@Model.X`. **No Razor trap fixed.**
+- **Both pins green (per the AGENTS.md test-runner quirk — build, then xunit.v3 in-process):** `dotnet build Kumunita.slnx -c Debug` green (0 errors / 0 warnings). `KwLRegistryConsistencyTests` (Web view-scan) — `Total: 1, Errors: 0, Failed: 0`. `KnownTranslationKeys_ParityTests` (en/de/fr/da registry-shape parity) — `Total: 7, Errors: 0, Failed: 0`. `Milestones.cs` / `MilestonesTests.cs` untouched (U13 owns the flip).
