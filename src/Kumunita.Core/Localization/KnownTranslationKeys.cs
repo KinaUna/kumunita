@@ -2121,6 +2121,20 @@ public static class KnownTranslationKeys
             ["portability.status.ok"]    = "Done.",
             ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
 
+            // M27 (ADR 0148 D9) — the resident's own portability surface (the
+            // /account/portability index: the export button + the import upload
+            // form + the status area; U07). Deliberately a DISTINCT
+            // myportability.* namespace from M11's admin portability.* keys so
+            // the resident surface never collides with the operator surface.
+            // closed-key registry + KnownTranslationKeys_ParityTests enforce the
+            // × 4; myportability.status is a TempData string (the controller's
+            // fail-closed render), outside the kw-l TagHelper's reach.
+            ["myportability.index.title"]  = "My data",
+            ["myportability.export"]       = "Export",
+            ["myportability.import"]       = "Import",
+            ["myportability.import.resolve"] = "Apply my choices",
+            ["myportability.status"]       = "Status",
+
             // M15 U04 (ADR 0116, D8) — the file-facing bulk keys.
             ["translations.bulk.export"]     = "Download translations (CSV)",
             ["translations.bulk.import"]     = "Upload translations (CSV)",
@@ -4395,6 +4409,17 @@ public static class KnownTranslationKeys
             ["portability.status.ok"]    = "Fertig.",
             ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
 
+            // M27 (ADR 0148 D9) — die Portabilitätsoberfläche der Bewohnerin / des
+            // Bewohners (der /account/portability Index: Export-Button +
+            // Import-Formular + Statusbereich; U07). Absichtlich ein ANDERER
+            // myportability.*-Name als M11s Admin portability.*-Keys, damit die
+            // Bewohner-Oberfläche nie mit der Operator-Oberfläche kollidiert.
+            ["myportability.index.title"]  = "Meine Daten",
+            ["myportability.export"]       = "Exportieren",
+            ["myportability.import"]       = "Importieren",
+            ["myportability.import.resolve"] = "Meine Auswahl anwenden",
+            ["myportability.status"]       = "Status",
+
             // M15 U04 (ADR 0116, D8) — die datei-basierten Bulk-Keys.
             ["translations.bulk.export"]     = "Übersetzungen herunterladen (CSV)",
             ["translations.bulk.import"]     = "Übersetzungen hochladen (CSV)",
@@ -6661,6 +6686,18 @@ public static class KnownTranslationKeys
             ["translations.bulk.mode_single"] = "Édition une par une",
             ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
 
+            // M27 (ADR 0148 D9) — la surface de portabilité du résident / de la
+            // résidente (l'index /account/portability : le bouton d'export, le
+            // formulaire d'import + l'aire de statut ; U07). Absolument un
+            // espace de noms myportability.* DISTINCT de celui de l'admin
+            // portability.* (M11), pour que la surface résident ne collisionne
+            // jamais avec la surface opérateur.
+            ["myportability.index.title"]  = "Mes données",
+            ["myportability.export"]       = "Exporter",
+            ["myportability.import"]       = "Importer",
+            ["myportability.import.resolve"] = "Appliquer mes choix",
+            ["myportability.status"]       = "Statut",
+
             // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
             ["translations.bulk.export"]     = "Télécharger les traductions (CSV)",
             ["translations.bulk.import"]     = "Téléverser les traductions (CSV)",
@@ -8909,6 +8946,17 @@ public static class KnownTranslationKeys
             ["translations.bulk.mode_batch"] = "Batchredigering",
             ["translations.bulk.mode_single"] = "Redigér én ad gangen",
             ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
+
+            // M27 (ADR 0148 D9) — beboerens portabilitetsoverflade (indexen
+            // /account/portability: eksportknap + importformular + statusområde;
+            // U07). Bevidst et ANDET myportability.*-navneområde end M11s admin
+            // portability.*-nøgler, så overfladen for beboere aldrig kolliderer
+            // med operatørens overflade.
+            ["myportability.index.title"]  = "Mine data",
+            ["myportability.export"]       = "Eksportér",
+            ["myportability.import"]       = "Importér",
+            ["myportability.import.resolve"] = "Anvend mine valg",
+            ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.
             ["translations.bulk.export"]     = "Download translationer (CSV)",
