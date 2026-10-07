@@ -66,3 +66,27 @@
   `GuardianTimeLimitEvaluator.IsAllowedNow` (a U02 type, not yet authored) is
   plain `<c>` text rather than `<see cref>` to keep the build warning-free;
   the type/shape is identical. No other deviation.)
+
+## U02 — evaluator + pure tests
+
+- **Polarity (load-bearing):** `IsAllowedNow` returns `true` = the child MAY
+  use the platform now — the **inverse** of M20's `IsQuietNow` (allowed is the
+  permission, not the restriction). The floor (<c>null</c> / `Enabled ==
+  false`) returns **`true`** (always allowed, C-M28·3) — the opposite of M20's
+  floor (`false` = never quiet). `Blocked` → allowed iff OUTSIDE the window
+  (`!windowMatches`); `Allowed` → allowed iff INSIDE the window
+  (`windowMatches`). Wall-clock-first (ADR 0019) + empty = all (D2) identical
+  to M20. Separate pure function in `Kumunita.Core.UserInfo` (no `Notifications`
+  dependency).
+- **7 tests + status (all PASS):** `F3_Missing_Schedule_Is_Always_Allowed`,
+  `F3_Disabled_Schedule_Is_Always_Allowed`, `F1_Blocked_InWindow_Is_Restricted`,
+  `F1_Blocked_OutOfWindow_Is_Allowed`, `F2_Allowed_InWindow_Is_Allowed`,
+  `F2_Allowed_OutOfWindow_Is_Restricted`, `F4_Verdict_Differs_Between_Zones` —
+  runner: `Total: 7, Errors: 0, Failed: 0`.
+- **Deviation (1, recorded):** the unit plan's F4 spec (`Hours=[22]`, `now=
+  21:30 UTC`) is internally inconsistent — 23 ∉ [22] so no verdict flip, the
+  `NotEqual` assert would fail. Resolved in favor of the named M20 analog
+  (`Hours=[22,23]`): 21:30 UTC = 23:30 UTC+2 (inside → restricted) vs 21:30
+  UTC (outside → allowed) — a genuine zone-dependent flip (C-M28·6).
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Error(s)**
+  (80 pre-existing warnings, none in the two new M28 files).
