@@ -3775,6 +3775,161 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
+    // ── M28 (ADR 0151, D4) — guardian time limits: the three seams ─────────
+    // The inverse of the M20 quiet lane (ADR 0121) on the GU surface (ADR
+    // 0028). Gate = an active <see cref="GuardianLink"/> for (guardian, child)
+    // ∪ GlobalAdmin (G·2 live, G·5 safety valve); a non-guardian, non-admin —
+    // including a child acting on their own <c>childId</c> (C-M28·7) — is
+    // denied. The write appends exactly one <see
+    // cref="Authorization.AccessAudit"/> row (verb
+    // <c>guardian.time-limit.set</c>, <c>Via</c> Guardian/Admin); the two
+    // reads append none. Zero new authorization surface (C-M28·5).
+
+    /// <summary>
+    /// M28 (ADR 0151, D4) — the M28 standing gate (G·2 live / G·5 valve,
+    /// C-M28·4/C-M28·7): an <b>active</b> <see cref="GuardianLink"/> for the
+    /// exact (guardian, child) pair confers <see cref="Authorization
+    /// .AccessVia.Guardian"/>; else, if <paramref name="guardianId"/> is a
+    /// GlobalAdmin, the G·5 safety valve confers <see cref="Authorization
+    /// .AccessVia.Admin"/>; else <see cref="UnauthorizedAccessException"/>
+    /// (the Web's 404 — the GU deny-by-default pin). A child subject used as
+    /// <paramref name="guardianId"/> on their own <paramref name="childId"/>
+    /// holds neither an active link (a child is never a GuardianId) nor the
+    /// GlobalAdmin role, so they are denied (C-M28·7).
+    /// </summary>
+    private async Task<Authorization.AccessVia> GuardTimeLimitStandingAsync(
+        string guardianId, string childId)
+    {
+        await using var probe = store.QuerySession();
+        var link = await probe.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (link is not null)
+            return Authorization.AccessVia.Guardian;
+
+        if (await IsGlobalAdminAsync(guardianId).ConfigureAwait(false))
+            return Authorization.AccessVia.Admin;
+
+        throw new UnauthorizedAccessException(
+            $"No active guardian link for ({guardianId}, {childId}) and the " +
+            $"guardian is not a GlobalAdmin — no standing to manage the child's " +
+            $"time limits (M28, C-M28·4/C-M28·7).");
+    }
+
+    /// <summary>
+    /// M28 (ADR 0151, D4) — resolves whether <paramref name="subjectId"/> is a
+    /// GlobalAdmin (the G·5 safety valve), via the <see cref="Kumunita.Core
+    /// .Identity.IIdentityService"/> resolved lazily off the
+    /// <c>IServiceProvider</c> (the <see cref="Notifications
+    /// .NotificationService"/> emission seam shape — always resolvable, no
+    /// construction cycle, the 181 direct-construction test harnesses that
+    /// build <c>UserInfoService(store)</c> positionally get <c>services ==
+    /// null</c> and therefore no admin standing, exactly as they get no
+    /// emission). Fails closed: no provider / no principal / no role ⇒ not a
+    /// GlobalAdmin.
+    /// </summary>
+    private async Task<bool> IsGlobalAdminAsync(string subjectId)
+    {
+        if (services is null)
+            return false;
+        var identity = services
+            .GetService<Kumunita.Core.Identity.IIdentityService>();
+        if (identity is null)
+            return false;
+        var principal = await identity.GetBySubjectAsync(subjectId).ConfigureAwait(false);
+        return principal is not null
+            && principal.Roles.Contains(Kumunita.Core.Identity.Roles.GlobalAdmin);
+    }
+
+    /// <inheritdoc />
+    public async Task<GuardianTimeLimitSchedule?> GetChildTimeLimitAsync(
+        string guardianId, string childId)
+    {
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+
+        // Standing gate first (C-M28·4, deny-by-default) — no audit row (a read).
+        await GuardTimeLimitStandingAsync(guardianId, childId).ConfigureAwait(false);
+
+        // Single-row read by the child's identity (the M20 GetQuietScheduleAsync
+        // shape); null = "never restricted" (the floor, C-M28·3).
+        await using var session = store.QuerySession();
+        return await session
+            .LoadAsync<GuardianTimeLimitSchedule>(childId)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetChildTimeLimitAsync(
+        string guardianId, string childId, GuardianTimeLimitSchedule? schedule)
+    {
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate (C-M28·4, deny-by-default) — returns the audit Via
+        // (Guardian on the link lane, Admin on the G·5 valve).
+        var via = await GuardTimeLimitStandingAsync(guardianId, childId).ConfigureAwait(false);
+
+        if (schedule is null)
+        {
+            // Clear = never restricted (the floor, C-M28·3): delete the child's
+            // row, if any (the M20 SetQuietScheduleAsync "clear" idiom — the
+            // session.Delete shape; the read seam then returns null).
+            session.Delete<GuardianTimeLimitSchedule>(childId);
+        }
+        else
+        {
+            schedule.ChildId = childId;    // pin the identity (singleton-per-child row)
+            schedule.Updated = now;
+            session.Store(schedule);
+        }
+
+        // The GU write appends exactly ONE audit row (verb guardian.time-limit.set,
+        // TargetKind the child account, the guardian.suspend / guardian.unsuspend
+        // shape), in the same transaction (invariant C3). Strong consistency
+        // (C-M28·4): live on the very next read (no projection, no cache).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.time-limit.set",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<GuardianTimeLimitSchedule?> GetActiveTimeLimitAsync(string childId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+
+        // The ENFORCEMENT read (C-M28·2): child-keyed, NO guardian gate, NO audit
+        // row — the TimeLimitMiddleware's single-row load (the
+        // BlockedAccountMiddleware GetProfileAsync shape). null = "never
+        // restricted" (the floor, C-M28·3).
+        await using var session = store.QuerySession();
+        return await session
+            .LoadAsync<GuardianTimeLimitSchedule>(childId)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin)
     {

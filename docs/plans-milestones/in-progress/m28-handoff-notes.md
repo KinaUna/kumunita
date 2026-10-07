@@ -90,3 +90,46 @@
   UTC (outside → allowed) — a genuine zone-dependent flip (C-M28·6).
 - **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Error(s)**
   (80 pre-existing warnings, none in the two new M28 files).
+
+## U03 — 3 seams + impl + standing/audit
+
+- **3 seam signatures (verbatim, ADR 0006-E ADDs on `IUserInfoService`):**
+  `Task<GuardianTimeLimitSchedule?> GetChildTimeLimitAsync(string guardianId,
+  string childId)` (guardian-gated read, no audit); `Task
+  SetChildTimeLimitAsync(string guardianId, string childId,
+  GuardianTimeLimitSchedule? schedule)` (guardian-gated write, one audit row;
+  `null` deletes the row — the M20 clear idiom); `Task<GuardianTimeLimit
+  Schedule?> GetActiveTimeLimitAsync(string childId)` (enforcement read,
+  child-keyed, no guardian gate, no audit).
+- **One-audit-row shape (write only):** `Action = "guardian.time-limit.set"`,
+  `TargetKind = "profile"`, `TargetId = childId`, `Outcome = Allow`, `Via =`
+  `AccessVia.Guardian` (link lane) **or** `AccessVia.Admin` (GlobalAdmin G·5
+  valve) — the `guardian.suspend` / `guardian.unsuspend` shape. Reads emit
+  **no** row (C-M28·2). One `SaveChangesAsync` per write (C3); `null` →
+  `session.Delete<GuardianTimeLimitSchedule>(childId)` (the M20 clear idiom).
+- **Gate shape (C-M28·4/C-M28·7):** active `GuardianLink` for (guardian,
+  child) ∪ GlobalAdmin, deny-by-default → `UnauthorizedAccessException` (Web
+  404). GlobalAdmin standing resolved **lazily** off the `IServiceProvider?`
+  seam → `IIdentityService.GetBySubjectAsync` (the `NotificationService`
+  emission-shape, no construction cycle — `IdentityService` already depends on
+  `IUserInfoService`); `services == null` (the positional test harnesses) ⇒ no
+  admin standing. A child as `guardianId` on their own `childId` is denied
+  (C-M28·7 — no link as GuardianId, never a GlobalAdmin).
+- **7 tests + status (all PASS):** `F5_NonGuardian_Set_Is_Denied`,
+  `F5_Guardian_Set_EmitsOneAuditRow_ViaGuardian`,
+  `F5_GlobalAdmin_Set_EmitsOneAuditRow_ViaAdmin`,
+  `F5_Set_Is_StronglyConsistent_NextReadSeesNewValue`,
+  `C_M28_7_Child_Cannot_Set_Own_TimeLimit`, `F5_Clear_SetsNull_DeletesRow`,
+  `C_M28_5_IAuthorizationService_Surface_Count_Unchanged` — runner: `Total:
+  7, Errors: 0, Failed: 0`. (The 7th is a **structural** pin: reflects
+  `IAuthorizationService` and asserts the distinct public instance method names
+  are exactly `CanAsync` / `CanSeeAsync` / `CanSeeGroupAsync` /
+  `CanSeeGroupFeedAsync` — the frozen 4-method surface, C-M28·5 unchanged.)
+- **Deviation (1, recorded):** the design-doc C-M28·5 prose says "the frozen
+  4-method surface" — the interface actually carries 8 methods (4 distinct
+  names × the standalone + `IDocumentSession`-overload two-form pattern). The
+  structural pin asserts on **distinct method names == 4**, not total method
+  count — that is the "4-method surface" reading and is stable to the two-form
+  pattern. (No seam/signature change; C-M28·5 = zero *new* surface, held.)
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Warning
+  (s), 0 Error(s)**. No compile warnings.
