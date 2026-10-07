@@ -239,3 +239,83 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
 - **No code, no build.** The design doc Part 1 is present with all
   sections (value chain, context, scope, invariants SITE·1–SITE·9,
   FACES SITE1–SITE10, frozen base).
+
+## U02 — design doc Part 2 + ADR 0150
+
+- **Date:** 2026-10-07
+- **Deliverable:** `docs/design/site-content-design.md` Part 2 appended
+  (the `## Seams & contracts (Part 2, written by U02)` section — §2.1
+  frozen base (unchanged), §2.2 the `SiteContent` field set (exact),
+  §2.3 the read-seam contract (exact C#), §2.4 the write-lane contract
+  (exact C#), §2.5 the pinned seam-test names (exact), §2.6 the
+  acceptance gate (exact), §2.7 the drift guard (exact)).
+- **13 `SiteContent` fields (by name):**
+  - `HomeHeroEyebrow` (string, default = the `home.intro_eyebrow`
+    English text, "A private home for one neighbourhood")
+  - `HomeHeroLead` (string, default = the `home.intro_lead` English
+    text, "One quiet place for everything your street does — the feed,
+    the groups, and the notes that deserve better than a group chat.
+    Private, plain-language, and yours.")
+  - `HomeShowAboutButton` (bool, default `true`)
+  - `HomeShowFeatures` (bool, default `true`)
+  - `HomeShowRoadmap` (bool, default `true`)
+  - `AboutHeroEyebrow` (string, default = the `about.eyebrow` English
+    text, "Private by default")
+  - `AboutHeroLead` (string, default = the `about.lead` English text,
+    "One home for everything your neighborhood does — the feed, the
+    groups, and the notes that deserve better than a group chat.
+    Private, plain-language, and yours.")
+  - `AboutShowFeatures` (bool, default `true`)
+  - `AboutShowScope` (bool, default `true`)
+  - `AboutShowPhilosophy` (bool, default `true`)
+  - `AboutShowProject` (bool, default `true`)
+  - `AboutShowWhatsNew` (bool, default `true`)
+  - `AboutShowContactCta` (bool, default `true`)
+- **Pinned test names (by class + method, 15 total — the §2.5 list is
+  the closed set, a unit may never introduce a test outside it):**
+  - **`SiteContentServiceTests`** (Core.Tests) — `GetAsync_MissingStore_ReturnsInCodeFallback`
+    / `SaveAsync_WritesOneAccessAuditRow` /
+    `SaveAsync_StrongConsistency_LiveOnNextGetAsync` /
+    `SaveAsync_UpsertsSingleton_NoDuplicateRow`
+  - **`SiteContentSeederTests`** (Core.Tests) —
+    `FreshBoot_HasExactlyOneSiteContentRow` /
+    `FreshBoot_DefaultsMatchShippedKwLText` /
+    `SecondBoot_IsIdempotent_NoDuplicateRow_NoFieldChange`
+  - **`HomeControllerSiteContentTests`** (Web.Tests) —
+    `FreshInstance_RendersShippedText_EverySectionShown` /
+    `SavedRow_HomeShowAboutButtonFalse_HidesHomeHeroButton` /
+    `ADR_0149_HideHomeIntroTrue_HomeShowFeaturesTrue_HidesHomeFeatureCards`
+    / `ADR_0149_HideHomeIntroFalse_HomeShowFeaturesFalse_HidesHomeFeatureCards`
+  - **`AdminSiteControllerTests`** (Web.Tests) —
+    `GET_SeesCurrentSingleton` /
+    `POST_SaveHome_SavesFieldGroup_WritesOneAccessAuditRow` /
+    `POST_SaveAbout_SavesFieldGroup_WritesOneAccessAuditRow` /
+    `POST_NonGlobalAdmin_IsDenied`
+- **Acceptance gate (exact command list):**
+  1. `dotnet build Kumunita.slnx -c Debug` (green)
+  2. `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` (green)
+  3. `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` (green)
+  4. Plus the **regression pins** (the precedent shapes are unchanged):
+     `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`
+     (the `kw-l` registry entries are untouched — SITE·4 / ADR 0150 D3
+     pin) + `LS_U04_SeederTests` + `PageServiceTests` (the ADR 0005 B /
+     ADR 0043 "seeded defaults match the shipped text" pins unchanged) +
+     `HomeControllerTests` + `StaticPagesControllerTests` (the ADR 0149
+     `Profile.HideHomeIntro` read path unchanged — SITE·5 / ADR 0150 D5
+     pin) + `AdminSignupControllerTests` + `AdminControllerTests` (the
+     ADR 0050 single-write-lane shape + the `AdminController`
+     constructor pin unchanged — SITE·7) + `MilestonesTests` (the M4
+     single-`StatusNext` pin intact — SITE·8 / ADR 0150 D9 pin) +
+     `WhatsNewTests` (the new `0.42.0` entry is present, newest-first —
+     SITE·8 / ADR 0150 D9 pin). All green.
+- **ADR 0150** — `docs/adr/0150-site-content-customization.md`
+  (Status: Accepted). The unit plan names the `docs/adr/README.md`
+  index row (the `0150` row after the `0149` row); this unit does
+  **not** modify `docs/adr/README.md` (the user's binding constraint is
+  3 files: the design doc append, the new ADR, and this handoff-note
+  section). The ADR index row is **deferred to the close unit** (U08,
+  the required sixth member of the close flip alongside `Milestones.cs`
+  / README / `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` /
+  `WhatsNew.cs`).
+- **No code, no build.** The design doc Part 2 is present with all
+  sub-sections (§2.1–§2.7); ADR 0150 is present (Status: Accepted).
