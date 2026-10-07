@@ -229,3 +229,60 @@
 - **No code beyond the keys + parity pin** (no Detail surface, no middleware,
   no seams — U06 owns the Detail surface). **M20 lane untouched.** Handing off
   to U06.
+
+## U06 — Detail section + HasTimeLimits badge + surface tests
+
+- **4-field re-pin:** `ChildAccountItem` now
+  `(string ChildId, string DisplayName, bool Blocked, bool HasTimeLimits)`
+  (`Models/GuardianViewModels.cs`). `HasTimeLimits` (the 4th field, the
+  `Blocked` flag precedent) drives the GU Index "time-limits set?" badge —
+  resolved in `ActiveChildrenAsync` via `GetActiveTimeLimitAsync(childId)` →
+  `schedule is not null && schedule.Enabled` (C-M28·3 floor: null/disabled →
+  false). The GU Index test re-pinned
+  `ChildAccountItem_Is_Exact_Three_Field_Projection` →
+  `ChildAccountItem_Is_Exact_Four_Field_Projection` (asserts the 4-field name
+  set) in `tests/Kumunita.Web.Tests/GuardianViewModelsTests.cs`.
+- **Detail section + 2 controller actions (D6 — no new route):**
+  `Detail` GET seeds `ViewData["TimeLimitsSection"]` (a new
+  `TimeLimitsSection(bool Enabled, string Mode, IReadOnlyList<int> Hours,
+  IReadOnlyList<int> DaysOfWeek)` record in `GuardianViewModels.cs` — the
+  `LocaleSettingsViewModel.Quiet` shape, the `MessagingRestricted`/
+  `EventRsvpMode` ViewData precedent — the `MembershipEditorModel` pinned
+  record is untouched) with `GetChildTimeLimitAsync(subject, childId)`
+  (null/disabled → the C-M28·3 floor; a seam re-gate → the disabled floor,
+  defensive). New `SaveTimeLimits` POST
+  (`me/children/{childId}/timelimits`, `GuardianController.cs`) — the
+  `LocaleController.SaveQuiet` shape: `enabled`/`mode`/`hours`/`daysOfWeek`/
+  `clear` form fields → `SetChildTimeLimitAsync(subject, childId, schedule)`
+  (one audit row, `guardian.time-limit.set`); `clear=1` → `null` → row delete
+  (the M20 "clear" idiom, C-M28·3); `UnauthorizedAccessException` → 404 (the
+  Suspend/Unsuspend precedent); flash `guardian.timelimit.flash_saved` /
+  `_cleared` via `TempData["info"]` (the `KnownTranslationKeys.EnValues`
+  floor).
+- **kw-l keys bound (consumed, NOT added — U05's set):** the Detail section
+  binds the 13 `guardian.timelimit.*` keys (`title`/`description`/`enabled`/
+  `mode_label`/`mode_blocked`/`mode_allowed`/`hours_label`/`days_label`/
+  `save`/`clear`/`flash_saved`/`flash_cleared`/`badge_set`) — NOT the M20
+  `settings.quiet.*` keys (C-M28·5 "M20 untouched" pin, D9 held). The view is
+  `Views/Guardian/Detail.cshtml` (the M20 `Views/Locale/Quiet.cshtml` form
+  shape: `Enabled` checkbox, `Mode` radio Blocked/Allowed, `Hours` +
+  `DaysOfWeek` multi-select, Save + Clear buttons); the badge renders on
+  `Views/Guardian/Index.cshtml`.
+- **3 F5-surface tests + record test + status (all PASS):**
+  `F5_Detail_Get_SeedsWithCurrentSchedule`, `F5_Detail_Post_SavesAndFlashes`
+  (asserts the row is live on the next read + the one audit row + the flash),
+  `F5_Detail_Post_Clear_SetsNull` (asserts the row is deleted → null read),
+  + the re-pinned `ChildAccountItem_Is_Exact_Four_Field_Projection` — runner
+  (in-process xunit.v3, the reliable path): `Total: 3, Errors: 0, Failed: 0`.
+  Full `Kumunita.Web.Tests` suite: **`Total: 950, Errors: 0, Failed: 0,
+  Skipped: 0`** (947 from U05 + the 3 new U06 surface tests).
+- **Build / warnings:** `dotnet build Kumunita.slnx -c Debug` — **0 Error(s),
+  82 Warning(s)**, NONE in the U06-touched files (all 82 are pre-existing in
+  other files — the `xUnit1051` / `CS8602` / `CS8604` / `CS8714` / `CS0219` /
+  `CS8620` / `CS4014` set the U00–U05 entries already note). No new M28
+  compile warnings.
+- **No code beyond the surface** (no new seam, no new middleware, no new
+  route, no self-lane — C-M28·7 held: the child cannot set/clear their own;
+  the GlobalAdmin reaches the same `SetChildTimeLimitAsync` write seam — the
+  standing is resolved by the seam, not a separate admin page). **M20 lane
+  untouched.** Handing off to U07.

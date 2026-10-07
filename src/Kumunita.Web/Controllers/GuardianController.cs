@@ -248,6 +248,36 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
             ViewData["ChildEventRsvps"] = System.Array.Empty<EventRsvpVetoItem>();
         }
 
+        // M28 (ADR 0151 D6) — the "Time limits" section (the M20
+        // LocaleController.SaveQuiet shape, the GU inverse): seed the form
+        // with the current schedule (the GetChildTimeLimitAsync guardian-
+        // gated read, §2.1). A missing/disabled schedule renders the floor
+        // (C-M28·3): Enabled=false, Mode="blocked", Hours=[], DaysOfWeek=[].
+        // Exposed on ViewData (the MessagingRestricted / EventRsvpMode
+        // precedent — the MembershipEditorModel is a pinned record; the U07
+        // exact-projection pin forbids adding a field).
+        // The standing gate (ActiveLinkAsync) already ran above (the Detail
+        // action's 404 gate), so the GetChildTimeLimitAsync read's own gate
+        // passes here — the catch is the defensive floor.
+        try
+        {
+            var schedule = await userInfo.GetChildTimeLimitAsync(subject, childId);
+            ViewData["TimeLimitsSection"] = new TimeLimitsSection(
+                schedule is { Enabled: true },
+                schedule is not null && schedule.Enabled
+                    ? (schedule.Mode == TimeLimitMode.Allowed ? "allowed" : "blocked")
+                    : "blocked",
+                schedule?.Hours ?? [],
+                schedule?.DaysOfWeek ?? []);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Defensive floor — the Detail action's ActiveLinkAsync gate
+            // should have already 404'd; if the seam re-gates (the Core
+            // seam's own gate, C-M28·4), render the disabled state (C-M28·3).
+            ViewData["TimeLimitsSection"] = new TimeLimitsSection(false, "blocked", [], []);
+        }
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
@@ -532,6 +562,85 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         }
         catch (UnauthorizedAccessException)
         {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
+    /// <summary>
+    /// M28 (ADR 0151 D6) — <b>Save / clear the child's time-limit schedule</b>
+    /// (POST <c>me/children/{childId}/timelimits</c>). The
+    /// <see cref="LocaleController.SaveQuiet"/> shape (the <c>enabled</c> /
+    /// <c>mode</c> / <c>hours</c> / <c>daysOfWeek</c> / <c>clear</c> form
+    /// fields), the GU inverse: writes the
+    /// <see cref="GuardianTimeLimitSchedule"/> through the
+    /// <see cref="IUserInfoService.SetChildTimeLimitAsync"/> seam (one audit
+    /// row, <c>guardian.time-limit.set</c>). <c>clear=1</c> → null → row
+    /// delete (the M20 "clear" idiom, C-M28·3 floor). Flash:
+    /// <c>guardian.timelimit.flash_saved</c> / <c>_cleared</c> (the
+    /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
+    /// floor — the same pattern as the other GU actions' hardcoded English
+    /// strings).
+    /// <para>
+    /// <b>Standing gate:</b> the Core seam's own
+    /// <see cref="IUserInfoService.SetChildTimeLimitAsync"/> gate (active
+    /// <see cref="GuardianLink"/> ∪ GlobalAdmin, C-M28·4) — the Web layer
+    /// does not re-gate (the <see cref="Suspend"/> / <see cref="Unsuspend"/>
+    /// precedent: the catch of <see cref="UnauthorizedAccessException"/> is
+    /// the 404).
+    /// </para>
+    /// </summary>
+    [HttpPost("{childId}/timelimits")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveTimeLimits(
+        string childId,
+        bool enabled,
+        string? mode,
+        int[]? hours,
+        int[]? daysOfWeek,
+        string? clear)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        try
+        {
+            if (clear == "1")
+            {
+                // Clear = never restricted (the floor, C-M28·3): delete the
+                // row (the M20 SetQuietScheduleAsync "clear" idiom — the
+                // null-schedule = delete shape in the Core seam).
+                await userInfo.SetChildTimeLimitAsync(subject, childId, null);
+                TempData["info"] = Kumunita.Core.Localization.KnownTranslationKeys
+                    .EnValues.GetValueOrDefault("guardian.timelimit.flash_cleared")
+                    ?? "Time limits cleared";
+            }
+            else
+            {
+                var schedule = new GuardianTimeLimitSchedule
+                {
+                    ChildId   = childId,
+                    Enabled   = enabled,
+                    Mode      = mode == "allowed" ? TimeLimitMode.Allowed : TimeLimitMode.Blocked,
+                    Hours     = hours ?? [],
+                    DaysOfWeek = daysOfWeek ?? [],
+                };
+                await userInfo.SetChildTimeLimitAsync(subject, childId, schedule);
+                TempData["info"] = Kumunita.Core.Localization.KnownTranslationKeys
+                    .EnValues.GetValueOrDefault("guardian.timelimit.flash_saved")
+                    ?? "Time limits saved";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The Core seam's own gate (C-M28·4, deny-by-default): non-guardian
+            // or dissolved link → 404 (the Suspend / Unsuspend precedent).
             return NotFound();
         }
         catch (InvalidOperationException ex)
@@ -1231,7 +1340,8 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
     /// <summary>The actor's <b>active</b> <see cref="GuardianLink"/> rows (a read,
     /// not a decision), joined to each child's display name + <c>Blocked</c> flag
-    /// (ids/names only — G·1).</summary>
+    /// + <c>HasTimeLimits</c> badge (M28, ADR 0151 D6 — the <c>Blocked</c> flag
+    /// precedent) (ids/names only — G·1).</summary>
     private async Task<IReadOnlyList<ChildAccountItem>> ActiveChildrenAsync(string guardianId)
     {
         await using var session = store.QuerySession();
@@ -1244,10 +1354,15 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         foreach (var link in links)
         {
             var profile = await userInfo.GetProfileAsync(link.ChildId);
+            // M28 (ADR 0151 D6) — resolve the HasTimeLimits badge:
+            // the child's active schedule (the GetActiveTimeLimitAsync read,
+            // C-M28·3 floor: null / Enabled==false → false).
+            var schedule = await userInfo.GetActiveTimeLimitAsync(link.ChildId);
             rows.Add(new ChildAccountItem(
                 link.ChildId,
                 profile?.DisplayName ?? link.ChildId,
-                profile?.Blocked ?? false));
+                profile?.Blocked ?? false,
+                schedule is not null && schedule.Enabled));
         }
 
         return rows;

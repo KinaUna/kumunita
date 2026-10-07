@@ -3,10 +3,12 @@ using System.ComponentModel.DataAnnotations;
 namespace Kumunita.Web.Models;
 
 /// <summary>
-/// One <b>child account row</b> on the <c>/me/children</c> list (GU, ADR 0028).
+/// One <b>child account row</b> on the <c>/me/children</c> list (GU, ADR 0028;
+/// M28 ADR 0151 §2.5 re-pin to 4 fields).
 /// <para>
-/// **Exact 3-field projection (U07 pin)** — <see cref="ChildId"/>,
-/// <see cref="DisplayName"/>, <see cref="Blocked"/>. <see cref="ChildId"/> is the
+/// **Exact 4-field projection (M28 U06 pin)** — <see cref="ChildId"/>,
+/// <see cref="DisplayName"/>, <see cref="Blocked"/>, <see
+/// cref="HasTimeLimits"/>. <see cref="ChildId"/> is the
 /// route's <c>{childId}</c> (the supervised child's
 /// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>);
 /// <see cref="DisplayName"/> is resolved from the child's
@@ -14,11 +16,38 @@ namespace Kumunita.Web.Models;
 /// fail-safe); <see cref="Blocked"/> drives the suspend/un-suspend button state —
 /// the <see cref="Kumunita.Core.UserInfo.Profile.Blocked"/> flag the existing
 /// <c>BlockedAccountMiddleware</c> + directory already read (enforcement parity;
-/// U04's suspension lane sets the same flag). No other field: the child's posts,
-/// profile body, or any audience-restricted content never reach this row (G·1).
+/// U04's suspension lane sets the same flag); <see cref="HasTimeLimits"/>
+/// (M28, ADR 0151 D6 — the <c>Blocked</c> flag precedent) drives the
+/// "time-limits set?" badge on the GU Index card: <c>true</c> when the
+/// child's <see cref="Kumunita.Core.UserInfo.GuardianTimeLimitSchedule"/>
+/// row exists with <c>Enabled == true</c> (resolved via
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetActiveTimeLimitAsync"/>),
+/// <c>false</c> otherwise (the floor, C-M28·3). No other field: the child's
+/// posts, profile body, or any audience-restricted content never reach this
+/// row (G·1).
 /// </para>
 /// </summary>
-public sealed record ChildAccountItem(string ChildId, string DisplayName, bool Blocked);
+public sealed record ChildAccountItem(string ChildId, string DisplayName, bool Blocked, bool HasTimeLimits);
+
+/// <summary>
+/// M28 (ADR 0151 §2.5, D6) — the <b>"Time limits" section</b> view-model
+/// for the child's <c>Detail</c> page. The <c>LocaleSettingsViewModel.Quiet</c>
+/// shape re-expressed on the GU surface (the M20 quiet-section form fields,
+/// flattened so the Razor view binds directly): <see cref="Enabled"/> (the
+/// schedule's master on/off — <c>false</c> when there is no schedule or the
+/// schedule is disabled, the floor C-M28·3), <see cref="Mode"/> (the form
+/// posts <c>"blocked"</c> or <c>"allowed"</c>), <see cref="Hours"/> (0–23,
+/// empty = all), <see cref="DaysOfWeek"/> (0=Sun…6=Sat, empty = all).
+/// Exposed on <c>ViewData["TimeLimitsSection"]</c> (the
+/// <c>MessagingRestricted</c> / <c>EventRsvpMode</c> ViewData precedent —
+/// the <c>MembershipEditorModel</c> is a pinned record; the U07
+/// exact-projection pin forbids adding a field).
+/// </summary>
+public sealed record TimeLimitsSection(
+    bool Enabled,
+    string Mode,
+    IReadOnlyList<int> Hours,
+    IReadOnlyList<int> DaysOfWeek);
 
 /// <summary>
 /// One <b>assigned guardian row</b> on the child's <c>Detail</c> "other

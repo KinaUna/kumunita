@@ -26,7 +26,7 @@ namespace Kumunita.Web.Tests;
 public sealed class GuardianViewModelsTests
 {
     [Fact]
-    public void ChildAccountItem_Is_Exact_Three_Field_Projection()
+    public void ChildAccountItem_Is_Exact_Four_Field_Projection()
     {
         var fields = typeof(ChildAccountItem)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -34,9 +34,12 @@ public sealed class GuardianViewModelsTests
             .OrderBy(n => n)
             .ToList();
 
-        // The U07 pin: ChildId + DisplayName + Blocked — and *nothing else*.
-        // No posts, no profile body, no audience-restricted content (G·1).
-        Assert.Equal(new[] { "Blocked", "ChildId", "DisplayName" }, fields.ToArray());
+        // M28 (ADR 0151 D6) — the 4-field pin (the U06 re-pin of the 3-field
+        // GU pin): ChildId + DisplayName + Blocked + HasTimeLimits — and
+        // *nothing else*. No posts, no profile body, no audience-restricted
+        // content (G·1). HasTimeLimits (the M28 badge, the Blocked flag
+        // precedent) drives the "time-limits set?" badge on the GU Index card.
+        Assert.Equal(new[] { "Blocked", "ChildId", "DisplayName", "HasTimeLimits" }, fields.ToArray());
     }
 
     [Fact]
