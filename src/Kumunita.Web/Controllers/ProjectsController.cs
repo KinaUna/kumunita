@@ -4,6 +4,7 @@ using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
 using Kumunita.Core.Query;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
@@ -92,6 +93,16 @@ public sealed class ProjectsController : Controller
     // sites that don't pass one get the UTC-floor fallback).
     private readonly EffectiveTimezoneResolver? _timezone;
 
+    // ADR 0044 / 0147 — the tag read seam (the <see cref="PostsController"/>
+    // optional-ctor-param precedent). The todo + board detail actions render
+    // the doc's tags (display names resolved in the viewer's language) and
+    // the edit GETs pre-seed the existing tag slugs for the tag-suggest
+    // input. **Optional** (default null) so the existing test-construction
+    // sites that build this controller without a tag service keep compiling —
+    // the tag display/seed surfaces are no-ops when the seam is absent. DI
+    // always supplies the live <c>ITagService</c> in the app.
+    private readonly ITagService? tags;
+
     public ProjectsController(
         IProjectService projects,
         IUserInfoService userInfo,
@@ -99,7 +110,8 @@ public sealed class ProjectsController : Controller
         IDocumentStore store,
         ITranslationProvider? translationProvider = null,
         EffectiveTimezoneResolver? timezone = null,
-        IEventService? events = null)
+        IEventService? events = null,
+        ITagService? tags = null)
     {
         this.projects = projects;
         this.userInfo = userInfo;
@@ -108,6 +120,7 @@ public sealed class ProjectsController : Controller
         this.translationProvider = translationProvider;
         this._timezone = timezone;
         this.events = events;
+        this.tags = tags;
     }
 
     // ADR 0019 — the actor's effective time zone (resident override →
@@ -949,6 +962,26 @@ public sealed class ProjectsController : Controller
                 IsAuthor: string.Equals(c.AuthorId, actorId, StringComparison.Ordinal)));
         }
 
+        // ADR 0044 / 0147 — the to-do's tags, resolved to display names in the
+        // viewer's language (the <see cref="PostsController"/> detail idiom —
+        // <c>ListForActorAsync</c> already does the TagTranslation lookup).
+        // A "read, not a decision" surface: the to-do's single Read decision
+        // ran in GetTodoAsync above; a dangling TagId simply drops (renders as
+        // nothing, not a 404). No <c>ITagService</c> (test construction site)
+        // ⇒ empty list (no-op).
+        var tagRows = new List<(string Slug, string DisplayedName)>();
+        if (tags is not null && result.Todo.TagIds.Count > 0)
+        {
+            var todoTagIds = result.Todo.TagIds.ToHashSet(StringComparer.Ordinal);
+            var readable = await tags.ListForActorAsync(actorId);
+            tagRows = readable
+                .Where(t => todoTagIds.Contains(t.Tag.Id))
+                .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
+                .OrderBy(x => x.DisplayedName, StringComparer.Ordinal)
+                .ThenBy(x => x.Slug, StringComparer.Ordinal)
+                .ToList();
+        }
+
         var vm = new TodoDetailViewModel(
             Todo: row,
             Subtasks: subtasks,
@@ -975,7 +1008,8 @@ public sealed class ProjectsController : Controller
             // <c>EventId</c> (the <c>&lt;select&gt;</c> prefill).
             EventPicker: new TodoEventPicker(
                 Options: await SeedEventPickerAsync(),
-                CurrentEventId: result.Todo.EventId));
+                CurrentEventId: result.Todo.EventId),
+            Tags: tagRows);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1035,9 +1069,15 @@ public sealed class ProjectsController : Controller
             ComponentId = todo.ComponentId,
             Audience    = AudienceEditorModel.FromAudience(todo.Audience),
             LanguageCode = todo.LanguageCode,
-            TagIds      = todo.TagIds is { Count: > 0 }
-                ? System.Text.Json.JsonSerializer.Serialize(todo.TagIds)
-                : null,
+            // ADR 0044 / 0147 — the tag-suggest input self-wires its own
+            // `name="TagIds"` hidden field (a JSON array of the author's typed
+            // labels); the edit prefill re-seeds the chips from the stored
+            // tags' **slugs** (the <see cref="SeedExistingTagSlugsAsync"/>
+            // → <c>ExistingTagSlugs</c> → <c>data-tag-suggest-initial</c>
+            // shape). The bound <c>TagIds</c> stays null — the component's
+            // hidden field is the form field on POST.
+            TagIds      = null,
+            ExistingTagSlugs = await SeedExistingTagSlugsAsync(todo.TagIds),
             Languages   = await SeedLanguagePickerAsync(),
             Components  = await SeedComponentPickerAsync(),
             // ADR 0086 D9 — the **project picker** (display surface, never a
@@ -1203,7 +1243,7 @@ public sealed class ProjectsController : Controller
             DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
-            TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
+            TagSlugs = TagSlugs.Parse(model.TagIds), // ADR 0044 / 0147 — server-side parse + normalize (the request carries slugs; the doc stores ids).
         };
 
         TodoItem todo;
@@ -1254,6 +1294,34 @@ public sealed class ProjectsController : Controller
 
         TempData["info"] = "To-do created.";
         return Redirect($"/projects/todos/{todo.Id}");
+    }
+
+    /// <summary>
+    /// ADR 0044 / 0147 — the edit lane's tag-suggest
+    /// <c>data-tag-suggest-initial</c> prefill: resolves a doc's stored
+    /// <see cref="TodoItem.TagIds"/> / <see cref="KanbanBoard.TagIds"/>
+    /// (the resolved ids) to the <see cref="Tag"/> slugs the
+    /// <c>tag-suggest.ts</c> component re-seeds into chips. The
+    /// <see cref="Posts.PostsController"/> <c>SeedExistingTagSlugsAsync</c>
+    /// shape. A null / empty id list yields an empty chip set; a dangling id
+    /// (a removed <c>Tag</c> row) simply drops (no error, no 404 — a read
+    /// surface).
+    /// </summary>
+    private async Task<IReadOnlyList<string>> SeedExistingTagSlugsAsync(IReadOnlyList<string>? tagIds)
+    {
+        if (tagIds is not { Count: > 0 })
+            return [];
+
+        await using var session = store.QuerySession();
+        var idSet = tagIds.ToHashSet(StringComparer.Ordinal);
+        var tagDocs = await session.Query<Tag>()
+            .Where(t => idSet.Contains(t.Id))
+            .ToListAsync(HttpContext.RequestAborted);
+        return tagDocs
+            .Select(t => t.Slug)
+            .Where(s => !string.IsNullOrEmpty(s))
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
@@ -1367,7 +1435,7 @@ public sealed class ProjectsController : Controller
             StartAt = model.StartAt is not null ? new DateTimeOffset(model.StartAt.Value, zone.GetUtcOffset(model.StartAt.Value)).UtcDateTime : null,
             DueAt   = model.DueAt   is not null ? new DateTimeOffset(model.DueAt.Value,   zone.GetUtcOffset(model.DueAt.Value)).UtcDateTime   : null,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
-            TagIds = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds),
+            TagSlugs = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds), // ADR 0044 / 0147 — null = leave stored tags untouched; empty = detach all.
         };
 
         try
@@ -1747,7 +1815,7 @@ public sealed class ProjectsController : Controller
             ParentId = id, // the route's to-do is the parent (C-M5·7 — the sole hierarchy mechanism)
             Audience = null, // the subtask is public (the ADR 0001-B `null` shape); the detail page's grant surface governs the parent, not the child
             LanguageCode = null, // materialized from the instance default server-side (ADR 0018)
-            TagIds = null,
+            TagSlugs = null, // the subtask form posts no tags (the simplified inline "add subtask" shape).
         };
 
         try
@@ -2148,6 +2216,26 @@ public sealed class ProjectsController : Controller
         // single Read decision already ran in GetBoardAsync (C-M3·1).
         var boardTranslations = await projects.GetBoardTranslationsAsync(id);
 
+        // ADR 0044 / 0147 — the board's tags, resolved to display names in
+        // the viewer's language (the <see cref="PostsController"/> detail
+        // idiom — <c>ListForActorAsync</c> already does the TagTranslation
+        // lookup). A "read, not a decision" surface: the board's single Read
+        // decision ran in GetBoardAsync above; a dangling TagId simply drops
+        // (renders as nothing, not a 404). No <c>ITagService</c> (test
+        // construction site) ⇒ empty list (no-op).
+        var boardTagRows = new List<(string Slug, string DisplayedName)>();
+        if (tags is not null && result.Board.TagIds.Count > 0)
+        {
+            var boardTagIds = result.Board.TagIds.ToHashSet(StringComparer.Ordinal);
+            var readable = await tags.ListForActorAsync(actorId);
+            boardTagRows = readable
+                .Where(t => boardTagIds.Contains(t.Tag.Id))
+                .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
+                .OrderBy(x => x.DisplayedName, StringComparer.Ordinal)
+                .ThenBy(x => x.Slug, StringComparer.Ordinal)
+                .ToList();
+        }
+
         var vm = new BoardDetailViewModel(
             Board: boardRow,
             Lanes: laneRows,
@@ -2176,7 +2264,8 @@ public sealed class ProjectsController : Controller
             Languages: LanguageOptionsFrom(boardTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode),
             CanTranslate: !string.IsNullOrEmpty(actorId)
                           && ProjectService.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
-            OriginalLanguageCode: result.Board.LanguageCode);
+            OriginalLanguageCode: result.Board.LanguageCode,
+            Tags: boardTagRows);
         // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
         // assignee picker. Seed the standing assignee options (verified,
         // non-self profiles) the way the Create / BoardNew views do, so the
@@ -2276,6 +2365,15 @@ public sealed class ProjectsController : Controller
             // association prefill posts blank = clear).
             ProjectId = board.ProjectId,
             Projects = await SeedProjectPickerAsync(),
+            // ADR 0044 / 0147 — the tag-suggest input self-wires its own
+            // `name="TagIds"` hidden field (a JSON array of the author's typed
+            // labels); the edit prefill re-seeds the chips from the stored
+            // tags' **slugs** (the <see cref="SeedExistingTagSlugsAsync"/>
+            // → <c>ExistingTagSlugs</c> → <c>data-tag-suggest-initial</c>
+            // shape). The bound <c>TagIds</c> stays null — the component's
+            // hidden field is the form field on POST.
+            TagIds = null,
+            ExistingTagSlugs = await SeedExistingTagSlugsAsync(board.TagIds),
         };
         // The _GrantPickers partial reads these from ViewData (the M2/M3/M4
         // shared shape — the create lane's precedent).
@@ -2324,6 +2422,12 @@ public sealed class ProjectsController : Controller
             // ADR 0098 — the posted audience is the actor's complete choice,
             // written verbatim (ADR 0001-B — the single deserialization site).
             Audience = model.Audience.BuildAudience(),
+            // ADR 0044 / 0147 — the posted tag slugs (the tag-suggest hidden
+            // field, a JSON array of the author's typed labels). `null` =
+            // leave stored tags untouched (the tag-suggest form always posts
+            // the field, so `null` is the "field absent" edge); `[]` = detach
+            // all; non-empty = replace.
+            TagSlugs = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds),
         };
 
         try
@@ -2490,6 +2594,12 @@ public sealed class ProjectsController : Controller
             ComponentId = string.IsNullOrWhiteSpace(model.ComponentId) ? null : model.ComponentId,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            // ADR 0044 / 0147 — the author's typed tag labels (the tag-suggest
+            // hidden field, a JSON array of labels) parsed to clean slugs
+            // (the <see cref="Kumunita.Web.Security.TagSlugs"/> parse — null /
+            // empty ⇒ no attach; non-empty ⇒ resolved to <c>Tag</c> ids by
+            // the <c>AttachToBoardAsync</c> lane).
+            TagSlugs = TagSlugs.Parse(model.TagIds),
             Lanes = model.Lanes
                 .Where(l => !string.IsNullOrWhiteSpace(l.Title))
                 .Select((l, i) => new CreateLaneRequest

@@ -123,6 +123,15 @@ public static class FirstBootSeeder
         // 4. Language catalog (ADR 0005: source-language row + instance default).
         await SeedLanguageCatalogAsync(mt, logger, ct);
 
+        // 4b. Site content (SITE lane, ADR 0150): the landing-surface
+        // `SiteContent` singleton (the two heroes' editable eyebrow + lead and
+        // the 9 section toggles) — the same "one row per instance" shape as the
+        // `LocaleSettings` singleton seeded in step 4. Create-if-missing,
+        // idempotent, never-overwrites (an admin's later edit is honored on a
+        // warm re-run); the 4 text-field defaults are the exact `en` source
+        // text from `KnownTranslationKeys` (SITE·3).
+        await SeedSiteContentAsync(mt, logger, ct);
+
         // 5. Canonical `en` UI strings + the `en` terms/help/privacy/conduct pages
         // (ML-UI U1 — D2; the four-page set per ADR 0043 D1/D5): materializes the
         // M·9 `en` floor + the M·12 completeness universe. Runs
@@ -352,6 +361,85 @@ public static class FirstBootSeeder
             "First boot: language catalog seeded (source language '{Lang}' enabled, sort 0; bundled initial pack " +
             "'de' sort 1, 'fr' sort 2 — ADR 0042 D4; pre-seeded 'da' DISABLED, sort 3); instance default stays '{Lang}'.",
             SourceLanguage, SourceLanguage);
+    }
+
+    /// <summary>
+    /// SITE lane (ADR 0150) — seed the <see cref="SiteContent.SiteContent"/>
+    /// singleton: the two landing heroes' editable eyebrow + lead text and the
+    /// show/hide toggle for every other section of <c>/home</c> and
+    /// <c>/about</c>. The <c>LocaleSettings</c> "one row per instance" shape
+    /// (ADR 0005 B): a single row, <c>Id = "singleton"</c>, so re-resolving it
+    /// is a plain identity-keyed load.
+    /// <para>
+    /// <b>Create-if-missing, idempotent, never-overwrites</b> (the
+    /// <see cref="SeedLanguageCatalogAsync"/> / <see cref="SeedDefaultPagesAsync"/>
+    /// shape): a fresh boot stores exactly one row with the 13 fields at their
+    /// defaults; a second boot (a warm re-run) leaves an existing row untouched,
+    /// so an admin's later edit is honored (SITE·3 / SITE·6).
+    /// </para>
+    /// <para>
+    /// The 4 text-field defaults are the **exact** <c>en</c> source text from
+    /// <see cref="KnownTranslationKeys.EnValues"/> (the
+    /// <c>home.intro_eyebrow</c> / <c>home.intro_lead</c> / <c>about.eyebrow</c>
+    /// / <c>about.lead</c> keys), read from the registry — not retyped (SITE·3,
+    /// byte-identical). The 9 toggle-field defaults are <c>true</c> (every
+    /// section shown).
+    /// </para>
+    /// <para>
+    /// <b>No <c>AccessAudit</c> row.</b> A first-boot seed is not an actor's
+    /// auditable action (the seeder is not a principal) — the single
+    /// <c>SaveChangesAsync</c> commits the singleton row only.
+    /// </para>
+    /// <para>
+    /// <b>Public (not private)</b> so the Core test can pin the fresh-boot
+    /// state + idempotency across two live boots without an
+    /// <c>InternalsVisibleTo</c> (the repo's Core test constraint — only
+    /// <c>public</c> members are reachable; the <see cref="SeedDefaultPagesAsync"/>
+    /// precedent).
+    /// </para>
+    /// </summary>
+    public static async Task SeedSiteContentAsync(
+        IDocumentStore mt, ILogger logger, CancellationToken ct)
+    {
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        var existing = await session
+            .LoadAsync<SiteContent.SiteContent>(SiteContent.SiteContent.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            session.Store(new SiteContent.SiteContent
+            {
+                Id = SiteContent.SiteContent.SingletonId,
+                // 4 text fields — the exact `en` source text (SITE·3, byte-identical).
+                HomeHeroEyebrow = KnownTranslationKeys.EnValues["home.intro_eyebrow"],
+                HomeHeroLead = KnownTranslationKeys.EnValues["home.intro_lead"],
+                AboutHeroEyebrow = KnownTranslationKeys.EnValues["about.eyebrow"],
+                AboutHeroLead = KnownTranslationKeys.EnValues["about.lead"],
+                // 9 toggles — every section shown (the POCO initializers already
+                // default to `true`; set explicitly to make the seed's intent
+                // visible, mirroring SeedLanguageCatalogAsync's explicit defaults).
+                HomeShowAboutButton = true,
+                HomeShowFeatures = true,
+                HomeShowRoadmap = true,
+                AboutShowFeatures = true,
+                AboutShowScope = true,
+                AboutShowPhilosophy = true,
+                AboutShowProject = true,
+                AboutShowWhatsNew = true,
+                AboutShowContactCta = true,
+            });
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            logger.LogInformation(
+                "First boot: SiteContent singleton seeded (id 'singleton'; hero text = the shipped `kw-l` `en` text, all 9 section toggles shown — ADR 0150).");
+        }
+        else
+        {
+            logger.LogInformation(
+                "First boot: SiteContent singleton already present; skipping (idempotent, never-overwrites — ADR 0150).");
+        }
     }
 
     /// <summary>

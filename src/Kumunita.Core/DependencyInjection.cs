@@ -86,6 +86,19 @@ public static class ServiceCollectionExtensions
         // harnesses omit it). No factory needed.
         services.AddTransient<IIdentityService, IdentityService>();
 
+        // SITE (ADR 0150, plan U03): the landing-surface content seam — the
+        // SiteContent singleton's read + audited write lanes (the ADR 0050
+        // IsSignupOpen / SetSignupOpen single-write-lane shape, the
+        // LocaleSettings-parallel bounded context Kumunita.Core.SiteContent).
+        // The same "AddTransient with the store injected" shape as
+        // IUsageAnalyticsService / IPageService above: composes the
+        // host-registered Marten IDocumentStore (reads open a QuerySession,
+        // the audited write opens a write session — invariant C3). Core stays
+        // HTTP-free (ADR 0006-D): the Web gate (U07) is the only place the
+        // GlobalAdmin authorization is produced.
+        services.AddTransient<SiteContent.ISiteContentService>(sp => new SiteContent.SiteContentService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
@@ -323,7 +336,14 @@ public static class ServiceCollectionExtensions
             // 0020) — the recipient's effective zone/format floor (the kw-dt /
             // EventReminderService resolution order).
             sp.GetRequiredService<Localization.ITranslationProvider>(),
-            sp.GetRequiredService<Localization.ILocalizationService>()));
+            sp.GetRequiredService<Localization.ILocalizationService>(),
+            // ADR 0044 / 0147 — the tag attach lane (the todo + board write
+            // lanes resolve the author's typed slugs to <c>Tag</c> ids via
+            // <c>ITagService.AttachToTodoAsync</c> /
+            // <c>AttachToBoardAsync</c>, then persist the resolved ids onto the
+            // doc — the <c>PostService._tags</c> shape). Optional (CS1736); the
+            // production wiring passes the registered instance so tags attach.
+            sp.GetRequiredService<Tags.ITagService>()));
 
         // M16 (ADR 0117, plan U02): the Inventory bounded context's service
         // seam (bounded context Kumunita.Core.Inventory — the "track where
@@ -443,6 +463,23 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CommunityOptions>>(),
             sp.GetRequiredService<IMediaStore>(),
             sp.GetRequiredService<IMediaFileStore>()));
+
+        // M27 (ADR 0148, plan U01): the Portability context's resident-lane
+        // service shell (the same Kumunita.Core.Portability bounded context
+        // as M11's operator lane — a lane on the shipped surface, not a new
+        // context; C-M27·7: zero new AccessAction / AccessVia /
+        // IAuthorizationService branch / Audience). The service composes
+        // only the frozen seams: IDocumentStore (Marten, the domain docs),
+        // IUserInfoService (the resident standing reads), IMediaStore (the
+        // content-addressed bytes), UserManager (Identity, the resident's
+        // own account). U01 ships signatures only (the bodies are U03–U06);
+        // the Web surface + U09–U11 tests target IUserPortabilityService
+        // verbatim.
+        services.AddTransient<IUserPortabilityService>(sp => new UserPortabilityService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IMediaStore>(),
+            sp.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<User>>()));
 
         return services;
     }

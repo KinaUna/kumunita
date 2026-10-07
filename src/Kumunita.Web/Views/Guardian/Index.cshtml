@@ -180,12 +180,11 @@
                 <input id="Email" name="Email" type="email" class="form-control" maxlength="255" required />
             </div>
 
-            <div class="mb-3">
-                <label for="Password" class="form-label"><kw-l key="guardian.password">Password</kw-l></label>
-                <input id="Password" name="Password" type="password" class="form-control" minlength="8" required />
-            </div>
-
             @*
+                ADR 0146 — no password field: the child sets their own password at the
+                confirmation link (the guardian never holds the credential — ADR 0028
+                "supervision rides the link, not the password").
+
                 Guardian consent — before creation, the guardian confirms they
                 are the legal guardian and agrees to the child-account terms
                 (guardian duties + data-processing terms). The checkbox is the

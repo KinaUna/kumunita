@@ -1,0 +1,120 @@
+@model Kumunita.Web.Controllers.AdminSiteController.AdminSiteViewModel
+@{
+    ViewData["Title"] = "Admin — Site content";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2">Site content</h1>
+
+<p class="text-muted">
+    The copy and sections of the two landing surfaces — the home page
+    (<code>/</code>) and the about page (<code>/about</code>). Change the
+    hero text, or hide a section on either page. Save each page separately;
+    saving one does not touch the other.
+</p>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-info">@info</div>
+}
+
+<h2 class="h5 mt-4">Home page (<code>/</code>)</h2>
+<p class="text-muted">
+    The hero eyebrow and lead, and which of the home page's sections are
+    shown. A hidden section is removed from the page entirely — visitors
+    and screen readers never see it.
+</p>
+
+<form method="post" action="/admin/site/save-home">
+    @Html.AntiForgeryToken()
+    <div class="mb-3">
+        <label for="HomeHeroEyebrow" class="form-label">Hero eyebrow</label>
+        <input class="form-control" type="text" name="HomeHeroEyebrow" id="HomeHeroEyebrow" value="@Model.Home.HomeHeroEyebrow" />
+    </div>
+    <div class="mb-3">
+        <label for="HomeHeroLead" class="form-label">Hero lead</label>
+        <textarea class="form-control" name="HomeHeroLead" id="HomeHeroLead" rows="3">@Model.Home.HomeHeroLead</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="HomeShowAboutButton" class="form-label d-block">"What it is &amp; how it works" button</label>
+        @* A hidden "false" precedes each checkbox: an unchecked box posts
+           nothing, and a bool property with no posted value keeps its
+           default (true) — so without this, unchecking would silently
+           re-check on the next load. The hidden field always posts
+           "false"; the checkbox, when checked, posts "true" and wins. *@
+        <input type="hidden" name="HomeShowAboutButton" value="false" />
+        <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @checked(Model.Home.HomeShowAboutButton) />
+        <span class="form-text text-muted">Show the hero's link to the about page.</span>
+    </div>
+    <div class="mb-3">
+        <label for="HomeShowFeatures" class="form-label d-block">Intro sections</label>
+        <input type="hidden" name="HomeShowFeatures" value="false" />
+        <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @checked(Model.Home.HomeShowFeatures) />
+        <span class="form-text text-muted">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</span>
+    </div>
+    <div class="mb-3">
+        <label for="HomeShowRoadmap" class="form-label d-block">"The plan" section</label>
+        <input type="hidden" name="HomeShowRoadmap" value="false" />
+        <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @checked(Model.Home.HomeShowRoadmap) />
+        <span class="form-text text-muted">Show the roadmap of what the platform ships next.</span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save home page</button>
+</form>
+
+<hr />
+
+<h2 class="h5 mt-4">About page (<code>/about</code>)</h2>
+<p class="text-muted">
+    The hero eyebrow and lead, and which of the about page's sections are
+    shown. A hidden section is removed from the page entirely.
+</p>
+
+<form method="post" action="/admin/site/save-about">
+    @Html.AntiForgeryToken()
+    <div class="mb-3">
+        <label for="AboutHeroEyebrow" class="form-label">Hero eyebrow</label>
+        <input class="form-control" type="text" name="AboutHeroEyebrow" id="AboutHeroEyebrow" value="@Model.About.AboutHeroEyebrow" />
+    </div>
+    <div class="mb-3">
+        <label for="AboutHeroLead" class="form-label">Hero lead</label>
+        <textarea class="form-control" name="AboutHeroLead" id="AboutHeroLead" rows="3">@Model.About.AboutHeroLead</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowFeatures" class="form-label d-block">Feature cards</label>
+        <input type="hidden" name="AboutShowFeatures" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @checked(Model.About.AboutShowFeatures) />
+        <span class="form-text text-muted">Show the three cards describing what the platform is.</span>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowScope" class="form-label d-block">Scope band</label>
+        <input type="hidden" name="AboutShowScope" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @checked(Model.About.AboutShowScope) />
+        <span class="form-text text-muted">Show the "one neighborhood" scope band.</span>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowPhilosophy" class="form-label d-block">Philosophy band</label>
+        <input type="hidden" name="AboutShowPhilosophy" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @checked(Model.About.AboutShowPhilosophy) />
+        <span class="form-text text-muted">Show the FIG-philosophy band (Fair, Invisible, Generous).</span>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowProject" class="form-label d-block">Code &amp; docs band</label>
+        <input type="hidden" name="AboutShowProject" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @checked(Model.About.AboutShowProject) />
+        <span class="form-text text-muted">Show the links to the project's code and documentation.</span>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowWhatsNew" class="form-label d-block">"What's new" changelog</label>
+        <input type="hidden" name="AboutShowWhatsNew" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @checked(Model.About.AboutShowWhatsNew) />
+        <span class="form-text text-muted">Show the list of recent changes.</span>
+    </div>
+    <div class="mb-3">
+        <label for="AboutShowContactCta" class="form-label d-block">Contact band</label>
+        <input type="hidden" name="AboutShowContactCta" value="false" />
+        <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @checked(Model.About.AboutShowContactCta) />
+        <span class="form-text text-muted">Show the "something missing?" contact call-to-action.</span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save about page</button>
+</form>

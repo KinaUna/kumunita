@@ -19,9 +19,24 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.42.0", "2026-10-07", new List<string>
+        {
+            "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide: a GlobalAdmin can now change what the home and about pages say (the hero eyebrow + lead) and choose which sections appear at all; the defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0150).",
+        }),
+        new("0.41.0", "2026-10-07", new List<string>
+        {
+            "Home, your way — if you've seen the intro enough, hide it: a new Home page setting turns off the two " +
+                "intro sections (what Kumunita is and what it does) so the home page opens straight on what's new; " +
+                "switch it off any time to see them again, and it's saved on your account only (ADR 0149).",
+        }),
+        new("0.40.0", "2026-10-07", new List<string>
+        {
+            "My data — you can now move your own content out of the platform and back in again: export the posts, replies, events, projects, documents, pages, messages and images you created into one portable archive (your account stays yours — no passwords or tokens ever travel with it), and when you bring that archive into a community where some of its references don't exist, you choose for each one whether to add it somewhere you belong or to discard it — nothing is merged on your behalf (ADR 0148).",
+        }),
         new("0.39.0", "2026-10-06", new List<string>
         {
             "Sorting — feeds, lists, and search results now offer a sort control (posts, events, projects, announcements, documents, inventory, tags, people find, and search): choose what to sort by and the direction, carried through the pager links like M7's filters; an unchosen sort behaves exactly as before, and sorting never changes what you can see (ADR 0145).",
+            "Child accounts are yours, not your parent's — when a guardian adds a child account they no longer set the child's password; the child sets their own when they open the confirmation link, and the guardian keeps their usual controls (suspend, memberships, invitations) without ever holding the credential (ADR 0146).",
         }),
         new("0.38.0", "2026-10-05", new List<string>
         {

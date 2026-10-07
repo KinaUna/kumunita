@@ -36,6 +36,16 @@
         <div class="fw-semibold">Sign-up</div>
         <small class="text-muted">Whether new residents may create an account on their own — close it for invitation-only sign-up.</small>
     </a>
+    @* ADR 0150 (SITE lane) — the /admin/site surface: the GlobalAdmin's edit
+       page for the two landing surfaces (/home + /about) — the hero text and
+       the show/hide toggles for each section. The row label is plain text
+       (the admin view's local convention — mostly non-kw-l English, so an
+       interpolated kw-l key would break the KwLRegistryConsistencyTests
+       static key scan). *@
+    <a href="/admin/site" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Site content</div>
+        <small class="text-muted">Edit the landing surfaces' hero text and choose which sections are shown on the home and about pages.</small>
+    </a>
     <a href="/admin/help" class="list-group-item list-group-item-action">
         <div class="fw-semibold">Help pages</div>
         <small class="text-muted">Reset the seeded platform help pages — per page, or every page at once — back to their shipped text.</small>

@@ -90,6 +90,15 @@ when you change behavior:
   follows. **Tests pin the exact order + the single-in-progress milestone
   (`tests/Kumunita.Web.Tests/MilestonesTests.cs`)** — keep that file in step
   with any roadmap reorder.
+- **`src/Kumunita.Web/WhatsNew.cs`** (the "What's new" registry, ADR 0110,
+  pinned by `tests/Kumunita.Web.Tests/WhatsNewTests.cs`) — the platform's
+  version history. When a milestone **or a named lane ships**, add its version
+  (newest-first; or extend the newest row) here — this is a **required sixth
+  member** of the close flip above. The milestone-flip contract
+  (`Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
+  `MilestonesTests.cs`) does **not** name it, which is why it is easy to miss
+  (M27 shipped 2026-10-07 with no entry until caught in review — added as
+  0.40.0). "Shipped" = the close unit ran, not "in progress."
 - When a **new capability lands out of the M-letter order**, it gets a *named
   lane* with a short ID — **not** a renumber. Precedent: the media/avatars
   lane (ADR 0011, "M4-adjacent") and **group posts** (`GP`, ADR 0013, "no

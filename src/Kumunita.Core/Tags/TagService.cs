@@ -377,6 +377,196 @@ public sealed class TagService : ITagService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Tag>> AttachToTodoAsync(
+        string todoId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(todoId))
+            throw new ArgumentException("A to-do id is required.", nameof(todoId));
+        if (slugs is null) throw new ArgumentNullException(nameof(slugs));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var todo = await session.LoadAsync<Projects.TodoItem>(todoId);
+        if (todo is null)
+            throw new KeyNotFoundException(
+                $"To-do '{todoId}' was not found in the session; nothing to attach.");
+
+        // Standing (C-TG·5; ADR 0147 — the to-do's own edit lane: creator ∪
+        // assignee ∪ GlobalAdmin — the <c>ProjectService.CheckTodoStanding</c>
+        // shape, re-checked here so the tag lane is self-contained):
+        if (!CanAttachToTodo(todo, actorId, roles))
+            throw new UnauthorizedAccessException(
+                "Only the to-do's creator, its assignee, or a GlobalAdmin may attach tags to it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var via = ResolveAttachVia(todo.AuthorId, actorId, roles);
+        var resolvedTags = new List<Tag>(slugs.Count);
+        var tagIds = new List<string>(slugs.Count);
+
+        foreach (var slug in slugs)
+        {
+            var derivedSlug = DeriveSlug(slug);
+
+            var existing = await session.Query<Tag>()
+                .Where(t => t.Slug == derivedSlug)
+                .FirstOrDefaultAsync();
+
+            if (existing is not null)
+            {
+                resolvedTags.Add(existing);
+                tagIds.Add(existing.Id);
+            }
+            else
+            {
+                var tag = new Tag
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Slug = derivedSlug,
+                    Name = derivedSlug,
+                    LanguageCode = string.IsNullOrEmpty(todo.LanguageCode) ? "en" : todo.LanguageCode,
+                    CreatedBy = actorId,
+                    Created = now,
+                };
+
+                var createAudit = new Authorization.AccessAudit
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    At = now,
+                    ActorId = actorId,
+                    EffectivePrincipalId = actorId,
+                    Action = "tag.create",
+                    TargetKind = "tag",
+                    TargetId = tag.Id,
+                    Via = via,
+                    Outcome = Authorization.AccessOutcome.Allow,
+                };
+
+                session.Store(tag);
+                session.Store(createAudit);
+                resolvedTags.Add(tag);
+                tagIds.Add(tag.Id);
+            }
+        }
+
+        todo.TagIds = tagIds;
+
+        var attachAudit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "tag.attach",
+            TargetKind = "todo",
+            TargetId = todoId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow,
+        };
+        session.Store(attachAudit);
+
+        await session.SaveChangesAsync();
+        return resolvedTags;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Tag>> AttachToBoardAsync(
+        string boardId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(boardId))
+            throw new ArgumentException("A board id is required.", nameof(boardId));
+        if (slugs is null) throw new ArgumentNullException(nameof(slugs));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var board = await session.LoadAsync<Projects.KanbanBoard>(boardId);
+        if (board is null)
+            throw new KeyNotFoundException(
+                $"Board '{boardId}' was not found in the session; nothing to attach.");
+
+        // Standing (C-TG·5; ADR 0147 — the board's own edit lane: creator ∪
+        // GlobalAdmin — the <c>ProjectService.CheckBoardStanding</c> shape,
+        // re-checked here so the tag lane is self-contained):
+        if (!CanAttachToBoard(board, actorId, roles))
+            throw new UnauthorizedAccessException(
+                "Only the board's creator or a GlobalAdmin may attach tags to it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var via = ResolveAttachVia(board.AuthorId, actorId, roles);
+        var resolvedTags = new List<Tag>(slugs.Count);
+        var tagIds = new List<string>(slugs.Count);
+
+        foreach (var slug in slugs)
+        {
+            var derivedSlug = DeriveSlug(slug);
+
+            var existing = await session.Query<Tag>()
+                .Where(t => t.Slug == derivedSlug)
+                .FirstOrDefaultAsync();
+
+            if (existing is not null)
+            {
+                resolvedTags.Add(existing);
+                tagIds.Add(existing.Id);
+            }
+            else
+            {
+                var tag = new Tag
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Slug = derivedSlug,
+                    Name = derivedSlug,
+                    LanguageCode = string.IsNullOrEmpty(board.LanguageCode) ? "en" : board.LanguageCode,
+                    CreatedBy = actorId,
+                    Created = now,
+                };
+
+                var createAudit = new Authorization.AccessAudit
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    At = now,
+                    ActorId = actorId,
+                    EffectivePrincipalId = actorId,
+                    Action = "tag.create",
+                    TargetKind = "tag",
+                    TargetId = tag.Id,
+                    Via = via,
+                    Outcome = Authorization.AccessOutcome.Allow,
+                };
+
+                session.Store(tag);
+                session.Store(createAudit);
+                resolvedTags.Add(tag);
+                tagIds.Add(tag.Id);
+            }
+        }
+
+        board.TagIds = tagIds;
+
+        var attachAudit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "tag.attach",
+            TargetKind = "board",
+            TargetId = boardId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow,
+        };
+        session.Store(attachAudit);
+
+        await session.SaveChangesAsync();
+        return resolvedTags;
+    }
+
+    /// <inheritdoc />
     public async Task<TagTranslation> AddTagTranslationAsync(
         string tagId, string languageCode, string name,
         string actorId, IReadOnlySet<string> roles, IDocumentSession session)
@@ -773,6 +963,32 @@ public sealed class TagService : ITagService
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(roles);
         return string.Equals(document.OwnerId, actorId, StringComparison.Ordinal)
+               || roles.Contains(Roles.GlobalAdmin);
+    }
+
+    /// <inheritdoc />
+    public bool CanAttachToTodo(
+        Projects.TodoItem todo, string actorId, IReadOnlySet<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(todo);
+        ArgumentNullException.ThrowIfNull(roles);
+        // The to-do's own edit lane (creator ∪ assignee ∪ GlobalAdmin — the
+        // <c>ProjectService.CheckTodoStanding</c> shape, ADR 0147):
+        return string.Equals(todo.AuthorId, actorId, StringComparison.Ordinal)
+               || roles.Contains(Roles.GlobalAdmin)
+               || (!string.IsNullOrEmpty(todo.AssigneeId)
+                   && string.Equals(todo.AssigneeId, actorId, StringComparison.Ordinal));
+    }
+
+    /// <inheritdoc />
+    public bool CanAttachToBoard(
+        Projects.KanbanBoard board, string actorId, IReadOnlySet<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        ArgumentNullException.ThrowIfNull(roles);
+        // The board's own edit lane (creator ∪ GlobalAdmin — the
+        // <c>ProjectService.CheckBoardStanding</c> shape, ADR 0147):
+        return string.Equals(board.AuthorId, actorId, StringComparison.Ordinal)
                || roles.Contains(Roles.GlobalAdmin);
     }
 

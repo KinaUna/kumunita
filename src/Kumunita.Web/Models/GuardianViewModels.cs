@@ -123,14 +123,17 @@ public sealed record MembershipEditorModel(
     IReadOnlyList<PendingCommunityRequestItem> PendingCommunityRequests);
 
 /// <summary>
-/// The <b>add-a-child</b> form model (GU, ADR 0028) bound via <c>[FromForm]</c> on
-/// <c>GuardianController.AddChild</c>. The <b>guardian</b> is never form-bound — it
-/// is minted by the Web layer from <c>KumunitaPrincipal.SubjectId(User)</c> (the
-/// single identity source) and passed as the <c>guardianId</c> argument to the Core
-/// seam <see cref="Kumunita.Core.UserInfo.IUserInfoService.CreateGuardianLinkAsync"/>
-/// (one commit, G·4). <see cref="DisplayName"/> / <see cref="Email"/> /
-/// <see cref="Password"/> feed the usual <c>RegisterAsync</c> signup lane — the
-/// verification email is M1's, the form does not bypass it.
+/// The <b>add-a-child</b> form model (GU, ADR 0028; ADR 0146) bound via
+/// <c>[FromForm]</c> on <c>GuardianController.AddChild</c>. The <b>guardian</b> is
+/// never form-bound — it is minted by the Web layer from
+/// <c>KumunitaPrincipal.SubjectId(User)</c> (the single identity source) and
+/// passed as the <c>guardianId</c> argument to the Core seam
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.CreateGuardianLinkAsync"/>
+/// (one commit, G·4). <see cref="DisplayName"/> / <see cref="Email"/> feed the
+/// <see cref="Kumunita.Core.Identity.IIdentityService.RegisterChildAccountAsync"/>
+/// child-formation lane — **no password field** (ADR 0146: the guardian does not
+/// set the child's credential; the child sets their own at the confirmation
+/// link, the ADR 0028 "supervision rides the link, not the password" shape).
 /// <see cref="GuardianConsent"/> is the guardian's consent to the child-account
 /// terms (guardian confirmation + data-processing terms), bound from the
 /// "I consent" checkbox on the add-a-child form; creation is refused until it
@@ -145,10 +148,6 @@ public sealed class AddChildForm
     [Required, EmailAddress, MaxLength(255)]
     [Display(Name = "Email address")]
     public string? Email { get; set; }
-
-    [Required, DataType(DataType.Password), MinLength(8)]
-    [Display(Name = "Password")]
-    public string? Password { get; set; }
 
     [Required]
     [Display(Name = "Guardian consent")]

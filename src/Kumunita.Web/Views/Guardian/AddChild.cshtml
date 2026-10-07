@@ -8,7 +8,9 @@
         <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; Back to your children</a></p>
 
         <h1><kw-l key="guardian.add">Add a child account</kw-l></h1>
-        <p class="text-muted">The child verifies their own email to sign in — the usual sign-up flow.</p>
+        <p class="text-muted">
+            <kw-l key="guardian.child_email_hint">The child opens the confirmation link in their email to set their own password and sign in — you don't need (or set) their password.</kw-l>
+        </p>
 
 
         @*
@@ -36,13 +38,11 @@
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="Password" class="form-label"><kw-l key="common.password">Password</kw-l></label>
-                <input asp-for="Password" class="form-control" minlength="8" required />
-                <span asp-validation-for="Password" class="text-danger"></span>
-            </div>
-
             @*
+                ADR 0146 — no password field: the child sets their own password at the
+                confirmation link (the guardian never holds the credential — ADR 0028
+                "supervision rides the link, not the password").
+
                 Guardian consent — before creation, the guardian confirms they
                 are the legal guardian and agrees to the child-account terms
                 (guardian duties + data-processing terms). The checkbox is the

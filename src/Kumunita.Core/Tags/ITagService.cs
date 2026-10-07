@@ -1,5 +1,6 @@
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Projects;
 using Kumunita.Core.Query;
 using Marten;
 
@@ -55,6 +56,38 @@ public interface ITagService
     /// </summary>
     Task<IReadOnlyList<Tag>> AttachToDocumentAsync(
         string documentId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session);
+
+    /// <summary>
+    /// Attach / detach the <paramref name="slugs"/> set on a <see
+    /// cref="Kumunita.Core.Projects.TodoItem"/> (ADR 0147 — the TG convention
+    /// carried to the M5 to-do surface). Standing = the to-do's existing edit
+    /// lane (**creator ∪ assignee ∪ GlobalAdmin** — the
+    /// <c>ProjectService.CheckTodoStanding</c> shape, re-checked here as
+    /// <see cref="CanAttachToTodo"/>; C-TG·5). A not-yet-existing <c>Slug</c>
+    /// is created (the actor becomes <c>CreatedBy</c>, C-TG·4); the resolved
+    /// <c>Tag</c> ids are written onto <c>TodoItem.TagIds</c>. One
+    /// <c>tag.attach</c> row (<c>TargetKind = "todo"</c>) + one
+    /// <c>tag.create</c> per newly created tag.
+    /// </summary>
+    Task<IReadOnlyList<Tag>> AttachToTodoAsync(
+        string todoId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<string> roles, IDocumentSession session);
+
+    /// <summary>
+    /// Attach / detach the <paramref name="slugs"/> set on a <see
+    /// cref="Kumunita.Core.Projects.KanbanBoard"/> (ADR 0147 — the TG
+    /// convention carried to the M5 board surface). Standing = the board's
+    /// existing edit lane (**creator ∪ GlobalAdmin** — the
+    /// <c>ProjectService.CheckBoardStanding</c> shape, re-checked here as
+    /// <see cref="CanAttachToBoard"/>; C-TG·5). A not-yet-existing <c>Slug</c>
+    /// is created (the actor becomes <c>CreatedBy</c>, C-TG·4); the resolved
+    /// <c>Tag</c> ids are written onto <c>KanbanBoard.TagIds</c>. One
+    /// <c>tag.attach</c> row (<c>TargetKind = "board"</c>) + one
+    /// <c>tag.create</c> per newly created tag.
+    /// </summary>
+    Task<IReadOnlyList<Tag>> AttachToBoardAsync(
+        string boardId, IReadOnlyList<string> slugs,
         string actorId, IReadOnlySet<string> roles, IDocumentSession session);
 
     /// <summary>
@@ -146,6 +179,27 @@ public interface ITagService
     /// </summary>
     bool CanAttachToDocument(
         Kumunita.Core.Documents.Document document,
+        string actorId, IReadOnlySet<string> roles);
+
+    /// <summary>
+    /// True if the actor is the to-do's **creator**, its **assignee**, or a
+    /// GlobalAdmin (the <c>ProjectService.CheckTodoStanding</c> shape —
+    /// creator ∪ assignee ∪ GlobalAdmin, ADR 0147). A display pin (the Web
+    /// renders the affordance); the real deny is the
+    /// <see cref="AttachToTodoAsync"/> standing re-check.
+    /// </summary>
+    bool CanAttachToTodo(
+        Kumunita.Core.Projects.TodoItem todo,
+        string actorId, IReadOnlySet<string> roles);
+
+    /// <summary>
+    /// True if the actor is the board's **creator** or a GlobalAdmin (the
+    /// <c>ProjectService.CheckBoardStanding</c> shape — creator ∪ GlobalAdmin,
+    /// ADR 0147). A display pin; the real deny is the
+    /// <see cref="AttachToBoardAsync"/> standing re-check.
+    /// </summary>
+    bool CanAttachToBoard(
+        Kumunita.Core.Projects.KanbanBoard board,
         string actorId, IReadOnlySet<string> roles);
 
     /// <summary>

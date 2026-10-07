@@ -1,9 +1,16 @@
 @model Kumunita.Web.Models.TodoEditorModel
 @using Kumunita.Web.Security
 @using Kumunita.Core.Projects
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "New to-do";
     string[] modes = { "Any", "All" };
+    // ADR 0044 / 0147 — the tag input's placeholder example (the
+    // tags.events_example registry key — the neighborhood-appropriate
+    // cleanup/social/garden set, the Event/Create.cshtml idiom).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var tagsExample = await Translation.GetAsync("tags.events_example", _kwL);
     // The assignee picker draws on the same option list the _GrantPickers
     // partial draws on (the M2/M3/M4 shared shape, seeded by the controller's
     // SeedGrantPickerOptionsAsync) — display + standing, never a gate (C-M5·6).
@@ -183,6 +190,25 @@
                 </div>
             }
 
+            @* ADR 0044 / 0147 — the composer tag input (a free-text field +
+               autocomplete dropdown). `data-tag-suggest` is the self-wire
+               selector for client/lib/tag-suggest.ts (tsc-only, RE·3); the
+               module creates the chips, the dropdown, and the hidden
+               `TagIds` submission field around this input. The filter is
+               server-side via POST /api/tags/suggest (C-TG·2 / C-TG·4). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           maxlength="64"
+                           placeholder="@tagsExample" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this to-do.</kw-l>
+                    </div>
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
@@ -318,6 +344,7 @@
 
 @section Scripts {
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
     <partial name="_GrantPickerScripts" />
     @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
        _Layout.cshtml — SECURITY.md §6). *@

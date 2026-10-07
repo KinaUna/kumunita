@@ -197,7 +197,13 @@ public sealed record TodoDetailViewModel(
     // to-do's current selection. `null` = the actor has no visible events —
     // the picker card hides (the ADR 0086 D9 <c>Projects.Count &gt; 0</c>
     // hide rule; the picker is a display surface, never a gate, C-M14·4).
-    TodoEventPicker? EventPicker = null);
+    TodoEventPicker? EventPicker = null,
+    // ADR 0044 / 0147 — the to-do's tags, resolved to display names in the
+    // viewer's language (the <see cref="Posts.PostDetailViewModel.Tags"/>
+    // shape). A "read, not a decision" surface: the to-do's single Read
+    // decision already ran; a dangling TagId simply drops (renders as
+    // nothing, not a 404). Empty = no chips.
+    IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null);
 
 /// <summary>
 /// The **event picker** affordance on the to-do detail (ADR 0115 D3, the M14
@@ -428,6 +434,16 @@ public sealed class TodoEditorModel
     /// server-side by <see cref="Kumunita.Web.Security.TagSlugs.Parse"/>
     /// (the M4 idiom — the client never posts a structured shape).</summary>
     public string? TagIds { get; set; }
+
+    /// <summary>The to-do's **current** tag slugs (the edit lane's
+    /// <c>tag-suggest.ts</c> <c>data-tag-suggest-initial</c> prefill).
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="TagIds"/> string,
+    /// not a slug list. Seeded server-side from the stored to-do's
+    /// <c>TagIds</c> → <c>Tag</c> slugs (the
+    /// <see cref="Posts.PostsController"/>
+    /// <c>SeedExistingTagSlugsAsync</c> shape).</summary>
+    [BindNever]
+    public IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
 
     /// <summary>
     /// true when the model is well-formed for a round-trip. <see

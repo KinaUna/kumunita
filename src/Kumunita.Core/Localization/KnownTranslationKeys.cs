@@ -405,7 +405,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "Email address",
             ["guardian.password"]            = "Password",
             ["guardian.child_email_hint"]    =
-                "The child verifies their own email to sign in — the usual sign-up flow.",
+                "The child opens the confirmation link in their email to set their own password and sign in — you don't need (or set) their password.",
             ["guardian.consent.intro"]       =
                 "By creating this profile, you confirm that you are the legal " +
                 "guardian of this child. As their guardian, you maintain full " +
@@ -655,6 +655,19 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Save",
             ["settings.pagesize_flash_set"]    = "Items per page set to \"{0}\" — it takes effect on the next request.",
             ["settings.pagesize_flash_reset"]  = "Items per page reset — the platform default will be used.",
+
+            // ── settings — home page (the resident's hide-home-intro display
+            // preference, ADR 0149 D1) ─────────────────────────────────────
+            ["settings.home_title"]        = "Home page",
+            ["settings.home_lede"]         =
+                "The home page opens with two intro sections (what Kumunita is and what it does) " +
+                "before the feed. Turn this on to land straight on what's new. " +
+                "Your choice is saved on your account and never affects other residents.",
+            ["settings.home_label"]        = "Hide the intro sections and show me the feed right away",
+            ["settings.home_note"]         = "When off, the home page shows its intro sections as usual.",
+            ["settings.home_save"]         = "Save",
+            ["settings.home_flash_hide"]   = "Home page updated — the intro sections are now hidden and the feed shows first.",
+            ["settings.home_flash_show"]   = "Home page updated — the intro sections will show again.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -1387,6 +1400,11 @@ public static class KnownTranslationKeys
             ["account.verify_pending"] =
                 "We're confirming your account — you'll be signed in in a moment.",
             ["account.verify_again"] = "Sign up again",
+            // ADR 0146 — the child-account handoff (the confirmation surface
+            // collects the child's own password before activating the account).
+            ["account.verify_set_password_lede"] =
+                "Set the password for this account — you're the one who will use it.",
+            ["account.verify_set_password_submit"] = "Set my password & sign in",
             ["account.resend_title"] = "Resend confirmation email",
             ["account.resend_lede"] =
                 "Enter the email you signed up with and we'll send a fresh verification link.",
@@ -1753,6 +1771,7 @@ public static class KnownTranslationKeys
             // ── events.mine (the EV-MINE "your upcoming events" section on /events — ADR 0065) ──
             ["events.mine.title"] = "Your upcoming events",
             ["events.mine.hint"] = "Events you've RSVPed to or organized.",
+            ["events.mine.show_more"] = "Show the {n} more events",
 
             // ── events.past (the EV-PAST toggle + empty state on /events — ADR 0109) ──
             ["events.upcoming"] = "Upcoming",
@@ -1835,6 +1854,13 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Hi {0},\n\nYour Kumunita account is set to verify on its first sign-in. " +
                 "Open this one-time link to confirm the account (it also signs you in):\n\n{1}\n\n" +
+                "If you didn't create this account, you can ignore this message.",
+            // ADR 0146 — the child lane's body: the one remaining step is to
+            // set the child's own password (the guardian set up the account
+            // but never held the credential).
+            ["email.verify_child_body"] =
+                "Hi {0},\n\nYour Kumunita account is ready. Open this one-time link to " +
+                "confirm the account and set your password (it also signs you in):\n\n{1}\n\n" +
                 "If you didn't create this account, you can ignore this message.",
             ["email.reminder_subject"] = "Reminder: {0}",
             ["email.reminder_body"] = "**{0}** is coming up: {1}{2}.",
@@ -2107,6 +2133,22 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Import this archive? This replaces the instance's content (the restore path — the operator's pre-import backup is the rollback).",
             ["portability.status.ok"]    = "Done.",
             ["portability.status.failure"] = "Refused — the archive was rejected before anything was written:",
+
+            // M27 (ADR 0148 D9) — the resident's own portability surface (the
+            // /account/portability index: the export button + the import upload
+            // form + the status area; U07). Deliberately a DISTINCT
+            // myportability.* namespace from M11's admin portability.* keys so
+            // the resident surface never collides with the operator surface.
+            // closed-key registry + KnownTranslationKeys_ParityTests enforce the
+            // × 4; myportability.status is a TempData string (the controller's
+            // fail-closed render), outside the kw-l TagHelper's reach.
+            ["myportability.index.title"]  = "My data",
+            ["myportability.export"]       = "Export",
+            ["myportability.import"]       = "Import",
+            ["myportability.import.resolve"] = "Apply my choices",
+            ["myportability.resolve.add_elsewhere"] = "Add elsewhere",
+            ["myportability.resolve.discard"] = "Discard",
+            ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — the file-facing bulk keys.
             ["translations.bulk.export"]     = "Download translations (CSV)",
@@ -2783,7 +2825,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "E-Mail-Adresse",
             ["guardian.password"]            = "Passwort",
             ["guardian.child_email_hint"]    =
-                "Das Kind bestätigt seine eigene E-Mail zur Anmeldung — der gewöhnliche Anmeldevorgang.",
+                "Das Kind öffnet den Bestätigungslink in seiner E-Mail, um sein eigenes Passwort festzulegen und sich anzumelden — du brauchst sein Passwort nicht (und setzt es nicht).",
             ["guardian.consent.intro"]       =
                 "Mit der Erstellung dieses Profils bestätigst du, dass du die " +
                 "gesetzliche Vertretung dieses Kindes bist. Als sein " +
@@ -3021,6 +3063,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Speichern",
             ["settings.pagesize_flash_set"]    = "Einträge pro Seite auf \"{0}\" gesetzt — es wirkt ab der nächsten Anfrage.",
             ["settings.pagesize_flash_reset"]  = "Einträge pro Seite zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
+
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Startseite",
+            ["settings.home_lede"]         =
+                "Die Startseite öffnet sich mit zwei Intro-Abschnitten (was Kumunita ist und was es kann) " +
+                "vor dem Feed. Aktiviere diese Option, um direkt zum Feed zu kommen. " +
+                "Deine Auswahl wird auf deinem Konto gespeichert und betrifft nie andere Bewohner.",
+            ["settings.home_label"]        = "Intro-Abschnitte ausblenden und mir sofort den Feed zeigen",
+            ["settings.home_note"]         = "Wenn aus, zeigt die Startseite ihre Intro-Abschnitte wie üblich.",
+            ["settings.home_save"]         = "Speichern",
+            ["settings.home_flash_hide"]   = "Startseite aktualisiert — die Intro-Abschnitte werden ausgeblendet, der Feed kommt zuerst.",
+            ["settings.home_flash_show"]   = "Startseite aktualisiert — die Intro-Abschnitte werden wieder gezeigt.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -3707,6 +3761,12 @@ public static class KnownTranslationKeys
             ["account.verify_pending"] =
                 "Wir bestätigen dein Konto — in einem Moment bist du angemeldet.",
             ["account.verify_again"] = "Erneut registrieren",
+            // ADR 0146 — die Handübergabe für ein Kind-Konto (die
+            // Bestätigungsseite nimmt das Passwort des Kindes selbst ab,
+            // bevor das Konto aktiviert wird).
+            ["account.verify_set_password_lede"] =
+                "Lege das Passwort für dieses Konto fest — du bist der, der es verwenden wird.",
+            ["account.verify_set_password_submit"] = "Mein Passwort festlegen & anmelden",
             ["account.resend_title"] = "Bestätigungs-E-Mail neu senden",
             ["account.resend_lede"] =
                 "Gib die E-Mail ein, mit der du dich registriert hast, und wir senden dir einen frischen Bestätigungslink.",
@@ -4051,6 +4111,7 @@ public static class KnownTranslationKeys
             // ── events.mine (der EV-MINE-Bereich „Deine Veranstaltungen“ auf /events — ADR 0065) ──
             ["events.mine.title"] = "Deine kommenden Veranstaltungen",
             ["events.mine.hint"] = "Veranstaltungen, die du bestätigt hast oder organisiert.",
+            ["events.mine.show_more"] = "Weitere {n} Veranstaltungen anzeigen",
 
             // ── events.past (der EV-PAST-Umschalter + Leerzustand auf /events — ADR 0109) ──
             ["events.upcoming"] = "Bevorstehend",
@@ -4126,6 +4187,14 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Hallo {0},\n\nDein Kumunita-Konto wird bei der ersten Anmeldung verifiziert. " +
                 "Öffne diesen einmaligen Link, um das Konto zu bestätigen (dabei wirst du auch angemeldet):\n\n{1}\n\n" +
+                "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
+            // ADR 0146 — der Kind-Konto-Text: der eine verbleibende Schritt ist,
+            // das eigene Passwort zu setzen (die Sorgeberechtigte hat das Konto
+            // angelegt, aber nie das Passwort gehalten).
+            ["email.verify_child_body"] =
+                "Hallo {0},\n\nDein Kumunita-Konto ist bereit. Öffne diesen einmaligen " +
+                "Link, um das Konto zu bestätigen und dein Passwort zu setzen (dabei wirst du " +
+                "auch angemeldet):\n\n{1}\n\n" +
                 "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
             ["email.reminder_subject"] = "Erinnerung: {0}",
             ["email.reminder_body"] = "**{0}** steht bevor: {1}{2}.",
@@ -4366,6 +4435,19 @@ public static class KnownTranslationKeys
             ["portability.confirm.import"] = "Dieses Archiv importieren? Es ersetzt den Inhalt der Instanz (der Wiederherstellungspfad — das Vorkopie-Backup des Operators ist der Rollback).",
             ["portability.status.ok"]    = "Fertig.",
             ["portability.status.failure"] = "Abgelehnt — das Archiv wurde abgelehnt, bevor etwas geschrieben wurde:",
+
+            // M27 (ADR 0148 D9) — die Portabilitätsoberfläche der Bewohnerin / des
+            // Bewohners (der /account/portability Index: Export-Button +
+            // Import-Formular + Statusbereich; U07). Absichtlich ein ANDERER
+            // myportability.*-Name als M11s Admin portability.*-Keys, damit die
+            // Bewohner-Oberfläche nie mit der Operator-Oberfläche kollidiert.
+            ["myportability.index.title"]  = "Meine Daten",
+            ["myportability.export"]       = "Exportieren",
+            ["myportability.import"]       = "Importieren",
+            ["myportability.import.resolve"] = "Meine Auswahl anwenden",
+            ["myportability.resolve.add_elsewhere"] = "Woanders hinzufügen",
+            ["myportability.resolve.discard"] = "Verwerfen",
+            ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — die datei-basierten Bulk-Keys.
             ["translations.bulk.export"]     = "Übersetzungen herunterladen (CSV)",
@@ -5026,7 +5108,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "Adresse e-mail",
             ["guardian.password"]            = "Mot de passe",
             ["guardian.child_email_hint"]    =
-                "L'enfant vérifie son propre e-mail pour se connecter — le flux d'inscription habituel.",
+                "L'enfant ouvre le lien de confirmation dans son e-mail pour définir son propre mot de passe et se connecter — tu n'as pas besoin (ni à définir) son mot de passe.",
             ["guardian.consent.intro"]       =
                 "En créant ce profil, tu confirmes être le représentant " +
                 "légal de cet enfant. En tant que tel, tu conserves le " +
@@ -5262,6 +5344,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Enregistrer",
             ["settings.pagesize_flash_set"]    = "Éléments par page réglés sur \"{0}\" — cela prend effet à la prochaine requête.",
             ["settings.pagesize_flash_reset"]  = "Éléments par page réinitialisés — le défaut de la plateforme sera utilisé.",
+
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Page d'accueil",
+            ["settings.home_lede"]         =
+                "La page d'accueil s'ouvre avec deux sections d'introduction (ce qu'est Kumunita et ce qu'elle fait) " +
+                "avant le fil. Activez cette option pour arriver directement au fil. " +
+                "Votre choix est enregistré sur votre compte et n'affecte jamais les autres résidents.",
+            ["settings.home_label"]        = "Masquer les sections d'introduction et m'afficher directement le fil",
+            ["settings.home_note"]         = "Désactivé, la page d'accueil affiche ses sections d'introduction comme d'habitude.",
+            ["settings.home_save"]         = "Enregistrer",
+            ["settings.home_flash_hide"]   = "Page d'accueil mise à jour — les sections d'introduction sont masquées, le fil apparaît en premier.",
+            ["settings.home_flash_show"]   = "Page d'accueil mise à jour — les sections d'introduction réapparaîtront.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -5940,6 +6034,12 @@ public static class KnownTranslationKeys
 
             // ── reply-report-target lane (ADR 0023) ─────────────────────────
             ["moderation.queue_reply_by"] = "réponse de",
+            // ADR 0146 — la prise de relais du compte-enfant (la page de
+            // confirmation collecte le mot de passe de l'enfant avant
+            // d'activer le compte).
+            ["account.verify_set_password_lede"] =
+                "Définis le mot de passe de ce compte — c'est toi qui va t'en servir.",
+            ["account.verify_set_password_submit"] = "Définir mon mot de passe & me connecter",
             ["moderation.resolve_reply_label"] = "Réponse (cible de ce signalement)",
             ["moderation.resolve_reply_by"] = "Réponse de",
 
@@ -6294,6 +6394,7 @@ public static class KnownTranslationKeys
             // ── events.mine (la section « Tes prochains événements » sur /events — ADR 0065) ──
             ["events.mine.title"] = "Tes prochains événements",
             ["events.mine.hint"] = "Événements auxquels tu as répondu ou que tu as organisés.",
+            ["events.mine.show_more"] = "Afficher les {n} événements supplémentaires",
 
             // ── events.past (le basculement EV-PAST + état vide sur /events — ADR 0109) ──
             ["events.upcoming"] = "À venir",
@@ -6370,6 +6471,15 @@ public static class KnownTranslationKeys
             ["email.verify_body"] =
                 "Bonjour {0},\n\nTon compte Kumunita est à vérifier lors de ta première connexion. " +
                 "Ouvre ce lien à usage unique pour confirmer le compte (il te connecte aussi) :\n\n{1}\n\n" +
+                "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
+            // ADR 0146 — le texte du compte-enfant : la seule étape restante
+            // est de définir le propre mot de passe de l'enfant (le
+            // représentant légal a créé le compte mais ne l'a jamais
+            // détenu).
+            ["email.verify_child_body"] =
+                "Bonjour {0},\n\nTon compte Kumunita est prêt. Ouvre ce lien à usage " +
+                "unique pour confirmer le compte et définir ton mot de passe (il te " +
+                "connecte aussi) :\n\n{1}\n\n" +
                 "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
             ["email.reminder_subject"] = "Rappel : {0}",
             ["email.reminder_body"] = "**{0}** arrive : {1}{2}.",
@@ -6616,6 +6726,20 @@ public static class KnownTranslationKeys
             ["translations.bulk.mode_batch"] = "Édition par lot",
             ["translations.bulk.mode_single"] = "Édition une par une",
             ["portability.status.failure"] = "Refusée — l'archive a été rejetée avant toute écriture :",
+
+            // M27 (ADR 0148 D9) — la surface de portabilité du résident / de la
+            // résidente (l'index /account/portability : le bouton d'export, le
+            // formulaire d'import + l'aire de statut ; U07). Absolument un
+            // espace de noms myportability.* DISTINCT de celui de l'admin
+            // portability.* (M11), pour que la surface résident ne collisionne
+            // jamais avec la surface opérateur.
+            ["myportability.index.title"]  = "Mes données",
+            ["myportability.export"]       = "Exporter",
+            ["myportability.import"]       = "Importer",
+            ["myportability.import.resolve"] = "Appliquer mes choix",
+            ["myportability.resolve.add_elsewhere"] = "Ajouter ailleurs",
+            ["myportability.resolve.discard"] = "Rejeter",
+            ["myportability.status"]       = "Statut",
 
             // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
             ["translations.bulk.export"]     = "Télécharger les traductions (CSV)",
@@ -7273,7 +7397,7 @@ public static class KnownTranslationKeys
             ["guardian.email"]               = "E-mailadresse",
             ["guardian.password"]            = "Adgangskode",
             ["guardian.child_email_hint"]    =
-                "Barnet bekræfter sin egen e-mail for at logge ind — den sædvanlige tilmeldingsproces.",
+                "Barnet åbner bekræftelseslinket i sin e-mail for at sætte sit eget adgangskode og logge ind — du behøver (eller sætter) ikke barnets adgangskode.",
             ["guardian.consent.intro"]       =
                 "Ved at oprette denne profil bekræfter du, at du er dette " +
                 "barns værgemand. Som dets værgemand har du fuldstændig " +
@@ -7507,6 +7631,18 @@ public static class KnownTranslationKeys
             ["settings.pagesize_save"]         = "Gem",
             ["settings.pagesize_flash_set"]    = "Elementer pr. side indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
             ["settings.pagesize_flash_reset"]  = "Elementer pr. side nulstillet — platformstandarden bruges.",
+
+            // ── settings — home page (hide-home-intro preference, ADR 0149) ─
+            ["settings.home_title"]        = "Forside",
+            ["settings.home_lede"]         =
+                "Forsiden åbner med to introduktionssektioner (hvad Kumunita er og hvad den kan) " +
+                "før strømmen. Slå til for at lande direkte i strømmen. " +
+                "Dit valg gemmes på din konto og berører aldrig andre beboere.",
+            ["settings.home_label"]        = "Skjul introduktionssektionerne og vis strømmen med det samme",
+            ["settings.home_note"]         = "Er slukket, viser forsiden sine introduktionssektioner som sædvanlig.",
+            ["settings.home_save"]         = "Gem",
+            ["settings.home_flash_hide"]   = "Forside opdateret — introduktionssektionerne skjules, strømmen vises først.",
+            ["settings.home_flash_show"]   = "Forside opdateret — introduktionssektionerne vises igen.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -8173,6 +8309,11 @@ public static class KnownTranslationKeys
             ["moderation.assign_pick"] = "Vælg en moderator …",
             ["moderation.assign_submit"] = "Tildel",
             ["moderation.cancel"] = "Annuller",
+            // ADR 0146 — overdragelsen af barnets konto (bekræftelsessiden
+            // indsamler barnets egen adgangskode, før kontoen aktiveres).
+            ["account.verify_set_password_lede"] =
+                "Sæt adgangskoden til denne konto — det er dig, der skal bruge den.",
+            ["account.verify_set_password_submit"] = "Sæt min adgangskode & log ind",
             ["moderation.unlock_submit"] = "Lås op",
             ["moderation.resolve_header"] = "Løs (luk denne rapport)",
             ["moderation.resolve_submit"] = "Løs",
@@ -8530,6 +8671,7 @@ public static class KnownTranslationKeys
             // ── events.mine (sektionen „Dine kommende arrangementer“ på /events — ADR 0065) ──
             ["events.mine.title"] = "Dine kommende arrangementer",
             ["events.mine.hint"] = "Arrangementer, du har svaret på eller arrangerer.",
+            ["events.mine.show_more"] = "Vis de {n} flere arrangementer",
 
             // ── events.past (skifteren EV-PAST + tom tilstand på /events — ADR 0109) ──
             ["events.upcoming"] = "Kommende",
@@ -8586,6 +8728,14 @@ public static class KnownTranslationKeys
 
             // ── settings (sektionen « Sprog til e-mail og beskeder » under /settings/language) ──
             ["settings.email_title"] = "Sprog til e-mail og beskeder",
+            // ADR 0146 — barnet-kontoteksten: det eneste resterende trin er
+            // at sætte barnets egen adgangskode (værgeren oprettede kontoen,
+            // men beholdte aldrig adgangskoden).
+            ["email.verify_child_body"] =
+                "Hej {0},\n\nDin Kumunita-konto er klar. Åbn dette engangsklink for at " +
+                "bekræfte kontoen og sætte dit adgangskode (den logger dig også " +
+                "ind):\n\n{1}\n\n" +
+                "Hvis du ikke har oprettet denne konto, kan du ignorere denne besked.",
             ["settings.email_lede"] =
                 "Vælg det sprog, platformen skriver til dig på — kontoer og arrangementspåmindelser. " +
                 "Dit valg gemmes på din konto.",
@@ -8851,6 +9001,19 @@ public static class KnownTranslationKeys
             ["translations.bulk.mode_batch"] = "Batchredigering",
             ["translations.bulk.mode_single"] = "Redigér én ad gangen",
             ["portability.status.failure"] = "Afvist — arkivet blev afvist, før noget blev skrevet:",
+
+            // M27 (ADR 0148 D9) — beboerens portabilitetsoverflade (indexen
+            // /account/portability: eksportknap + importformular + statusområde;
+            // U07). Bevidst et ANDET myportability.*-navneområde end M11s admin
+            // portability.*-nøgler, så overfladen for beboere aldrig kolliderer
+            // med operatørens overflade.
+            ["myportability.index.title"]  = "Mine data",
+            ["myportability.export"]       = "Eksportér",
+            ["myportability.import"]       = "Importér",
+            ["myportability.import.resolve"] = "Anvend mine valg",
+            ["myportability.resolve.add_elsewhere"] = "Tilføj andre steder",
+            ["myportability.resolve.discard"] = "Kassér",
+            ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.
             ["translations.bulk.export"]     = "Download translationer (CSV)",

@@ -32,7 +32,11 @@ public sealed record CreateTodoRequest
     public DateTimeOffset? DueAt { get; init; }                // optional due date — the Event Start/End shape, optional (ADR 0079)
     public Audience? Audience { get; init; }
     public string? LanguageCode { get; init; }
-    public IReadOnlyList<string>? TagIds { get; init; }
+    // ADR 0044 / 0147 — the author's typed tag labels (slugs), resolved to
+    // <c>Tag</c> doc ids by the write lane's <c>ITagService.AttachToTodoAsync</c>
+    // seam (the <c>PostDraft.TagSlugs</c> naming: the request carries *labels*,
+    // the stored <c>TodoItem.TagIds</c> carries *ids*).
+    public IReadOnlyList<string>? TagSlugs { get; init; }
 }
 
 /// <summary>
@@ -65,7 +69,11 @@ public sealed record UpdateTodoRequest
     public DateTimeOffset? StartAt { get; init; }              // ADR 0079 — non-null applied, null clears (the edit form's blank field)
     public DateTimeOffset? DueAt { get; init; }                // ADR 0079 — non-null applied, null clears (the edit form's blank field)
     public string? LanguageCode { get; init; }
-    public IReadOnlyList<string>? TagIds { get; init; }
+    // ADR 0044 / 0147 — the author's typed tag labels (slugs), `null` = leave
+    // the stored tags untouched, a non-null list (possibly empty = detach all)
+    // is resolved to <c>Tag</c> doc ids by the <c>AttachToTodoAsync</c> seam
+    // and written onto <c>TodoItem.TagIds</c>.
+    public IReadOnlyList<string>? TagSlugs { get; init; }
 }
 
 /// <summary>
@@ -82,6 +90,10 @@ public sealed record CreateBoardRequest
     public Audience? Audience { get; init; }
     public string? LanguageCode { get; init; }
     public IReadOnlyList<CreateLaneRequest> Lanes { get; init; } = [];
+    // ADR 0044 / 0147 — the author's typed tag labels (slugs), resolved to
+    // <c>Tag</c> doc ids by the <c>ITagService.AttachToBoardAsync</c> seam and
+    // stored on <c>KanbanBoard.TagIds</c> (the <c>TodoItem.TagIds</c> shape).
+    public IReadOnlyList<string>? TagSlugs { get; init; }
 }
 
 /// <summary>
@@ -104,6 +116,13 @@ public sealed record UpdateBoardRequest
     public required string Title { get; init; }
     public string? Description { get; init; }
     public Audience? Audience { get; init; }
+    // ADR 0044 / 0147 — the author's typed tag labels (slugs) for the edit
+    // lane. `null` leaves the stored tags **untouched** (a lane that posts
+    // only title/description/audience leaves them unchanged); a non-null
+    // list (possibly empty = detach all) is resolved to <c>Tag</c> doc ids by
+    // the <c>AttachToBoardAsync</c> seam and written onto
+    // <c>KanbanBoard.TagIds</c>.
+    public IReadOnlyList<string>? TagSlugs { get; init; }
 }
 
 /// <summary>

@@ -152,6 +152,21 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// <c>GET /settings/home</c> — the resident's home-page display
+    /// preference (ADR 0149 D1) on its own linkable page (ADR 0080, the ADR
+    /// 0019 time-zone section verbatim): the "hide the home intro" toggle
+    /// ("Intro: what Kumunita is and does" + "What Kumunita does"), so a
+    /// signed-in resident can land straight on the "What's new" feed. The
+    /// model is the full <see cref="LocaleSettingsViewModel"/>; the view
+    /// renders only this section (a single on/off checkbox — no picker).
+    /// </summary>
+    [HttpGet("/settings/home")]
+    public async Task<IActionResult> SettingsHome()
+    {
+        return View("Home", await BuildModel());
+    }
+
+    /// <summary>
     /// <c>GET /settings/quiet</c> — the resident's quiet-hours section (ADR
     /// 0121, D7) on its own linkable page (ADR 0080, the ADR 0019 time-zone
     /// section verbatim). The model is the full
@@ -291,6 +306,11 @@ public sealed class LocaleController(
                 : quiet.Mode == QuietScheduleMode.Allowed ? "allowed" : "blocked",
             QuietHours = quiet?.Hours ?? [],
             QuietDaysOfWeek = quiet?.DaysOfWeek ?? [],
+
+            // ADR 0149 D1 — the hide-home-intro display preference: the
+            // resident's Profile.HideHomeIntro flag (a simple on/off; the
+            // floor is false = show the intro). No subject → the floor.
+            HideHomeIntro = profile?.HideHomeIntro ?? false,
         };
     }
 
@@ -559,6 +579,46 @@ public sealed class LocaleController(
     }
 
     /// <summary>
+    /// <c>POST /settings/home</c> — the home-page display preference save
+    /// (ADR 0149 D1, the <c>SavePageSize</c> shape simplified to a single
+    /// on/off checkbox). With a <c>hideHomeIntro</c> form value of
+    /// <c>"true"</c>: <see cref="IUserInfoService
+    /// .SetProfileHideHomeIntroAsync"/> sets the flag (hide both intro
+    /// sections); with no value: the same lane with <c>false</c> (show the
+    /// intro — the "reset" action, no <c>clear=1</c> needed since
+    /// un-checked is the floor). The change is live on the very next home
+    /// page visit (data, not config — no rebuild / restart). A missing
+    /// profile (a pre-bootstrap edge) fails closed: the lane throws
+    /// <c>KeyNotFoundException</c> and we surface the error + redirect (the
+    /// <c>SetProfileTimezoneAsync</c> pin).
+    /// </summary>
+    [HttpPost("/settings/home")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveHome(string? hideHomeIntro)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+            return RedirectToAction(nameof(SettingsHome));
+
+        try
+        {
+            await userInfo.SetProfileHideHomeIntroAsync(subject, hideHomeIntro == "true", subject);
+            TempData["info"] = hideHomeIntro == "true"
+                ? await FlashAsync("settings.home_flash_hide")
+                : await FlashAsync("settings.home_flash_show");
+        }
+        catch (KeyNotFoundException)
+        {
+            // A pre-bootstrap edge (no profile row). Fail closed + surface the
+            // error; the lane never load-or-creates (the
+            // SetProfileTimezoneAsync pin), so nothing is half-written.
+            TempData["error"] = "Your profile is not available — sign out and back in.";
+        }
+
+        return RedirectToAction(nameof(SettingsHome));
+    }
+
+    /// <summary>
     /// <c>POST /settings/email-language</c> — the email &amp; notification
     /// language section save (ADR 0061). With a <c>code</c> form value:
     /// <see cref="IUserInfoService.SetProfileEmailLanguageAsync"/> (sets the
@@ -695,6 +755,14 @@ public sealed class LocaleController(
         /// when the caller has no subject (the public quick picker renders the
         /// language section only).</summary>
         public PageSizeSettings? PageSize { get; init; }
+
+        /// <summary>ADR 0149 D1 — the home-intro display preference: whether
+        /// the resident's home page hides the two top intro sections ("Intro:
+        /// what Kumunita is and does" + "What Kumunita does") so they land
+        /// straight on the "What's new" feed. Mirrors the flat
+        /// <see cref="Kumunita.Core.UserInfo.Profile.HideHomeIntro"/> flag
+        /// (a simple on/off — no picker, unlike the other sections).</summary>
+        public bool HideHomeIntro { get; init; }
 
         // ── M20 (ADR 0121, D7) — the quiet-hours section (the 5th resident
         // section). Flat fields (the ADR 0019 time-zone section's shape,

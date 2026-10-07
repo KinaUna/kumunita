@@ -35,6 +35,7 @@ public sealed class KanbanBoard
 
     public bool IsDeleted { get; set; } = false;               // ADR 0024 soft-delete flag, reused
     public string LanguageCode { get; set; } = string.Empty;   // ADR 0018 authored-in tag, reused
+    public IReadOnlyList<string> TagIds { get; set; } = [];    // ADR 0044 / 0147 — resolved Tag doc ids (the `TodoItem.TagIds` shape)
 
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }

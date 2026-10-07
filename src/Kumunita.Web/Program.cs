@@ -124,6 +124,15 @@ var marten = builder.Services.AddMarten(opts =>
     // the docs are invisible to Marten (the M3/Media precedent).
     PageDocTypes.Configure(opts);
 
+    // SITE (ADR 0150, U05): the SiteContent bounded context's singleton doc
+    // (SiteContent, ADR 0004 §B.1 additive — one row per instance, Id = "singleton",
+    // the LocaleSettings shape, ADR 0005 B). Without this call the doc is invisible
+    // to Marten and a pristine boot never creates the mt_doc_sitecontent table
+    // (the U03 drift note — this host registration is what resolves it).
+    // SiteContentDocTypes lives in Kumunita.Core (like the other *DocTypes), so
+    // the unqualified name resolves here unchanged.
+    SiteContentDocTypes.Configure(opts);
+
     // TG (ADR 0044 D1, plan U3): the Tags bounded context's documents (Tag +
     // TagTranslation, ADR 0004 §B.1 additive — the (TagId, LanguageCode)
     // business-key unique index, tg_tr_uidx_tag_lang). Without this call

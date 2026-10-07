@@ -197,6 +197,24 @@
                             <span class="badge text-bg-light border ms-2">@Model.Board.ComponentDisplayName</span>
                         }
                     </div>
+                    @* ADR 0044 / 0147 — the board's tags (display names in
+                       the viewer's language, resolved by the controller from
+                       the access-scoped read seam — the
+                       <see cref="BoardDetailViewModel.Tags"/> field, the
+                       Posts/Detail.cshtml chip idiom). A label, never a gate
+                       (C-TG·1): each badge links to the by-tag view
+                       (/tags/{slug}); a broken reference is dropped upstream,
+                       never an error. Empty = no chips. *@
+                    @if (Model.Tags is { Count: > 0 })
+                    {
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                            @foreach (var tag in Model.Tags)
+                            {
+                                <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                                   href="/tags/@tag.Slug">@tag.DisplayedName</a>
+                            }
+                        </div>
+                    }
                     @* ADR 0086 D9 — the **project link**: present only when
                        the board has a `ProjectId` that resolves to a
                        readable, non-deleted project (the D6 dangling rule —

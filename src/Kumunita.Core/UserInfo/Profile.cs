@@ -319,6 +319,28 @@ public sealed class Profile
     /// migration.
     /// </summary>
     public int? PageSize { get; set; }
+
+    // ADD (ADR 0149 D1; ADR 0004 §B.1 additive — the 13th additive Profile
+    // field after AvatarId, TimeZone, DateFormat, EmailLanguage, Bio, TagIds,
+    // OnboardingCompletedAt, MessagingOptIn, MessagingRestricted,
+    // BlockedCommunityIds, EventRsvpMode, PageSize):
+    /// <summary>
+    /// The resident's **hide-home-intro preference** (ADR 0149, D1) — the
+    /// home page's two top sections: the "Intro: what Kumunita is and does"
+    /// hero and the "What Kumunita does" three-surfaces band. <c>true</c> =
+    /// hide both for this resident, so a signed-in resident lands straight on
+    /// the "What's new" feed; <c>false</c> (the default) = show them, exactly
+    /// as before. This is a pure *display* preference — it changes what this
+    /// resident sees on <c>/</c>, never any authorization or data. Written only
+    /// by the owner-scope
+    /// <see cref="IUserInfoService.SetProfileHideHomeIntroAsync"/> lane (the
+    /// <see cref="IUserInfoService.SetProfilePageSizeAsync"/> single-write-lane
+    /// shape — the self-scope check happens at the Web boundary); read by the
+    /// <see cref="Kumunita.Web.Controllers.HomeController"/> per request. An
+    /// *additive* field (ADR 0004 §B.1), like <see cref="PageSize"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public bool HideHomeIntro { get; set; } = false;
 }
 
 /// <summary>

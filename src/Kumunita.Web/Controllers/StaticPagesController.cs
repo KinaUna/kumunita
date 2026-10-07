@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
+using Kumunita.Core.SiteContent;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -54,19 +55,22 @@ public sealed class StaticPagesController : Controller
     private readonly ILocalizationService _localization;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IOptions<CommunityOptions> _community;
+    private readonly ISiteContentService? _siteContent;
 
     public StaticPagesController(
         IPageService pages,
         ITranslationProvider translations,
         ILocalizationService localization,
         IHttpContextAccessor httpContextAccessor,
-        IOptions<CommunityOptions> community)
+        IOptions<CommunityOptions> community,
+        ISiteContentService? siteContent = null)
     {
         _pages = pages;
         _translations = translations;
         _localization = localization;
         _httpContextAccessor = httpContextAccessor;
         _community = community;
+        _siteContent = siteContent;
     }
 
     private static readonly string[] Slugs = { "terms", "help", "about", "privacy", "conduct" };
@@ -142,7 +146,7 @@ public sealed class StaticPagesController : Controller
             }
             catch (KeyNotFoundException)
             {
-                return FallThrough(fallBackToProductStory);
+                return await FallThrough(fallBackToProductStory);
             }
         }
 
@@ -193,11 +197,25 @@ public sealed class StaticPagesController : Controller
             slug, title, body, page.Modified ?? page.Created));
     }
 
-    private IActionResult FallThrough(bool fallBackToProductStory)
+    private async Task<IActionResult> FallThrough(bool fallBackToProductStory)
     {
         if (fallBackToProductStory)
+        {
+            // SITE·1 (ADR 0150): best-effort read of the SiteContent singleton
+            // (the ADR 0050 / ADR 0149 best-effort shape) — a missing seam,
+            // a missing store / row, or a read failure degrades to null;
+            // the view degrades to the in-code fallback (the byte-identical
+            // shipped kw-l text + every section shown). The page always
+            // renders.
+            SiteContent? site = null;
+            if (_siteContent is not null)
+            {
+                try { site = await _siteContent.GetAsync(); }
+                catch { site = null; }
+            }
             return View("About",
-                new Models.HomeViewModel(_community.Value.Name, _community.Value.SupportEmail));
+                new Models.HomeViewModel(_community.Value.Name, _community.Value.SupportEmail, Site: site));
+        }
         return NotFound();
     }
 

@@ -49,13 +49,29 @@
 
         @if (Model.MyEvents.Count > 0)
         {
+            @* The "your upcoming events" list is capped at 5 visible rows:
+               overflow rows render with the native `hidden` attribute (a
+               JS-less visitor still sees the first 5 + the whole list stays
+               in the markup for screen-reader users), and the button below
+               reveals the rest in batches via the mine-more.js module — the
+               About whatsnew / home roadmap disclosure idiom. The localized
+               "{n} …" label is resolved server-side (kw-l can't substitute
+               {n}) with the en floor as the in-code fallback. (The About
+               whatsnew pattern: plain C# statements, incl. `await`, live
+               directly in the @if body — a nested @{} block is illegal here.) *@
+            int _mineVisible = 5;
+            int _mineHidden = Math.Max(0, Model.MyEvents.Count - _mineVisible);
+            string _mineLabelRaw = await Translation.GetAsync("events.mine.show_more", effLang);
+            string _mineLabel = (string.IsNullOrWhiteSpace(_mineLabelRaw) || _mineLabelRaw == "events.mine.show_more")
+                ? "Show the {n} more events" : _mineLabelRaw;
             <section class="mb-4">
                 <h2 class="h5 mb-1"><kw-l key="events.mine.title">Your upcoming events</kw-l></h2>
                 <p class="text-muted small mb-3"><kw-l key="events.mine.hint">Events you've RSVPed to or organized.</kw-l></p>
-                <div class="airy-ann-list">
-                    @foreach (var row in Model.MyEvents)
+                <div class="airy-ann-list" id="events-mine-list">
+                    @for (int _mi = 0; _mi < Model.MyEvents.Count; _mi++)
                     {
-                        <div class="airy-ann-row">
+                        var row = Model.MyEvents[_mi];
+                        <div class="airy-ann-row" @(_mi >= _mineVisible ? "hidden" : null)>
                             <div>
                                 <h3 class="airy-ann-title">
                                     <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
@@ -76,6 +92,18 @@
                         </div>
                     }
                 </div>
+                @if (_mineHidden > 0)
+                {
+                    <div class="text-center mt-3" id="events-mine-more-wrap">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm kmb-events-mine-show-more"
+                                data-mine-batch-size="5"
+                                data-mine-label="@_mineLabel"
+                                aria-label="@(_mineLabel.Replace("{n}", _mineHidden.ToString()))">
+                            @(_mineLabel.Replace("{n}", _mineHidden.ToString()))
+                        </button>
+                    </div>
+                }
             </section>
         }
 

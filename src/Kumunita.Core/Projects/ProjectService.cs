@@ -4,6 +4,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.Query;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using System.Linq.Expressions;
@@ -63,9 +64,19 @@ public sealed class ProjectService : IProjectService
     private readonly ITranslationProvider? _translator;
     private readonly ILocalizationService? _localization;
 
+    // ADR 0044 / 0147 — the TG attach lanes (the to-do + board tag surfaces).
+    // Optional so the existing positional test-construction sites (3-arg) keep
+    // compiling (the <c>_notifications</c> / <c>_translator</c> CS1736
+    // precedent); production wiring passes the DI-registered
+    // <c>ITagService</c>. When absent, the tag lanes degrade to "no tags"
+    // (a to-do / board with no typed slugs — the U4 additive default-empty
+    // pin), the <c>PostService._tags</c> no-op idiom.
+    private readonly ITagService? _tags;
+
     public ProjectService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
-        NotificationService? notifications = null, ITranslationProvider? translator = null, ILocalizationService? localization = null)
+        NotificationService? notifications = null, ITranslationProvider? translator = null,
+        ILocalizationService? localization = null, ITagService? tags = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
@@ -73,6 +84,7 @@ public sealed class ProjectService : IProjectService
         _notifications = notifications;
         _translator = translator;
         _localization = localization;
+        _tags = tags;
     }
 
     // --- Sort (M26 U6) ---------------------------------------------------------
@@ -1091,7 +1103,7 @@ public sealed class ProjectService : IProjectService
             Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
             IsDeleted = false,                             // published on creation (D8a — no draft lane).
             LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below (instance default floor).
-            TagIds = request.TagIds ?? [],                 // ADR 0044 — null-coalesce to the POCO's non-null empty list.
+            TagIds = [],                                   // ADR 0044 / 0147 — resolved to <c>Tag</c> ids below via the attach lane (the <c>PostService._tags</c> shape).
             Created = now
         };
 
@@ -1121,9 +1133,33 @@ public sealed class ProjectService : IProjectService
                     $"To-do '{todo.BlockedByTodoId}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
         }
 
+        // Store the to-do first (C3 — the create + the audit row commit
+        // atomically), so the <c>AttachToTodoAsync</c> lane below can
+        // <c>LoadAsync</c> it by id (the <c>PostService</c> create-lane
+        // ordering: the post is stored before its tag attach lane runs).
         session.Store(todo);
         session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.create", TargetKindTodo, todo.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // ADR 0044 / 0147 — resolve the author's typed tag slugs to <c>Tag</c>
+        // ids (create-or-reuse each tag, C-TG·4) via the <c>AttachToTodoAsync</c>
+        // lane, then persist the resolved ids onto the to-do (the
+        // <c>PostService._tags</c> re-store + save shape — the attach lane's own
+        // SaveChangesAsync does not reliably carry the loaded to-do's TagIds
+        // mutation to the DB). A bad slug is an <c>ArgumentException</c> from
+        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form error.
+        // No slugs (null/empty) ⇒ no attach call (the U4 default-empty pin).
+        // A null <c>ITagService</c> (a test-construction site) ⇒ no tags
+        // (the <c>PostService._tags</c> no-op idiom).
+        if (request.TagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToTodoAsync(todo.Id, request.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            todo.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(todo);
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return todo;
     }
 
@@ -1289,7 +1325,7 @@ public sealed class ProjectService : IProjectService
             || todo.StartAt != request.StartAt
             || todo.DueAt != request.DueAt
             || (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
-            || (request.TagIds is not null && !ListsEqual(todo.TagIds, request.TagIds));
+            || (request.TagSlugs is not null && _tags is not null); // ADR 0044 / 0147 — a posted tag set (incl. empty = detach all) is a real change (tags are resolved via the attach lane below).
 
         // Apply the request's fields verbatim (ADR 0001-B — the written fields
         // are the author's choice). AuthorId / Created / AssigneeId / IsDeleted
@@ -1314,10 +1350,32 @@ public sealed class ProjectService : IProjectService
         todo.BlockedByTodoId = newBlockedByTodoId;         // ADR 0087 D5 — the resolved "waiting on" (no-op when unchanged; C-TBD·3 cycle guard applied above).
         if (request.LanguageCode is not null)
             todo.LanguageCode = updatedLanguageCode;       // ADR 0018
-        if (request.TagIds is not null)
-            todo.TagIds = request.TagIds;                  // ADR 0044
+        // ADR 0044 / 0147 — the tags are **not** assigned here; they are
+        // resolved to <c>Tag</c> ids + written via the <c>AttachToTodoAsync</c>
+        // lane below (the <c>PostService</c> re-store shape). A non-null
+        // <c>request.TagSlugs</c> (possibly empty = detach all) triggers the
+        // attach; a null value leaves the stored tags untouched.
         if (changed)
             todo.Modified = DateTimeOffset.UtcNow;
+
+        // ADR 0044 / 0147 — resolve the posted tag slugs to <c>Tag</c> ids
+        // (create-or-reuse, C-TG·4) via the <c>AttachToTodoAsync</c> lane and
+        // write them onto the to-do (the <c>PostService._tags</c> re-store +
+        // save shape). A non-null <c>request.TagSlugs</c> triggers the attach:
+        // an **empty** list detaches all (the U8b detach shape); a non-empty
+        // set replaces the stored tags. A null value (the field not posted)
+        // leaves the stored tags untouched. A bad slug is an
+        // <c>ArgumentException</c> (C-TG·4) — the Web maps it to a form error.
+        // The attach lane re-checks standing (creator ∪ assignee ∪ GlobalAdmin
+        // — already passed by <c>CheckTodoStanding</c> above).
+        if (request.TagSlugs is not null && _tags is not null)
+        {
+            var resolved = await _tags.AttachToTodoAsync(todo.Id, request.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            todo.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(todo);
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
 
         session.Store(todo);
         // Design doc §2.5 — the audit row tags the branch the actor qualified
@@ -1707,7 +1765,6 @@ public sealed class ProjectService : IProjectService
             Audience = request.Audience,
             IsDeleted = false,                             // published on creation (D8a).
             LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below.
-            TagIds = request.TagIds ?? [],
             Created = now
         };
 
@@ -1728,6 +1785,24 @@ public sealed class ProjectService : IProjectService
         session.Store(subtask);
         session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.add_subtask", TargetKindTodo, subtask.Id, StandingMatrix.AuditVia(actorId, parent.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // ADR 0044 / 0147 — resolve the posted tag slugs to <c>Tag</c> ids
+        // (create-or-reuse, C-TG·4) via the <c>AttachToTodoAsync</c> lane
+        // (the subtask is stored above, so the lane can <c>LoadAsync</c> it by
+        // id) and persist the resolved ids onto the subtask (the
+        // <c>PostService._tags</c> re-store + save shape). The actor is the
+        // subtask's creator, so the attach lane's standing check
+        // (creator ∪ assignee ∪ GlobalAdmin) passes. No slugs ⇒ no attach call;
+        // a null <c>ITagService</c> (a test-construction site) ⇒ no tags.
+        if (request.TagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToTodoAsync(subtask.Id, request.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            subtask.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(subtask);
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return subtask;
     }
 
@@ -1861,6 +1936,24 @@ public sealed class ProjectService : IProjectService
 
         session.Store(AccessAuditFactory.SingleTarget(actorId, "board.create", TargetKindBoard, board.Id, AccessVia.Owner));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // ADR 0044 / 0147 — resolve the author's typed tag slugs to <c>Tag</c>
+        // ids (create-or-reuse each tag, C-TG·4) via the <c>AttachToBoardAsync</c>
+        // lane (the board is stored above, so the lane can <c>LoadAsync</c> it
+        // by id), then persist the resolved ids onto the board (the
+        // <c>PostService._tags</c> re-store + save shape). A bad slug is an
+        // <c>ArgumentException</c> (C-TG·4) — the Web maps it to a form error.
+        // No slugs (null/empty) ⇒ no attach call (the U4 default-empty pin); a
+        // null <c>ITagService</c> (a test-construction site) ⇒ no tags.
+        if (request.TagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToBoardAsync(board.Id, request.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            board.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(board);
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return board;
     }
 
@@ -1916,7 +2009,8 @@ public sealed class ProjectService : IProjectService
         var audienceChanged = request.Audience is not null && !AudiencesEqual(board.Audience, request.Audience);
         var changed = board.Title != request.Title
             || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal)
-            || audienceChanged;
+            || audienceChanged
+            || (request.TagSlugs is not null && _tags is not null); // ADR 0044 / 0147 — a posted tag set (incl. empty = detach all) is a real change (tags are resolved via the attach lane below).
 
         board.Title = request.Title;
         board.Description = normalizedDescription;
@@ -1924,6 +2018,25 @@ public sealed class ProjectService : IProjectService
             board.Audience = request.Audience;     // written verbatim (ADR 0001-B — the create lane's shape).
         if (changed)
             board.Modified = DateTimeOffset.UtcNow;
+
+        // ADR 0044 / 0147 — resolve the posted tag slugs to <c>Tag</c> ids
+        // (create-or-reuse, C-TG·4) via the <c>AttachToBoardAsync</c> lane and
+        // write them onto the board (the <c>PostService._tags</c> re-store +
+        // save shape). A non-null <c>request.TagSlugs</c> triggers the attach:
+        // an **empty** list detaches all (the detach shape); a non-empty set
+        // replaces the stored tags. A null value (the field not posted) leaves
+        // the stored tags untouched. A bad slug is an
+        // <c>ArgumentException</c> (C-TG·4) — the Web maps it to a form error.
+        // The attach lane re-checks standing (creator ∪ GlobalAdmin — already
+        // passed by <c>CheckBoardStanding</c> above).
+        if (request.TagSlugs is not null && _tags is not null)
+        {
+            var resolved = await _tags.AttachToBoardAsync(board.Id, request.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            board.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(board);
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
 
         // Track the loaded document for save explicitly (the UpdateLaneAsync /
         // CreateBoardAsync `session.Store(...)` shape) — the sibling write

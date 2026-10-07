@@ -482,65 +482,165 @@ public sealed class AccountController(
     }
 
     // ── Verify (the one designed handoff) ───────────────────────────────────────────────
+    // ADR 0146 — the handoff is now two-shaped: the self-serve lane (the credential was
+    // set at signup) confirms the account on the link click, while the **child lane**
+    // (the guardian created the account without holding the child's credential — ADR
+    // 0028 "supervision rides the link, not the password") collects the child's own
+    // password on the confirmation page and activates the account in one commit. The
+    // lane is decided by whether the account has a password (the single-source
+    // `UserManager.HasPasswordAsync` read), so a resident who exhausts the resend
+    // attempts and is manually verified still gets the confirm-only surface, and a
+    // child who re-requests the link still gets the set-password surface.
 
     [AllowAnonymous]
+    [HttpGet]
     public async Task<IActionResult> Verify([FromQuery] string id)
     {
         if (User.Identity?.IsAuthenticated == true)
             return Redirect("/profile/edit");
 
+        var (token, errorModel) = await LoadUsableVerifyTokenAsync(id);
+        if (token is null)
+            return View(errorModel);
+
+        if (await AccountHasPasswordAsync(token.UserId))
+        {
+            // Self-serve lane — the credential exists; confirm and sign in directly.
+            return await ConfirmAndSignInAsync(token);
+        }
+
+        // Child lane — the account has no password; render the set-password form so
+        // the child sets their own credential at the confirmation link.
+        return View(new VerifyViewModel { RequiresPassword = true, Id = id });
+    }
+
+    [AllowAnonymous]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Verify(VerifyViewModel model)
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return Redirect("/profile/edit");
+
+        // The POST carries the token row id back in the model (the form's hidden
+        // input) — the child lane re-submits to the same link.
+        var id = model.Id ?? string.Empty;
+        var (token, errorModel) = await LoadUsableVerifyTokenAsync(id);
+        if (token is null)
+            return View(errorModel ?? new VerifyViewModel { Id = id });
+
+        if (!await AccountHasPasswordAsync(token.UserId))
+        {
+            // Child lane — the account has no password yet.
+            if (!ModelState.IsValid)
+            {
+                await LocalizeValidationAsync(model);
+                return View(new VerifyViewModel { RequiresPassword = true, Error = model.Error, Id = id });
+            }
+
+            // Set the child's own password + flip Verified + consume the token, one
+            // Core commit (the ADR 0146 seam), then sign the resident in.
+            try
+            {
+                var profile = await identity.VerifyAndSetPasswordAsync(token.Token, model.Password);
+                return await SignInAfterVerifyAsync(
+                    await userManager.FindByIdAsync(profile.SubjectId)
+                        ?? throw new InvalidOperationException("Account not found."));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return View(new VerifyViewModel { RequiresPassword = true, Error = ex.Message, Id = id });
+            }
+        }
+
+        // Self-serve lane — the credential exists; confirm and sign in.
+        return await ConfirmAndSignInAsync(token);
+    }
+
+    /// <summary>
+    /// Whether the account for a subject id has a password set (the ADR 0146
+    /// lane-decision read: true ⇒ self-serve lane / confirm-only; false ⇒
+    /// child lane / collect the password at the link). A user lookup is
+    /// required (the <see cref="UserManager{TUser}.HasPasswordAsync"/> seam
+    /// takes a <c>User</c>, not an id), so this is a single EF read — cheap,
+    /// and the same read the confirm / set-password branches will do.
+    /// </summary>
+    private async Task<bool> AccountHasPasswordAsync(string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        return user is not null && await userManager.HasPasswordAsync(user);
+    }
+
+    /// <summary>
+    /// Resolves the verification link to a usable single-use token, or (null, the
+    /// error model) when the link is invalid/expired/consumed (the M1 error shape,
+    /// unchanged). Shared by the GET and POST lanes so the two agree on the
+    /// usable-token definition.
+    /// </summary>
+    private async Task<(IdentityToken? token, VerifyViewModel? errorModel)> LoadUsableVerifyTokenAsync(string id)
+    {
         await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         var token = await session.LoadAsync<IdentityToken>(id);
-
-        if (token is null
-            || token.Kind != IdentityToken.KindVerify
-            || !token.IsUsableAt(DateTimeOffset.UtcNow))
+        if (token is not null
+            && token.Kind == IdentityToken.KindVerify
+            && token.IsUsableAt(DateTimeOffset.UtcNow))
         {
-            return View(new VerifyViewModel
-            {
-                Error = "This verification link is invalid, expired, or already used. " +
-                        "Sign up again or ask an admin to verify your account."
-            });
+            return (token, null);
         }
 
-        try
+        return (null, new VerifyViewModel
         {
-            // VerifyWithTokenAsync flips Profile.Verified and consumes the token in one
-            // Core transaction (audit row via:Owner).
-            var profile = await identity.VerifyWithTokenAsync(token.Token);
-            var user = await userManager.FindByIdAsync(profile.SubjectId)
-                ?? throw new InvalidOperationException("Account not found.");
+            Error = "This verification link is invalid, expired, or already used. " +
+                    "Sign up again or ask an admin to verify your account."
+        });
+    }
 
-            // The verification link is the handoff end — the resident should land signed-in,
-            // so mint the cookie through the same factory step 6 uses at sign-in (the claim
-            // set is the whole principal; no extra DB read on later requests).
-            var factory = HttpContext.RequestServices.GetRequiredService<KumunitaClaimsPrincipalFactory>();
-            var identityPrinciple = await factory.CreateAsync(user);
+    /// <summary>
+    /// Confirms a verification token (self-serve lane, no credential write) and signs
+    /// the resident in — the M1 handoff end, factored out of the former monolithic
+    /// <c>Verify</c> action. The child lane calls the <c>VerifyAndSetPasswordAsync</c>
+    /// seam + <see cref="SignInAfterVerifyAsync"/> itself instead.
+    /// </summary>
+    private async Task<IActionResult> ConfirmAndSignInAsync(IdentityToken token)
+    {
+        // VerifyWithTokenAsync flips Profile.Verified and consumes the token in one
+        // Core transaction (audit row via:Owner).
+        var profile = await identity.VerifyWithTokenAsync(token.Token);
+        var user = await userManager.FindByIdAsync(profile.SubjectId)
+            ?? throw new InvalidOperationException("Account not found.");
 
-            // The verification link's purpose is to end the handoff with the resident
-            // signed-in — this branch bypasses the password check (the link IS the proof
-            // the user owns the account) while keeping the same admissible claim shape
-            // the rest of the request pipeline expects. Mint the same persistent,
-            // 14-day cookie every sign-in lane issues: the handler honors the explicit
-            // ExpiresUtc and, with sliding expiration on, refreshes the ticket as the
-            // resident keeps the tab open. Without this, the handler falls back to a
-            // session cookie that dies when the browser closes.
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true,  // persistent cookie — survives a browser close
-                ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
-            };
-            await HttpContext.SignInAsync(
-                scheme: CookieAuthenticationDefaults.AuthenticationScheme,
-                principal: identityPrinciple,
-                properties: authProperties);
+        return await SignInAfterVerifyAsync(user);
+    }
 
-            return Redirect("/profile/edit");
-        }
-        catch (InvalidOperationException ex)
+    /// <summary>
+    /// Mints the admissible claim set and signs the resident in with the persistent
+    /// 14-day cookie every sign-in lane issues (the M1 "land signed-in" handoff end).
+    /// Factored out so both the confirm-only and set-password lanes end the handoff
+    /// the same way.
+    /// </summary>
+    private async Task<IActionResult> SignInAfterVerifyAsync(User user)
+    {
+        // The verification link is the handoff end — the resident should land signed-in,
+        // so mint the cookie through the same factory step 6 uses at sign-in (the claim
+        // set is the whole principal; no extra DB read on later requests).
+        var factory = HttpContext.RequestServices.GetRequiredService<KumunitaClaimsPrincipalFactory>();
+        var identityPrinciple = await factory.CreateAsync(user);
+
+        // Mint the same persistent, 14-day cookie every sign-in lane issues: the handler
+        // honors the explicit ExpiresUtc and, with sliding expiration on, refreshes the
+        // ticket as the resident keeps the tab open. Without this, the handler falls
+        // back to a session cookie that dies when the browser closes.
+        var authProperties = new AuthenticationProperties
         {
-            return View(new VerifyViewModel { Error = ex.Message });
-        }
+            IsPersistent = true,  // persistent cookie — survives a browser close
+            ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
+        };
+        await HttpContext.SignInAsync(
+            scheme: CookieAuthenticationDefaults.AuthenticationScheme,
+            principal: identityPrinciple,
+            properties: authProperties);
+
+        return Redirect("/profile/edit");
     }
 
     // ── Login ───────────────────────────────────────────────────────────────────────────

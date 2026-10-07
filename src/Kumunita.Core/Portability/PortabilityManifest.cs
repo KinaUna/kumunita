@@ -45,6 +45,17 @@ public sealed class PortabilityManifest
     /// loop's output (the §validate (d) byte-verification target set).
     /// </summary>
     public List<PortabilityMediaEntry> MediaManifest { get; set; } = new();
+
+    /// <summary>
+    /// The D2 resident-scope marker. <c>"resident"</c> = a M27
+    /// resident-scoped archive; <c>null</c> = a plain M11 whole-instance
+    /// archive (the ADR 0098 additive-frozen-surface precedent: existing
+    /// readers keep compiling, a plain M11 archive still imports whole).
+    /// </summary>
+    public string? Scope { get; set; }
+
+    /// <summary>The subjectId of the resident this archive is scoped to (D2, D3).</summary>
+    public string? ResidentSubjectId { get; set; }
 }
 
 /// <summary>

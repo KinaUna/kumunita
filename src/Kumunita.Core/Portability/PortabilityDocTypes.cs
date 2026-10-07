@@ -136,7 +136,7 @@ public static class PortabilityDocTypes
         new PortabilityDocEntry("ProjectGoal", 28, new[] { R("ComponentId", "Component"), P("AuthorId") }),
         new PortabilityDocEntry("Project", 29, new[] { R("GoalId", "ProjectGoal"), R("ComponentId", "Component"), P("AuthorId") }),
         new PortabilityDocEntry("TodoItem", 30, new[] { R("ComponentId", "Component"), R("ProjectId", "Project"), P("AuthorId"), P("AssigneeId"), R("ParentId", "TodoItem"), R("BlockedByTodoId", "TodoItem"), A("TagIds", "Tag"), A("ImageIds", "MediaObject") }),
-        new PortabilityDocEntry("KanbanBoard", 31, new[] { R("ComponentId", "Component"), R("ProjectId", "Project"), P("AuthorId") }),
+        new PortabilityDocEntry("KanbanBoard", 31, new[] { R("ComponentId", "Component"), R("ProjectId", "Project"), P("AuthorId"), A("TagIds", "Tag") }),
         new PortabilityDocEntry("KanbanLane", 32, new[] { R("BoardId", "KanbanBoard") }),
         new PortabilityDocEntry("BoardItemPlacement", 33, new[] { R("TodoItemId", "TodoItem"), R("BoardId", "KanbanBoard"), R("LaneId", "KanbanLane") }),
         new PortabilityDocEntry("TodoTranslation", 34, new[] { R("TodoItemId", "TodoItem"), L("LanguageCode"), P("AuthorId") }),

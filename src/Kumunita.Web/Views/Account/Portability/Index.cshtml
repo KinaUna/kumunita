@@ -1,0 +1,71 @@
+@{
+    ViewData["Title"] = "My data";
+    // The status area (the myportability.status line) is a TempData string the
+    // import action writes — outside the kw-l TagHelper's reach, rendered by
+    // the _FlashToast partial (the one, uniform flash surface, the house
+    // convention the M11 admin index uses for the same purpose).
+}
+
+<h1 class="mt-2"><kw-l key="myportability.index.title">My data</kw-l></h1>
+
+<p class="text-muted">
+    Your own authored content — the posts, events, projects, documents, pages,
+    messages, and media you created — as one portable <code>*.kumunita</code>
+    archive. Export it as a file, or import one of your archives back into this
+    community. Nothing here ever carries your password, and only your own rows
+    travel.
+</p>
+
+@* Export — the resident downloads their own, resident-scoped archive
+   (the loop closes out of the platform at the resident's scale — F1). A
+   plain link (no form): the archive streams as a download (the ADR 0034
+   attachment shape, the same serve idiom the M11 operator export uses). *@
+<div class="card mb-4">
+    <div class="card-body d-flex justify-content-between align-items-center gap-3 flex-wrap">
+        <div>
+            <div class="fw-semibold"><kw-l key="myportability.export">Export</kw-l></div>
+            <small class="text-muted">
+                One <code>*.kumunita</code> archive — your own authored content
+                and media (never your password, and only your rows).
+            </small>
+        </div>
+        <a class="btn btn-primary" href="~/account/portability/export">
+            <kw-l key="myportability.export">Export</kw-l>
+        </a>
+    </div>
+</div>
+
+@* Import — the upload form (the POST /account/portability/import target, the
+   ClassifyAsync delegation). The import is a classify step (read-only — the
+   clean/duplicate/conflict report), so unlike the M11 destructive restore
+   there is no data-confirm guard: nothing is written until the resident
+   resolves each entity on the U08 resolve-review page. *@
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="fw-semibold mb-2"><kw-l key="myportability.import">Import</kw-l></div>
+        <small class="text-muted d-block mb-3">
+            Bring one of your <code>*.kumunita</code> archives back. We'll check
+            what fits this community and what needs your call — you decide, item
+            by item, where each piece goes.
+        </small>
+        <form method="post" action="/account/portability/import" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-8">
+                    <input type="file" name="archive" id="archive" class="form-control" accept=".kumunita" required />
+                </div>
+                <div class="col-sm-4">
+                    <button type="submit" class="btn btn-primary"><kw-l key="myportability.import">Import</kw-l></button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* The status area — the success (myportability.status + the
+   clean/duplicate/conflict summary) / the closed-failure-set render — the
+   _FlashToast partial (rendered by _Layout) reads the TempData the import
+   action writes. The keys resolve through the provider (they are TempData
+   strings, outside the kw-l TagHelper's reach). *@
+@* No inline markup here — the _FlashToast partial is the one, uniform
+   flash surface (the house convention). *@

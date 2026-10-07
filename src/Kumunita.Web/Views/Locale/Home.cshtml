@@ -1,0 +1,40 @@
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
+@{
+    ViewData["Title"] = "Settings — Home page";
+}
+
+@* The settings sub-nav (the _EventsTabs.cshtml idiom): top of the page —
+   the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("_SettingsTabs.cshtml")
+
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+
+<h2 class="mt-1"><kw-l key="settings.home_title">Home page</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="settings.home_lede">The home page opens with two intro sections — "What Kumunita is and does" and "What Kumunita does" — before the "What's new" feed. Hide them to land straight on what's new. Your choice is saved on your account and never affects other residents.</kw-l>
+</p>
+
+<form method="post" action="/settings/home">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="hideHomeIntro" id="hideHomeIntroId"
+                       value="true" @(Model.HideHomeIntro ? "checked" : null)>
+                <label class="form-check-label" for="hideHomeIntroId">
+                    <kw-l key="settings.home_label">Hide the intro sections and show me the feed right away</kw-l>
+                </label>
+                <div class="form-text small">
+                    <kw-l key="settings.home_note">When off, the home page shows its intro sections as usual.</kw-l>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="settings.home_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>
