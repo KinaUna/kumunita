@@ -615,3 +615,90 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   `KnownTranslationKeys_ParityTests` pins, and the
   `HomeControllerSiteContentTests` pins from U05).
 - **No Core change, no `HomeController` change, no `/admin/site` surface.**
+
+## U07 — Web: /admin/site surface
+
+- **Date:** 2026-10-07
+- **3 deliverable files (2 new + 1 modified):**
+  1. `src/Kumunita.Web/Controllers/AdminSiteController.cs` (new) — the
+     `AdminSiteController` (`[Route("admin/site")]` +
+     `[Authorize(Roles = GlobalAdmin)]`, the ADR 0050 shape; primary-constructor
+     `ISiteContentService site` — the dedicated controller, no `AdminController`
+     dependency, SITE·7).
+  2. `src/Kumunita.Web/Views/AdminSite/Index.cshtml` (new) — the
+     `AdminSite` view (two `<form>` sections — Home + About, each with its
+     own field group + save button; the `AdminSignupController`'s two-form
+     shape; the `TempData["info"]` flash at the top).
+  3. `src/Kumunita.Web/Views/Admin/Platform.cshtml` (modified) — the
+     `/admin/platform` page gains one list-group row linking to
+     `/admin/site` (the "Site content" row, after the "Sign-up" row).
+- **`AdminSiteController` action signatures (pinned):**
+  - `GET /admin/site` → `Index()` — reads the singleton via
+    `ISiteContentService.GetAsync()`, seeds both form sections, returns
+    the `AdminSite` view (the `AdminSiteViewModel` with the nested
+    `HomeSection` + `AboutSection` types).
+  - `POST /admin/site/save-home` → `SaveHome(AdminSiteViewModel.HomeSection home)`
+    — `[ValidateAntiForgeryToken]` — takes the 5 Home fields, loads the
+    current singleton, applies **only** the Home field group (the About
+    8 fields pass through unchanged — the save is partial), calls
+    `ISiteContentService.SaveAsync`, sets `TempData["info"]`,
+    `RedirectToAction(nameof(Index))`.
+  - `POST /admin/site/save-about` → `SaveAbout(AdminSiteViewModel.AboutSection about)`
+    — `[ValidateAntiForgeryToken]` — takes the 8 About fields, loads the
+    current singleton, applies **only** the About field group (the Home
+    5 fields pass through unchanged), calls `ISiteContentService.SaveAsync`,
+    sets `TempData["info"]`, `RedirectToAction(nameof(Index))`.
+- **`AdminSiteViewModel` field list (the 13 `SiteContent` fields, pinned):**
+  - `Home.HomeHeroEyebrow` / `Home.HomeHeroLead` (text)
+  - `Home.HomeShowAboutButton` / `Home.HomeShowFeatures` /
+    `Home.HomeShowRoadmap` (toggles)
+  - `About.AboutHeroEyebrow` / `About.AboutHeroLead` (text)
+  - `About.AboutShowFeatures` / `About.AboutShowScope` /
+    `About.AboutShowPhilosophy` / `About.AboutShowProject` /
+    `About.AboutShowWhatsNew` / `About.AboutShowContactCta` (toggles)
+  The field names match the `SiteContent` POCO exactly — the Razor model
+  binder binds the flat `name="HomeHeroEyebrow"` form inputs (the
+  `AdminSignupController.Save(bool isOpen)` flat-binding shape) to the
+  nested `HomeSection` / `AboutSection` properties.
+- **`AdminSite` view's two form sections:**
+  - **Home** — `<form method="post" action="/admin/site/save-home">` with
+    a text input for `HomeHeroEyebrow`, a `<textarea>` for `HomeHeroLead`,
+    three checkboxes for `HomeShowAboutButton` / `HomeShowFeatures` /
+    `HomeShowRoadmap` + a "Save home page" button.
+  - **About** — `<form method="post" action="/admin/site/save-about">`
+    with a text input for `AboutHeroEyebrow`, a `<textarea>` for
+    `AboutHeroLead`, six checkboxes for the six About toggles + a "Save
+    about page" button.
+  - Each section has a `@if (TempData["info"] is string info)` flash at
+    the top of the page (the `AdminSignup/Index.cshtml` shape — the flash
+    is a single shared block, rendered once at the top, not per-section).
+  - The field labels are plain English (the admin view's local convention
+    — the `Platform.cshtml` / `AdminSignup/Index.cshtml` shape; an
+    interpolated `kw-l` key would break the `KwLRegistryConsistencyTests`
+    static key scan).
+- **Checkbox model-binding note (a real trap in the repo):** an unchecked
+  checkbox posts **nothing**, and a `bool` property with no posted value
+  keeps its default (`true`) — so without a fix, unchecking a checkbox
+  would silently re-check it on the next load. The standard fix is a
+  hidden `<input type="hidden" name="…" value="false" />` preceding each
+  checkbox; the hidden field always posts `"false"`, the checkbox (when
+  checked) posts `"true"` and wins. Applied to all 9 toggle checkboxes
+  (3 Home + 6 About).
+- **`/admin/platform` link row (added after the "Sign-up" row):**
+  `<a href="/admin/site" class="list-group-item list-group-item-action">`
+  with `<div class="fw-semibold">Site content</div>` + `<small
+  class="text-muted">Edit the landing surfaces' hero text and choose which
+  sections are shown on the home and about pages.</small>`.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (`BUILD_EXIT=0`,
+  `Kumunita.Core` + `Kumunita.Core.Tests` + `Kumunita.Web` +
+  `Kumunita.Web.Tests` all succeeded — warnings only, no errors).
+- **No Core change, no `HomeController` change, no
+  `StaticPagesController` change, no view conditional-rendering change
+  (U05/U06 scope held).**
+- **Constraints held:** no re-shape of the 13-field set (ADR 0150 D1); no
+  `kw-l` registry entry removed (ADR 0150 D3); ADR 0149
+  `Profile.HideHomeIntro` untouched (ADR 0150 D5); `LocaleSettings` doc
+  untouched (ADR 0150 D6); the `AdminController` constructor is unchanged
+  (SITE·7 — the `AdminSiteController` is a dedicated, separate controller);
+  no new `AccessAction` / `AccessVia` (the existing `AccessVia.Admin`
+  value is reused).
