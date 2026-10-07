@@ -1,0 +1,152 @@
+@model Kumunita.Web.Controllers.UserPortabilityController.ResolveReviewModel
+@{
+    ViewData["Title"] = "Resolve my import";
+    // The two closed decision kinds (the UserPortabilityResolutionKind value
+    // names — bound as plain strings so an unchosen conflict posts empty, the
+    // C-M27·4 no-auto-merge shape).
+    var addElsewhere = Kumunita.Core.Portability.UserPortabilityResolutionKind.AddElsewhere.ToString();
+    var discard = Kumunita.Core.Portability.UserPortabilityResolutionKind.Discard.ToString();
+}
+
+<h1 class="mt-2"><kw-l key="myportability.index.title">My data</kw-l></h1>
+
+<p class="text-muted">
+    Your archive was checked against this community. <b>@Model.CleanCount</b>
+    row@(Model.CleanCount == 1 ? "" : "s") fit and will be imported;
+    <b>@Model.DuplicateCount</b>
+    duplicate@(Model.DuplicateCount == 1 ? "" : "s") already exist and will be
+    skipped. The ones below reference a group that does not exist here — you
+    decide, one by one, where each goes.
+</p>
+
+@if (Model.Conflicts.Count == 0)
+{
+    <div class="alert alert-success">
+        Nothing to resolve — every row in your archive fits this community or
+        already exists.
+    </div>
+}
+
+<form method="post" action="/account/portability/import/resolve" enctype="multipart/form-data">
+    @Html.AntiForgeryToken()
+
+    @* The re-uploaded archive — the apply reads the entity rows from these
+       bytes (the U06 seam refinement: the `archive` parameter on
+       IUserPortabilityService.ResolveAsync). The review page was reached via
+       the same upload, so the resident re-attaches the file to apply. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="form-label" style="font-weight:600;">
+                Your <code>*.kumunita</code> archive
+            </div>
+            <input type="file" name="archive" id="archive" class="form-control" accept=".kumunita" required />
+            <small class="text-muted d-block mt-1">
+                The same archive you imported above — your choices are applied
+                to its contents.
+            </small>
+        </div>
+    </div>
+
+    @for (var i = 0; i < Model.Conflicts.Count; i++)
+    {
+        var conflict = Model.Conflicts[i];
+        @* One card per conflict entity (the resident's per-entity choice,
+           C-M27·4 — no auto-merge, the author's choice is absolute). The §2.4
+           reason renders the first absent reference ({Kind, Field, Value}):
+           "This post references group {Value}, which does not exist here.
+           Add it to a group you are a member of, or discard it."
+           The form fields are Conflicts[i].* — the default complex binder
+           lands them on ResolveReviewModel.Conflicts[i] on the POST. *@
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="fw-semibold mb-1">
+                    @conflict.Kind <span class="text-muted">(@conflict.EntityId)</span>
+                </div>
+
+                @* The §2.4 conflict-reason text (the first absent reference). *@
+                @if (!string.IsNullOrEmpty(conflict.AbsentKind) && !string.IsNullOrEmpty(conflict.AbsentValue))
+                {
+                    <div class="text-muted">
+                        This @conflict.Kind.ToLowerInvariant() references
+                        @conflict.AbsentKind.ToLowerInvariant()
+                        <code>@conflict.AbsentValue</code>, which does not
+                        exist here.
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted">A reference this row points to does not exist here.</div>
+                }
+
+                <hr class="my-3" />
+
+                <div class="row g-3 align-items-end">
+                    @* The closed two-choice radio group (Conflicts[i].Resolution).
+                       "Add elsewhere" re-points the absent reference to a group
+                       the resident is a member of (the §2.4 verbatim);
+                       "Discard" drops it (no write). An unchosen conflict posts
+                       no Resolution — it is not applied (the C-M27·4
+                       no-auto-merge pin). *@
+                    <div class="col-sm-5">
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="radio"
+                                   id="res-add-@i"
+                                   name="Conflicts[@i].Resolution"
+                                   value="@addElsewhere" />
+                            <label class="form-check-label" for="res-add-@i">
+                                <kw-l key="myportability.resolve.add_elsewhere">Add elsewhere</kw-l>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                   id="res-discard-@i"
+                                   name="Conflicts[@i].Resolution"
+                                   value="@discard" />
+                            <label class="form-check-label" for="res-discard-@i">
+                                <kw-l key="myportability.resolve.discard">Discard</kw-l>
+                            </label>
+                        </div>
+                    </div>
+                    @* The AddElsewhere re-point target (Conflicts[i].PickedTargetId)
+                       — the resident's member-of groups (the §2.4 "a group you
+                       are a member of"). The absent reference's Kind/Field are
+                       carried as hidden inputs (the Apply POST maps them onto
+                       the UserPortabilityEntityResolution AbsentRefKind /
+                       AbsentRefField). *@
+                    <div class="col-sm-7">
+                        <input type="hidden" name="Conflicts[@i].Kind" value="@conflict.Kind" />
+                        <input type="hidden" name="Conflicts[@i].EntityId" value="@conflict.EntityId" />
+                        <input type="hidden" name="Conflicts[@i].AbsentKind" value="@(conflict.AbsentKind ?? "")" />
+                        <input type="hidden" name="Conflicts[@i].AbsentField" value="@(conflict.AbsentField ?? "")" />
+                        <label class="form-label d-block" for="target-@i">
+                            <span class="text-muted">Target group (for "Add elsewhere")</span>
+                        </label>
+                        <select id="target-@i" name="Conflicts[@i].PickedTargetId" class="form-select">
+                            <option value="">— choose a group —</option>
+                            @foreach (var target in Model.Targets)
+                            {
+                                <option value="@target.Id">@target.Label</option>
+                            }
+                        </select>
+                        @if (Model.Targets.Count == 0)
+                        {
+                            <small class="text-muted d-block mt-1">
+                                You have no member-of groups here — you can
+                                discard this row.
+                            </small>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex gap-2 mt-1">
+        <a class="btn btn-outline-secondary" href="~/account/portability">
+            <kw-l key="myportability.import">Import</kw-l> — back
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <kw-l key="myportability.import.resolve">Apply my choices</kw-l>
+        </button>
+    </div>
+</form>

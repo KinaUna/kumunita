@@ -2133,6 +2133,8 @@ public static class KnownTranslationKeys
             ["myportability.export"]       = "Export",
             ["myportability.import"]       = "Import",
             ["myportability.import.resolve"] = "Apply my choices",
+            ["myportability.resolve.add_elsewhere"] = "Add elsewhere",
+            ["myportability.resolve.discard"] = "Discard",
             ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — the file-facing bulk keys.
@@ -4418,6 +4420,8 @@ public static class KnownTranslationKeys
             ["myportability.export"]       = "Exportieren",
             ["myportability.import"]       = "Importieren",
             ["myportability.import.resolve"] = "Meine Auswahl anwenden",
+            ["myportability.resolve.add_elsewhere"] = "Woanders hinzufügen",
+            ["myportability.resolve.discard"] = "Verwerfen",
             ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — die datei-basierten Bulk-Keys.
@@ -6696,6 +6700,8 @@ public static class KnownTranslationKeys
             ["myportability.export"]       = "Exporter",
             ["myportability.import"]       = "Importer",
             ["myportability.import.resolve"] = "Appliquer mes choix",
+            ["myportability.resolve.add_elsewhere"] = "Ajouter ailleurs",
+            ["myportability.resolve.discard"] = "Rejeter",
             ["myportability.status"]       = "Statut",
 
             // M15 U04 (ADR 0116, D8) — les clés de lot côté fichier.
@@ -8956,6 +8962,8 @@ public static class KnownTranslationKeys
             ["myportability.export"]       = "Eksportér",
             ["myportability.import"]       = "Importér",
             ["myportability.import.resolve"] = "Anvend mine valg",
+            ["myportability.resolve.add_elsewhere"] = "Tilføj andre steder",
+            ["myportability.resolve.discard"] = "Kassér",
             ["myportability.status"]       = "Status",
 
             // M15 U04 (ADR 0116, D8) — de filbaserede bulk-nøgler.
