@@ -755,3 +755,64 @@ keys) and are unchanged.
 
 Each × **4 languages** (`en` / `de` / `fr` / `da`), the closed-key registry
 shape (the ADR 0015 `KnownTranslationKeys` pin).
+
+## M27 — Closed (recorded)
+
+**Recorded:** 2026-10-07 (U13 close unit). M27 is **shipped**; the close
+satisfies the C-M27·7 zero-new-authorization-surface pin (U12 confirmed the
+`IAuthorizationService` surface count is unchanged — 8 methods) and unblocks
+**M28 (guardian time limits)** (M27 `StatusDone` / M28 `StatusNext`).
+
+- **The three acceptance tests (U09, run green at U11's gate — the source-of-truth
+  names, not the §2.6 illustrative `UserPortability*` prose):**
+  - `M27_Acceptance_RoundTrip_ResidentFootprintRestored` (D8a, the "handoff") — **pass**.
+  - `M27_Acceptance_NoSecret_SelfScoped` (D8b, the "closed-loop") — **pass**.
+  - `M27_Acceptance_PerEntityConflict_Resolve` (D8c, the "part-vs-whole") — **pass**.
+  - Web-surface pins: `UserPortabilityControllerTests` (7, the 6 `[Fact]` pins +
+    the 7-case `Web_KwL_KeysResolve` `[Theory]`) — **pass**.
+
+- **The total M27 test count (honest "Closed" basis, U11 gate + U13 exit run).**
+  Core `Kumunita.Core.Tests`: the 3 `M27_Acceptance_*` tests — **Total: 3, Errors: 0,
+  Failed: 0, Skipped: 0, Not Run: 0** (`postgres:18` Testcontainers the long pole).
+  Web `Kumunita.Web.Tests`: `UserPortabilityControllerTests` — **Total: 13, Errors: 0,
+  Failed: 0, Skipped: 0, Not Run: 0** (the 7 `myportability.*` keys × 4 languages is
+  the `Web_KwL_KeysResolve` `[Theory]`). **Both full suites green** at close (U13
+  exit run, xunit.v3 in-process).
+
+- **The ADR pointer.** `docs/adr/0148-user-scoped-portability.md` — the decision
+  record for this lane (Status: **Accepted**); the ADR index (`docs/adr/README.md`)
+  carries the 0148 row (appended after the backfilled 0146 / 0147 rows, per the U00
+  drift resolution). The 8 invariants (C-M27·1–·8), the 5 FACES (F1–F5), the D1
+  closed resident-scope inventory (§2.2), the D4 classify + resolve model (§2.4/§2.5),
+  and the D9 `myportability.*` 7-key closed set are the ADR's normative core; the
+  design doc is the reference tier.
+
+- **The D9 deferred-lane list (each named; a future ADR per lane, none resolved by an
+  M27 unit):**
+  1. **Cross-neighborhood federation** — the `README §Deferred` OpenIddict lane (M27
+     is a single-neighborhood resident's own data, not cross-community identity).
+  2. **Backup-automation / cron surface** — the `OPS.md` operator lane (M27 is the
+     resident's on-demand export/import, not a scheduled backup).
+  3. **Resident delete-all-their-data** — a future ADR (M27 is export/import, not
+     deletion; the author soft-delete precedent, ADR 0024, is the model to follow).
+  4. **Import-merge beyond the per-entity resident choice** — community-level
+     reconciliation, own ADR (M27's `ResolveAsync` is the resident's per-entity
+     add-elsewhere / discard, never an automatic merge).
+
+- **The `Milestones.cs` flip (U13).** M27 `StatusNext` → `StatusDone`; M28
+  `StatusPlanned` → `StatusNext`; the order is **unchanged** (`…"M24", "M25", "M26",
+  "M27", "M28"` — the "named lane, not a renumber" precedent). `MilestonesTests.cs`
+  is re-pinned to match: `Shipped_Milestones_Are_Marked_Done` gains `M27`, and the
+  single-in-progress test is renamed
+  `M27_Is_The_Single_InProgress_Milestone` → `M28_Is_The_Single_InProgress_Milestone`
+  + re-pointed to assert `M28` (with `M27` now in the done list). The order pin
+  (`Roadmap_Covers_M0_Through_M28_Plus_Named_Lanes_In_Order`) is **untouched**.
+
+- **The M28 handoff (C-M27·7) — a closed-loop artifact.** M28 (guardian time limits)
+  starts **only after** M27 `StatusDone` **and** M28 `StatusNext`. M27 is a
+  *resident-scoped export/import* surface over the existing content lanes; M28 is a
+  *child-scoped schedule* on the GU guardian-controls lane (ADR 0028) — the two do
+  not collide on the seams named above. The GU `GuardianLink` + the GU supervision
+  seams stay frozen for any M28 schedule surface; M27's `IUserPortabilityService`
+  seam (the M11 context, not a new bounded context — D7) is untouched by M28. M28's
+  own register + unit plans follow the same sealed-unit shape as this one.

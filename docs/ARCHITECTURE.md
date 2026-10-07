@@ -47,6 +47,8 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
 
   (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
+  **Milestone status (kept in sync with `Milestones.cs` / README / STATUS).** **M27 user-scoped portability is shipped** (ADR 0148) — a resident exports / backs up their own authored data and, on import, resolves conflicts per entity (add elsewhere or discard); the `UserPortabilityService` rides the M11 (ADR 0108) context + archive machinery, the verified-resident self-lane is the gate, and the `IAuthorizationService` surface is unchanged (zero new authorization surface). **M28 guardian time limits is next** (a child-scoped schedule on the GU guardian-controls lane, ADR 0028) — it gates *when* a supervised child may use the platform, distinct from the M20 per-resident notification quiet times.
+
 - **The seams are the architecture.** The "modular monolith" in §3 is the
   integration discipline applied: few stable module interfaces over one process,
   with the **access model** (§4) as the most load-bearing contract. The philosophy
