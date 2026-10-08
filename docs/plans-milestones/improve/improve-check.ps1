@@ -159,8 +159,12 @@ function Get-SharedH2([string]$a, [string]$b) {
 $agentsMd   = Join-Path $repo 'AGENTS.md'
 $instrMd    = Join-Path $repo '.github/copilot-instructions.md'
 $cShared = Get-SharedH2 $agentsMd $instrMd
-# Baseline (U00 time, 2026-10-08): 5 shared headings, all of which U03 will
-# dedupe. New shared headings beyond these are violations.
+# Baseline (U00 time, 2026-10-08): 5 shared headings.
+# U03 (2026-10-08) de-duplicated all 5 — the `.github/copilot-instructions.md`
+# now carries a pointer list instead of full copies, and the shared count is 0
+# (the baseline list below is grandfathered-and-met, not just allowed — same
+# pattern U01 used for the ADR rows; the gate passes either way, so the list
+# is left untouched as optional cleanup).
 $cBaselineShared = @(
   "Don't pause mid-task to check in",
   'Razor verification doctrine',

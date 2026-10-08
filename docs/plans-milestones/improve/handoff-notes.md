@@ -369,3 +369,103 @@ and the gate passes on the current baseline.
   C# touched, no test affected). The `ImproveHarnessTests.ImproveCheck_Gate_Passes`
   test still passes (it shells out to `improve-check.ps1` and asserts
   exit 0, which it does).
+
+## U03 — De-duplicate `AGENTS.md` ↔ `.github/copilot-instructions.md` (2026-10-08)
+
+**Status: done.** Two files changed: `.github/copilot-instructions.md` (the
+5 duplicated doctrine sections are now a thin pointer list) and
+`improve-check.ps1` (the gate (c) baseline comment now records that U03
+closed the drift — the 5-name grandfathering list is left untouched,
+consistent with U01's treatment of the ADR baseline).
+
+### What was done
+
+1. **Rewrote `.github/copilot-instructions.md`** (the file went from 219
+   lines to ~40): the intro paragraph ("This file is read by GitHub Copilot
+   in Visual Studio …") is preserved; the five duplicated `##` sections
+   (PowerShell here-string + `$variables`, Razor verification, Git-state,
+   browser-trusted-folder, don't-pause-mid-task) are **replaced** with a
+   single `## Shared doctrine (defined once, in `AGENTS.md`)` section that
+   lists each section by name, a one-line summary, and a relative Markdown
+   link to the corresponding heading in `AGENTS.md`. A new `## This file's
+   unique content (VS Code / Copilot specific)` section names where future
+   VS-Code-specific rules should land (here, not in `AGENTS.md`) — and
+   notes that the `improve-check.ps1` gate (c) fails the close if a `##`
+   heading is ever re-duplicated between the two files. `AGENTS.md` is
+   untouched — it remains the source of truth (read by Copilot, Claude,
+   Cursor, etc.).
+
+2. **Updated the gate (c) comment in `improve-check.ps1`** (comment only,
+   no logic change): the comment now records that U03 (2026-10-08) closed
+   the drift — the 5-name `cBaselineShared` grandfathering list is left
+   as-is (the gate still passes; the list is now grandfathered-*and-met*,
+   not just grandfathered — the same pattern U01 used for the ADR rows,
+   and the same treatment the U00 handoff note's "What the next agent
+   (U01) must know" section recommends for the ADR baseline: "U01 does
+   **not** need to remove the baseline entries from the gate — they are
+   grandfathered, and removing them is optional cleanup").
+
+### What was found
+
+- **The measurement (via `improve-report.ps1` [3]) confirmed 5 shared
+  headings** — not 6, as the plan's Evidence table suggested. The 5 are
+  exactly the ones the gate's `cBaselineShared` list names:
+  - `Don't pause mid-task to check in`
+  - `Razor verification doctrine`
+  - `Git state gotcha`
+  - `Using the browser (trusted-folder quirk)`
+  - `Running PowerShell commands safely (Windows agents)`
+  (The plan's U00 handoff note had already recorded this — 5, not 6 — and
+  the plan's Evidence table was the stale source. This unit trusted the
+  measurement, per the user's instruction.)
+- **The two files had drifted** in subtle ways even before the de-dup:
+  the `.github/copilot-instructions.md` version of the Razor doctrine had
+  a slightly different "Getting a live server" paragraph (it was shorter),
+  and the `Using the browser` section had an extra rule 4 ("Plans-folder
+  path") that the `AGENTS.md` version does not carry. The de-dup
+  resolves this by making `AGENTS.md` the source of truth — the pointer
+  file now has *no* content to drift against.
+- **After the de-dup, `improve-report.ps1` [3] reads `shared: 0`** (was
+  `shared: 5` before). Gate (c) reports `new shared beyond U03 baseline:
+  0` and all six gates pass. The gate's `cBaselineShared` list is now
+  grandfathered-and-met — the 5 names in the list are no longer shared
+  with `AGENTS.md`, so the "new beyond baseline" set is empty, exactly
+  like the ADR baseline U01 left in place.
+
+### What U04 must know
+
+- U04's scope (`KnownTranslationKeys.cs` — split the ~4 500-key flat
+  dictionary into per-surface static properties) is **unaffected** by U03 —
+  no shared files. U03 is docs-only; U04 is code-only.
+- **U04 should read `AGENTS.md` directly** (not
+  `.github/copilot-instructions.md`) for the test-runner quirk, the
+  PowerShell doctrine, the Razor verification doctrine, and the
+  browser-trusted-folder rules — those are all in `AGENTS.md`, and the
+  pointer file no longer duplicates them. If U04 needs to verify a
+  rendered page, follow `AGENTS.md § Razor verification doctrine →
+  Getting a live server` (the docker-compose command, the ~8 s boot, the
+  `admin@examplium.com` / `Admin123!` sample GlobalAdmin credentials).
+  The browser-trusted-folder rule ("Never put browser harness files in
+  the system temp folder. Use `.tmp/`.") is in `AGENTS.md § Using the
+  browser (trusted-folder quirk)`.
+- **U04 should NOT re-add any of the 5 doctrine sections to
+  `.github/copilot-instructions.md`** — if a future lane needs a new
+  VS-Code-specific rule, the pointer file's `## This file's unique content
+  (VS Code / Copilot specific)` section is the right place (per the U03
+  change). The `improve-check.ps1` gate (c) will fail the close if a
+  shared `##` heading reappears beyond the 5-name grandfathering list
+  (which is now grandfathered-and-met, so any *new* shared heading is a
+  violation).
+
+### Build + gate verification (all green, 2026-10-08)
+
+- `improve-report.ps1` [3] — **5 → 0** (the 5 shared headings are now out
+  of the intersection set; the pointer file carries a link list, not
+  copies).
+- `improve-check.ps1` — **exit 0**, all six gates pass (gate (c) reads
+  `new shared beyond U03 baseline: 0` — the 5 de-duped headings are out
+  of the *new* violation set, same mechanism U01 used for the ADR rows).
+- No build (the change is 1 Markdown rewrite + 1 comment-only edit to the
+  gate script; no C# touched, no test affected). The
+  `ImproveHarnessTests.ImproveCheck_Gate_Passes` test still passes (it
+  shells out to `improve-check.ps1` and asserts exit 0, which it does).
