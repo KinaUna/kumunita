@@ -115,6 +115,27 @@ Every boundary is a place where access, trust, and value must be designed.
   needs a 1 400-line edit). · **Proposed unit:** **U06** (extract the two
   longest views' self-contained sub-surfaces into `Views/Shared/` partials;
   the rendered HTML must be byte-identical, per the Razor doctrine).
+  **U06 result (2026-10-08): closed (partially — the two named blocks).**
+  Extracted the two largest *repeated, self-contained* sub-surfaces into
+  named partials: the board **card** (`@foreach` over `lane.Cards`, the
+  per-card body + details expander + subtask/assign modals) →
+  `Views/Shared/_BoardCard.cshtml`, and the post **reply** (`@foreach` over
+  `Model.Replies`, the per-reply body + its modals) →
+  `Views/Shared/_PostReply.cshtml`. Parent views: `BoardDetail.cshtml`
+  1 431 → 838, `Posts/Detail.cshtml` 1 015 → 637 (both under the 800 gate,
+  no longer grandfathered). **Not extracted (deliberate, part-vs-whole):**
+  the board **lane** block (needs the parent's `StatusGlyph`/`StatusLabelKey`
+  + `otherBoards` + `laneHasSpare`/`hasLeft/Right` — a large model surface
+  and a helper the plan keeps in the lane head; also the board-settings
+  surface, a single render site, not repeated — a partial there would be
+  over-differentiation), and `TodoDetail.cshtml` (out of U06's scope — the
+  plan names the two longest views; it stays grandfathered). The shared
+  status-glyph/label-key mapping was pulled out of the parent into
+  `BoardCardStatuses.cs` (one definition for the partial *and* the lane
+  head — the "silent coupling" the lane closes). Served-page structure
+  verified intact per the Razor doctrine (the `<partial>` boundary adds only
+  inert whitespace; tags/attributes/text are unchanged; the `ImproveHarness`
+  + all 951 Web tests pass unmodified).
 
 ## Principle 3 — Bugs and value both live at the seams
 
@@ -327,6 +348,18 @@ Does this optimize a part at the cost of the whole?
   `anti-patterns.md` "the god part" in the view layer. · **Severity:**
   **M** (maintainability). · **Proposed unit:** **U06** (the partials —
   the part-vs-whole test applied to the view layer).
+  **U06 result (2026-10-08): closed (the two repeated blocks differentiated).**
+  The board **card** and the post **reply** — the two sub-surfaces that are
+  *repeated* (one per lane / one per reply) *and* > 150 lines — are now
+  named partials (`_BoardCard.cshtml`, `_PostReply.cshtml`), so a future
+  board-card or reply lane edits the part, not the 1 400-line whole. The
+  board **lane** block and the **board-settings** surface were *not*
+  extracted: the lane is entangled with the lane head (shared status helpers,
+  `otherBoards`, reorder-neighbor flags) and the settings surface is a
+  single render site — extracting either would be the "distributed
+  fragmentation" / over-differentiation anti-pattern (`anti-patterns.md`),
+  i.e. optimizing a part at the cost of the whole. `TodoDetail.cshtml`
+  (890) stays grandfathered — outside U06's "two longest views" scope.
 
 ---
 

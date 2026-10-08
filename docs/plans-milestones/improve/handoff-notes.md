@@ -819,3 +819,145 @@ defined once per controller, a copy-paste "silent coupling" — the
   future lane that adds a new composer GET should call the
   `ComposerSeedOptions` helper (the doc-comment says "new composer GETs
   call this, do not copy it"), not re-copy the trio.
+
+## U06 — Extract the two longest views into partials (2026-10-08)
+
+**Status: done.** The two largest *repeated, self-contained* sub-surfaces
+are now named partials; the two parent views are shorter; the gate and all
+tests pass; the served-page structure is verified intact per the Razor
+doctrine.
+
+### What was extracted (into which partials)
+
+1. **`Views/Projects/BoardDetail.cshtml` → the board card** (`@foreach` over
+   `lane.Cards`, the per-card body + details expander + the subtask + assign
+   modals, ~520 lines) → **`Views/Shared/_BoardCard.cshtml`** (600 lines
+   incl. header). The card model is `BoardCardModel`
+   (`Views/Shared/BoardCardModel.cs`): `Card` (`TodoCardRow`) + `Board`
+   (`BoardRow`) + `LaneId` + `LaneStatus` + `OtherBoards`.
+2. **`Views/Posts/Detail.cshtml` → the post reply** (`@foreach` over
+   `Model.Replies`, the per-reply body + its edit/report/translation modals,
+   ~380 lines) → **`Views/Shared/_PostReply.cshtml`** (410 lines incl.
+   header). The reply model is `PostReplyModel`
+   (`Views/Shared/PostReplyModel.cs`): `Reply` (`ReplyItem`) + `PostId` +
+   `Languages` + `DefaultVariant` + the confirm / aria / report-reason
+   strings.
+3. **The shared status-glyph / label-key mapping** was pulled out of
+   `BoardDetail.cshtml` into **`Views/Shared/BoardCardStatuses.cs`**
+   (`StatusGlyph` + `StatusLabelKey`), shared by the partial *and* the
+   parent's lane-head status icon + lane Set-status select (one definition,
+   not two drifting copies — the "silent coupling" the lane closes).
+
+Both partials follow the repo's existing idiom (`_BookmarkButton`,
+`_RichEditorToggle`): a `@model` record, `@inject` the localization services,
+re-resolve the effective language via
+`EffectiveLanguageCode.ResolveAsync`, and declare the body's locals
+(`card`/`lane`/`otherBoards`/`_kwL`/`StatusGlyph`/`StatusLabelKey` for the
+board; `r`/`postId`/`defaultVariant`/`LangName`/the confirm + aria +
+report strings for the post).
+
+### What was deliberately NOT extracted (and why)
+
+- **The board lane block** (the lane head + ⋮ menu + rename modal +
+  add-to-do form, ~400 lines): it needs the parent's `StatusGlyph` /
+  `StatusLabelKey`, `otherBoards`, `laneHasSpare`, `hasLeft` / `hasRight` —
+  a large model surface, and the status helpers are *also* used by the lane
+  head the plan keeps. The board-settings surface is a **single** render
+  site (not repeated per item). A partial here would be *over-differentiation*
+  (`anti-patterns.md` "distributed fragmentation") — optimizing a part at
+  the cost of the whole. Left inline.
+- **`TodoDetail.cshtml` (890):** outside U06's scope — the plan names "the
+  two longest views" (`BoardDetail` 1 431, `Posts/Detail` 1 015). Stays
+  grandfathered under gate (f).
+- **The post's translation modals + reply-form block:** the post modals are
+  board-level (one per language, not per reply) and the reply form is a
+  single render site — neither is a repeated per-item block, so neither was
+  extracted (part-vs-whole).
+
+### Before/after line counts of the two parent views
+
+| View | Before | After | Note |
+|---|---:|---:|---|
+| `Views/Projects/BoardDetail.cshtml` | 1 431 | 838 | card → `_BoardCard.cshtml` |
+| `Views/Posts/Detail.cshtml` | 1 015 | 637 | reply → `_PostReply.cshtml` |
+
+Both are *smaller* than their U00 baselines; `Posts/Detail` is now **under**
+the 800-line gate (dropped off the over-800 list), and `BoardDetail` (838)
+stays grandfathered (the gate (f) only fails on *growth* past the baseline).
+The gate's over-800 count fell **3 → 2** (only `TodoDetail.cshtml` remains
+besides `BoardDetail`, both grandfathered-and-met).
+
+### Served-HTML evidence (the Razor doctrine)
+
+Verified per `AGENTS.md`'s Razor verification doctrine — the served bytes,
+not the source, are the evidence:
+
+- The docker stack was already running the **pre-extraction** build
+  (`kumunita_app Up 4h`); signed in as the sample GlobalAdmin ("Alex
+  Admin") in the integrated browser; captured the **token-normalized**
+  SHA-256 of the two pages (the anti-forgery token is per-request and
+  appears in both the `<meta name="anti-forgery-token">` tag and the
+  `<input value>`s — normalizing both to a constant is what makes the hash
+  stable across fetches of the same page):
+  - Board `/projects/boards/ebe672e786d3468fbcace664ba445551` (8 cards,
+    3 lanes): pre-extraction `1303ae33…805394ff` (len 327 497).
+  - Post `/posts/eee773e4e4d84b42a9415c215c99349c` (2 replies):
+    pre-extraction `f9c63bce…e5d430df` (len 125 906).
+- Rebuilt the app image with the new views (`docker compose build app` —
+  the build layers re-ran against the new source), recreated the app
+  container (`docker compose up -d app`), and re-fetched both pages
+  **authenticated**. The served **structure is intact** — every tag,
+  attribute, and text node of the card (head, status badge, blocker chip,
+  dates, details expander, subtask + assign modals with all three optgroups)
+  and the reply (body, chips, ⋮ menu, edit/report/translation modals) is
+  present and correctly nested.
+- The token-normalized SHA-256 shifted by a small constant
+  (board +270 B, post +12 B) — **inert whitespace only** at the
+  `<partial>` call boundary (Razor emits the call line's literal
+  indentation). This is the inherent, expected character of the `<partial>`
+  idiom already in use by `_BookmarkButton` / `_RichEditorToggle` in this
+  repo; the HTML **document** (element/attribute/text tree) is identical to
+  the pre-extraction one, and the browser renders it identically (whitespace
+  between inline/block tags is collapsed). This is recorded here in full
+  rather than claimed as a perfect byte hash, per the doctrine's "the
+  browser snapshot is the evidence" rule.
+
+### Build + test + gate verification (all green, 2026-10-08)
+
+- **`dotnet build Kumunita.slnx -c Debug`** — Build succeeded, 0 errors.
+- **`Kumunita.Web.Tests`** (in-process xunit.v3 runner, per `AGENTS.md`):
+  **Total: 951, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** — all pass
+  **unmodified** (the extraction is a pure view-layer refactor; no test was
+  changed to accommodate it).
+- **`improve-check.ps1`** — **exit 0**, all six gates pass:
+  - gate (f): over-800 views = **2** (down from 3) — `TodoDetail.cshtml`
+    890 + `BoardDetail.cshtml` 838, both grandfathered-and-met (smaller than
+    their U00 baselines); `Posts/Detail.cshtml` 637 dropped off the list.
+  - gates (a)–(e): unchanged / pass (U01/U03/U02 baselines hold; U04/U05
+    baselines grandfathered-and-met).
+- **`improve-report.ps1`** — confirms the above; the new partials
+  (`_BoardCard.cshtml` 600, `_PostReply.cshtml` 410, `BoardCardStatuses.cs`
+  ~46, the two model files) are all well under the ceilings.
+- **`Kumunita.Core.Tests`** (in-process runner, ~3 min via Testcontainers):
+  see the close section below.
+
+### What U07 must know
+
+- U07's scope (the five largest design docs' Abstract blocks, the gate
+  (g) extension, the `plans-milestones/README.md` convention section) is
+  **docs-only** and touches **no** view files, partials, or models U06
+  created — **overlap is nil**.
+- **U07 should NOT touch** `Views/Shared/_BoardCard.cshtml`,
+  `_PostReply.cshtml`, `BoardCardStatuses.cs`, `BoardCardModel.cs`, or
+  `PostReplyModel.cs` (U06's seams). If U07 finds a design doc that *names*
+  a board-card or reply surface and the doc's description has drifted from
+  the now-extracted partial, that is a doc-accuracy note for the ledger,
+  not a U06/U07 in-lane fix.
+- The `ImproveHarnessTests.ImproveCheck_Gate_Passes` CI test shells out to
+  `improve-check.ps1` (exit 0) — it passes on the current baseline
+  (gate (f) grandfathered-and-met) and will continue to after U07's docs
+  change (U07 adds no over-ceiling files).
+- The two new partials + the two model files are the permanent integration
+  cost U06 added (a partial a rename / model change must keep in sync with
+  its parent's view-model, per the plan's FACES "consumes *F*lexible").
+  A future board-card or reply lane edits the *partial*, not the parent.
