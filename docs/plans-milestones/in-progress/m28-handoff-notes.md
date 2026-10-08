@@ -311,3 +311,27 @@
   the handoff note. All invariants C-M28·1–7 held.
 - **Gate NOT recorded into the design doc yet** (U08 owns the `### Run
   result` §2.8 append). Handing off to U08.
+
+## U08 — gate recorded
+
+**Date:** 2026-10-07
+**Status:** COMPLETE (the "run the record" step, U08 owns the `### Run
+result` §2.8 append). U08 *records only* — no code, no new tests, no
+production file touched; the evidence is **U07's already-executed, already-
+green run** (not a fresh run). `### Run result (M28 acceptance gate —
+2026-10-07)` appended to the design doc §2.8 (inside the gate section,
+before §2.9 drift-guard — the M27 U11 shape). `m28-u08.md` stays in
+`in-progress/` until U09's close moves it.
+
+- **3 gate tests + status (all PASS — U07's run, recorded here):**
+  `Gate1_ClosedLoop_BlockedWindow_ContainingNow_RestrictsChild`,
+  `Gate2_Handoff_AllowedWindow_Then_Clear_Is_AlwaysAllowed`,
+  `Gate3_PartVsWhole_AllTwentySeamTestsPassTogether` — byte-identical to the
+  §2.8 pinned names (verified against
+  `tests/Kumunita.Core.Tests/M28AcceptanceGateTests.cs`; no prose-vs-source
+  drift, so no `## U08 — Drift pause` opened).
+- **20-test seam count (from U07, all green):** U02 7 pure + U03 7 standing +
+  U04 3 middleware + U06 3 surface = 20 seam; + 3 gate = **23/23 green**.
+  Core.Tests `Total: 17, Failed: 0`; Web.Tests `Total: 10, Failed: 0`.
+- **Still-open drift:** none. U07 recorded no `## U# — Drift pause`; all
+  invariants C-M28·1–7 held. No drift opened or left open by U08.

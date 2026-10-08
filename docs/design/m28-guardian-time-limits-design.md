@@ -604,6 +604,45 @@ pinned test in U07's `tests/Kumunita.Core.Tests/M28AcceptanceGateTests.cs`),
   unchanged.)* Pinned test name:
   `Gate3_PartVsWhole_AllTwentySeamTestsPassTogether` (U07).
 
+### Run result (M28 acceptance gate — 2026-10-07)
+
+> **Recorded by U08** (the "run the record" step, split from U07 so the
+> test-authoring unit stays atomic). **U08 records only** — it writes no
+> code, runs no new tests, and touches no production file; the evidence is
+> **U07's already-executed, already-green run** recorded in the handoff note
+> (`## U07`), not a fresh run in this unit. Build (at U07's run): `dotnet
+> build Kumunita.slnx -c Debug` green (0 errors). Runner: xunit.v3 in-process
+> (`dotnet exec <assembly.dll> -class <FQCN>`), per the AGENTS.md test-runner
+> quirk (VS Test Explorer / `dotnet test` discovery broken on this machine).
+>
+> **Name note (source-of-truth):** the three gate tests authored by U07
+> (and run green) carry **exactly** the §2.8 pinned names — verified
+> byte-identical against
+> `tests/Kumunita.Core.Tests/M28AcceptanceGateTests.cs` (no prose-vs-source
+> drift, so no `## U08 — Drift pause` was opened). The gate below records
+> that actual run.
+
+| Test | Status |
+|---|---|
+| `Gate1_ClosedLoop_BlockedWindow_ContainingNow_RestrictsChild` (GATE-1, F1 + C-M28·4) | **pass** (Core.Tests run reports `Total: 17, Errors: 0, Failed: 0, Skipped: 0`) |
+| `Gate2_Handoff_AllowedWindow_Then_Clear_Is_AlwaysAllowed` (GATE-2, F2-in-window + F3 floor + C-M28·4 strong consistency) | **pass** (same `Total: 17, … Failed: 0` Core.Tests run) |
+| `Gate3_PartVsWhole_AllTwentySeamTestsPassTogether` (GATE-3, C-M28·5 structural pin — frozen 4-method `IAuthorizationService` surface unchanged) | **pass** (the part-vs-whole is **both suites green**, not one test reflecting over all 20 classes — a Core.Tests assembly cannot reference Web.Tests types) |
+
+**Part-vs-whole evidence (the 20-test seam list, §2.6 — all green, from
+U07's run):** the U02 7 pure + U03 7 standing/audit live in Core.Tests
+(`Total: 17, Errors: 0, Failed: 0, Skipped: 0` — the 14 seam + the 3 gate),
+and the U04 3 middleware + U06 3 surface live in Web.Tests (`Total: 10,
+Errors: 0, Failed: 0, Skipped: 0` — the 6 seam + the 4 U05 kw-l parity
+pins). **20 seam (14 Core + 6 Web) + 3 gate = 23/23 green.** No seam test
+red; no author-not-run gap (the M3/M4 precedent did not fire — the Core
+runtime was present and both suites ran green).
+
+**Drift pauses (one line each, the `## U<m> — Drift pause` sections in the
+handoff note):** **none.** U07 recorded no `## U# — Drift pause` section in
+the handoff note; all invariants C-M28·1–7 held. No `## U08 — Drift pause`
+opened by this unit — the gate is green on U07's recorded run, and the three
+gate names are byte-identical to the §2.8 pin.
+
 ## 2.9 — §drift-guard (frozen once written)
 
 **A unit stops (does not improvise) when it hits any of:**
