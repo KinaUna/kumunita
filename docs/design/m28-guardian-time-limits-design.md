@@ -732,3 +732,54 @@ one-line "why it is deferred":
   two `int[]` axes), mirroring ADR 0121 D2's `NotificationQuietSchedule`.
   **ADR 0151 verified free** against `docs/adr/README.md` (index runs to 0150)
   and on disk (no `0151-*.md`). Status remains **Accepted**.
+
+## M28 — Closed (recorded)
+
+> **Recorded by U09** (the single close unit, C-M28·8 — the loop-closing step,
+> the M27 U13 / M3 U11 analog). M28 is the **LAST milestone on the roadmap** —
+> the close flips `Milestones.cs` / README / STATUS / ARCHITECTURE to **M28
+> done, the roadmap complete** in one unit (the AGENTS.md doc↔code parity
+> contract), reframes `MilestonesTests` from "M28 is the single in-progress"
+> to "the roadmap is fully shipped" (zero `StatusNext` + all `StatusDone` —
+> a semantic reframe, not a rename), and adds the `WhatsNew.cs` `0.43.0` row
+> (the required **sixth** member of the close flip, the M27 "shipped with no
+> entry until caught in review" lesson — held). **No new ADR** (ADR 0151 was
+> authored in U00); the close adds none.
+
+**The three acceptance tests (from U08's `### Run result (M28 acceptance gate
+— 2026-10-07)` record, §2.8):**
+
+| Test | Definition | Status |
+|---|---|---|
+| `Gate1_ClosedLoop_BlockedWindow_ContainingNow_RestrictsChild` | A guardian sets a `Blocked`-mode window covering "now" → the child is restricted (F1 + C-M28·4) | **pass** |
+| `Gate2_Handoff_AllowedWindow_Then_Clear_Is_AlwaysAllowed` | An `Allowed`-mode window permitting "now" → allowed; then cleared → always allowed (F2-in-window + F3 floor + C-M28·4) | **pass** |
+| `Gate3_PartVsWhole_AllTwentySeamTestsPassTogether` | The full 20-test seam list passes together (C-M28·5 — the `IAuthorizationService` surface count unchanged) | **pass** |
+
+**Total M28 test count (Core + Web):** **23/23 green** — the 20-test seam
+list (U02 7 pure + U03 7 standing/audit + U04 3 middleware + U06 3 surface) +
+the 3 acceptance-gate tests (U07). Core.Tests `Total: 17, Errors: 0, Failed: 0`
+(14 seam + 3 gate); Web.Tests `Total: 10, Errors: 0, Failed: 0` (6 seam + the
+4 U05 kw-l parity pins). **No seam test red; no drift pause left open**
+(U07/U08 recorded no `## U# — Drift pause`).
+
+**The `IAuthorizationService` surface is unchanged** (C-M28·5, the final close
+pin — U07 confirmed it; the close adds none). Zero new `AccessAction`, zero new
+`AccessVia`, zero new `Decide()` branch, zero new `IAuthorizationService`
+signature.
+
+**The ADR pointer:** **ADR 0151** (`docs/adr/0151-guardian-time-limits.md`,
+Accepted 2026-10-07; Amends 0028 + 0006-E; references 0121 / 0019 / 0004
+§B.1) — the decision record the close does **not** re-author.
+
+**The D9 deferred lanes (each named — §2.10, each a new ADR-gated lane, not a
+toggle):**
+
+1. A *resident* self-service time limit (a non-guardian version) — new ADR.
+2. Per-feature / per-content restrictions (browse-yes / message-no) — new ADR.
+3. An awareness / reminder lane ("your parent has enabled time limits") — new ADR.
+4. Enforcement-history auditing (which requests were denied) — new ADR (the M13 ADR 0114 `UsageEvent` capture shape).
+5. Per-content time limits — a larger design, new ADR.
+
+**The roadmap is complete.** M28 is the last milestone; after this close there
+is **no** `StatusNext` milestone. The `Milestones.All` **order** is unchanged
+(`…, M26, M27, SITE, M28`) — a status bump, not a renumber. The loop is closed.

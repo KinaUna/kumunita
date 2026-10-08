@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.43.0", "2026-10-07", new List<string>
+        {
+            "Guardian time limits — a parent/guardian sets when the child may use the platform: a per-child allow/block schedule (hours × days of week, in the child's own time zone) that gates the child's whole-platform access — a sign-out, exactly like a suspension but windowed. The guardian sets it on the child's manage page, a GlobalAdmin can clear it, and the child cannot set or clear their own (ADR 0151).",
+        }),
         new("0.42.0", "2026-10-07", new List<string>
         {
             "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide: a GlobalAdmin can now change what the home and about pages say (the hero eyebrow + lead) and choose which sections appear at all; the defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0150).",

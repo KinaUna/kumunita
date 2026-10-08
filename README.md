@@ -32,7 +32,7 @@ document management (a shared repository for official documents, contracts, etc.
 **Documents organization is done** — tags + folders on the M21 document repository (a Page-style folder forest + the TG tag convention; ADR 0137).
 **M26 is done** — sorting (feeds, lists & search results are sortable by various properties in increasing or decreasing order; ADR 0145).
 **M27 is done** — user-scoped portability (a resident exports / backs up their own data; imports resolve conflicts per entity; ADR 0148).
-**M28 is next** — guardian time limits (for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week)
+**M28 is done** — guardian time limits (for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week; ADR 0151). **The roadmap is complete — every milestone is done.**
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -277,7 +277,7 @@ stays trivial and the authorization rules can grow freely.
 - **M26** — Sorting: feeds, lists, and search results are sortable by various properties, in increasing or decreasing order (the M7 sibling that pagination and filtering shipped without). **Done** (ADR 0145).
 - **M27** — User-scoped portability: a resident exports / backs up their own data. Imports may not fit the community's structure and authorization settings (communities, groups, pages, …), so on import the user manually resolves conflicts, choosing per entity whether to add it elsewhere or discard it. **Done** (ADR 0148).
 - **Site content** (`SITE`, ADR 0150) — the two landing surfaces' hero text is admin-editable (the home + about heroes' eyebrow and lead) and every other section is show/hide (a GlobalAdmin chooses which sections appear at all, from `/admin/site`). The defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today; a hidden section is not in the DOM at all (a screen reader never sees it). **Done.**
-- **M28** — Guardian time limits: for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week. A child-scoped schedule on the GU guardian-controls lane (ADR 0028), distinct from the per-resident M20 notification quiet times (these gate the child's whole platform access, not just notifications). **In progress** (next).
+- **M28** — Guardian time limits: for a child's account, a parent/guardian sets when the child may use the platform — allow or block certain hours of each day and days of the week. A child-scoped schedule on the GU guardian-controls lane (ADR 0028), distinct from the per-resident M20 notification quiet times (these gate the child's whole platform access, not just notifications). **Done** (ADR 0151). **This is the last milestone on the roadmap — the roadmap is complete.**
 
 ## Deferred (future, by design)
 
