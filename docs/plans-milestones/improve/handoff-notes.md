@@ -1081,3 +1081,153 @@ design docs' **bodies are unchanged** (pure top-of-file addition, like U02).
   reports a *new* violation, that is a design doc over 400 lines that
   crossed the ceiling *after* U07 — a real finding (record it in the
   ledger, severity L — discoverability at risk), not a gate bug.
+
+## U08 — The security & privacy seam audit (2026-10-08)
+
+**Status: done.** The `## Security & privacy` section of `improve-audit.md`
+is filled with the evidence for all four audit passes. **Zero S findings** —
+all four passes are clean (verified by reading the code + the tests), so per
+the plan's "no code changes unless an S finding is found" rule, **no code
+was touched** — the only working-tree change is the ledger section. A
+verified-clean is a legitimate seam-audit outcome (the U05 "verified
+negative" pattern).
+
+### What was audited (the four passes)
+
+1. **Access-model closed-loop** — for each `AccessAction` × `AccessVia`
+   (the ledger's checklist a/b/c): denied-path test present? audit row on
+   both the granted and the security-meaningful denied path? does the row
+   carry *who* (`ActorId` + `EffectivePrincipalId`) + *why* (`Via`)? **Clean.**
+   Key structural facts that shape the audit (recorded in the ledger so a
+   future lane doesn't re-litigate them):
+   - `Decide()` (`src/Kumunita.Core/Authorization/AuthorizationService.cs`)
+     is **standing-keyed, not action-keyed** — it branches on the actor's
+     standing (owner → moderator → break-glass → community → resident →
+     public → match-groups → deny) and never on `AccessAction`; the action
+     is *recorded* on the audit row. So the matrix collapses to "per
+     `AccessVia`" for the decision.
+   - Every one of the 11 `AccessVia` values has a denied-path test + an
+     audit row on the deny path (the ledger's table lists the exact test per
+     value; the `AccessAudit` shape is the (c) guarantee by construction,
+     and `C3_AuditRow_CommitsWithTheDecision_AllowAndDeny` pins the (b)
+     "no silent, unaudited access" invariant on both outcomes).
+   - **`AccessVia.Report` is a live branch, not the "reserved" the
+     `Decision.cs` enum comment (and `AuditPurgeService`'s "no
+     `AccessVia.Report` rows yet" line) suggest** —
+     `ModerationService.CanReadWithReportAsync`
+     (`src/Kumunita.Core/Moderation/ModerationService.cs`,
+     §2.4 item 3, the M3b F2 read lane) writes both the Allow and the
+     C5-unactivated Deny rows with `Via = Report`. Two stale code comments —
+     a doc-hygiene note, not an S finding.
+   - **`AccessVia.Guardian` is a write-lane standing only** (the five GU
+     supervisory actions, all `IUserInfoService` lanes with `Via = Guardian`
+     rows) — it never appears in a `Decide()` branch (the G·1 "the
+     guardian's ceiling, not a content right" pin).
+
+2. **The guardian boundary** (ADR 0028 — no standing to read the child's
+   private content) — grep of `GuardianController` for a read of child
+   content (post body, message body, document) returned **no content read**;
+   every `.Body` / `message` hit is `ex.Message` (exception text to
+   `TempData["error"]`). The controller's G·1 doc-comment states the pin
+   verbatim ("never the child's posts or profile body"). Cross-checked the
+   `IUserInfoService` guardian seams: every one is a **write** lane
+   (suspend / membership curation / messaging + event ceiling / block-hide /
+   dissolve / invitation-approval) with a `Via = Guardian` audit row; none
+   is a content *read*. The block/hide lanes work in the *opposite* direction
+   of a leak (they remove a guardian-blocked community from the child's
+   visibility). **Clean.**
+
+3. **The translation-swap surface** (ADR 0027/0049/0051) — verified the
+   swap never reveals a translation the viewer may not read, for **all four
+   surfaces** (posts, group posts, announcements, pages): in every one the
+   visibility/audience **gate runs first**, and the variant selection
+   (ADR 0049/0051, `EffectiveLanguageCode.ResolveAsync`) only re-words an
+   item already in the visible set (each helper's doc-comment says "a read,
+   not a decision: … already ran"). The composite is pinned by the
+   gate-first ordering + the visibility denied-path tests + the translation
+   data-shape/standing tests (`TranslationDisplayTests`,
+   `PostTranslationTests`, `*ControllerTranslationTests`). **Clean**,
+   with **one L observation (record and accept)**: the gate-first
+   *ordering* invariant is
+   a code invariant verified by reading, **not** pinned by a single dedicated
+   end-to-end test (the `translationProvider` is optional/null in most seam
+   tests, so the swap is a no-op there). Flagged for the next audit pass —
+   it is a discoverability/audit observation, not a trust violation.
+
+4. **The portability lane** (ADR 0148) — no-secret: grep of
+   `UserPortabilityService` found **no credential field in the export shape**
+   (the only `Password`/`Token`/`Hash`/`Secret`/`Credential` hits are
+   `CancellationToken` params); the export reads exactly the 8 allowed
+   `PortabilityPrincipal` fields and the doc-comment names the 5 excluded
+   ones. **Test-pinned** (M11 D9b):
+   `PortabilityNoSecret_ArchiveContainsNoCredentialMaterial` — plants a
+   witness with a non-empty `PasswordHash` +
+   `SecurityStamp`, exports, byte-scans the wire, and asserts
+   `DoesNotContain(witness.PasswordHash, wire)`; the M27 analog is
+   `M27_Acceptance_NoSecret_SelfScoped`. References-don't-exist (the ADR's
+   own acceptance case): `M27_Acceptance_PerEntityConflict_Resolve` imports
+   into a target where the resident's component *does not* exist → the
+   conflict is not auto-applied (the resident resolves it) — fail-closed, no
+   silent auto-merge; the M11 analog is
+   `PortabilityFailClosed_RejectedArchiveWritesZeroRows` +
+   `AssertFailClosedOnDanglingReferenceAsync`. **Clean.**
+
+### The ledger section
+
+Filled `docs/plans-milestones/improve-audit.md` `## Security & privacy`:
+the verdict blockquote (all four clean, zero S, no code changed) + a
+per-pass "U08 result (2026-10-08)" paragraph under each of the four
+subsections (access model / guardian boundary / translation-swap /
+portability), with the exact file + test evidence and the two stale-comment
+corrections + the one L note. **175 insertions, 1 file changed** (the
+ledger only — `git status --porcelain` shows
+`M docs/plans-milestones/improve-audit.md` and nothing else).
+
+### S findings surfaced
+
+**None.** All four passes are clean. (The two stale enum/code comments about
+`AccessVia.Report` and the one L translation-swap ordering note are
+discoverability/doc-hygiene, not trust violations — none of them is an S, so
+none of them triggers the "record with exact file/line + proposed fix + stop
+and hand to a human + new named lane" path.)
+
+### What U09 must know
+
+- U09's scope (the three-audience UX audit — resident / admin / maintainer —
+  + the integrative question + the close flip) is **unaffected** by U08:
+  overlap is nil. U08 touched **no** code, **no** design doc, **no**
+  controller/service, and **no** support file — only the
+  `## Security & privacy` section of `improve-audit.md`.
+- **U09's "Admin (the standing test)"** can lean on U08's access-model
+  evidence: the admin's actions are audited under their standing
+  (`AccessVia.Admin` rows, the `AccessAudit` who + why shape) — U08 already
+  verified the (b)/(c) guarantee for the admin standing, so U09 needs only
+  to confirm the *within-surface* closed-loop (no "open the DB" handoff) and
+  record it, not re-audit the audit-row shape.
+- **The two stale code comments** (the `Decision.cs` `AccessVia.Report`
+  "reserved for the read branch" line + the `AuditPurgeService` "there are
+  no `AccessVia.Report` rows yet (reports land in M3)" line) are now
+  inaccurate — `ModerationService.CanReadWithReportAsync` writes them. U09's
+  close flip does **not** touch them (U09 is docs + the close flip; the
+  close flip's six members are `Milestones.cs` / `README.md` / `STATUS.md` /
+  `ARCHITECTURE.md` / `MilestonesTests.cs` / `WhatsNew.cs`). They are a
+  candidate for a future `DOC-HYGIENE` note, not a U09 in-lane fix.
+- **The L translation-swap ordering note** is the one open item U08 left.
+  If U09 (or a future unit) wants it pinned, that is a **new named lane**
+  (the lane's own rule: a new requirement → a new lane), not a U09 in-lane
+  edit — and it is *not* an S, so it does not gate the close.
+- **The gate is unchanged** — U08 tripped no gate (`improve-check.ps1` exit
+  0, all seven gates OK; the `## Security & privacy` section is in
+  `improve-audit.md`, which no gate reads). U09's close flip should still
+  keep `improve-check.ps1` green.
+
+### Build + gate verification (all green, 2026-10-08)
+
+- **`git status --porcelain`** — `M docs/plans-milestones/improve-audit.md`
+  only (175 insertions, 0 deletions; no untracked files).
+- **`improve-check.ps1`** — **exit 0**, all seven gates OK (a–g).
+- **`dotnet build Kumunita.slnx -c Debug`** — **Build succeeded**
+  (`Kumunita.Core` / `Kumunita.Web` / both test projects all "succeeded";
+  the warnings are pre-existing `CS860x` nullable + `xUnit` analyzer
+  warnings in unrelated files — no errors; U08 touched no C#, so this is a
+  no-op confirmation).

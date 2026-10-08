@@ -487,6 +487,19 @@ survives a handoff of the admin, a restore, a release.
 > subsections below are the *checklist* U08 works through, one row per
 > `AccessAction` × `AccessVia` (the U08 deliverable is the *evidence* for
 > each row).
+>
+> **U08 verdict (2026-10-08): all four passes clean — zero S findings.**
+> The access model is tested on the denied path and audited on both the
+> granted and the security-meaningful denied path, with *who* + *why* on
+> every row (all 11 `AccessVia` values); the guardian boundary holds (no
+> content read); the translation-swap is gate-first in all four surfaces;
+> the portability lane is no-secret and covers the ADR 0148
+> references-don't-exist acceptance case. One **L** observation (the
+> translation-swap gate-first *ordering* invariant is code-verified, not
+> pinned by a single end-to-end test) is recorded and accepted — it is not
+> a trust violation. **No code changed in U08** (the plan's "no code
+> changes unless an S finding is found" rule held — a verified-clean is a
+> legitimate seam-audit outcome, the U05 "verified negative" pattern).
 
 ### The closed-loop audit of the access model
 
@@ -509,6 +522,52 @@ change becomes a *new* named lane (e.g. `SECAUDIT-1`), per this lane's own
 rule (the philosophy says "the most load-bearing contract in the codebase"
 is changed only through an ADR).
 
+**U08 result (2026-10-08): clean — no S finding.** The single decision
+path (`AuthorizationService.Decide`,
+`src/Kumunita.Core/Authorization/AuthorizationService.cs`) is **standing-
+keyed, not action-keyed**: `Decide()` branches on the actor's standing
+(owner → moderator → break-glass → community → resident → public →
+match-groups → deny) and never on `AccessAction` — the action is *recorded*
+on the audit row, it does not change the branch. So the `AccessAction` ×
+`AccessVia` matrix collapses to "per `AccessVia`" for the decision, with
+the action carried on the row. Every `AccessVia` value has a **denied-path
+test** (a) and an **audit row on both the granted and the security-
+meaningful denied path** (b) carrying **who** (`ActorId` +
+`EffectivePrincipalId`) and **why** (`Via`) (c) — the `AccessAudit` shape
+(`src/Kumunita.Core/Authorization/AccessAudit.cs`) is the (c) guarantee by
+construction, and `C3_AuditRow_CommitsWithTheDecision_AllowAndDeny`
+(`tests/Kumunita.Core.Tests/AuthorizationServiceTests.cs`) pins the (b)
+"no silent, unaudited access" invariant on both outcomes. Denied-path
+evidence per `AccessVia`:
+
+| `AccessVia` | Denied-path test (a) | Audit row on deny (b) |
+|---|---|---|
+| `Owner` | allow-branch; a non-owner's denial is the other branches' denies (e.g. `C4_MembershipChange_IsLiveOnTheNextDecision`, `A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly`) | the same deny rows carry `Via` |
+| `Audience` | `C4_MembershipChange_IsLiveOnTheNextDecision` (the Deny row landed), `C6_BulkMatches` (c2 unrelated-group Deny), `A0041_AllResidentsFlagFalse_EmptyGrants_Denies`, `EvaluateAudience_EmptyAudience_AllMode_Denies` (the vacuous-truth guard) | `C3_AuditRow_CommitsWithTheDecision_AllowAndDeny` |
+| `Delegation` | `C2_Delegate_OutOfScope_Denies_WithDelegationViaRecorded` | Deny row `Via = Delegation` (asserted in that test) |
+| `Moderator` | `C5_ModeratorAccess_OffByDefault_ModeratorCannotSee` | the off-by-default C5 row |
+| `Report` | `ModerationServiceTests.CanReadWithReportAsync_ModeratorWithoutReport_Denied_C5Unactivated` | Deny row `Via = Report`, `Outcome = Deny` (asserted) |
+| `BreakGlass` | `BreakGlass_NotConsumed_DoesNotElevate`, `BreakGlass_Expired_DoesNotElevate` | the non-elevated deny rows |
+| `Admin` | `AnnouncementControllerTests.AddTranslation_Denied_Forbid_NoWrite`, `EventControllerTests.UpdateTranslation_Denied_Forbid`, `PageControllerTranslationTests.RemoveTranslation_Denied_Forbid` (Web.Tests) | `AccessAuditFactoryTests` pins the `(Admin, Deny)` row shape |
+| `Group` | `GroupPostServiceTests.G2_NonMemberFeedEmptyWithDenyRow` | aggregate Deny row `Via = Group` (asserted) |
+| `Guardian` | `GuardianTimeLimitStandingTests.F5_NonGuardian_Set_Is_Denied` | `Via = Guardian` write-lane row |
+| `Community` | `A0036_CommunityFlagButNotMember_Denies`, `A0036_CommunityFlagNullComponent_AnonymousActor_Denies` | the deny rows carry `Via` |
+| `Resident` | `A0041_AllResidentsFlag_AnonymousActor_Denies` | the deny rows carry `Via` |
+
+Two corrections to the code's own stale comments, recorded so a future lane
+doesn't re-litigate them: **`AccessVia.Report` is a live branch, not the
+"reserved" the `Decision.cs` enum comment (and `AuditPurgeService`'s "no
+`AccessVia.Report` rows yet" line) suggest** — `ModerationService.
+CanReadWithReportAsync` (`src/Kumunita.Core/Moderation/ModerationService.cs`
+§2.4 item 3, the M3b F2 read lane) writes both the Allow and the C5-
+unactivated Deny rows with `Via = Report`. **`AccessVia.Guardian` is a
+write-lane standing only** (the five GU supervisory actions, all `IUserInfo-
+Service` lanes with `Via = Guardian` audit rows) — it never appears in a
+`Decide()` branch, which is the G·1 "the guardian's ceiling, not a content
+right" pin. `AccessAction.Moderate` is exercised through the moderator
+branch (`C5_…`) + the report branch (`ModerationServiceTests`) — its denial
+is the C5 unactivated case, not a separate branch.
+
 ### The guardian boundary
 
 ADR 0028 says the guardian has "no standing to read the child's private
@@ -518,6 +577,34 @@ message body, document). Any hit is an **S** finding (the "delegation
 scoped narrower than the grant" pin from `in-code.md`, applied to the GU
 surface).
 
+**U08 result (2026-10-08): clean — no S finding.** Grep of
+`src/Kumunita.Web/Controllers/GuardianController.cs` for a read of child
+content (post body, message body, document) returned **no content read** —
+every `.Body` / `message` hit in the file is `ex.Message` (exception text
+surfaced to `TempData["error"]`), not a child's content. The controller's
+doc-comment states the pin verbatim (G·1, load-bearing in the Web): "no
+route reads or links to a child's *content* — the reads are the
+`GuardianLink` row + the child's membership rows + the child's pending group
+invitations (curation data, ids/names only), never the child's posts or
+profile body." The `Detail` view reads `DisplayName` + `Blocked` (curation
+data) and the child's *membership* rows (the `GetEffectiveCommunityIds-
+Async` / group-membership reads the GU lanes curate) — the child's
+**authored content** (post body, reply body, message body) is never loaded
+by any `GuardianController` action. Cross-checked against the
+`IUserInfoService` guardian seams (`src/Kumunita.Core/UserInfo/IUserInfo-
+Service.cs`): every guardian method is a **write** lane — `SuspendChild-
+Async` / `UnsuspendChildAsync` / `SetChildMessagingRestrictionAsync` /
+`SetChildEventRsvpModeAsync` / `BlockChildCommunityAsync` / invitation-
+approval / `CreateGuardianLinkAsync` / `DissolveGuardianLinkAsync` — each
+emits a `Via = Guardian` audit row and none of them is a content *read*
+seam. The guardian's **block/hide** lanes (`Profile.BlockedCommunityIds`,
+the `GetEffectiveCommunityIdsAsync` read) work in the *opposite* direction
+of a leak: they *remove* a guardian-blocked community from the child's
+audience visibility — a ceiling, not a window. This is the "delegation
+scoped narrower than the grant" pin holding on the GU surface: the guardian
+holds standing over the child's *account* (suspend, membership curation,
+messaging/event ceiling) with **no** standing over the child's *content*.
+
 ### The translation-swap surface
 
 ADR 0027 / 0049 / 0051 changed what a *viewer* sees first. U08 verifies the
@@ -526,6 +613,62 @@ a display preference over rows the viewer may already read, by the
 tag/audience seams — confirm a test pins this for posts, group posts,
 announcements, and pages).
 
+**U08 result (2026-10-08): clean (verified by construction) — one L note.**
+In **all four surfaces the visibility gate runs *before* the variant
+selection**, so the swap can only re-word an item that is already in the
+viewer's visible set — it never loads a variant for an item the viewer may
+not read:
+
+- **Posts** (`PostsController.Index` / `AllSections`, `src/Kumunita.Web/`
+  `Controllers/PostsController.cs`) — the audience decision runs in
+  `PostService.ListFeedAsync` / `ListAllFeedAsync` (the `feed.Visible`
+  set); the `ApplyTranslationToPostAsync` helper (its own doc-comment:
+  "a read, not a decision: the post's `CanSeeAsync` already ran in the
+  feed read") then picks among that post's stored variants. The detail path
+  (`Detail`) is the same: `GetPostAsync`'s single `CanAsync` row returns
+  `Post = null` on a Deny → 403 *before* any translation read.
+- **Group posts** (`GroupsController.GroupPostDetail`,
+  `src/Kumunita.Web/Controllers/GroupsController.cs`) — the single
+  group-lane decision runs in `PostService.GetGroupPostAsync` (returns
+  `Post = null` on a membership Deny → 404); the group-name swap and the
+  post/reply variant chips are read *after* that decision (doc-comment: "the
+  post's single group-lane decision already ran in `GetGroupPostAsync`").
+- **Announcements** (`AnnouncementController.Index` / `Detail`,
+  `src/Kumunita.Web/Controllers/AnnouncementController.cs`) — the flat
+  public/community scope gate runs in `ListVisiblePagedAsync` / `GetAsync`
+  (a not-visible id returns null → 404 *before* the translation read); the
+  ADR 0029/0051 row swap picks among the `visible`/already-authorized set
+  (doc-comment: "the per-announcement read inherits the flat scope gate
+  that already ran").
+- **Pages** (`PageController.Show`, `src/Kumunita.Web/Controllers/Page-
+  Controller.cs`) — the draft gate + the `CanAsync` Read decision (and the
+  anonymous non-public 403) run *before* `GetTranslationsAsync` is even
+  called; `defaultVariant` (the ADR 0049 selection) is computed from
+  `EffectiveLanguageCode.ResolveAsync` after the gate, and the page's own
+  audience is what the gate checks.
+
+**The pin:** the composite "denied viewer → no translation leak" is
+**guaranteed by the gate-first ordering** (verified by reading all four
+controllers) + the two component test families — the *visibility* denied-
+path tests (`C5_ModeratorAccess_OffByDefault_ModeratorCannotSee`,
+`GroupPostServiceTests.G2_NonMemberFeedEmptyWithDenyRow`,
+`A0041_AllResidentsFlag_AnonymousActor_Denies`, the announcement scope-gate
+tests, `PageControllerTests.Index_When_CanSeeAsync_HidesPage_DeniedPageIs-
+Absent`) and the *translation* data-shape / standing tests (`Translation-
+DisplayTests`, `PostTranslationTests`, `GroupsControllerTranslationTests`,
+`AnnouncementControllerTests.AddTranslation_Denied_Forbid_NoWrite`,
+`PageControllerTranslationTests.UpdateTranslation_Denied_Forbid`).
+**L note (record and accept):** the gate-first *ordering* is a **code
+invariant** verified by reading, not pinned by a single dedicated end-to-
+end test — a future lane that reorders a swap to precede the gate would
+only be caught if that lane's own denied-path tests also exercised the
+translation path (the `translationProvider` is optional/null in most of the
+existing seam tests, so the swap is a no-op there). The ordering is correct
+today and each component property is test-pinned, so this is a
+discoverability/audit observation, not a trust violation — flagged so the
+next audit pass knows the invariant is load-bearing and un-pinned as a
+single named test.
+
 ### The portability lane
 
 ADR 0148: "no passwords or tokens ever travel with it." U08 greps
@@ -533,6 +676,38 @@ ADR 0148: "no passwords or tokens ever travel with it." U08 greps
 shape; confirms the export's round-trip test (`PortabilityRoundTripTests`)
 covers the *import into a community where references don't exist* path (the
 ADR's own acceptance case).
+
+**U08 result (2026-10-08): clean — no S finding.** **No-secret:** grep of
+`src/Kumunita.Core/Portability/UserPortabilityService.cs` for an identity-
+credential field in the export shape found **none in the archive shape** —
+the only `Password`/`Token`/`Hash`/`Secret`/`Credential` hits are the
+`CancellationToken ct = default` params. The export (the "no-secret
+principal", `UserPortabilityService.cs` §the M11 `PortabilityPrincipal`
+shape) reads exactly the eight allowed fields (`SubjectId`, `Username`,
+`Email`, `NormalizedEmail`, `DisplayName`, `Verified`, `Blocked`, `Roles`)
+and the doc-comment is explicit: "`PasswordHash` / `SecurityStamp` /
+`AccessToken` / `RefreshToken` / `RecoveryCode` are never touched" (the
+C-M27·2 boundary). **This is test-pinned**, not just doc-pinned: `Portability-
+RoundTripTests.PortabilityNoSecret_ArchiveContainsNoCredentialMaterial`
+(`tests/Kumunita.Core.Tests/PortabilityRoundTripTests.cs`, the M11 D9b pin)
+plants a witness user with a non-empty `PasswordHash` + `SecurityStamp` (and
+asserts they are non-empty on the source), exports, and byte-scans the wire
+for `passwordhash` / `securitystamp` / `accesstoken` / `refreshtoken` +
+asserts `Assert.DoesNotContain(witnessUser.PasswordHash, wire)` — a real
+leak would fail the scan. The M27 resident-lane analog is `M27_Acceptance-
+NoSecret_SelfScoped` (`UserPortabilityAcceptanceTests.cs`). **References-
+don't-exist (the ADR 0148 acceptance case):** `M27_Acceptance_PerEntity-
+Conflict_Resolve` (`tests/Kumunita.Core.Tests/UserPortabilityAcceptance-
+Tests.cs`) imports into a target where the resident's component *does not*
+exist → the conflict entity is **not** auto-applied; the resident resolves
+it (add-elsewhere re-points + applies; discard writes nothing) — the
+fail-closed, no-silent-auto-merge shape. The M11 operator-lane analog is
+`PortabilityFailClosed_RejectedArchiveWritesZeroRows` (D9c) + its
+`AssertFailClosedOnDanglingReferenceAsync` helper (a dangling reference is
+rejected *before any write* — zero content rows, zero principals, zero
+audit rows). Both legs of the ADR's acceptance case are therefore pinned:
+no credential material travels, and the import-into-a-community-where-
+references-don't-exist path is fail-closed and resident-controlled.
 
 ### U00's baseline note
 
