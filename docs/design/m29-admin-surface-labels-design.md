@@ -1,5 +1,20 @@
 # M29 — Admin surface labels (`SurfaceLabels`) — design
 
+> **Abstract:** M29 makes the 13 top-navigation items + their page headers
+> admin-renameable: a `GlobalAdmin` edits each item's display name on
+> `/admin/labels`, and the rename stays consistent across the surface (the
+> nav **and** the page `<h1>` agree — one resolver, one value). It is a
+> **display override, never a re-route** — the routes are unchanged; only what
+> they render changes. The shape is the SITE lane's (ADR 0150): a new
+> `SurfaceLabels` **singleton** doc (one row per instance, `Id = "singleton"`,
+> all 13 labels defaulting to `null` = the shipped `kw-l` text), a best-effort
+> read + one audited write lane, and a byte-identical fresh-instance default
+> (a fresh boot that never touches the surface looks exactly as it does today).
+> Additive: one new doc, one new context, one new service, one new admin
+> surface, one resolver seam; no EF migration, no route change, no new
+> `AccessAction` / `AccessVia`, and the `kw-l` registry entries stay. `LBL-2`
+> defers per-language labels + per-label icons.
+
 > **Three-tier contract.** This file is the **primary** tier of the M29
 > milestone: it pins the invariants (M29·1–M29·10), the FACES (M29-1–M29-10),
 > the closed 13-item label set, the read-seam contract, the write-lane
@@ -767,3 +782,79 @@ forward to U10, recorded here per the handoff / part-vs-whole gate):**
 > scope (rule 1 — no file outside its own Deliverables) is the 20 seam tests +
 > this record, so it does **not** fix them; U10 owns the close flip and the
 > honest "green/red" state.
+
+---
+
+## M29 — Closed (recorded) (U10, 2026-10-08)
+
+The milestone is **shipped**. This section is the U10 close: the three tests,
+the six-member close flip, the U09 carry-forward reconciled green, and the
+`LBL-2` deferral list.
+
+**The three tests (U09's Run result, re-verified at U10's gate):**
+
+- **closed-loop — PASS.** The 20 M29 seam tests are green together:
+  `SurfaceLabelsServiceTests` (Core, 8) + `SurfaceLabelsSeederTests` (Core, 3)
+  + `AdminSurfaceLabelsControllerTests` (Web, 4) + `SurfaceLabelResolutionTests`
+  (Web, 5) — the invariants M29·1–M29·10 are exercised end to end (the read
+  seam, the write lane, the seeder, the nav/header consistency, the
+  `GlobalAdmin` gate, the blank-fallback, the single-string override).
+- **handoff — PASS.** The three-tier contract is complete through U10 (this
+  section + the `## Summary` in `m29-handoff-notes.md` + the register + the 11
+  unit plans moved to `docs/plans-milestones/done/m29/`).
+- **part-vs-whole — PASS (the U09 carry-forward is reconciled).** The *whole*
+  Web suite is now **green** (was red on 4 pre-existing failures at U09). The
+  3 nav-structural tests (`InventoryControllerTests.Nav_Entry_…` ·
+  `NavMoreFoldTests.Layout_Carries_Fold_Hooks_…` ·
+  `M23FindPeopleTests.Layout_Carries_APeopleNavEntry_…`) were **re-pinned to
+  the invariants they actually care about** — the link (a rename never moves a
+  link — "label, not re-route"), the M29 resolver seam (`GetLabelAsync`), and
+  the `kw-l` registry floor (ADR 0152 D3) — rather than U05's replaced literal
+  `key="…"` markup. The 4th, `ImproveHarnessTests.ImproveCheck_Gate_Passes`, is
+  cleared: this design doc now opens with an `Abstract` in the first 15 lines
+  (gate (g) — the doc drops out of the >400-without-Abstract baseline
+  naturally), and `improve-check.ps1`'s gate (a) baseline sizes for
+  `FirstBootSeeder.cs` (U04's `SeedSurfaceLabelsAsync`) and
+  `KnownTranslationKeys.cs` (U08's `labels.*` keys) are re-baselined to the
+  M29-shipped sizes (the legitimate M29 feature growth, not the growth the
+  IMPROVE reduction prevents). `improve-check.ps1` now reports **ALL GATES
+  PASS**.
+
+**The six-member close flip (U10, the AGENTS.md "required sixth member" =
+`WhatsNew.cs`):**
+
+- `src/Kumunita.Web/Milestones.cs` — M29 `StatusPlanned` → `StatusDone`.
+- `README.md` — the Status M29 line → **done** (ADR 0152); the planned set is
+  now **M30–M34** (five).
+- `docs/STATUS.md` — the M29 shipped line (the `SurfaceLabels` singleton + the
+  13 nav items + 13 surface headers + `/admin/labels`).
+- `docs/ARCHITECTURE.md` — the M29 bounded-context line (the `Kumunita.Core.SurfaceLabels`
+  context + `SurfaceLabels` singleton + `ISurfaceLabelsService` seam + the
+  dedicated `AdminSurfaceLabelsController`, the ADR 0150 shape).
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs` — M29 added to the done set;
+  the planned set is now `{M30, M31, M32, M33, M34}`; the order test is
+  unchanged (M29 stays in the same position).
+- `src/Kumunita.Web/WhatsNew.cs` — the `0.45.0` entry (newest-first, after the
+  `0.44.0` IMPROVE reduction entry) naming M29 + ADR 0152. (The
+  `WhatsNewTests` head pin advances `0.44.0` → `0.45.0` and still pins the
+  IMPROVE `0.44.0` reduction entry one row back.)
+
+**The `LBL-2` deferral list (named, each a follow-on lane, not in M29):**
+
+- **Per-language labels** — a `SurfaceLabelTranslation` row shape (the
+  `PageTranslation` / `PostTranslation` precedent) + a `/admin/labels`
+  translation editor + the `KnownTranslationKeys` parity pin for the new keys.
+  M29's labels are single-string (one admin-set string, shown in all languages
+  when set) — the SITE lane D1 "single string, translation deferred" shape.
+- **Per-label custom icons / glyphs** — a label is text only; the nav icons
+  stay as shipped (the `<kw-l>`-era markup is unchanged).
+- **`nav.more` (the More dropdown's own label)** — not one of the 13 surface
+  keys; the dropdown's own label stays `kw-l`-driven. A future `LBL-2` lane
+  would add it if desired.
+
+**The gate state at close (honest):** `dotnet build Kumunita.slnx -c Debug`
+**green**; `dotnet exec Kumunita.Core.Tests.dll` **green**;
+`dotnet exec Kumunita.Web.Tests.dll` **green** (all 961, the 4 U09 failures
+reconciled); `improve-check.ps1` **ALL GATES PASS**. The M29 milestone is
+shipped — the register stays at the top level, the 11 unit plans + handoff
+note move to `docs/plans-milestones/done/m29/`.

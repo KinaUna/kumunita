@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.45.0", "2026-10-08", new List<string>
+        {
+            "Admin surface labels — a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface: a label store on the SITE lane's shape (a per-item label, not a re-route), and a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0152).",
+        }),
         new("0.44.0", "2026-10-08", new List<string>
         {
             "A quiet pass over what we already ship — no new feature. We applied the platform's own integration principles to the code and docs: the four largest files are smaller, the ADR index no longer has missing rows, the two agent-instruction files no longer disagree, the long handoff notes and design docs now open with a 10-second summary, and every access decision is audited with who and why. The codebase is measurably smaller, the docs measurably more navigable, the seams measurably more tested — and nothing you already use has changed (the IMPROVE lane).",

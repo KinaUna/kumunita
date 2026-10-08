@@ -90,10 +90,23 @@ public class NavMoreFoldTests
             "<script type=\"module\" src=\"~/js/lib/nav-more-fold.js\"></script>",
             html);
 
-        // The two folded links keep their existing kw-l labels (no new key —
-        // the parity pins are untouched): they are re-homed, not re-labelled.
-        Assert.Contains("key=\"nav.community\"", html);
-        Assert.Contains("key=\"nav.groups\"", html);
+        // The two folded links are re-homed, not re-labelled (M29·9 a11y
+        // floor — the label is rendered where the kw-l key was today). M29
+        // (ADR 0152) resolves the *label* via the ISurfaceLabelsService
+        // resolver (the nav.community / nav.groups keys as the kw-l floor),
+        // so this pin holds the LINK + resolver invariants rather than the
+        // old literal <kw-l key="…"> markup: both links are present (≥ 2 each
+        // — variant B dropdown + variant C rail) and the resolver drives them
+        // with the two surface keys as the fallback floor.
+        Assert.True(
+            Regex.Matches(html, "asp-controller=\"Posts\"\\s+asp-action=\"AllSections\"").Count >= 2,
+            "Expected the Community (Posts/AllSections) link in both nav variants.");
+        Assert.True(
+            Regex.Matches(html, "asp-controller=\"Groups\"\\s+asp-action=\"Index\"").Count >= 2,
+            "Expected the Groups link in both nav variants.");
+        Assert.Contains("GetLabelAsync", html);
+        Assert.Contains("nav.community", html);
+        Assert.Contains("nav.groups", html);
     }
 
     // ── (3) the fold state class is styled, outside any @media block ───────
