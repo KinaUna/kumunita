@@ -115,3 +115,87 @@ and the gate passes on the current baseline.
   Testcontainers-based GU integration tests; the containers cleaned up
   after themselves). My change is additive (one test file + four docs) and
   broke none of the existing 950 tests.
+
+## U01 — Close the ADR-index drift (2026-10-08)
+
+**Status: done.** `docs/adr/README.md` is the only file changed.
+
+### What was done
+
+1. **Added the 8 missing rows** to `docs/adr/README.md`, in numeric order,
+   with Title / Status pulled verbatim from each ADR's H1 (a `.tmp` script
+   read the H1 of each of the 8 files; none of them had an H1 that
+   diverged from the filename slug):
+   - `0096` (inserted between 0095 and 0097) — "Per-row read/unread toggle
+     on the Notifications inbox" (H1: `# ADR 0096 — Per-row read/unread
+     toggle on the Notifications inbox`).
+   - `0137`–`0143` (inserted as a block between 0136 and 0144) —
+     Documents organization; Sample-data change-password lock; Per-resident
+     messaging controls; Guardian community block-and-hide; GU
+     community-approval lane; Delete account; Guardian deletes a child
+     account. (The H1s are long — the row text is the H1's title sentence,
+     matching the existing row style, e.g. `0142`'s H1 is one long sentence
+     and the row carries it in full rather than a paraphrase, consistent
+     with `0028`/`0037`/`0039` which also carry their H1's full scope
+     sentence.)
+2. **Added the one-line index-maintenance note** at the top of the README
+   (a blockquote after the intro paragraph, before the table), verbatim
+   from the plan's U01 "Do" section.
+3. **Verified with `improve-report.ps1`:** ADR drift went from
+   **8 → 0** (files on disk: 151, index rows: 151, missing: (), extra: ()).
+
+### What was found
+
+- The gate (b) regex (`^\| 0NNN `) picked up all 8 new rows correctly —
+  no format issue. The 8 rows are now in the "index rows" count, so the
+  *new* missing set is empty, which is what the gate checks. The gate's
+  `bBaselineMissing` grandfathering list still names the 8 ADRs, but that
+  no longer matters — the baseline is now *met*, not just *allowed*.
+  U03 (the de-dup unit) does **not** need to touch the gate's baseline
+  list for ADRs; it's already a non-issue. Leaving the baseline list
+  untouched (the plan's handoff note confirms this is optional cleanup,
+  not required).
+- **One H1 was genuinely long** (`0142` — a full sentence describing the
+  deletion lane, the last-GlobalAdmin lockout pin, and the self-serve
+  GlobalAdmin gate). This is consistent with the existing index style
+  (several `01xx` rows are also single long sentences, e.g. `0028`,
+  `0037`, `0039`, `0044`), so no style mismatch was introduced — but it's
+  the one row where a *paraphrase* would have been shorter. U02 (the
+  TL;DR unit) may want to note this when it reads the ADR index, since
+  the row is now the *only* place a reader sees the ADR's one-sentence
+  summary (the H1 of `0142` is not repeated anywhere else in the
+  repo's top-level docs).
+
+### Build + gate verification (all green, 2026-10-08)
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded with 83
+  warning(s)** (all pre-existing `xUnit1051` analyzer warnings in test
+  files; none introduced by this change — the change is a single
+  Markdown file edit, no C# touched).
+- `improve-check.ps1` — **exit 0**, all six gates OK; gate (b) now reads
+  `missing=(), extra=()` (empty missing set, the drift is closed, not
+  grandfathered).
+- `ImproveHarnessTests.ImproveCheck_Gate_Passes` run in isolation via the
+  in-process xunit.v3 runner (`-class Kumunita.Web.Tests.ImproveHarnessTests`):
+  **Total: 1, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** — 2.5 s.
+
+### What U02 must know
+
+- U02's scope (TL;DR blocks on the 8 largest handoff notes + the convention
+  section in `docs/plans-milestones/README.md`) is **unaffected** by U01 —
+  no shared files. The only overlap is conceptual: U01's index-maintenance
+  note and U02's TL;DR convention note are *different* blockquotes in
+  *different* files (`docs/adr/README.md` vs. `docs/plans-milestones/README.md`) —
+  no de-dup needed between the two.
+- U02's entry reads should include the 8 largest handoff notes from the
+  U00 Evidence table (top of the U00 "Baseline numbers" list in this
+  file): `m3b-handoff-notes.md` (1 860), `m13-logging-analytics-handoff-notes.md`
+  (the U00 list has it at 1 693 in the plan's Evidence table, but the
+  `improve-report.ps1` [4] section now shows the actual current size —
+  U02 should re-run `improve-report.ps1` to get the current sizes, since
+  files may have changed since U00), and so on through the top 8.
+- The `improve-check.ps1` gate (d) grandfathering list (23 handoff notes
+  over 600 lines without a TL;DR) is **unchanged** by U01 and should
+  remain the U02 baseline — U02's TL;DR additions drop the top 8 out of
+  the *new* violation set (same mechanism U01 just used for the ADR
+  rows).
