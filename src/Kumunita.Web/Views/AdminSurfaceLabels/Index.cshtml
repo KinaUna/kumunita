@@ -1,0 +1,80 @@
+@model Kumunita.Web.Controllers.AdminSurfaceLabelsController.AdminSurfaceLabelsViewModel
+@{
+    ViewData["Title"] = "Admin — Surface labels";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="labels.title">Surface labels</kw-l></h1>
+
+<p class="text-muted">
+    The display name of each top-navigation surface — what residents see in the
+    top nav and in that surface's page header. Leave a field blank to keep the
+    default label (the platform's shipped name for that surface). Saving applies
+    every field at once; a rename stays consistent across the surface (the nav
+    and the page header always agree).
+</p>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-info">@info</div>
+}
+
+<form method="post" action="/admin/labels">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label for="Home" class="form-label"><kw-l key="labels.home">Home</kw-l> <span class="text-muted small">(<code>/</code>)</span></label>
+        <input class="form-control" type="text" name="Home" id="Home" value="@Model.Home" />
+    </div>
+    <div class="mb-3">
+        <label for="Announcements" class="form-label"><kw-l key="labels.announcements">Announcements</kw-l> <span class="text-muted small">(<code>/announcements</code>)</span></label>
+        <input class="form-control" type="text" name="Announcements" id="Announcements" value="@Model.Announcements" />
+    </div>
+    <div class="mb-3">
+        <label for="Community" class="form-label"><kw-l key="labels.community">Community</kw-l> <span class="text-muted small">(<code>/community</code>)</span></label>
+        <input class="form-control" type="text" name="Community" id="Community" value="@Model.Community" />
+    </div>
+    <div class="mb-3">
+        <label for="Groups" class="form-label"><kw-l key="labels.groups">Groups</kw-l> <span class="text-muted small">(<code>/groups</code>)</span></label>
+        <input class="form-control" type="text" name="Groups" id="Groups" value="@Model.Groups" />
+    </div>
+    <div class="mb-3">
+        <label for="Events" class="form-label"><kw-l key="labels.events">Events</kw-l> <span class="text-muted small">(<code>/events</code>)</span></label>
+        <input class="form-control" type="text" name="Events" id="Events" value="@Model.Events" />
+    </div>
+    <div class="mb-3">
+        <label for="Projects" class="form-label"><kw-l key="labels.projects">Projects</kw-l> <span class="text-muted small">(<code>/projects/todos</code>)</span></label>
+        <input class="form-control" type="text" name="Projects" id="Projects" value="@Model.Projects" />
+    </div>
+    <div class="mb-3">
+        <label for="Inventory" class="form-label"><kw-l key="labels.inventory">Inventory</kw-l> <span class="text-muted small">(<code>/inventory</code>)</span></label>
+        <input class="form-control" type="text" name="Inventory" id="Inventory" value="@Model.Inventory" />
+    </div>
+    <div class="mb-3">
+        <label for="Bookmarks" class="form-label"><kw-l key="labels.bookmarks">Bookmarks</kw-l> <span class="text-muted small">(<code>/bookmarks</code>)</span></label>
+        <input class="form-control" type="text" name="Bookmarks" id="Bookmarks" value="@Model.Bookmarks" />
+    </div>
+    <div class="mb-3">
+        <label for="Documents" class="form-label"><kw-l key="labels.documents">Documents</kw-l> <span class="text-muted small">(<code>/documents</code>)</span></label>
+        <input class="form-control" type="text" name="Documents" id="Documents" value="@Model.Documents" />
+    </div>
+    <div class="mb-3">
+        <label for="Pages" class="form-label"><kw-l key="labels.pages">Pages</kw-l> <span class="text-muted small">(<code>/pages</code>)</span></label>
+        <input class="form-control" type="text" name="Pages" id="Pages" value="@Model.Pages" />
+    </div>
+    <div class="mb-3">
+        <label for="Tags" class="form-label"><kw-l key="labels.tags">Tags</kw-l> <span class="text-muted small">(<code>/tags</code>)</span></label>
+        <input class="form-control" type="text" name="Tags" id="Tags" value="@Model.Tags" />
+    </div>
+    <div class="mb-3">
+        <label for="Directory" class="form-label"><kw-l key="labels.directory">Directory</kw-l> <span class="text-muted small">(<code>/directory</code>)</span></label>
+        <input class="form-control" type="text" name="Directory" id="Directory" value="@Model.Directory" />
+    </div>
+    <div class="mb-3">
+        <label for="People" class="form-label"><kw-l key="labels.people">People</kw-l> <span class="text-muted small">(<code>/people</code>)</span></label>
+        <input class="form-control" type="text" name="People" id="People" value="@Model.People" />
+    </div>
+
+    <button type="submit" class="btn btn-primary"><kw-l key="labels.save">Save labels</kw-l></button>
+</form>

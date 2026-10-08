@@ -97,6 +97,34 @@ public sealed class SurfaceLabelsService : ISurfaceLabelsService
     }
 
     /// <inheritdoc />
+    public async Task<SurfaceLabels> GetAsync(CancellationToken ct = default)
+    {
+        // ADR 0050 IsSignupOpenAsync best-effort shape (M29·2, SITE·1) — the
+        // exact SiteContentService.GetAsync parallel: a missing store, a
+        // missing row (a fresh boot before the seeder ran), or a read failure
+        // degrades to the **in-code fallback** — a fresh SurfaceLabels with
+        // every label field null (the all-null = "use the kw-l fallback"
+        // shape, M29·3 / M29·4). The read never throws and never returns null
+        // (the /admin/labels form always renders); it is world-readable, never
+        // an access decision, never a claim (ADR 0001-B thin-token), never
+        // audited (M29·2). This returns the **stored** override fields — NOT
+        // the resolved text (that is GetLabelAsync) — so a blank field stays
+        // blank and a save clears (the U08 drift fix).
+        try
+        {
+            using var session = _store.QuerySession();
+            var row = await session
+                .LoadAsync<SurfaceLabels>(SurfaceLabels.SingletonId, ct)
+                .ConfigureAwait(false);
+            return row ?? new SurfaceLabels();
+        }
+        catch
+        {
+            return new SurfaceLabels(); // a read failure degrades to the all-null fallback
+        }
+    }
+
+    /// <inheritdoc />
     public async Task SaveAsync(SurfaceLabels labels, string actorBy, CancellationToken ct = default)
     {
         // ADR 0050 SetSignupOpenAsync single audited write-lane shape (M29·5,

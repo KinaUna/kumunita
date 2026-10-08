@@ -6,6 +6,9 @@ namespace Kumunita.Core.SurfaceLabels;
 /// header views call (M29·1) — best-effort (a missing row / read failure
 /// degrades to the <c>kw-l</c> fallback, never throws, never blank),
 /// world-readable, never audited (M29·2, ADR 0001-B thin-token). The
+/// <c>GetAsync</c> read returns the **stored** label set (the raw override
+/// fields, never the resolved text) for the <c>/admin/labels</c> form seed
+/// (ADR 0152, M29·7 — best-effort, never null, never audited). The
 /// <c>SaveAsync</c> write is the ADR 0150 single audited write-lane shape
 /// (M29·5): one session, the doc + exactly one <c>AccessAudit</c> row commit
 /// together (invariant C3), strong consistency (the new value is live on the
@@ -45,6 +48,33 @@ public interface ISurfaceLabelsService
     Task<string> GetLabelAsync(string surfaceKey, string fallbackKey,
                                string? effectiveLanguage,
                                CancellationToken ct = default);
+
+    /// <summary>
+    /// Loads the <c>SurfaceLabels</c> singleton's **stored** label set (the
+    /// raw override fields, **not** the resolved text) for the
+    /// <c>/admin/labels</c> form seed (ADR 0152, M29·7). **Best-effort**: a
+    /// missing store, a missing row (a fresh boot before the seeder ran), or a
+    /// read failure degrades to the **in-code fallback** — a fresh
+    /// <see cref="SurfaceLabels"/> with every label field <c>null</c> (the
+    /// all-null = "use the <c>kw-l</c> fallback" shape, M29·3 / M29·4). The
+    /// read is **never null** (the form always renders) and **never audited**
+    /// (M29·2 — the same world-readable read shape as <c>GetLabelAsync</c>,
+    /// the <see cref="ISiteContentService.GetAsync"/> / ADR 0050
+    /// <c>IsSignupOpenAsync</c> best-effort shape).
+    /// <para>
+    /// <b>Why this seam exists (the U08 drift fix):</b> the register's
+    /// <c>/admin/labels</c> GET says "seed the form with the current
+    /// singleton" but the interface only had <c>GetLabelAsync</c> — which
+    /// returns the **resolved** text (admin label <b>or</b> the
+    /// <c>kw-l</c> fallback). Seeding the form via <c>GetLabelAsync</c> would
+    /// put the fallback text (e.g. "Announcements") into a blank field, and a
+    /// save would then **store** that text as the admin label (a regression —
+    /// an admin who never set a label would "lock in" the fallback). This seam
+    /// returns the **stored** value so a blank field stays blank and a save
+    /// clears (the "empty = use default" shape, M29·3).
+    /// </para>
+    /// </summary>
+    Task<SurfaceLabels> GetAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Saves the <c>SurfaceLabels</c> singleton — the ADR 0150 single audited

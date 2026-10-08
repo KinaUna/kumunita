@@ -355,6 +355,33 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Directory",
             ["nav.people"]        = "People",
+
+            // ── ADR 0152 (M29) — the /admin/labels surface: the GlobalAdmin's
+            //    edit page for the 13 top-navigation surfaces' display labels
+            //    (the nav item + that surface's page header). labels.title /
+            //    labels.save are the page chrome; labels.{surface} are the 13
+            //    row labels. The 13 nav.* keys above are the FALLBACK (ADR 0152
+            //    D3) — these labels.* keys are the admin form's own row labels
+            //    only (a distinct namespace, like the settings.quiet.* / admin.*
+            //    keys M20 added for its own admin surface). en values match the
+            //    corresponding nav.* en values so a fresh en instance renders
+            //    identically to the nav today (M29·4 byte-identity).
+            ["labels.title"]          = "Surface labels",
+            ["labels.save"]           = "Save labels",
+            ["labels.home"]           = "Home",
+            ["labels.announcements"]  = "Announcements",
+            ["labels.community"]      = "Community",
+            ["labels.groups"]         = "Groups",
+            ["labels.events"]         = "Events",
+            ["labels.projects"]       = "Projects",
+            ["labels.inventory"]      = "Inventory",
+            ["labels.bookmarks"]      = "Bookmarks",
+            ["labels.documents"]      = "Documents",
+            ["labels.pages"]          = "Pages",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Directory",
+            ["labels.people"]         = "People",
+
             ["nav.sign_in"]       = "Sign in",
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
@@ -2895,6 +2922,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Verzeichnis",
             ["nav.people"]        = "Menschen",
+
+            // ── ADR 0152 (M29) — die /admin/labels-Oberfläche: die 13
+            //    Navigations-Bereiche umbenennen (Nav-Text + Seiten-Header).
+            //    labels.* = die Formular-Zeilenbezeichnungen (de); die nav.*
+            //    Keys oben bleiben das FALLBACK (ADR 0152 D3).
+            ["labels.title"]          = "Bereichsbezeichnungen",
+            ["labels.save"]           = "Bezeichnungen speichern",
+            ["labels.home"]           = "Start",
+            ["labels.announcements"]  = "Ankündigungen",
+            ["labels.community"]      = "Gemeinschaft",
+            ["labels.groups"]         = "Gruppen",
+            ["labels.events"]         = "Veranstaltungen",
+            ["labels.projects"]       = "Projekte",
+            ["labels.inventory"]      = "Inventar",
+            ["labels.bookmarks"]      = "Lesezeichen",
+            ["labels.documents"]      = "Dokumente",
+            ["labels.pages"]          = "Seiten",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Verzeichnis",
+            ["labels.people"]         = "Menschen",
+
             ["nav.sign_in"]       = "Anmelden",
             ["nav.sign_up"]       = "Registrieren",
             ["nav.profile"]       = "Profil",
@@ -5057,6 +5105,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Étiquettes",
             ["nav.directory"]     = "Annuaire",
             ["nav.people"]        = "Personnes",
+
+            // ── ADR 0152 (M29) — la surface /admin/labels : renommer les 13
+            //    sections de la navigation (libellé du menu + en-tête de page).
+            //    labels.* = les étiquettes de lignes du formulaire (fr) ; les
+            //    clés nav.* ci-dessus restent la RECHUTE (ADR 0152 D3).
+            ["labels.title"]          = "Libellés des sections",
+            ["labels.save"]           = "Enregistrer les libellés",
+            ["labels.home"]           = "Accueil",
+            ["labels.announcements"]  = "Annonces",
+            ["labels.community"]      = "Communauté",
+            ["labels.groups"]         = "Groupes",
+            ["labels.events"]         = "Événements",
+            ["labels.projects"]       = "Projets",
+            ["labels.inventory"]      = "Inventaire",
+            ["labels.bookmarks"]      = "Signets",
+            ["labels.documents"]      = "Documents",
+            ["labels.pages"]          = "Pages",
+            ["labels.tags"]           = "Étiquettes",
+            ["labels.directory"]      = "Annuaire",
+            ["labels.people"]         = "Personnes",
+
             ["nav.sign_in"]       = "Se connecter",
             ["nav.sign_up"]       = "S'inscrire",
             ["nav.profile"]       = "Profil",
@@ -7370,6 +7439,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Kontaktliste",
             ["nav.people"]        = "Personer",
+
+            // ── ADR 0152 (M29) — /admin/labels-overfladen: omdøb de 13
+            //    navigationsområder (nav-menu + sideoverskrift). labels.* =
+            //    formularens rækker (da); nav.*-nøglerne ovenfor forbliver
+            //    RESERVEN (ADR 0152 D3).
+            ["labels.title"]          = "Områdenavne",
+            ["labels.save"]           = "Gem navne",
+            ["labels.home"]           = "Forside",
+            ["labels.announcements"]  = "Meddelelser",
+            ["labels.community"]      = "Fællesskab",
+            ["labels.groups"]         = "Grupper",
+            ["labels.events"]         = "Arrangementer",
+            ["labels.projects"]       = "Projekter",
+            ["labels.inventory"]      = "Lager",
+            ["labels.bookmarks"]      = "Bogmærker",
+            ["labels.documents"]      = "Dokumenter",
+            ["labels.pages"]          = "Sider",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Kontaktliste",
+            ["labels.people"]         = "Personer",
+
             ["nav.sign_in"]       = "Log ind",
             ["nav.sign_up"]       = "Opret konto",
             ["nav.profile"]       = "Profil",
