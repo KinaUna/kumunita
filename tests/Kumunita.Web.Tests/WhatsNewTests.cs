@@ -61,6 +61,27 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
+    [Fact(DisplayName = "The IMPROVE lane's reduction entry is shipped (0.44.0, the newest-first head)")]
+    public void The_Improve_Lane_Reduction_Entry_Is_Shipped()
+    {
+        // The IMPROVE lane (U00–U09) is the one named lane in this repo that
+        // ships a *reduction* rather than a capability — its Definition of Done
+        // is "the codebase is measurably smaller, the docs measurably more
+        // navigable, the seams measurably more tested, and the existing tests
+        // still pass." Pin its version-registry entry (the required sixth close-
+        // flip member, ADR 0110 / AGENTS.md) so a copy-paste that drops it or
+        // re-orders it is caught by the build instead of silently losing the
+        // "What's new" announcement of the close.
+        var head = WhatsNew.All[0];
+        Assert.True(
+            head.Version == "0.44.0" && head.Date == "2026-10-08",
+            "The IMPROVE lane's 0.44.0 (2026-10-08) reduction entry must be the head of the registry; got "
+                + head.Version + " / " + head.Date + ".");
+        Assert.True(
+            head.Changes.Any(c => c.Contains("IMPROVE", StringComparison.OrdinalIgnoreCase)),
+            "The 0.44.0 entry must name the IMPROVE lane (the honest 'a reduction, not a feature' statement).");
+    }
+
     [Fact(DisplayName = "Every WhatsNew row is well-formed (version, ISO date, ≥1 non-blank change)")]
     public void Every_Row_Is_WellFormed()
     {

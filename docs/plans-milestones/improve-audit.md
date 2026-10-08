@@ -739,6 +739,65 @@ value leak, not a security risk). **No fix in-lane** — each exit is a
 *candidate* for a future named lane, and the philosophy says "every new
 part states which seam it integrates."
 
+**U09 result (2026-10-08): the five named journeys are closed loops in-app;
+the one consistent exit is the *feedback channel*, not the journeys.**
+Traced against `how-it-works.md`'s "What you can do" + the shipped surface:
+
+| Journey | Exit (where the resident leaves the platform)? | Verdict |
+|---|---|---|
+| **Post to an audience** | none — the audience picker (everyone / group / one person) + the group "Maple Street" reuse + delegation are all in-app; the post reaches the chosen audience, the audit trail shows who/why | **closed loop** (the linkage) |
+| **Report a post** | none — file → moderator (audited access) → resolve → recorded, all in-app (`how-it-works.md`: "the whole path is short and every step is checked") | **closed loop** (the linkage) |
+| **Join / leave a group** | none — a group is a named access list the resident builds once and reuses; membership changes propagate to past posts automatically | **closed loop** (the linkage) |
+| **Read a page** | none — the page tree (`/pages` browse + `/pages/{path}` view) is in-app; the `help/` guides subtree is resident-facing | **closed loop** (the linkage) |
+| **Translate** | none — the resident picks their language at `/language`; a Translator edits UI strings + pages in-app; *adding a missing language* is the admin's in-app `/admin/languages` lane, not a resident exit | **closed loop** (the linkage) |
+
+**L findings (record and accept — no fix in-lane):**
+
+- **L-RES·1 — the feedback channel is an off-platform exit.**
+  `how-it-works.md` §"How to give feedback — no code required" names it
+  explicitly: the main channel for a resident's *feedback* ("flag the seams,"
+  "say when something is missing," "disagree out loud," "request a language
+  that isn't there yet") is **"Issues in this repository"** (an off-platform
+  tool) or **"tell a team member in person."** The resident's *journeys* are
+  closed loops, but the *meta-journey of improving the platform* sends them
+  out. · **Where:** `docs/philosophy/how-it-works.md` §"Where to put it."
+  · **Violates:** principle 1 (the feedback loop is the strongest possible
+  linkage — resident signal → maintainer response — and it currently leaves
+  the platform); `in-product.md` ("the most important loop in the system").
+  · **Severity:** **L** (a value leak, not a security risk). · **Proposed
+  unit:** **record and accept** — a *candidate* for a future named lane (a
+  resident-facing suggest/feedback surface; the plan's own rule is that a
+  new capability becomes a new lane, and this lane is a *reduction* lane,
+  not a feature).
+- **L-RES·2 — "disagree out loud" lands in the same off-platform repo.** The
+  platform's own doctrine invites the resident to *argue with the written
+  rules* ("a rule nobody questions is a rule nobody is checking"), but the
+  surface for that is the open repository's issue tracker — a place a non-
+  technical resident does not have standing in. · **Where:** `how-it-works.md`
+  §"5. Disagree out loud." · **Violates:** principle 2 (part-vs-whole — the
+  resident is "the best reviewer of it," yet the review channel is external);
+  the "closed loop" test. · **Severity:** **L.** · **Proposed unit:**
+  **record and accept** (the same candidate lane as L-RES·1).
+- **L-RES·3 — the "copy a phone number into a text" handoff the platform
+  itself names.** `how-it-works.md`'s own seam-flagging example is a resident
+  copying a phone number out into a chat app — the directory is opt-in, and
+  sharing a contact detail is a *handoff to another tool* by design (the
+  platform does not hand the number to the other person, the resident takes
+  it out). · **Where:** `how-it-works.md` §"3. Flag the seams." ·
+  **Violates:** principle 1 (the linkage is the value; this is the one
+  deliberate exit). · **Severity:** **L** (a *deliberate* value leak — the
+  platform is honest that contact sharing is opt-in + external). · **Proposed
+  unit:** **record and accept** (M9 messaging closes *in-platform* 1:1
+  messaging, but the *phone-number* handoff remains a resident choice, not a
+  platform gap).
+
+**The pin:** the resident's *named journeys* all close in-app — the
+platform's core promise (the audience picker, the report loop, the group
+access list, the page tree, the language picker) holds. The exit is the
+*meta-layer* (feedback, disagreement, the one deliberate contact-handoff),
+and it is recorded, not hidden — the honest statement of a value leak, per
+the lane's Definition of Done.
+
 ### Admin (the standing test)
 
 For each admin surface (`/admin/*`), U09 verifies the admin can complete
@@ -747,7 +806,89 @@ a handoff + an accidental-integration risk — the "one admin who knows
 everything" god-part smell). Each handoff is recorded. U09 also verifies
 the admin's actions are *audited under their standing* (the U08 pin, from
 the admin side).
+**U09 result (2026-10-08): every `/admin/*` surface is an in-app closed
+loop with an `AccessVia.Admin` audit row; the one seam where the admin hits
+a wall is the *designed operator/admin split*, not a missing surface.**
+Traced against the 16 `Admin*Controller` surfaces (the `AdminController`
+five routes `/admin` · `/admin/accounts` · `/admin/communities` ·
+`/admin/platform` · `/admin/security` (+ `/admin/audit` + `/admin/break-
+glass`), plus the 11 dedicated `Admin*Controller`s — `AdminHelpController`
+· `AdminSignupController` · `AdminTimezoneController` ·
+`AdminDateFormatController` · `AdminQuietController` ·
+`AdminGuestsController` · `AdminMessagingController` ·
+`AdminPortabilityController` · `AdminStorageController` ·
+`AdminStorageMetricsController` · `AdminSampleDataController` ·
+`AdminSiteController` · `AdminAnnouncementCommentsController` ·
+`AdminAnalyticsController` · `LanguagesController` (`/admin/languages`)):
 
+| Admin task | In-app closed loop? | Standing + audit (the U08 pin) |
+|---|---|---|
+| Verify / block / unblock accounts | yes — `/admin/accounts` verify queue + Block/Unblock | `Via = Admin` on the write lane (U08 verified the (b)/(c) guarantee) |
+| Add / edit / enable / disable communities | yes — `/admin/communities` | `Via = Admin` (ADR 0062 §per-community admin) |
+| Manage platform pages (preview + edit) | yes — `/admin/platform` | the `page.reset` / `page.update` audit rows (`Via = Admin`) |
+| Read the audit log + break-glass | yes — `/admin/security` → `/admin/audit` + `/admin/break-glass` | the audit rows themselves *are* the standing record |
+| Enable / disable 1:1 messaging instance-wide | yes — `/admin/messaging` | `Via = Admin` (ADR 0105, the `LocaleSettings` toggle) |
+| Set platform time zone + date format | yes — `/admin/timezone` + `/admin/dateformat` | `Via = Admin` (ADR 0019 / 0020) |
+| Add / enable / reorder / set-default / remove languages | yes — `/admin/languages` | `Via = Admin` (ADR 0005, the catalog lane) |
+| Grant / revoke the Translator role | yes — `/admin/accounts/{id}` | `Via = Admin` (ADR 0021, the role lane) |
+| Set per-file size limit + per-user quota | yes — `/admin/storage/settings` | `Via = Admin` (ADR 0135, M25) |
+| Read storage metrics | yes — `/admin/storage` | a read — **no `AccessAudit` row** (the M13 "read = no row" discipline, ADR 0134) |
+| Reset seeded help pages | yes — `/admin/help` + `/admin/help/reset-all` | `page.reset` + `Via = Admin` (ADR 0058 / 0128, the batch lane) |
+| Enable / disable announcement comments | yes — `/admin/announcements/comments` | `Via = Admin` (ADR 0101) |
+| Set the platform storage-space cap | **no — operator env (`Media__MaxPlatformBytes`), not an admin surface** | n/a (an operator config knob, OPS.md §Config reference) |
+| Read the analytics + export CSV | yes — `/admin/analytics?window=7|30|90` | one `AccessAudit` row per CSV export (M13, ADR 0114) |
+| Sample-data demo controls | yes — `/admin/sample` | `Via = Admin` (ADR 0138) |
+
+**L findings (record and accept — no fix in-lane):**
+
+- **L-ADM·1 — the operator/admin split is the one designed wall.**
+  OPS.md §"Two roles, don't confuse them" makes it explicit: the **Host
+  operator** (VPS, Coolify, backups, upgrades, TLS, SMTP, the `env` config
+  set) vs. the **Community GlobalAdmin** (in-app roles, moderation,
+  content). The `Media__MaxPlatformBytes` knob is the clearest example —
+  OPS.md names it "the operator's capacity knob (an env value, **not** an
+  admin-set-in-app limit)." This is *by design* (the operator owns the
+  infrastructure, the admin owns the community), but it means a GlobalAdmin
+  who wants to cap platform storage must leave the platform and ask an
+  operator to change an env var + redeploy. · **Where:**
+  `docs/OPS.md` §"Configuration reference" (the `Media__MaxPlatformBytes`
+  row); the OPS.md §"Two roles" header. · **Violates:** principle 2 (part-
+  vs-whole — the admin's task is complete, but the *infrastructure* knob is
+  out of the admin's reach by design); the "no open-the-DB handoff" test
+  (this is the one place the handoff is *the env store*, not a DB).
+  · **Severity:** **L** (a *designed* seam, not a gap — the philosophy
+  names it explicitly, so it is recorded, not hidden). · **Proposed unit:**
+  **record and accept** (the operator/admin split is the repo's stated
+  doctrine; collapsing it would be a *new* capability, not a reduction).
+- **L-ADM·2 — the "one admin who knows everything" risk is mitigated by
+  the surface split, but the audit *log* is the one surface the admin reads
+  that they do not themselves write.** The `/admin/audit` surface shows the
+  `AccessAudit` rows the admin *produced* (via their own `Via = Admin`
+  writes) plus the rows *other* standing produced (moderator, guardian,
+  break-glass). The admin is a *reader* of the audit log, not a writer —
+  the write is the *decision*, the read is the *aftermath*. This is the
+  correct shape (the audit log is the community's accountability record,
+  not the admin's personal to-do list), but it means the admin's *closed
+  loop* for "did my action land?" is a *read* of the log, not a *write*
+  confirmation in the UI. · **Where:** `AdminController.Audit` (the
+  `/admin/audit` action); `AccessAudit.cs` (the row shape). · **Violates:**
+  principle 3 (handoff — the admin's "did it work?" handoff is to the audit
+  log, not to an inline confirmation). · **Severity:** **L** (a *deliberate*
+  seam — the audit log is the community's accountability record, and the
+  philosophy names it as the trust mechanism). · **Proposed unit:**
+  **record and accept** (the audit-log-read pattern is the correct shape;
+  adding inline confirmations would be a new capability).
+
+**The pin (the U08 lean):** every `Via = Admin` write lane carries the
+`AccessAudit` who + why shape (U08 verified this for all 11 `AccessVia`
+values, including `Admin`). The `AccessVia.Admin` denied-path test (a) is
+`AnnouncementControllerTests.AddTranslation_Denied_Forbid_NoWrite` /
+`EventControllerTests.UpdateTranslation_Denied_Forbid` /
+`PageControllerTranslationTests.RemoveTranslation_Denied_Forbid`, and the
+deny-row shape (b) is pinned by `AccessAuditFactoryTests` for the
+`(Admin, Deny)` row. The admin's *within-surface* closed loop is
+**verified** — no "open the DB" handoff in any of the 16 surfaces; the one
+*designed* wall (the operator/admin split) is recorded, not hidden.
 ### Maintainer (the decay test)
 
 U09 verifies the maintainer's "one page" exists: `README.md` (what +
@@ -760,6 +901,101 @@ a fact lives (a single-point-of-failure in the doc layer — the "tribal
 knowledge" anti-pattern), and any fact that lives in *three+* places (the
 silent-coupling anti-pattern, like the U03 `AGENTS.md` /
 `copilot-instructions.md` drift but in the wider doc set).
+
+**U09 result (2026-10-08): the "one page" exists — all five entry-seam docs
+are present and each owns a distinct job; the tribal knowledge that is the
+*only* place a fact lives is concentrated in `AGENTS.md` (the agent
+integration layer), and the one *silent-coupling* fact that lives in three+
+places is the "how to build / run / test" recipe.**
+
+| Entry-seam doc | Job (the one thing it owns) | Present? |
+|---|---|---|
+| `README.md` | **what + status + running** — the platform, the roadmap, the Running instructions (the "one page" a new resident lands on) | yes |
+| `AGENTS.md` | **how to work here** — the repo doctrine (PowerShell, the test-runner quirk, the close-flip contract, the Razor verification doctrine) | yes |
+| `docs/ARCHITECTURE.md` | **the map** — the stack, the three bounded contexts, the module-boundary contracts, the CQRS-lite + Wolverine convention | yes |
+| `docs/OPS.md` | **the ops** — the host operator's runbook (provision, first-boot, upgrade, backup, restore, the config reference) | yes |
+| `docs/SECURITY.md` | **the model** — the privacy model, the threat model, the access-control rules | yes |
+
+The five are *complementary, not overlapping* — each owns a distinct job,
+and the U03 de-dup (the `AGENTS.md` ↔ `copilot-instructions.md` drift) has
+already closed the one *real* silent-coupling pair. The remaining findings:
+
+**L findings (record and accept — no fix in-lane):**
+
+- **L-MNT·1 — the build / run / test recipe is tribal knowledge in
+  `AGENTS.md`, and the repo's own workspace tasks point at the *broken*
+  paths.** The "how to actually build, run, and test" recipe (the
+  `dotnet exec` in-process runner for the xunit.v3 test projects, the
+  `docker compose build app && docker compose up -d app` live-server recipe,
+  the sample-GlobalAdmin credentials, the `node .tmp\build-harness.js`
+  harness rebuild) lives *only* in `AGENTS.md` — but the repo's own
+  `.vscode` workspace tasks (`test` → `dotnet test`, `run` →
+  `dotnet run --project src/Kumunita.Web --launch-profile http`) point at
+  the *exact* paths `AGENTS.md` warns are broken on this machine (the
+  "Running the tests (test-runner quirk)" + "Getting a live server"
+  sections). · **Where:** `AGENTS.md` §"Running the tests (test-runner
+  quirk)" + §"Getting a live server"; the `.vscode` workspace tasks
+  (`test`, `run`). · **Violates:** principle 2 (part-vs-whole — the
+  workspace task is the *entry seam* for a maintainer's first build, and it
+  is the seam that fails); the "handoff" test (the recipe's transfer from
+  `AGENTS.md` to the workspace task is implicit, not explicit). ·
+  **Severity:** **L** (a discoverability leak — a maintainer who runs the
+  workspace `test` task hits the xunit.v3 discovery bug `AGENTS.md`
+  documents). · **Proposed unit:** **record and accept** (aligning the
+  workspace tasks with the `dotnet exec` recipe is a *small* fix, but it
+  touches the `.vscode` task surface — a new requirement, not a reduction;
+  the honest statement is that the recipe is correct in `AGENTS.md`, and
+  the task is the stale copy).
+- **L-MNT·2 — the docker-compose live-server recipe + the sample-GlobalAdmin
+  credentials are tribal knowledge in `AGENTS.md` and `OPS.md`, but the
+  *sample-data* credentials the agent needs are in `SampleDataSeeder` (code),
+  not in a doc.** The "Getting a live server" recipe (the docker-compose
+  stack, the ~8 s boot time, the `admin@examplium.com` / `Admin123!`
+  credentials) is in `AGENTS.md`, but the *source of truth* for the
+  credentials is the `SampleDataSeeder` constants in
+  `Kumunita.Core/Bootstrap/` — a reader who wants the *exact* seeded
+  credentials (all the `@examplium.com` accounts) has to read the code, not
+  the doc. · **Where:** `AGENTS.md` §"Getting a live server";
+  `src/Kumunita.Core/Bootstrap/SampleDataSeeder.cs` (the constants);
+  `docs/OPS.md` §"Sample data — opt-in" (the deploy-posture credentials).
+  · **Violates:** principle 2 (part-vs-whole — the credentials are a fact
+  that lives in code, and the doc is the *copy*); the "handoff" test (the
+  transfer from code → doc is implicit). · **Severity:** **L** (a
+  discoverability leak — the credentials are correct in code, the doc is
+  the convenience copy). · **Proposed unit:** **record and accept** (the
+  code is the source of truth by design; the doc is the convenience copy —
+  the U03 de-dup already named this shape, and the code-vs-doc copy is the
+  correct direction).
+- **L-MNT·3 — the PowerShell traps (the here-string + `$variables` gotchas)
+  are tribal knowledge in `AGENTS.md`, and they are the *only* place a
+  Windows maintainer learns them.** The "Running PowerShell commands safely
+  (Windows agents)" section (the here-string `>>` continuation trap, the
+  `$variables`-don't-survive-between-terminal-calls bug, the "keep
+  PowerShell commands to a single logical line" rule) is in `AGENTS.md` —
+  and the U03 de-dup moved the *other* framework's copy to a pointer, but
+  *this* section is the *source* that every agent reads. The trap is real
+  (it has actually hung agent sessions before), but it is *Windows-agent-
+  specific* and lives in *one* file. · **Where:** `AGENTS.md` §"Running
+  PowerShell commands safely (Windows agents)". · **Violates:** principle 2
+  (part-vs-whole — the tribal knowledge is the *only* place a fact lives);
+  the "closed loop" test (a Windows agent who does not read this section
+  hits the `>>` hang with no recovery path in the doc layer). ·
+  **Severity:** **L** (a discoverability leak — the knowledge is correct,
+  but it is concentrated in one file that a Windows agent must happen to
+  read). · **Proposed unit:** **record and accept** (the section is
+  correct and the U03 de-dup already made it the single source; moving it
+  to a separate `docs/guides/windows-powershell.md` would be a *new*
+  structure, not a reduction).
+
+**The pin:** the "one page" exists — the five entry-seam docs are present,
+complementary, and each owns a distinct job. The U03 de-dup closed the one
+*real* silent-coupling pair (`AGENTS.md` ↔ `copilot-instructions.md`).
+The remaining tribal-knowledge findings (L-MNT·1/2/3) are all "record and
+accept" — the knowledge is correct, the docs are the convenience copies,
+and the code / `AGENTS.md` are the sources of truth by design. The one
+*actionable* item (L-MNT·1, the workspace tasks pointing at the broken
+paths) is a small fix, but it is a *new requirement* (align the tasks),
+not a reduction, so it is recorded, not fixed in-lane.
 
 ---
 
@@ -816,6 +1052,44 @@ philosophy's "quality is the quality of the linkage, not the sum of the
 parts" is the Definition of Done for this lane: **the codebase is
 measurably smaller, the docs measurably more navigable, the seams
 measurably more tested, and the existing tests still pass.**
+
+**U09 synthesis (2026-10-08) — for the non-technical reader.** Read this
+after the three-audience section above. The lane's verdict, in the
+philosophy's own vocabulary:
+
+- **What the platform does well (the linkages that held under the audit):**
+  the resident's *named journeys* — post to an audience, report a post,
+  join/leave a group, read a page, translate — are **all closed loops
+  in-app**. The resident takes a problem in and gets an outcome out
+  *without leaving the platform*; the connection between the resident and
+  the neighborhood is held by the access model + the audit log. The admin's
+  16 `/admin/*` surfaces are **all in-app closed loops** with an audited
+  standing (`Via = Admin` on every write; the one *designed* wall is the
+  operator/admin split, recorded as L-ADM·1). The maintainer's "one page"
+  (README / `AGENTS.md` / ARCHITECTURE / OPS / SECURITY) **exists** — each
+  doc owns a distinct job, and the U03 de-dup closed the one *real* silent-
+  coupling pair. This is the platform's core strength, and this lane has
+  *not* touched it — the linkages held under the audit, which is exactly the
+  test the philosophy asks for.
+- **Where it leaks (the seams we did not integrate — all L, recorded, not
+  hidden):** the resident's **feedback channel** (the issue tracker / a
+  human, off-platform — L-RES·1/2/3); the admin's **operator/admin wall**
+  (the platform-storage cap is an operator env var, not an admin surface —
+  L-ADM·1); and the maintainer's **build/run/test recipe** (concentrated in
+  `AGENTS.md`; the workspace tasks point at the broken paths — L-MNT·1/2/3).
+  Every one is a *value leak, not a trust violation*, and every one is
+  *recorded as a candidate for a future named lane*, not fixed in-lane (this
+  is a *reduction* lane, not a feature lane).
+- **What this lane *reduced* (the honest statement, per the plan's
+  Definition of Done):** it made the *integration decay* **visible and
+  testable** — the four god-files are smaller (U04/U05/U06), the ADR index
+  is no longer stale (U01), the two agent-instruction docs no longer
+  disagree (U03), the handoff notes + design docs have a 10-second "is this
+  the right read" gate (U02/U07), and the security & privacy seam is audited
+  with *who* + *why* on every row (U08). **It added no feature.** The
+  codebase is measurably smaller, the docs measurably more navigable, the
+  seams measurably more tested, and the existing tests still pass — the
+  inverse of every other lane in this repository.
 
 ---
 

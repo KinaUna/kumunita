@@ -1231,3 +1231,162 @@ and hand to a human + new named lane" path.)
   the warnings are pre-existing `CS860x` nullable + `xUnit` analyzer
   warnings in unrelated files — no errors; U08 touched no C#, so this is a
   no-op confirmation).
+
+## U09 — The three-audience UX audit + the close flip (2026-10-08)
+
+**Status: done — the lane is now closed.** This is the lane's final unit.
+The three-audience passes (resident / admin / maintainer) + the integrative
+question are recorded in `improve-audit.md`, and the **close flip** landed
+all six members in step (the `AGENTS.md` contract). **Pure audit + close-
+flip: no new capability, no C# logic change** — the only code touched is
+the two *static-data* registries (`Milestones.cs` / `WhatsNew.cs`) and their
+two pin tests, which is exactly the close-flip's data/doc-edit scope (a
+named lane entry + a version-registry reduction entry, not a feature).
+
+### What was audited (the three passes + the integrative question)
+
+All findings are in `docs/plans-milestones/improve-audit.md` `## The three
+audiences` + the `## The integrative question` U09 synthesis. Summary:
+
+1. **Resident (the closed-loop test).** Traced the five named `how-
+   it-works.md` journeys (post to an audience / report a post / join-leave a
+   group / read a page / translate). **All five are closed loops in-app**
+   (the platform's core strength — the audience picker, the report loop,
+   the group access list, the page tree, the language picker all hold). The
+   one consistent *exit* is the **meta-layer**: **L-RES·1/2/3** — the
+   resident's *feedback channel* ("flag the seams", "disagree out loud",
+   "request a language") is deliberately off-platform (the repo's issue
+   tracker or a human), plus the one *deliberate* contact-handoff (`how-it-
+   works.md`'s own "copy a phone number into a text" seam). All **L**, all
+   **record and accept** (a candidate for a future named lane, not an in-
+   lane fix — this is a reduction lane, not a feature lane).
+2. **Admin (the standing test).** Traced all 16 `Admin*Controller` surfaces.
+   **Every one is an in-app closed loop with a `Via = Admin` audit row** (or
+   a *read* that emits no row by design — `/admin/storage`, `/admin/audit`
+   read). **Leaned on U08's standing evidence** for the audit-row shape
+   (the `AccessVia.Admin` denied-path test + deny-row shape) rather than
+   re-deriving it. The one wall is **designed**, not missing: **L-ADM·1**
+   (the operator/admin split — `Media__MaxPlatformBytes` is "the operator's
+   capacity knob (an env value, not an admin-set-in-app limit)") and
+   **L-ADM·2** (the admin's "did it work?" handoff is to the audit log,
+   which is the community's accountability record by design). All **L**, all
+   **record and accept**.
+3. **Maintainer (the decay test).** The "one page" **exists** — all five
+   entry-seam docs are present and complementary (README = what+status+
+   running / `AGENTS.md` = how to work here / `ARCHITECTURE.md` = the map /
+   `OPS.md` = the ops / `SECURITY.md` = the model); the U03 de-dup already
+   closed the one *real* silent-coupling pair. The remaining findings are
+   the *only*-place-a-fact-lives tribal knowledge: **L-MNT·1** (the build/
+   run/test recipe is in `AGENTS.md`, but the repo's own workspace tasks
+   point at the *broken* paths — `dotnet test` / `dotnet run` without a
+   connection string — the exact paths `AGENTS.md` warns are broken),
+   **L-MNT·2** (the sample-data credentials' source of truth is the
+   `SampleDataSeeder` constants in code, not a doc), **L-MNT·3** (the
+   Windows PowerShell traps live in one file a Windows agent must happen to
+   read). All **L**, all **record and accept**.
+4. **The integrative question (part-vs-whole, the non-technical reader's
+   entry point).** Recorded the synthesis: what the platform does well (the
+   five resident linkages that held under the audit), where it leaks (the
+   meta-layer exits, all L, recorded not hidden), and what this lane
+   *reduced* (the honest "a reduction, not a feature" statement).
+
+**No S, M, or actionable findings** — every finding is **L** (a value leak,
+not a trust violation), and every one is **record and accept** (a candidate
+for a future named lane, consistent with the plan's "a new requirement
+becomes a new lane" rule). The three passes are a *verified-clean* outcome,
+the U05/U08 "verified negative" pattern, applied to the UX layer.
+
+### The close flip (the last act of the lane)
+
+The `AGENTS.md` six-member contract (`Milestones.cs` / `README.md` /
+`STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` / `WhatsNew.cs`) +
+the `WhatsNewTests.cs` pin, all in **one consistent pass**:
+
+- **`Milestones.cs`** — added the `IMPROVE` entry (a *named lane*, not a
+  milestone — consistent with the existing named-lane entries `GP`/`ML`/
+  `LS`/`SP`/`TZ`/`DF`/`TR`/`RC`/`GU`/`GA`/`RE`/`TG`/`PG`/`UG`/`EV-CAL`/
+  `EV-DWM`/`EV-NW`/`SITE`) at `StatusDone`, after `M28`.
+- **`MilestonesTests.cs`** — re-pinned the two id-lists (order +
+  `StatusDone`) to include `IMPROVE`. The `Roadmap_Is_Fully_Shipped_No_
+  InProgress_Milestone` test (the M28-close reframe — no `StatusNext`,
+  all `StatusDone`) is satisfied by `IMPROVE` being `StatusDone`.
+- **`WhatsNew.cs`** — added the **`0.44.0` (2026-10-08)** reduction entry at
+  the head: *"A quiet pass over what we already ship — no new feature… the
+  codebase is measurably smaller, the docs measurably more navigable, the
+  seams measurably more tested — and nothing you already use has changed
+  (the IMPROVE lane)."* (the honest statement of a reduction, per the plan).
+- **`WhatsNewTests.cs`** — added **`The_Improve_Lane_Reduction_Entry_Is_
+  Shipped`** (the required sixth-member pin — asserts `0.44.0` is the head,
+  dated `2026-10-08`, and names the IMPROVE lane).
+- **`README.md`** — the `## Status` line (after the M28 / "roadmap is
+  complete" line) + the `## Roadmap` bullet (after the M28 "last milestone"
+  bullet), both naming the IMPROVE lane.
+- **`STATUS.md`** — the milestone-status line (after the M28 / "roadmap is
+  complete" sentence), naming the IMPROVE lane + the six-member close flip.
+- **`ARCHITECTURE.md`** — the milestone-status line (after the M28 / "last
+  milestone" sentence), naming the IMPROVE lane + the six-member close flip.
+
+**The close-flip shape note (recorded so a future lane doesn't re-litigate
+it):** `Milestones.All` *already* carries named lanes as entries (the `GP`
+/ `ML` / `SITE` precedent), so `IMPROVE` is consistent with the existing
+pattern — this is **not** a renumber (the plan's own rule: "a named lane
+with a short ID — not a renumber; M4/M5/M6 stay untouched"). The *named-lane*
+precedent in `Milestones.All` is the established shape for "a capability
+landed out of the M-letter order," and the close-flip's six-member contract
+is what makes it in-step across `Milestones.cs` / README / STATUS /
+ARCHITECTURE / `MilestonesTests.cs` / `WhatsNew.cs`. The `M28` "last
+milestone / roadmap is complete" framing is *preserved* (M28 is still the
+last *M-letter* milestone; `IMPROVE` is a *named lane* that follows it,
+exactly like `SITE` followed `M27` before the M28 row was added).
+
+### Before → after numbers (the reduction, measured)
+
+| Gate | U00 baseline | Now (U09 close) | Change |
+|---|---:|---:|---|
+| (a) `src/*.cs` over 2 000 | 10 files | 0 new/grown past baseline | **closed** (U04/U05/U06 shrank the god-files) |
+| (b) ADR index drift | 8 missing | 0 | **closed** (U01) |
+| (c) shared `##` AGENTS.md ↔ copilot-instructions | 5 shared | 0 new | **closed** (U03) |
+| (d) handoff >600 w/o TL;DR | 23 | 0 new beyond U02 baseline | **closed top 8** (U02) |
+| (e) `client/*.ts` over 800 | 1 file | 0 new/grown | **held** (baseline grandfathered) |
+| (f) `.cshtml` over 800 | 3 views | 0 new/grown | **closed** (U06) |
+| (g) design >400 w/o Abstract | 43 | 0 new beyond U07 baseline | **closed top 5** (U07) |
+
+`improve-check.ps1` — **exit 0**, all seven gates OK.
+
+### Build + test verification (all green, 2026-10-08)
+
+- **`git status --porcelain`** — the expected U09 set only: the ledger
+  (`improve-audit.md`), the handoff note (this file), the six close-flip
+  members (`Milestones.cs` / `WhatsNew.cs` / `README.md` / `STATUS.md` /
+  `ARCHITECTURE.md`), and their two pin tests (`MilestonesTests.cs` /
+  `WhatsNewTests.cs`). *(No unexpected files — the `.tmp/` build/test
+  output files are gitignored scratch, not part of the change.)*
+- **`improve-check.ps1`** — **exit 0**, all seven gates OK.
+- **`dotnet build Kumunita.slnx -c Debug`** — **Build succeeded**, 0 errors
+  (53 pre-existing warnings: `CS860x` nullable + `xUnit` analyzer in
+  unrelated files; the close-flip C# edits are the two static-data
+  registries only).
+- **`Kumunita.Web.Tests` full suite** (in-process xunit.v3 runner, per the
+  `AGENTS.md` test-runner quirk — *not* `dotnet test`) — **Total: 952,
+  Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (baseline 951 + the 1 new
+  `The_Improve_Lane_Reduction_Entry_Is_Shipped`). The three close-flip
+  classes (`MilestonesTests` + `WhatsNewTests` + `ImproveHarnessTests`)
+  pass in isolation: **Total: 12, Errors: 0, Failed: 0**.
+- **`Kumunita.Core.Tests`** — **not touched** (the close flip is Web-surface
+  only: the two Web registries + their Web tests + the five doc files; no
+  Core code, doc, or test changed).
+
+### Lane status
+
+**The lane is now closed.** All nine units (U00–U09) are done and recorded
+in this handoff note; the audit ledger (`improve-audit.md`) is complete
+(principles 1–6 + the three tests + FACES + the Security & privacy audit
+(U08) + the three-audience audit (U09) + the integrative-question synthesis
+(U09)); the harness (`improve-check.ps1` + `improve-report.ps1`) passes; the
+close flip landed all six members in step; the full test run is green. Per
+the plan's Definition of Done: **the codebase is measurably smaller, the
+docs measurably more navigable, the seams measurably more tested, and the
+existing tests still pass** — the inverse of every other lane in this
+repository. *(This handoff note is the close; staging + commit is the next
+turn's job, per the plan's "Do not stage or commit — leave that to the next
+turn unless told otherwise.")*

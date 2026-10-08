@@ -69,6 +69,7 @@ public static class Milestones
         new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusDone),
         new("SITE", "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide (ADR 0150)", StatusDone),
         new("M28", "Guardian time limits — for a child's account, a parent/guardian sets when the child may use the platform: allow or block certain hours of each day and days of the week", StatusDone),
+        new("IMPROVE", "Integration audit — the platform's own integration pass (a named lane, not a milestone): the codebase is measurably smaller, the docs measurably more navigable, the seams measurably more tested — no new feature (the close of U00–U09)", StatusDone),
     };
 
     public static string BadgeClass(string status) => status switch
