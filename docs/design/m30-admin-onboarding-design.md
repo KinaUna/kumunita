@@ -359,3 +359,542 @@ it does not re-shape the existing seven.
 *Part 2 (U02) appends: the `AdminOnboarding` field set (exact), the read-seam
 contract, the write-lane contract, the banner-eligibility rule, the pinned
 seam-test names, the acceptance gate, the drift guard — plus **ADR 0153**.*
+
+## Seams & contracts (Part 2, written by U02)
+
+This Part 2 is the **pinned-contract** half of the design doc. It names the
+exact `AdminOnboarding` field set, the read-seam contract, the write-lane
+contract, the banner-eligibility rule, the pinned seam-test names (by class +
+method), the acceptance gate (the exact command list), and the drift guard. A
+later unit **never** re-shapes any of these outside the drift-guard; a
+mismatch found by a later unit is a `## U<m> — Drift pause` section in the
+handoff note (unit-series rule 6), not a silent edit.
+
+### 2.1 frozen base (unchanged)
+
+The following still bind **unchanged** and this milestone does not re-shape
+any of them (re-anchored verbatim from Part 1's §The frozen base, for
+reference in the Part-2 context):
+
+- **ADR 0005 B** — the `LocaleSettings` singleton (`Id = "singleton"`
+  sentinel, the additive-field convention, one row per instance). The
+  `AdminOnboarding` doc is a **new** singleton in the same shape, **not** a
+  new field on `LocaleSettings`.
+- **ADR 0150** — the `SiteContent` shape (the `Id = "singleton"` sentinel,
+  the best-effort read, the single audited write-lane, the
+  `GlobalAdmin`-gated dedicated `/admin/*` controller). The
+  `AdminOnboarding` doc + `IAdminOnboardingService` +
+  `AdminOnboardingController` mirror this shape exactly.
+- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+  `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write,
+  the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
+  `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
+  `CompleteAsync` + the `AdminOnboardingController.Complete` action mirror
+  this shape exactly (one `AccessAudit` row per stamp).
+- **ADR 0132 (M22)** — the resident onboarding lane (the stateless
+  `OnboardingController` + the dismissible `_OnboardingBanner` partial + the
+  closed `onboarding.*` `kw-l` set + the `Profile.OnboardingCompletedAt`
+  additive field). M30 mirrors this shape at the admin scope; the M22
+  `Profile.OnboardingCompletedAt` field is **untouched** (M22 is
+  resident-scope, M30 is admin-scope, the two completion flags are
+  independent).
+- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+  no EF migration). The `AdminOnboarding` doc is a **new** Marten doc type,
+  not a new field on an existing one.
+- **ADR 0006** — module-boundary contract. The `AdminOnboarding` context is a
+  **new** bounded context (`Kumunita.Core.AdminOnboarding`), independent of
+  `SiteContent`, `LocaleSettings`, and the `Localization` context.
+- **ADR 0015 D1** — `kw-l` provider-floor discipline. The
+  `adminonboarding.*` keys are authored in all four languages (en/de/fr/da);
+  the existing `kw-l` registry entries are **not** removed, not re-shaped,
+  not re-keyed.
+- **The M22 / SITE test model** — the `FirstBootSeeder` default pin (the
+  `SeedSiteContentAsync` create-if-missing / idempotent / never-overwrites
+  pattern), the Web-layer pins (the `AdminSiteControllerTests` /
+  `OnboardingControllerTests` shape), the `KwLRegistryConsistencyTests` /
+  `KnownTranslationKeys_ParityTests` pins (the registry entries are
+  untouched).
+- **The `Milestones.cs` / README / `MilestonesTests` close-flip trio** —
+  the `MilestonesTests` order + single-in-progress pin stays intact until
+  the milestone *ships* (U07 owns the close flip).
+
+### 2.2 the `AdminOnboarding` field set (exact)
+
+The `AdminOnboarding` POCO (a new `Kumunita.Core.AdminOnboarding` bounded
+context) carries **exactly one field** — the optional `CompletedAt`
+`DateTimeOffset?`, defaulting to `null` (= not-yet-guided, the floor). The
+`Id` is the sentinel `"singleton"` (the exact `SiteContent` /
+`LocaleSettings` shape, ADR 0005 B). The field set is the **ceiling** (the
+ADR 0153 D1 pin): no field outside this set may appear in the doc. A future
+lane **adds** fields (the `AdminOnboarding` doc is additive per ADR 0004
+§B.1); it does **not** re-shape the existing one.
+
+| # | Field | Type | Default | Note |
+|---|---|---|---|---|
+| 1 | `CompletedAt` | `DateTimeOffset?` | `null` | `null` = not-yet-guided (the banner shows, the walk-through is available); a non-null value = completed (the banner clears, the walk-through is still reachable but the "you haven't finished setup yet" affordance is gone). A `Complete()` helper stamps `CompletedAt = DateTimeOffset.UtcNow`. |
+
+**The `AdminOnboarding` POCO (exact C#):**
+
+```csharp
+namespace Kumunita.Core.AdminOnboarding;
+
+/// <summary>
+/// The admin onboarding completion record (ADR 0153): a **singleton** —
+/// one row per instance, <see cref="Id"/> fixed to the sentinel
+/// <c>singleton</c> (the exact <c>SiteContent</c> / <c>LocaleSettings</c>
+/// shape, ADR 0005 B), so re-resolving it is a plain identity-keyed load.
+/// Carries exactly one additive member — <see cref="CompletedAt"/>,
+/// <c>null</c> = not-yet-guided (the floor, the banner shows), non-null =
+/// completed (the banner clears). The one-field set is the **ceiling**
+/// (the ADR 0153 D1 pin); a future lane **adds** fields (additive per ADR
+/// 0004 §B.1), it does not re-shape the existing one. The
+/// <c>SiteContent</c> + <c>LocaleSettings</c> docs are **untouched** — this
+/// is a new doc in a new context, not a new field on an existing one (the
+/// ADR 0150 D6 / ADR 0006 module-boundary pin).
+/// </summary>
+public sealed class AdminOnboarding
+{
+    public const string SingletonId = "singleton";
+
+    public string Id { get; set; } = SingletonId;
+
+    /// <summary>
+    /// When a GlobalAdmin completed the guided walk-through; <c>null</c> =
+    /// not-yet-guided (the banner shows), non-null = completed (the banner
+    /// clears). The floor (M30·2).
+    /// </summary>
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    /// <summary>Stamps <see cref="CompletedAt"/> to <see
+    /// cref="DateTimeOffset.UtcNow"/> (the single-write-lane helper,
+    /// ADR 0153 D2).</summary>
+    public void Complete() => CompletedAt = DateTimeOffset.UtcNow;
+}
+```
+
+### 2.3 the read-seam contract (exact C#)
+
+The read is the `IAdminOnboardingService.GetAsync(ct)` call, made by the
+`AdminOnboardingController.Index` action **and** the admin onboarding banner
+partial. It is **best-effort** — a missing store, a missing row (a fresh boot
+before the seeder ran), or a read failure degrades to `null` (= not-yet-
+guided, the floor), and the page **always renders** (the ADR 0050
+`IsSignupOpenAsync` best-effort shape, M30·3). The banner partial + the
+`/admin/onboarding` view call **one** helper (the read-seam) so they resolve
+to the **same** value (M30·5). The read is **never audited** (a read, not an
+access decision, M30·3).
+
+```csharp
+// Kumunita.Core.AdminOnboarding.IAdminOnboardingService (the read half)
+public interface IAdminOnboardingService
+{
+    /// <summary>
+    /// Returns the <c>AdminOnboarding</c> singleton's <c>CompletedAt</c>
+    /// value. **Best-effort**: a missing store, a missing row (a fresh boot
+    /// before the seeder ran), or a read failure degrades to <c>null</c>
+    /// (= not-yet-guided, the floor). The read never throws and never
+    /// returns a sentinel other than <c>null</c>; the banner + the
+    /// /admin/onboarding page always render (M30·3, the ADR 0050
+    /// IsSignupOpenAsync shape). The read is a **public admin surface**
+    /// (GlobalAdmin-gated by the controller's [Authorize], not a new
+    /// authorization surface) and is **never audited** (M30·3, ADR 0001-B
+    /// thin-token).
+    /// </summary>
+    Task<DateTimeOffset?> GetAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Stamps the <c>AdminOnboarding</c> singleton's <c>CompletedAt</c> to
+    /// <see cref="DateTimeOffset.UtcNow"/> — the ADR 0150 / ADR 0050 single
+    /// audited write-lane shape. Loads the singleton (a missing row is
+    /// **upserted**, not load-or-creates — the lane never creates a second
+    /// row, M30·2), stamps <c>CompletedAt = now</c>, and saves in one
+    /// session (invariant C3). Exactly **one** <c>AccessAudit</c> row per
+    /// call (<c>Via = Admin</c>, action <c>admin_onboarding.complete</c>,
+    /// <c>TargetKind</c> "admin-onboarding" — the <c>site.save</c> /
+    /// <c>signup.set-open</c> / <c>timezone.set-default</c> singleton-toggle
+    /// shape, M30·4). **Strong consistency** (invariant C4): the new value
+    /// is live on the very next <c>GetAsync</c> / banner read. The lane
+    /// **upserts** the singleton — it never creates a second row (M30·2,
+    /// the ADR 0150 D6 pin).
+    /// </summary>
+    Task CompleteAsync(string actorBy, CancellationToken ct = default);
+}
+```
+
+```csharp
+// Kumunita.Core.AdminOnboarding.AdminOnboardingService (the read half)
+public sealed class AdminOnboardingService : IAdminOnboardingService
+{
+    private readonly IDocumentStore _store;
+
+    public AdminOnboardingService(IDocumentStore store) => _store = store;
+
+    /// <inheritdoc />
+    public async Task<DateTimeOffset?> GetAsync(CancellationToken ct = default)
+    {
+        // ADR 0050 IsSignupOpenAsync best-effort shape (M30·3): a missing
+        // store (a test construction with no IDocumentStore), a missing row
+        // (a fresh boot before the seeder ran), or a read failure degrades
+        // to null (= not-yet-guided, the floor). The read never throws and
+        // never returns a sentinel other than null; the banner + the
+        // /admin/onboarding page always render. The read is a public admin
+        // surface — never an access decision, never audited (M30·3, ADR
+        // 0001-B thin-token).
+        try
+        {
+            using var session = _store.QuerySession();
+            var row = await session
+                .LoadAsync<AdminOnboarding>(AdminOnboarding.SingletonId, ct)
+                .ConfigureAwait(false);
+            return row?.CompletedAt;
+        }
+        catch
+        {
+            return null; // a read failure degrades to null (M30·3)
+        }
+    }
+    // CompleteAsync in §2.4.
+}
+```
+
+```csharp
+// Kumunita.Web.Controllers.AdminOnboardingController (the read call-site)
+[HttpGet]
+public async Task<IActionResult> Index()
+{
+    var completedAt = await _adminOnboarding.GetAsync(); // best-effort; null = not-yet-guided
+    return View(new AdminOnboardingViewModel
+    {
+        Completed   = completedAt is not null, // the GetAsync read's inverse (M30·5)
+        Steps       = AdminOnboardingViewModel.ClosedSteps, // the closed seven-step list
+    });
+}
+
+// Kumunita.Web.Views.Shared._AdminOnboardingBanner.cshtml (the banner read call-site —
+// the SAME GetAsync seam, so the banner + the view resolve to the same value, M30·5)
+// @inject IAdminOnboardingService AdminOnboarding
+// @* bannerEligible = User is a GlobalAdmin AND (await AdminOnboarding.GetAsync()) is null *@
+```
+
+### 2.4 the write-lane contract (exact C#)
+
+The write is the `IAdminOnboardingService.CompleteAsync(actorBy)` lane — the
+ADR 0150 / ADR 0050 single audited write-lane shape. It loads the singleton
+(a missing row is **upserted**, not load-or-creates — the lane never creates
+a second row, M30·2), stamps `CompletedAt = now`, saves in one session
+(invariant C3), and writes **exactly one** `AccessAudit` row (`Via = Admin`,
+action `admin_onboarding.complete`, `TargetKind` "admin-onboarding" — the
+`site.save` shape). **Strong consistency** (invariant C4): the new value is
+live on the very next `GetAsync` / banner read. The lane **upserts** the
+singleton — it never creates a second row (M30·2, the ADR 0150 D6 pin).
+
+```csharp
+// Kumunita.Core.AdminOnboarding.AdminOnboardingService (the write half)
+public async Task CompleteAsync(string actorBy, CancellationToken ct = default)
+{
+    // ADR 0050 SetSignupOpenAsync / ADR 0150 SaveAsync shape (M30·4): one
+    // write session, the doc + exactly one AccessAudit row (Via = Admin,
+    // action "admin_onboarding.complete", TargetKind "admin-onboarding")
+    // commit together (invariant C3, strong consistency C4 — live on the
+    // very next GetAsync / banner read). The lane upserts the singleton —
+    // it never creates a second row (M30·2, the ADR 0150 D6 pin); a missing
+    // row is upserted (the seeder is the only writer that creates the row
+    // on a fresh boot, so a fresh instance is already at the floor).
+    await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+    var stored = await session
+        .LoadAsync<AdminOnboarding>(AdminOnboarding.SingletonId, ct)
+        .ConfigureAwait(false)
+        ?? new AdminOnboarding(); // a missing row is upserted (M30·2)
+
+    stored.Complete(); // stamps CompletedAt = DateTimeOffset.UtcNow
+
+    session.Store(stored);
+
+    // Exactly one AccessAudit row (the site.save / signup.set-open /
+    // timezone.set-default singleton-toggle shape, M30·4).
+    session.Store(new AccessAudit
+    {
+        Id                     = Guid.NewGuid().ToString("N"),
+        At                     = DateTimeOffset.UtcNow,
+        ActorId                = actorBy,
+        EffectivePrincipalId   = actorBy,
+        Action                 = "admin_onboarding.complete",
+        TargetKind             = "admin-onboarding",
+        TargetId               = AdminOnboarding.SingletonId,
+        Via                    = AccessVia.Admin,
+        Outcome                = AccessOutcome.Allow
+    });
+
+    await session.SaveChangesAsync(ct).ConfigureAwait(false);
+}
+```
+
+```csharp
+// Kumunita.Web.Controllers.AdminOnboardingController (the thin wrapper — the
+// AdminSiteController.SaveHome / AdminSignupController.Save shape)
+[Route("admin/onboarding")]
+[Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
+public sealed class AdminOnboardingController(IAdminOnboardingService adminOnboarding) : Controller
+{
+    private static string? ActorId(ClaimsPrincipal user) => KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>GET /admin/onboarding — the walk-through page. Seeds the view
+    /// model with the current CompletedAt state + the closed seven-step list
+    /// (M30·2, M30·7). The read is best-effort — a missing row degrades to
+    /// Completed = false (the banner shows), so the page always renders
+    /// (M30·3, the ADR 0050 IsSignupOpenAsync shape).</summary>
+    [HttpGet]
+    public async Task<IActionResult> Index()
+    {
+        var completedAt = await adminOnboarding.GetAsync();
+        return View(new AdminOnboardingViewModel
+        {
+            Completed = completedAt is not null,
+            Steps     = AdminOnboardingViewModel.ClosedSteps, // the closed seven-step list
+        });
+    }
+
+    /// <summary>POST /admin/onboarding/complete — the **one** write action
+    /// (M30·1): stamps CompletedAt = now + writes exactly one AccessAudit row
+    /// (Via = Admin, action admin_onboarding.complete, TargetKind
+    /// "admin-onboarding" — M30·4). The ADR 0050 / ADR 0150 shape: a
+    /// GlobalAdmin-gated [ValidateAntiForgeryToken] POST, a
+    /// TempData["info"] flash (resolved via the adminonboarding.flash_done
+    /// kw-l key, falling back to the en floor), a
+    /// RedirectToAction(nameof(Index)) redirect.</summary>
+    [HttpPost("complete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Complete()
+    {
+        var actor = ActorId(User) ?? string.Empty;
+        await adminOnboarding.CompleteAsync(actor);
+        TempData["info"] = await FlashAsync("adminonboarding.flash_done");
+        return RedirectToAction(nameof(Index));
+    }
+}
+```
+
+The `AdminOnboardingViewModel` (the M22 `OnboardingViewModel` shape, admin-
+scope) carries the `Completed` property (the `GetAsync` read's inverse —
+`CompletedAt != null`) + the closed seven-step list. The seven `Step` entries
+are the closed set (the register's §"closed `kw-l` key set" table, the seven
+`(key, labelKey, route, descriptionKey)` tuples in the README /
+`Milestones.cs` order: community name → `/admin/languages`, languages →
+`/admin/languages`, moderation → `/admin/announcements/comments`,
+notifications → `/admin/quiet`, storage limits → `/admin/storage/settings`,
+site content → `/admin/site`, issue escalation →
+`/admin/announcements`). The banner partial reads the **same** `GetAsync`
+seam (M30·5 — the read is the **single** seam the banner + the view call, so
+they resolve to the **same** value).
+
+### 2.5 the banner-eligibility rule (exact)
+
+The banner renders **iff** the signed-in actor is a `GlobalAdmin` AND
+`CompletedAt` is `null` (the M22 `bannerEligible` read + the M29
+`GlobalAdmin`-gated scope). The banner is **non-blocking**: the admin sign-in
+is never gated, the banner is always dismissible (a `sessionStorage` flag —
+never a write to `CompletedAt`, the M22 `onboarding-banner.js` shape), and
+the `/admin/onboarding` route is always reachable for a `GlobalAdmin`
+regardless of completion state (M30·5). The banner link points to
+`/admin/onboarding` (the M22 `onboarding.banner.action` idiom — the
+`adminonboarding.banner.action` `kw-l` key). The banner copy is the
+`adminonboarding.banner.text` `kw-l` key. The banner is rendered in the
+`_AdminNav` partial's scope (the admin sub-nav — the M29 `_AdminNav` shape),
+visible on every `/admin/*` page.
+
+```
+// Banner-eligibility (the exact rule, M30·5):
+//
+//   renders  ⟺  IsGlobalAdmin(actor)  AND  (await GetAsync()) is null
+//
+//   IsGlobalAdmin(actor)  — the standard [Authorize(Roles = GlobalAdmin)]
+//                           gate (M30·3, ADR 0001-B thin-token)
+//   (await GetAsync())    — the single read-seam (M30·5 — the banner + the
+//                           /admin/onboarding view call the same helper)
+//
+//   non-blocking:
+//     - the admin sign-in is never gated (the banner is an affordance, not a
+//       wall, M30·5)
+//     - the banner is always dismissible (a sessionStorage flag — never a
+//       write to CompletedAt, the M22 onboarding-banner.js shape)
+//     - the /admin/onboarding route is always reachable for a GlobalAdmin
+//       regardless of completion state (M30·5)
+//     - the banner link points to /admin/onboarding (the M22
+//       onboarding.banner.action idiom, admin-scope)
+```
+
+### 2.6 the pinned seam-test names (exact)
+
+**Frozen — a unit may never introduce a test whose exact name is not on this
+list** (unit-series rule 3). The names below are the **only** test names the
+M30 milestone authors; a later unit that finds a mismatch is a `## U<m> —
+Drift pause` section in the handoff note, not a silent edit.
+
+**Core.Tests — `AdminOnboardingServiceTests` (the ADR 0150 single-write-lane
+shape, M30·2 / M30·3 / M30·4):**
+
+1. `AdminOnboardingServiceTests.GetAsync_MissingStore_ReturnsNull` — a test
+   construction with no `IDocumentStore` returns `null` (not-yet-guided, the
+   floor — M30·2, M30·3).
+2. `AdminOnboardingServiceTests.GetAsync_MissingRow_ReturnsNull` — a fresh
+   store (no `AdminOnboarding` row) returns `null` (M30·2, M30·3).
+3. `AdminOnboardingServiceTests.CompleteAsync_WritesOneAccessAuditRow` —
+   `CompleteAsync` writes **exactly one** `AccessAudit` row (`Via = Admin`,
+   action `admin_onboarding.complete`, `TargetKind` "admin-onboarding")
+   (M30·4).
+4. `AdminOnboardingServiceTests.CompleteAsync_StrongConsistency_LiveOnNextGetAsync`
+   — after `CompleteAsync`, the very next `GetAsync` returns the stamped
+   `CompletedAt` value (strong consistency — M30·4).
+5. `AdminOnboardingServiceTests.CompleteAsync_UpsertsSingleton_NoDuplicateRow`
+   — `CompleteAsync` **upserts** the singleton (no duplicate row, the
+   M29·6 / ADR 0150 D6 pin — M30·2).
+
+**Core.Tests — `AdminOnboardingSeederTests` (the `SeedSiteContentAsync`
+create-if-missing / idempotent / never-overwrites pattern, M30·2):**
+
+6. `AdminOnboardingSeederTests.FreshBoot_HasExactlyOneAdminOnboardingRow` —
+   a fresh boot has **exactly one** `AdminOnboarding` row
+   (`Id = "singleton"`) (M30·2).
+7. `AdminOnboardingSeederTests.FreshBoot_CompletedAtIsNull` — a fresh boot
+   has `CompletedAt = null` (not-yet-guided, the floor — M30·2).
+8. `AdminOnboardingSeederTests.SecondBoot_IsIdempotent_NoDuplicateRow` — a
+   second boot is **idempotent** (no duplicate row, no field change — the
+   create-if-missing / never-overwrites pattern, M30·2).
+
+**Web.Tests — `AdminOnboardingControllerTests` (the `/admin/onboarding`
+surface, M30·1 / M30·3 / M30·4 / M30·7):**
+
+9. `AdminOnboardingControllerTests.GET_SeesCurrentCompletedAt` — the `GET`
+   seeds the view model with the current `CompletedAt` state (the `Completed`
+   property is the `GetAsync` read's inverse — M30·3).
+10. `AdminOnboardingControllerTests.POST_Complete_StampsCompletedAt_WritesOneAccessAuditRow`
+    — the `POST /admin/onboarding/complete` stamps `CompletedAt = now` +
+    writes exactly **one** `AccessAudit` row (M30·4).
+11. `AdminOnboardingControllerTests.GET_NonGlobalAdmin_IsDenied` — the `GET`
+    is `GlobalAdmin`-gated (a non-`GlobalAdmin` is denied — M30·3, the M29·7
+    pin).
+12. `AdminOnboardingControllerTests.POST_NonGlobalAdmin_IsDenied` — the
+    `POST` is `GlobalAdmin`-gated (a non-`GlobalAdmin` is denied — M30·3,
+    the M29·7 pin).
+
+**Web.Tests — `AdminOnboardingBannerTests` (the admin onboarding banner,
+M30·5):**
+
+13. `AdminOnboardingBannerTests.BannerRenders_ForGlobalAdmin_WhenNotCompleted`
+    — the banner renders **iff** the signed-in actor is a `GlobalAdmin` AND
+    `CompletedAt` is `null` (M30·5).
+14. `AdminOnboardingBannerTests.BannerDoesNotRender_ForNonGlobalAdmin` — the
+    banner does **not** render for a non-`GlobalAdmin` (even if `CompletedAt`
+    is `null`) (M30·3, M30·5).
+15. `AdminOnboardingBannerTests.BannerDoesNotRender_WhenCompleted` — the
+    banner does **not** render when `CompletedAt` is non-null (even if the
+    actor is a `GlobalAdmin`) (M30·5).
+16. `AdminOnboardingBannerTests.BannerLinkPointsToAdminOnboarding` — the
+    banner link points to `/admin/onboarding` (the M22
+    `onboarding.banner.action` idiom, admin-scope — M30·5).
+
+### 2.7 the acceptance gate (exact)
+
+The acceptance gate is the **exact** command list below. A later unit
+(U03–U07) runs the gate after its own deliverable and records the result in
+the handoff note. The gate is **green** when:
+
+```powershell
+# 1. The solution builds green (the touched projects — Kumunita.Core, Kumunita.Web, Kumunita.Core.Tests, Kumunita.Web.Tests).
+dotnet build Kumunita.slnx -c Debug
+
+# 2. The Core.Tests suite is green (the AdminOnboardingServiceTests + AdminOnboardingSeederTests pins, the ADR 0150 shape).
+dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+
+# 3. The Web.Tests suite is green (the AdminOnboardingControllerTests + AdminOnboardingBannerTests pins, the M30·1–M30·5 pins).
+dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+```
+
+Plus the **regression pins** (the precedent shapes are unchanged — the
+`kw-l` registry entries are untouched, the ADR 0050 / ADR 0150 / M22 shapes
+are unchanged, the close-flip trio is intact):
+
+- `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` **green**
+  (the `adminonboarding.*` registry entries are present, non-empty, in all
+  four languages — M30·6, the ADR 0153 D3 pin).
+- `SiteContentServiceTests` + `AdminSiteControllerTests` **green** (the ADR
+  0150 SITE precedent shapes are unchanged — the `SiteContent` doc +
+  `SiteContentService` best-effort read + single audited write-lane + the
+  `AdminSiteController` `[Authorize(Roles = GlobalAdmin)]` surface).
+- `OnboardingControllerTests` (M22) **green** (the ADR 0132 M22 precedent
+  shapes are unchanged — the `OnboardingController` + the
+  `_OnboardingBanner` partial + the `CompleteOnboardingAsync` single-write-
+  lane + the closed `onboarding.*` `kw-l` set).
+- `MilestonesTests` **green** (the order + single-in-progress pin is intact —
+  M30·8, the ADR 0153 D8 pin).
+- `WhatsNewTests` **green** (the new `0.46.0` entry is present, newest-first
+  — M30·8, the ADR 0153 D8 pin).
+
+**Runner (per AGENTS.md):** the `dotnet exec` path on the test assemblies,
+**not** `dotnet test` / VS Test Explorer (the xunit.v3 discovery quirk on
+this machine).
+
+### 2.8 the drift guard (frozen once written)
+
+The following are **frozen** once this Part 2 is written; a mismatch found
+by a later unit is a `## U<m> — Drift pause` section in the handoff note
+(unit-series rule 6), **not** a silent edit:
+
+- **The one-field `AdminOnboarding` field set** (§2.2) — the **ceiling** (the
+  ADR 0153 D1 pin): the one optional `DateTimeOffset?` field `CompletedAt` —
+  no field outside the field set may appear in the doc; a future lane
+  **adds** fields (additive per ADR 0004 §B.1), it does **not** re-shape
+  the existing one.
+- **The `SiteContent` + `LocaleSettings` docs** — **untouched** (the ADR 0150
+  D6 / ADR 0006 module-boundary pin): M30 adds a **new** doc in a **new**
+  context (`Kumunita.Core.AdminOnboarding`); the `SiteContent` doc's shape
+  (the 13 fields) and the `LocaleSettings` doc's shape (the
+  `DefaultLanguageCode` / `DefaultTimezone` / `DefaultDateFormat` /
+  `IsSignupOpen` / `NotifyAdminsOnSignup` / `AnnouncementCommentsEnabled` /
+  `MessagingEnabled` / `QuietCheckMinutes` / … fields) are **unchanged**.
+- **The seven admin routes** — **unchanged** (the "walk-through is a guided
+  shell, not a re-route" pin, M30·7): the walk-through *links into* the six
+  concrete routes (`/admin/languages` / `/admin/announcements/comments` /
+  `/admin/quiet` / `/admin/storage/settings` / `/admin/site` /
+  `/admin/announcements`) by route; the walk-through adds **one new
+  route**, `/admin/onboarding`, for the walk-through + the completion stamp
+  — it does not re-route the seven.
+- **The `kw-l` registry entries** — the **floor** (the ADR 0153 D3 pin): the
+  `adminonboarding.*` keys in `KnownTranslationKeys.cs` are **not** removed,
+  not re-shaped, not re-keyed; the existing `kw-l` registry entries are
+  **not** removed, not re-shaped, not re-keyed; the registry parity tests
+  (`KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests`) are
+  **untouched**.
+- **The M22 `Profile.OnboardingCompletedAt` field** — **untouched** (the M22
+  / M30 distinction): M22 is resident-scope, M30 is admin-scope; the two
+  completion flags are **independent** (M30 does not re-shape the M22
+  resident onboarding).
+- **The read-seam contract** (§2.3) — `IAdminOnboardingService.GetAsync(ct)`
+  is the ADR 0050 `IsSignupOpenAsync` best-effort shape (missing row / read
+  failure degrades to `null` = not-yet-guided; never throws; the banner +
+  the `/admin/onboarding` view call **one** helper so they resolve to the
+  **same** value; never audited).
+- **The write-lane contract** (§2.4) —
+  `IAdminOnboardingService.CompleteAsync(actorBy, ct)` is the ADR 0150 / ADR
+  0050 single audited write-lane shape (one session, one `AccessAudit` row,
+  `Via = Admin`, action `admin_onboarding.complete`, `TargetKind`
+  "admin-onboarding"; strong consistency; upserts the singleton — never
+  creates a second row).
+- **The banner-eligibility rule** (§2.5) — the banner renders **iff** the
+  actor is a `GlobalAdmin` AND `CompletedAt` is `null`; non-blocking (sign-in
+  never gated, always dismissible via a `sessionStorage` flag, the route
+  always reachable for a `GlobalAdmin`).
+- **The 16 pinned seam-test names** (§2.6) — verbatim, a unit may never
+  introduce a test outside this list.
+- **The acceptance gate** (§2.7) — the exact command list + the regression
+  pins; the gate is **green** only when every line passes.
+- **The frozen base** (§2.1) — ADR 0005 B / ADR 0150 / ADR 0050 / ADR 0132
+  (M22) / ADR 0004 §B.1 / ADR 0006 / ADR 0015 D1 / the M22 / SITE test model
+  / the `Milestones.cs` / README / `MilestonesTests` close-flip trio —
+  **unchanged**.
+
+*— Part 2 (seams & contracts) authored by U02 (2026-10-08). ADR 0153 is
+the milestone's decision record (Status: Accepted, created by U02); the
+`Milestones.cs` / README / `MilestonesTests` / `WhatsNew.cs` close flip is
+owned by U07 (M30·8).*

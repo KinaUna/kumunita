@@ -243,3 +243,103 @@
   naming each step by route** in the design doc's step table — consistent with
   M30·7 (route-agnostic), not a blocker. The invariants and FACES text is
   restated verbatim from the register's "one thing" section; none invented.
+
+## U02 — design doc Part 2 + ADR 0153
+
+- **Design doc Part 2 authored** (appended to
+  `docs/design/m30-admin-onboarding-design.md`, sub-sections 2.1–2.8):
+  the `AdminOnboarding` field set (exact C#), the read-seam contract
+  (exact C#), the write-lane contract (exact C#), the banner-eligibility
+  rule (exact), the 16 pinned seam-test names (exact), the acceptance gate
+  (exact command list + regression pins), and the drift guard (frozen once
+  written). The Part-2 text mirrors the `site-content-design.md` Part 2
+  shape (the §2.1–§2.8 sub-section set) and pins against the Part-1
+  invariants (M30·1–M30·8) + FACES (M30-1–M30-8) by id.
+- **The `AdminOnboarding` field set (exact):** the **one** optional
+  `DateTimeOffset?` field `CompletedAt` (default `null` = not-yet-guided,
+  the floor); `Id = "singleton"` sentinel (the `SiteContent` /
+  `LocaleSettings` shape, ADR 0005 B); the field set is the **ceiling** (the
+  ADR 0153 D1 pin). A `Complete()` helper stamps
+  `CompletedAt = DateTimeOffset.UtcNow`.
+- **The read-seam contract (exact):**
+  `IAdminOnboardingService.GetAsync(CancellationToken ct)` returns the
+  singleton's `CompletedAt` value, **best-effort** (a missing store /
+  missing row / read failure degrades to `null` = not-yet-guided, the floor);
+  **never audited** (M30·3). The banner partial + the `/admin/onboarding`
+  view call **one** helper (the read-seam) so they resolve to the **same**
+  value (M30·5).
+- **The write-lane contract (exact):**
+  `IAdminOnboardingService.CompleteAsync(string actorBy, CancellationToken
+  ct)` loads the singleton, stamps `CompletedAt = now`, saves in one session
+  (invariant C3); exactly **one** `AccessAudit` row per stamp (`Via =
+  Admin`, action `admin_onboarding.complete`, `TargetKind` "admin-onboarding"
+  — the `site.save` shape, M30·4); **upserts** the singleton (ADR 0150 D6);
+  **strong consistency** (live on the next `GetAsync` / banner read). The
+  `AdminOnboardingController.Complete` action is the thin wrapper (the
+  `AdminSiteController.SaveHome` shape — `GlobalAdmin`-gated
+  `[ValidateAntiForgeryToken]` POST, `TempData["info"]` flash via
+  `adminonboarding.flash_done`, `RedirectToAction(nameof(Index))`).
+- **The banner-eligibility rule (exact):** the banner renders **iff** the
+  actor is a `GlobalAdmin` AND `CompletedAt` is `null` (the M22
+  `bannerEligible` read + the M29 `GlobalAdmin`-gated scope); **non-blocking**
+  (sign-in never gated, always dismissible via a `sessionStorage` flag —
+  never a write to `CompletedAt`, the route always reachable for a
+  `GlobalAdmin`); the banner link points to `/admin/onboarding` (the M22
+  `onboarding.banner.action` idiom).
+- **The 16 pinned seam-test names (by class + method, exact):**
+  - **Core.Tests `AdminOnboardingServiceTests`:**
+    `GetAsync_MissingStore_ReturnsNull` /
+    `GetAsync_MissingRow_ReturnsNull` /
+    `CompleteAsync_WritesOneAccessAuditRow` /
+    `CompleteAsync_StrongConsistency_LiveOnNextGetAsync` /
+    `CompleteAsync_UpsertsSingleton_NoDuplicateRow`.
+  - **Core.Tests `AdminOnboardingSeederTests`:**
+    `FreshBoot_HasExactlyOneAdminOnboardingRow` /
+    `FreshBoot_CompletedAtIsNull` /
+    `SecondBoot_IsIdempotent_NoDuplicateRow`.
+  - **Web.Tests `AdminOnboardingControllerTests`:**
+    `GET_SeesCurrentCompletedAt` /
+    `POST_Complete_StampsCompletedAt_WritesOneAccessAuditRow` /
+    `GET_NonGlobalAdmin_IsDenied` /
+    `POST_NonGlobalAdmin_IsDenied`.
+  - **Web.Tests `AdminOnboardingBannerTests`:**
+    `BannerRenders_ForGlobalAdmin_WhenNotCompleted` /
+    `BannerDoesNotRender_ForNonGlobalAdmin` /
+    `BannerDoesNotRender_WhenCompleted` /
+    `BannerLinkPointsToAdminOnboarding`.
+- **The acceptance gate (exact command list):**
+  `dotnet build Kumunita.slnx -c Debug` + `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` +
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  + the `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests`
+  pins + the `SiteContentServiceTests` / `AdminSiteControllerTests` /
+  `OnboardingControllerTests` (M22) pins + the `MilestonesTests` pin + the
+  `WhatsNewTests` pin. Runner: `dotnet exec` on the test assemblies (per
+  AGENTS.md), **not** `dotnet test` / VS Test Explorer.
+- **ADR 0153:** **created by U02** at `docs/adr/0153-admin-onboarding.md`
+  with **`Status: Accepted`** (per the register's U02 entry — the register is
+  authoritative for *what each unit does*). **U07 note:** the register's U07
+  close-flip says "flip `Status: Draft` → `Status: Accepted`," but the ADR is
+  **already `Accepted`** as created — so **U07's flip is a no-op** (the ADR
+  is at its final status; U07 does not need to change it). The U07 close-flip
+  that still applies: tag the `docs/adr/README.md` index row
+  `**Done** (M30)` (the row currently reads `Accepted` and is **not yet**
+  tagged `**Done** (M30)`).
+- **ADR index update:** `docs/adr/README.md` gained the `0153` row (after
+  the `0152` row): `| 0153 | Admin onboarding: a guided walk-through for a
+  new GlobalAdmin through the seven most important initial settings (an
+  `AdminOnboarding` singleton on the M22 / SITE lane's shape — a links-only
+  walk-through, not a new write path; additive on 0150 + 0004 §B.1 + 0005 B +
+  0006 + 0132) | Accepted |`. **0153 was free** (the index ended at 0152;
+  ADR 0132 confirmed present on disk at
+  `docs/adr/0132-onboarding.md`).
+- **Drift check:** all Entry reads (the register's "one thing" section,
+  U01's Part-1 invariants + FACES, the `site-content-design.md` Part-2 shape,
+  `SiteContentService.cs`, `AdminSiteController.cs`, `FirstBootSeeder.cs`,
+  ADR 0150, ADR 0132, `docs/adr/README.md`) are consistent with the register.
+  **No drift pause required.** One note: the register's U06 entry names
+  "15 tests" (5 service + 3 seeder + 4 controller + 4 banner = 16), and the
+  register's U02 §2.6 entry also lists 16 names (5 + 3 + 4 + 4). The **16
+  pinned names** are the authoritative count; U06 should author **16** tests,
+  not 15. This is a count-typo in the register's U06 entry ("15"), not a
+  drift in the pinned-name list.
