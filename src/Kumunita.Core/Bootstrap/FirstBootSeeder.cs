@@ -132,6 +132,16 @@ public static class FirstBootSeeder
         // text from `KnownTranslationKeys` (SITE·3).
         await SeedSiteContentAsync(mt, logger, ct);
 
+        // 4c. Surface labels (M29, ADR 0152): the `SurfaceLabels` singleton —
+        // the 13 top-navigation surfaces' admin-editable display-name
+        // overrides. Create-if-missing, idempotent, never-overwrites (the
+        // exact `SiteContent` shape): a fresh boot stores exactly one row with
+        // all 13 label fields `null` (the "use the `kw-l` fallback" default,
+        // M29·3 / M29·4 — byte-identical to a fresh instance that never
+        // touches the surface); a second boot leaves an existing row
+        // untouched, so an admin's later rename is honored.
+        await SeedSurfaceLabelsAsync(mt, logger, ct);
+
         // 5. Canonical `en` UI strings + the `en` terms/help/privacy/conduct pages
         // (ML-UI U1 — D2; the four-page set per ADR 0043 D1/D5): materializes the
         // M·9 `en` floor + the M·12 completeness universe. Runs
@@ -439,6 +449,80 @@ public static class FirstBootSeeder
         {
             logger.LogInformation(
                 "First boot: SiteContent singleton already present; skipping (idempotent, never-overwrites — ADR 0150).");
+        }
+    }
+
+    /// <summary>
+    /// M29 (ADR 0152) — seed the <see cref="SurfaceLabels.SurfaceLabels"/>
+    /// singleton: the 13 top-navigation surfaces' admin-editable display-name
+    /// overrides (the nav item + the surface's page header, resolved by
+    /// <see cref="SurfaceLabels.ISurfaceLabelsService"/>). The
+    /// <c>SiteContent</c> / <c>LocaleSettings</c> "one row per instance" shape
+    /// (ADR 0005 B / ADR 0150): a single row, <c>Id = "singleton"</c>, so
+    /// re-resolving it is a plain identity-keyed load.
+    /// <para>
+    /// <b>Create-if-missing, idempotent, never-overwrites</b> (the exact
+    /// <see cref="SeedSiteContentAsync"/> shape): a fresh boot stores exactly
+    /// one row with <b>all 13</b> label fields <c>null</c> — the "use the
+    /// <c>kw-l</c> fallback" default (M29·3 / M29·4), so a fresh instance that
+    /// never touches the surface is byte-identical to today (every label falls
+    /// back to its <c>kw-l</c> key in the viewer's language). A second boot
+    /// (a warm re-run) leaves an existing row untouched, so an admin's later
+    /// rename is honored (the never-overwrites pin).
+    /// </para>
+    /// <para>
+    /// <b>All 13 fields are <c>null</c> by construction</b> — there is no
+    /// "default text" to seed here (unlike <see cref="SeedSiteContentAsync"/>,
+    /// whose 4 text fields carry the shipped <c>en</c> source text). The
+    /// floor is the <c>kw-l</c> registry entry each field resolves to, read at
+    /// resolution time by <see cref="SurfaceLabels.ISurfaceLabelsService"/> —
+    /// the registry entries stay (ADR 0152 D3), so the seeder only creates the
+    /// row and leaves every override unset.
+    /// </para>
+    /// <para>
+    /// <b>No <c>AccessAudit</c> row.</b> A first-boot seed is not an actor's
+    /// auditable action (the seeder is not a principal) — the single
+    /// <c>SaveChangesAsync</c> commits the singleton row only.
+    /// </para>
+    /// <para>
+    /// <b>Public (not private)</b> so the Core test can pin the fresh-boot
+    /// state + idempotency across two live boots without an
+    /// <c>InternalsVisibleTo</c> (the <see cref="SeedSiteContentAsync"/>
+    /// precedent — the repo's Core test constraint).
+    /// </para>
+    /// </summary>
+    public static async Task SeedSurfaceLabelsAsync(
+        IDocumentStore mt, ILogger logger, CancellationToken ct)
+    {
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        var existing = await session
+            .LoadAsync<SurfaceLabels.SurfaceLabels>(SurfaceLabels.SurfaceLabels.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            // All 13 label fields default to `null` (the "use the `kw-l`
+            // fallback" default, M29·3 / M29·4). None are set — the floor is
+            // the `kw-l` registry entry each resolves to (ADR 0152 D3).
+            session.Store(new SurfaceLabels.SurfaceLabels
+            {
+                Id = SurfaceLabels.SurfaceLabels.SingletonId,
+                // Home / Announcements / Community / Groups / Events / Projects /
+                // Inventory / Bookmarks / Documents / Pages / Tags / Directory /
+                // People — all left `null` (the POCO initializers already
+                // default each to `null`; the all-null row IS the shipped
+                // default, so no field is set explicitly here).
+            });
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            logger.LogInformation(
+                "First boot: SurfaceLabels singleton seeded (id 'singleton'; all 13 label overrides null — the `kw-l` fallback default, byte-identical to the shipped text — ADR 0152).");
+        }
+        else
+        {
+            logger.LogInformation(
+                "First boot: SurfaceLabels singleton already present; skipping (idempotent, never-overwrites — ADR 0152).");
         }
     }
 
