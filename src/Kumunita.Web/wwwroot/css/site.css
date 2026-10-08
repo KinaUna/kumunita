@@ -2063,6 +2063,15 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 .msg-row.other.unread .msg-avatar .avatar-mono {
   box-shadow: 0 0 0 2px var(--kmb-amber);
 }
+/* The conversation-list preview row (Index.cshtml) is a `text-truncate` div
+   inside a flex item (li.d-flex > a.flex-grow-1). A flex item's default
+   `min-width: auto` stops it shrinking below the unbreakable min-content of
+   that nowrap preview, so a long unbroken token (a URL, an id) blows the row,
+   the column, and the whole page wide instead of ellipsizing. Reset the flex
+   item to `min-width: 0` so the truncate can shrink + ellipsize and the row holds. */
+.messages-conv-list .list-group-item > a.flex-grow-1 {
+  min-width: 0;
+}
 
 /* --- Rich-content bodies (RC U06) ------------------------------------------
    Every UGC body (post / group-post / announcement + replies + translations)
