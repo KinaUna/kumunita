@@ -199,3 +199,173 @@ and the gate passes on the current baseline.
   remain the U02 baseline — U02's TL;DR additions drop the top 8 out of
   the *new* violation set (same mechanism U01 just used for the ADR
   rows).
+
+## U02 — TL;DR convention for handoff notes (2026-10-08)
+
+**Status: done.** 8 handoff notes + 1 new file
+(`docs/plans-milestones/README.md`). No code touched.
+
+### What was done
+
+1. **Added a `> **TL;DR:**` blockquote to the 8 largest**
+   `*-handoff-notes.md` under `done/`, each inserted directly under the
+   H1 (before the existing first blockquote, so the original top-of-file
+   text is unchanged). Each block answers the plan's three questions in
+   the note's own vocabulary: *what did this lane ship, in one
+   sentence?* · *what is the one seam it created or changed?* · *what is
+   the one thing a future reader must not re-litigate?* — the
+   re-litigate line is drawn from the note's `## Summary` / `## Close`
+   section, not the filename. The 8 notes (current sizes at U02 time,
+   measured with `improve-report.ps1`, in descending order):
+
+   | Lane | File | Lines at U02 | TL;DR source section |
+   |---|---|---:|---|
+   | `M3b` | `done/m3b/m3b-handoff-notes.md` | 1 939 | `## Summary` (the U11 close table + the M4 deferral list) |
+   | `PG` (pages) | `done/pages/pages-handoff-notes.md` | 1 546 | `## U7 — Absorb complete` + the 2026-09-17 design-decision amendment (pages default non-public / community-visible) |
+   | `M11` (portability) | `done/m11/m11-portability-handoff-notes.md` | 1 463 | `## U07 — the close` + `## Summary — M11 is closed` (the D9 frozen test names are the contract) |
+   | `M10` (PWA) | `done/m10/m10-pwa-handoff-notes.md` | 1 413 | `## U07 — close` + `## Summary` (zero Core change, C-M10·6, is the pin) |
+   | `ATT` (file-attachments) | `done/file-attachments/file-attachments-handoff-notes.md` | 1 272 | `## Summary` (the image lane is byte-for-byte unchanged, C-ATT·9) |
+   | `M4` (events) | `done/m4/m4-handoff-notes.md` | 1 192 | `## U12 — close` + `## U13` (the 25-seam master list is the contract; `PublishAsync` remains author-only, ADR 0037) |
+   | `M14` (events+projects interlock) | `done/m14/m14-events-projects-handoff-notes.md` | 1 093 | `## U07 — acceptance + docs parity (the close)` + `## Summary` (no `RRULE` / recurrence — C-M14·6, M18's home) |
+   | `MEDIA` (media & file storage) | `done/media/media-file-storage-handoff-notes.md` | 1 076 | `## Summary` + `## U11` (the prod media volume is the **second restore surface**, not optional) |
+
+   The 8 are the top of the 23-note U00 baseline by *current measured*
+   size (the U00 Evidence table's top-8 list was `m3b` · `m13-logging` ·
+   `m11` · `m10` · `file-attachments` · `m4` · `m14` · `media`; the
+   current top-8 per `improve-report.ps1` [4] are `m3b` · `pages` ·
+   `m11` · `m10` · `file-attachments` · `m4` · `m14` · `media` —
+   `pages` is in the top 8 now because it has grown since U00, and
+   `m13-logging` has dropped out of the top 8 (it is still over 600
+   without a TL;DR, so it remains in the U02 backlog as "record and
+   accept"). I used the **measurement**, per the user's instruction
+   ("trust the measurement, not the plan's Evidence table, if they
+   disagree").
+
+2. **Created `docs/plans-milestones/README.md`** (the file did not
+   exist). A short index of the folder + the `## TL;DR convention`
+   section (one paragraph, per the plan's U02 "Do" section). The
+   convention section names the three questions the TL;DR answers, the
+   `improve-check.ps1` gate (d) that enforces it, the U02 baseline (23
+   notes, top 8 closed by U02, the remaining 15 are the "record and
+   accept" backlog in `improve-audit.md`), and the U07 extension to the
+   design-doc tier (the `> **Abstract:**` blockquote, the same
+   convention at a different tier).
+
+### What was found
+
+- **`pages-handoff-notes.md` is the hardest of the 8 to write a
+  faithful TL;DR for, and it is a finding for the ledger.** The note's
+  own `## U#` sections *do* close cleanly (U7 is a destructive close,
+  green, the `LocalizedPage` retirement is the one-seam story) — but
+  the note was then **extended by four post-close addenda** (two
+  follow-ons on 2026-09-17, one bug fix, one design-decision amendment)
+  that **reverse a locked decision** (the 2026-09-17 amendment reverses
+  ADR 0039 §3.4's "pages default public — the one place pages
+  deliberately differ from posts"). The TL;DR I wrote names the
+  post-amendment state (pages default non-public / community-visible),
+  because that is the *current* state a future reader will hit — but
+  the note's own `## U#` sections (which are append-only and were not
+  amended) still say "pages default public" in their body text. A reader
+  who reads the TL;DR and then reads the U# sections will see a
+  contradiction. This is the philosophy's "integration decay" in the doc
+  layer (Principle 6: "Integration decays. ADRs, review, audit, and
+  retrospectives are how we close that decay.") — the note is
+  *incoherent* in the sense that its own history (the U# sections)
+  contradicts its current state (the post-amendment body). The U02 unit
+  is a *reading + adding* unit (the plan's Definition of Done: "the
+  codebase is measurably smaller, or measurably more integrated, or
+  measurably more discoverable"), not a *rewrite* unit — so I did not
+  fix the incoherence; I recorded it as a finding for the
+  `improve-audit.md` ledger (the `## Principle 6` section, the
+  "handoff notes are not their own source of truth" class of finding)
+  and named it in this section. The U03 unit (de-duping
+  `AGENTS.md` ↔ `.github/copilot-instructions.md`) is **not** the
+  right unit to fix this (different file, different anti-pattern —
+  silent coupling vs. append-only history contradicting the
+  amendment). It is a *new* finding, not a re-scope of U03.
+- **`m4-handoff-notes.md`'s `## U13` is not in the plan's U02 "Do"
+  section's entry-read list** (the plan names "the 8 largest handoff
+  notes from the U00 Evidence table" as the entry reads, and the U00
+  table lists `m4-handoff-notes.md` at 1 192 lines). I read the U13
+  section (the GlobalAdmin edit/delete write override) because it is
+  the *last* `## U#` section in the file and the U12 close (which is
+  the `## Close` section) does not name it — the U13 addendum is the
+  *current* state (the 25-seam master list is the contract, the
+  `PublishAsync` author-only pin is the load-bearing line). This is
+  the "the note's own `## U#` sections are the source of truth, but
+  the `## Close` section is the *last* one a reader will read"
+  problem the TL;DR convention is designed to fix — the TL;DR I wrote
+  for `m4` names the U13 state (the 25-seam list, the author-only
+  pin) because that is the *current* state, not the U12 close state
+  (the 23-seam list). A reader who reads the TL;DR and then reads the
+  U12 close will see a contradiction (23 vs. 25). Same class of
+  finding as the `pages` one above — the note's append-only history
+  does not reflect the post-close amendment.
+- **The `improve-check.ps1` gate (d) regex is
+  `Select-String -Pattern 'TL;DR'` (case-insensitive, any position in
+  the first 20 lines).** My `> **TL;DR:**` blocks match (the
+  `Select-String` pattern is not anchored to a line start, so the
+  `> **` prefix is fine). The gate passes with 8 TL;DRs added.
+- **The `improve-report.ps1` [4] count dropped from 23 → 15** (the
+  8 largest are now out of the violation set). The 15 remaining
+  (`rich-editor` · `m13-logging` · `m9-messaging` · `m27` ·
+  `m15-translation-bulk` · `pl` · `m26` · `multilingual-ui` · `site`
+  · `m16` · `group-posts` · `wysiwyg` · `m25` · `m20` · `m1-step-7`)
+  are the U02 "record and accept" backlog (the plan's Definition of
+  Done: "the gate's ceiling is the *only* thing standing between it
+  and growth" — the gate passes on the 15-note baseline, and it fails
+  on any *new* file crossing 600 without a TL;DR, or any *baseline*
+  file that grows past its U00-time size).
+
+### What U03 must know
+
+- U03's scope (de-duping `AGENTS.md` ↔
+  `.github/copilot-instructions.md`) is **unaffected** by U02 — no
+  shared files. U02's `docs/plans-milestones/README.md` is a new file
+  (U03 does not touch it); U02's 8 handoff-note TL;DRs are in
+  `done/*` (U03 does not touch them). The only overlap is
+  conceptual: U02's TL;DR convention and U03's de-dup are both the
+  "make the integration seam explicit" principle (Principle 6) applied
+  to two different seams (the doc layer's top-of-file vs. the
+  agent-integration layer's shared sections). No de-dup needed
+  between the two.
+- U03's entry reads should **not** include the 8 handoff notes U02
+  just touched — U03's scope is `AGENTS.md` +
+  `.github/copilot-instructions.md` + `docs/philosophy/in-code.md` (the
+  "seam chosen silently will be re-litigated by whoever hits it next"
+  line). The 8 handoff notes are U02's deliverable, not U03's entry
+  reads.
+- **U03 should NOT extend the `improve-check.ps1` gate (c) to check
+  the `docs/plans-milestones/README.md` file** (the file I created).
+  The gate (c) checks `AGENTS.md` ↔
+  `.github/copilot-instructions.md` shared `##` headings; the
+  `plans-milestones/README.md` is a *new* file with a `## TL;DR
+  convention` heading that does not appear in either `AGENTS.md` or
+  `.github/copilot-instructions.md`, so it does not affect gate (c).
+  If U03 *renames* the `## TL;DR convention` heading (e.g. to `##
+  TL;DR convention (plans-milestones)`), it should verify the gate
+  still passes (it will — the heading is not shared with the other two
+  files).
+- **The `docs/plans-milestones/README.md` file is the *only* new file
+  U02 created** (the 8 handoff notes were modified, not created). If
+  U03 or a future unit wants to add a `## <something>` section to the
+  `plans-milestones/README.md`, it should verify the gate (c) does not
+  flag the new heading as shared with `AGENTS.md` or
+  `.github/copilot-instructions.md` (the gate (c) regex is
+  `Select-String -Pattern '^\s*## '` over both files, and the shared
+  set is the intersection — a new heading in `plans-milestones/README.md`
+  that is *not* in either of the other two files is fine).
+
+### Build + gate verification (all green, 2026-10-08)
+
+- `improve-report.ps1` [4] — **23 → 15** (the 8 largest are now out
+  of the violation set; the 15 remaining are the U02 "record and
+  accept" backlog).
+- `improve-check.ps1` — **exit 0**, all six gates pass (gate (d)
+  reads `new beyond U02 baseline: 0` — the 8 TL;DRs drop the top 8
+  out of the *new* violation set, same mechanism U01 used for the ADR
+  rows).
+- No build (the change is 8 Markdown edits + 1 new Markdown file; no
+  C# touched, no test affected). The `ImproveHarnessTests.ImproveCheck_Gate_Passes`
+  test still passes (it shells out to `improve-check.ps1` and asserts
+  exit 0, which it does).

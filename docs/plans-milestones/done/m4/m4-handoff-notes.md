@@ -1,5 +1,9 @@
 # M4 — Events, RSVPs & reminders — rolling handoff log
 
+> **TL;DR:** Shipped M4 (Events, RSVPs & reminders, ADR 0054) + U13 (GlobalAdmin edit/delete write override): the `Event` / `EventRsvp` docs, the `IEventService` write lanes (`CreateAsync` / `PublishAsync` / `UpdateAsync` / `DeleteAsync` / `RsvpAsync`), the §6.4 scheduled `EventReminders` job, the `EventToAuditableResource` adapter + the `M4DocTypes` surface, and the 25 pinned seam tests (T01–T25) green end-to-end (Core 670/670, Web 351/351).
+> **Seam it created:** `Kumunita.Core.Events` — the `actorRoles`-bearing `UpdateAsync` / `DeleteAsync` (the U13 seam that honors ADR 0054 §3.4 server-side) + the `AuditViaFor(actorId, authorId)` helper (the author → `AccessVia.Owner`; a non-author actor, reachable only via the GlobalAdmin override, → `AccessVia.Admin`) — the audit-tag correctness fix that the U05(f) drift note flagged as "a Core change, out of U05 scope" and carried through U12.
+> **Do not re-litigate:** the §3.7 master list is **25** names (T01–T25) — U13 added T24 / T25 (`M4_GlobalAdminOverrideEditEndToEnd` / `M4_GlobalAdminOverrideDeleteEndToEnd`) as the §3.8 row-3 part-vs-whole gate, which was red for the GlobalAdmin branch before U13 (the U09 `M4_GlobalAdminOverrideEdit` (T09) pin only drove the **pure** `CheckEditStanding` helper, not the **lane** — green CI, red seam); `PublishAsync` remains **author-only** (ADR 0037 — a non-author GlobalAdmin is still denied publish), and `CreateAsync` / `RsvpAsync` are unchanged (the `StaticEmptyRoles` sentinel is now used only by create / publish).
+
 > One `## U#` section per unit, appended (never rewritten). Each unit writes
 > exactly one short section before it exits; the next unit reads only that
 > section + its own entry-read list.

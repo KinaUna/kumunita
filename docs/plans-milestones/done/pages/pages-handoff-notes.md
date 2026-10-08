@@ -1,5 +1,9 @@
 # Pages lane (`PG`) — handoff notes (scratch tier)
 
+> **TL;DR:** Shipped the `PG` Pages lane (ADR 0039): a `Page` / `PageTranslation` tree that **absorbs and retires the legacy `LocalizedPage`**, a `MountPoint` resolver for the two UI slots (`footer/community`, `help/account`), the composer + translation surface, the navbar entry, and the `kw-l` registry consistency test — with the 2026-09-17 design-decision amendment (pages now default non-public / community-visible, consistent with posts).
+> **Seam it created:** `Kumunita.Core.Pages` — the `IPageService` + `PageDocTypes` surface + the `PageToAuditableResource` adapter; the legacy `LocalizedPage` document, its `M1DocTypes` index, the `ITranslationProvider.GetPageAsync` / `FindPageByImageIdAsync` seams, the `ILocalizationService.GetPageAsync` / `UpsertPageAsync` pair, and the ML-UI admin page editor (`PreviewPage` / `SavePage`) are all **deleted** (U07, the destructive close) — `LanguageCompleteness` is now 3-prop, and `StaticPagesController` is 2-arg.
+> **Do not re-litigate:** pages **default non-public / community-visible** (the 2026-09-17 amendment that reverses ADR 0039 §3.4's "pages default public") — the public *capability* is retained (`IsPublic = true`), the seeded `about` / `terms` / `help` pages are public by the **seeder** (not the composer default), and the `CommunityId` seed in `PageController.New()` is **load-bearing** (removing it would drop the default back to "denies everyone," C1 — empty-audience-denies).
+
 > **Three-tier contract.** This lane has three written surfaces, in order of
 > authority:
 >

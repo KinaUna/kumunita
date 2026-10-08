@@ -1,5 +1,9 @@
 # M3b — rolling handoff note
 
+> **TL;DR:** Shipped the M3b moderation lane: report filing, the `Via = Report` read branch, the `HidePostAsync` / `RemovePostAsync` write lanes on `Post` (the `PostStatus` enum, ADR 0004 §B.1 additive), the `/moderation` queue + resolve UI, the reply route, and 13 pinned Core tests + 3 acceptance gates (closed-loop / handoff / part-vs-whole) green end-to-end.
+> **Seam it created:** `Kumunita.Core.Moderation` — a new bounded context: `ModerationService` (the `FileReportAsync` / `AssignReportAsync` / `UnlockAsync` / `ResolveReportAsync` write lanes) + the `Via = Report` read branch (`CanReadWithReportAsync`) — the C5 carve-out, the "filed report is the gate, not the `Moderate` action alone" pin (C-M3b·2).
+> **Do not re-litigate:** the M1-frozen `CanAsync` seam's audit shape is authoritative — U9's two drift notes (the §2.3 item-3 `AccessVia.Admin` pin vs U3's `canasync` → `decision.Via` shape, and the §2.3 item-4 "lane's own `report.assign` / `report.resolve` row" vs U5's `if (decision.Allowed)`-guarded lane) were reconciled in U11 in favor of the M1 seam, not the design doc's §2.3 pin — the design doc's §2.5 test *names* are the contract, and the test *bodies* adapt to what the M1 seam writes.
+
 > One section per unit, **appended** (never rewritten), exactly the
 > M2 / M3 convention (`m3-handoff-notes.md`). Each unit writes exactly one
 > short section before it exits; the next unit reads only that section +

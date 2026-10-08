@@ -1,5 +1,9 @@
 # M10 handoff notes
 
+> **TL;DR:** Shipped M10 (PWA and responsive design, ADR 0107): an installable PWA app shell (the honest static `manifest.webmanifest` + the two icon PNGs + the GET-only same-origin closed-15-path-allowlist service worker + the quiet localized install affordance) + a single `@media (max-width: 767.98px)` phone-width pass over a closed surface inventory + the two pinned a11y floors (≥ 44×44 px hit areas, the `:focus-visible` ring on the `.kmb-*` custom pieces).
+> **Seam it created:** `wwwroot/sw.js` — the stale-while-revalidate `kumunita-shell-v1` cache, the `activate` clear rule, and the exact fall-through line; the load-bearing contract of the milestone is the **SW cache as a privacy boundary** (C-M10·2 — the negative pin that a signed-in route is *not* cached, the direct analogue of the access model's "most load-bearing contract" principle in `docs/philosophy/in-code.md`).
+> **Do not re-litigate:** **zero Core change** (C-M10·6) — no document, no service seam, no audit verb, no schema, no `LocaleSettings` toggle; the design doc's "Seams & contracts" section is the honest "no new seams" answer, with the real contracts (manifest / SW / install-module / responsive / a11y) each named and test-pinned; the deferred lanes (PWA push, the tablet pass, offline authenticated pages, per-OS adaptive icons, manifest enrichment) are each named and each a follow-on ADR under the design doc's §drift-guard — not a re-scope of M10.
+
 One `## U#` section per unit, **appended, never rewritten** (the shared
 scratch tier of the three-tier contract — see the register header). Each
 entry: files written/touched, decisions locked or refined (with the
