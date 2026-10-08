@@ -133,6 +133,15 @@ var marten = builder.Services.AddMarten(opts =>
     // the unqualified name resolves here unchanged.
     SiteContentDocTypes.Configure(opts);
 
+    // M29 (ADR 0152, U03): the SurfaceLabels bounded context's singleton doc
+    // (SurfaceLabels, ADR 0004 §B.1 additive — one row per instance,
+    // Id = "singleton", the SiteContent / LocaleSettings shape, ADR 0005 B /
+    // ADR 0150). Without this call the doc is invisible to Marten and a
+    // pristine boot never creates its mt table (the SITE / Page / Tag
+    // precedent). SurfaceLabelsDocTypes lives in Kumunita.Core (like the
+    // other *DocTypes), so the unqualified name resolves here unchanged.
+    SurfaceLabelsDocTypes.Configure(opts);
+
     // TG (ADR 0044 D1, plan U3): the Tags bounded context's documents (Tag +
     // TagTranslation, ADR 0004 §B.1 additive — the (TagId, LanguageCode)
     // business-key unique index, tg_tr_uidx_tag_lang). Without this call
