@@ -7,7 +7,7 @@ and the gate passes on the current baseline.
 
 ### What was done
 
-1. **`docs/plans-milestones/improve-audit.md`** — the audit ledger. One `##`
+1. **`docs/plans-milestones/done/improve/improve-audit.md`** — the audit ledger. One `##`
    section per principle (1–6), one `###` per three-test (closed-loop /
    handoff / part-vs-whole), one `###` per FACES face (Flexible / Adaptive /
    Coherent / Energizing / Stable). Under each: findings with where, what,
@@ -17,7 +17,7 @@ and the gate passes on the current baseline.
    scope), and the `## The integrative question` section (the non-technical
    reader's entry point).
 
-2. **`docs/plans-milestones/improve/improve-check.ps1`** — the 6-gate CI
+2. **`docs/plans-milestones/done/improve/improve-check.ps1`** — the 6-gate CI
    check. Gates: (a) `src/*.cs` over 2 000 lines, (b) ADR index drift,
    (c) `AGENTS.md` ↔ `copilot-instructions.md` shared `##` heading,
    (d) handoff notes over 600 lines without TL;DR, (e) `client/*.ts` over
@@ -26,7 +26,7 @@ and the gate passes on the current baseline.
    *allows* the current baseline but *fails* new violations or baseline
    growth. Exit 0 = all gates pass; exit 1 = at least one gate failed.
 
-3. **`docs/plans-milestones/improve/improve-report.ps1`** — the one-page
+3. **`docs/plans-milestones/done/improve/improve-report.ps1`** — the one-page
    human-facing summary: top 10 C# files (red/amber/green vs ceiling), ADR
    drift count, shared-heading count, handoff-without-TL;DR count,
    TS-over-800 count, view-over-800 count, design-doc-without-Abstract

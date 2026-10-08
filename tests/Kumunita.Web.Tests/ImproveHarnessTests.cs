@@ -43,7 +43,7 @@ public class ImproveHarnessTests
             Assert.Skip("pwsh is not on PATH on this machine; the gate script cannot run (CI has PowerShell 7).");
         }
 
-        var script = Path.Combine(RepoRoot(), "docs", "plans-milestones", "improve", "improve-check.ps1");
+        var script = Path.Combine(RepoRoot(), "docs", "plans-milestones", "done", "improve", "improve-check.ps1");
         Assert.True(File.Exists(script), "improve-check.ps1 is missing at " + script);
 
         var psi = new ProcessStartInfo

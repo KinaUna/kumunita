@@ -6,7 +6,7 @@
 > entry-reads list. The primary tier is
 > `docs/design/m28-guardian-time-limits-design.md` (authored by U00); the
 > secondary tier (this lane's register) is
-> `docs/plans-milestones/plan-m28-guardian-time-limits.md`.
+> `docs/plans-milestones/done/m28/plan-m28-guardian-time-limits.md`.
 
 ## U00 — design doc + ADR 0151
 

@@ -464,7 +464,7 @@ below), one unit per fresh agent with a **~32K context window**.
   evaluator / seam / middleware / kw-l pins + the acceptance gate + the
   drift guard. Locked before any code unit runs.
 - **Secondary tier — this file**
-  (`docs/plans-milestones/plan-m28-guardian-time-limits.md`) — the unit
+  (`docs/plans-milestones/done/m28/plan-m28-guardian-time-limits.md`) — the unit
   register: one row per unit, each with Goal / Entry reads / Deliverables /
   Exit.
 - **Scratch tier — the rolling handoff note**
@@ -978,7 +978,7 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
      `docs/plans-milestones/in-progress/` to
      `docs/plans-milestones/done/` (the **flat** `done/` convention — the
      M27 precedent + the user's stated storage instruction). The master
-     register `docs/plans-milestones/plan-m28-guardian-time-limits.md`
+     register `docs/plans-milestones/done/m28/plan-m28-guardian-time-limits.md`
      stays at the top level (the sealed register, not a unit plan). Move
      the handoff note **after** appending its `## Summary` (step 8).
 - **Rules:** the **order** of `Milestones.All` is **unchanged** (C-M28·8);

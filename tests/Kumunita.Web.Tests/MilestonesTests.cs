@@ -13,10 +13,10 @@ public class MilestonesTests
         Milestones.All.Select(m => m.Id);
 
     [Fact]
-    public void Roadmap_Covers_M0_Through_M28_Plus_Named_Lanes_In_Order()
+    public void Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "M28", "IMPROVE" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "M33", "M34" },
             Ids.ToList());
     }
 
@@ -34,17 +34,20 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void Roadmap_Is_Fully_Shipped_No_InProgress_Milestone()
+    public void No_Milestone_Is_InProgress_And_Planned_Milestones_Are_Marked_Planned()
     {
-        // M28 (guardian time limits) is the LAST milestone on the roadmap and is
-        // now DONE — closed in the U09 close unit (ADR 0151). The "single
-        // in-progress" premise no longer holds: the roadmap is complete, so
-        // there is no `StatusNext` milestone and every row is `StatusDone`.
-        // (A semantic reframe of `M28_Is_The_Single_InProgress_Milestone`, not
-        // a rename — M28 was the last, so the premise it asserted is gone.)
-        // The order is unchanged (…, M26, M27, SITE, M28).
+        // M28 (guardian time limits) is the last shipped milestone (closed in
+        // the U09 close unit, ADR 0151); M29–M34 are six new planned
+        // milestones queued next (admin surface labels, admin onboarding,
+        // production error handling, issue submission & escalation,
+        // storage metrics history, analytics history). No milestone is
+        // currently in-progress (the roadmap is not mid-flip), the six new
+        // rows are all StatusPlanned, and every other row is StatusDone.
         Assert.Empty(Milestones.All.Where(m => m.Status == Milestones.StatusNext));
-        Assert.All(Milestones.All, m => Assert.Equal(Milestones.StatusDone, m.Status));
+        Assert.All(Milestones.All.Where(m => m.Id is "M29" or "M30" or "M31" or "M32" or "M33" or "M34"),
+            m => Assert.Equal(Milestones.StatusPlanned, m.Status));
+        Assert.All(Milestones.All.Where(m => m.Id is not ("M29" or "M30" or "M31" or "M32" or "M33" or "M34")),
+            m => Assert.Equal(Milestones.StatusDone, m.Status));
     }
 
     [Fact]

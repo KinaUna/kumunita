@@ -72,7 +72,7 @@ integration between the parts did not keep up.**
 
 1. A *read* pass over the shipped surface, scored against the six
    principles + the three tests + FACES, with findings written to a single
-   **audit ledger** (`docs/plans-milestones/improve-audit.md`). The ledger
+   **audit ledger** (`docs/plans-milestones/done/improve/improve-audit.md`). The ledger
    is the *deliverable the community reads*.
 2. A *do* pass — units `U01..U09` — that close the highest-value findings,
    each with an exit criterion that *measures* the reduction.
@@ -158,12 +158,12 @@ next. **No unit re-opens an ADR.**
 ### `U00` — Baseline: audit ledger + improvement harness
 
 **Entry reads (3):** `docs/philosophy/README.md` · `docs/philosophy/in-code.md` ·
-`docs/plans-milestones/plan-m28-guardian-time-limits.md` (lane register
+`docs/plans-milestones/done/m28/plan-m28-guardian-time-limits.md` (lane register
 style, unit sizing, exit-criteria shape).
 
 **Do:**
 
-1. Author **`docs/plans-milestones/improve-audit.md`** — the **audit
+1. Author **`docs/plans-milestones/done/improve/improve-audit.md`** — the **audit
    ledger**. One `##` section per principle (1–6), one `###` per three-test
    (closed-loop / handoff / part-vs-whole), one `###` per FACES face.
    Under each: a bullet list of findings, each with **where** (file + line
@@ -174,7 +174,7 @@ style, unit sizing, exit-criteria shape).
    *reading* pass; it is the only unit that produces a doc rather than a
    code change.
 
-2. Author **`docs/plans-milestones/improve/improve-check.ps1`** — the
+2. Author **`docs/plans-milestones/done/improve/improve-check.ps1`** — the
    CI-able gate. Exits non-zero if *any* of:
    - (a) a `.cs` file in `src/` exceeds **2 000 lines** (current top-12 are
      the *baseline*; the gate is the *ceiling* — a new file crossing the
@@ -192,7 +192,7 @@ style, unit sizing, exit-criteria shape).
    The gate *allows* the current baseline (it does not force an immediate
    fix); it *prevents* the baseline from growing.
 
-3. Author **`docs/plans-milestones/improve/improve-report.ps1`** — the
+3. Author **`docs/plans-milestones/done/improve/improve-report.ps1`** — the
    human-facing summary: top 10 files by lines (red/amber/green against
    the ceiling), ADR drift count, doc-duplication count,
    handoff-without-TL;DR count, TS-over-800 count, view-over-800 count.
@@ -334,7 +334,7 @@ are still self-sufficient (the pointer file links to the source).
 
 ### `U07` - Abstracts for the largest design docs
 
-**Entry reads (3):** the 5 largest design docs from the Evidence table (`m13-logging-analytics-design.md` 1 693, `m3b-moderation.md` 1 130, `m18-recurring-events-design.md` 1 100, `m20-notification-quiet-times-design.md` 1 094, `m5-projects-design.md` 1 048) / `docs/plans-milestones/improve/improve-check.ps1` (extend the gate) / `docs/plans-milestones/README.md` (the TL;DR convention from U02 - extend it to design docs).
+**Entry reads (3):** the 5 largest design docs from the Evidence table (`m13-logging-analytics-design.md` 1 693, `m3b-moderation.md` 1 130, `m18-recurring-events-design.md` 1 100, `m20-notification-quiet-times-design.md` 1 094, `m5-projects-design.md` 1 048) / `docs/plans-milestones/done/improve/improve-check.ps1` (extend the gate) / `docs/plans-milestones/README.md` (the TL;DR convention from U02 - extend it to design docs).
 
 **Do:**
 - For each of the 5, add a **`> **Abstract:**`** block in the first 15 lines (5-10 lines, blockquote), answering: *what question does this design settle? what is the one contract it creates (the seam name)? what is explicitly out of scope?* This is the user's exact ask - "a short abstract with key points at the start, so you don't have to read the whole thing to decide if it contains what you need for your current task."

@@ -12,13 +12,13 @@ across all of them.
   Empty when the current milestone is between units or just closed.
 - **`done/`** — the register + handoff notes + unit plans for every
   shipped milestone / named lane, one folder per lane (the `M27` / `M28`
-  / `site` / `pl` / `m27-uNN.md` shapes are the three common layouts —
+  / `site` / `pl` / `improve` shapes are the common layouts —
   the M-lettered milestones use `done/mNN/`, the named lanes use
   `done/<lane-slug>/`).
-- **`improve/`** — the **`IMPROVE`** lane's register
+- **`done/improve/`** — the **`IMPROVE`** lane's register
   (`plan-improve.md`) + handoff notes + the audit harness
   (`improve-check.ps1`, `improve-report.ps1`) + the audit ledger
-  (`improve-audit.md`). See `improve/plan-improve.md` for the lane's
+  (`improve-audit.md`). See `done/improve/plan-improve.md` for the lane's
   Definition of Done (the inverse of a capability lane: the codebase is
   measurably *smaller* or *more integrated*, not *bigger*).
 

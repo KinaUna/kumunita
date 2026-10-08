@@ -37,7 +37,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 # --- locate repo root (walk up from the CWD, or fall back to the script's
-# --- own location, which lives under docs/plans-milestones/improve/) -------
+# --- own location, which lives under docs/plans-milestones/done/improve/) -----
 function Find-RepoRoot {
   $dir = (Get-Location).Path
   while ($dir -and $dir.Length -gt 0) {
@@ -46,7 +46,7 @@ function Find-RepoRoot {
     if (-not $parent -or $parent -eq $dir) { break }
     $dir = $parent
   }
-  # fallback: the script itself lives at docs/plans-milestones/improve/...
+  # fallback: the script itself lives at docs/plans-milestones/done/improve/...
   $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
   for ($i = 0; $i -lt 5 -and $scriptDir; $i++) {
     if (Test-Path (Join-Path $scriptDir 'Kumunita.slnx')) { return $scriptDir }
@@ -213,7 +213,7 @@ $dBaseline = @(
   'docs/plans-milestones/done/rich-editor/rich-editor-handoff-notes.md',
   'docs/plans-milestones/done/m13/m13-logging-analytics-handoff-notes.md',
   'docs/plans-milestones/done/m9/m9-messaging-handoff-notes.md',
-  'docs/plans-milestones/done/m27-handoff-notes.md',
+  'docs/plans-milestones/done/m27/m27-handoff-notes.md',
   'docs/plans-milestones/done/m15/m15-translation-bulk-handoff-notes.md',
   'docs/plans-milestones/done/pl/pl-handoff-notes.md',
   'docs/plans-milestones/done/m26/m26-handoff-notes.md',

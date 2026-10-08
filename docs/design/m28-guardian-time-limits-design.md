@@ -41,7 +41,7 @@
 > middleware + surface pins, the §2.6 20-test seam list, the §2.7 `kw-l` key list,
 > the §2.8 gate, and the §2.9 drift-guard are locked in **ADR 0151 (Accepted,
 > 2026-10-07)**. The `[PROPOSED]` set in the register
-> `docs/plans-milestones/plan-m28-guardian-time-limits.md` is the locked set
+> `docs/plans-milestones/done/m28/plan-m28-guardian-time-limits.md` is the locked set
 > this doc restates **verbatim** (the U00 handoff entry records the lock + the
 > one refinement in §1.a).
 >
