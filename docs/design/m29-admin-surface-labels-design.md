@@ -266,3 +266,414 @@ any of them:
 - **The `Milestones.cs` / README / `MilestonesTests` close-flip trio** — the
   order + single-in-progress pin stays intact until the milestone ships
   (U10 owns it).
+
+## Seams & contracts (Part 2, written by U02)
+
+The Part 1 invariants (M29·1–M29·10) and FACES (M29-1–M29-10) are the
+*what* this milestone pins; this section is the *how* — the exact `SurfaceLabels`
+field set, the read-seam contract, the write-lane contract, the pinned
+seam-test names, the acceptance gate, and the drift guard. Every unit in
+U03–U09 codes against these exact shapes; the pinned test names are the
+**primary source** for U09's test authoring.
+
+### 2.1 frozen base (unchanged)
+
+All of the following keep binding **unchanged**; this section re-anchors them
+for the contract readers and they are **not** re-shaped by Part 2:
+
+- **ADR 0005 B** — the `LocaleSettings` singleton shape (`Id = "singleton"`
+  sentinel, the additive-field convention, one row per instance). The
+  `SurfaceLabels` doc is a **new** singleton in the same shape, **not** a new
+  field on `LocaleSettings` (ADR 0006 module-boundary contract).
+- **ADR 0150** — the `SiteContent` singleton shape: the `SiteContentService`
+  best-effort read (`GetAsync` never throws / never null → the in-code
+  all-null fallback), the `SaveAsync` single audited write-lane (one session,
+  the doc + exactly one `AccessAudit` row commit together, no-op on missing
+  row — the SITE·6 "never load-or-creates" pin), and the
+  `AdminSiteController` `[Route("admin/site")]` `[Authorize(Roles =
+  GlobalAdmin)]` dedicated surface. The `SurfaceLabels` doc + service +
+  `AdminSurfaceLabelsController` mirror this shape exactly.
+- **ADR 0050** — the single-write-lane shape (`AdminSignupController`, the
+  `IsSignupOpen` best-effort read, the `SetSignupOpenAsync` audited write, the
+  `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST, the
+  `TempData["info"]` flash, the `RedirectToAction(nameof(Index))` redirect).
+- **ADR 0004 §B.1** — additive doc type (delta applied idempotently at boot,
+  no EF migration). The `SurfaceLabels` doc is a **new** Marten doc type,
+  registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the
+  `SiteContentDocTypes` parallel surface).
+- **ADR 0006** — module-boundary contract. The `SurfaceLabels` context is a
+  **new** bounded context (`Kumunita.Core.SurfaceLabels`), independent of
+  `SiteContent`, `LocaleSettings`, and the `Localization` context.
+- **ADR 0015 D1** — `kw-l` provider-floor discipline. The `kw-l` registry
+  entries stay (the `nav.*` / `inv.nav` / `bm.nav` / `documents.title` keys
+  are not removed, not re-shaped, not re-keyed).
+- **The SITE / M28 test model** — the `FirstBootSeeder` default pin, the
+  Web-layer pins, and the `KwLRegistryConsistencyTests` /
+  `KnownTranslationKeys_ParityTests` pins are untouched.
+- **The `Milestones.cs` / README / `MilestonesTests` close-flip trio** — the
+  order + single-in-progress pin stays intact until the milestone ships
+  (U10 owns it).
+
+### 2.2 the `SurfaceLabels` field set (exact)
+
+The `SurfaceLabels` doc (a **new** bounded context
+`Kumunita.Core.SurfaceLabels`, `Id = "singleton"` sentinel — the exact
+`SiteContent` / `LocaleSettings` shape, ADR 0005 B) carries **exactly 13
+optional `string?` label fields**, one per surface key, **all defaulting to
+`null`** (`null` = "use the `kw-l` fallback" — the "empty = use default"
+shape, M29·3 / M29·4). The field set is the **ceiling** (ADR 0152 D1): a
+future `LBL-2` lane **adds** fields (additive per ADR 0004 §B.1), it does not
+re-shape the existing 13.
+
+| # | Field (`public string?`) | Surface key | `kw-l` fallback key | Surface route | a11y note |
+|---|---|---|---|---|---|
+| 1 | `Home` | `home` | `nav.home` | `/` | label is text only — the nav icon stays as shipped; the SITE hero (`HomeHeroEyebrow` / `HomeHeroLead`) is **untouched** (M29·10) |
+| 2 | `Announcements` | `announcements` | `nav.announcements` | `/announcements` | label is text only — the nav icon stays as shipped |
+| 3 | `Community` | `community` | `nav.community` | `/community` | label is text only — the nav icon stays as shipped |
+| 4 | `Groups` | `groups` | `nav.groups` | `/groups` | label is text only — the nav icon stays as shipped |
+| 5 | `Events` | `events` | `nav.events` | `/events` | label is text only — the nav icon stays as shipped |
+| 6 | `Projects` | `projects` | `nav.projects` | `/projects/todos` | label is text only — the nav icon stays as shipped |
+| 7 | `Inventory` | `inventory` | `inv.nav` | `/inventory` | label is text only — the nav icon stays as shipped |
+| 8 | `Bookmarks` | `bookmarks` | `bm.nav` | `/bookmarks` | label is text only — the nav icon stays as shipped |
+| 9 | `Documents` | `documents` | `documents.title` | `/documents` | label is text only — the nav icon stays as shipped |
+| 10 | `Pages` | `pages` | `nav.pages` | `/pages` | label is text only — the nav icon stays as shipped |
+| 11 | `Tags` | `tags` | `nav.tags` | `/tags` | label is text only — the nav icon stays as shipped |
+| 12 | `Directory` | `directory` | `nav.directory` | `/directory` | label is text only — the nav icon stays as shipped |
+| 13 | `People` | `people` | `nav.people` | `/people` | label is text only — the nav icon stays as shipped |
+
+The `Id` is the sentinel `"singleton"` (the exact `SiteContent` /
+`LocaleSettings` shape, ADR 0005 B — one row per instance). The doc is
+registered in a new `SurfaceLabelsDocTypes.Configure(opts)` surface (the
+`SiteContentDocTypes` parallel surface, ADR 0004 §B.1): `opts.Schema.For
+<SurfaceLabels>()` — the delta is applied idempotently at boot. **No EF
+migration.** The `SiteContent` and `LocaleSettings` docs are **untouched**
+(this milestone adds a *new* doc in a *new* context, not a new field on an
+existing one — the ADR 0150 D6 / ADR 0006 module-boundary pin). A
+`GetLabel(string surfaceKey)` helper (case-insensitive) returns the field's
+value or `null` (the `surfaceKey` → field mapping above, e.g. `"home"` →
+`Home`, `"announcements"` → `Announcements`, …, `"people"` → `People`).
+
+### 2.3 the read-seam contract (exact C#)
+
+The read seam is the **single** helper the nav + header views call, so the
+nav and the header resolve to the **same** value (M29·1). The read is
+**world-readable**, **not** an access decision, **not** a claim (the ADR
+0001-B thin-token rule), and **never audited** (M29·2). A missing
+`SurfaceLabels` row (a fresh boot before the seeder ran, or a test
+construction with no store) degrades to the **all-null** `SurfaceLabels`
+→ every label falls back to its `kw-l` key (byte-identical to today) —
+never a blank nav, never an error (the ADR 0050 `IsSignupOpenAsync`
+best-effort shape, the SITE·1 read contract).
+
+```csharp
+// Kumunita.Core.SurfaceLabels.ISurfaceLabelsService (the read seam)
+public interface ISurfaceLabelsService
+{
+    /// <summary>
+    /// The shared label-resolver (M29·1 — the nav + header call **one**
+    /// helper so they resolve to the **same** value).
+    /// Returns the admin-set label **if present and non-blank**, else the
+    /// `kw-l` translation of <paramref name="fallbackKey"/> in
+    /// <paramref name="effectiveLanguage"/> (the "empty = use default"
+    /// shape, M29·3 / M29·4). Best-effort: a missing row / read failure
+    /// degrades to the `kw-l` fallback — never throws, never blank.
+    /// World-readable, never audited (M29·2, ADR 0001-B thin-token).
+    /// </summary>
+    Task<string> GetLabelAsync(string surfaceKey, string fallbackKey,
+                               string effectiveLanguage,
+                               CancellationToken ct = default);
+
+    /// <summary>
+    /// The ADR 0150 single audited write-lane (M29·5): loads the singleton,
+    /// applies the full 13-field set, and saves in one session (invariant
+    /// C3); exactly **one** `AccessAudit` row per save (`Via = Admin`,
+    /// action `surface_labels.save`, `TargetKind` "surface-labels" — the
+    /// `site.save` shape). Strong consistency: the new value is live on the
+    /// very next `GetLabelAsync` / render. The lane upserts the singleton —
+    /// it never creates a second row (M29·6).
+    /// </summary>
+    Task SaveAsync(SurfaceLabels labels, string actorBy,
+                   CancellationToken ct = default);
+}
+```
+
+`SurfaceLabelsService.GetLabelAsync` (the implementation):
+
+```csharp
+public async Task<string> GetLabelAsync(
+    string surfaceKey, string fallbackKey, string effectiveLanguage,
+    CancellationToken ct = default)
+{
+    // ADR 0050 IsSignupOpenAsync best-effort shape (M29·2, SITE·1): a
+    // missing row / read failure degrades to the all-null fallback —
+    // never throws, never blank. World-readable, never audited.
+    string? adminLabel = null;
+    try
+    {
+        using var session = _store.QuerySession();
+        var row = await session.LoadAsync<SurfaceLabels>(
+            SurfaceLabels.SingletonId, ct).ConfigureAwait(false);
+        adminLabel = row?.GetLabel(surfaceKey); // null when unset / blank
+    }
+    catch
+    {
+        adminLabel = null; // a read failure degrades to the kw-l fallback
+    }
+
+    if (!string.IsNullOrWhiteSpace(adminLabel))
+    {
+        return adminLabel; // the admin's literal string (all languages — M29·8)
+    }
+
+    // The kw-l floor (M29·3 / M29·4): the canonical en source text in the
+    // viewer's effective language. The registry entries stay (ADR 0152 D3).
+    return await Translation.GetAsync(fallbackKey, effectiveLanguage);
+}
+```
+
+The nav + header views (U05/U06/U07) call **one** helper (this resolver) so
+they resolve to the **same** value (M29·1). The `href` / `asp-route-*`
+attributes are **unchanged** (the "label, not re-route" pin — a rename never
+moves a link); the `aria-label`s are unchanged for the surfaces that are
+shown (M29·9).
+
+### 2.4 the write-lane contract (exact C#)
+
+The write is the **ADR 0150 single-write-lane shape** (M29·5). One
+`ISurfaceLabelsService.SaveAsync(labels, actorBy)` lane that loads the
+singleton, applies the full 13-field set, and saves in one session
+(invariant C3); exactly **one** `AccessAudit` row per save (`Via = Admin`,
+action `surface_labels.save`, `TargetKind` "surface-labels" — the
+`site.save` / `signup.set-open` / `timezone.set-default` singleton-toggle
+shape). The lane **upserts** the singleton (the `SiteContent` "one row per
+instance" shape, ADR 0150 D6) — it never creates a second row (M29·6).
+**Strong consistency** (invariant C4): the new value is live on the very
+next `GetLabelAsync` / render.
+
+```csharp
+// Kumunita.Core.SurfaceLabels.SurfaceLabelsService (the write lane)
+public async Task SaveAsync(SurfaceLabels labels, string actorBy,
+                            CancellationToken ct = default)
+{
+    // ADR 0150 single audited write-lane shape (M29·5): one write session,
+    // the doc + exactly one AccessAudit row commit together (invariant C3,
+    // strong consistency C4 — live on the very next GetLabelAsync / render).
+    // The lane upserts the singleton — it never creates a second row
+    // (M29·6); a missing row is a no-op (the seeder is the only writer
+    // that creates the row on a fresh boot).
+    await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+    var stored = await session.LoadAsync<SurfaceLabels>(
+        SurfaceLabels.SingletonId, ct).ConfigureAwait(false);
+
+    if (stored is null)
+    {
+        return; // a missing row is a no-op — the lane never load-or-creates (M29·6)
+    }
+
+    // The full 13-field set, verbatim from the caller's SurfaceLabels.
+    stored.Home        = labels.Home;
+    stored.Announcements = labels.Announcements;
+    stored.Community   = labels.Community;
+    stored.Groups      = labels.Groups;
+    stored.Events      = labels.Events;
+    stored.Projects    = labels.Projects;
+    stored.Inventory   = labels.Inventory;
+    stored.Bookmarks   = labels.Bookmarks;
+    stored.Documents   = labels.Documents;
+    stored.Pages       = labels.Pages;
+    stored.Tags        = labels.Tags;
+    stored.Directory   = labels.Directory;
+    stored.People      = labels.People;
+
+    session.Store(stored);
+
+    // Exactly one AccessAudit row (the site.save / signup.set-open /
+    // timezone.set-default singleton-toggle shape, M29·5) — the real
+    // AccessAudit doc shape (Id + EffectivePrincipalId + Outcome).
+    session.Store(new AccessAudit
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        At = DateTimeOffset.UtcNow,
+        ActorId = actorBy,
+        EffectivePrincipalId = actorBy,
+        Action = "surface_labels.save",
+        TargetKind = "surface-labels",
+        TargetId = SurfaceLabels.SingletonId,
+        Via = AccessVia.Admin,
+        Outcome = AccessOutcome.Allow
+    });
+
+    await session.SaveChangesAsync(ct).ConfigureAwait(false);
+}
+```
+
+The `AdminSurfaceLabelsController.Save` action (U08) is the **thin wrapper**
+(the `AdminSiteController.SaveHome` shape — the `GlobalAdmin`-gated
+`[ValidateAntiForgeryToken]` POST, the `TempData["info"]` flash, the
+`RedirectToAction(nameof(Index))` redirect). The controller is a **dedicated**
+controller (the `AdminController`'s constructor is pinned by two Web-layer
+test harnesses, so a new dependency there would break them; a separate
+`/admin/labels` surface mirrors `/admin/site` / `/admin/signup` /
+`/admin/timezone`): `[Route("admin/labels")]` + `[Authorize(Roles =
+Kumunita.Core.Identity.Roles.GlobalAdmin)]`. The GET seeds the form with the
+current singleton (the `ISurfaceLabelsService` best-effort read — a missing
+row degrades to the all-null fallback, so the form always renders); the POST
+saves the full 13-field set (one `AccessAudit` row). A blank field **clears**
+that surface's label (falls back to the `kw-l` key — M29·4).
+
+### 2.5 the pinned seam-test names (exact)
+
+The **primary source** for U09's test authoring. Twenty tests across four
+classes; the exact names are the drift-guard's test-name ceiling (no test
+whose exact name is not in this list may be introduced — unit-series rule 3).
+
+**`tests/Kumunita.Core.Tests/SurfaceLabelsServiceTests.cs`** — the 8 Core
+seam pins (the ADR 0150 single-write-lane shape + the read-seam contract):
+
+1. `GetAsync_MissingStore_ReturnsAllNullFallback` — a test construction with
+   no store degrades to the all-null fallback (M29·2, M29·6).
+2. `GetAsync_MissingRow_ReturnsAllNullFallback` — a store with no
+   `SurfaceLabels` row degrades to the all-null fallback (M29·2, M29·6).
+3. `SaveAsync_WritesOneAccessAuditRow` — one save writes exactly **one**
+   `AccessAudit` row (`Via = Admin`, action `surface_labels.save`,
+   `TargetKind` "surface-labels") (M29·5).
+4. `SaveAsync_StrongConsistency_LiveOnNextGetAsync` — the saved value is
+   live on the very next `GetLabelAsync` / `GetAsync` (invariant C4, M29·5).
+5. `SaveAsync_UpsertsSingleton_NoDuplicateRow` — a second save does not
+   create a second `Id = "singleton"` row (M29·6).
+6. `SaveAsync_BlankLabel_StoredBlank_FallsBackAtResolution` — a blank stored
+   label is stored blank and falls back to the `kw-l` key at resolution
+   (M29·3, M29·4).
+7. `GetLabelAsync_ReturnsOverrideWhenSet` — a non-blank admin label is
+   returned as the resolved label (all languages — M29·8) (M29·3).
+8. `GetLabelAsync_ReturnsNullWhenNotSet` — an unset label resolves to the
+   `kw-l` fallback (M29·3, M29·4).
+
+**`tests/Kumunita.Core.Tests/SurfaceLabelsSeederTests.cs`** — the 3 Core
+seeder pins (the `FirstBootSeeder` all-null default, the SITE / M28
+"seeded defaults match the shipped text" shape):
+
+9. `FreshBoot_HasExactlyOneSurfaceLabelsRow` — a fresh boot has exactly one
+   `SurfaceLabels` row (`Id = "singleton"`) (M29·6).
+10. `FreshBoot_AllLabelsNull` — all 13 label fields are `null` (M29·4, M29·6).
+11. `SecondBoot_IsIdempotent_NoDuplicateRow` — a second boot is idempotent
+    (no duplicate row, no field change) (M29·6).
+
+**`tests/Kumunita.Web.Tests/AdminSurfaceLabelsControllerTests.cs`** — the 4
+Web controller pins (the `/admin/labels` surface, the ADR 0150 shape):
+
+12. `GET_SeesCurrentSingleton` — the GET seeds the form with the current
+    singleton (all 13 fields) (M29·7).
+13. `POST_Save_SavesLabel_WritesOneAccessAuditRow` — the POST saves the
+    label set + writes exactly one `AccessAudit` row (M29·5, M29·7).
+14. `POST_NonGlobalAdmin_IsDenied` — a non-`GlobalAdmin` is denied the POST
+    (the `GlobalAdmin`-gated `[ValidateAntiForgeryToken]` POST) (M29·7).
+15. `GET_FreshInstance_AllLabelsBlank` — a fresh instance's GET shows all
+    13 labels blank (the all-null fallback) (M29·1, M29·4, M29·6).
+
+**`tests/Kumunita.Web.Tests/SurfaceLabelResolutionTests.cs`** — the 5 Web
+resolution pins (the nav + header consistency, the single-string override,
+the blank fallback):
+
+16. `FreshInstance_NavShowsKwLText` — a fresh instance's nav shows the
+    shipped `kw-l` text (M29·1, M29·2, M29·4).
+17. `SavedLabel_NavShowsOverride` — a saved label shows in the nav (M29·1,
+    M29·3).
+18. `SavedLabel_HeaderShowsOverride` — a saved label shows in the surface's
+    `<h1>` header (M29·1).
+19. `SavedLabel_SameLabelNavAndHeader` — the nav and the header resolve to
+    the **same** value (M29·1).
+20. `BlankLabel_FallsBackToKwL` — a blank / whitespace label falls back to
+    the `kw-l` key (M29·3, M29·4).
+
+### 2.6 the acceptance gate (exact)
+
+The acceptance gate (U09 runs + records it) is the **closed-loop** gate —
+all three must be green:
+
+1. `dotnet build Kumunita.slnx -c Debug` — **green** (the touched projects
+   `Kumunita.Core` + `Kumunita.Web` compile).
+2. `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+   — **green** (the `SurfaceLabelsServiceTests` 8 pins + the
+   `SurfaceLabelsSeederTests` 3 pins + the `SiteContentServiceTests` /
+   `KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`
+   registry-parity pins + the pre-existing Core suite all pass; the registry
+   entries are **untouched** — ADR 0152 D3, M29·4, M29·8).
+3. `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+   — **green** (the `AdminSurfaceLabelsControllerTests` 4 pins + the
+   `SurfaceLabelResolutionTests` 5 pins + the `AdminSiteControllerTests`
+   SITE-precedent pins + the `MilestonesTests` pin (the order +
+   single-in-progress pin is intact through U00–U09) + the `WhatsNewTests`
+   pin (the new `0.45.0` entry is present, newest-first — added by U10) +
+   the pre-existing Web suite all pass).
+
+The `KwLRegistryConsistencyTests` / `KnownTranslationKeys_ParityTests` pins
+stay **green** (the registry entries are untouched — the `nav.*` /
+`inv.nav` / `bm.nav` / `documents.title` keys remain the canonical `en`
+source text the fallback resolves to). The `SiteContentServiceTests` /
+`AdminSiteControllerTests` pins stay **green** (the SITE precedent shapes are
+unchanged — M29 adds a *new* doc in a *new* context, not a new field on
+`SiteContent` — ADR 0150 D6 / ADR 0006 module-boundary pin). The
+`MilestonesTests` pin stays **green** through U00–U09 (the order +
+single-in-progress pin is intact until the milestone *ships* — U10 owns the
+close flip). The `WhatsNewTests` pin is **green at U10** (the `0.45.0`
+entry is added by U10, newest-first — the required sixth member of the
+close flip, the M27 "shipped with no entry until caught in review" lesson,
+AGENTS.md, is held).
+
+> **Test-runner quirk (AGENTS.md).** Both test projects use **xunit.v3**
+> (`Microsoft.Testing.Platform`). On this machine the discovery path
+> reliably goes wrong (VS Test Explorer / `dotnet test` report "No tests
+> found to run" / `Zero tests ran / Exit code: 5` even though discovery found
+> them). The reliable path is the **in-process** `dotnet exec` of each test
+> assembly (the commands above) — this is what actually reports pass/fail
+> here. `Kumunita.Core.Tests` takes ~20 s (Testcontainers `postgres:18`)
+> and leaves Docker containers behind if killed — clean up with
+> `docker container prune`.
+
+### 2.7 the drift guard (exact)
+
+The drift guard is the **ceiling / floor / untouched / unchanged** pin set
+for M29. A unit that drifts from any of these is a `## U<m> — Drift pause`
+in the handoff note (unit-series rule 8), not a silent re-shape.
+
+- **The `SurfaceLabels` field set is the ceiling** (ADR 0152 D1, M29·6) — the
+  13 optional `string?` fields (Home / Announcements / Community / Groups /
+  Events / Projects / Inventory / Bookmarks / Documents / Pages / Tags /
+  Directory / People) are the **complete** admin surface for the current
+  scope. **No field outside the field set may appear in the doc**; a future
+  `LBL-2` lane **adds** fields (additive per ADR 0004 §B.1), it does not
+  re-shape the existing 13.
+- **The `kw-l` registry entries are the floor** (ADR 0152 D3, M29·4) — the
+  `nav.home` / `nav.announcements` / `nav.community` / `nav.groups` /
+  `nav.events` / `nav.projects` / `inv.nav` / `bm.nav` / `documents.title` /
+  `nav.pages` / `nav.tags` / `nav.directory` / `nav.people` keys in
+  `KnownTranslationKeys.cs` are **not** removed, not re-shaped, not re-keyed.
+  They remain the **fallback** the in-code default resolves to (the canonical
+  `en` source text). The registry parity tests
+  (`KnownTranslationKeys_ParityTests` / `KwLRegistryConsistencyTests`) are
+  **untouched**.
+- **The `SiteContent` + `LocaleSettings` docs are untouched** (ADR 0150 D6 /
+  ADR 0006 module-boundary pin, M29·6) — M29 adds a **new** doc in a **new**
+  bounded context (`Kumunita.Core.SurfaceLabels`), not a new field on an
+  existing one. The `SiteContent` and `LocaleSettings` field sets are
+  **unchanged**.
+- **The routes are unchanged** (the "label, not re-route" pin, M29·9) — the
+  13 existing nav routes (`/`, `/announcements`, `/community`, `/groups`,
+  `/events`, `/projects/todos`, `/inventory`, `/bookmarks`, `/documents`,
+  `/pages`, `/tags`, `/directory`, `/people`) are **unchanged**; a rename
+  never moves a link, never changes a route, never touches an
+  `asp-route-*` / `href`. Only the **text** the nav item and the surface's
+  `<h1>` show changes.
+- **The `Milestones.cs` / README / `MilestonesTests` trio is untouched
+  until the milestone *ships*** (M29·10) — the order + single-in-progress
+  pin stays intact through U00–U09; U10 owns the close flip (the
+  six-member close flip including the `WhatsNew.cs` `0.45.0` entry).
+- **The SITE hero is untouched** (M29·10) — the Home surface's hero text
+  (the `HomeHeroEyebrow` / `HomeHeroLead` fields, ADR 0150) is **already**
+  admin-editable via the SITE lane; M29 drives the **Home nav label only**
+  (the `nav.home` key), it does **not** touch the SITE hero.
+- **The test names are the ceiling** (unit-series rule 3) — no test whose
+  exact name is not in §2.5 may be introduced; the 20 pinned names above are
+  the complete set for M29.

@@ -160,3 +160,4 @@ Decision / Consequences. New decisions take the next number.
 | 0149 | Home intro sections: a per-resident "hide and show me the feed" preference | Accepted |
 | 0150 | Site content customization: the landing surfaces' hero text is admin-editable + the sections are show/hide | Accepted |
 | 0151 | Guardian time limits: a per-child allow/block schedule that gates the child's platform access (guardian-set; mirrors ADR 0121's evaluator; the GU-lane inverse of the M20 quiet lane) | Accepted |
+| 0152 | Admin surface labels: a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice (a `SurfaceLabels` singleton on the SITE lane's shape — a per-item label, not a re-route; additive on 0150 + 0004 §B.1 + 0005 B + 0006) | Accepted |
