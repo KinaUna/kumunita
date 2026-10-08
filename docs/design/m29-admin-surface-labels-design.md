@@ -677,3 +677,93 @@ in the handoff note (unit-series rule 8), not a silent re-shape.
 - **The test names are the ceiling** (unit-series rule 3) — no test whose
   exact name is not in §2.5 may be introduced; the 20 pinned names above are
   the complete set for M29.
+
+### Run result (M29 acceptance gate — 2026-10-08)
+
+**The three-test gate (closed-loop / handoff / part-vs-whole):**
+
+- **closed-loop — PASS.** The gate ran end-to-end through the in-process
+  xunit.v3 runner (the AGENTS.md reliable path — not `dotnet test` / VS Test
+  Explorer). Real exit codes + test counts were captured:
+  - `dotnet build Kumunita.slnx -c Debug` → **green** (`Build succeeded.
+    53 Warning(s) 0 Error(s)`; all 53 warnings pre-existing in unrelated
+    Core/Web/view/test files, none in the 4 U09-touched files).
+  - `dotnet exec Kumunita.Core.Tests.dll` → **green** (`Total: 1384,
+    Errors: 0, Failed: 0, EXITCODE=0`, ~195 s / Testcontainers `postgres:18`).
+  - `dotnet exec Kumunita.Web.Tests.dll` → **my 9 M29 tests green** (confirmed
+    in isolation: `Total: 9, Errors: 0, Failed: 0`, ~8.6 s); the *full* Web
+    suite is `Total: 961, Errors: 0, Failed: 4` — see the part-vs-whole note.
+- **handoff — PASS.** This Run result section + the `## U09 — tests + gate`
+  scratch-tier section in `m29-handoff-notes.md` are appended (the three-tier
+  contract is complete through U09).
+- **part-vs-whole — PARTIAL (recorded, not silent).** The *part* (M29's 20
+  seam tests) is green; the *whole* (full Web suite) is **red on 4
+  pre-existing failures that are not M29's tests** — carried forward to U10
+  (see below). The Core suite (the whole of the Core side) is green.
+
+**The 20-test count (all PASS):**
+
+- `SurfaceLabelsServiceTests` (Core, 8): `GetAsync_MissingStore_ReturnsAllNullFallback`
+  / `GetAsync_MissingRow_ReturnsAllNullFallback` / `SaveAsync_WritesOneAccessAuditRow`
+  / `SaveAsync_StrongConsistency_LiveOnNextGetAsync` /
+  `SaveAsync_UpsertsSingleton_NoDuplicateRow` /
+  `SaveAsync_BlankLabel_StoredBlank_FallsBackAtResolution` /
+  `GetLabelAsync_ReturnsOverrideWhenSet` / `GetLabelAsync_ReturnsNullWhenNotSet`.
+- `SurfaceLabelsSeederTests` (Core, 3, U04's): `FreshBoot_HasExactlyOneSurfaceLabelsRow`
+  / `FreshBoot_AllLabelsNull` / `SecondBoot_IsIdempotent_NoDuplicateRow`.
+- `AdminSurfaceLabelsControllerTests` (Web, 4): `GET_SeesCurrentSingleton` /
+  `POST_Save_SavesLabel_WritesOneAccessAuditRow` / `POST_NonGlobalAdmin_IsDenied` /
+  `GET_FreshInstance_AllLabelsBlank`.
+- `SurfaceLabelResolutionTests` (Web, 5): `FreshInstance_NavShowsKwLText` /
+  `SavedLabel_NavShowsOverride` / `SavedLabel_HeaderShowsOverride` /
+  `SavedLabel_SameLabelNavAndHeader` / `BlankLabel_FallsBackToKwL`.
+
+**The pin status (registry-parity / SITE-precedent / `MilestonesTests` / `WhatsNewTests`):**
+
+- **registry parity — GREEN.** `KnownTranslationKeys_ParityTests` +
+  `KwLRegistryConsistencyTests` pass (not in the 4-failure set) — the
+  `nav.*` / `inv.nav` / `bm.nav` / `documents.title` registry entries are
+  **untouched** (ADR 0152 D3, M29·4).
+- **SITE precedent — GREEN.** `SiteContentServiceTests` +
+  `SiteContentSeederTests` (Core, green in the 1384) + `AdminSiteControllerTests`
+  (Web, not in the 4-failure set) pass — the SITE shapes are unchanged
+  (ADR 0150 D6 / ADR 0006 — M29 adds a *new* doc in a *new* context).
+- **`MilestonesTests` — GREEN** (not in the 4-failure set) — the order +
+  single-in-progress pin is intact through U00–U09 (U10 owns the close flip).
+- **`WhatsNewTests` — PENDING U10** — the `0.45.0` entry (the required sixth
+  close-flip member, newest-first) is not yet added; U10 owns it. The
+  M27 "shipped with no entry until caught in review" lesson (AGENTS.md) is held
+  by pinning it to U10.
+
+**The 4 full-Web-suite failures (all pre-existing, NOT M29's tests — carried
+forward to U10, recorded here per the handoff / part-vs-whole gate):**
+
+1. `InventoryControllerTests.Nav_Entry_Present_In_Both_Layout_Variants_And_Registry`
+   — asserts the literal `key="inv.nav"` `<kw-l>` markup in
+   `_Layout.cshtml`; **U05 replaced the 13 nav items' `<kw-l key="…">` text
+   with the resolver** (`@_nav*` locals), so the literal `key="…"` attribute no
+   longer appears. The registry key, the `/inventory` link, and the 2-variant
+   presence are all still present — only the *markup assertion* is stale.
+2. `NavMoreFoldTests.Layout_Carries_Fold_Hooks_And_Loads_Module` — asserts
+   `key="nav.groups"` (same U05 resolver change; the `data-nav-fold` /
+   `data-nav-more` hooks, the module load, and the `/projects/todos` + `/inventory`
+   links all still hold).
+3. `M23FindPeopleTests.Layout_Carries_APeopleNavEntry_InBothVariants` — asserts
+   `key="nav.people"` (same U05 resolver change; the two `FindPeople/Index`
+   nav links still hold).
+4. `ImproveHarnessTests.ImproveCheck_Gate_Passes` — the IMPROVE lane's growth
+   gate: 2 files grew past their U00 baseline (`FirstBootSeeder.cs` from U04's
+   `SeedSurfaceLabelsAsync`; `KnownTranslationKeys.cs` from U08's `labels.*`
+   keys — both legitimate M29 additions) + the design doc is >400 lines without
+   an `Abstract` in the first 15 lines.
+
+> **Carry-forward for U10 (or a follow-up lane):** U05's register-authorized
+> resolver change (the nav `<kw-l key="…">` → resolver text, the `kw-l` registry
+> keys staying) **regressed 3 pre-existing nav-structural tests** that assert
+> the old literal `key="…"` markup. U05's exit was "build green" (no Web-suite
+> run), so this surfaced at U09's gate. These 3 tests + the improve-check
+> baseline need reconciling (re-pin to the resolver shape, or the structural
+> invariants the tests actually care about) before the milestone ships. U09's
+> scope (rule 1 — no file outside its own Deliverables) is the 20 seam tests +
+> this record, so it does **not** fix them; U10 owns the close flip and the
+> honest "green/red" state.
