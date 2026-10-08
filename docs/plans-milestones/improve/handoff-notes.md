@@ -961,3 +961,123 @@ not the source, are the evidence:
   cost U06 added (a partial a rename / model change must keep in sync with
   its parent's view-model, per the plan's FACES "consumes *F*lexible").
   A future board-card or reply lane edits the *partial*, not the parent.
+
+## U07 — Abstracts for the largest design docs (2026-10-08)
+
+**Status: done.** 5 design docs + 2 support files. No code touched; the
+design docs' **bodies are unchanged** (pure top-of-file addition, like U02).
+
+### What was done
+
+1. **Added a `> **Abstract:**` blockquote to the 5 largest** design docs,
+   each inserted directly under the H1 (before the existing opening
+   blockquote, so the original top-of-file text is unchanged). Each block
+   answers the plan's three questions in the doc's own vocabulary: *what
+   question does this design settle?* · *what is the one contract it
+   creates (the seam name)?* · *what is explicitly out of scope?* The 5
+   docs (in `docs/design/`):
+
+   | Doc | Lines | Contract named in the Abstract |
+   |---|---:|---|
+   | `m13-logging-analytics-design.md` | 1 693 | "the feedback is local and the row is minimal" (C-M13·1/2); ADR 0114 |
+   | `m3b-moderation.md` | 1 130 | the four `ModerationService` signatures + `PostStatus` enum + C-M3b·1..4 (FACES pinned 6) |
+   | `m18-recurring-events-design.md` | 1 100 | "the read seam is concrete-only" (C-M18·1); ADR 0119 |
+   | `m20-notification-quiet-times-design.md` | 1 094 | "M20 defers the email, never the inbox row" (C-M20·1) + pure-function verdict (D3); ADR 0121 |
+   | `m5-projects-design.md` | 1 048 | "a to-do is the work item; a placement is where it sits on a board"; ADR 0067 |
+
+   Each Abstract names the **one seam** a future lane will build on (the
+   invariant / contract line), the **out-of-scope** set (the "zero new
+   `AccessAction` / `AccessVia` / adapter / `Decide()` branch" shape for
+   M18 / M20, the "events / projects / notifications … is **not** M3b" line
+   for m3b, the "no per-account data / no third-party telemetry" line for
+   m13, the "U01 owns Part 2" line for m5), and the **LOCKED ADR** — the
+   10-second "is this the right read" gate at the design tier.
+
+2. **Extended `improve-check.ps1` with a new gate (g)** (the 7th gate, after
+   (f)). Gate (g): any `docs/design/*.md` over **400 lines** without an
+   `Abstract` in its first 15 lines *fails the close*, grandfathered by
+   *name* (the same by-name pattern as gate (d) / U02's 23-note baseline).
+   The 5 above are the baseline U07 closed (they now pass and are **not** in
+   the grandfather list); the **38** remaining over-400-without-Abstract
+   docs are grandfathered by name. A *new* design doc over 400 without an
+   Abstract fails the close; when any future unit adds an Abstract to a
+   baseline doc, it drops out of the violation set naturally (it stops
+   violating). Also updated the header comment (the "six gates" list →
+   "gates a–f … g added by U07" + a (g) bullet).
+
+3. **Extended the `## TL;DR convention` section in
+   `docs/plans-milestones/README.md`** (U02's convention) to name the
+   design-doc Abstract as the same convention at the design tier: *TL;DR
+   for handoff notes, Abstract for design docs — both are the 10-second
+   "is this the right read" gate, applied at their tier.* Replaced U02's
+   forward-reference ("extends to the design-doc tier at U07") with a
+   present-tense statement that names **gate (g)** and the 5-vs-38 baseline
+   split.
+
+### What was found
+
+- **The design-docs-over-400-without-Abstract count at U00 was 43** (per the
+  U00 baseline table: "43 over 400, no Abstract — U07 closes top 5"). U07
+  closed the **5 largest** (per the plan's Evidence table: m13 1 693, m3b
+  1 130, m18 1 100, m20 1 094, m5 1 048), leaving **38** in the
+  "record and accept" backlog (the same backlog pattern U02 used for the
+  15 remaining handoff notes — `improve-audit.md`). The 38 are the U00-time
+  set of 43 minus the 5 U07 closed; the gate (g) grandfather list is that
+  38 by name.
+- **The U00 Evidence table's "5 largest" matched the current measured
+  top-5** (unlike U02, where `pages` had grown past `m13-logging` since
+  U00 — here the design docs' relative sizes did not change, so the
+  plan's named 5 = the measured 5). No measurement disagreement to
+  reconcile.
+- **The 5 design docs each already opened with a `> **Milestone …**`
+  blockquote** that *does* answer the three questions (settle / contract /
+  out-of-scope) — the Abstract I added **distills** that opening blockquote
+  (it does not contradict it) into a single 10-second gate line that names
+  the one contract and the one out-of-scope boundary explicitly. The
+  original blockquote is preserved below the Abstract (body untouched).
+
+### Build + test + gate verification (all green, 2026-10-08)
+
+- **`dotnet build Kumunita.slnx -c Debug`** — Build succeeded, **0 Warning(s),
+  0 Error(s)** (a no-op — U07 touched no C#).
+- **`improve-check.ps1`** — **exit 0**, all **seven** gates pass:
+  - gate (g): design docs over 400 without Abstract, new beyond U07
+    baseline = **0** (the 5 largest now pass; the 38 grandfathered).
+  - gates (a)–(f): unchanged / pass (U01/U03/U02/U06 baselines hold).
+- **`git diff --stat`** — 7 files changed, **162 insertions(+), 6
+  deletions(-)**: 5 design docs (13–15 added lines each, **0 deleted**) +
+  `improve-check.ps1` (79 added) + `plans-milestones/README.md` (19 added /
+  6 removed). The 6 deletions are all in the 2 support files (the
+  forward-reference rewrite in `README.md` + the "six gates" header update
+  in `improve-check.ps1`); **the 5 design docs have zero deleted lines**
+  (verified: `git diff` deletion-line count across the 5 = 0).
+- **`ImproveHarnessTests.ImproveCheck_Gate_Passes`** (the CI gate) — shells
+  out to `improve-check.ps1` and asserts exit 0; it continues to pass
+  (the gate allows the baseline and now *more* — the 5 largest design docs
+  are now compliant). No test was changed.
+
+### What U08 must know
+
+- U08's scope (the security & privacy seam audit — the user's explicit
+  question: `AccessAction` × `AccessVia` denied-path tests + audit rows,
+  the guardian boundary, the translation-swap surface, the portability
+  lane) is **docs + a read pass over the authorization surface**, and
+  touches **no** design doc U07 abstracted — **overlap is nil**.
+- **U08 should NOT touch** the 5 design docs U07 added Abstracts to
+  (`m13` / `m3b` / `m18` / `m20` / `m5`) or the 2 support files U07
+  changed (`improve-check.ps1` gate (g), `plans-milestones/README.md`).
+  U08's ledger entries (the `## Security & privacy` section of
+  `improve-audit.md`) may *reference* a design doc's Abstract as the
+  "10-second is-this-the-right-read" entry point, but that is a read, not
+  an edit.
+- **The 38-doc design-abstract backlog is a "record and accept" item** (the
+  U00 baseline, grandfathered by name in gate (g)). If U08 (or any future
+  unit) wants to add an Abstract to one of the 38, it can — the gate (g)
+  will pass either way (the 38 are grandfathered, and adding an Abstract
+  to one drops it out of the violation set). It is **not** a U08
+  in-lane fix; the gate (g) is the ceiling, not a floor.
+- **The gate (g) grandfather list is the *current* over-400-without-Abstract
+  set by name** (38 files). If U08 runs `improve-check.ps1` and gate (g)
+  reports a *new* violation, that is a design doc over 400 lines that
+  crossed the ceiling *after* U07 — a real finding (record it in the
+  ledger, severity L — discoverability at risk), not a gate bug.

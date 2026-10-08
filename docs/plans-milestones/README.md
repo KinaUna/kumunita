@@ -54,8 +54,17 @@ note used to be *the entire file*; the TL;DR is the "read the abstract,
 decide if this is the right lane, then read the rest" path (the
 "public surface is permanent integration cost" principle from
 `docs/philosophy/in-code.md`, applied to the doc layer). The same
-convention extends to the **design-doc** tier at U07 (the
-`> **Abstract:**` blockquote in the first 15 lines of any
-`docs/design/*.md` over 400 lines — see `improve/plan-improve.md`
-§U07) — both are the 10-second "is this the right read" gate, applied
-at their tier.
+convention applies to the **design-doc** tier too, closed by U07 of the
+IMPROVE lane: any `docs/design/*.md` over **400 lines** carries a
+`> **Abstract:**` blockquote in its first 15 lines answering three
+questions in the doc's own vocabulary — *what question does this design
+settle?* · *what is the one contract it creates (the seam name)?* ·
+*what is explicitly out of scope?* The `improve-check.ps1` **gate (g)**
+enforces this: any `docs/design/*.md` over 400 lines without an Abstract
+in its first 15 lines *fails the close* (the 38-doc U00-time baseline is
+grandfathered by name; the gate fails on any *new* design doc over 400
+without an Abstract). U07 added Abstracts to the 5 largest of that
+baseline (`m13` · `m3b` · `m18` · `m20` · `m5`); the remaining 38 are the
+"record and accept" backlog (see `improve-audit.md`). **TL;DR for
+handoff notes, Abstract for design docs — both are the 10-second "is this
+the right read" gate**, applied at their tier.

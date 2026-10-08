@@ -1,5 +1,19 @@
 # M20 — Notification quiet times (design doc)
 
+> **Abstract:** *What it settles:* **per-resident quiet schedules** (allowed /
+> blocked hours of day + days of week) on the frozen M6 notification lane,
+> plus an admin-set check cadence — a **time dimension on the email half only**,
+> evaluated in the resident's **own time zone** (ADR 0019). *The one contract:*
+> **M20 defers the email, never the inbox row** (C-M20·1) and the quiet verdict
+> is a **pure function** of (schedule, instant, effective zone), not an
+> authorization decision (D3); the only schema change is one additive `bool`
+> on `Notification` (`EmailDeferred`) + one additive `int` on `LocaleSettings`
+> (`QuietCheckMinutes`) + one new `NotificationQuietSchedule` document (D2).
+> *Out of scope:* zero new bounded context / `AccessAction` / `AccessVia` /
+> adapter / `Decide()` branch, no relational quiet table; the frozen
+> `NotificationService` writer, the frozen `IMailerStage` stager, and the frozen
+> ADR 0019 zone resolution are byte-identical (C-M20·1/5). LOCKED in ADR 0121.
+
 > **Milestone M20 — Notification quiet times.** The README M20 line, verbatim:
 > "**per-resident quiet schedules (allowed/blocked hours of day and days of
 > week) on the M6 notification lane; admin-set check cadence for pending

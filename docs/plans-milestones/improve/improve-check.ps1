@@ -11,7 +11,7 @@
 # whole thing is driven non-interactively by the command above — which is
 # exactly the shape AGENTS.md prescribes for multi-line PowerShell.
 #
-# The six gates (from the U00 "Do" section of plan-improve.md):
+# The gates (a–f from the U00 "Do" section of plan-improve.md; g added by U07):
 #   (a) .cs in src/ over 2 000 lines
 #   (b) docs/adr/README.md index rows != docs/adr/0*.md file count
 #   (c) AGENTS.md and .github/copilot-instructions.md share a "## " heading
@@ -20,6 +20,10 @@
 #       lines without a "TL;DR" in the first 20 lines
 #   (e) first-party .ts under src/Kumunita.Web/client/ over 800 lines
 #   (f) any .cshtml view over 800 lines
+#   (g) any docs/design/*.md over 400 lines without an "Abstract" in its first
+#       15 lines (added by U07, 2026-10-08 — the design-doc tier of the
+#       10-second "is this the right read" gate; the handoff-note TL;DR of
+#       gate (d) is the same convention at the handoff tier)
 #
 # Baseline grandfathering (the plan's own words: "the gate allows the
 # current baseline (it does not force an immediate fix); it prevents the
@@ -287,6 +291,79 @@ foreach ($v in $fViolations) {
 }
 Check "f" "views .cshtml over 800 lines (new or grown past its U00 baseline): $($fNew.Count)" ($fNew.Count -eq 0)
 foreach ($v in $fNew) { Write-Host "       - $v" }
+
+# =============================================================================
+# Gate (g) — design docs over 400 lines without an Abstract (U07, added 2026-10-08)
+# =============================================================================
+# Plan-improve.md §U07: any docs/design/*.md over 400 lines must carry a
+# "> **Abstract:**" blockquote in its first 15 lines — the 10-second "is this
+# the right read" gate at the design tier (the handoff-note TL;DR, gate (d),
+# at a different tier). The 5 largest (m13 / m3b / m18 / m20 / m5) are the
+# baseline U07 closed; the 38 remaining over-400-without-Abstract docs are
+# grandfathered by *name* (same pattern as gate (d) — U02's 23-note baseline).
+# When any future unit adds an Abstract to one, it drops out of the baseline
+# naturally (it stops violating). A *new* design doc over 400 without an
+# Abstract fails the close.
+$gCeiling = 400
+$gDir = Join-Path $repo 'docs/design'
+$gViolations = [System.Collections.Generic.List[string]]::new()
+if (Test-Path $gDir) {
+  $gFiles = Get-ChildItem -Path $gDir -Recurse -Filter '*.md' -File
+  foreach ($f in $gFiles) {
+    $n = Lines $f.FullName
+    if ($n -le $gCeiling) { continue }
+    $first15 = Get-Content -LiteralPath $f.FullName -TotalCount 15
+    $hasAbstract = @($first15 | Select-String -Pattern 'Abstract').Count -gt 0
+    if (-not $hasAbstract) { $gViolations.Add((Rel $f.FullName) + " (" + $n + " lines, no Abstract in first 15 lines)") }
+  }
+}
+# Baseline (U07 time, 2026-10-08): the 38 over-400 design docs without an
+# Abstract (the U00-time set of 43, minus the 5 largest U07 closed: m13, m3b,
+# m18, m20, m5 — those now pass and are not listed here).
+$gBaseline = @(
+  'docs/design/events-calendar-design.md',
+  'docs/design/events-calendar-dwm-design.md',
+  'docs/design/file-attachments-design.md',
+  'docs/design/group-posts-design.md',
+  'docs/design/guardian-assignment-design.md',
+  'docs/design/guardian-controls-design.md',
+  'docs/design/m10-pwa-responsive-design.md',
+  'docs/design/m11-portability-design.md',
+  'docs/design/m12-ical-design.md',
+  'docs/design/m14-events-projects-design.md',
+  'docs/design/m15-translation-bulk-design.md',
+  'docs/design/m16-inventory-design.md',
+  'docs/design/m17-bookmarks-design.md',
+  'docs/design/m19-guest-accounts-design.md',
+  'docs/design/m2-directory-profiles-groups.md',
+  'docs/design/m21-document-management-design.md',
+  'docs/design/m22-onboarding-design.md',
+  'docs/design/m23-extended-profiles-design.md',
+  'docs/design/m24-storage-metrics-design.md',
+  'docs/design/m25-upload-limits-design.md',
+  'docs/design/m26-sorting-design.md',
+  'docs/design/m27-user-scoped-portability-design.md',
+  'docs/design/m28-guardian-time-limits-design.md',
+  'docs/design/m3-posts-design.md',
+  'docs/design/m4-events-design.md',
+  'docs/design/m6-notifications-design.md',
+  'docs/design/m7-pagination-filtering-design.md',
+  'docs/design/m8-search-design.md',
+  'docs/design/m9-messaging-design.md',
+  'docs/design/media-file-storage-design.md',
+  'docs/design/multilingual-design.md',
+  'docs/design/pages-design.md',
+  'docs/design/pl-goals-projects-design.md',
+  'docs/design/rich-content-design.md',
+  'docs/design/site-content-design.md',
+  'docs/design/tags-design.md',
+  'docs/design/tbd-todo-dependency-design.md',
+  'docs/design/wysiwyg-editor-design.md'
+)
+# violation strings are "path (N lines, ...)" — compare on the path prefix
+$gNew = @($gViolations | Where-Object { $p = ($_ -split ' \(')[0]; $gBaseline -notcontains $p })
+Check "g" "design docs >400 lines without Abstract (new beyond U07 baseline): $($gNew.Count)" ($gNew.Count -eq 0)
+foreach ($v in $gNew) { Write-Host "       - $v" }
 
 # =============================================================================
 # Summary
