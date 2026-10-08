@@ -161,3 +161,85 @@
   walk-through. No route re-shape, no singleton re-shape, no ADR-number change
   is required by this note. **U01 reads only this `## U00` section + its own
   entry-reads list.**
+
+## U01 — design doc Part 1
+
+- **Design doc Part 1 authored** at
+  `docs/design/m30-admin-onboarding-design.md` (~330 lines): the value chain,
+  the context (the seven step cards **named by route**, in the README /
+  `Milestones.cs` order — resolving U00's location/framing note by naming each
+  step by route, not by list-group-row location), the scope (In / Out, incl.
+  the M22 D8·1 / D8·2 / D8·4 deferrals + the `Milestones.cs` / README /
+  `MilestonesTests` trio until ship), the **8 invariants** (M30·1–M30·8), the
+  **8 FACES** (M30-1–M30-8), and the frozen-base assumptions (ADR 0132 M22 ·
+  ADR 0150 SITE · ADR 0005 B · ADR 0050 · ADR 0004 §B.1 · ADR 0006 · ADR 0015
+  D1). U02 can now pin by id.
+- **The 8 invariants (by id):**
+  - **M30·1** — the walk-through is a *guided shell*, not a new data surface
+    (rides the six shipped `GlobalAdmin`-gated lanes; adds **no new write
+    lane** for any of the seven settings; the only write is the completion
+    stamp).
+  - **M30·2** — the completion state is one **singleton** doc, `null` =
+    not-yet-guided (`AdminOnboarding.CompletedAt: DateTimeOffset?`,
+    `Id = "singleton"` sentinel, the `SiteContent` / `LocaleSettings` shape,
+    ADR 0005 B / ADR 0150; registered in a new `AdminOnboardingDocTypes`
+    surface, ADR 0004 §B.1; no EF migration; `SiteContent` +
+    `LocaleSettings` docs untouched, ADR 0006).
+  - **M30·3** — the read is a **public admin surface** (`GlobalAdmin`-gated
+    by the standard `[Authorize(Roles = GlobalAdmin)]`, not a new
+    authorization surface — the thin-token rule ADR 0001-B; never audited; a
+    missing row degrades to `CompletedAt = null`).
+  - **M30·4** — the write is the **ADR 0150 single-write-lane shape** (one
+    `CompleteAsync` lane, one session, exactly one `AccessAudit` row —
+    `Via = Admin`, action `admin_onboarding.complete`, `TargetKind`
+    "admin-onboarding"; upserts the singleton; strong consistency).
+  - **M30·5** — the banner is the **affordance, non-blocking** (a dismissible
+    admin banner rendered on the admin surfaces **only while `CompletedAt` is
+    `null`** AND the actor is a `GlobalAdmin`; links to `/admin/onboarding`;
+    sign-in never gated; always dismissible via a `sessionStorage` flag —
+    never a write to `CompletedAt`; the route always reachable).
+  - **M30·6** — the closed **`adminonboarding.*` `kw-l` set is parity-pinned
+    in four languages** (en/de/fr/da; pinned by
+    `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`).
+  - **M30·7** — the walk-through **links into the seven roadmap settings**
+    (community name, languages, moderation, notifications, storage limits,
+    site content, issue escalation — each linking into the existing admin
+    surface by route; links-only: no inline control, no per-step POST, no
+    persisted step cursor, no completion gate).
+  - **M30·8** — the `Milestones.cs` / README / `MilestonesTests` trio is
+    **untouched until the milestone ships** (U07 owns the close flip); the
+    `WhatsNew.cs` registry gains one new entry (newest-first, the `0.46.0`
+    row) naming M30 + ADR 0153.
+- **The 8 FACES (by id, each bound to its invariant(s)):**
+  - **M30-1** — a fresh `GlobalAdmin` sees the banner on every `/admin/*`
+    page (banner renders iff `CompletedAt` is `null` AND the actor is a
+    `GlobalAdmin`) (M30·5).
+  - **M30-2** — the `/admin/onboarding` page walks the seven settings in the
+    README / `Milestones.cs` order, each step linking into the existing admin
+    surface that owns it (M30·1, M30·7).
+  - **M30-3** — the "mark as complete" button stamps `CompletedAt = now` +
+    writes exactly one `AccessAudit` row (`Via = Admin`, action
+    `admin_onboarding.complete`, `TargetKind` "admin-onboarding") (M30·4).
+  - **M30-4** — the banner clears on the next read after `CompletedAt` is
+    stamped (strong consistency) (M30·4, M30·5).
+  - **M30-5** — a non-`GlobalAdmin` never sees the banner (even if
+    `CompletedAt` is `null`) (M30·3, M30·5).
+  - **M30-6** — the walk-through's *only* write is `CompleteAsync` (no
+    per-step POST, no persisted step cursor, no server-session step state)
+    (M30·1, M30·7).
+  - **M30-7** — the closed `adminonboarding.*` `kw-l` key set is
+    parity-pinned in four languages (every key present, non-empty, in
+    en/de/fr/da) (M30·6).
+  - **M30-8** — the `AdminOnboarding` doc is a singleton (one row per
+    instance, `Id = "singleton"` sentinel); the `SiteContent` +
+    `LocaleSettings` docs are untouched (M30·2).
+- **Drift check:** all Entry reads (the register's "one thing" section,
+  U00's `## U00` section, the M22 design doc's FACES/invariant template, the
+  SITE design doc's singleton + read-seam + write-lane shape, the design-doc
+  template, `Platform.cshtml` + the M22 `Onboarding/Index.cshtml`) are
+  consistent with the register. U00's location/framing note (only three of the
+  seven routes are `/admin/platform` list-group rows; the rest are `/admin`
+  dashboard-hub cards; the seventh is the M32 placeholder) is **resolved by
+  naming each step by route** in the design doc's step table — consistent with
+  M30·7 (route-agnostic), not a blocker. The invariants and FACES text is
+  restated verbatim from the register's "one thing" section; none invented.
