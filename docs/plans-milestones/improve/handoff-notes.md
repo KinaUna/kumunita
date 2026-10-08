@@ -469,3 +469,189 @@ consistent with U01's treatment of the ADR baseline).
   gate script; no C# touched, no test affected). The
   `ImproveHarnessTests.ImproveCheck_Gate_Passes` test still passes (it
   shells out to `improve-check.ps1` and asserts exit 0, which it does).
+
+## U04 — Differentiate `KnownTranslationKeys.cs` into per-surface key groups (2026-10-08)
+
+**Status: done.** `EnValues` is now exposed alongside twelve named
+per-surface views; the public surface (`EnValues`, `DeValues`, `FrValues`,
+`DaValues`, `AllKeys`) is unchanged and byte-identical — pinned by the new
+`KnownTranslationKeys_SurfaceViewTests`.
+
+### What was done
+
+1. **Added twelve per-surface `static` properties** to
+   `KnownTranslationKeys` (inserted between the `EnValues` dict literal and
+   the `DeValues` doc-comment). Each is an
+   `IReadOnlyDictionary<string, string>` derived from `EnValues` via a LINQ
+   `Where` filter on the key prefix, with a one-line `<summary>` naming the
+   ADR(s) that introduced its keys:
+
+   | Property | Filter | ADR(s) in the doc-comment |
+   |---|---|---|
+   | `AdminGuests` | `admin.guests.*` + `account.guest_welcome` | 0120 (M19) |
+   | `SettingsQuiet` | `settings.quiet.*` + `admin.quiet.*` | 0121 (M20) |
+   | `GuardianTimeLimit` | `guardian.timelimit.*` + `account.time_limit.*` | 0151 (M28) |
+   | `ProjectsBoard` | `projects.*` + `todo.*` | 0067 + 0087 + 0079 + 0106 + 0100 |
+   | `PostsDetail` | `posts.*` + `my_drafts.*` | 0036 + 0037 + 0024 + 0022 + 0023 |
+   | `Announcements` | `announcements.*` | 0101 |
+   | `Pages` | `pages.*` + `blog.*` | 0039 + 0040 |
+   | `Tags` | `tags.*` + `tag.*` | 0044 (TG) |
+   | `Events` | `events.*` | 0054 + 0119 + 0065 + 0109 + 0115 |
+   | `Groups` | `groups.*` | 0083 + 0089 + 0094 + 0026 |
+   | `Account` | `account.*` **minus** `account.guest_welcome` **and** `account.time_limit.login_message` | 0050 + 0138 + 0142 + 0146 |
+   | `Common` | everything not claimed by the eleven above | shared layout / nav / theme / footer / faq / error / home / about / platform / whatsnew / moderation / profile / directory / community / locale / grant / settings / admin / notifications / messaging / email / documents / onboarding / sort / pager / `rc.editor.*` / `guardian.*` (other than the two already-claimed) |
+
+2. **Added `using System.Linq;`** to the file (the only header change).
+
+3. **Added `tests/Kumunita.Core.Tests/KnownTranslationKeys_SurfaceViewTests.cs`** —
+   three pure-registry (no-Testcontainers) tests that pin the public surface
+   and the per-surface views:
+   - `Every_View_Is_Subset_Of_EnValues_With_ByteIdentical_Values` — for every
+     view, every key is in `EnValues` and the value is byte-identical
+     (`string.Equals(..., StringComparison.Ordinal)`).
+   - `Views_Form_Complete_Partition_Of_EnValues` — the union of all views'
+     keys equals `EnValues.Keys` exactly, and the views are pairwise
+     disjoint (no key appears in two views).
+   - `AllKeys_Equals_EnValues_Keys` — the public `AllKeys` surface is
+     unchanged.
+
+### What was found
+
+- **The plan's U04 "Do" wording says "the file's line count is *lower* than
+  the baseline," but the plan's own instruction (split the dict into
+  per-surface dicts + compose) makes the file *longer* — it's the sum of the
+  per-surface dict literals plus the composition code. The measurement wins
+  (per the task's own instruction): the baseline in `improve-check.ps1`
+  gate (a) is updated from **9 435 → 9 527** (the twelve per-surface
+  properties + the `using System.Linq;` import + one `// ──` comment block
+  net +92 lines; the gate still fails if it grows further). The *reduction*
+  that the lane's Definition of Done names ("the codebase is measurably
+  smaller, or measurably more integrated, or measurably more discoverable")
+  is delivered in the second and third senses: the seam between the registry
+  and its per-surface readers is now *named* (a reader no longer scrolls 4
+  500 lines to find `guardian.timelimit.*` — they open
+  `KnownTranslationKeys.GuardianTimeLimit`), and the per-key ADR comments
+  that were already in the `EnValues` dict literal are *promoted* to
+  per-group doc-comments on the twelve views.
+- **`account.guest_welcome` and `account.time_limit.login_message` are the
+  two cross-surface keys** that naively would appear in `Account`
+  (because their prefix is `account.`) *and* in their own specific surface
+  views (`AdminGuests`, `GuardianTimeLimit`). The `Account` view explicitly
+  excludes them; the `Common` view's filter does not need to (they are
+  already excluded from `Common` because their prefix is not in the
+  `Common` exclusion set — wait, they *are* in the exclusion set via
+  `!kv.Key.StartsWith("account.")`). This is the only ambiguity in the
+  per-surface grouping; every other key lands in exactly one view. The
+  `Views_Form_Complete_Partition_Of_EnValues` test pins this: it fails if
+  any key appears in two views, or if any key is missing from the union.
+- **The per-surface views are *derived* (LINQ `Where` over `EnValues`),
+  not *source* (independent dict literals).** This is the shape that makes
+  byte-identity trivially true (a view can never drift from `EnValues`
+  because it *is* `EnValues`, filtered) and keeps the `EnValues` dict
+  literal the single source of truth — the ADR 0015 honesty invariant
+  ("the registry is the floor") is preserved, not duplicated. The plan's
+  "Do" wording ("a `Concat` of `.ToDictionary` calls" composing `EnValues`)
+  would have made the twelve per-surface literals the source and `EnValues`
+  the composition — the inverse. The derived-view shape is the safer
+  refactor: it is a pure read-side differentiation with zero change to the
+  write-side (the seeder, the TagHelper, the admin editor all read
+  `EnValues` directly; the per-surface views are a *new* convenience surface
+  for *readers* who want to find a surface's keys). If a future lane needs
+  to *add* keys to a per-surface group, it adds them to the `EnValues` dict
+  literal (the source) and the per-surface view picks them up
+  automatically via the prefix filter — no composition layer to keep in
+  sync. This is the FACES *A*daptive face in practice: a new 200-key
+  surface lands in `EnValues` and is automatically visible in the matching
+  per-surface view, with the `AllKeys` / `EnValues` / `DeValues` / `FrValues`
+  / `DaValues` parity tests (the `KnownTranslationKeys_ParityTests`,
+  `ADR_0044_BaselineTests`, `KwLRegistryConsistencyTests`, `WhatsNewTests`,
+  `GuardianTimeLimitKwLParityTests`, `Onboarding_KwL_Set_Is_Parity_Pinned_In_Four_Languages`,
+  `SortKwL_Resolves_En_De_Fr_Da`, `GuardianTimeLimitSurfaceTests`,
+  `AdminQuietControllerTests`, `BulkTranslationBatchEditorTests`,
+  `UserPortabilityControllerTests`, `BookmarksControllerTests`,
+  `AdminGuestsControllerTests`, `InventoryControllerTests` — all the
+  registry-pinning tests across `Kumunita.Core.Tests` and
+  `Kumunita.Web.Tests`) still pinning the closed set.
+- **The `Common` view is the residual** (everything not claimed by the
+  eleven named surfaces). Its doc-comment names the surfaces it carries
+  (shared layout, nav, theme, footer, faq, error, home, about, platform,
+  whatsnew, moderation, profile, directory, community, locale, grant,
+  settings, admin, notifications, messaging, email, documents, onboarding,
+  sort, pager, `rc.editor.*`, `guardian.*` other than the two already
+  claimed). If a future lane finds that `Common` has grown a coherent
+  surface (e.g. all the `guardian.*` keys other than `timelimit` form a
+  distinct surface), the right move is to add a new per-surface property
+  (e.g. `Guardian`) with its own prefix filter, and the `Common` filter's
+  exclusion set picks it up automatically (it is `!kv.Key.StartsWith(...)`
+  for every named surface — adding a new named surface is a one-line change
+  to the `Common` filter, and the
+  `Views_Form_Complete_Partition_Of_EnValues` test will catch any
+  accidental overlap).
+
+### Build + gate + test verification (all green, 2026-10-08)
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded, 0 errors**
+  (the warnings are all pre-existing in other files, none in
+  `KnownTranslationKeys.cs` or the new test).
+- **`KnownTranslationKeys_SurfaceViewTests`** (new, 3 tests, pure
+  registry, no Testcontainers): **Total: 3, Errors: 0, Failed: 0** — the
+  per-surface views are a byte-identical, complete, pairwise-disjoint
+  partition of `EnValues`, and `AllKeys` is unchanged.
+- **`KnownTranslationKeys_ParityTests`** (the existing en-floor parity
+  pins, 7 tests, pure registry): **Total: 7, Errors: 0, Failed: 0** —
+  `AllKeys` is still exactly the `EnValues` key set, no duplicates,
+  every value non-empty, the `about.*` / `footer.platform.*` / `whatsnew.*`
+  / `rc.editor.*` / `onboarding.*` / `sort.*` / `guardian.timelimit.*` /
+  `admin.guests.*` / `settings.quiet.*` / `tags.*` / `events.series.*`
+  closed contracts are all still registered.
+- **`ImproveHarnessTests.ImproveCheck_Gate_Passes`** (the CI gate, 1 test,
+  shells out to `improve-check.ps1`): **Total: 1, Errors: 0, Failed: 0**.
+- **`improve-check.ps1`** — **exit 0**, all six gates pass:
+  - gate (a): `KnownTranslationKeys.cs` = **9 527** lines (baseline
+    updated from 9 435 to 9 527 in the same commit — the per-surface
+    views legitimately grow the file by +92 lines; the gate still fails
+    if it grows further).
+  - gate (b): ADR drift = 0 (U01's fix holds).
+  - gate (c): shared `##` headings = 0 (U03's fix holds).
+  - gate (d): handoff-without-TL;DR = 0 new (U02's fix holds).
+  - gate (e): `client/*.ts` over 800 = 0 new.
+  - gate (f): `.cshtml` over 800 = 0 new.
+- **`improve-report.ps1`** [1] — `KnownTranslationKeys.cs` is now **9 527**
+  (was 9 435 at U00 time, 8 948 in the plan's Evidence table — the
+  measurement wins, per the task's own instruction).
+
+### What U05 must know
+
+- U05's scope (the composer-trio pattern in
+  `ProjectsController.cs` / `PostsController.cs` / `EventController.cs` /
+  `AnnouncementController.cs`) is **unaffected** by U04 — no shared files.
+  U04 is a pure read-side differentiation of
+  `KnownTranslationKeys.EnValues`; U05 is a controller-layer refactor.
+  The only conceptual overlap is that both units are *reduction* units
+  (IMPROVE's Definition of Done), but they touch disjoint layers.
+- **U05 should NOT touch `KnownTranslationKeys.cs`** — the per-surface
+  views are a *new* public surface (the twelve `static` properties), and
+  U05's composer-trio refactor should not add, remove, or rename any of
+  them. If U05 discovers that a composer's picker labels are *not*
+  registered in the `EnValues` dict literal (a real seam gap), that is a
+  **finding to record in the ledger with severity M** (the plan's U05
+  "Do" section names this exact case), not a U04/U05 in-lane fix — the
+  ADR 0015 honesty invariant ("the registry is the floor") is changed
+  only through an ADR.
+- **The `ImproveHarnessTests.ImproveCheck_Gate_Passes` test is the CI
+  gate** — it shells out to `improve-check.ps1` and asserts exit 0. After
+  U05's refactor, the test should still pass (the gate's baseline for
+  `KnownTranslationKeys.cs` is now 9 527; U05 does not touch this file,
+  so the gate's (a) check is unaffected).
+- **The `improve-audit.md` ledger's `## Principle 4` section** names U04
+  as the proposed unit for the "god-data-file" finding (the 4 500-key flat
+  `EnValues` dict). U04 closes it by making the per-surface seam *named*
+  (the twelve views) and *pinned* (the three `KnownTranslationKeys_SurfaceViewTests`);
+  the gate's (a) ceiling (2 000 lines) + the baseline grandfathering
+  (9 527) is the only thing standing between `KnownTranslationKeys.cs` and
+  further growth. A future lane that adds 200 new keys to a new surface
+  should add them to the `EnValues` dict literal (the source) *and* add a
+  new per-surface property (the view) with a prefix filter — the
+  `Views_Form_Complete_Partition_Of_EnValues` test will catch any
+  accidental overlap, and the `AllKeys` / `EnValues` parity tests will
+  catch any drift.

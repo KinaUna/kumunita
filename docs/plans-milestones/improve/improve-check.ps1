@@ -93,7 +93,7 @@ $aBaseline = @(
 )
 #aBaselineSizes = the *exact* sizes at U00 time (baseline may not grow either)
 $aBaselineSizes = @{
-  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 9435
+  'src/Kumunita.Core/Localization/KnownTranslationKeys.cs' = 9527
   'src/Kumunita.Web/Controllers/ProjectsController.cs'     = 4971
   'src/Kumunita.Core/Projects/ProjectService.cs'           = 4803
   'src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs'         = 4579

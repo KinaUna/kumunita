@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Kumunita.Core.Localization;
 
@@ -2518,6 +2519,97 @@ public static class KnownTranslationKeys
                 "Reset ALL {0} seeded help pages to their seeded text? This overwrites any hand-edited " +
                 "copy on every page.",
         };
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Per-surface key groups (U04, IMPROVE lane, 2026-10-08)
+    //
+    // Each property below is a *view* into <see cref="EnValues"/>, filtered
+    // to the keys that belong to one resident/admin surface. The public
+    // surface (<see cref="EnValues"/>, <see cref="AllKeys"/>,
+    // <see cref="DeValues"/>, <see cref="FrValues"/>, <see cref="DaValues"/>)
+    // is **unchanged** — these are convenience views that let a reader find
+    // the keys for *their* surface without scrolling the full 4 500-key
+    // registry. ADR references are promoted from per-key inline comments to
+    // per-group doc-comments (the per-key comments are preserved in the
+    // <see cref="EnValues"/> dict literal above).
+    //
+    // The plan's own words (U04 "Do"): "Split the single EnValues dictionary
+    // into per-surface static properties … each an IReadOnlyDictionary<string,
+    // string>. The top-level EnValues remains as a composition … so the
+    // public surface is unchanged."
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>ADR 0120 (M19) — the guest-accounts surface: the /admin/guests admin panel (D6) + the signed-in guest's shell notice (D5).</summary>
+    public static IReadOnlyDictionary<string, string> AdminGuests { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("admin.guests") || kv.Key == "account.guest_welcome")
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0121 (M20) — notification quiet times: the 5th /settings/quiet resident section (D7) + the /admin/quiet cadence surface (D8).</summary>
+    public static IReadOnlyDictionary<string, string> SettingsQuiet { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("settings.quiet") || kv.Key.StartsWith("admin.quiet"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0151 (M28) — guardian time limits: the 13-key guardian.timelimit.* GU Detail section (D7) + the single account.time_limit.login_message login landing.</summary>
+    public static IReadOnlyDictionary<string, string> GuardianTimeLimit { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("guardian.timelimit") || kv.Key.StartsWith("account.time_limit"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0067 (M5) + ADR 0087 + ADR 0079 + ADR 0106 + ADR 0100 — the projects surface: to-do feed + board lanes + card actions + dependency lane + start/due dates + self-assign + comments.</summary>
+    public static IReadOnlyDictionary<string, string> ProjectsBoard { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("projects.") || kv.Key.StartsWith("todo."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0036 + ADR 0037 + ADR 0024 + ADR 0022 + ADR 0023 — the posts surface: composer, detail, drafts, soft-delete, user-added translations, reply-report.</summary>
+    public static IReadOnlyDictionary<string, string> PostsDetail { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("posts.") || kv.Key.StartsWith("my_drafts."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0101 — the announcements surface: shared labels, New/Edit compose, Index/Detail/pinned banner, comments lane.</summary>
+    public static IReadOnlyDictionary<string, string> Announcements { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("announcements."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0039 + ADR 0040 — the pages surface: tree browse + post view (PG lane) + per-resident blog feed.</summary>
+    public static IReadOnlyDictionary<string, string> Pages { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("pages.") || kv.Key.StartsWith("blog."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0044 (TG) — the tags surface: browse + composer affordances + tag input + suggest + translate.</summary>
+    public static IReadOnlyDictionary<string, string> Tags { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("tags.") || kv.Key.StartsWith("tag."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0054 (M4) + ADR 0119 (M18) + ADR 0065 (EV-MINE) + ADR 0109 (EV-PAST) + ADR 0115 (M14) — the events surface: index, detail, composer, recurrence picker, series chip, mine, past, calendar, interlock.</summary>
+    public static IReadOnlyDictionary<string, string> Events { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("events."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0083 + ADR 0089 (GE) + ADR 0094 + ADR 0026 — the groups surface: Index/Detail/New/Create/Edit, tabs, events lane, join-requests, translations, Airy layout.</summary>
+    public static IReadOnlyDictionary<string, string> Groups { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("groups."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0050 + ADR 0138 + ADR 0142 + ADR 0146 — the account surface: Login/Signup, change-password, delete-account, verify/resend, child handoff, signup-closed notice.</summary>
+    public static IReadOnlyDictionary<string, string> Account { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("account.")
+                    && kv.Key != "account.guest_welcome"          // owned by AdminGuests
+                    && kv.Key != "account.time_limit.login_message") // owned by GuardianTimeLimit
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>Shared layout + common labels + nav/theme/footer/faq/error + grant picker + locale + home + about/platform/whatsnew + moderation + profile/directory/community + rich editor + notifications/messaging/email + documents/onboarding/sort/pager + guardian + admin + settings (the full cross-surface common surface).</summary>
+    public static IReadOnlyDictionary<string, string> Common { get; } =
+        EnValues.Where(kv => !kv.Key.StartsWith("admin.guests") && kv.Key != "account.guest_welcome"
+                    && !kv.Key.StartsWith("settings.quiet") && !kv.Key.StartsWith("admin.quiet")
+                    && !kv.Key.StartsWith("guardian.timelimit") && !kv.Key.StartsWith("account.time_limit")
+                    && !kv.Key.StartsWith("projects.") && !kv.Key.StartsWith("todo.")
+                    && !kv.Key.StartsWith("posts.") && !kv.Key.StartsWith("my_drafts.")
+                    && !kv.Key.StartsWith("announcements.")
+                    && !kv.Key.StartsWith("pages.") && !kv.Key.StartsWith("blog.")
+                    && !kv.Key.StartsWith("tags.") && !kv.Key.StartsWith("tag.")
+                    && !kv.Key.StartsWith("events.")
+                    && !kv.Key.StartsWith("groups.")
+                    && !kv.Key.StartsWith("account."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
 
     /// <summary>
     /// The curated German (<c>de</c>) baseline (LS U02, ADR 0042 D2/D5). One
