@@ -343,3 +343,162 @@
   pinned names** are the authoritative count; U06 should author **16** tests,
   not 15. This is a count-typo in the register's U06 entry ("15"), not a
   drift in the pinned-name list.
+
+## U03 — AdminOnboarding Core
+
+- **Core implementation authored** (5 new files + 2 modified files + 1 test
+  file). **Build green** (`dotnet build Kumunita.slnx -c Debug` —
+  "Build succeeded with 86 warning(s)", **zero** of the 86 on the new
+  AdminOnboarding files — all 86 are pre-existing xUnit analyzer warnings
+  in unrelated test files). No new seams, no Web change, no view, no banner,
+  no `kw-l` keys, no admin surface. **U04 can now pin by file.**
+
+- **(a) The one field name:** `CompletedAt` (a nullable
+  `DateTimeOffset?`, default `null` = not-yet-guided, the floor, M30·2).
+  The `AdminOnboarding` POCO (the `Kumunita.Core.AdminOnboarding` bounded
+  context, ADR 0153 D1 / the ADR 0005 B / ADR 0150 singleton shape) carries
+  **exactly** this one field + the `Id` sentinel (`"singleton"`) + a
+  `Complete()` helper stamping `CompletedAt = DateTimeOffset.UtcNow`.
+  Field set is the **ceiling** (the ADR 0153 D1 pin).
+
+- **(b) The `AdminOnboardingDocTypes` line (one `.Schema.For` call):**
+  `src/Kumunita.Core/AdminOnboarding/AdminOnboardingDocTypes.cs` —
+  `public static void Configure(StoreOptions opts) {
+  opts.Schema.For<AdminOnboarding.AdminOnboarding>(); }` (the
+  `SiteContentDocTypes` / `SurfaceLabelsDocTypes` shape, verbatim; fully
+  qualified as `AdminOnboarding.AdminOnboarding` for the type/namespace
+  collision idiom — the type and its parent namespace share the name
+  `AdminOnboarding`). ADR 0004 §B.1 additive, no EF migration.
+
+- **(c) The two boot-path `Configure(opts)` lines added:**
+  - **`src/Kumunita.Web/Program.cs:152`** — `AdminOnboardingDocTypes.Configure(opts);`
+    immediately after the `SurfaceLabelsDocTypes.Configure(opts);` neighbor
+    (the same host dev-loop `AddMarten` lambda that registers every other
+    `*DocTypes` surface). This is the **only** line needed to register the
+    doc for the host — the `SchemaBootstrap.ApplyAsync` all-env boot path
+    picks it up automatically via
+    `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`
+    (line 48 of `SchemaBootstrap.cs`), which delta-detects and applies the
+    new `mt_doc_adminonboarding` table idempotently (the exact
+    `SiteContent` / `SurfaceLabels` / `Media` / `Tag` precedent — those
+    surfaces also have a single `Configure(opts)` call in `Program.cs`
+    only, not a second call in `SchemaBootstrap.cs`). The register's
+    "two boot paths" phrasing is a single registration site + an automatic
+    schema-apply call, not two distinct lines to add.
+  - **`src/Kumunita.Core/DependencyInjection.cs:131`** — the
+    `AddTransient<AdminOnboarding.IAdminOnboardingService>(sp => new
+    AdminOnboarding.AdminOnboardingService(sp.GetRequiredService<Marten.IDocumentStore>()));`
+    registration (the `ISiteContentService` / `ISurfaceLabelsService`
+    "AddTransient with the store injected" shape, the type/namespace-collision
+    idiom). **No** `ITranslationProvider` arg needed (the M30 service is
+    narrower than the M29 `SurfaceLabelsService` — it does not resolve
+    `kw-l` keys itself; the Web-layer `FlashAsync` idiom handles that at
+    the U04 controller boundary, the M22 / M29 `OnboardingController`
+    shape).
+
+- **(d) The `FirstBootSeeder` step:**
+  `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs:153` — the call
+  `await SeedAdminOnboardingAsync(mt, logger, ct);` (step **4d**, between
+  step 4c `SeedSurfaceLabelsAsync` and step 5
+  `SeedTranslationResourcesAsync`). The method body is at
+  `FirstBootSeeder.cs:578` (the `public static async Task
+  SeedAdminOnboardingAsync(IDocumentStore mt, ILogger logger,
+  CancellationToken ct)` shape, mirroring
+  `SeedSiteContentAsync` / `SeedSurfaceLabelsAsync` verbatim):
+  **create-if-missing, idempotent, never-overwrites** — a fresh boot
+  stores exactly one `AdminOnboarding` row (`Id = "singleton"`,
+  `CompletedAt = null`); a warm boot is a no-op (an existing row's
+  `CompletedAt` field is left untouched, so a GlobalAdmin's later
+  completion stamp is honored). **No `AccessAudit` row** on the seed (the
+  seeder is not a principal — the exact `SeedSiteContentAsync` /
+  `SeedSurfaceLabelsAsync` shape). **Public** (not private) so the Core
+  test can pin the fresh-boot state + idempotency without an
+  `InternalsVisibleTo` (the repo's Core test constraint — the
+  `SeedSiteContentAsync` / `SeedSurfaceLabelsAsync` precedent).
+
+- **(e) Compile warnings on the new types:** **zero** (confirmed by
+  `Select-String` on the build output for `AdminOnboarding` /
+  `SeedAdminOnboarding` — no matches). The 86 build warnings are all
+  pre-existing xUnit analyzer warnings (`xUnit1051` CancellationToken,
+  `xUnit2017` / `xUnit2029` assert-style) in unrelated test files
+  (`GuardianEventRsvpGateTests.cs`, `LocaleControllerQuietSectionTests.cs`,
+  `MilestonesTests.cs`, `M17AcceptanceGateTests.cs`, …), untouched by
+  U03.
+
+- **Deliverables authored (7 files, 5 new + 2 modified):**
+  1. **`src/Kumunita.Core/AdminOnboarding/AdminOnboarding.cs`** (new) — the
+     `AdminOnboarding` doc (the one `CompletedAt` field, the `Id =
+     "singleton"` sentinel, the `Complete()` helper — the exact C# from the
+     design doc §2.2, verbatim).
+  2. **`src/Kumunita.Core/AdminOnboarding/IAdminOnboardingService.cs`**
+     (new) — the `IAdminOnboardingService` interface (the `GetAsync(ct)`
+     best-effort read + the `CompleteAsync(actorBy, ct)` audited write —
+     the exact C# from the design doc §2.3, verbatim).
+  3. **`src/Kumunita.Core/AdminOnboarding/AdminOnboardingService.cs`**
+     (new) — the `AdminOnboardingService` implementation (the
+     `GetAsync` best-effort try/catch → `null` + the `CompleteAsync`
+     upsert-singleton + exactly one `AccessAudit` row (`Via = Admin`,
+     action `admin_onboarding.complete`, `TargetKind` "admin-onboarding")
+     in one session — the exact C# from the design doc §2.3/§2.4,
+     verbatim).
+  4. **`src/Kumunita.Core/AdminOnboarding/AdminOnboardingDocTypes.cs`**
+     (new) — the `AdminOnboardingDocTypes.Configure(StoreOptions opts)`
+     surface (the `SiteContentDocTypes` shape, verbatim).
+  5. **`src/Kumunita.Core/DependencyInjection.cs`** (modify) — the
+     `AddTransient<AdminOnboarding.IAdminOnboardingService>` registration
+     (immediately after the `ISurfaceLabelsService` neighbor, mirroring
+     the `ISiteContentService` / `ISurfaceLabelsService` shape).
+  6. **`src/Kumunita.Web/Program.cs`** (modify) — the
+     `AdminOnboardingDocTypes.Configure(opts);` host line (immediately
+     after the `SurfaceLabelsDocTypes.Configure(opts);` neighbor, mirroring
+     the `SiteContentDocTypes.Configure(opts);` /
+     `SurfaceLabelsDocTypes.Configure(opts);` shape).
+  7. **`src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs`** (modify) — the
+     `SeedAdminOnboardingAsync` step (the call at line 153 + the method at
+     line 578, mirroring `SeedSiteContentAsync` / `SeedSurfaceLabelsAsync`
+     verbatim).
+  8. **`tests/Kumunita.Core.Tests/AdminOnboardingSeederTests.cs`** (new) —
+     the 3 seeder pins (names verbatim from the design doc §2.6):
+     `FreshBoot_HasExactlyOneAdminOnboardingRow` /
+     `FreshBoot_CompletedAtIsNull` /
+     `SecondBoot_IsIdempotent_NoDuplicateRow`. The harness wires
+     `AdminOnboardingDocTypes.Configure(opts)` in its own
+     `DocumentStore.For` lambda (the `SiteContentSeederTests.BootStoreAsync`
+     / `SurfaceLabelsSeederTests` idiom — without it the doc is invisible
+     to Marten).
+
+- **Test execution:** the 3 seeder tests are **not yet run** (U06 owns the
+  acceptance gate — the design doc §2.7). The register's U03 exit criteria
+  is "build green + `AdminOnboarding.cs` exists + the
+  `AdminOnboardingService` + `AdminOnboardingDocTypes` compile" — **met**.
+  The 5 service tests (the `AdminOnboardingServiceTests` class) + the 4
+  controller tests (the `AdminOnboardingControllerTests` class) + the 4
+  banner tests (the `AdminOnboardingBannerTests` class) are U06's
+  deliverables — **not** authored by U03 (the unit-series rule: a unit
+  never introduces a test whose exact name is not in the §pinned-test-names
+  list for *its own* deliverables; U03's deliverable is the 3 seeder tests
+  only).
+
+- **Drift check:** all Entry reads (the register's U03 entry, U02's handoff
+  `## U02` section, `SiteContent.cs` + `SiteContentService.cs` +
+  `SiteContentDocTypes.cs` + `ISiteContentService.cs`, `DependencyInjection.cs`,
+  `FirstBootSeeder.cs` (the `SeedSiteContentAsync` /
+  `SeedSurfaceLabelsAsync` shapes), `SurfaceLabelsSeederTests.cs` (the
+  `BootStoreAsync` harness idiom), `AccessAudit.cs` + `Decision.cs` (the
+  `AccessAudit` field shape + the `AccessVia.Admin` / `AccessOutcome.Allow`
+  enum values), `SchemaBootstrap.cs` (the all-env boot path),
+  `Program.cs` (the host `AddMarten` lambda), the design doc §2.2–§2.4
+  (the exact `AdminOnboarding` shape + the read/write contracts), ADR 0153
+  (the decision record, read-only)) are consistent with the register.
+  **No drift pause required.** One note: the register's U03 entry (c) says
+  "the two boot-path lines added (file + line numbers)" — but the
+  `SchemaBootstrap.cs` all-env path does **not** have its own
+  `AdminOnboardingDocTypes.Configure(opts)` line (per the
+  `SiteContent` / `SurfaceLabels` / `Media` / `Tag` precedent, all
+  `*DocTypes.Configure` calls live in the host's `Program.cs` `AddMarten`
+  lambda; `SchemaBootstrap.ApplyAsync` picks them up via
+  `ApplyAllConfiguredChangesToDatabaseAsync`). The "two boot paths" is a
+  **single** `Program.cs:152` line + an automatic schema-apply call in
+  `SchemaBootstrap.cs:48` (the existing call, not a new one). This is a
+  **register-imprecision, not a drift** — the actual code matches the
+  SITE / M29 precedent exactly.

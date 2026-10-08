@@ -142,6 +142,16 @@ public static class FirstBootSeeder
         // untouched, so an admin's later rename is honored.
         await SeedSurfaceLabelsAsync(mt, logger, ct);
 
+        // 4d. Admin onboarding (M30, ADR 0153): the `AdminOnboarding` singleton
+        // — the GlobalAdmin's guided-walk-through completion record (the
+        // `CompletedAt` flag, `null` = not-yet-guided). The same "one row per
+        // instance" shape as the `SiteContent` / `SurfaceLabels` singletons
+        // seeded in steps 4b/4c. Create-if-missing, idempotent, never-overwrites
+        // (a GlobalAdmin's later completion stamp is honored on a warm re-run);
+        // a fresh boot stores exactly one row with `CompletedAt = null` (the
+        // "not-yet-guided" floor, M30·2).
+        await SeedAdminOnboardingAsync(mt, logger, ct);
+
         // 5. Canonical `en` UI strings + the `en` terms/help/privacy/conduct pages
         // (ML-UI U1 — D2; the four-page set per ADR 0043 D1/D5): materializes the
         // M·9 `en` floor + the M·12 completeness universe. Runs
@@ -523,6 +533,77 @@ public static class FirstBootSeeder
         {
             logger.LogInformation(
                 "First boot: SurfaceLabels singleton already present; skipping (idempotent, never-overwrites — ADR 0152).");
+        }
+    }
+
+    /// <summary>
+    /// M30 (ADR 0153) — seed the <see
+    /// cref="AdminOnboarding.AdminOnboarding"/> singleton: the
+    /// GlobalAdmin's guided-walk-through completion record (the
+    /// <c>CompletedAt</c> flag, <c>null</c> = not-yet-guided). The
+    /// <c>SiteContent</c> / <c>SurfaceLabels</c> / <c>LocaleSettings</c>
+    /// "one row per instance" shape (ADR 0005 B / ADR 0150 / ADR 0152): a
+    /// single row, <c>Id = "singleton"</c>, so re-resolving it is a plain
+    /// identity-keyed load.
+    /// <para>
+    /// <b>Create-if-missing, idempotent, never-overwrites</b> (the exact
+    /// <see cref="SeedSiteContentAsync"/> / <see cref="SeedSurfaceLabelsAsync"/>
+    /// shape): a fresh boot stores exactly one row with <c>CompletedAt =
+    /// null</c> — the "not-yet-guided" floor (M30·2), so a fresh instance
+    /// that never touches the surface looks exactly the same as it does
+    /// today (the banner is the affordance, not a wall). A second boot (a
+    /// warm re-run) leaves an existing row untouched, so a GlobalAdmin's
+    /// later completion stamp is honored (the never-overwrites pin).
+    /// </para>
+    /// <para>
+    /// <b><c>CompletedAt</c> is <c>null</c> by construction</b> — there is no
+    /// "default value" to seed here (unlike <see cref="SeedSiteContentAsync"/>,
+    /// whose 4 text fields carry the shipped <c>en</c> source text). The floor
+    /// is <c>null</c> = not-yet-guided (M30·2), so the seeder only creates the
+    /// row and leaves <c>CompletedAt</c> unset.
+    /// </para>
+    /// <para>
+    /// <b>No <c>AccessAudit</c> row.</b> A first-boot seed is not an actor's
+    /// auditable action (the seeder is not a principal) — the single
+    /// <c>SaveChangesAsync</c> commits the singleton row only.
+    /// </para>
+    /// <para>
+    /// <b>Public (not private)</b> so the Core test can pin the fresh-boot
+    /// state + idempotency across two live boots without an
+    /// <c>InternalsVisibleTo</c> (the <see cref="SeedSiteContentAsync"/> /
+    /// <see cref="SeedSurfaceLabelsAsync"/> precedent — the repo's Core test
+    /// constraint).
+    /// </para>
+    /// </summary>
+    public static async Task SeedAdminOnboardingAsync(
+        IDocumentStore mt, ILogger logger, CancellationToken ct)
+    {
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        var existing = await session
+            .LoadAsync<AdminOnboarding.AdminOnboarding>(AdminOnboarding.AdminOnboarding.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            // CompletedAt defaults to `null` (the "not-yet-guided" floor,
+            // M30·2). None is set — the floor is `null` (M30·2).
+            session.Store(new AdminOnboarding.AdminOnboarding
+            {
+                Id = AdminOnboarding.AdminOnboarding.SingletonId,
+                // CompletedAt — left `null` (the POCO initializer already
+                // defaults it to `null`; the not-yet-guided row IS the
+                // shipped floor, so no field is set explicitly here).
+            });
+            await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+            logger.LogInformation(
+                "First boot: AdminOnboarding singleton seeded (id 'singleton'; CompletedAt null — the not-yet-guided floor, byte-identical to a fresh instance that never touches the surface — ADR 0153).");
+        }
+        else
+        {
+            logger.LogInformation(
+                "First boot: AdminOnboarding singleton already present; skipping (idempotent, never-overwrites — ADR 0153).");
         }
     }
 

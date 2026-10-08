@@ -117,6 +117,20 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Localization.ITranslationProvider>()));
 
+        // M30 (ADR 0153, U03): the admin-onboarding seam — the AdminOnboarding
+        // singleton's read + audited write lanes (the ADR 0150
+        // single-write-lane shape, the LocaleSettings-parallel bounded context
+        // Kumunita.Core.AdminOnboarding). The same "AddTransient with the store
+        // injected" shape as ISiteContentService / ISurfaceLabelsService above:
+        // composes the host-registered Marten IDocumentStore (reads open a
+        // QuerySession, the audited write opens a write session — invariant
+        // C3). Core stays HTTP-free (ADR 0006-D): the Web gate (U04) is the
+        // only place the GlobalAdmin authorization is produced. Fully qualified
+        // AdminOnboarding.IAdminOnboardingService for the type/namespace-
+        // collision idiom (like SiteContent.ISiteContentService).
+        services.AddTransient<AdminOnboarding.IAdminOnboardingService>(sp => new AdminOnboarding.AdminOnboardingService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
