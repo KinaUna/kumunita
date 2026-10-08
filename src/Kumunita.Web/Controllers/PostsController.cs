@@ -752,86 +752,15 @@ public sealed class PostsController(
         return all.Where(c => accessible.Contains(c.Id)).ToList();
     }
 
-    /// <summary>
-    /// Seeds the composer's "Who to grant to" option lists for the shared
-    /// <c>Views/Shared/_GrantPickers</c> partial — the <b>same option
-    /// source</b> the M2 <see cref="ProfileController"/>'s editor uses
-    /// (its private <c>SeedGrantPickerOptionsAsync</c>, mirrored here for
-    /// the composer surface): <b>Users</b> — every visible, non-blocked,
-    /// verified <c>Profile</c> <b>except the actor themselves</b> (the F6
-    /// "thin token, fat authorization" rule: self-access is implicit and
-    /// <b>Groups</b> — the platform-wide <i>public</i> group
-    /// list (<c>IUserInfoService.GetPublicGroupsAsync</c>; ADR 0010 — a
-    /// private group is an organizing/membership unit, never granted as an
-    /// audience, so it stays out of the composer's picker; a resident's
-    /// membership does not constrain which <i>public</i> groups they may
-    /// name in a post's audience — the decision is on the <c>Group</c>
-    /// subject).
-    /// Stored on the statically-typed <see cref="Controller.ViewData"/>
-    /// (NOT <c>ViewBag</c> — the bag's indexer throws
-    /// <see cref="RuntimeBinderException"/>; the same channel the M2
-    /// profile editor reads its options from). Read-only view data, never
-    /// model properties on <see cref="PostComposeViewModel"/> — the
-    /// only form-bound grants field remains the partial's hidden
-    /// <c>Audience.Grants</c> textarea (the M2 U11 / F13 single-source
-    /// pin, carried verbatim to the composer).
-    /// </summary>
-    private async Task SeedGrantPickerOptionsAsync()
-    {
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
-        var selfId = SubjectId(User);
-        var userOptions = profiles
-            .Where(p => !p.Blocked)
-            .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
-            .Select(p => new GrantOption
-            {
-                Id    = p.SubjectId,
-                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
-                Kind  = "User",
-            })
-            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
+    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
+    // that used to live here are thin delegates to that helper.)
 
-        // ADR 0010: the composer's audience = public groups only (a private
-        // group is an organizing unit, never granted as an audience).
-        var groups = await userInfo.GetPublicGroupsAsync();
-        var groupOptions = groups
-            .Select(g => new GrantOption
-            {
-                Id    = g.Id,
-                Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
-                Kind  = "Group",
-            })
-            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    private Task SeedGrantPickerOptionsAsync()
+        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo);
 
-        ViewData["Audience_Users"] = userOptions;
-        ViewData["Audience_Groups"] = groupOptions;
-    }
-
-    /// <summary>
-    /// Seeds the composer's <b>authored-in language</b> picker (ADR 0018,
-    /// ADR 0005 B) — the instance's **enabled** <see
-    /// cref="Kumunita.Core.Localization.LanguageCatalog"/>, ordered by
-    /// <c>SortOrder</c>. Read through <see cref="ILocalizationService.ListLanguagesAsync"/>
-    /// (the HTTP-free seam, ADR 0005 D) — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses, so this composer
-    /// dependency mirrors an established lane rather than re-deriving the
-    /// catalog from the store. The create lane pre-selects the actor's
-    /// current effective language (ADR 0049 —
-    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
-    /// highlights the language the resident is reading the platform in.
-    /// Stored on <see cref="PostComposeViewModel.Languages"/> ([BindNever]).
-    /// </summary>
-    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-    {
-        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
-        return catalog
-            .Where(l => l.Enabled)
-            .OrderBy(l => l.SortOrder)
-            .Select(l => (l.Id, l.NativeName))
-            .ToList();
-    }
+    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the

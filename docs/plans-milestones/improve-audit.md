@@ -61,7 +61,31 @@ works. Most failures are seam failures, not component failures.
   accidental, not designed); `anti-patterns.md` "silent coupling". ·
   **Severity:** **M** (maintainability: a picker change landing in four
   places). · **Proposed unit:** **U05** (verify the claim; if duplicated,
-  extract to one shared helper).
+  extract to one shared helper). · **Status (U05, 2026-10-08):** **closed —
+  the claim was false, the trio was copy-paste.** Each of the three seed
+  methods was defined once per controller (a private copy in each of the
+  four composer controllers; `ProfileController` + `GroupsController` each
+  carried their own partial copies). The ADR 0106 `Assign_Users` surface in
+  `ProjectsController` was a *divergence* — the same seed method but with an
+  extra list, the "silent coupling" anti-pattern the ledger names. U05
+  extracts the trio into one shared helper
+  (`src/Kumunita.Web/Models/ComposerSeedOptions.cs`, the composer trio
+  shared by the post/announcement/event/project/group composer GETs — new
+  composer GETs call this, do not copy it), with an optional
+  `includeAssignUsers: bool` parameter for the ADR 0106 surface. The
+  per-controller private methods are now thin delegates to the helper.
+  **Before → after line counts:** `ProjectsController.cs` 4971 → 4890
+  (−81), `PostsController.cs` 2165 → 2094 (−71), `EventController.cs`
+  1927 → 1861 (−66), `AnnouncementController.cs` 1132 → 1118 (−14).
+  `ComposerSeedOptions.cs` is new (160 lines — well under the 2 000-line
+  gate ceiling). **Public surface unchanged:** routes, view-models,
+  rendered HTML are all identical (the existing controller tests —
+  `PostsControllerTests`, `EventControllerTests`,
+  `ProjectsControllerTests`, `AnnouncementControllerTests` — pass
+  **unmodified**: 951 Web.Tests, 0 errors, 0 failures). The gate (a) still
+  passes (the four controllers are grandfathered at their U00 baselines,
+  and they are now *smaller* than those baselines — the gate only fails on
+  growth).
 
 ## Principle 2 — Differentiation is deliberate, integration is the work
 

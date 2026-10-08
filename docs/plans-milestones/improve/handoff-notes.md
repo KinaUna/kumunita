@@ -655,3 +655,167 @@ per-surface views; the public surface (`EnValues`, `DeValues`, `FrValues`,
   `Views_Form_Complete_Partition_Of_EnValues` test will catch any
   accidental overlap, and the `AllKeys` / `EnValues` parity tests will
   catch any drift.
+
+## U05 — Consolidate the shared controller composer/picker pattern (2026-10-08)
+
+**Status: done.** The composer trio is now defined **exactly once** in a
+new shared helper (`src/Kumunita.Web/Models/ComposerSeedOptions.cs`); the
+per-controller copies are thin delegates to it. The `ProjectsController`
+doc-comment's claim that the trio was "the M2/M3/M4 shared pattern, reused
+not reinvented" is now **true** (it was **false** before — the methods were
+defined once per controller, a copy-paste "silent coupling" — the
+`anti-patterns.md` seam the IMPROVE lane names).
+
+### What was done
+
+1. **Created `src/Kumunita.Web/Models/ComposerSeedOptions.cs`** (160 lines,
+   well under the 2 000-line gate ceiling) — a `public static class` with
+   three methods:
+   - `SeedGrantPickerOptionsAsync(Controller, IUserInfoService,
+     bool includeAssignUsers = false)` — the "Who to grant to" option lists
+     (`Audience_Users` + `Audience_Groups`, and optionally `Assign_Users`
+     for the ADR 0106 self-assign lane). The optional parameter lets
+     `ProjectsController` opt in to the ADR 0106 surface without polluting
+     the other three composers.
+   - `SeedLanguagePickerAsync(ILocalizationService)` — the authored-in
+     language picker (ADR 0018 / ADR 0005 B).
+   - `SeedComponentPickerAsync(IUserInfoService)` — the component
+     feed-organizer picker (C-M3·2).
+
+   Each method carries the full doc-comment (the ADR references, the
+   "a read, not a decision" framing, the "the audience is the sole access
+   boundary" pin, etc.) — the doc-comment is now a *single* source of
+   truth, not four drifting copies.
+
+2. **Replaced the per-controller copies with thin delegates** in all four
+   composer controllers:
+   - `ProjectsController.cs` (4971 → 4890, −81) — the three seed methods are
+     now one-liners calling `ComposerSeedOptions.*`; the ADR 0106
+     `Assign_Users` divergence is captured by the
+     `includeAssignUsers: true` parameter (a *named* divergence, not a
+     silent copy-paste).
+   - `PostsController.cs` (2165 → 2094, −71) — same treatment.
+   - `EventController.cs` (1927 → 1861, −66) — same treatment.
+   - `AnnouncementController.cs` (1132 → 1118, −14) — only
+     `SeedLanguagePickerAsync` was there (no component picker, no grant
+     picker); the one-liner delegate replaces the 14-line private copy.
+
+   **Not touched:** `ProfileController.cs` and `GroupsController.cs` — they
+   each carried a *partial* copy of the trio (Profile: grant picker only;
+   Groups: language picker only). They are *not* composer controllers in
+   the plan's U05 scope (the four composer controllers are
+   `ProjectsController`, `PostsController`, `EventController`,
+   `AnnouncementController`). Their copies remain private (a *separate*
+   finding the ledger can record for a future lane, if the community wants
+   to consolidate them too). The `improve-check.ps1` gate does not gate on
+   them.
+
+3. **Updated the audit ledger**
+   (`docs/plans-milestones/improve-audit.md` → `## Principle 1`) with the
+   U05 finding: the claim was **false** (the trio was copy-paste), the
+   ADR 0106 `Assign_Users` surface was a *divergence* (the "silent
+   coupling" anti-pattern), and the extraction closes the finding. The
+   before/after line counts, the public-surface-unchanged claim, and the
+   gate result are recorded.
+
+### What was found
+
+- **The claim was false.** The `ProjectsController` doc-comment said the
+  trio was "the M2/M3/M4 shared pattern, reused not reinvented." In
+  reality, each of the three seed methods was defined once *per controller*
+  (a private copy in each of the four composer controllers). This is the
+  "silent coupling" anti-pattern the IMPROVE lane names: the *shape* of
+  the code was the same, but the *integration* was accidental (copy-paste),
+  not designed (a named shared helper).
+- **The ADR 0106 divergence was a real seam gap.** `ProjectsController`'s
+  `SeedGrantPickerOptionsAsync` had an extra `Assign_Users` block (the
+  self-assign lane) that the other three composers did not. Before U05,
+  this was a *silent* divergence — a future reader of the
+  `PostsController`'s `SeedGrantPickerOptionsAsync` would not know that
+  `ProjectsController`'s version had more behavior. After U05, the
+  divergence is *named* (the `includeAssignUsers` parameter on the shared
+  helper), and a future reader of the helper sees both surfaces in one
+  place.
+- **`ProfileController` + `GroupsController` are out of U05's scope.** They
+  each carried a *partial* copy of the trio (Profile: grant picker only;
+  Groups: language picker only). The plan's U05 scope is the **four
+  composer controllers** (`ProjectsController`, `PostsController`,
+  `EventController`, `AnnouncementController`). A future lane that wants
+  to consolidate the Profile/Groups copies can do so — the shared helper
+  is the right place to call, and the `includeAssignUsers` parameter
+  pattern can be extended if the Profile editor needs a similar
+  divergence.
+
+### Build + gate + test verification (all green, 2026-10-08)
+
+- **`dotnet build Kumunita.slnx -c Debug`** — **Build succeeded, 0 errors**
+  (the warnings are all pre-existing in other files; none in
+  `ComposerSeedOptions.cs` or the four edited controllers).
+- **`Kumunita.Web.Tests`** (the four affected controller test classes —
+  `PostsControllerTests`, `EventControllerTests`,
+  `ProjectsControllerTests`, `AnnouncementControllerTests` — plus the
+  `ImproveHarnessTests.ImproveCheck_Gate_Passes` gate test and the 945
+  other Web tests) — **Total: 951, Errors: 0, Failed: 0, Skipped: 0, Not
+  Run: 0, Time: 19.669s** — all pass **unmodified** (no test was changed
+  to accommodate the refactor; the public surface — routes, view-models,
+  rendered HTML — is identical).
+- **`Kumunita.Core.Tests`** (the 1 373 service-layer tests, including
+  `ProjectServiceTests`, `EventServiceTests`, `PostServiceTests`,
+  `AnnouncementServiceTests`, and the `KnownTranslationKeys_SurfaceViewTests`
+  / `KnownTranslationKeys_ParityTests` pins from U04) — **Total: 1373,
+  Errors: 0, Failed: 0, Skipped: 0, Not Run: 0, Time: 184.990s** — all
+  pass **unmodified** (the composer trio is a *controller-layer* surface;
+  the service layer it calls — `IUserInfoService.GetProfilesAsync`,
+  `IUserInfoService.GetPublicGroupsAsync`, `IUserInfoService
+  .GetComponentsAsync`, `ILocalizationService.ListLanguagesAsync` — is
+  unchanged, and the four composer controllers are the only readers of
+  the trio).
+- **`improve-check.ps1`** — **exit 0**, all six gates pass:
+  - gate (a): `ProjectsController.cs` = **4890** (baseline 4971 — now
+    *smaller* than the baseline; the gate only fails on growth, so it
+    passes). `PostsController.cs` = **2094** (baseline 2165 — smaller).
+    `EventController.cs` = **1861** (baseline 1927 — smaller).
+    `AnnouncementController.cs` = **1118** (baseline 1132 — smaller).
+    `ComposerSeedOptions.cs` = **160** (new file, well under the 2 000
+    ceiling — not grandfathered, just small).
+  - gate (b): ADR drift = 0 (U01's fix holds).
+  - gate (c): shared `##` headings = 0 (U03's fix holds).
+  - gate (d): handoff-without-TL;DR = 0 new (U02's fix holds).
+  - gate (e): `client/*.ts` over 800 = 0 new.
+  - gate (f): `.cshtml` over 800 = 0 new.
+- **`improve-report.ps1`** [1] — the four composer controllers are now
+  *smaller* than their U00 baselines (the gate (a) grandfathering list is
+  now grandfathered-and-met, the same pattern U01 used for the ADR rows
+  and U03 used for the shared headings).
+
+### What U06 must know
+
+- U06's scope (extract the two longest views — `BoardDetail.cshtml` 1 431,
+  `Posts/Detail.cshtml` 1 015 — into partials) is **unaffected** by U05 —
+  no shared files. U05 is a controller-layer refactor; U06 is a
+  view-layer refactor. The only conceptual overlap is that both units are
+  *reduction* units (IMPROVE's Definition of Done), but they touch
+  disjoint layers.
+- **U06 should NOT touch `ComposerSeedOptions.cs`** — the shared helper
+  is a *new* public surface (the three `static` methods), and U06's
+  view-extraction should not add, remove, or rename any of them. If U06
+  discovers that a view is reading a ViewData key that is *not* seeded by
+  the composer trio (a real seam gap), that is a **finding to record in
+  the ledger with severity M** (the plan's U06 "Do" section names this
+  exact case), not a U05/U06 in-lane fix.
+- **The `ImproveHarnessTests.ImproveCheck_Gate_Passes` test is the CI
+  gate** — it shells out to `improve-check.ps1` and asserts exit 0. After
+  U06's refactor, the test should still pass (the gate's baseline for the
+  four composer controllers is now grandfathered-and-met — they are
+  *smaller* than their U00 baselines, so the gate (a) check is
+  unaffected).
+- **The `improve-audit.md` ledger's `## Principle 1` section** names U05
+  as the proposed unit for the "composer trio" finding. U05 closes it by
+  making the trio *defined exactly once* (the `ComposerSeedOptions`
+  helper) and *pinned* (the four existing controller test classes pass
+  unmodified). The gate's (a) ceiling (2 000 lines) + the baseline
+  grandfathering (the four composer controllers at their U00 baselines) is
+  the only thing standing between the controllers and further growth. A
+  future lane that adds a new composer GET should call the
+  `ComposerSeedOptions` helper (the doc-comment says "new composer GETs
+  call this, do not copy it"), not re-copy the trio.
