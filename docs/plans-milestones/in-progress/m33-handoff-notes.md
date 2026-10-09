@@ -267,3 +267,38 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   0 Errors). All six touched/created files report no errors.
 - **No new test (U07's), no capture lane (U04's), no Web surface (U05's),
   no new kw-l keys (U06's).**
+
+## U04 — capture lane + handler + boot seed
+
+- **3 new capture-lane files + 1 boot-seed line** (build green):
+  - `src/Kumunita.Core/Usage/StorageMetricsCaptureService.cs` — Wolverine-free
+    static (M33·5, the `UsagePurgeService` shape); `public const int
+    RetentionDays = 365;` (M33·7) + `public static async Task<int>
+    CaptureAndPurgeAsync(IDocumentStore store, IStorageMetricsService metrics,
+    DateTimeOffset now, CancellationToken ct = default)`: (1) `metrics.
+    GetSnapshotAsync(ct)` (the M24 frozen seam reuse, M33·1), (2) one
+    `StorageMetricsSample` with deterministic `Id = "smh-" + yyyy-MM-dd` + the 7
+    M24 snapshot data members (M33·2), (3) one write session — `session.Store(
+    sample)` + purge `SampleDate < now − RetentionDays` (batched id-collection +
+    delete, one `SaveChangesAsync`, M33·7) — (4) returns the purge count. **Zero**
+    `AccessAudit` rows (M33·4).
+  - `src/Kumunita.Core/Usage/StorageMetricsCaptureTick.cs` — `public sealed
+    record StorageMetricsCaptureTick() : Wolverine.TimeoutMessage(
+    TimeSpan.FromDays(1));` (the `UsagePurgeTick` 1-day shape, M33·3).
+  - `src/Kumunita.Web/SideEffects/StorageMetricsCaptureHandler.cs` — Web thin
+    adapter (M33·3, the `UsagePurgeHandler` shape); `public static async
+    Task<IEnumerable<object>> Handle(StorageMetricsCaptureTick tick,
+    IDocumentStore store, IStorageMetricsService metrics)` — calls the Core
+    service, returns `new[] { new StorageMetricsCaptureTick() }` (the
+    `Task<IEnumerable<object>>` async-cascade shape, not `yield return`).
+- **Program.cs boot seed** — `await bus.PublishAsync(new
+  StorageMetricsCaptureTick());` added next to `await bus.PublishAsync(new
+  UsagePurgeTick());` (the §6.4 boot-seed block, ~line 856), with a
+  doc-comment anchoring M33·3 (the "without this line the handler never fires
+  and no StorageMetricsSample rows are ever stored, so the /admin/storage Trend
+  section is permanently empty" note, the M13 `UsagePurgeTick` seed precedent).
+- **Flags:** M24 `GetSnapshotAsync` **reused** unchanged (M33·1) · **zero**
+  `AccessAudit` rows (M33·4) · no new DI line (the handler is a static thin
+  adapter, the `UsagePurgeHandler` precedent) · **no** compile warnings (build
+  0 Warnings / 0 Errors).
+- **No new test (U07's), no Web surface (U05's), no kw-l keys (U06's).**

@@ -854,6 +854,13 @@ await bus.PublishAsync(new EventReminderTick());
 // UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
 // would silently stop honoring the 365-day constant).
 await bus.PublishAsync(new UsagePurgeTick());
+// M33 (ADR 0156) — the StorageMetricsSample 365-day capture + retention tick
+// (the StorageMetricsCaptureHandler self-reschedules after each run; this
+// seed is the first-boot scheduling. Without this line the handler never
+// fires and no StorageMetricsSample rows are ever stored, so the
+// /admin/storage Trend section is permanently empty — the M13
+// UsagePurgeTick seed precedent, M33·3).
+await bus.PublishAsync(new StorageMetricsCaptureTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).
