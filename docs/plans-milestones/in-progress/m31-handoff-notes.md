@@ -181,3 +181,42 @@ next unit (U01 — design doc Part 1) needs:
   four-language (~20 keys)" — U01's design doc Part 1 does **not** need to
   re-list them (that is U02's §2.3 deliverable); U01 only names the invariant
   (M31·7) and the FACES (M31-8).
+
+## U01 — design doc Part 1
+
+`docs/design/m31-production-error-handling-design.md` Part 1 authored
+(Context / Scope In-Out / Invariants / FACES + the frozen-base header + the
+one-thing summary). All 9 entry reads verified; **no drift** against the
+register (the U00 facts hold — the `Error()` action shape, the 2-member
+`ErrorViewModel`, the 19-line `Error.cshtml`, the `Posts/Report` dormant doc,
+the `UsageEvent` row-per-event shape, ADR 0004 §B.1, ADR 0023). Pinned in
+Part 1, by id, for U02:
+
+- **10 invariants (M31·1–M31·10):** M31·1 platform-error signal, separate
+  context · M31·2 form on the 500 page, always available, non-blocking ·
+  M31·3 Marten-native, new parallel surface (`ErrorReportDocTypes`) ·
+  M31·4 admin list = GlobalAdmin-gated read, no audit on reads · M31·5
+  submission = single-write-lane, exactly one `AccessAudit` row, `Via` tag is
+  **U02's §2.1 pin** (additive-append precedent ADR 013/028/036/041) · M31·6
+  triage = GlobalAdmin-gated **idempotent** single-write-lane (`Via =
+  Admin`), `TriageStatus` closed to `{"new", "triaged"}` · M31·7 closed
+  `errorreport.*` `kw-l` set ×4 (exact set is U02's §2.3) · M31·8 six-member
+  close flip is U07's (`WhatsNew.cs` `0.47.0`) · M31·9 no new authorization
+  surface (error page public; admin `[Authorize(Roles = GlobalAdmin)]`) ·
+  M31·10 `Posts/Report` doc **untouched**.
+- **8 FACES (M31-1–M31-8):** M31-1 anonymous submit → row + 1 audit +
+  confirmation · M31-2 signed-in submit → `SubjectId` set + `Via = Resident`
+  · M31-3 GlobalAdmin list read (newest-first, no audit) · M31-4 mark
+  `new`→`triaged` (stamp + 1 audit, `Via = Admin`) · M31-5 re-stamp
+  already-`triaged` = no-op · M31-6 non-GlobalAdmin → 403 · M31-7 no submit
+  → page renders unchanged · M31-8 labels resolve per request language
+  (`kw-l`).
+- **Nuances for U02:** the `Error()` action (`HomeController` line 153)
+  currently reads only `Activity.Current?.Id ?? HttpContext.TraceIdentifier`;
+  the `IExceptionHandlerFeature` read is U04's enhancement, not a Part-2
+  seam pin. The `ErrorReport` field set (11-member ceiling) is the register's
+  Assumptions — U02 pins it in §2.2; the `UsageEvent` 4-field set is the
+  *shape* analog only, not the field source. The `*DocTypes` block in
+  `Program.cs` spans lines 107–243 (`UsageDocTypes` at 225 is the closest
+  analog — `ErrorReportDocTypes.Configure(opts)` goes next to it, per U03).
+  The 16 pinned test names + the three-test gate are U02's §2.4/§2.5.
