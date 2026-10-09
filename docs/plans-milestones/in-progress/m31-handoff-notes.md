@@ -220,3 +220,67 @@ Part 1, by id, for U02:
   `Program.cs` spans lines 107–243 (`UsageDocTypes` at 225 is the closest
   analog — `ErrorReportDocTypes.Configure(opts)` goes next to it, per U03).
   The 16 pinned test names + the three-test gate are U02's §2.4/§2.5.
+
+## U02 — design doc Part 2 + ADR 0154
+
+Part 2 (`## Seams & contracts (Part 2, written by U02)`) appended to
+`docs/design/m31-production-error-handling-design.md` (§2.1–§2.6) + ADR 0154
+(`docs/adr/0154-production-error-handling.md`, `Status: Draft`) + the 0154 row
+in `docs/adr/README.md` (`Status: Draft`). All entry reads verified; **no
+drift** against Part 1 (the 10 invariants + 8 FACES hold). U03's entry point:
+**§2.1 (the seam + `Via` pin) + §2.2 (the Core types)**.
+
+- **(a) The 3 seam method names** (`IErrorReportService`, §2.1):
+  `CreateAsync(ErrorReportDraft)` · `MarkTriagedAsync(string reportId, string
+  actorId)` · `ListAsync(int maxCount = 100)`. U03 **may** add a trailing
+  optional `CancellationToken ct = default` (the house style, a superset — not
+  a drift); names/params/return-types/`maxCount = 100` default are frozen.
+- **(b) The 16 test names (verbatim, §2.4):** `M31_1_CreateAnonymous_Stores_
+  ErrorReport_And_AuditRow` · `M31_2_CreateSignedIn_Stores_SubjectId_And_AuditRow`
+  · `M31_5_Create_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_6_MarkTriaged_New_Updates_TriageStatus_And_AuditRow` ·
+  `M31_6_MarkTriaged_AlreadyTriaged_Is_NoOp` ·
+  `M31_6_MarkTriaged_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_4_List_Returns_All_Reports_NewestFirst` ·
+  `M31_3_ErrorReport_Doc_FieldSet_Ceiling` ·
+  `M31_2_Error_Page_Shows_Report_Form` ·
+  `M31_5_Error_Report_Post_Creates_ErrorReport` ·
+  `M31_5_Error_Report_Post_Validation_BlankDescription_Renders_Error` ·
+  `M31_2_Error_Report_Post_Confirmation_Visible` ·
+  `M31_4_Admin_List_SignedIn_GlobalAdmin_Sees_Reports` ·
+  `M31_4_Admin_List_NonGlobalAdmin_Denied` ·
+  `M31_6_Admin_MarkTriaged_GlobalAdmin_Updates_Row` ·
+  `M31_6_Admin_MarkTriaged_AlreadyTriaged_NoOp`.
+- **(c) The 3 gate tests (by name, §2.5):** closed-loop (anonymous 500 →
+  submit → row + 1 audit + `errorreport.thanks`) · handoff (GlobalAdmin mark
+  `triaged` → stamp + 1 audit `Via = Admin`; second POST = no-op) ·
+  part-vs-whole (the 16 in §2.4 are the whole; closed-loop + handoff are the
+  parts; all 16 must be green together).
+- **(d) The `Via`-tag pin (U02's decision, §2.1 — U03 implements verbatim):**
+  the `CreateAsync` audit row's `Via` = **`AccessVia.Resident`** (ADR 0041)
+  for a **non-blank** `SubjectId`; **`AccessVia.Anonymous`** (a **new
+  additive** enum value, the 12th — appended after `Resident` in
+  `src/Kumunita.Core/Authorization/Decision.cs` with a doc comment citing
+  ADR 0154 + the ADR 013/028/036/041 append precedent) for a **blank**
+  `SubjectId`. None of the eleven frozen values fits "unsigned visitor"
+  (`Resident` requires a signed-in actor), so the least-distortion slot is a
+  new value — the repo's established answer to "a new standing with no
+  existing tag." The eleven frozen values are **never re-shaped**. The
+  `MarkTriagedAsync` audit row's `Via = AccessVia.Admin`. **This is not a new
+  authorization surface** (M31·9 holds — no new `AccessAction` / `Decide()`
+  branch / `IAuthorizationService` method; the `AccessVia` enum is the
+  *record* of "by what right," not a *gate*). **U03 must add the `Anonymous`
+  enum value** as part of its deliverables (it is named in §2.1/§2.2; it is
+  the one additive `AccessVia` append M31 makes).
+- **(e) ADR 0154 + `Posts/Report` untouched flag:** ADR 0154
+  (`docs/adr/0154-production-error-handling.md`) is **`Status: Draft`**
+  (U07 flips it → `Accepted` at close). The `Posts/Report` doc
+  (`src/Kumunita.Core/Posts/Report.cs`, the M3b content-moderation report,
+  ADR 0023) is **untouched** (M31·10) — M31 adds a *new* doc in a *new*
+  context (`Kumunita.Core.ErrorReports`), not a new field on the existing
+  one; the `TargetKind` strings are distinct (`"error-report"` vs `"post"` /
+  `"reply"`). **§2.6 drift-guard frozen** (the 10 invariants, the 8 FACES,
+  the seam surface, the 11-member field set, the `ErrorReportDraft` shape,
+  the `ErrorReportDocTypes` shape, the `Via` pin, the 20-key set, the 16 test
+  names, the M32 boundary) — a later unit that finds a mismatch records a
+  `## U<m> — Drift pause` (unit-series rule §9) instead of improvising.
