@@ -2,11 +2,13 @@ using System.Diagnostics;
 using Kumunita.Core;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.ErrorReports;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.SiteContent;
 using Kumunita.Core.UserInfo;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -59,6 +61,11 @@ public class HomeController : Controller
     /// singleton, ADR 0150). Null in test constructions; the view degrades to
     /// the in-code fallback (the byte-identical shipped <c>kw-l</c> text +
     /// every section shown), so the page always renders (SITE·1).</param>
+    /// <param name="errorReports">Optional — the M31 (ADR 0154) report-an-issue
+    /// write lane (<see cref="IErrorReportService.CreateAsync"/>). Null in test
+    /// constructions; the 500 page still renders and the form is still shown —
+    /// a submit with no seam degrades to a 500-safe confirmation, never a crash
+    /// (M31·5 "never a 500 back to the resident").</param>
     public HomeController(
         ILogger<HomeController> logger,
         IOptions<CommunityOptions> community,
@@ -69,7 +76,8 @@ public class HomeController : Controller
         ILocalizationService? localization = null,
         IUserInfoService? userInfo = null,
         ITranslationProvider? translationProvider = null,
-        ISiteContentService? siteContent = null)
+        ISiteContentService? siteContent = null,
+        IErrorReportService? errorReports = null)
     {
         _logger = logger;
         _community = community.Value;
@@ -81,6 +89,7 @@ public class HomeController : Controller
         UserInfo = userInfo;
         TranslationProvider = translationProvider;
         SiteContentService = siteContent;
+        ErrorReports = errorReports;
     }
 
     // The optional feed seams (internal so the tests can assert the
@@ -93,6 +102,7 @@ public class HomeController : Controller
     internal IUserInfoService? UserInfo { get; }
     internal ITranslationProvider? TranslationProvider { get; }
     internal ISiteContentService? SiteContentService { get; }
+    internal IErrorReportService? ErrorReports { get; }
 
     public async Task<IActionResult> Index()
     {
@@ -152,8 +162,102 @@ public class HomeController : Controller
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        // M31 (ADR 0154) — read the exception from IExceptionHandlerFeature when
+        // this page is the UseExceptionHandler target (Program.cs, the
+        // production path). A direct visit (no feature) still renders — the
+        // form is the affordance, the exception context is best-effort
+        // metadata only (never a gate, M31·2).
+        Exception? ex = HttpContext.Features.Get<IExceptionHandlerFeature>()?.Error;
+
+        return View(new ErrorViewModel
+        {
+            RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier,
+            ExceptionType = ex?.GetType().Name,
+            ExceptionMessage = ex?.Message,
+        });
     }
+
+    /// <summary>
+    /// M31 (ADR 0154) — the 500-page report-an-issue submission. Binds the
+    /// resident's description + optional contact email, and (on a valid
+    /// model) stores one <see cref="Kumunita.Core.ErrorReports.ErrorReport"/>
+    /// row + exactly one <c>AccessAudit</c> row through the U03
+    /// <see cref="IErrorReportService.CreateAsync"/> write lane, then re-renders
+    /// the error view with the <c>errorreport.thanks</c> confirmation
+    /// (<see cref="ErrorViewModel.FormSubmitted"/> = true — no redirect, no
+    /// modal, M31·2).
+    /// </summary>
+    /// <remarks>
+    /// <b>Blank description is a 400 re-render, never a 500 (M31·5).</b> The
+    /// <c>[Required]</c> + <c>[MinLength]</c> on
+    /// <see cref="ErrorReportFormModel.Description"/> surface in
+    /// <see cref="ModelState"/>; a failed model re-renders the form pre-filled
+    /// (the resident's already-typed text is preserved) instead of calling the
+    /// write lane. The form is <b>public</b> (no <c>[Authorize]</c>, M31·2 /
+    /// M31·9): an anonymous visitor's <c>SubjectId</c> is the empty string, and
+    /// the U03 lane maps that to the <c>AccessVia.Anonymous</c> audit row (the
+    /// §2.1 pin — U03's done work, not re-litigated here). The user agent is
+    /// truncated to 256 chars before the draft (the register's U04 shape).
+    /// </remarks>
+    [HttpPost("/Home/Error/Report")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ErrorReport(ErrorReportFormModel form)
+    {
+        var requestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+        var userAgent = Truncate(HttpContext.Request.Headers.UserAgent.ToString(), 256);
+        string subjectId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+
+        if (!ModelState.IsValid)
+        {
+            // A form-level validation error: re-render the form (the existing
+            // "Something went wrong" + request-ID content stays intact) with
+            // the resident's already-typed values preserved — never a 500.
+            return View("Error", new ErrorViewModel
+            {
+                RequestId = requestId,
+                FormSubmitted = false,
+                FormDescription = form.Description,
+                FormContactEmail = form.ContactEmail,
+            });
+        }
+
+        // The write lane is optional (null in test constructions): when present,
+        // store the report row + one audit row in one session (the U03
+        // single-write-lane shape); a failure must never crash the page —
+        // degrade to the confirmation (M31·5 "never a 500 back to the resident").
+        if (ErrorReports is not null)
+        {
+            var draft = new ErrorReportDraft(
+                SubjectId: subjectId,
+                Description: form.Description,
+                ContactEmail: string.IsNullOrWhiteSpace(form.ContactEmail) ? null : form.ContactEmail,
+                RequestId: requestId,
+                ExceptionType: HttpContext.Features.Get<IExceptionHandlerFeature>()?.Error?.GetType().Name,
+                UserAgent: userAgent);
+            try
+            {
+                _ = await ErrorReports.CreateAsync(draft).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Swallow: a report failure must never surface as a 500 to the
+                // resident (the page already failed once — the report is a best-
+                // effort follow-up, M31·5). The confirmation still renders.
+            }
+        }
+
+        return View("Error", new ErrorViewModel
+        {
+            RequestId = requestId,
+            FormSubmitted = true,
+        });
+    }
+
+    /// <summary>Truncates a value to <paramref name="max"/> chars (the
+    /// user-agent cap, the register's U04 shape); null-safe (null in, null
+    /// out).</summary>
+    private static string? Truncate(string? value, int max) =>
+        value is null ? null : (value.Length <= max ? value : value[..max]);
 
     // ── the signed-in "what's new" feed ────────────────────────────────────
 

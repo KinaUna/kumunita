@@ -382,3 +382,115 @@ non-blank `SubjectId`, `AccessVia.Anonymous` for blank) is implemented
   `AccessVia.Admin` for `MarkTriagedAsync`); the 5 new
   `ErrorViewModel` fields U04 adds; the 20 `kw-l` keys U05 authors (U04
   consumes keys 1–8 on the error page).
+
+## U04 — error page enhancement
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 errors, 0 warnings)**. All
+entry reads verified; **no drift** against the register's U04 deliverable or
+§2.1/§2.3 — the 5 `ErrorViewModel` fields are the register's list verbatim,
+the 7 form `kw-l` keys 1–8 are consumed verbatim, the U03 seam is called
+**as-is** (the `Via` pin is U03's done work — not re-litigated). 5 files
+touched (4 in `src/Kumunita.Web` + this note). U05's entry point: keys 1–8
+below are now **consumed** by the error page (the `en` values the `kw-l`
+TagHelper / `ITranslationProvider.GetAsync` resolve are the §2.3 floor); the
+`ErrorReportFormModel` bind-model shape + the `POST /Home/Error/Report` route
++ the `FormSubmitted` confirmation are the page U05's admin view mirrors.
+
+- **(a) The `Error()` action**
+  (`src/Kumunita.Web/Controllers/HomeController.cs`, `Error()` — now an
+  `IActionResult` returning a `View(...)`; the `IExceptionHandlerFeature`
+  read is one line: `Exception? ex =
+  HttpContext.Features.Get<IExceptionHandlerFeature>()?.Error;`, then
+  `ExceptionType = ex?.GetType().Name` + `ExceptionMessage = ex?.Message`
+  + the existing `RequestId = Activity.Current?.Id ??
+  HttpContext.TraceIdentifier`). The `using
+  Microsoft.AspNetCore.Diagnostics;` was added for
+  `IExceptionHandlerFeature`. **The `POST /Home/Error/Report` action**
+  (`ErrorReport(ErrorReportFormModel form)`, `async Task<IActionResult>`,
+  `[HttpPost("/Home/Error/Report")]` + `[ValidateAntiForgeryToken]`, the
+  house `AdminOnboardingController.Complete` shape): reads
+  `requestId`/`userAgent`(truncated to 256)/`subjectId`
+  (`KumunitaPrincipal.SubjectId(User) ?? string.Empty`); on
+  `!ModelState.IsValid` re-renders the `Error` view with
+  `FormSubmitted=false` + the resident's typed `FormDescription` /
+  `FormContactEmail` preserved (a blank description → 400 re-render, never
+  a 500, M31·5); else builds `new ErrorReportDraft(SubjectId, Description,
+  ContactEmail, RequestId, ExceptionType, UserAgent)` and calls
+  `await ErrorReports.CreateAsync(draft).ConfigureAwait(false)` inside a
+  `try/catch` that **swallows** (a report failure must never surface as a
+  500 to the resident, M31·5 "never a 500 back to the resident"), then
+  re-renders the `Error` view with `FormSubmitted = true` (the
+  `errorreport.thanks` confirmation — no redirect, no modal, M31·2).
+  `IErrorReportService` is injected as an **optional** last ctor param
+  (`IErrorReportService? errorReports = null`, the `PostService?` /
+  `ISiteContentService?` house shape — null in test constructions, the form
+  still renders + a submit degrades to the confirmation). A private
+  `Truncate(string?, int)` helper caps the user agent at 256 (the
+  register's U04 shape).
+- **(b) The `ErrorViewModel` fields added (5)**
+  (`src/Kumunita.Web/Models/ErrorViewModel.cs`): `ExceptionType`
+  (`string?`), `ExceptionMessage` (`string?`), `FormSubmitted`
+  (`bool`, default `false`), `FormDescription` (`string`, default `""`),
+  `FormContactEmail` (`string?`) — **verbatim** the register's U04 list.
+  `RequestId` + `ShowRequestId` unchanged. **New bind model**
+  (`src/Kumunita.Web/Models/ErrorReportFormModel.cs`): `Description`
+  (`[Required]` — the register's U04 "required, non-blank" pin; no extra
+  `MinLength` over-constraint) + `ContactEmail` (`[EmailAddress]
+  [MaxLength(254)]` — the 254-char email cap is the RFC 5321 maximum, the
+  `ContactEmail` field's natural bound) — the POST action's bind target
+  (the view's `@model` is `ErrorViewModel`, so the form uses explicit `name`
+  attributes — the echo-back comes from `Model.FormDescription` /
+  `Model.FormContactEmail`).
+- **(c) The `Error.cshtml` form markup**
+  (`src/Kumunita.Web/Views/Shared/Error.cshtml`): the existing
+  `error.title` / `error.subtitle` / `error.request_id` /
+  `error.development_title` / `error.development_hint` `kw-l` keys are
+  **intact** (the register's U04 "keep the existing … content intact" pin);
+  the `@Model.ExceptionType` / `@Model.ExceptionMessage` fields are
+  **deliberately NOT rendered** on the public page (a Razor/security
+  choice — they would leak implementation details, file paths, SQL,
+  internal state; they are captured into the `ErrorReportDraft` via the
+  POST action's `IExceptionHandlerFeature` read + the `ErrorViewModel`
+  fields are present per the register's U04 list — M31·2 / SECURITY.md
+  privacy posture; the public page stays generic, the request ID is the
+  resident's correlation handle); **below** an `<hr>`: if
+  `Model.FormSubmitted` → the `errorreport.thanks` confirmation
+  (key 8, the `alert-success`); else → the report form consuming **the 7
+  `kw-l` keys 1–7 verbatim** (`errorreport.title` /
+  `errorreport.intro` / `errorreport.description.label` /
+  `errorreport.description.placeholder` / `errorreport.email.label` /
+  `errorreport.email.placeholder` / `errorreport.submit`) + a
+  `<textarea name="Description">` + an `<input type="email"
+  name="ContactEmail">` + a submit button, POSTing to `/Home/Error/Report`
+  with `@Html.AntiForgeryToken()`. The form is **public** (no
+  `[Authorize]` gate, M31·2 / M31·9). **Razor traps honored (AGENTS.md):**
+  the 7 keys are resolved **server-side** (the `EffectiveLanguageCode.
+  ResolveAsync` + `ITranslationProvider.GetAsync` house seam, the
+  `_OnboardingBanner.cshtml` shape) into local vars (`rpTitle` …
+  `rpThanks`), with the `KnownTranslationKeys.EnValues` provider-floor
+  fallback (ADR 0015 D1) — so **no `<kw-l>` inside a quoted attribute
+  value** and **no un-awaited `Task<string>`** in markup.
+  `@section Scripts { <partial name="_ValidationScriptsPartial" /> }`
+  included (the layout `RenderSectionAsync("Scripts")` is `required:
+  false`).
+- **(d) Compile warnings:** **0** new warnings — the 68 solution warnings
+  are all pre-existing (test files + `_Layout.cshtml` / `Groups/Detail.cshtml`
+  / `Posts/Detail.cshtml` / `PostsController.cs` / `ProjectsController.cs` /
+  `_WhatsNewToast.cshtml` / `_PageForm.cshtml` / `_BoardCard.cshtml` /
+  `TodosIndex.cshtml` / `AccountController.cs` — **none** in `Error.cshtml` /
+  `HomeController.cs` / `ErrorViewModel.cs` / `ErrorReportFormModel.cs`,
+  verified by `grep -E "Error\.cshtml|ErrorViewModel|ErrorReportFormModel|
+  HomeController"` on the build output → empty). Two compile fixes during
+  this unit (both in **U04's own view only**, no drift): (1) the first pass
+  referenced `ITranslationProvider` unqualified (CS0246) — fixed with
+  `@using Kumunita.Core.Localization` + the `@inject` lines; (2) the first
+  pass used a `static string L(...)` local fn with a
+  `.GetAwaiter().GetResult()` bridge (a non-async `@{}` block) — replaced
+  with the house `_OnboardingBanner.cshtml` shape: a `static async Task<
+  string> L(...)` local fn + direct `await tp.GetAsync(key, lang)` (the
+  Razor `@{}` block is async, so `await` is the compile-correct + house-
+  idiomatic shape; the resolution is the same `GetAsync` the TagHelper path
+  uses).
+- **(e) `m31-u04.md` move:** **skipped** — the file does not exist in
+  `in-progress/` (only `m31-u00.md` is present, already moved to
+  `done/m31/`); the register's "if the file exists" condition is not met.

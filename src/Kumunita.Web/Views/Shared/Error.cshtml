@@ -1,6 +1,43 @@
-﻿@model ErrorViewModel
+﻿@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@model ErrorViewModel
+@inject ILocalizationService Localization
+@inject ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Error";
+
+    // ── M31 (ADR 0154) — resolve the errorreport.* kw-l keys 1–8 server-side ──
+    // The <kw-l> TagHelper can't wrap an attribute (the Razor trap in AGENTS.md:
+    // "A TagHelper tag inside a quoted attribute value renders as raw HTML text"),
+    // so labels/placeholders/buttons are resolved here via the same house seam
+    // the <kw-l> TagHelper uses (EffectiveLanguageCode.ResolveAsync +
+    // ITranslationProvider.GetAsync), with the KnownTranslationKeys.EnValues
+    // provider-floor fallback (ADR 0015 D1 — code is the floor, so a resident
+    // never sees a raw key even if the translation seam is absent).
+    // The _OnboardingBanner.cshtml house shape.
+    string? effLang = null;
+    if (Localization is not null && Translation is not null)
+    {
+        try { effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor?.HttpContext?.Request, Localization, Translation); }
+        catch { effLang = null; }
+    }
+
+    static async Task<string> L(string key, string? lang, ITranslationProvider? tp)
+    {
+        if (tp is not null && lang is not null)
+            return await tp.GetAsync(key, lang);
+        return KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key;
+    }
+
+    string rpTitle   = await L("errorreport.title", effLang, Translation);
+    string rpIntro   = await L("errorreport.intro", effLang, Translation);
+    string rpDescL   = await L("errorreport.description.label", effLang, Translation);
+    string rpDescP   = await L("errorreport.description.placeholder", effLang, Translation);
+    string rpEmailL  = await L("errorreport.email.label", effLang, Translation);
+    string rpEmailP  = await L("errorreport.email.placeholder", effLang, Translation);
+    string rpSubmit  = await L("errorreport.submit", effLang, Translation);
+    string rpThanks  = await L("errorreport.thanks", effLang, Translation);
 }
 
 <h1 class="text-danger"><kw-l key="error.title">Error.</kw-l></h1>
@@ -13,7 +50,79 @@
     </p>
 }
 
+@* NOTE (M31): the exception type/message (Model.ExceptionType /
+   Model.ExceptionMessage) are deliberately NOT rendered on this public page —
+   they would leak implementation details (file paths, SQL, internal state).
+   They are captured into the ErrorReport row (via ErrorReportDraft) for the
+   GlobalAdmin's /admin/error-reports surface (U05) + log correlation. The
+   public page stays generic (the request ID is the resident's correlation
+   handle). M31·2 / SECURITY.md privacy posture. *@
+
 <h3><kw-l key="error.development_title">Development Mode</kw-l></h3>
 <p>
     <kw-l key="error.development_hint">Swapping to the Development environment will display more detailed information about the error that occurred. The Development environment shouldn't be enabled for deployed applications — it can reveal sensitive information from exceptions to end users.</kw-l>
 </p>
+
+<!-- ── M31 (ADR 0154) — the report-an-issue affordance (M31·2, M31·8) ──────
+     Public, anonymous-safe, non-blocking. If the resident submitted the form,
+     show the confirmation; otherwise show the form. The form is NOT inside any
+     [Authorize] gate (M31·2 / M31·9). -->
+<hr class="my-4" />
+
+@if (Model.FormSubmitted)
+{
+    <!-- The post-submission confirmation (key 8: errorreport.thanks) —
+         no redirect, no modal, M31·2. -->
+    <div class="alert alert-success" role="status">
+        <p class="mb-0">@rpThanks</p>
+    </div>
+}
+else
+{
+    <!-- The report form (keys 1–7) — always available on the 500 page. -->
+    <div class="card" role="region" aria-label="@rpTitle">
+        <div class="card-body">
+            <h2 class="h5 card-title">@rpTitle</h2>
+            <p class="card-text text-muted">@rpIntro</p>
+
+            @* The form binds to ErrorReportFormModel (Description + ContactEmail)
+               via explicit name attributes — the view's @model is ErrorViewModel
+               (display: FormSubmitted, ExceptionType, etc.), so asp-for is not
+               available for the bind-model fields. The echo-back values come
+               from Model.FormDescription / Model.FormContactEmail (set by the
+               POST action on a validation re-render). *@
+            <form asp-controller="Home" asp-action="ErrorReport" method="post">
+                @Html.AntiForgeryToken()
+
+                @* Shows only when ModelState has errors (a blank description →
+                   400 re-render, never a 500, M31·5). The house Setup.cshtml
+                   idiom. *@
+                <div asp-validation-summary="All" class="text-danger"></div>
+
+                <div class="mb-3">
+                    <label for="rp-description" class="form-label">@rpDescL</label>
+                    <textarea name="Description" id="rp-description"
+                              class="form-control"
+                              rows="4"
+                              placeholder="@rpDescP">@Model.FormDescription</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="rp-email" class="form-label">@rpEmailL</label>
+                    <input name="ContactEmail" id="rp-email"
+                           class="form-control"
+                           type="email"
+                           autocomplete="email"
+                           placeholder="@rpEmailP"
+                           value="@(Model.FormContactEmail ?? "")" />
+                </div>
+
+                <button type="submit" class="btn btn-primary">@rpSubmit</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
