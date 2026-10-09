@@ -370,4 +370,509 @@ Part 2 (Seams & contracts — the exact `StorageMetricsSample` doc shape, the
 `StorageHistoryDocTypes` surface, the capture service / tick / handler shapes,
 the `RetentionDays` constant, the closed `storage.trend.*` `kw-l` key set, the
 11 pinned test names, the three-test acceptance gate, the drift-guard) is
-authored by U02 (`m33-u02.md`) + **ADR 0156**.*
+authored by U02, 2026-10-09 + **ADR 0156**.*
+
+## Seams & contracts (Part 2, written by U02)
+
+Part 1 froze **which** invariants + FACES bind M33. Part 2 freezes the
+**shapes** — the exact C# the implementation units (U03–U06) must match, the
+closed `storage.trend.*` `kw-l` key set, the 11 pinned test names, the
+three-test acceptance gate, and the drift-guard. Every shape below is a
+frozen pin: a unit that disagrees pauses and records a `## U<m> — Drift
+pause` (unit-series rule §12).
+
+### 2.1 frozen seam list (exact C#)
+
+The M33 additive seam on the existing `IStorageMetricsService` (the
+**5th** method — the 3 M24 `GetSnapshotAsync` / `GetPerUserListAsync` /
+`GetPerUserUsageBytesAsync` + the M25 ADD `GetPlatformSpaceAsync` are
+**unchanged**, M33·1):
+
+```csharp
+namespace Kumunita.Core.Usage;
+
+public interface IStorageMetricsService
+{
+    // … 3 M24 methods + the M25 GetPlatformSpaceAsync ADD, unchanged (M33·1) …
+
+    /// <summary>
+    /// The M33 history read (M33·1 / M33·8): the <see cref="StorageMetricsSample"/>
+    /// rows whose <c>SampleDate</c> falls within the trailing <paramref name="days"/>-day
+    /// window, **ascending** by <c>SampleDate</c>. <paramref name="days"/> is a
+    /// **pinned** value in <c>{30, 90, 180, 365}</c>; an unknown value throws
+    /// <see cref="ArgumentOutOfRangeException"/> (the M13
+    /// <c>IUsageAnalyticsService.GetWindowAsync</c> "unknown value throws, not
+    /// a 0-row query" precedent, M33·8). Read-only, zero writes, zero
+    /// <c>AccessAudit</c> rows (M33·4) — one <c>QuerySession</c>.
+    /// </summary>
+    Task<StorageHistoryResult> GetHistoryAsync(int days,
+        CancellationToken ct = default);
+}
+
+/// <summary>
+/// The M33 history read result (the M13 <c>UsageAnalyticsResult</c> wrapper
+/// precedent). <see cref="WindowDays"/> echoes the pinned window the caller
+/// passed (so the view can label the section without re-deriving it);
+/// <see cref="Points"/> is the sample rows **ascending** by
+/// <c>SampleDate</c> — **only the days present** (no fabricated zero rows,
+/// the M33-9 FACE).
+/// </summary>
+public sealed record StorageHistoryResult(int WindowDays,
+    IReadOnlyList<StorageMetricsSample> Points);
+```
+
+The **capture lane** shapes (verbatim from the register's Assumptions, the
+M13 `UsagePurge` / M1 `AuditPurge` precedent, M33·3 / M33·5):
+
+```csharp
+// Kumunita.Core/Usage/StorageMetricsCaptureService.cs (new)
+using Marten;
+
+namespace Kumunita.Core.Usage;
+
+/// <summary>
+/// The M33 storage-sample capture + retention (ADR 0156, M33·2 / M33·5 / M33·7).
+/// A <b>Wolverine-free static class</b> (the
+/// <see cref="UsagePurgeService"/> house shape): the handler injects a live
+/// <see cref="IDocumentStore"/> + the live <see cref="IStorageMetricsService"/>
+/// and calls this; the business logic has **no** Wolverine reference, **no**
+/// <c>HttpClient</c> (ADR 0006-D), and **zero** <c>AccessAudit</c> rows
+/// (M33·4). One sample per UTC day (the deterministic <c>Id</c> overwrites a
+/// same-day row — idempotent-by-construction, M33·2); the purge rides the
+/// **same** run (the M13 "one durable job" shape, M33·7).
+/// </summary>
+public static class StorageMetricsCaptureService
+{
+    /// <summary>The M33 retention: 365 days (the
+    /// <see cref="UsagePurgeService.RetentionDays"/> platform-constant
+    /// precedent, M33·7 — a per-instance knob is a **named deferral**).</summary>
+    public const int RetentionDays = 365;
+
+    /// <summary>
+    /// (1) computes the M24 snapshot via <c>metrics.GetSnapshotAsync(ct)</c>
+    /// (the **M24 frozen seam reuse**, the M33·1 pin — the capture reuses the
+    /// exact same read the surface renders); (2) stores **one**
+    /// <see cref="StorageMetricsSample"/> for <c>now</c>'s UTC day (the
+    /// deterministic <c>Id</c> <c>"smh-" + yyyy-MM-dd</c> overwrites a same-day
+    /// row — M33·2); (3) **purges** <see cref="StorageMetricsSample"/> rows
+    /// with <c>SampleDate &lt; now − RetentionDays</c> (batched id-collection +
+    /// delete in **one** session, no per-row <c>SaveChangesAsync</c>, the
+    /// <see cref="UsagePurgeService.PurgeAsync"/> house shape — M33·7); and
+    /// (4) returns the purge count. **Zero** <c>AccessAudit</c> rows (M33·4).
+    /// </summary>
+    public static async Task<int> CaptureAndPurgeAsync(
+        IDocumentStore store,
+        IStorageMetricsService metrics,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(metrics);
+
+        // (1) The M24 frozen seam reuse (M33·1) — the exact same read the
+        // surface renders.
+        var snap = await metrics.GetSnapshotAsync(ct);
+
+        // (2) Build the sample for now's UTC day (the deterministic Id,
+        // the 7 data members mirroring StorageMetricsSnapshot, SampleDate
+        // replacing AsOf — the M33·2 8-member ceiling).
+        var day = now.ToUniversalTime().Date;
+        var sample = new StorageMetricsSample
+        {
+            Id = "smh-" + day.ToString("yyyy-MM-dd"),
+            SampleDate = now,
+            TotalUsedBytes = snap.TotalUsedBytes,
+            TotalVolumeBytes = snap.TotalVolumeBytes,
+            FreeVolumeBytes = snap.FreeVolumeBytes,
+            UserContentUsedBytes = snap.UserContentUsedBytes,
+            TotalUniqueFiles = snap.TotalUniqueFiles,
+            TotalDistinctUsers = snap.TotalDistinctUsers,
+        };
+
+        // (3) One write session: store the sample (the deterministic Id
+        // overwrites a same-day row — the M33·2 idempotent-by-construction
+        // pin) + purge the expired (the UsagePurgeService batched shape —
+        // one SaveChangesAsync for the whole batch, M33·7).
+        var cutoff = now.AddDays(-RetentionDays);
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        {
+            session.Store(sample);
+            var expiredIds = (await session.Query<StorageMetricsSample>()
+                                       .Where(s => s.SampleDate < cutoff)
+                                       .Select(s => s.Id)
+                                       .ToListAsync(ct))
+                           .Distinct().ToList();
+            foreach (var id in expiredIds) session.Delete<StorageMetricsSample>(id);
+            await session.SaveChangesAsync(ct);
+            return expiredIds.Count;
+        }
+    }
+}
+```
+
+```csharp
+// Kumunita.Core/Usage/StorageMetricsCaptureTick.cs (new)
+namespace Kumunita.Core.Usage;
+
+/// <summary>
+/// The recurring message shape for the M33 storage-metrics-capture job
+/// (ADR 0156, M33·3 — the <see cref="UsagePurgeTick"/> shape verbatim: one
+/// class, one baked-in schedule (1 day), re-yielded by the
+/// <see cref="Kumunita.Web.SideEffects.StorageMetricsCaptureHandler"/> after
+/// each run. The <see cref="Wolverine.TimeoutMessage"/> 1-day delay is baked
+/// into the type, so every re-publish carries the same cadence — no
+/// per-callsite <c>DelayedFor</c> needed. Postgres-backed durability (a
+/// Coolify redeploy mid-day does not silently drop a pending run, the
+/// <see cref="UsagePurgeTick"/> precedent).
+/// </summary>
+public sealed record StorageMetricsCaptureTick()
+    : Wolverine.TimeoutMessage(TimeSpan.FromDays(1));
+```
+
+```csharp
+// Kumunita.Web/SideEffects/StorageMetricsCaptureHandler.cs (new)
+using Kumunita.Core.Usage;
+using Marten;
+
+namespace Kumunita.Web.SideEffects;
+
+/// <summary>
+/// The recurring <see cref="StorageMetricsCaptureTick"/> job (ADR 0156,
+/// M33·3 — the <see cref="UsagePurgeHandler"/> thin-adapter shape verbatim).
+/// Each run re-publishes <see cref="StorageMetricsCaptureTick"/> for the
+/// next day (the <see cref="Wolverine.TimeoutMessage"/>'s 1-day delay is
+/// baked into the type, so this re-publish picks up the same cadence). The
+/// business logic is the Wolverine-free
+/// <see cref="StorageMetricsCaptureService"/> in <c>Kumunita.Core</c> — this
+/// handler is a thin adapter that injects a live <see cref="IDocumentStore"/>
+/// + the live <see cref="IStorageMetricsService"/> into that service, then
+/// re-schedules the next tick. Postgres-backed durability (the
+/// <see cref="UsagePurgeHandler"/> precedent).
+/// </summary>
+public static class StorageMetricsCaptureHandler
+{
+    /// <summary>
+    /// Durable recurring tick: self-schedules 1 day ahead.
+    /// <c>Task&lt;IEnumerable&lt;object&gt;&gt;</c> is the async-eligible
+    /// cascade shape in Wolverine (an <c>IEnumerable&lt;object&gt;</c>
+    /// iterator can't <c>await</c>); we return the array rather than
+    /// <c>yield return</c> (which is invalid inside an async method) — the
+    /// <see cref="UsagePurgeHandler"/> note.
+    /// </summary>
+    public static async Task<IEnumerable<object>> Handle(
+        StorageMetricsCaptureTick tick,
+        IDocumentStore store,
+        IStorageMetricsService metrics)
+    {
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(
+            store, metrics, DateTimeOffset.UtcNow);
+
+        return new[] { new StorageMetricsCaptureTick() };
+    }
+}
+```
+
+The **Program.cs boot seed** (the M13 `UsagePurgeTick` seed shape — next to
+`await bus.PublishAsync(new UsagePurgeTick());` around line 846):
+
+```csharp
+// M33 (ADR 0156) — the StorageMetricsSample 365-day capture + retention tick
+// (the StorageMetricsCaptureHandler self-reschedules after each run; this
+// seed is the first-boot scheduling. Without this line the handler never
+// fires and no StorageMetricsSample rows are ever stored, so the
+// /admin/storage Trend section is permanently empty — the M13
+// UsagePurgeTick seed precedent, M33·3).
+await bus.PublishAsync(new StorageMetricsCaptureTick());
+```
+
+The **M24 surface extension** (M33·9, additive-only — the M24
+`[Authorize(Roles = GlobalAdmin)]` gate + the M24 `GetSnapshotAsync` +
+`GetPerUserListAsync` reads are **unchanged**):
+
+```csharp
+// Kumunita.Web/Controllers/AdminStorageMetricsController.cs (modify)
+[HttpGet]
+public async Task<IActionResult> Index(
+    [FromQuery] int page = 1,
+    [FromQuery] int window = 90,          // M33·8 default window
+    CancellationToken ct = default)
+{
+    // … M24 snapshot + per-user list reads (unchanged, M33·1) …
+    // M33 additive: the history read (the M33·8 pinned-window guard throws
+    // ArgumentOutOfRangeException on an unknown value — the M13 windowDays
+    // precedent, 400s at the surface).
+    var history = await _metrics.GetHistoryAsync(window, ct);
+    // … M24 view-model construction (unchanged) + History/WindowDays (M33) …
+}
+```
+
+```csharp
+// Kumunita.Web/Models/AdminStorageMetricsViewModel.cs (modify)
+public IReadOnlyList<StorageMetricsSample> History { get; init; }
+    = Array.Empty<StorageMetricsSample>();
+public int WindowDays { get; init; } = 90;
+```
+
+### 2.2 new M33-owned Core types (exact C#)
+
+The `StorageMetricsSample` doc (the **8-member M33·2 ceiling** — the `Id` +
+the 7 data members mirroring the M24 `StorageMetricsSnapshot`, `SampleDate`
+replacing `AsOf`):
+
+```csharp
+// Kumunita.Core/Usage/StorageMetricsSample.cs (new)
+namespace Kumunita.Core.Usage;
+
+/// <summary>
+/// The M33 storage-sample document (ADR 0156, M33·2) — the M24
+/// <see cref="StorageMetricsSnapshot"/> frozen at a UTC day boundary. One
+/// sample per UTC day; the <see cref="Id"/> is **deterministic**
+/// (<c>"smh-" + yyyy-MM-dd</c> from <see cref="SampleDate"/>'s UTC date),
+/// so a same-day re-capture **overwrites** the row
+/// (idempotent-by-construction — the M13 "no-double-send guard" / the M32·8
+/// idempotency precedent; **no** dedup query needed, M33·2).
+/// <para>
+/// The 8-member field set below is the **M33·2 ceiling** — no field outside
+/// the set may appear in the doc (drift-guard §2.6). The
+/// <see cref="StorageMetricsSnapshot.AsOf"/> member is **not** carried
+/// (replaced by <see cref="SampleDate"/> — the snapshot's capture instant is
+/// the day).
+/// </para>
+/// <para>
+/// This doc is **not** an <c>IAuditableResource</c> — it is platform
+/// telemetry (the M13 C-M13·6 "the <c>UsageEvent</c> row is not an auditable
+/// resource" + the M24 C-SM·6 "read = no row" precedent); a capture emits
+/// **zero** <c>AccessAudit</c> rows (M33·4). The sample **never leaves the
+/// instance** (M33·6).
+/// </para>
+/// </summary>
+public sealed class StorageMetricsSample
+{
+    /// <summary>The deterministic <c>"smh-" + yyyy-MM-dd</c> id (M33·2).</summary>
+    public string Id { get; set; } = null!;
+
+    /// <summary>The UTC day captured (M33·2 — the snapshot's capture instant).</summary>
+    public DateTimeOffset SampleDate { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.TotalUsedBytes"/>.</summary>
+    public long TotalUsedBytes { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.TotalVolumeBytes"/>.</summary>
+    public long TotalVolumeBytes { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.FreeVolumeBytes"/>.</summary>
+    public long FreeVolumeBytes { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.UserContentUsedBytes"/>
+    /// (<c>== TotalUsedBytes</c> by M24 design).</summary>
+    public long UserContentUsedBytes { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.TotalUniqueFiles"/>.</summary>
+    public int TotalUniqueFiles { get; set; }
+
+    /// <summary>Mirrors <see cref="StorageMetricsSnapshot.TotalDistinctUsers"/>.</summary>
+    public int TotalDistinctUsers { get; set; }
+}
+```
+
+The `StorageHistoryDocTypes` parallel-surface registration (the ADR 0004
+§B.1 shape — the `UsageDocTypes` / `StorageSettingsDocTypes` precedent,
+M33·1):
+
+```csharp
+// Kumunita.Core/Usage/StorageHistoryDocTypes.cs (new)
+using Marten;
+
+namespace Kumunita.Core.Usage;
+
+/// <summary>
+/// The M33 storage-history doc surface (ADR 0004 §B.1 — a parallel surface
+/// to <see cref="UsageDocTypes"/> / <see cref="StorageSettingsDocTypes"/>,
+/// not additive on an existing one: <see cref="StorageMetricsSample"/> uses
+/// the conventional string <c>Id</c>, so no non-default convention or
+/// business-key index is pinned). Without the boot-path call the doc is
+/// invisible to Marten (the M3/Media/Usage precedent, M33·1).
+/// </summary>
+public static class StorageHistoryDocTypes
+{
+    public static void Configure(StoreOptions opts)
+    {
+        opts.Schema.For<StorageMetricsSample>();
+    }
+}
+```
+
+The `StorageMetricsService.GetHistoryAsync` impl (one `QuerySession` + one
+`StorageMetricsSample` query over the window, **ascending** — the M24
+Linq-to-objects fallback precedent; the pinned-window guard throwing
+`ArgumentOutOfRangeException`, M33·8):
+
+```csharp
+// Kumunita.Core/Usage/StorageMetricsService.cs (modify — additive only)
+/// <inheritdoc/>
+public async Task<StorageHistoryResult> GetHistoryAsync(int days,
+    CancellationToken ct = default)
+{
+    // The M33·8 pinned-window guard (the M13 windowDays precedent — an
+    // unknown value throws, not a 0-row query).
+    if (days is not (30 or 90 or 180 or 365))
+        throw new ArgumentOutOfRangeException(nameof(days),
+            days, $"Window must be one of 30, 90, 180, 365 days (M33·8).");
+
+    var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+
+    // One QuerySession (M33·4 — read-only, zero writes, zero AccessAudit
+    // rows): the StorageMetricsSample rows in the trailing window, ascending.
+    // The Linq-to-objects fallback over a ToListAsync row set (the
+    // GetSnapshotAsync precedent) — one server-side ToListAsync, then
+    // client-side OrderBy; the deterministic result is identical to a
+    // server-side ORDER BY.
+    await using var session = _store.QuerySession();
+    var points = (await session.Query<StorageMetricsSample>()
+                                .Where(s => s.SampleDate >= cutoff)
+                                .ToListAsync(ct))
+                 .OrderBy(s => s.SampleDate)
+                 .ToList();
+    return new StorageHistoryResult(days, points);
+}
+```
+
+### 2.3 the closed `storage.trend.*` `kw-l` key set
+
+The **closed** M33 `storage.trend.*` `kw-l` key set — the **10 keys** (the
+M24 `storage.*` key set is **unchanged**, M33·1 additive-only; M33 **adds**
+this set, M33·11). Every key is present, **non-empty, in all four**
+languages (en/de/fr/da), pinned by `KwLRegistryConsistencyTests` +
+`KnownTranslationKeys_ParityTests` (the M33·11 pin). The `en` value is the
+source text (the ADR 0015 D1 `kw-l` provider-floor discipline); the `de` /
+`fr` / `da` values are U06's to author (the M30·6 four-language pin).
+
+| Key | `en` value (source text) |
+|-----|--------------------------|
+| `storage.trend.title` | `Storage trend` |
+| `storage.trend.window.30` | `30 days` |
+| `storage.trend.window.90` | `90 days` |
+| `storage.trend.window.180` | `180 days` |
+| `storage.trend.window.365` | `365 days` |
+| `storage.trend.col.date` | `Date` |
+| `storage.trend.col.used` | `Total used` |
+| `storage.trend.col.free` | `Free` |
+| `storage.trend.legend.used` | `Total used over window` |
+| `storage.trend.empty` | `No samples recorded yet — the daily capture tick has not run (or the samples are older than the retention window).` |
+
+### 2.4 pinned seam tests (exact names)
+
+**Core** — `tests/Kumunita.Core.Tests/Usage/StorageMetricsHistoryTests.cs`
+(**7** tests):
+
+1. `M33_2_Capture_Stores_One_Sample_Per_Day` — the capture stores **exactly
+   one** `StorageMetricsSample` row for the current UTC day (M33·2 pin).
+2. `M33_5_Capture_SameDayTwice_Dedups` — the capture run **twice** the same
+   day stores the **same single** row (the deterministic `Id` dedups — the
+   M33·2 idempotent-by-construction pin).
+3. `M33_4_Capture_Writes_No_AuditRow` — the capture writes **zero**
+   `AccessAudit` rows (the M33·4 pin).
+4. `M33_7_Purge_Deletes_Expired_Samples` — the capture **purges**
+   `StorageMetricsSample` rows older than `RetentionDays` (the M33·7 pin) and
+   keeps recent ones.
+5. `M33_2_Sample_FieldSet_Snapshot_Shape` — the stored sample's field set is
+   the **8-member M33·2 ceiling** (the `Id` + the 7 data members mirroring
+   the M24 `StorageMetricsSnapshot`) (M33·2).
+6. `M33_8_GetHistory_Returns_Only_Days_Present` — `GetHistoryAsync(30)` over
+   a window with gaps (some days missing) returns **only the days present**
+   (no fabricated zero rows — the M33-9 FACE).
+7. `M33_8_GetHistory_Unknown_Window_Throws` — `GetHistoryAsync(999)` throws
+   `ArgumentOutOfRangeException` (the M33·8 / M13 `windowDays` pin).
+
+**Web** — `tests/Kumunita.Web.Tests/AdminStorageMetricsHistoryTests.cs`
+(**4** tests):
+
+8. `M33_9_GlobalAdmin_Sees_Trend_Section` — a `GlobalAdmin` sees the **Trend**
+   section on `/admin/storage` (the `storage.trend.title` `kw-l` key is
+   present in the HTML) + the M24 four-metric header + per-user table still
+   render (the M33·9 additive-only pin).
+9. `M33_2_Window_Switch_Renders_Chosen_Window` — the `?window=30` /
+   `?window=180` / `?window=365` params render the chosen window (the M33·8
+   pin).
+10. `M33_3_Empty_History_Renders_Empty_Message` — an **empty** history renders
+    the `storage.trend.empty` message (the M33-3 FACE).
+11. `M33_7_NonGlobalAdmin_Denied` — a non-`GlobalAdmin` (signed-in resident)
+    gets a **403** on `/admin/storage` (the M24 gate is unchanged — the M33-7
+    FACE).
+
+### 2.5 acceptance gate (U07 records)
+
+The three-test shape (each is a composite assertion over the pins above —
+they run **after** U03–U06 land and before U08 flips the close):
+
+- **Closed loop** — the capture service (`CaptureAndPurgeAsync`) stores
+  **one** `StorageMetricsSample` for the current UTC day + `GetHistoryAsync(90)`
+  returns it + the `/admin/storage` Trend section renders it (the M33·2 /
+  M33·8 / M33·9 / M33-1 composite; asserts the seam-to-surface loop).
+- **Handoff** — a second-day sample is stored + the window shows **both**
+  days (ascending) + an expired sample (older than 365 days) is **purged**
+  (the M33·2 / M33·7 / M33-4 / M33-5 composite; asserts the idempotent store
+  + the retention + the multi-day window).
+- **Part-vs-whole** — the **11-test list** (the 7 Core + the 4 Web) is the
+  **whole**; closed-loop + handoff are the **parts**; all **must pass
+  together** (the M33·12 pin — no single test passes while another fails; a
+  red is a red on the milestone).
+
+U07 appends the `### Run result (M33 acceptance gate — <date>)` section to
+this design doc with the three test names, their results (pass/red), the 11
+test pass/red counts, and the still-open drift (if any).
+
+### 2.6 drift-guard (frozen once written)
+
+The frozen pins for M33 (any mismatch is a `## U<m> — Drift pause` per
+unit-series rule §12):
+
+- **The 12 invariants** (U01 Part 1): M33·1 … M33·12 (re-pinned above).
+- **The 10 FACES** (U01 Part 1): M33-1 … M33-10 (re-pinned above).
+- **The `IStorageMetricsService` 5-method surface** — the 3 M24 methods
+  (`GetSnapshotAsync` / `GetPerUserListAsync` / `GetPerUserUsageBytesAsync`)
+  + the M25 ADD `GetPlatformSpaceAsync` (all **unchanged**, M33·1) + the M33
+  `GetHistoryAsync` (the §2.1 signature).
+- **The `StorageMetricsSample` doc field set** — the **8-member M33·2
+  ceiling**: `Id` (string, deterministic) · `SampleDate` (DateTimeOffset,
+  UTC) · `TotalUsedBytes` (long) · `TotalVolumeBytes` (long) ·
+  `FreeVolumeBytes` (long) · `UserContentUsedBytes` (long) ·
+  `TotalUniqueFiles` (int) · `TotalDistinctUsers` (int). **No field outside
+  this set** may appear in the doc (unit-series rule §4).
+- **The `StorageHistoryDocTypes` registration shape** — one
+  `opts.Schema.For<StorageMetricsSample>();` call (the ADR 0004 §B.1
+  parallel-surface shape, the `UsageDocTypes` / `StorageSettingsDocTypes`
+  precedent, M33·1); wired into **both** boot paths (the dev loop in
+  `Program.cs` + the all-env `SchemaBootstrap` — the M3/Media/Usage
+  `*DocTypes` boot-wiring precedent).
+- **The capture lane shapes** — the
+  `StorageMetricsCaptureService.CaptureAndPurgeAsync(IDocumentStore store,
+  IStorageMetricsService metrics, DateTimeOffset now, CancellationToken ct =
+  default)` signature + the `RetentionDays = 365` constant + the
+  `StorageMetricsCaptureTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1))`
+  type + the `StorageMetricsCaptureHandler.Handle(StorageMetricsCaptureTick
+  tick, IDocumentStore store, IStorageMetricsService metrics)` signature +
+  the `await bus.PublishAsync(new StorageMetricsCaptureTick());` boot-seed
+  line next to `await bus.PublishAsync(new UsagePurgeTick());` in
+  `Program.cs` (the M33·3 / M33·5 / M33·7 pins).
+- **The `RetentionDays` constant** — `365` (the M13
+  `UsagePurgeService.RetentionDays` platform-constant precedent, M33·7 — a
+  per-instance knob is a **named deferral**, not shipped).
+- **The §2.3 `kw-l` key set** — the **10** `storage.trend.*` keys (the exact
+  names in the table above), each present, non-empty, in **all four**
+  languages (en/de/fr/da) (M33·11).
+- **The 11 pinned test names** — the 7 Core + the 4 Web names in §2.4
+  (exact, verbatim — a unit never introduces a test whose exact name is not
+  in this list, unit-series rule §3).
+- **The M24 surface** — the `AdminStorageMetricsController.Index` action,
+  the `AdminStorageMetricsViewModel` existing members, and the
+  `Views/AdminStorageMetrics/Index.cshtml` M24 four-metric header +
+  per-user table are **unchanged** (M33·1 additive-only); the M24
+  `GlobalAdmin` gate is **unchanged** (M33·9).
+- **The M24 `storage.*` `kw-l` key set** — **unchanged** (M33·11 — M33
+  **adds** the `storage.trend.*` set, it does not re-author the M24 set).
+
+*Part 2 — Seams & contracts, closed `kw-l` key set, pinned test names,
+acceptance gate, drift-guard. Authored by U02, 2026-10-09. **ADR 0156** is
+`docs/adr/0156-storage-metrics-history.md` (the index row is
+`docs/adr/README.md`).*

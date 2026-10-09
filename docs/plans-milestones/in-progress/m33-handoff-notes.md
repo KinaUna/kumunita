@@ -147,3 +147,69 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   `ArgumentOutOfRangeException` (M33·8).
 - U02 pins these by id in Part 2 (the §2.6 drift-guard re-pins all 12
   invariants + all 10 FACES). No code, no build, no test.
+
+## U02 — design doc Part 2 + ADR 0156
+
+- **Part 2 authored** — `docs/design/m33-storage-metrics-history-design.md`
+  gains the `## Seams & contracts (Part 2, written by U02)` section:
+  §2.1 frozen seam list (the `GetHistoryAsync` + `StorageHistoryResult` +
+  the capture service / tick / handler / boot-seed shapes) · §2.2 the new
+  M33-owned Core types (the `StorageMetricsSample` 8-member M33·2 ceiling +
+  the `StorageHistoryDocTypes` surface + the
+  `StorageMetricsService.GetHistoryAsync` impl) · §2.3 the closed
+  `storage.trend.*` `kw-l` key set (10 keys, en values) · §2.4 the 11 pinned
+  test names · §2.5 the three-test acceptance gate · §2.6 the drift-guard
+  (re-pinning all 12 invariants + all 10 FACES + the sealed shapes).
+- **Sealed seam signatures:**
+  - `Task<StorageHistoryResult> IStorageMetricsService.GetHistoryAsync(int
+    days, CancellationToken ct = default)` — the 5th method on the existing
+    seam (M33·1 additive-only); `days` pinned to `{30, 90, 180, 365}`
+    (unknown ⇒ `ArgumentOutOfRangeException`, M33·8).
+  - `public sealed record StorageHistoryResult(int WindowDays,
+    IReadOnlyList<StorageMetricsSample> Points);` — `Points` **ascending**
+    by `SampleDate`, **only the days present** (M33-9 FACE).
+  - `public static class StorageMetricsCaptureService { public const int
+    RetentionDays = 365; public static async Task<int>
+    CaptureAndPurgeAsync(IDocumentStore store, IStorageMetricsService
+    metrics, DateTimeOffset now, CancellationToken ct = default); }` — the
+    Wolverine-free static (M33·5), the `UsagePurgeService` house shape
+    (M33·7); **zero** `AccessAudit` rows (M33·4).
+  - `public sealed record StorageMetricsCaptureTick() : Wolverine.
+    TimeoutMessage(TimeSpan.FromDays(1));` — the `UsagePurgeTick` shape
+    (M33·3).
+  - `public static class StorageMetricsCaptureHandler { public static async
+    Task<IEnumerable<object>> Handle(StorageMetricsCaptureTick tick,
+    IDocumentStore store, IStorageMetricsService metrics); }` — the
+    `UsagePurgeHandler` thin-adapter shape (M33·3).
+  - The Program.cs boot seed: `await bus.PublishAsync(new
+    StorageMetricsCaptureTick());` next to
+    `await bus.PublishAsync(new UsagePurgeTick());` (the M13
+    `UsagePurgeTick` seed precedent, M33·3).
+- **11 pinned test names (by id, §2.4):**
+  - **Core** (`tests/Kumunita.Core.Tests/Usage/StorageMetricsHistoryTests.cs`,
+    7): `M33_2_Capture_Stores_One_Sample_Per_Day` · `M33_5_Capture_SameDayTwice_Dedups`
+    · `M33_4_Capture_Writes_No_AuditRow` · `M33_7_Purge_Deletes_Expired_Samples`
+    · `M33_2_Sample_FieldSet_Snapshot_Shape` ·
+    `M33_8_GetHistory_Returns_Only_Days_Present` ·
+    `M33_8_GetHistory_Unknown_Window_Throws`.
+  - **Web** (`tests/Kumunita.Web.Tests/AdminStorageMetricsHistoryTests.cs`,
+    4): `M33_9_GlobalAdmin_Sees_Trend_Section` ·
+    `M33_2_Window_Switch_Renders_Chosen_Window` ·
+    `M33_3_Empty_History_Renders_Empty_Message` ·
+    `M33_7_NonGlobalAdmin_Denied`.
+- **Three-test acceptance gate (by name, §2.5):** **Closed loop** · **Handoff**
+  · **Part-vs-whole** (the 11-test list is the whole; closed-loop + handoff
+  are the parts; all must pass together — M33·12).
+- **ADR 0156** — `docs/adr/0156-storage-metrics-history.md` (Status: Draft,
+  the M24 ADR 0134 / M32 ADR 0155 format) + the `docs/adr/README.md` index
+  row (the 0156 row, `Status: Draft`).
+- **M24 surface reused (M33·1):** the M24 `Kumunita.Core.Usage` context +
+  the `IStorageMetricsService` 4-method surface + the M24
+  `StorageMetricsSnapshot` DTO + the `UsageDocTypes` /
+  `StorageSettingsDocTypes` registration surfaces + the M24
+  `AdminStorageMetricsController` + `Views/AdminStorageMetrics/Index.cshtml`
+  + the M24 `storage.*` `kw-l` key set are **unchanged** — M33 **adds** the
+  `StorageMetricsSample` doc + the `StorageHistoryDocTypes` surface + the
+  `GetHistoryAsync` seam + the capture lane + the Trend section + the
+  `storage.trend.*` key set, additive-only.
+- **No code, no build, no test.**
