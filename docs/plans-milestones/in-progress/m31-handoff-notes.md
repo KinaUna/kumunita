@@ -494,3 +494,103 @@ TagHelper / `ITranslationProvider.GetAsync` resolve are the §2.3 floor); the
 - **(e) `m31-u04.md` move:** **skipped** — the file does not exist in
   `in-progress/` (only `m31-u00.md` is present, already moved to
   `done/m31/`); the register's "if the file exists" condition is not met.
+
+## U05 — admin surface + kw-l keys
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 errors, 0 warnings in my
+files — 68 solution warnings are all pre-existing, none in
+`ErrorReportAdminController` / `AdminErrorReportViewModel` /
+`ErrorReports/Index.cshtml` / `KnownTranslationKeys.cs`, verified by
+`grep -E "ErrorReportAdminController|AdminErrorReportViewModel|ErrorReports/
+Index"` on the build output → empty)**. All entry reads verified; **no
+drift** against the register's U05 deliverable or §2.1/§2.3 — the two routes
+are the register's verbatim, the `AdminErrorReportViewModel` fields are the
+register's list (2), the 20 `errorreport.*` keys are the §2.3 closed set
+verbatim (en values = §2.3 source text; de/fr/da = U05's translations), the
+`Via` pin + the U03 seam are called **as-is** (U03's done work — not
+re-litigated). 4 files touched (3 new in `src/Kumunita.Web` + the registry
+modify). U06's entry point: the 4 `AdminErrorReportTests` (§2.4 items 13–16)
+target the controller + the `errorreport.list.*` keys 9–20.
+
+- **(a) The two routes**
+  (`src/Kumunita.Web/Controllers/ErrorReportAdminController.cs`):
+  `GET /admin/error-reports` → `IErrorReportService.ListAsync(100)` →
+  `AdminErrorReportViewModel` (M31·4 — a read, no per-row authz, no audit
+  row). `POST /admin/error-reports/{id}/triage` →
+  `IErrorReportService.MarkTriagedAsync(id, actorId)` → redirect to
+  `/admin/error-reports` (the `AdminOnboardingController.Complete` shape —
+  `[ValidateAntiForgeryToken]` POST + `TempData["info"]` flash +
+  `RedirectToAction(nameof(Index))`). The flash (the
+  `errorreport.list.flash_triaged` key, the U05 closed set, M31·7) is set
+  **only** when `MarkTriagedAsync` returns non-null (an effective
+  `"new"` → `"triaged"` transition, M31·6); a no-op (an already-`triaged`
+  report) sets no flash → no second audit row (M31·6 idempotency). The
+  `[Authorize(Roles = GlobalAdmin)]` gate is the standard admin surface (the
+  `AdminOnboardingController` shape, ADR 0001-B thin-token rule); **no new
+  `AccessAction` / `Decide()` branch / `IAuthorizationService` surface**
+  (M31·9). The `ILocalizationService` + `ITranslationProvider` ctor params
+  are **optional** (default null, the `AdminOnboardingController` house
+  shape — null in test constructions renders the
+  `KnownTranslationKeys.EnValues` source text, the kw-l floor, ADR 0015 D1).
+- **(b) The `AdminErrorReportViewModel` fields (2)**
+  (`src/Kumunita.Web/Models/AdminErrorReportViewModel.cs`):
+  `IReadOnlyList<ErrorReport> Reports` (the `ListAsync` read, newest first,
+  empty when no reports) + `bool FlashTriaged` (true when the just-processed
+  action was an effective triage, M31·6) — **verbatim** the register's U05
+  list.
+- **(c) The 20 `kw-l` key names (verbatim, §2.3):** keys 1–8 (consumed by
+  U04's error page — **already present in the registry** from U04? **No** —
+  U04 *consumed* them in the view but did **not** author them in the
+  registry; U05 authors the **complete** 20-key set):
+  `errorreport.title` / `errorreport.intro` /
+  `errorreport.description.label` / `errorreport.description.placeholder` /
+  `errorreport.email.label` / `errorreport.email.placeholder` /
+  `errorreport.submit` / `errorreport.thanks` / `errorreport.list.title` /
+  `errorreport.list.empty` / `errorreport.list.status.new` /
+  `errorreport.list.status.triaged` / `errorreport.list.mark_triaged` /
+  `errorreport.list.request_id` / `errorreport.list.exception` /
+  `errorreport.list.description` / `errorreport.list.reporter` /
+  `errorreport.list.created` / `errorreport.list.anonymous` /
+  `errorreport.list.flash_triaged`.
+- **(d) The four-language status:** all 20 keys are present, non-empty, in
+  **en/de/fr/da** (verified by `grep -c "\"errorreport.$k\""` on
+  `KnownTranslationKeys.cs` → **4** for each of the 20 keys; inserted
+  immediately after the `adminonboarding.banner.action` line in each
+  language, mirroring the M30·6 / M22 D7 four-language pin). The `en` values
+  are the §2.3 source text (the ADR 0015 D1 `kw-l` provider-floor
+  discipline); the `de` / `fr` / `da` values are the translations (U05's
+  authoring, the M30·6 four-language pin).
+- **(e) Compile warnings:** **0** new warnings — the 68 solution warnings
+  are all pre-existing (test files + `_Layout.cshtml` / `_WhatsNewToast.cshtml`
+  / `AccountController.cs` / `PostsController.cs` / `ProjectsController.cs` /
+  `SampleDataSeeder.cs` / `SmtpSender.cs` / `DocumentsOrganizationTests.cs` /
+  `GuardianAssignmentTests.cs` / `SampleDataCorpusBackfillTests.cs` /
+  `PageServiceTests.cs` / `UserInfoServiceTests.cs` — **none** in my 4
+  files, verified by `grep -E
+  "ErrorReportAdminController|AdminErrorReportViewModel|ErrorReports/
+  Index"` on the build output → empty). **One compile fix** during this unit
+  (in **U05's own view only**, no drift): the first pass used an `@{ }`
+  local-variable block inside the `@foreach (var r in Model.Reports)` block
+  (RZ1010 — the `@foreach` already opens a code block, so the inner `@{ }`
+  is invalid); fixed by declaring the 4 local `var` (`desc` / `descShort` /
+  `exc` / `excShort`) directly in the `@foreach` body (no `@{ }` wrapper) —
+  the house `AdminSite/Index.cshtml` shape (a `var` declaration inside the
+  `@foreach` body, not a nested `@{ }`). **Razor traps honored (AGENTS.md):**
+  (1) the status chip uses a conditional `@if/@else` with **two separate
+  `<kw-l>` elements** (each with a static key:
+  `errorreport.list.status.new` + `errorreport.list.status.triaged`), so the
+  `KwLRegistryConsistencyTests` static scan finds both keys — **no
+  interpolated `@(cond ? "kw1" : "kw2")` key** (the `KwLRegistryConsistencyTests`
+  scan only matches literal string keys, not Razor expressions); (2) the
+  flash string is **server-resolved** by the controller's `FlashAsync` (the
+  `AdminOnboardingController.FlashAsync` idiom), so the view only renders
+  the resolved string — **no un-awaited `Task<string>`** in markup; (3) all
+  Bootstrap classes (`text-bg-warning` / `text-bg-success` / `badge` /
+  `list-group-item` / `d-flex` / `align-items-start` / `gap-3` / `flex-grow-
+  1` / `small` / `mt-1` / `text-muted` / `fw-semibold` / `btn` / `btn-sm` /
+  `btn-primary` / `text-nowrap` / `ms-2` / `me-0` / `alert` / `alert-success`)
+  are **static strings** — **no `style=`/`data-*` attributes built by
+  interpolating quoted strings via `@(...)`**.
+- **(f) `m31-u05.md` move:** **skipped** — the file does not exist in
+  `in-progress/` (the register's "if the file exists" condition is not met;
+  only `m31-u00.md` is present, already moved to `done/m31/`).

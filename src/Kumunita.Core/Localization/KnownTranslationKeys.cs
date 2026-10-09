@@ -2365,6 +2365,35 @@ public static class KnownTranslationKeys
             ["adminonboarding.banner.text"]        = "Finish setting up this community?",
             ["adminonboarding.banner.action"]      = "Start setup",
 
+            // ── M31 (ADR 0154) — production error handling: the 500-page
+            // report-an-issue affordance (M31·2) + the /admin/error-reports
+            // GlobalAdmin triage surface (M31·4 / M31·6). U05 authors the
+            // COMPLETE closed 20-key set (keys 1–8 consumed by the error
+            // page, keys 9–20 consumed by the admin list view). The parity
+            // pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M31·7). ──
+            ["errorreport.title"]                    = "Tell us what went wrong",
+            ["errorreport.intro"]                    = "If something went wrong, let us know what you were trying to do so we can look into it.",
+            ["errorreport.description.label"]        = "What were you trying to do?",
+            ["errorreport.description.placeholder"]  = "e.g. I was trying to sign up for the Saturday event and the page went blank",
+            ["errorreport.email.label"]              = "Your email (optional)",
+            ["errorreport.email.placeholder"]        = "you@example.com",
+            ["errorreport.submit"]                   = "Send report",
+            ["errorreport.thanks"]                   = "Thanks — your report has been filed.",
+            ["errorreport.list.title"]               = "Error reports",
+            ["errorreport.list.empty"]               = "No error reports yet.",
+            ["errorreport.list.status.new"]          = "New",
+            ["errorreport.list.status.triaged"]      = "Triaged",
+            ["errorreport.list.mark_triaged"]        = "Mark as triaged",
+            ["errorreport.list.request_id"]          = "Request ID",
+            ["errorreport.list.exception"]           = "Exception",
+            ["errorreport.list.description"]         = "Description",
+            ["errorreport.list.reporter"]            = "Reporter",
+            ["errorreport.list.created"]             = "Reported",
+            ["errorreport.list.anonymous"]           = "Anonymous",
+            ["errorreport.list.flash_triaged"]       = "Report marked as triaged.",
+
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
@@ -4825,6 +4854,36 @@ public static class KnownTranslationKeys
             ["adminonboarding.banner.text"]        = "Diese Gemeinschaft fertig einrichten?",
             ["adminonboarding.banner.action"]      = "Einrichtung starten",
 
+            // ── M31 (ADR 0154) — Produktionsfehlerbehandlung: die 500-Seite
+            // (M31·2) + die /admin/error-reports Triagierungsfläche
+            // (M31·4 / M31·6). U05 verfasst den vollständigen geschlossenen
+            // 20-Schlüssel-Satz (Keys 1–8 für die Fehlerseite, Keys 9–20 für
+            // die Admin-Liste). Die Paritätssperre
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) verlangt, dass jeder
+            // Schlüssel in allen vier Sprachen vorhanden und nicht leer ist
+            // (M31·7). ──
+            ["errorreport.title"]                    = "Sagen Sie uns, was schiefgelaufen ist",
+            ["errorreport.intro"]                    = "Falls etwas schiefgelaufen ist, sagen Sie uns, was Sie gerade versucht haben, damit wir uns das ansehen können.",
+            ["errorreport.description.label"]        = "Was haben Sie versucht zu tun?",
+            ["errorreport.description.placeholder"]  = "z. B. Ich wollte mich für das Samstagsereignis anmelden, und die Seite wurde leer",
+            ["errorreport.email.label"]              = "Ihre E-Mail (optional)",
+            ["errorreport.email.placeholder"]        = "sie@beispiel.de",
+            ["errorreport.submit"]                   = "Melden Sie das Problem",
+            ["errorreport.thanks"]                   = "Danke — Ihr Bericht wurde eingereicht.",
+            ["errorreport.list.title"]               = "Fehlermeldungen",
+            ["errorreport.list.empty"]               = "Noch keine Fehlermeldungen.",
+            ["errorreport.list.status.new"]          = "Neu",
+            ["errorreport.list.status.triaged"]      = "Eingearbeitet",
+            ["errorreport.list.mark_triaged"]        = "Als eingearbeitet markieren",
+            ["errorreport.list.request_id"]          = "Anforderungs-ID",
+            ["errorreport.list.exception"]           = "Ausnahme",
+            ["errorreport.list.description"]         = "Beschreibung",
+            ["errorreport.list.reporter"]            = "Melder",
+            ["errorreport.list.created"]             = "Gemeldet",
+            ["errorreport.list.anonymous"]           = "Anonym",
+            ["errorreport.list.flash_triaged"]       = "Meldung als eingearbeitet markiert.",
+
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
@@ -7188,6 +7247,35 @@ public static class KnownTranslationKeys
             ["adminonboarding.banner.text"]        = "Terminer la configuration de cette communauté ?",
             ["adminonboarding.banner.action"]      = "Démarrer la configuration",
 
+            // ── M31 (ADR 0154) — gestion des erreurs en production :
+            // la page 500 (M31·2) + la surface de triage /admin/error-reports
+            // (M31·4 / M31·6). U05 rédige le jeu complet de 20 clés
+            // (clés 1–8 pour la page d'erreur, clés 9–20 pour la liste
+            // admin). La verrou de parité
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) exige que chaque clé soit
+            // présente et non vide dans les quatre langues (M31·7). ──
+            ["errorreport.title"]                    = "Dites-nous ce qui s'est mal passé",
+            ["errorreport.intro"]                    = "Si quelque chose s'est mal passé, dites-nous ce que vous essayiez de faire afin que nous puissions y regarder.",
+            ["errorreport.description.label"]        = "Qu'essayiez-vous de faire ?",
+            ["errorreport.description.placeholder"]  = "p. ex. J'essayais de m'inscrire à l'événement de samedi et la page est devenue blanche",
+            ["errorreport.email.label"]              = "Votre e-mail (facultatif)",
+            ["errorreport.email.placeholder"]        = "vous@exemple.fr",
+            ["errorreport.submit"]                   = "Envoyer le rapport",
+            ["errorreport.thanks"]                   = "Merci — votre rapport a été enregistré.",
+            ["errorreport.list.title"]               = "Rapports d'erreurs",
+            ["errorreport.list.empty"]               = "Aucun rapport d'erreur pour l'instant.",
+            ["errorreport.list.status.new"]          = "Nouveau",
+            ["errorreport.list.status.triaged"]      = "Trié",
+            ["errorreport.list.mark_triaged"]        = "Marquer comme trié",
+            ["errorreport.list.request_id"]          = "ID de la requête",
+            ["errorreport.list.exception"]           = "Exception",
+            ["errorreport.list.description"]         = "Description",
+            ["errorreport.list.reporter"]            = "Signaleur",
+            ["errorreport.list.created"]             = "Signalé",
+            ["errorreport.list.anonymous"]           = "Anonyme",
+            ["errorreport.list.flash_triaged"]       = "Rapport marqué comme trié.",
+
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
@@ -9538,6 +9626,34 @@ public static class KnownTranslationKeys
             ["adminonboarding.flash_done"]         = "Admin-opsætning færdig — rundturen er sluttet.",
             ["adminonboarding.banner.text"]        = "Færdiggøre opsætningen af dette fællesskab?",
             ["adminonboarding.banner.action"]      = "Start opsætning",
+
+            // ── M31 (ADR 0154) — produktionsfejlhåndtering: 500-siden
+            // (M31·2) + /admin/error-reports triagefladen (M31·4 / M31·6).
+            // U05 udarbejder det komplette lukkede 20-nøgledæksel (nøgler
+            // 1–8 til fejliden, nøgler 9–20 til adminlisten). Paritetslåsen
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) kræver, at hver nøgle er
+            // til stede og ikke tom i alle fire sprog (M31·7). ──
+            ["errorreport.title"]                    = "Fortæl os, hvad der gik galt",
+            ["errorreport.intro"]                    = "Hvis noget gik galt, fortæl os, hvad du prøvede at gøre, så vi kan kigge på det.",
+            ["errorreport.description.label"]        = "Hvad prøvede du at gøre?",
+            ["errorreport.description.placeholder"]  = "f.eks. Jeg prøvede at tilmelde mig lørdagsbegivenheden, og siden blev hvid",
+            ["errorreport.email.label"]              = "Din e-mail (valgfri)",
+            ["errorreport.email.placeholder"]        = "dig@eksempel.dk",
+            ["errorreport.submit"]                   = "Send rapport",
+            ["errorreport.thanks"]                   = "Tak — din rapport er indsendt.",
+            ["errorreport.list.title"]               = "Fejlrapporter",
+            ["errorreport.list.empty"]               = "Ingen fejlrapporter endnu.",
+            ["errorreport.list.status.new"]          = "Ny",
+            ["errorreport.list.status.triaged"]      = "Behandlet",
+            ["errorreport.list.mark_triaged"]        = "Markér som behandlet",
+            ["errorreport.list.request_id"]          = "Anmodnings-ID",
+            ["errorreport.list.exception"]           = "Undtagelse",
+            ["errorreport.list.description"]         = "Beskrivelse",
+            ["errorreport.list.reporter"]            = "Melder",
+            ["errorreport.list.created"]             = "Rapporteret",
+            ["errorreport.list.anonymous"]           = "Anonym",
+            ["errorreport.list.flash_triaged"]       = "Rapport markeret som behandlet.",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;
