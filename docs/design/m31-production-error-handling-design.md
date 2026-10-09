@@ -799,3 +799,54 @@ The following are **frozen pins**; any mismatch found by a later unit is a
 `Status: Draft`) is the companion document — it names the Decision /
 Consequences that this design doc pins in detail. The ADR index
 (`docs/adr/README.md`) gains the 0154 row (`Status: Draft`).*
+
+---
+
+### Run result (M31 acceptance gate — 2026-10-09)
+
+> **U06 records.** The 16 pinned seam tests (§2.4) are implemented in the
+> three named files and **all 16 are green**. The three-test gate (§2.5) is
+> recorded below. **No `## U<m> — Drift pause` section** exists in the
+> handoff note (`docs/plans-milestones/in-progress/m31-handoff-notes.md`) —
+> U00/U01/U02/U03/U04/U05 each recorded "no drift" against the §2.1–§2.6
+> pins; the U03 `ErrorReportDocTypes` chained-`.Index()` form and the
+> `OrderByDescending` correction are compile-correctness fixes in U03's own
+> new files (the AGENTS.md version-pinned-Marten trap), not a drift pause.
+
+**The 16/16 test count (the whole):**
+
+- `tests/Kumunita.Core.Tests/ErrorReportServiceTests.cs` — **8/8 green**
+  (tests 1–8 of §2.4): `M31_1_CreateAnonymous_Stores_ErrorReport_And_AuditRow`
+  · `M31_2_CreateSignedIn_Stores_SubjectId_And_AuditRow` ·
+  `M31_5_Create_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_6_MarkTriaged_New_Updates_TriageStatus_And_AuditRow` ·
+  `M31_6_MarkTriaged_AlreadyTriaged_Is_NoOp` ·
+  `M31_6_MarkTriaged_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_4_List_Returns_All_Reports_NewestFirst` ·
+  `M31_3_ErrorReport_Doc_FieldSet_Ceiling`.
+- `tests/Kumunita.Web.Tests/ErrorReportPageTests.cs` — **4/4 green**
+  (tests 9–12 of §2.4): `M31_2_Error_Page_Shows_Report_Form` ·
+  `M31_5_Error_Report_Post_Creates_ErrorReport` ·
+  `M31_5_Error_Report_Post_Validation_BlankDescription_Renders_Error` ·
+  `M31_2_Error_Report_Post_Confirmation_Visible`.
+- `tests/Kumunita.Web.Tests/AdminErrorReportTests.cs` — **4/4 green**
+  (tests 13–16 of §2.4): `M31_4_Admin_List_SignedIn_GlobalAdmin_Sees_Reports`
+  · `M31_4_Admin_List_NonGlobalAdmin_Denied` ·
+  `M31_6_Admin_MarkTriaged_GlobalAdmin_Updates_Row` ·
+  `M31_6_Admin_MarkTriaged_AlreadyTriaged_NoOp`.
+
+**The three-test gate (§2.5):**
+
+| Gate test | Status | Covers |
+|-----------|--------|--------|
+| **closed-loop** (anonymous 500 → submit → `ErrorReport` row + exactly one `AccessAudit` row, `Via = Anonymous`, + the `errorreport.thanks` confirmation) | **GREEN** | `M31_1_CreateAnonymous_Stores_ErrorReport_And_AuditRow` + `M31_5_Create_Writes_ExactlyOne_AccessAuditRow` + `M31_5_Error_Report_Post_Creates_ErrorReport` + `M31_2_Error_Report_Post_Confirmation_Visible` (M31-1 + M31·5) |
+| **handoff** (GlobalAdmin mark `triaged` → stamp + exactly one `AccessAudit` row `Via = Admin`; a second POST is a no-op) | **GREEN** | `M31_6_MarkTriaged_New_Updates_TriageStatus_And_AuditRow` + `M31_6_MarkTriaged_Writes_ExactlyOne_AccessAuditRow` + `M31_6_MarkTriaged_AlreadyTriaged_Is_NoOp` + `M31_6_Admin_MarkTriaged_GlobalAdmin_Updates_Row` + `M31_6_Admin_MarkTriaged_AlreadyTriaged_NoOp` (M31-4 / M31-5 + M31·6) |
+| **part-vs-whole** (the 16 in §2.4 are the whole; closed-loop + handoff are the parts; all must be green together) | **GREEN** | all 16 of §2.4 — **16/16** (a single red would fail the gate) |
+
+**Part-vs-whole verification:** the full `Kumunita.Web.Tests` assembly ran
+**977 total, 0 failed, 1 skipped** (the pre-existing
+`MilestonesTests.M31_Is_The_Single_InProgress_Milestone` + the
+`WhatsNewTests` pins are intact and green — U07's close-flip preconditions
+hold). The full `Kumunita.Core.Tests` `ErrorReportServiceTests` class ran
+**8/8 green** (live Postgres via Testcontainers). **The M31 acceptance gate
+passes: 16/16, no drift pause, no still-open drift.**

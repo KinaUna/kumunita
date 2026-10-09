@@ -594,3 +594,82 @@ target the controller + the `errorreport.list.*` keys 9–20.
 - **(f) `m31-u05.md` move:** **skipped** — the file does not exist in
   `in-progress/` (the register's "if the file exists" condition is not met;
   only `m31-u00.md` is present, already moved to `done/m31/`).
+
+## U06 — seam tests (16) + gate recorded
+
+**16/16 green; the three-test gate passes; no drift pause, no still-open
+drift.** `dotnet build Kumunita.slnx -c Debug` **green (0 errors, 0 new
+warnings — all pre-existing)**. Three new test files (the §2.4 pinned names
+verbatim — the §2.6 drift guard held; the 16 are the names frozen in U02's
+§2.4, not re-litigated) + the design doc `### Run result` gate append.
+U07's entry point: the three gate tests below (all green) + the
+`MilestonesTests.M31_Is_The_Single_InProgress_Milestone` pin (still green —
+U07 flips it to `M32_...` at close) + the 16 names verbatim.
+
+- **(a) The 3 test file paths:** `tests/Kumunita.Core.Tests/ErrorReportServiceTests.cs`
+  (8) · `tests/Kumunita.Web.Tests/ErrorReportPageTests.cs` (4) ·
+  `tests/Kumunita.Web.Tests/AdminErrorReportTests.cs` (4).
+- **(b) The 16 test names (verbatim, §2.4):** `M31_1_CreateAnonymous_Stores_
+  ErrorReport_And_AuditRow` · `M31_2_CreateSignedIn_Stores_SubjectId_And_AuditRow`
+  · `M31_5_Create_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_6_MarkTriaged_New_Updates_TriageStatus_And_AuditRow` ·
+  `M31_6_MarkTriaged_AlreadyTriaged_Is_NoOp` ·
+  `M31_6_MarkTriaged_Writes_ExactlyOne_AccessAuditRow` ·
+  `M31_4_List_Returns_All_Reports_NewestFirst` ·
+  `M31_3_ErrorReport_Doc_FieldSet_Ceiling` ·
+  `M31_2_Error_Page_Shows_Report_Form` ·
+  `M31_5_Error_Report_Post_Creates_ErrorReport` ·
+  `M31_5_Error_Report_Post_Validation_BlankDescription_Renders_Error` ·
+  `M31_2_Error_Report_Post_Confirmation_Visible` ·
+  `M31_4_Admin_List_SignedIn_GlobalAdmin_Sees_Reports` ·
+  `M31_4_Admin_List_NonGlobalAdmin_Denied` ·
+  `M31_6_Admin_MarkTriaged_GlobalAdmin_Updates_Row` ·
+  `M31_6_Admin_MarkTriaged_AlreadyTriaged_NoOp`.
+- **(c) The 16 pass/red counts:** **16 pass / 0 red** (Core 8/8, Web 8/8).
+  Verification path (the AGENTS.md runner quirk — `dotnet test` discovery is
+  unreliable on this machine): `dotnet exec
+  tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll
+  -displayName "*M31*"` → `Total: 8, Errors: 0, Failed: 0` (live Postgres via
+  Testcontainers, ~9.5s); `dotnet exec
+  tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll
+  -displayName "*M31*"` → `Total: 9, Errors: 0, Failed: 0` (the 9th is the
+  pre-existing `MilestonesTests.M31_Is_The_Single_InProgress_Milestone`,
+  still green). **Part-vs-whole:** the full Web suite ran **977 total,
+  0 failed, 1 skipped** (no regression; the `MilestonesTests` +
+  `WhatsNewTests` close-flip pins are intact — U07's preconditions hold).
+- **(d) The three-test gate status:** **closed-loop — GREEN** (covers
+  `M31_1_...` + `M31_5_Create_...` + `M31_5_Error_Report_Post_Creates_...` +
+  `M31_2_Error_Report_Post_Confirmation_...`) · **handoff — GREEN** (covers
+  `M31_6_MarkTriaged_New_...` + `M31_6_MarkTriaged_Writes_...` +
+  `M31_6_MarkTriaged_AlreadyTriaged_Is_NoOp` + `M31_6_Admin_MarkTriaged_GlobalAdmin_...`
+  + `M31_6_Admin_MarkTriaged_AlreadyTriaged_NoOp`) · **part-vs-whole —
+  GREEN** (the 16 are the whole; all green together — 16/16). Recorded in
+  the design doc `### Run result (M31 acceptance gate — 2026-10-09)`.
+- **(e) Still-open drift:** **none.** No `## U<m> — Drift pause` section in
+  the note (U00–U05 each recorded "no drift"). The `Via` pin
+  (`AccessVia.Resident` non-blank / `AccessVia.Anonymous` blank — U02's §2.1
+  decision, U03's implementation) is asserted verbatim by
+  `M31_1_CreateAnonymous_Stores_ErrorReport_And_AuditRow` (Anonymous) and
+  `M31_2_CreateSignedIn_Stores_SubjectId_And_AuditRow` (Resident) — not
+  re-litigated. Two **test-harness** compile fixes during this unit (both in
+  **U06's own test files**, no code drift): (1) the `M31_2_Error_Page_Shows_
+  Report_Form` public-page pin originally asserted
+  `Assert.DoesNotContain("[Authorize]", src)`, which the view's own
+  documentation comment ("NOT inside any [Authorize] gate") tripped —
+  replaced with a comment-proof, meaningful pin: the view has **no
+  role-claim gate** (`IsGlobalAdmin` / `IsInRole` / `KumunitaPrincipal.Is*`
+  all absent — the page is the one place an anonymous visitor sees a product
+  surface, M31·2 / M31·9); (2) two `x is null` patterns in the NSubstitute
+  `Arg.Is<ErrorReportDraft>` expression trees (CS8122 — `is` pattern
+  matching is not allowed in an expression tree) were replaced with
+  `== null`. Both changes preserve the §2.4 / §2.1 pins exactly — **not** a
+  drift pause (the design doc's intent is unchanged). **`m31-u06.md` move:
+  skipped** — the file does not exist in `in-progress/` (the register's "if
+  the file exists" condition is not met; consistent with U04 / U05).
+  U07's entry: flip the `Milestones.cs` `M31` row `StatusNext` → `StatusDone`
+  + promote `M32` `StatusPlanned` → `StatusNext` (order unchanged), re-pin
+  `MilestonesTests.M31_Is_The_Single_InProgress_Milestone` →
+  `M32_...`, append the `WhatsNew.cs` `0.47.0` entry (newest-first, naming
+  M31 + ADR 0154), the README / `STATUS.md` / `ARCHITECTURE.md` parity
+  appends, flip ADR 0154 `Draft` → `Accepted` + the index row `**Done**
+  (M31)`, and the `done/m31/` move.
