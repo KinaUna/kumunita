@@ -1514,4 +1514,71 @@ public interface IUserInfoService
     /// </summary>
     Task<IReadOnlyList<CommunityMembershipRequest>>
         GetPendingCommunityMembershipRequestsForChildAsync(string childId);
+
+    // ── M28 (ADR 0151, D4) — guardian time limits: the per-child allow/block
+    // schedule that gates a child's whole-platform access (the inverse of the
+    // M20 quiet lane, ADR 0121, on the GU surface, ADR 0028). Three additive
+    // seams (the ADR 0006-E compatible-ADD lane this file uses, the
+    // <see cref="SetChildMessagingRestrictionAsync"/> GU-scope shape): the
+    // guardian's edit-page READ (no audit), the guardian's WRITE (one audit
+    // row), and the ENFORCEMENT READ (child-keyed, no guardian gate, no
+    // audit). Zero new authorization surface (C-M28·5): no
+    // IAuthorizationService method, no AccessAction/AccessVia, no Decide()
+    // branch. ──────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// M28 (ADR 0151, D4) — the guardian's EDIT-PAGE READ. Gate = an active
+    /// <see cref="GuardianLink"/> for (guardianId, childId) ∪ GlobalAdmin
+    /// (G·2 live, G·5 safety valve); a non-guardian, non-admin →
+    /// <see cref="UnauthorizedAccessException"/> (Web 404, the GU standing-lane
+    /// shape, the <see cref="SuspendChildAsync"/> precedent). A
+    /// <c>LoadAsync</c> read; returns the row or <c>null</c> = "never
+    /// restricted" (the floor, C-M28·3). **No** <see
+    /// cref="Authorization.AccessAudit"/> row (a read).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="guardianId"/> or
+    /// <paramref name="childId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair and the
+    /// guardian is not a GlobalAdmin — the actor has no standing (the Web
+    /// surfaces a 404, the GU deny-by-default pin).</exception>
+    Task<GuardianTimeLimitSchedule?> GetChildTimeLimitAsync(string guardianId, string childId);
+
+    /// <summary>
+    /// M28 (ADR 0151, D4) — the guardian's WRITE. Same gate as the read. A
+    /// <c>null</c> <paramref name="schedule"/> **deletes** the row (the M20
+    /// <c>SetQuietScheduleAsync(recipientId, null)</c> "clear" idiom — the
+    /// <c>session.Delete</c> shape); otherwise an upsert of the singleton-per-
+    /// child row (<c>session.Store</c>). Appends **exactly one**
+    /// <see cref="Authorization.AccessAudit"/> row (<see
+    /// cref="Authorization.AccessVia.Guardian"/> for a guardian write,
+    /// <see cref="Authorization.AccessVia.Admin"/> for a GlobalAdmin write —
+    /// the G·5 safety valve; <c>TargetKind</c> the child account; verb
+    /// <c>guardian.time-limit.set</c> — the <c>guardian.suspend</c> /
+    /// <c>guardian.unsuspend</c> shape, ADR 0028 §E). Strong consistency
+    /// (C-M28·4): the write is in the caller's session — a save is live on the
+    /// very next read (no projection, no cache — the ADR 0050
+    /// <c>IsSignupOpen</c> shape). **The child cannot write their own**
+    /// (C-M28·7) — a child subject used as <paramref name="guardianId"/> on
+    /// their own <paramref name="childId"/> is denied.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="guardianId"/> or
+    /// <paramref name="childId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active
+    /// <see cref="GuardianLink"/> for this (guardian, child) pair and the
+    /// guardian is not a GlobalAdmin (deny-by-default; includes a child acting
+    /// on their own <paramref name="childId"/> — C-M28·7).</exception>
+    Task SetChildTimeLimitAsync(string guardianId, string childId, GuardianTimeLimitSchedule? schedule);
+
+    /// <summary>
+    /// M28 (ADR 0151, D4) — the **ENFORCEMENT** READ. Child-keyed, **no**
+    /// guardian gate (the <c>BlockedAccountMiddleware</c> <c>GetProfileAsync</c>
+    /// shape), **no** <see cref="Authorization.AccessAudit"/> row (a read,
+    /// C-M28·2). The <c>TimeLimitMiddleware</c>'s single-row load (U04).
+    /// Returns the row or <c>null</c> = "never restricted" (the floor,
+    /// C-M28·3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> is
+    /// null/whitespace.</exception>
+    Task<GuardianTimeLimitSchedule?> GetActiveTimeLimitAsync(string childId);
 }

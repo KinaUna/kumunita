@@ -1,0 +1,598 @@
+@* _BoardCard — one board card on a lane (U06, IMPROVE lane).
+   Extracted verbatim from Views/Projects/Projects/BoardDetail.cshtml so a
+   future board-card lane (ADR 0079 dates / 0087 blocker chip / 0106 details
+   / 0074 assign / 0106 self-assign) edits a named partial instead of a
+   1 400-line view. Pure view-layer refactor: the card body below is
+   byte-identical to the prior inline copy, so the parent view renders the
+   same bytes (the served-page diff is the evidence, per the Razor
+   doctrine). The partial declares the locals the body uses (card / lane /
+   otherBoards / _kwL / StatusGlyph / StatusLabelKey) and re-injects its
+   own localization (the _BookmarkButton / _RichEditorToggle idiom). *@
+@model Kumunita.Web.Views.Shared.BoardCardModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Views.Shared
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    var card = Model.Card;
+    var lane = new { LaneId = Model.LaneId, Status = Model.LaneStatus };
+    var otherBoards = Model.OtherBoards;
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    static string StatusGlyph(string? s) => BoardCardStatuses.StatusGlyph(s);
+    static string StatusLabelKey(string? s) => BoardCardStatuses.StatusLabelKey(s);
+    string ariaClose = "Close";
+    if (Translation is not null) ariaClose = await Translation.GetAsync("a11y.close", _kwL);
+}
+
+                            @* The card carries the ids the drag-drop handler
+                               posts (ADR 0069 — HTML5 DnD as an input channel
+                               on top of the keyboard / menu channels; the
+                               server stays authoritative — no optimistic DOM
+                               reordering, C-M5·9). The drag itself is owned
+                               by the .kanban-lane (see below); the card's
+                               data-* attrs are read at dragstart when the grab
+                               point is a card. The assignee avatar (left) +
+                               the status badge (own Status, else the lane's
+                               — C-M5·4) are display only, never a gate. *@
+                            @* The card's effective status — the to-do's own
+                               Status when it has one (C-M5·4 — the stored
+                               state label), else the status the lane imparts
+                               (C-M5·4 — a card moved into a lane reads the
+                               lane's status; on a board the column *is* the
+                               status, so every card carries the glyph). The
+                               glyph mapping is the StatusGlyph helper above
+                               (a free-text / unrecognized value shows the
+                               fallback circle + the raw text, C3). *@
+@{
+                             string? effectiveStatus = !string.IsNullOrWhiteSpace(card.Status) ? card.Status : lane.Status;
+                             // The badge text: the card's own raw Status when it
+                             // has one (C3 — the view renders what the service
+                             // stored), else the lane's status resolved through
+                             // the same translation registry the lane dropdown
+                             // uses (projects.board.status.*). The provider
+                             // floor (en registry) is the backstop.
+                             string effectiveStatusLabel = !string.IsNullOrWhiteSpace(card.Status)
+                                 ? card.Status
+                                 : (await Translation.GetAsync(StatusLabelKey(lane.Status), _kwL));
+                            
+                             string assigneeInitial = !string.IsNullOrWhiteSpace(card.AssigneeDisplayName)
+                                 ? char.ToUpperInvariant(card.AssigneeDisplayName.TrimStart()[0]).ToString()
+                                 : string.Empty;
+}                            <div class="kanban-card mb-2"
+                                 data-placement-id="@card.PlacementId" data-todo-id="@card.TodoId">
+                                <div class="d-flex align-items-start gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                    {
+                                        <span class="d-inline-flex align-items-center mt-1">
+                                            <img class="avatar avatar-sm" src="/profile/avatar/@card.AssigneeId" alt=""
+                                                 data-avatar-fallback>
+                                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                        </span>
+                                    }
+                                    <div class="flex-grow-1">
+                                        <h4 class="h6 mb-1">
+                                            <a href="@($"/projects/todos/{card.TodoId}")">@card.Title</a>
+                                        </h4>
+                                        <div class="text-muted small">
+                                            @if (!string.IsNullOrWhiteSpace(effectiveStatus))
+                                            {
+                                                <span class="badge text-bg-light border d-inline-flex align-items-center gap-1" title="@effectiveStatus">
+                                                    @Html.Raw(StatusGlyph(effectiveStatus))
+                                                    <span>@effectiveStatusLabel</span>
+                                                </span>
+                                            }
+                                            @* ADR 0087 D4 — the card's "waiting on" chip (the D4
+                                               surface — the to-do detail + the board card). The service
+                                               resolved the access-scoped chip (the CardBlockers map); a
+                                               blocker the actor may not read, or one that is
+                                               absent/soft-deleted, is a **Generic** chip (no title, no
+                                               link, no leak — C-TBD·4). A resolved chip links to the
+                                               blocker's detail. Purely informational — it never gates the
+                                               card (D2). *@
+                                            @if (card.Blocker is not null)
+                                            {
+                                                @if (card.Blocker.Generic)
+                                                {
+                                                    <span class="badge text-bg-secondary">
+                                                        <kw-l key="todo.blocked_by">Waiting on</kw-l> · <kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l>
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <a class="badge text-bg-light border text-decoration-none"
+                                                       href="@card.Blocker.LinkPath">
+                                                        <kw-l key="todo.blocked_by">Waiting on</kw-l> · @card.Blocker.Title
+                                                        @if (!string.IsNullOrWhiteSpace(card.Blocker.Status))
+                                                        {
+                                                            <span class="text-muted"> · @card.Blocker.Status</span>
+                                                        }
+                                                    </a>
+                                                }
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.assignee">Assignee</kw-l>: @card.AssigneeDisplayName</span>
+                                            }
+                                            @* ADR 0079 — the optional dates (the
+                                               <kw-dt> effective-timezone render;
+                                               gated on non-null so an unset date
+                                               shows nothing). The due date is the
+                                               at-a-glance deadline on a kanban
+                                               card. *@
+                                            @if (card.StartAt is not null)
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.start">Start</kw-l> <kw-dt dt="@card.StartAt" format="g"></kw-dt></span>
+                                            }
+                                            @if (card.DueAt is not null)
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
+                                            }
+                                        </div>
+                                        @* ADR 0106 — the card details collapse content.
+                                           Rendered markdown body (the same
+                                           MarkdownRenderer the TodoDetail view uses),
+                                           the dates, the blocker chip (reusing the
+                                           same markup as the at-a-glance line), and
+                                           the community name. Each section is gated
+                                           on the field being set. *@
+                                        <div class="collapse mt-2" id="@($"details-{card.TodoId}")">
+                                            @if (!string.IsNullOrWhiteSpace(card.Body))
+                                            {
+                                                <div class="rc-body text-body-secondary small">
+                                                    @Html.Raw(MarkdownRenderer.RenderHtml(card.Body))
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-body-secondary small mb-2">
+                                                    <kw-l key="projects.todo.no_body">No body — this to-do is title-only.</kw-l>
+                                                </p>
+                                            }
+                                            @if (card.StartAt is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.start">Start</kw-l>: <kw-dt dt="@card.StartAt" format="g"></kw-dt>
+                                                </div>
+                                            }
+                                            @if (card.DueAt is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.due">Due</kw-l>: <kw-dt dt="@card.DueAt" format="g"></kw-dt>
+                                                </div>
+                                            }
+                                            @if (card.Blocker is not null)
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    @if (card.Blocker.Generic)
+                                                    {
+                                                        <span><kw-l key="todo.blocked_by">Waiting on</kw-l>: <kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span><kw-l key="todo.blocked_by">Waiting on</kw-l>: @card.Blocker.Title
+                                                            @if (!string.IsNullOrWhiteSpace(card.Blocker.Status))
+                                                            {
+                                                                <span class="text-muted"> · @card.Blocker.Status</span>
+                                                            }
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(card.CommunityDisplayName))
+                                            {
+                                                <div class="text-body-secondary small mb-1">
+                                                    <kw-l key="projects.todo.community">Community</kw-l>: @card.CommunityDisplayName
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                    @* The card action dropdown (the
+                                       _AccountNav.cshtml Bootstrap dropdown
+                                       shape, the U09 to-do dropdown idiom):
+                                       unassign / add-subtask / delete — thin
+                                       POST forms to the U07 to-do routes;
+                                       copy-to / move-to — POST forms to the
+                                       U08 board routes with the target-board
+                                       picker; move up / down / left / right
+                                       — POST forms to the U08 reorder
+                                       routes (the placement's id is the
+                                       service's first arg, §2.3). The
+                                       standing + cascade + limit decisions
+                                       are the service's (F7 / F8 / F6); the
+                                       view renders what the service returns
+                                       (C3). *@
+                                    <div class="dropdown" data-detach>
+                                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                aria-label="Actions for @card.Title">⋮</button>
+                                        @* ADR 0071 — horizontal dividers group
+                                           the card menu's functions: Edit /
+                                           Unassign / Add subtask (the card's
+                                           own shape), then Copy / Move to
+                                           another board, then the reorder
+                                           moves, then Delete (the destructive
+                                           action, always separated). *@
+                                        <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
+                                            @* ADR 0074 — "Assign to…" (always first): a
+                                               button opening a per-card Bootstrap modal
+                                               with one <select> each for People / Groups /
+                                               Communities; the modal posts the existing
+                                               assign route with a same-site returnUrl back
+                                               to this board (the standing decision is the
+                                               service's on write — the options are a display
+                                               convenience, never a gate). *@
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#assign-{card.TodoId}")">
+                                                    <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                                </button>
+                                            </li>
+                                            @* ADR 0106 — "Assign to me" (the self-assign
+                                               pick-up lane, the claim generalized): visible
+                                               only when the to-do is **unassigned** and the
+                                               actor is authenticated. Posts the assign route
+                                               with the actor's own subject id + the same-site
+                                               returnUrl back to this board. The service's
+                                               self-assign allowance (Read-allowed +
+                                               unassigned) is the server-side gate. *@
+                                            @if (string.IsNullOrWhiteSpace(card.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                                        <input type="hidden" name="returnUrl" value="@($"/projects/boards/{Model.Board.Id}")" />
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li>
+                                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{card.TodoId}")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                                            </li>
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")"
+                                                          data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            @* ADR 0071 (amendment) — "Add subtask" is a
+                                               button opening a Bootstrap modal (the
+                                               inline Title input is replaced; a modal
+                                               gives the field room + a proper Save /
+                                               Cancel). The modal posts the to-do
+                                               subtask route (POST /projects/todos/{id}
+                                               /subtasks) with the subtask's Title; the
+                                               optional Status is carried as a free-text
+                                               label (C-M5·4). *@
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#subtask-{card.TodoId}")">
+                                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                                </button>
+                                            </li>
+                                            @if (otherBoards.Count > 0)
+                                            {
+                                                <li><hr class="dropdown-divider" /></li>
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/copy-to")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="copy-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.copy_to">Copy to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="copy-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.copy_to">Copy to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/move-to")"
+                                                          data-confirm="@("Move this to-do to another board? It will no longer be on this board.")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="move-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.move_to">Move to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="move-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_to">Move to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li><hr class="dropdown-divider" /></li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-up")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_up">Move up</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-down")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_down">Move down</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-left")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_left">Move left</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-right")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_right">Move right</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li><hr class="dropdown-divider" /></li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/delete")"
+                                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    @* ADR 0071 (amendment) — the Add-subtask modal.
+                                       The card ⋮ menu's "Add subtask" button opens
+                                       this (Bootstrap 5 modal — the first in-repo
+                                       use; the bundle is already loaded). It posts
+                                       the to-do subtask route (POST /projects/todos
+                                       /{id}/subtasks, the AddSubtaskModel shape)
+                                       with the subtask's Title (required), an
+                                       optional free-text Status (C-M5·4), and an
+                                       optional Assignee (the seeded standing
+                                       options; display + standing, never a gate).
+                                       Cancel dismisses. The footer submit names the
+                                       form via the `form` attribute. Placed inside
+                                       the card div (fixed-position, display:none
+                                       until opened — it never affects the card's
+                                       drag-drop / menu markup). *@
+                                    <div class="modal fade" id="@($"subtask-{card.TodoId}")" tabindex="-1"
+                                         aria-labelledby="@($"subtask-label-{card.TodoId}")" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/subtasks")"
+                                                      id="@($"subtask-form-{card.TodoId}")">
+                                                    @Html.AntiForgeryToken()
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="@($"subtask-label-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                                aria-label="@ariaClose"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label" for="@($"subtask-title-{card.TodoId}")">
+                                                                <kw-l key="common.title">Title</kw-l>
+                                                            </label>
+                                                            <input class="form-control" type="text" name="Title"
+                                                                   id="@($"subtask-title-{card.TodoId}")"
+                                                                   maxlength="120" required />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label" for="@($"subtask-status-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.status">Status</kw-l>
+                                                            </label>
+                                                            @* ADR 0069 — the fixed status vocabulary (the same
+                                                               <c>KanbanStatuses.Known</c> set the lane's Set-status
+                                                               select offers: None + the four codes). A new subtask
+                                                               starts with no status, so "None" is the selected
+                                                               default (no legacy free-text value to preserve here,
+                                                               unlike the lane editor which edits an existing lane). *@
+                                                            <select class="form-select" name="Status" id="@($"subtask-status-{card.TodoId}")">
+                                                                <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
+                                                                @foreach (var statusCode in KanbanStatuses.Known)
+                                                                {
+                                                                    <option value="@statusCode">
+                                                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                                                    </option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label" for="@($"subtask-assignee-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                                            </label>
+                                                            @{
+                                                                var subtaskAssigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            }
+                                                            <select class="form-control" name="AssigneeId"
+                                                                    id="@($"subtask-assignee-{card.TodoId}")">
+                                                                <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                                                @foreach (var o in subtaskAssigneeOptions)
+                                                                {
+                                                                    <option value="@o.Id">@o.Label</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                                        </button>
+                                                        <button type="submit" class="btn btn-primary" form="@($"subtask-form-{card.TodoId}")">
+                                                            <kw-l key="common.add">Add</kw-l>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @* ADR 0074 — the "Assign to…" modal. The card ⋮
+                                       menu's "Assign to…" button opens this (the
+                                       ADR 0071 modal shape: a Bootstrap 5 modal in
+                                       the card div, fixed-position, display:none
+                                       until opened — it never affects the card's
+                                       drag-drop / menu markup). A single
+                                       <c>name="assigneeId"</c> <select> with three
+                                       optgroups — People (the seeded
+                                       Audience_Users: verified, non-blocked, non-self
+                                       profiles), Groups (the seeded
+                                       Audience_Groups: public groups, ADR 0010),
+                                       and Communities (the seeded
+                                       Assign_Communities: the instance's enabled
+                                       components) — led by the Unassigned option
+                                       (an empty value clears the assignee on
+                                       submit). The current assignee is preselected
+                                       when it matches an option (person, group, or
+                                       community — the id spaces are disjoint). The
+                                       form posts the existing assign route (POST
+                                       /projects/todos/{id}/assign — the standing
+                                       gate is the service's, creator ∪ assignee ∪
+                                       GlobalAdmin, never re-derived here) with a
+                                       same-site <c>returnUrl</c> back to this
+                                       board, so the flash toast ("To-do assigned."
+                                       / "Assignee removed.") lands here, not on the
+                                       to-do's detail. The options are a display
+                                       convenience, never a gate. Cancel dismisses.
+                                       The footer submit names the form via the
+                                       <c>form</c> attribute. *@
+                                    <div class="modal fade" id="@($"assign-{card.TodoId}")" tabindex="-1"
+                                         aria-labelledby="@($"assign-label-{card.TodoId}")" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")"
+                                                      id="@($"assign-form-{card.TodoId}")">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="returnUrl"
+                                                           value="@($"/projects/boards/{Model.Board.Id}")" />
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="@($"assign-label-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                                            <span class="text-body-secondary">· @card.Title</span>
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                                aria-label="@ariaClose"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        @* The current assignee (the names the controller resolved —
+                                                           person, group, or community; a raw id is the fallback). *@
+                                                        @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                                        {
+                                                            <p class="mb-3">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>: <span>@card.AssigneeDisplayName</span>
+                                                            </p>
+                                                        }
+                                                        @{
+                                                            // ADR 0106 — the assign people list is the **self-including**
+                                                            // `Assign_Users` (the current user can assign a to-do onto
+                                                            // themselves, the self-assign lane), not the grant-picker
+                                                            // `Audience_Users` (which excludes self).
+                                                            var assignPeople = (ViewData["Assign_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            var assignGroups = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            var assignCommunities = (ViewData["Assign_Communities"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            // ADR 0074 — the optgroup labels (the <kw-l> TagHelper
+                                                            // renders text nodes, not attributes, so the labels are
+                                                            // resolved the ADR 0072 way: provider by the effective
+                                                            // language, the en registry the floor).
+                                                            var assignPeopleLabel = await Translation.GetAsync("projects.todo.assign_people", _kwL);
+                                                            var assignGroupsLabel = await Translation.GetAsync("projects.todo.assign_groups", _kwL);
+                                                            var assignCommunitiesLabel = await Translation.GetAsync("projects.todo.assign_communities", _kwL);
+                                                            bool IsCurrent(string? oId) =>
+                                                                !string.IsNullOrEmpty(card.AssigneeId) && card.AssigneeId == oId;
+                                                        }
+                                                        <div>
+                                                            <label class="form-label" for="@($"assign-select-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                                            </label>
+                                                            <select class="form-control" name="assigneeId"
+                                                                    id="@($"assign-select-{card.TodoId}")">
+                                                                <option value=""
+                                                                        selected="@(!string.IsNullOrEmpty(card.AssigneeId) ? null : "selected")">
+                                                                    <kw-l key="projects.todo.unassigned">Unassigned</kw-l>
+                                                                </option>
+                                                                @if (assignPeople.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignPeopleLabel">
+                                                                        @foreach (var o in assignPeople)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                                @if (assignGroups.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignGroupsLabel">
+                                                                        @foreach (var o in assignGroups)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                                @if (assignCommunities.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignCommunitiesLabel">
+                                                                        @foreach (var o in assignCommunities)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                                        </button>
+                                                        <button type="submit" class="btn btn-primary" form="@($"assign-form-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.assign">Assign</kw-l>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @* ADR 0106 — the card's "Details" expander
+                                   (a Bootstrap collapse): reveals the body
+                                   (rendered as markdown), the Start / Due
+                                   dates if set, the waiting-on if set, and
+                                   the community name if set. Always available
+                                   on a card — the "at a glance" summary is the
+                                   metadata line above; the expander gives the
+                                   full picture without navigating to the detail.
+                                   Rendered as an arrow-icon toggle on its own
+                                   row at the card's foot (the repo's inline
+                                   lucide-style SVG convention, no icon font);
+                                   the localized label is kept for assistive
+                                   tech via a visually-hidden span. The arrow
+                                   sits at the row's right; .kanban-details-toggle
+                                   (site.css) rotates it to point up while the
+                                   card is expanded (aria-expanded is set on the
+                                   button by the Bootstrap collapse). *@
+                                <div class="mt-1 text-end">
+                                    <button type="button" class="btn btn-sm btn-link text-dark text-decoration-none p-0 kanban-details-toggle"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="@($"#details-{card.TodoId}")"
+                                            aria-expanded="false"
+                                            aria-controls="@($"details-{card.TodoId}")">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span class="visually-hidden"><kw-l key="projects.todo.details">Details</kw-l></span>
+                                    </button>
+                                </div>
+                            </div>
+

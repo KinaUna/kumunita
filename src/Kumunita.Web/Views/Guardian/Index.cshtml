@@ -135,6 +135,10 @@
                             {
                                 <span class="badge bg-secondary ms-1"><kw-l key="guardian.suspended">Suspended</kw-l></span>
                             }
+                            @if (item.HasTimeLimits)
+                            {
+                                <span class="badge bg-info text-dark ms-1"><kw-l key="guardian.timelimit.badge_set">Time limits set</kw-l></span>
+                            }
                         </span>
                         @if (item.Blocked)
                         {

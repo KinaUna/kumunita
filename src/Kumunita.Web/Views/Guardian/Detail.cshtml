@@ -472,6 +472,118 @@
         }
 
         @*
+            M28 (ADR 0151 D6) — the "Time limits" section (the GU inverse
+            of the M20 quiet lane, the LocaleController.SaveQuiet shape).
+            The form is seeded with the current schedule via
+            ViewData["TimeLimitsSection"] (the TimeLimitsSection record:
+            Enabled / Mode / Hours / DaysOfWeek — the M20 Quiet shape
+            re-expressed on the GU surface). A missing/disabled schedule
+            renders the floor (C-M28·3): Enabled=false, Mode="blocked",
+            Hours=[], DaysOfWeek=[].
+            Exposed on ViewData (the MessagingRestricted / EventRsvpMode
+            precedent — the MembershipEditorModel is a pinned record; the
+            U07 exact-projection pin forbids adding a field).
+            Bound to U05's guardian.timelimit.* keys (NOT the M20
+            settings.quiet.* keys — those are the notification lane's).
+            The save / clear POST is the SaveTimeLimits action (POST
+            me/children/{childId}/timelimits); the clear form posts
+            clear=1 → null → row delete (the M20 "clear" idiom, C-M28·3).
+        *@
+        @{
+            var _tl = (Kumunita.Web.Models.TimeLimitsSection?)(ViewData["TimeLimitsSection"])
+                ?? new Kumunita.Web.Models.TimeLimitsSection(false, "blocked", [], []);
+            var _tlHours = _tl.Hours ?? System.Array.Empty<int>();
+            var _tlDays  = _tl.DaysOfWeek ?? System.Array.Empty<int>();
+        }
+        <h2 class="mt-4"><kw-l key="guardian.timelimit.title">Time limits</kw-l></h2>
+        <p class="text-muted">
+            <kw-l key="guardian.timelimit.description">Choose when your child may use the platform. The schedule is saved on their account, applied in their own time zone — it takes effect on their next sign-in, and never affects you.</kw-l>
+        </p>
+
+        <form method="post" action="@Url.Action("SaveTimeLimits", "Guardian", new { childId = Model.ChildId })">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-3">
+                <div class="col-sm-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" role="switch" id="tlEnabled"
+                               name="enabled" value="true"
+                               @(_tl.Enabled ? "checked" : null) />
+                        <label class="form-check-label" for="tlEnabled">
+                            <kw-l key="guardian.timelimit.enabled">Enforce time limits for this child</kw-l>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-sm-12">
+                    <span class="form-label"><kw-l key="guardian.timelimit.mode_label">When may the child use the platform?</kw-l></span>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="tlModeBlocked"
+                               name="mode" value="blocked"
+                               @(_tl.Mode == "blocked" ? "checked" : null) />
+                        <label class="form-check-label" for="tlModeBlocked">
+                            <kw-l key="guardian.timelimit.mode_blocked">Blocked during the selected hours &amp; days</kw-l>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" id="tlModeAllowed"
+                               name="mode" value="allowed"
+                               @(_tl.Mode == "allowed" ? "checked" : null) />
+                        <label class="form-check-label" for="tlModeAllowed">
+                            <kw-l key="guardian.timelimit.mode_allowed">Allowed only during the selected hours &amp; days</kw-l>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-sm-6">
+                    <label for="tlHours" class="form-label">
+                        <kw-l key="guardian.timelimit.hours_label">Hours of day</kw-l>
+                    </label>
+                    <select class="form-select" name="hours" id="tlHours" multiple size="6">
+                        @for (var h = 0; h < 24; h++)
+                        {
+                            <option value="@h" selected="@(_tlHours.Contains(h) ? "selected" : null)">@h</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-6">
+                    <label for="tlDays" class="form-label">
+                        <kw-l key="guardian.timelimit.days_label">Days of week</kw-l>
+                    </label>
+                    <select class="form-select" name="daysOfWeek" id="tlDays" multiple size="7">
+                        @for (var d = 0; d < 7; d++)
+                        {
+                            <option value="@d" selected="@(_tlDays.Contains(d) ? "selected" : null)">@d</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="row g-2 mt-3">
+                <div class="col-sm-12">
+                    <button type="submit" class="btn btn-primary">
+                        <kw-l key="guardian.timelimit.save">Save time limits</kw-l>
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        @* The clear lane — a separate form posting clear=1; the controller
+           maps this to a null schedule (the "never restricted" floor,
+           C-M28·3 — the M20 clear idiom). *@
+        <form method="post" action="@Url.Action("SaveTimeLimits", "Guardian", new { childId = Model.ChildId })" class="mt-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="clear" value="1" />
+            <button type="submit" class="btn btn-outline-secondary">
+                <kw-l key="guardian.timelimit.clear">Clear time limits</kw-l>
+            </button>
+        </form>
+
+        @*
             Count-aware steering (ADR 0028 §F amendment, 2026-10-05). Both
             lanes below POST to the same Dissolve action — the standing over
             the child ends either way — but they are framed differently

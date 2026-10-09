@@ -61,6 +61,42 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
+    [Fact(DisplayName = "The newest-first head is the M30 0.46.0 entry (M29 0.45.0 + IMPROVE 0.44.0 one/two rows back)")]
+    public void The_Improve_Lane_Reduction_Entry_Is_Shipped()
+    {
+        // Pin the version-registry head (the required sixth close-flip member,
+        // ADR 0110 / AGENTS.md) so a copy-paste that drops or re-orders an
+        // entry is caught by the build instead of silently losing the
+        // "What's new" announcement of the close. The head is newest-first:
+        // when a milestone ships it becomes the head and the previous head
+        // slides down. M30 (admin onboarding) is the newest shipped milestone
+        // (the 0.46.0 entry, this M30 close flip), so it is now the head; the
+        // M29 (admin surface labels) 0.45.0 entry slides one row back, and
+        // the IMPROVE lane's 0.44.0 reduction entry (the honest "a reduction,
+        // not a feature" statement) must remain, two rows back.
+        var head = WhatsNew.All[0];
+        Assert.True(
+            head.Version == "0.46.0" && head.Date == "2026-10-08",
+            "The M30 0.46.0 (2026-10-08) entry must be the head of the registry; got "
+                + head.Version + " / " + head.Date + ".");
+        Assert.True(
+            head.Changes.Any(c => c.Contains("admin onboarding", StringComparison.OrdinalIgnoreCase)),
+            "The 0.46.0 head entry must name M30's admin onboarding capability.");
+
+        // The M29 admin-surface-labels entry slides one row back from the head.
+        var m29 = WhatsNew.All.Single(v => v.Version == "0.45.0");
+        Assert.True(
+            m29.Changes.Any(c => c.Contains("surface label", StringComparison.OrdinalIgnoreCase)),
+            "The M29 0.45.0 entry must name M29's admin surface labels capability.");
+
+        // The IMPROVE lane's reduction entry is still shipped (not dropped by
+        // the M30 close) — two rows back from the head.
+        var improve = WhatsNew.All.Single(v => v.Version == "0.44.0");
+        Assert.True(
+            improve.Changes.Any(c => c.Contains("IMPROVE", StringComparison.OrdinalIgnoreCase)),
+            "The IMPROVE lane's 0.44.0 reduction entry must name the IMPROVE lane.");
+    }
+
     [Fact(DisplayName = "Every WhatsNew row is well-formed (version, ISO date, ≥1 non-blank change)")]
     public void Every_Row_Is_WellFormed()
     {

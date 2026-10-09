@@ -507,6 +507,17 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .badge.text-dark {
     color: #17251d !important;
   }
+  /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
+     Community / Private): the token flip re-points --bs-light to a dark
+     fill, so the .badge.text-dark dark ink above would sit on a dark
+     surface — dark on dark. Re-point the text to the light emphasis ink
+     (higher specificity than .badge.text-dark, so it wins; the amber
+     bg-warning text-dark chips are untouched — they don't carry .bg-light). */
+  html:not([data-kmb-theme='light']) .badge.bg-light.text-dark {
+    background-color: var(--kmb-tint-a) !important;
+    color: var(--kmb-ink) !important;
+    border-color: var(--kmb-border);
+  }
   /* .card.text-bg-light (the admin dashboard's count cards): the fill
      re-resolves to the dark surface via the --bs-light token, but the text
      stays Bootstrap's hard-coded black — unreadable on the dark fill.
@@ -710,6 +721,17 @@ html[data-kmb-theme='dark'] .badge.text-bg-light {
    would render on the amber fill — unreadable. Restore the real dark ink. */
 html[data-kmb-theme='dark'] .badge.text-dark {
   color: #17251d !important;
+}
+/* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
+   Community / Private): the token flip re-points --bs-light to a dark
+   fill, so the .badge.text-dark dark ink above would sit on a dark
+   surface — dark on dark. Re-point the text to the light emphasis ink
+   (higher specificity than .badge.text-dark, so it wins; the amber
+   bg-warning text-dark chips are untouched — they don't carry .bg-light). */
+html[data-kmb-theme='dark'] .badge.bg-light.text-dark {
+  background-color: var(--kmb-tint-a) !important;
+  color: var(--kmb-ink) !important;
+  border-color: var(--kmb-border);
 }
 /* .card.text-bg-light (the admin dashboard's count cards): dark fill +
    Bootstrap's hard-coded black text — flip the text to the light ink. */
@@ -2040,6 +2062,15 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 .msg-row.other.unread .msg-avatar .avatar,
 .msg-row.other.unread .msg-avatar .avatar-mono {
   box-shadow: 0 0 0 2px var(--kmb-amber);
+}
+/* The conversation-list preview row (Index.cshtml) is a `text-truncate` div
+   inside a flex item (li.d-flex > a.flex-grow-1). A flex item's default
+   `min-width: auto` stops it shrinking below the unbreakable min-content of
+   that nowrap preview, so a long unbroken token (a URL, an id) blows the row,
+   the column, and the whole page wide instead of ellipsizing. Reset the flex
+   item to `min-width: 0` so the truncate can shrink + ellipsize and the row holds. */
+.messages-conv-list .list-group-item > a.flex-grow-1 {
+  min-width: 0;
 }
 
 /* --- Rich-content bodies (RC U06) ------------------------------------------

@@ -13,17 +13,20 @@ public class MilestonesTests
         Milestones.All.Select(m => m.Id);
 
     [Fact]
-    public void Roadmap_Covers_M0_Through_M28_Plus_Named_Lanes_In_Order()
+    public void Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "M28" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "M33", "M34" },
             Ids.ToList());
     }
 
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE" })
+        // M28 (guardian time limits) is now DONE — closed in the U09 close unit
+        // (ADR 0151). M28 is the LAST milestone on the roadmap, so every
+        // milestone is now done; the asserted set is the full `Ids` set.
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "M28", "IMPROVE", "M29", "M30" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,24 +34,19 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M28_Is_The_Single_InProgress_Milestone()
+    public void M31_Is_The_Single_InProgress_Milestone()
     {
-        // M27 (user-scoped portability) is now DONE — closed in the U13 close
-        // unit (ADR 0148); M28 (guardian time limits) is promoted to the single
-        // in-progress milestone, the order unchanged
-        // (M20, M21, M23, M22, M24, M25, M26, M27, M28);
-        // M27 (user-scoped portability) + M26 (sorting) + M25 (upload limits) + M24 (storage metrics) + M22 (onboarding) + M23 (extended profiles) + M21 (document management) are all done.
-        var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
-        Assert.Single(next);
-        Assert.Equal("M28", next[0].Id);
-        // the done list has grown to M27 (M28 is not done)
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M27").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M26").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M25").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M24").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M22").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M23").Status);
-        Assert.Equal(Milestones.StatusDone, Milestones.All.Single(x => x.Id == "M21").Status);
+        // M30 (admin onboarding) is now the last shipped milestone (closed in
+        // this M30 close unit, ADR 0153); M31 (production error handling) is
+        // the single in-progress milestone promoted to StatusNext; M32–M34
+        // remain planned. The roadmap order is unchanged ("…M29","M30","M31"
+        // — the "named lane, not a renumber" precedent).
+        var next = Assert.Single(Milestones.All.Where(m => m.Status == Milestones.StatusNext));
+        Assert.Equal("M31", next.Id);
+        Assert.All(Milestones.All.Where(m => m.Id is "M32" or "M33" or "M34"),
+            m => Assert.Equal(Milestones.StatusPlanned, m.Status));
+        Assert.All(Milestones.All.Where(m => m.Id is not ("M31" or "M32" or "M33" or "M34")),
+            m => Assert.Equal(Milestones.StatusDone, m.Status));
     }
 
     [Fact]

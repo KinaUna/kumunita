@@ -67,6 +67,15 @@ public static class M1DocTypes
         opts.Schema.For<DelegationGrant>();
         // GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)
         opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);
+        // M28 (ADR 0151, D2): the per-child guardian time-limit schedule — one
+        // row per child (id = the child's SubjectId), the NotificationQuietSchedule
+        // "one row per subject" shape with ChildId in place of RecipientId. The
+        // ChildId IS the document identity (the NotificationPreference / Profile
+        // .Identity precedent) — a bare Schema.For<> would fail Marten's identity
+        // resolution. Part of the GU surface (not a new *DocTypes); the
+        // additive-surface delta is applied idempotently at boot (ADR 0004 §B.1,
+        // zero migration, no EF).
+        opts.Schema.For<UserInfo.GuardianTimeLimitSchedule>().Identity(s => s.ChildId);
         opts.Schema.For<Component>();
         opts.Schema.For<ModeratorAssignment>();
         // Posting right: one row per (component, user) pair, the same business-key

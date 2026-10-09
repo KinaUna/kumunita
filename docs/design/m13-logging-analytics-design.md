@@ -1,5 +1,19 @@
 # M13 — Logging and analytics — design
 
+> **Abstract:** *What it settles:* the **operator's feedback loop**, in two
+> halves — **logging** (dated files under a configurable directory, daily
+> rotation + a pinned day-count retention deleted at boot, the console sink
+> untouched) and **analytics** (one minimal `UsageEvent` row, aggregated over
+> a pinned 7/30/90-day window, rendered on one GlobalAdmin-gated admin section
+> `/admin/analytics` + a CSV export). *The one contract:* **the feedback is
+> local and the row is minimal** (C-M13·1 / C-M13·2) — a `UsageEvent` carries
+> *exactly* `Id` / `At` / `ActorId` / `RouteTemplate`; nothing M13 emits,
+> stores, or renders leaves the instance. *Out of scope:* no per-account data
+> rendered anywhere, no third-party telemetry of any kind (C-M13·1,
+> SECURITY.md §5), and the `AccessAudit` lane (M1) — that answers "who was
+> allowed/denied, when," not "how the platform is used over time." LOCKED in
+> ADR 0114.
+
 > **Milestone M13.** The **operator's feedback loop**, operator-local in two
 > halves. **(1) The logging half:** the host's logs land in **dated files**
 > under a configurable directory (a BCL-only, hand-rolled file sink with

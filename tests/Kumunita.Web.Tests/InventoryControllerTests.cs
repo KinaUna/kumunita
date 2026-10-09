@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Inventory;
 using Kumunita.Core.Query;
@@ -701,44 +702,57 @@ public sealed class InventoryControllerTests
     /// no admin toggle; the M5 <c>nav.projects</c> nav-entry shape): the
     /// <see cref="KnownTranslationKeys"/> <c>inv.nav</c> key is registered
     /// (the §kw-l list, × en/de/fr/da — the U04 pin extends automatically),
-    /// and <c>_Layout.cshtml</c> carries the <c>inv.nav</c> kw-l link to
-    /// <c>/inventory</c> in **both** nav variants (B's "More ▾" dropdown +
-    /// C's icon rail) — the house structural-pin idiom (the
-    /// <see cref="NavMoreFoldTests"/> "string pin, no TestServer" precedent).
+    /// and <c>_Layout.cshtml</c> links to <c>/inventory</c> in **both** nav
+    /// variants (B's "More ▾" dropdown + C's icon rail) — the house
+    /// structural-pin idiom (the <see cref="NavMoreFoldTests"/> "string pin,
+    /// no TestServer" precedent). M29 (ADR 0152) resolves the item's *label*
+    /// via the <c>ISurfaceLabelsService</c> resolver (the <c>inv.nav</c> key
+    /// is the kw-l floor the resolver falls back to) rather than the literal
+    /// <c>&lt;kw-l key="…"&gt;</c> markup, so this pin holds the link +
+    /// registry invariants (M29·9 a11y floor + ADR 0152 D3 registry), not the
+    /// old literal-key markup.
     /// </summary>
     [Fact]
     public void Nav_Entry_Present_In_Both_Layout_Variants_And_Registry()
     {
         // (1) The registry has the inv.nav key in all four languages (the
-        // §kw-l parity pin — the U04 registration; U05 consumes it, never
-        // re-registers).
+        // §kw-l parity pin — the U04 registration; M29's resolver consumes it
+        // as the fallback floor, never re-registers; ADR 0152 D3 — the
+        // registry entries stay).
         Assert.Equal("Inventory", Kumunita.Core.Localization.KnownTranslationKeys.EnValues["inv.nav"]);
         Assert.Equal("Inventar", Kumunita.Core.Localization.KnownTranslationKeys.DeValues["inv.nav"]);
         Assert.Equal("Inventaire", Kumunita.Core.Localization.KnownTranslationKeys.FrValues["inv.nav"]);
         Assert.Equal("Lager", Kumunita.Core.Localization.KnownTranslationKeys.DaValues["inv.nav"]);
 
-        // (2) _Layout.cshtml links to /inventory with the inv.nav kw-l key,
-        // in BOTH nav variants (the M5 projects nav-entry shape: variant B's
-        // dropdown item + variant C's rail button).
+        // (2) _Layout.cshtml links to /inventory in BOTH nav variants (the M5
+        // projects nav-entry shape: variant B's dropdown item + variant C's
+        // rail button). M29 (ADR 0152) resolves the *label* via the
+        // ISurfaceLabelsService resolver (the inv.nav key as the kw-l floor),
+        // so this pin holds the LINK invariant (a rename never moves a link —
+        // "label, not re-route") rather than the old literal <kw-l key="…">
+        // markup.
         var path = Path.Combine(RepoRoot, "src", "Kumunita.Web", "Views", "Shared", "_Layout.cshtml");
         Assert.True(File.Exists(path), $"_Layout.cshtml not found at {path}.");
         var html = File.ReadAllText(path);
 
-        Assert.Contains("href=\"/inventory\"", html);
-        Assert.Contains("key=\"inv.nav\"", html);
+        // The Inventory link is present in BOTH nav variants (≥ 2 — variant B
+        // dropdown + variant C rail), the M29·9 link invariant.
+        var invLinks = Regex.Matches(html, "href=\"/inventory\"");
+        Assert.True(invLinks.Count >= 2,
+            $"Expected the /inventory link in both nav variants (B dropdown + C rail); found {invLinks.Count}.");
 
         // The M5 projects nav-entry is the shape to mirror: the Inventory
         // entry links to /inventory exactly as Projects links to
-        // /projects/todos — both present in the layout.
-        Assert.Contains("href=\"/projects/todos\"", html);
-        Assert.Contains("key=\"nav.projects\"", html);
+        // /projects/todos — both present in the layout (≥ 2 each: both
+        // variants).
+        Assert.True(Regex.Matches(html, "href=\"/projects/todos\"").Count >= 2,
+            "Expected the /projects/todos link in both nav variants.");
 
-        // Two occurrences of the inv.nav key (variant B's dropdown item +
-        // variant C's rail button — the visually-hidden + tooltip spans in C
-        // carry the key twice, so ≥ 2 is the invariant).
-        Assert.True(
-            html.Split("key=\"inv.nav\"", StringSplitOptions.None).Length - 1 >= 2,
-            "Expected the inv.nav kw-l key in both nav variants (B dropdown + C rail); found < 2.");
+        // The M29 label resolver drives the Inventory label (the inv.nav key
+        // is the kw-l floor it falls back to) — the resolver seam is present
+        // in the layout and resolves this surface's key.
+        Assert.Contains("GetLabelAsync", html);
+        Assert.Contains("inv.nav", html);
     }
 
     // ── Harness ──────────────────────────────────────────────────────────

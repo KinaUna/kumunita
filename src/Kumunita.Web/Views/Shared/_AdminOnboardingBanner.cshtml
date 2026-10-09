@@ -1,0 +1,83 @@
+@*
+    _AdminOnboardingBanner.cshtml — the M30 admin onboarding affordance (ADR
+    0153, M30·5).
+
+    The GlobalAdmin sibling of the M22 resident _OnboardingBanner (ADR 0132):
+    a dismissible banner rendered on every /admin/* page (wired into
+    _AdminNav.cshtml, the M29 admin sub-nav scope) that walks a new
+    GlobalAdmin to /admin/onboarding.
+
+      - Renders ONLY when the signed-in actor is a GlobalAdmin AND
+        AdminOnboarding.CompletedAt is null (M30·5 — the bannerEligible read
+        + the GlobalAdmin-gated scope; a non-GlobalAdmin never sees it, and a
+        completed admin never sees it). The GlobalAdmin check is the standard
+        role read (KumunitaPrincipal.IsGlobalAdmin — the thin-token rule, ADR
+        0001-B, never a claim re-derived here); the completion read is the
+        IAdminOnboardingService.GetAsync seam — the SAME seam the
+        AdminOnboardingController.Index action + the /admin/onboarding view
+        call, so the banner + the view resolve to the same value (M30·5).
+      - Non-blocking (M30·5): it never gates sign-in; the /admin/onboarding
+        route is always reachable for a GlobalAdmin. The close button is a
+        *client-side* dismiss only (onboarding-banner.js — a sessionStorage
+        flag, never a write to CompletedAt); the only way to clear the banner
+        for real is the explicit "mark as complete" POST (M30·4).
+      - The copy is the closed adminonboarding.banner.* kw-l set (M30·6, the
+        21-key set U05 authored) — never an inline string. The a11y.*
+        accessible names are server-resolved (the kw-l TagHelper can't wrap
+        an attribute).
+
+    Dismissal is remembered per browser via sessionStorage (the M22
+    onboarding-banner.js idiom) — a plain ES module (tsc-built, no bundler),
+    CSP-safe (script-src 'self'). The shared .kumunita-onboarding-banner
+    class is intentional: onboarding-banner.js selects that class, so the
+    single shared module dismisses this banner too (one dismissal mechanism,
+    two banners — the resident's and the admin's).
+*@
+@using Kumunita.Core.AdminOnboarding
+@using Kumunita.Web.Security
+@inject IAdminOnboardingService AdminOnboarding
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    // GlobalAdmin only (M30·5): a non-GlobalAdmin never sees the banner, even
+    // if CompletedAt is null. Unauthenticated has no role → no banner.
+    bool isGlobalAdmin = User.Identity?.IsAuthenticated == true
+        && KumunitaPrincipal.IsGlobalAdmin(User);
+    // The completion read (M30·5): the SAME GetAsync seam the controller +
+    // the /admin/onboarding view call — best-effort, a missing store / missing
+    // row / read failure degrades to null (= not-yet-guided, the floor).
+    bool bannerEligible = false;
+    if (isGlobalAdmin)
+    {
+        var completedAt = await AdminOnboarding.GetAsync();
+        bannerEligible = completedAt is null;
+    }
+}
+@if (bannerEligible)
+{
+    // The banner's accessible names are server-resolved (the kw-l TagHelper
+    // can't wrap an attribute); the a11y.* floor is the closed M22 set (the
+    // region / action / dismiss a11y keys are shared, present in four
+    // languages).
+    var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    string ariaRegion   = await Translation.GetAsync("a11y.onboarding_region", effLang);
+    string ariaAction   = await Translation.GetAsync("a11y.onboarding_action", effLang);
+    string ariaDismiss  = await Translation.GetAsync("a11y.onboarding_dismiss", effLang);
+
+    <div class="kumunita-onboarding-banner alert alert-secondary alert-dismissible fade show mb-3"
+         role="region" aria-label="@ariaRegion">
+        <div class="container-fluid py-2 d-flex align-items-center gap-2">
+            <span class="me-auto me-2">
+                <kw-l key="adminonboarding.banner.text">Finish setting up this community?</kw-l>
+            </span>
+            <a class="btn btn-sm btn-primary text-nowrap" href="/admin/onboarding"
+               aria-label="@ariaAction"><kw-l key="adminonboarding.banner.action">Start setup</kw-l></a>
+            <button type="button" class="btn-close"
+                    data-dismiss-key="kumunita-onboarding-banner-dismissed"
+                    aria-label="@ariaDismiss"></button>
+        </div>
+    </div>
+
+    <script type="module" src="~/js/lib/onboarding-banner.js"></script>
+}

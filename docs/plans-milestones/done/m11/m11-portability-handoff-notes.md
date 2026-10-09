@@ -1,5 +1,9 @@
 # M11 handoff notes
 
+> **TL;DR:** Shipped M11 (Portability — import/export, ADR 0108): a `*.kumunita` archive that round-trips a whole instance (the content graph + the media bytes + the role standing) onto a fresh instance byte-identically, with the no-secret identity boundary enforced at the wire and the closed-failure-set enforced before any write; the close is U07 (the D9 frozen tests + the Web-surface pins + the milestone flip + the plan-file moves).
+> **Seam it created:** `Kumunita.Core.Portability` — the `PortabilityService.ExportAsync` / `ImportAsync` pair over the real Postgres-backed seams (the shared `IDocumentStore`, `UserManager<User>` / `RoleManager<IdentityRole>`, `LocalVolumeMediaStore`), the `PortabilityPrincipal` POCO field shape (the C-M11·2 **type boundary** — exactly `subjectId` / `username` / `email` / `normalizedEmail` / `displayName` / `verified` / `blocked` / `roles`; no `PasswordHash` / `SecurityStamp` / `AccessToken` / `RefreshToken` / `RecoveryCode`), and the `AdminPortabilityController` (the GlobalAdmin gate, `Via = Admin`, `Content-Disposition: attachment`).
+> **Do not re-litigate:** the three D9 frozen test names (`PortabilityRoundTrip_ExportThenImportPreservesContentGraphAndMediaAndRoles`, `PortabilityNoSecret_ArchiveContainsNoCredentialMaterial`, `PortabilityFailClosed_RejectedArchiveWritesZeroRows`) are **the** contract — a test whose exact name is not in the design doc's pinned list is a drift pause, not a silent add; the fail-closed pin is at the **wire** (C-M11·4 — a rejected archive writes zero content rows, zero principals, zero audit rows), not at the UI.
+
 One `## U#` section per unit, **appended, never rewritten** (the shared
 scratch tier of the three-tier contract — see the register header). Each
 entry: files written/touched, decisions locked or refined (with the

@@ -249,8 +249,12 @@ public sealed class M23FindPeopleTests
     /// F6 — the <c>_Layout.cshtml</c> carries a "People" nav item in <b>both</b>
     /// variants (the variant-B "More ▾" dropdown next to Directory, and the
     /// variant-C icon rail next to Directory), each linking to
-    /// <c>FindPeople/Index</c> and carrying the U05 <c>nav.people</c> kw-l
-    /// key (a non-empty value in the current language — the parity pin below).
+    /// <c>FindPeople/Index</c>. M29 (ADR 0152) resolves the item's *label* via
+    /// the <c>ISurfaceLabelsService</c> resolver (the U05 <c>nav.people</c>
+    /// key is the kw-l floor the resolver falls back to — a non-empty value in
+    /// the current language, the parity pin below) rather than the literal
+    /// <c>&lt;kw-l key="…"&gt;</c> markup, so this pin holds the LINK +
+    /// resolver invariants, not the old literal-key markup.
     /// </summary>
     [Fact]
     public void Layout_Carries_APeopleNavEntry_InBothVariants()
@@ -259,13 +263,19 @@ public sealed class M23FindPeopleTests
         Assert.True(File.Exists(path), $"_Layout.cshtml not found at {path}.");
         var html = File.ReadAllText(path);
 
-        // The U05 nav key is referenced (both variants reuse the one key).
-        Assert.Contains("key=\"nav.people\"", html);
-
-        // Both variants link to the FindPeople controller (dropdown + rail).
+        // Both variants link to the FindPeople controller (dropdown + rail) —
+        // the M29·9 link invariant (a rename never moves a link — "label, not
+        // re-route").
         var findPeopleLinks = Regex.Matches(html, "asp-controller=\"FindPeople\"\\s+asp-action=\"Index\"");
         Assert.True(findPeopleLinks.Count >= 2,
             $"Expected ≥2 'FindPeople/Index' nav links (variant-B dropdown + variant-C rail); found {findPeopleLinks.Count}.");
+
+        // M29 (ADR 0152) drives the label via the resolver, with the U05
+        // nav.people key as the kw-l floor (the registry entry stays — ADR
+        // 0152 D3) and a non-empty value in all four languages (the parity pin
+        // below).
+        Assert.Contains("GetLabelAsync", html);
+        Assert.Contains("nav.people", html);
     }
 
     /// <summary>

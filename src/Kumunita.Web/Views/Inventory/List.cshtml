@@ -1,4 +1,9 @@
 @model Kumunita.Web.Models.InventoryListViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @functions {
     // The ownerKind badge's label key (the dynamic-key idiom — the same
     // <c>StatusLabelKey</c> the M5 to-do feed's status badge uses: the
@@ -15,6 +20,26 @@
 }
 @{
     ViewData["Title"] = "Inventory";
+
+    // M29 (ADR 0152) — the surface header label (M29·1: the same value the nav
+    // item resolves — one resolver, one value, so a rename is never "nav says
+    // X, header says Y"). A non-blank admin label wins; otherwise the inv.nav
+    // kw-l key resolves in the viewer's effective language. Best-effort:
+    // GetLabelAsync never throws (a missing row / store degrades to the kw-l
+    // floor), so a null/absent service only degrades to the raw kw-l floor.
+    string _surfaceTitle = "Inventory";
+    if (SurfaceLabels is not null)
+    {
+        try
+        {
+            string surfaceLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            _surfaceTitle = await SurfaceLabels.GetLabelAsync("inventory", "inv.nav", surfaceLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the header (the kw-l floor).
+        }
+    }
 }
 
 <div class="row justify-content-center">
@@ -22,7 +47,7 @@
         <header class="airy-head">
             <div class="head-row">
                 <div>
-                    <h1><kw-l key="inv.list.title">Inventory</kw-l></h1>
+                    <h1>@_surfaceTitle</h1>
                 </div>
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <a class="btn btn-outline-primary" href="/inventory/new"><kw-l key="inv.create.title">New item</kw-l></a>

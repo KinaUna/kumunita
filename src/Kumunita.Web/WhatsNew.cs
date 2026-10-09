@@ -19,6 +19,22 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.46.0", "2026-10-08", new List<string>
+        {
+            "Admin onboarding — a guided walk-through for a new GlobalAdmin through the seven most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation): a links-only walk-through on the M22 / SITE lane's shape (a singleton completion flag, not a new write path), and a fresh GlobalAdmin who never touches the surface sees the admin banner (the affordance, not a wall) (ADR 0153).",
+        }),
+        new("0.45.0", "2026-10-08", new List<string>
+        {
+            "Admin surface labels — a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface: a label store on the SITE lane's shape (a per-item label, not a re-route), and a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0152).",
+        }),
+        new("0.44.0", "2026-10-08", new List<string>
+        {
+            "A quiet pass over what we already ship — no new feature. We applied the platform's own integration principles to the code and docs: the four largest files are smaller, the ADR index no longer has missing rows, the two agent-instruction files no longer disagree, the long handoff notes and design docs now open with a 10-second summary, and every access decision is audited with who and why. The codebase is measurably smaller, the docs measurably more navigable, the seams measurably more tested — and nothing you already use has changed (the IMPROVE lane).",
+        }),
+        new("0.43.0", "2026-10-07", new List<string>
+        {
+            "Guardian time limits — a parent/guardian sets when the child may use the platform: a per-child allow/block schedule (hours × days of week, in the child's own time zone) that gates the child's whole-platform access — a sign-out, exactly like a suspension but windowed. The guardian sets it on the child's manage page, a GlobalAdmin can clear it, and the child cannot set or clear their own (ADR 0151).",
+        }),
         new("0.42.0", "2026-10-07", new List<string>
         {
             "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide: a GlobalAdmin can now change what the home and about pages say (the hero eyebrow + lead) and choose which sections appear at all; the defaults are byte-identical to the shipped text, so a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0150).",

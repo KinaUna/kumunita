@@ -2,9 +2,34 @@
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @model Kumunita.Web.Models.FeedViewModel
 @{
     ViewData["Title"] = $"{Model.ComponentName}";
+
+    // M29 (ADR 0152) — the "Community" surface header label (M29·1: the same
+    // value the nav item resolves — one resolver, one value, so a rename is
+    // never "nav says X, header says Y"). A non-blank admin label wins;
+    // otherwise the nav.community kw-l key resolves in the viewer's effective
+    // language. Best-effort: GetLabelAsync never throws (a missing row / store
+    // degrades to the kw-l floor), so a null/absent service only degrades to
+    // the raw kw-l floor. Only the all-sections feed (the /community nav target)
+    // uses this; the single-community feed header stays the community's own
+    // name (UGC, rendered as authored).
+    string _surfaceTitle = "Community";
+    if (SurfaceLabels is not null)
+    {
+        try
+        {
+            string surfaceLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            _surfaceTitle = await SurfaceLabels.GetLabelAsync("community", "nav.community", surfaceLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the header (the kw-l floor).
+        }
+    }
+
     // The leave form's data-confirm (the ADR 0072 attribute idiom — the
     // confirm.js seam reads the attribute verbatim; the kw-l TagHelper can't
     // wrap an attribute). The en floor is the server fallback (a null provider
@@ -30,7 +55,7 @@
                     <h1>
                         @if (string.IsNullOrEmpty(Model.ComponentId))
                         {
-                            <kw-l key="posts.feed_all_sections">Community</kw-l>
+                            @_surfaceTitle
                         }
                         else
                         {

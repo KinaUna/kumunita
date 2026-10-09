@@ -137,84 +137,21 @@ public sealed class ProjectsController : Controller
     private static IReadOnlySet<string> RoleSet(ClaimsPrincipal user) =>
         KumunitaPrincipal.RoleSet(user);
 
-    // ── Seed helpers (the M2 / M3 / M4 single-source pin — mirrored, not re-invented)
+    // ── Seed helpers (U05, IMPROVE lane — the composer trio is now defined
+    // once in <see cref="ComposerSeedOptions"/>; the per-controller copies
+    // that used to live here are thin delegates to that helper. The
+    // class-level doc-comment's "M2/M3/M4 shared pattern, reused not
+    // reinvented" claim is now true.)
 
-    /// <summary>
-    /// Seeds the composer's "Who to grant to" option lists for the shared
-    /// <c>Views/Shared/_GrantPickers</c> partial — the same option source the
-    /// M2 <see cref="ProfileController"/> editor + M3 <see cref="PostsController"/>
-    /// composer + M4 <see cref="EventController"/> composer use: <b>Users</b> —
-    /// every visible, non-blocked, verified <c>Profile</c> except the actor
-    /// themselves; <b>Groups</b> — the platform public group list (a private
-    /// group is an organizing unit, never granted as an audience, ADR 0010).
-    /// Stored on <see cref="Controller.ViewData"/> (read-only view data — never
-    /// model properties on <see cref="TodoEditorModel"/>; the only form-bound
-    /// grants field remains the partial's hidden <c>Audience.Grants</c>
-    /// textarea).
-    /// </summary>
-    private async Task SeedGrantPickerOptionsAsync()
-    {
-        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
-        var selfId = SubjectId(User);
-        var userOptions = profiles
-            .Where(p => !p.Blocked)
-            .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
-            .Select(p => new GrantOption
-            {
-                Id    = p.SubjectId,
-                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
-                Kind  = "User",
-            })
-            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    // ADR 0106 — the **assign** people list (the <c>Assign_Users</c>
+    // ViewData key) is the ProjectsController-specific surface: it is the
+    // same verified/non-blocked set as <c>Audience_Users</c> but **includes
+    // the actor** (the self-assign lane — a resident can take a to-do onto
+    // themselves). The other three composers leave the default
+    // <c>includeAssignUsers: false</c> and do not set the key.
+    private Task SeedGrantPickerOptionsAsync()
+        => ComposerSeedOptions.SeedGrantPickerOptionsAsync(this, userInfo, includeAssignUsers: true);
 
-        var groups = await userInfo.GetPublicGroupsAsync();
-        var groupOptions = groups
-            .Select(g => new GrantOption
-            {
-                Id    = g.Id,
-                Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
-                Kind  = "Group",
-            })
-            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        ViewData["Audience_Users"] = userOptions;
-        ViewData["Audience_Groups"] = groupOptions;
-
-        // ADR 0106 — the **assign** people list includes the actor themself:
-        // "Assign to…" should let a resident take a to-do onto themselves
-        // (the self-assign lane, the claim generalized), so the current user
-        // must appear as an option. This is a *separate* list from the
-        // grant-picker `Audience_Users` (which deliberately excludes self —
-        // a grant of "addressed to me" is meaningless; the single-source
-        // audience editor and the subtask assignee picker keep reading
-        // `Audience_Users`). Same verified/non-blocked set, same order,
-        // self included.
-        var assignUserOptions = profiles
-            .Where(p => !p.Blocked)
-            .Select(p => new GrantOption
-            {
-                Id    = p.SubjectId,
-                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
-                Kind  = "User",
-            })
-            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        ViewData["Assign_Users"] = assignUserOptions;
-    }
-
-    /// <summary>
-    /// Seeds the composer's <b>authored-in language</b> picker (ADR 0018,
-    /// ADR 0005 B) — the instance's **enabled** <see cref="LanguageCatalog"/>,
-    /// ordered by <c>SortOrder</c>, read through
-    /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
-    /// seam, ADR 0005 D — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses). The create lane
-    /// pre-selects the actor's current effective language (ADR 0049 —
-    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
-    /// highlights the language the resident is reading the platform in.
-    /// </summary>
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the
     /// picker's pre-selection): the actor's per-request **effective**
@@ -234,29 +171,11 @@ public sealed class ProjectsController : Controller
         return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
 
-    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-    {
-        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
-        return catalog
-            .Where(l => l.Enabled)
-            .OrderBy(l => l.SortOrder)
-            .Select(l => (l.Id, l.NativeName))
-            .ToList();
-    }
+    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
 
-    /// <summary>
-    /// Seeds the composer's component *feed-organizer* picker (C-M3·2) — the
-    /// instance's **enabled** <see cref="Component"/> set (a *filter, never a
-    /// gate*; the audience is the sole access boundary on the form).
-    /// </summary>
-    private async Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
-    {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
-        return components
-            .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
-            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
+    private Task<IReadOnlyList<(string Id, string Name)>> SeedComponentPickerAsync()
+        => ComposerSeedOptions.SeedComponentPickerAsync(userInfo);
 
     /// <summary>
     /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a

@@ -1,5 +1,20 @@
 # M5 — Projects (to-dos + Kanban boards) — design (Part 1)
 
+> **Abstract:** *What it settles:* the **outcome arrow** — assignable,
+> hierarchical **to-dos** and **Kanban boards** with statused, limitable lanes.
+> A new bounded context `Kumunita.Core.Projects`: four documents, one new
+> document surface (`M5DocTypes`), one new service seam (`IProjectService`),
+> two new authorization adapters, one new Web controller + views, and one new
+> plain-TS module for the board's reorder / move / copy / assign / delete
+> actions. *The one contract:* **a to-do is the work item; a placement is where
+> it sits on a board** — `TodoItem` is standalone / assignable / hierarchical /
+> *placeable*, its position is a separate `BoardItemPlacement` record, and a
+> lane at its `MaxItems` limit refuses a further move / copy into it (the board
+> is the state machine the to-do flows through). *Out of scope (this file, Part
+> 1):* the exact POCO field sets, the exact `IProjectService` signatures, the
+> 16 + 8 pinned test names, the gate, and the drift-guard (U01 owns Part 2).
+> LOCKED in ADR 0067 (D1–D12 + D8a).
+
 > **Milestone.** `M5` — the **outcome** arrow (the `M0`–`M6` roadmap letters
 > stay fixed: M4 is shipped — Events, ADR 0054; M6 stays Portability).
 > **ADR 0067** is this milestone's decision record — **not yet authored**;

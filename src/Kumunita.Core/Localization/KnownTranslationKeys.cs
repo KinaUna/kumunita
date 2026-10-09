@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Kumunita.Core.Localization;
 
@@ -114,6 +115,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.cadence_label"]   = "Re-check held notifications every (minutes)",
             ["admin.quiet.save"]            = "Save cadence",
             ["admin.quiet.flash_saved"]     = "Quiet-time cadence saved.",
+
+            // ── M28 (ADR 0151) — guardian time limits: the 13-key
+            // guardian.timelimit.* GU Detail section (D7) + the single
+            // account.time_limit.login_message login landing (referenced in
+            // U04's Login.cshtml ?error=time-limit case). U05 authors the
+            // COMPLETE 14-key closed set; U06 consumes, adds none. A DISTINCT
+            // namespace — NOT the M20 settings.quiet.* / admin.quiet.* keys
+            // (those are the notification lane's, unchanged — D9).
+            ["guardian.timelimit.title"]        = "Time limits",
+            ["guardian.timelimit.description"]  = "Choose when your child may use the platform. The schedule " +
+                "is saved on their account, applied in their own time zone — it " +
+                "takes effect on their next sign-in, and never affects you.",
+            ["guardian.timelimit.enabled"]      = "Enforce time limits for this child",
+            ["guardian.timelimit.mode_label"]   = "When may the child use the platform?",
+            ["guardian.timelimit.mode_blocked"] = "Blocked during the selected hours & days",
+            ["guardian.timelimit.mode_allowed"] = "Allowed only during the selected hours & days",
+            ["guardian.timelimit.hours_label"]  = "Hours of day",
+            ["guardian.timelimit.days_label"]   = "Days of week",
+            ["guardian.timelimit.save"]         = "Save time limits",
+            ["guardian.timelimit.clear"]        = "Clear time limits",
+            ["guardian.timelimit.flash_saved"]  = "Time limits saved — the child will be signed out outside the allowed window.",
+            ["guardian.timelimit.flash_cleared"] = "Time limits cleared — the child may now use the platform at any time.",
+            ["guardian.timelimit.badge_set"]    = "Time limits set",
+            ["account.time_limit.login_message"] = "You are outside your allowed hours. Please check back later.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
@@ -330,6 +355,33 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Directory",
             ["nav.people"]        = "People",
+
+            // ── ADR 0152 (M29) — the /admin/labels surface: the GlobalAdmin's
+            //    edit page for the 13 top-navigation surfaces' display labels
+            //    (the nav item + that surface's page header). labels.title /
+            //    labels.save are the page chrome; labels.{surface} are the 13
+            //    row labels. The 13 nav.* keys above are the FALLBACK (ADR 0152
+            //    D3) — these labels.* keys are the admin form's own row labels
+            //    only (a distinct namespace, like the settings.quiet.* / admin.*
+            //    keys M20 added for its own admin surface). en values match the
+            //    corresponding nav.* en values so a fresh en instance renders
+            //    identically to the nav today (M29·4 byte-identity).
+            ["labels.title"]          = "Surface labels",
+            ["labels.save"]           = "Save labels",
+            ["labels.home"]           = "Home",
+            ["labels.announcements"]  = "Announcements",
+            ["labels.community"]      = "Community",
+            ["labels.groups"]         = "Groups",
+            ["labels.events"]         = "Events",
+            ["labels.projects"]       = "Projects",
+            ["labels.inventory"]      = "Inventory",
+            ["labels.bookmarks"]      = "Bookmarks",
+            ["labels.documents"]      = "Documents",
+            ["labels.pages"]          = "Pages",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Directory",
+            ["labels.people"]         = "People",
+
             ["nav.sign_in"]       = "Sign in",
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
@@ -2282,6 +2334,37 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Finish setting up your account?",
             ["onboarding.banner.action"]    = "Start setup",
 
+            // ── M30 (ADR 0153) — admin onboarding: the /admin/onboarding
+            // guided walk-through (M30·2/M30·7) + the dismissible admin
+            // banner (M30·5) + the "mark as complete" flash (M30·4). U05
+            // authors the COMPLETE closed set (21 keys: the 14 named in the
+            // register + the 7 adminonboarding.desc_* per-step descriptions
+            // referenced by AdminOnboardingViewModel.Step.DescriptionKey).
+            // The parity pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Set up this community",
+            ["adminonboarding.intro"]              = "A guided walk through the seven most important initial settings for a new administrator. Each step links into the setting that already owns it — visit them in order, then mark the walk-through complete when you're set.",
+            ["adminonboarding.step_communityname"] = "Community name & description",
+            ["adminonboarding.step_languages"]     = "Languages",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_storage"]       = "Storage limits",
+            ["adminonboarding.step_sitecontent"]   = "Site content",
+            ["adminonboarding.step_escalation"]    = "Issue escalation",
+            ["adminonboarding.desc_communityname"] = "What this community is called and how it describes itself — edited within the languages surface.",
+            ["adminonboarding.desc_languages"]     = "The languages residents can use, the translated interface strings, and the static pages.",
+            ["adminonboarding.desc_moderation"]    = "How announcement comments are moderated on this instance.",
+            ["adminonboarding.desc_notifications"] = "How often held notification emails are flushed to residents.",
+            ["adminonboarding.desc_storage"]       = "The per-file size limit and the per-user total content quota.",
+            ["adminonboarding.desc_sitecontent"]   = "The landing surfaces' hero text and the show/hide toggles.",
+            ["adminonboarding.desc_escalation"]    = "Where residents' issues are surfaced and escalated (the announcements surface for now).",
+            ["adminonboarding.visit"]              = "Visit this setting",
+            ["adminonboarding.complete"]           = "Mark as complete",
+            ["adminonboarding.flash_done"]         = "Admin setup complete — the walk-through is done.",
+            ["adminonboarding.banner.text"]        = "Finish setting up this community?",
+            ["adminonboarding.banner.action"]      = "Start setup",
+
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
@@ -2495,6 +2578,97 @@ public static class KnownTranslationKeys
                 "copy on every page.",
         };
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Per-surface key groups (U04, IMPROVE lane, 2026-10-08)
+    //
+    // Each property below is a *view* into <see cref="EnValues"/>, filtered
+    // to the keys that belong to one resident/admin surface. The public
+    // surface (<see cref="EnValues"/>, <see cref="AllKeys"/>,
+    // <see cref="DeValues"/>, <see cref="FrValues"/>, <see cref="DaValues"/>)
+    // is **unchanged** — these are convenience views that let a reader find
+    // the keys for *their* surface without scrolling the full 4 500-key
+    // registry. ADR references are promoted from per-key inline comments to
+    // per-group doc-comments (the per-key comments are preserved in the
+    // <see cref="EnValues"/> dict literal above).
+    //
+    // The plan's own words (U04 "Do"): "Split the single EnValues dictionary
+    // into per-surface static properties … each an IReadOnlyDictionary<string,
+    // string>. The top-level EnValues remains as a composition … so the
+    // public surface is unchanged."
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>ADR 0120 (M19) — the guest-accounts surface: the /admin/guests admin panel (D6) + the signed-in guest's shell notice (D5).</summary>
+    public static IReadOnlyDictionary<string, string> AdminGuests { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("admin.guests") || kv.Key == "account.guest_welcome")
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0121 (M20) — notification quiet times: the 5th /settings/quiet resident section (D7) + the /admin/quiet cadence surface (D8).</summary>
+    public static IReadOnlyDictionary<string, string> SettingsQuiet { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("settings.quiet") || kv.Key.StartsWith("admin.quiet"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0151 (M28) — guardian time limits: the 13-key guardian.timelimit.* GU Detail section (D7) + the single account.time_limit.login_message login landing.</summary>
+    public static IReadOnlyDictionary<string, string> GuardianTimeLimit { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("guardian.timelimit") || kv.Key.StartsWith("account.time_limit"))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0067 (M5) + ADR 0087 + ADR 0079 + ADR 0106 + ADR 0100 — the projects surface: to-do feed + board lanes + card actions + dependency lane + start/due dates + self-assign + comments.</summary>
+    public static IReadOnlyDictionary<string, string> ProjectsBoard { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("projects.") || kv.Key.StartsWith("todo."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0036 + ADR 0037 + ADR 0024 + ADR 0022 + ADR 0023 — the posts surface: composer, detail, drafts, soft-delete, user-added translations, reply-report.</summary>
+    public static IReadOnlyDictionary<string, string> PostsDetail { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("posts.") || kv.Key.StartsWith("my_drafts."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0101 — the announcements surface: shared labels, New/Edit compose, Index/Detail/pinned banner, comments lane.</summary>
+    public static IReadOnlyDictionary<string, string> Announcements { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("announcements."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0039 + ADR 0040 — the pages surface: tree browse + post view (PG lane) + per-resident blog feed.</summary>
+    public static IReadOnlyDictionary<string, string> Pages { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("pages.") || kv.Key.StartsWith("blog."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0044 (TG) — the tags surface: browse + composer affordances + tag input + suggest + translate.</summary>
+    public static IReadOnlyDictionary<string, string> Tags { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("tags.") || kv.Key.StartsWith("tag."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0054 (M4) + ADR 0119 (M18) + ADR 0065 (EV-MINE) + ADR 0109 (EV-PAST) + ADR 0115 (M14) — the events surface: index, detail, composer, recurrence picker, series chip, mine, past, calendar, interlock.</summary>
+    public static IReadOnlyDictionary<string, string> Events { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("events."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0083 + ADR 0089 (GE) + ADR 0094 + ADR 0026 — the groups surface: Index/Detail/New/Create/Edit, tabs, events lane, join-requests, translations, Airy layout.</summary>
+    public static IReadOnlyDictionary<string, string> Groups { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("groups."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>ADR 0050 + ADR 0138 + ADR 0142 + ADR 0146 — the account surface: Login/Signup, change-password, delete-account, verify/resend, child handoff, signup-closed notice.</summary>
+    public static IReadOnlyDictionary<string, string> Account { get; } =
+        EnValues.Where(kv => kv.Key.StartsWith("account.")
+                    && kv.Key != "account.guest_welcome"          // owned by AdminGuests
+                    && kv.Key != "account.time_limit.login_message") // owned by GuardianTimeLimit
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>Shared layout + common labels + nav/theme/footer/faq/error + grant picker + locale + home + about/platform/whatsnew + moderation + profile/directory/community + rich editor + notifications/messaging/email + documents/onboarding/sort/pager + guardian + admin + settings (the full cross-surface common surface).</summary>
+    public static IReadOnlyDictionary<string, string> Common { get; } =
+        EnValues.Where(kv => !kv.Key.StartsWith("admin.guests") && kv.Key != "account.guest_welcome"
+                    && !kv.Key.StartsWith("settings.quiet") && !kv.Key.StartsWith("admin.quiet")
+                    && !kv.Key.StartsWith("guardian.timelimit") && !kv.Key.StartsWith("account.time_limit")
+                    && !kv.Key.StartsWith("projects.") && !kv.Key.StartsWith("todo.")
+                    && !kv.Key.StartsWith("posts.") && !kv.Key.StartsWith("my_drafts.")
+                    && !kv.Key.StartsWith("announcements.")
+                    && !kv.Key.StartsWith("pages.") && !kv.Key.StartsWith("blog.")
+                    && !kv.Key.StartsWith("tags.") && !kv.Key.StartsWith("tag.")
+                    && !kv.Key.StartsWith("events.")
+                    && !kv.Key.StartsWith("groups.")
+                    && !kv.Key.StartsWith("account."))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
     /// <summary>
     /// The curated German (<c>de</c>) baseline (LS U02, ADR 0042 D2/D5). One
     /// entry per key in <see cref="AllKeys"/> — full registry parity, the ADR
@@ -2549,6 +2723,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.cadence_label"]   = "Zurückgehaltene Benachrichtigungen alle (Minuten) erneut prüfen",
             ["admin.quiet.save"]            = "Takt speichern",
             ["admin.quiet.flash_saved"]     = "Stumstunden-Takt gespeichert.",
+
+            // ── M28 (ADR 0151) — Betreuer-Nutzungslimits: der 13-Schlüssel-
+            // guardian.timelimit.* GU-Detail-Abschnitt (D7) + der einzelne
+            // account.time_limit.login_message Login-Landing (in U04s
+            // Login.cshtml ?error=time-limit Fall referenziert). U05 autorisiert
+            // den VOLLSTÄNDIGEN 14-Schlüssel-Satz; U06 konsumiert, fügt keine
+            // hinzu. ABGEGRENZTER Namensraum — NICHT die M20 settings.quiet.*
+            // / admin.quiet.* Schlüssel (die gehören der Benachrichtigungslane).
+            ["guardian.timelimit.title"]        = "Nutzungslimits",
+            ["guardian.timelimit.description"]  = "Wähle, wann dein Kind die Plattform nutzen darf. Der Plan " +
+                "wird auf seinem Konto gespeichert, in seiner eigenen Zeitzone " +
+                "angewendet — er wirkt bei seinem nächsten Anmelden und betrifft nie dich.",
+            ["guardian.timelimit.enabled"]      = "Nutzungslimits für dieses Kind durchsetzen",
+            ["guardian.timelimit.mode_label"]   = "Wann darf das Kind die Plattform nutzen?",
+            ["guardian.timelimit.mode_blocked"] = "Gesperrt während der gewählten Stunden & Tage",
+            ["guardian.timelimit.mode_allowed"] = "Nur erlaubt in den gewählten Stunden & Tagen",
+            ["guardian.timelimit.hours_label"]  = "Stunden des Tages",
+            ["guardian.timelimit.days_label"]   = "Wochentage",
+            ["guardian.timelimit.save"]         = "Nutzungslimits speichern",
+            ["guardian.timelimit.clear"]        = "Nutzungslimits entfernen",
+            ["guardian.timelimit.flash_saved"]  = "Nutzungslimits gespeichert — das Kind wird außerhalb des erlaubten Fensters abgemeldet.",
+            ["guardian.timelimit.flash_cleared"] = "Nutzungslimits entfernt — das Kind darf die Plattform jetzt jederzeit nutzen.",
+            ["guardian.timelimit.badge_set"]    = "Nutzungslimits gesetzt",
+            ["account.time_limit.login_message"] = "Du bist außerhalb deiner erlaubten Zeiten. Bitte melde dich später erneut an.",
 
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
@@ -2755,6 +2953,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Verzeichnis",
             ["nav.people"]        = "Menschen",
+
+            // ── ADR 0152 (M29) — die /admin/labels-Oberfläche: die 13
+            //    Navigations-Bereiche umbenennen (Nav-Text + Seiten-Header).
+            //    labels.* = die Formular-Zeilenbezeichnungen (de); die nav.*
+            //    Keys oben bleiben das FALLBACK (ADR 0152 D3).
+            ["labels.title"]          = "Bereichsbezeichnungen",
+            ["labels.save"]           = "Bezeichnungen speichern",
+            ["labels.home"]           = "Start",
+            ["labels.announcements"]  = "Ankündigungen",
+            ["labels.community"]      = "Gemeinschaft",
+            ["labels.groups"]         = "Gruppen",
+            ["labels.events"]         = "Veranstaltungen",
+            ["labels.projects"]       = "Projekte",
+            ["labels.inventory"]      = "Inventar",
+            ["labels.bookmarks"]      = "Lesezeichen",
+            ["labels.documents"]      = "Dokumente",
+            ["labels.pages"]          = "Seiten",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Verzeichnis",
+            ["labels.people"]         = "Menschen",
+
             ["nav.sign_in"]       = "Anmelden",
             ["nav.sign_up"]       = "Registrieren",
             ["nav.profile"]       = "Profil",
@@ -4574,6 +4793,38 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Dein Konto fertig einrichten?",
             ["onboarding.banner.action"]    = "Einrichtung starten",
 
+            // ── M30 (ADR 0153) — Admin-Onboarding: der /admin/onboarding-
+            // Rundgang (M30·2/M30·7) + das entfern- und schließbare
+            // Admin-Banner (M30·5) + der „Als abgeschlossen markieren"-
+            // Hinweis (M30·4). U05 verfasst die vollständige geschlossene
+            // Menge (21 Schlüssel: die 14 aus dem Register + die 7
+            // adminonboarding.desc_*-Zeilenumgebungen, die
+            // AdminOnboardingViewModel.Step.DescriptionKey referenziert).
+            // Die Paritäts-Pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) verlangt jeden Schlüssel in
+            // allen vier Sprachen, nicht leer (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Diese Gemeinschaft einrichten",
+            ["adminonboarding.intro"]              = "Ein geführter Rundgang durch die sieben wichtigsten Anfangseinstellungen für eine neue Administratorenin. Jeder Schritt führt in die Einstellung, die es bereits besitzt — besuche sie in der Reihenfolge und markiere den Rundgang als abgeschlossen, wenn du bereit bist.",
+            ["adminonboarding.step_communityname"] = "Name & Beschreibung der Gemeinschaft",
+            ["adminonboarding.step_languages"]     = "Sprachen",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Benachrichtigungen",
+            ["adminonboarding.step_storage"]       = "Speichergrenzen",
+            ["adminonboarding.step_sitecontent"]   = "Website-Inhalte",
+            ["adminonboarding.step_escalation"]    = "Eskalation von Anliegen",
+            ["adminonboarding.desc_communityname"] = "Wie diese Gemeinschaft heißt und wie sie sich beschreibt — in der Sprachoberfläche bearbeitbar.",
+            ["adminonboarding.desc_languages"]     = "Die Sprachen, die Bewohner verwenden können, die übersetzten Interface-Zeichenketten und die statischen Seiten.",
+            ["adminonboarding.desc_moderation"]    = "Wie Ankündigungskommentare auf dieser Instanz moderiert werden.",
+            ["adminonboarding.desc_notifications"] = "Wie oft zurückgehaltene Benachrichtigungs-E-Mails an Bewohner zugestellt werden.",
+            ["adminonboarding.desc_storage"]       = "Die Dateigrößengrenze und das Kontingent pro Nutzer für den gesamten Inhalt.",
+            ["adminonboarding.desc_sitecontent"]   = "Der Hero-Text der Startseiten und die ein-/ausblenden-Schalter.",
+            ["adminonboarding.desc_escalation"]    = "Wo Anliegen von Bewohnern auftauchen und eskaliert werden (vorerst die Ankündigungsfläche).",
+            ["adminonboarding.visit"]              = "Zu dieser Einstellung",
+            ["adminonboarding.complete"]           = "Als abgeschlossen markieren",
+            ["adminonboarding.flash_done"]         = "Admin-Einrichtung abgeschlossen — der Rundgang ist erledigt.",
+            ["adminonboarding.banner.text"]        = "Diese Gemeinschaft fertig einrichten?",
+            ["adminonboarding.banner.action"]      = "Einrichtung starten",
+
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
@@ -4835,6 +5086,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.save"]            = "Enregistrer la cadence",
             ["admin.quiet.flash_saved"]     = "Cadence des heures de silence enregistrée.",
 
+            // ── M28 (ADR 0151) — limites d'utilisation tuteur : la section GU
+            // Detail à 13 clés guardian.timelimit.* (D7) + la landing de
+            // connexion account.time_limit.login_message (référencée dans le
+            // cas ?error=time-limit de Login.cshtml, U04). U05 autorise le JEU
+            // COMPLET de 14 clés ; U06 consomme, n'en ajoute aucune. Espace de
+            // noms DISTINCT — PAS les clés M20 settings.quiet.* / admin.quiet.*
+            // (elles appartiennent à la lane de notification).
+            ["guardian.timelimit.title"]        = "Limites d'utilisation",
+            ["guardian.timelimit.description"]  = "Choisis quand ton enfant peut utiliser la plateforme. " +
+                "L'horaire est enregistré sur son compte, appliqué dans son " +
+                "propre fuseau horaire — il prend effet à sa prochaine connexion et ne t'affecte jamais.",
+            ["guardian.timelimit.enabled"]      = "Appliquer des limites d'utilisation à cet enfant",
+            ["guardian.timelimit.mode_label"]   = "Quand l'enfant peut-il utiliser la plateforme ?",
+            ["guardian.timelimit.mode_blocked"] = "Bloqué pendant les heures & jours sélectionnés",
+            ["guardian.timelimit.mode_allowed"] = "Autorisé seulement pendant les heures & jours sélectionnés",
+            ["guardian.timelimit.hours_label"]  = "Heures de la journée",
+            ["guardian.timelimit.days_label"]   = "Jours de la semaine",
+            ["guardian.timelimit.save"]         = "Enregistrer les limites",
+            ["guardian.timelimit.clear"]        = "Effacer les limites",
+            ["guardian.timelimit.flash_saved"]  = "Limites enregistrées — l'enfant sera déconnecté hors de la fenêtre autorisée.",
+            ["guardian.timelimit.flash_cleared"] = "Limites effacées — l'enfant peut maintenant utiliser la plateforme à tout moment.",
+            ["guardian.timelimit.badge_set"]    = "Limites définies",
+            ["account.time_limit.login_message"] = "Tu es en dehors de tes heures autorisées. Merci de revenir plus tard.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
 
@@ -4893,6 +5168,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Étiquettes",
             ["nav.directory"]     = "Annuaire",
             ["nav.people"]        = "Personnes",
+
+            // ── ADR 0152 (M29) — la surface /admin/labels : renommer les 13
+            //    sections de la navigation (libellé du menu + en-tête de page).
+            //    labels.* = les étiquettes de lignes du formulaire (fr) ; les
+            //    clés nav.* ci-dessus restent la RECHUTE (ADR 0152 D3).
+            ["labels.title"]          = "Libellés des sections",
+            ["labels.save"]           = "Enregistrer les libellés",
+            ["labels.home"]           = "Accueil",
+            ["labels.announcements"]  = "Annonces",
+            ["labels.community"]      = "Communauté",
+            ["labels.groups"]         = "Groupes",
+            ["labels.events"]         = "Événements",
+            ["labels.projects"]       = "Projets",
+            ["labels.inventory"]      = "Inventaire",
+            ["labels.bookmarks"]      = "Signets",
+            ["labels.documents"]      = "Documents",
+            ["labels.pages"]          = "Pages",
+            ["labels.tags"]           = "Étiquettes",
+            ["labels.directory"]      = "Annuaire",
+            ["labels.people"]         = "Personnes",
+
             ["nav.sign_in"]       = "Se connecter",
             ["nav.sign_up"]       = "S'inscrire",
             ["nav.profile"]       = "Profil",
@@ -6860,6 +7156,38 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Terminer la configuration de ton compte ?",
             ["onboarding.banner.action"]    = "Démarrer la configuration",
 
+            // ── M30 (ADR 0153) — onboarding administrateur : la marche en
+            // avant guidée /admin/onboarding (M30·2/M30·7) + la bannière
+            // admin rétractable (M30·5) + l'accusé « marquer comme terminé »
+            // (M30·4). U05 crée la clôture fermée complète (21 clés : les 14
+            // nommées dans le registre + les 7 adminonboarding.desc_*
+            // décrivant chaque étape, référencées par
+            // AdminOnboardingViewModel.Step.DescriptionKey). L'assurance
+            // parité (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) exige chaque clé présente et
+            // non vide dans les quatre langues (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Configurer cette communauté",
+            ["adminonboarding.intro"]              = "Une marche guidée à travers les sept réglages de départ les plus importants pour un nouvel administrateur. Chaque étape mène au réglage qui l'a déjà — visite-les dans l'ordre, puis marque la marche comme terminée quand tu es prêt.",
+            ["adminonboarding.step_communityname"] = "Nom & description de la communauté",
+            ["adminonboarding.step_languages"]     = "Langues",
+            ["adminonboarding.step_moderation"]    = "Modération",
+            ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_storage"]       = "Limites de stockage",
+            ["adminonboarding.step_sitecontent"]   = "Contenu du site",
+            ["adminonboarding.step_escalation"]    = "Escalade des problèmes",
+            ["adminonboarding.desc_communityname"] = "Comment cette communauté s'appelle et comment elle se présente — modifiable dans la surface langues.",
+            ["adminonboarding.desc_languages"]     = "Les langues que les résidents peuvent utiliser, les chaînes d'interface traduites et les pages statiques.",
+            ["adminonboarding.desc_moderation"]    = "Comment les commentaires d'annonces sont modérés sur cette instance.",
+            ["adminonboarding.desc_notifications"] = "À quelle fréquence les e-mails de notification retenus sont envoyés aux résidents.",
+            ["adminonboarding.desc_storage"]       = "La limite de taille par fichier et le quota de contenu total par utilisateur.",
+            ["adminonboarding.desc_sitecontent"]   = "Le texte d'accroche des surfaces d'accueil et les interrupteurs afficher/masquer.",
+            ["adminonboarding.desc_escalation"]    = "Où les problèmes des résidents sont signalés et escaladés (pour l'instant la surface annonces).",
+            ["adminonboarding.visit"]              = "Aller à ce réglage",
+            ["adminonboarding.complete"]           = "Marquer comme terminé",
+            ["adminonboarding.flash_done"]         = "Configuration admin terminée — la marche est achevée.",
+            ["adminonboarding.banner.text"]        = "Terminer la configuration de cette communauté ?",
+            ["adminonboarding.banner.action"]      = "Démarrer la configuration",
+
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
@@ -7124,6 +7452,30 @@ public static class KnownTranslationKeys
             ["admin.quiet.save"]            = "Gem takt",
             ["admin.quiet.flash_saved"]     = "Stumtid-takt gemt.",
 
+            // ── M28 (ADR 0151) — tidsbegrænsninger for formynder: den 13-nøgle-
+            // GU-Detail-sektion guardian.timelimit.* (D7) + den enkelt login-
+            // landing account.time_limit.login_message (refererenced i U04s
+            // Login.cshtml ?error=time-limit tilfælde). U05 forfatter det FULDE
+            // 14-nøgle-sæt; U06 forbruger, tilføjer ingen. DISTinkt namespace —
+            // IKKE M20 settings.quiet.* / admin.quiet.* nøglerne (de tilhører
+            // notifikationssporet).
+            ["guardian.timelimit.title"]        = "Brugsgrænser",
+            ["guardian.timelimit.description"]  = "Vælg hvornår dit barn må bruge platformen. Tidsplanen " +
+                "gemmes på deres konto og anvendes i deres egen tidssone — den " +
+                "træder i kraft ved deres næste login og påvirker aldrig dig.",
+            ["guardian.timelimit.enabled"]      = "Gennemfør brugsgrænser for dette barn",
+            ["guardian.timelimit.mode_label"]   = "Hvornår må barnet bruge platformen?",
+            ["guardian.timelimit.mode_blocked"] = "Blokeret i de valgte timer & dage",
+            ["guardian.timelimit.mode_allowed"] = "Kun tilladt i de valgte timer & dage",
+            ["guardian.timelimit.hours_label"]  = "Timer på døgnet",
+            ["guardian.timelimit.days_label"]   = "Ugedage",
+            ["guardian.timelimit.save"]         = "Gem brugsgrænser",
+            ["guardian.timelimit.clear"]        = "Ryd brugsgrænser",
+            ["guardian.timelimit.flash_saved"]  = "Brugsgrænser gemt — barnet logges ud uden for det tilladte vindue.",
+            ["guardian.timelimit.flash_cleared"] = "Brugsgrænser ryddet — barnet må nu bruge platformen til enhver tid.",
+            ["guardian.timelimit.badge_set"]    = "Brugsgrænser sat",
+            ["account.time_limit.login_message"] = "Du er uden for dine tilladte timer. Tjek venligst ind senere.",
+
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
 
@@ -7182,6 +7534,27 @@ public static class KnownTranslationKeys
             ["nav.tags"]          = "Tags",
             ["nav.directory"]     = "Kontaktliste",
             ["nav.people"]        = "Personer",
+
+            // ── ADR 0152 (M29) — /admin/labels-overfladen: omdøb de 13
+            //    navigationsområder (nav-menu + sideoverskrift). labels.* =
+            //    formularens rækker (da); nav.*-nøglerne ovenfor forbliver
+            //    RESERVEN (ADR 0152 D3).
+            ["labels.title"]          = "Områdenavne",
+            ["labels.save"]           = "Gem navne",
+            ["labels.home"]           = "Forside",
+            ["labels.announcements"]  = "Meddelelser",
+            ["labels.community"]      = "Fællesskab",
+            ["labels.groups"]         = "Grupper",
+            ["labels.events"]         = "Arrangementer",
+            ["labels.projects"]       = "Projekter",
+            ["labels.inventory"]      = "Lager",
+            ["labels.bookmarks"]      = "Bogmærker",
+            ["labels.documents"]      = "Dokumenter",
+            ["labels.pages"]          = "Sider",
+            ["labels.tags"]           = "Tags",
+            ["labels.directory"]      = "Kontaktliste",
+            ["labels.people"]         = "Personer",
+
             ["nav.sign_in"]       = "Log ind",
             ["nav.sign_up"]       = "Opret konto",
             ["nav.profile"]       = "Profil",
@@ -9133,6 +9506,38 @@ public static class KnownTranslationKeys
             ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen til dit nabolag.",
             ["onboarding.banner.text"]      = "Færdiggøre opsætningen af din konto?",
             ["onboarding.banner.action"]    = "Start opsætning",
+
+            // ── M30 (ADR 0153) — administrator-onboarding: den guidede
+            // rundtur /admin/onboarding (M30·2/M30·7) + det
+            // lukkelige admin-banner (M30·5) + "markér som færdig"-
+            // meddelelsen (M30·4). U05 forfatter den fulde lukke sæt (21
+            // nøgler: de 14 i registeret + de 7 adminonboarding.desc_*
+            // beskrivelser pr. trin, som AdminOnboardingViewModel.Step.
+            // DescriptionKey refererer). Paritets-pinen
+            // (KwLRegistryConsistencyTests + KnownTranslationKeys_ParityTests)
+            // kræver hver nøgle til stede og ikke-tom i alle fire sprog
+            // (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Opsæt dette fællesskab",
+            ["adminonboarding.intro"]              = "En guidet tur gennem de syv vigtigste indledende indstillinger for en ny administrator. Hvert trin henviser til den indstilling, der allerede ejer det — besøg dem i rækkefølge, og markér så runden som færdig, når du er klar.",
+            ["adminonboarding.step_communityname"] = "Fællesskabets navn & beskrivelse",
+            ["adminonboarding.step_languages"]     = "Sprog",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Beskedelser",
+            ["adminonboarding.step_storage"]       = "Lagringsgrænser",
+            ["adminonboarding.step_sitecontent"]   = "Sideindhold",
+            ["adminonboarding.step_escalation"]    = "Eskalering af henvendelser",
+            ["adminonboarding.desc_communityname"] = "Hvad dette fællesskab hedder og hvordan det beskriver sig selv — redigér det i sprogfladen.",
+            ["adminonboarding.desc_languages"]     = "De sprog, beboerne kan bruge, de oversatte grænsefladesnore og de statiske sider.",
+            ["adminonboarding.desc_moderation"]    = "Hvordan annoncerkommentarer modereres på denne instans.",
+            ["adminonboarding.desc_notifications"] = "Hvor ofte tilbagelagte beskedelsesmails sendes til beboerne.",
+            ["adminonboarding.desc_storage"]       = "Størrelsesgrænsen pr. fil og den samlede kvote pr. bruger.",
+            ["adminonboarding.desc_sitecontent"]   = "Landesfladens overskriftstekst og vis/skub-omskifterne.",
+            ["adminonboarding.desc_escalation"]    = "Hvor beboernes henvendelser optræder og eskaleres (for nu annoncerfladen).",
+            ["adminonboarding.visit"]              = "Gå til denne indstilling",
+            ["adminonboarding.complete"]           = "Markér som færdig",
+            ["adminonboarding.flash_done"]         = "Admin-opsætning færdig — rundturen er sluttet.",
+            ["adminonboarding.banner.text"]        = "Færdiggøre opsætningen af dette fællesskab?",
+            ["adminonboarding.banner.action"]      = "Start opsætning",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;

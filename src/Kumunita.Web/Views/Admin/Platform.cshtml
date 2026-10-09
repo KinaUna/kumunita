@@ -46,6 +46,16 @@
         <div class="fw-semibold">Site content</div>
         <small class="text-muted">Edit the landing surfaces' hero text and choose which sections are shown on the home and about pages.</small>
     </a>
+    @* ADR 0152 (M29 — admin surface labels) — the /admin/labels surface: the
+       GlobalAdmin's edit page for the 13 top-navigation surfaces' display
+       labels (the nav item + that surface's page header). The row label is
+       plain text (the admin view's local convention — mostly non-kw-l English,
+       so an interpolated kw-l key would break the KwLRegistryConsistencyTests
+       static key scan). *@
+    <a href="/admin/labels" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Surface labels</div>
+        <small class="text-muted">Rename the top-navigation surfaces (Home, Announcements, Community, Groups, and the "More" menu items) — the nav and each surface's page header follow the choice. A blank field keeps the default label.</small>
+    </a>
     <a href="/admin/help" class="list-group-item list-group-item-action">
         <div class="fw-semibold">Help pages</div>
         <small class="text-muted">Reset the seeded platform help pages — per page, or every page at once — back to their shipped text.</small>

@@ -1,5 +1,9 @@
 # File-attachments lane — handoff notes (scratch tier)
 
+> **TL;DR:** Shipped the ATT (file-attachments) lane, ADR 0034 (Amends 0025 + 0011): `AttachmentIds` on `Post` / `PostReply` / `Announcement` (additive, zero migrations), the `POST /attachment` upload lane + the `GET /attachment/{id}` serve lane (the 5-step ordering, the reply-parent resolution, `Content-Disposition: attachment` + `nosniff`), the separate `AttachmentAllowedContentTypes` allowlist (SVG excluded), and the "Attach file" editor button across 16 composers — 10 pinned Core tests + 10 pinned Web tests (7 live, 5 `AttachServe_F1..F5` drift-paused) green end-to-end.
+> **Seam it created:** the `IMediaStore` byte seam (C-MED·6, ADR 0011) is now **reused** for the attachment lane — the `AttachmentIds` field (C-ATT·5, separate from `ImageIds`) + the three `Find*ByAttachmentIdAsync` reverse-lookup seams (C-ATT·3, no `IPostService` invented) + the `MediaOptions.AttachmentAllowedContentTypes` / `ResolvedAttachmentAllowedTypes` / `IsAttachmentAllowed` trio (C-ATT·6) + the `AttachmentIds.ExtractAttachmentIds` Web-only parse helper (C-ATT·4, Core body-parse-free).
+> **Do not re-litigate:** **the image lane is byte-for-byte unchanged** (C-ATT·9) — `IMediaStore` / `AccessAction` are untouched, the `AttachmentIds` field is separate from `ImageIds`, and Core is body-parse-free (C-ATT·4); the 5 Web serve tests (`AttachServe_F1..F5`) are **drift-paused** (the sealed-concrete-`PostService` seam gap) — the intended bodies are preserved in `tests/Kumunita.Web.Tests/Attachment/AttachmentServingTests.cs` comment blocks, and the lift path (a substitutable `PostService` seam or a Testcontainers-backed Web harness) is a named follow-on lane, not a silent re-scope.
+
 > **Three-tier contract.** This lane has three written surfaces, in order of
 > authority:
 >

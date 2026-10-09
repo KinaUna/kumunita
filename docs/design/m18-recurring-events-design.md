@@ -1,5 +1,19 @@
 # M18 — Recurring events (design doc)
 
+> **Abstract:** *What it settles:* **recurring events over the frozen M4 events
+> surface** (the `RRULE` home deferred by ADR 0112 + ADR 0115 C-M14·6) — the
+> author declares a series (daily / weekly / monthly / yearly, optional count or
+> end date) and the platform **materializes it as concrete `Event` rows at write
+> time**, so every other surface (read seams, RSVP, reminders, ICS, calendar,
+> search, bookmarks, audit) keeps working unchanged. *The one contract:*
+> **the read seam is concrete-only** (C-M18·1) — the ICS / reminder / RSVP /
+> search / bookmark surfaces do not need to know a series exists; the only
+> schema change is two additive fields on the `Event` POCO (`RecurrenceHeadId`,
+> `RecurrenceRule`). *Out of scope:* zero new bounded context / `AccessAction`
+> / `AccessVia` / adapter / `Decide()` branch, no per-occurrence override, no
+> `RRULE` line in the ICS output, no versioned migration, no `RecurrenceSeries`
+> doc (C-M18·5, D8). LOCKED in ADR 0119.
+
 > **Milestone M18.** **Repeating / recurring events over the M4 events surface**
 > (the `RRULE` home deferred by ADR 0112 + ADR 0115 C-M14·6): the author
 > declares that a series of events repeats daily / weekly / monthly / yearly,

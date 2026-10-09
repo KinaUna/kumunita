@@ -1,5 +1,18 @@
 # Design Doc — M3b: Moderation (report workflow, `Via = Report`, `Post.Status`, reply route, e2e)
 
+> **Abstract:** *What it settles:* the **report workflow** (file / assign /
+> unlock / resolve), the `Via = Report` read branch (a filed report unlocks the
+> post **for a standing moderator with `ModeratorAccess` scope** on that
+> component), the `Post.Status` removal path (hidden / removed), and the missing
+> `POST /posts/{id}/replies` route — the **first milestone that exercises the
+> reserved M1 vocabulary** (`AccessAction.Moderate` + `AccessVia.Report`).
+> *The one contract:* the four `ModerationService` method signatures + the
+> `PostStatus` enum + the `C-M3b·1..4` invariants, pinned in Part 2's
+> `## Seams & contracts` (the FACES count is pinned at 6). *Out of scope:*
+> everything M3 deferred — events, projects, notifications, export / iCal /
+> federation / MCP / API — is **not** M3b; `/admin` (M1) is unchanged (ADR 0003
+> SoD pins this).
+
 > **Part 1 of 2 (U1 — doc-only, no build).** Part 1 pins **scope** (the six-item
 > M3b deferral list = M3b's complete in-scope, nothing else), **invariants**
 > (the new `C-M3b·1..4` + which ADR 0006 / ADR 0001-B / ADR 0003 clause still

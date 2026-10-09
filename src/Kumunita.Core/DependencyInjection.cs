@@ -99,6 +99,38 @@ public static class ServiceCollectionExtensions
         services.AddTransient<SiteContent.ISiteContentService>(sp => new SiteContent.SiteContentService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M29 (ADR 0152, U03): the admin-surface-labels seam — the SurfaceLabels
+        // singleton's read + audited write lanes (the ADR 0150 single-write-lane
+        // shape, the LocaleSettings-parallel bounded context
+        // Kumunita.Core.SurfaceLabels). The same "AddTransient with the store
+        // injected" shape as ISiteContentService above: composes the host-
+        // registered Marten IDocumentStore (reads open a QuerySession, the
+        // audited write opens a write session — invariant C3). The
+        // ITranslationProvider (the kw-l floor, M29·3 / M29·4) is resolved
+        // from the container as the optional second ctor arg (auto-injected,
+        // the ProjectService / EventReminderService optional-seam shape). Core
+        // stays HTTP-free (ADR 0006-D): the Web gate (U08) is the only place the
+        // GlobalAdmin authorization is produced. Fully qualified
+        // SurfaceLabels.ISurfaceLabelsService for the type/namespace-collision
+        // idiom (like SiteContent.ISiteContentService).
+        services.AddTransient<SurfaceLabels.ISurfaceLabelsService>(sp => new SurfaceLabels.SurfaceLabelsService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>()));
+
+        // M30 (ADR 0153, U03): the admin-onboarding seam — the AdminOnboarding
+        // singleton's read + audited write lanes (the ADR 0150
+        // single-write-lane shape, the LocaleSettings-parallel bounded context
+        // Kumunita.Core.AdminOnboarding). The same "AddTransient with the store
+        // injected" shape as ISiteContentService / ISurfaceLabelsService above:
+        // composes the host-registered Marten IDocumentStore (reads open a
+        // QuerySession, the audited write opens a write session — invariant
+        // C3). Core stays HTTP-free (ADR 0006-D): the Web gate (U04) is the
+        // only place the GlobalAdmin authorization is produced. Fully qualified
+        // AdminOnboarding.IAdminOnboardingService for the type/namespace-
+        // collision idiom (like SiteContent.ISiteContentService).
+        services.AddTransient<AdminOnboarding.IAdminOnboardingService>(sp => new AdminOnboarding.AdminOnboardingService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the

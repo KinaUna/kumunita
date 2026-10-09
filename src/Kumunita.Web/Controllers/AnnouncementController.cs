@@ -601,25 +601,11 @@ public sealed class AnnouncementController(
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 
-    /// <summary>
-    /// Seeds the detail page's language chip / "add a translation" candidate
-    /// list (ADR 0005 B) — the instance's **enabled**
-    /// <see cref="Kumunita.Core.Localization.LanguageCatalog"/>, ordered by
-    /// <c>SortOrder</c>. Read through the HTTP-free
-    /// <see cref="ILocalizationService.ListLanguagesAsync"/> seam (the exact
-    /// catalog read the <see cref="PostsController"/>'s detail lane uses), so
-    /// the announcement surface mirrors an established lane rather than
-    /// re-deriving the catalog from the store.
-    /// </summary>
-    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
-    {
-        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
-        return catalog
-            .Where(l => l.Enabled)
-            .OrderBy(l => l.SortOrder)
-            .Select(l => (l.Id, l.NativeName))
-            .ToList();
-    }
+    // U05, IMPROVE lane — the composer trio is now defined once in
+    // <see cref="ComposerSeedOptions"/>; the per-controller copy that used
+    // to live here is a thin delegate to that helper.
+    private Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+        => ComposerSeedOptions.SeedLanguagePickerAsync(localization);
 
     /// <summary>
     /// The create-lane composer's <b>default authored-in language</b> (the

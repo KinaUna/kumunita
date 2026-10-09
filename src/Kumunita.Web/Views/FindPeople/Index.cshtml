@@ -3,6 +3,7 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @{
     ViewData["Title"] = "People";
 
@@ -11,6 +12,25 @@
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     string ariaFindTag = await Translation.GetAsync("a11y.find_tag", effLang);
     string ariaFindBio = await Translation.GetAsync("a11y.find_bio", effLang);
+
+    // M29 (ADR 0152) — the surface header label (M29·1: the same value the nav
+    // item resolves — one resolver, one value, so a rename is never "nav says
+    // X, header says Y"). A non-blank admin label wins; otherwise the nav.people
+    // kw-l key resolves in the viewer's effective language. Best-effort:
+    // GetLabelAsync never throws (a missing row / store degrades to the kw-l
+    // floor), so a null/absent service only degrades to the raw kw-l floor.
+    string _surfaceTitle = "People";
+    if (SurfaceLabels is not null)
+    {
+        try
+        {
+            _surfaceTitle = await SurfaceLabels.GetLabelAsync("people", "nav.people", effLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the header (the kw-l floor).
+        }
+    }
 }
 
 <div class="row justify-content-center">
@@ -18,7 +38,7 @@
         <header class="airy-head">
             <div class="head-row">
                 <div>
-                    <h1><kw-l key="profile.find.title">Find people</kw-l></h1>
+                    <h1>@_surfaceTitle</h1>
                     <p class="lede"><kw-l key="nav.people">People</kw-l></p>
                 </div>
             </div>

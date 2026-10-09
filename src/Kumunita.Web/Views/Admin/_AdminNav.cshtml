@@ -25,6 +25,17 @@
         _             => "Overview",
     };
 }
+@* M30 (ADR 0153, M30·5) — the admin onboarding affordance: the dismissible
+   banner (the _AdminOnboardingBanner partial, the M22 _OnboardingBanner's
+   admin sibling). Rendered at the top of the admin sub-nav, before the
+   nav-tabs, so it is visible on every /admin/* page (the _AdminNav scope).
+   Rendered by the partial only when the signed-in actor is a GlobalAdmin AND
+   AdminOnboarding.CompletedAt is null (the same GetAsync seam the
+   AdminOnboardingController + /admin/onboarding view call — M30·5).
+   Non-blocking (M30·5): it never gates sign-in; the close button is a
+   client-side dismiss (onboarding-banner.js), and the only way to clear it
+   for real is the explicit "mark as complete" POST (M30·4). *@
+@await Html.PartialAsync("~/Views/Shared/_AdminOnboardingBanner")
 <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
     @foreach (var tab in tabs)
     {

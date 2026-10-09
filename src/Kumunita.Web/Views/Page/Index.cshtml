@@ -4,6 +4,7 @@
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
 @{
     ViewData["Title"] = "Pages";
     var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
@@ -11,13 +12,32 @@
     string ariaCommunityTree   = await Translation.GetAsync("a11y.community_page_tree", effLang);
     string ariaPlatformPages   = await Translation.GetAsync("a11y.platform_pages", effLang);
     string ariaPlatformTree    = await Translation.GetAsync("a11y.platform_page_tree", effLang);
+
+    // M29 (ADR 0152) — the surface header label (M29·1: the same value the nav
+    // item resolves — one resolver, one value, so a rename is never "nav says
+    // X, header says Y"). A non-blank admin label wins; otherwise the nav.pages
+    // kw-l key resolves in the viewer's effective language. Best-effort:
+    // GetLabelAsync never throws (a missing row / store degrades to the kw-l
+    // floor), so a null/absent service only degrades to the raw kw-l floor.
+    string _surfaceTitle = "Pages";
+    if (SurfaceLabels is not null)
+    {
+        try
+        {
+            _surfaceTitle = await SurfaceLabels.GetLabelAsync("pages", "nav.pages", effLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the header (the kw-l floor).
+        }
+    }
 }
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-8">
         <header class="airy-head">
             <div class="head-row">
-                <h1><kw-l key="pages.title">Pages</kw-l></h1>
+                <h1>@_surfaceTitle</h1>
                 @if (User?.Identity?.IsAuthenticated == true)
                 {
                     <a class="btn btn-primary" href="/pages/new">
