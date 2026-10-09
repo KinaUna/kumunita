@@ -241,6 +241,17 @@ var marten = builder.Services.AddMarten(opts =>
     // business-key index is pinned). Without this call the doc is invisible
     // to Marten (the M3/Media/Usage/Document precedent).
     StorageSettingsDocTypes.Configure(opts);
+
+    // M31 (ADR 0154 D1, U03): the error-report bounded context's document
+    // (ErrorReport, ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
+    // M17DocTypes / DocumentDocTypes, not additive on an existing one:
+    // ErrorReport uses the conventional string Id identity, so only the
+    // (TriageStatus, Created) admin-list-ordering index is pinned). Without
+    // this call the ErrorReport doc is invisible to Marten (the
+    // M3/Media/Usage/Document precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    ErrorReportDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

@@ -284,3 +284,101 @@ drift** against Part 1 (the 10 invariants + 8 FACES hold). U03's entry point:
   the `ErrorReportDocTypes` shape, the `Via` pin, the 20-key set, the 16 test
   names, the M32 boundary) — a later unit that finds a mismatch records a
   `## U<m> — Drift pause` (unit-series rule §9) instead of improvising.
+
+## U03 — Core (ErrorReport + service + DI)
+
+Core context `Kumunita.Core.ErrorReports` created (5 new files) + 3 wiring
+edits (the `AccessVia.Anonymous` enum append, the DI registration, the
+`Program.cs` `Configure` call). `dotnet build Kumunita.slnx -c Debug`
+**green (0 errors, 0 warnings)**. All entry reads verified; **no functional
+drift** against §2.1/§2.2 — the `Via` pin (`AccessVia.Resident` for
+non-blank `SubjectId`, `AccessVia.Anonymous` for blank) is implemented
+**verbatim**. U04's entry point: the 3 seam methods below + the `Via` pin.
+
+- **(a) The 3 method names as implemented**
+  (`src/Kumunita.Core/ErrorReports/IErrorReportService.cs`,
+  `ErrorReportService.cs`): `CreateAsync(ErrorReportDraft draft,
+  CancellationToken ct = default)` · `MarkTriagedAsync(string reportId,
+  string actorId, CancellationToken ct = default)` · `ListAsync(int maxCount
+  = 100, CancellationToken ct = default)` — each with the **trailing optional
+  `CancellationToken ct = default`** (§2.1's sanctioned superset, the
+  `AdminOnboardingService` house style — a superset, not a drift).
+  `CreateAsync`: one write session, stores the `ErrorReport`
+  (`TriageStatus = "new"`, `TriagedAt`/`TriagedBy` stay `null`) + **exactly
+  one** `AccessAudit` row (`Action = "errorreport.create"`, `TargetKind =
+  "error-report"`, `Outcome = Allow`, `Via =` the §2.1 pin —
+  `string.IsNullOrEmpty(draft.SubjectId) ? AccessVia.Anonymous :
+  AccessVia.Resident`), returns the stored report. `MarkTriagedAsync`: **one
+  read session** (not a write session) — if the report is **missing or
+  already `triaged`, returns `null` (no-op, no audit row, no state change,
+  M31·6)**; else opens a write session, stamps
+  `TriageStatus`/`TriagedAt`/`TriagedBy`, stores the report + **exactly one**
+  `AccessAudit` row (`Action = "errorreport.triage"`, `TargetKind =
+  "error-report"`, `Outcome = Allow`, `Via = AccessVia.Admin`), returns the
+  stamped report. `ListAsync`: **read session** (`QuerySession`),
+  `.OrderByDescending(x => x.Created).Take(maxCount)` — **no audit row
+  (M31·4)**, returns an empty list when there are no reports.
+- **(b) The `ErrorReportDocTypes` shape**
+  (`src/Kumunita.Core/ErrorReports/ErrorReportDocTypes.cs`): **1
+  `opts.Schema.For<ErrorReports.ErrorReport>()` call + 2 chained
+  `.Index(x => x.TriageStatus)` / `.Index(x => x.Created)` calls** — the
+  repo's established **chained-`.Index()` convention** (the M6 `Notification`
+  / M17 `Bookmark` / M5 `TodoItem` feed-ordering-index shape). **Deviates
+  from §2.2's `opts.Schema.For<T>(o => { o.Index(...); })` lambda-config
+  form only in syntax, not in semantic intent** (the same 2 indexes on the
+  same 2 fields) — this Marten version's `Schema.For<T>()` takes **no**
+  config lambda (CS1501 — the AGENTS.md "version-pinned Marten API" trap),
+  so the chained form is the compile-correct shape. U06's drift pin
+  (`M31_3_ErrorReport_Doc_FieldSet_Ceiling`) asserts the **field set**, not
+  the registration syntax — the 11-member `ErrorReport` doc
+  (`src/Kumunita.Core/ErrorReports/ErrorReport.cs`) is **verbatim** §2.2,
+  `TriageStatus` defaults `"new"`, `TriagedAt`/`TriagedBy` default `null`.
+- **(c) The DI registration line**
+  (`src/Kumunita.Core/DependencyInjection.cs`, immediately after the
+  `AdminOnboarding.IAdminOnboardingService` registration, the
+  `M30 (ADR 0153, U03)` block): `services.AddTransient<ErrorReports.IErrorReportService>(sp
+  => new ErrorReports.ErrorReportService(sp.GetRequiredService<Marten.IDocumentStore>()));`
+  — the `IAdminOnboardingService` / `ISiteContentService` fully-qualified
+  "AddTransient with the store injected" shape (the ADR 0006-D Core
+  stays-HTTP-free rule holds — `ErrorReportService` composes the host-
+  registered `IDocumentStore` only).
+- **(d) The `Program.cs` line added** (`src/Kumunita.Web/Program.cs`,
+  immediately after the `StorageSettingsDocTypes.Configure(opts);` line —
+  the last line of the `*DocTypes` block, just before the closing `})` of
+  the `Marten` registration): `ErrorReportDocTypes.Configure(opts);` — the
+  `M3/Media/Usage/Document` "one line per bounded context" precedent.
+  `SchemaBootstrap.cs` line 48 calls
+  `ApplyAllConfiguredChangesToDatabaseAsync()`, which applies **every**
+  configured Marten schema change — the new `ErrorReport` surface is picked
+  up **automatically** at the versioned boot with no per-DocTypes list
+  (confirmed, the design-doc §2.2 "Wiring" note holds).
+- **(e) The `AccessVia.Anonymous` append**
+  (`src/Kumunita.Core/Authorization/Decision.cs`, appended **after** the
+  existing `Resident` value — the **12th** `AccessVia` value, the
+  eleven frozen values `Owner`/`Audience`/`Delegation`/`Moderator`/`Report`/
+  `BreakGlass`/`Admin`/`Group`/`Guardian`/`Community`/`Resident` are
+  **never re-shaped**): a `/// <summary>` doc comment citing ADR 0154
+  (M31·5) + the ADR 0013 `Group` / ADR 0028 `Guardian` / ADR 0036 `Community`
+  / ADR 0041 `Resident` additive-append precedent, and noting this is a
+  *record* of "by what right," not a gate (M31·9 — no new `AccessAction` /
+  `Decide()` branch / `IAuthorizationService` surface). No re-order, no
+  re-shape.
+- **(f) Compile warnings:** **0** warnings, **0** errors (the pre-existing
+  `CS8600`/`CS8604` warnings in `SampleDataSeeder.cs` / `SmtpSender.cs`
+  that were present before this unit's edits are unchanged — not introduced
+  by U03). The one fix applied during this unit (both in **U03's own new
+  files**, no drift): the §2.2 `ErrorReportService.ListAsync` snippet's
+  `.OrderDescending(x => x.Created)` (a typo — no such LINQ operator exists;
+  CS1660) was corrected to `.OrderByDescending(x => x.Created)` (the
+  repo's pinned shape, `AnnouncementService`/`MessagingService`/
+  `UserInfoService` all use `.OrderByDescending(.Created)`); the §2.2
+  `ErrorReportDocTypes` lambda-config form was replaced with the chained
+  `.Index()` form (item (b) above). Both changes are **in U03's new files
+  only** and preserve §2.2's semantic intent exactly — **not** a drift
+  pause (the design doc's intent is unchanged; the fixes make the code
+  compile-correct in this Marten version, the exact class of bug AGENTS.md
+  warns about). U04's entry: the 3 seam methods above; the `Via` pin
+  (`AccessVia.Resident` / `AccessVia.Anonymous` for `CreateAsync`;
+  `AccessVia.Admin` for `MarkTriagedAsync`); the 5 new
+  `ErrorViewModel` fields U04 adds; the 20 `kw-l` keys U05 authors (U04
+  consumes keys 1–8 on the error page).

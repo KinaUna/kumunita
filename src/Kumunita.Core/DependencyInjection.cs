@@ -131,6 +131,21 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AdminOnboarding.IAdminOnboardingService>(sp => new AdminOnboarding.AdminOnboardingService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M31 (ADR 0154, U03): the production-error-handling seam — the
+        // ErrorReport doc's read + two audited-write lanes (the ADR 0153
+        // single-write-lane shape, the LocaleSettings-parallel bounded context
+        // Kumunita.Core.ErrorReports). The same "AddTransient with the store
+        // injected" shape as IAdminOnboardingService above: composes the
+        // host-registered Marten IDocumentStore (reads open a QuerySession,
+        // the audited write opens a write session — invariant C3). Core stays
+        // HTTP-free (ADR 0006-D): the Web gate (U04/U05) is the only place the
+        // subject / request context are produced + the GlobalAdmin
+        // authorization is checked. Fully qualified
+        // ErrorReports.IErrorReportService for the type/namespace-collision
+        // idiom (like SiteContent.ISiteContentService).
+        services.AddTransient<ErrorReports.IErrorReportService>(sp => new ErrorReports.ErrorReportService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the

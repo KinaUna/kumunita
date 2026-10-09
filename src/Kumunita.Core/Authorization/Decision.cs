@@ -57,7 +57,21 @@ public enum AccessVia
     /// community required). The ADR 0036 <see cref="Community"/> append
     /// precedent: an additive enum value, the ten frozen values untouched.
     /// </summary>
-    Resident
+    Resident,
+    /// <summary>
+    /// The anonymous-visitor standing (ADR 0154, M31·5): an unsigned visitor
+    /// filing a platform-error signal on the 500 error page (a blank
+    /// <c>SubjectId</c>). None of the eleven frozen values fits this standing
+    /// (<see cref="Resident"/> requires a signed-in actor; the others encode a
+    /// standing an unsigned visitor does not hold), so the least-distortion
+    /// slot is a new value — the ADR 0013 <see cref="Group"/> / ADR 0028
+    /// <see cref="Guardian"/> / ADR 0036 <see cref="Community"/> / ADR 0041
+    /// <see cref="Resident"/> additive-append precedent, the eleven frozen
+    /// values untouched. This is a <c>record</c> of "by what right," not a
+    /// gate (M31·9 — no new <c>AccessAction</c> / <c>Decide()</c> branch /
+    /// <c>IAuthorizationService</c> surface).
+    /// </summary>
+    Anonymous
 }
 
 /// <summary>The outcome an audited decision produced.</summary>
