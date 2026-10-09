@@ -196,3 +196,54 @@ FACES** U02 pins by id: M32-1 (signed-in `/issues/new` submit →
 `errorreport.escalate` audit row) · M32-8 (Escalate unconfigured → no state
 change) · M32-9 (Escalate forward fails → no state change) · M32-10 (non-
 GlobalAdmin → 403).
+
+## U02 — design doc Part 2 + ADR 0155
+
+Appended `## Seams & contracts (Part 2, written by U2)` to the design doc
+(§2.1–§2.6) + drafted **ADR 0155** (`Status: Draft`) + the `docs/adr/README.md`
+index row (0155 is free after 0154, confirmed against the index). **No code,
+no build.** (a) Sealed seams: `IErrorReportService` is **4 methods** in M32
+(the M31 3 unchanged + `Task<ErrorReport?> MarkResolvedAsync(string reportId,
+string actorId, string? resolutionNote, CancellationToken ct = default)`,
+M32·8) + `ErrorReportDraft` gains the additive `Origin` member (default
+`"error-page"`, M32·4) + the Web-layer `Task<EscalationResult>
+IEscalationForwarder.ForwardAsync(string reportId, CancellationToken ct =
+default)` (namespace `Kumunita.Web.Services`, M32·5 — the first outbound
+HTTP; `record EscalationResult(bool Configured, bool Success, int?
+StatusCode, string? Error)`). (b) The **19 pinned test names** (§2.4): 1–6
+`M32_8_MarkResolved_New_Updates_TriageStatus_And_AuditRow` /
+`M32_8_MarkResolved_Triaged_Updates_TriageStatus_And_AuditRow` /
+`M32_8_MarkResolved_AlreadyResolved_Is_NoOp` /
+`M32_8_MarkResolved_Missing_Returns_Null` /
+`M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` /
+`M32_4_CreateAsync_Origin_General_Stores_ErrorReport` (in
+`ErrorReportResolveTests.cs`); 7–11 `M32_4_Issue_Page_Shows_Issue_Form` /
+`M32_4_Issue_Post_SignedIn_Creates_ErrorReport_Origin_General` /
+`M32_4_Issue_Post_Anonymous_Creates_ErrorReport_Origin_General` /
+`M32_4_Issue_Post_Validation_BlankDescription_Renders_Error` /
+`M32_4_Issue_Post_Confirmation_Visible` (in `IssuePageTests.cs`); 12–18
+`M32_10_Admin_Detail_SignedIn_GlobalAdmin_Sees_Report` /
+`M32_10_Admin_Detail_NonGlobalAdmin_Denied` /
+`M32_8_Admin_Resolve_GlobalAdmin_Updates_Row` /
+`M32_8_Admin_Resolve_AlreadyResolved_NoOp` /
+`M32_7_Admin_Escalate_Configured_ForwardSucceeds_Resolves_Row` /
+`M32_7_Admin_Escalate_ForwardFails_NoStateChange` /
+`M32_6_Admin_Escalate_NotConfigured_NoStateChange` (in
+`AdminErrorReportDetailTests.cs`); 19
+`M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports` (in
+`AdminOnboardingControllerTests.cs`, + the in-place M30 step-7 route
+re-point `/admin/announcements` → `/admin/error-reports`). (c) The
+**three-test acceptance gate** (§2.5, U07 records): **closed-loop**
+(anonymous `/issues/new` → `Origin="general"` row + one `Via=Anonymous`
+audit row + `issue.thanks` confirmation) · **handoff** (GlobalAdmin
+`POST …/resolve` → `resolved` + the 4 resolution fields stamped + one
+`Via=Admin` audit row + a second POST is a no-op) · **part-vs-whole**
+(all 19 of §2.4 must be green together). (d) **ADR 0155** (the next free
+number after 0154, the M31 ADR) — `Status: Draft`; the M31 surface
+**reused** flag holds (M32·1 — the M31 `ErrorReport` 11-member doc /
+3-method service surface / `ErrorReportDocTypes` / `errorreport.*` 20-key
+set are all **unchanged**; M32 **adds** the 4 additive fields → the
+15-member M32 ceiling, the `MarkResolvedAsync` seam, the
+`IEscalationForwarder`, the 19-key M32 `kw-l` set, and the `resolved`
+`TriageStatus` value). No drift against the register's §U02 or the U00/U01
+frozen-base facts.

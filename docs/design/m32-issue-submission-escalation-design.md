@@ -381,10 +381,481 @@ per-report attachment (the named deferrals, §Scope).
 
 ---
 
-*Part 2 (U02) appends: the `IErrorReportService` 4-method surface (the M31 3 +
-the `MarkResolvedAsync` seam), the `ErrorReport` additive field set (the
-15-member M32 ceiling), the `ErrorReportDraft.Origin` member, the
-`IEscalationForwarder` + `EscalationResult` shape, the
-`KUMUNITA_ESCALATION_ENDPOINT` config read shape, the closed `issue.*` /
-`errorreport.resolve.*` / `errorreport.escalate.*` `kw-l` key set, the 19
-pinned test names, the acceptance gate, the drift guard — plus **ADR 0155**.*
+*Part 2 (U02) follows below.*
+
+---
+
+## Seams & contracts (Part 2, written by U2)
+
+> **Authoritative for U03–U06.** These shapes are the copy-paste-exact C# the
+> Core/Web units implement against. Any later unit that finds a mismatch
+> between the code it is about to write and a pin in §2.1–§2.6 records a
+> `## U<m> — Drift pause` (unit-series rule §11) instead of improvising. The
+> pinned C# below is the **seam contract** — U03 implements it verbatim; U04
+> and U05 consume it; U07's tests assert against it. **M32 adds exactly one
+> Core seam** (`MarkResolvedAsync`, M32·8), **one additive draft member**
+> (`ErrorReportDraft.Origin`, M32·4), **four additive doc fields** (the
+> 15-member M32 ceiling, M32·3), and **one Web-layer interface**
+> (`IEscalationForwarder`, M32·5). The M31 3-method surface, the M31 11
+> doc fields, and the M31 `ErrorReportDocTypes` registration surface are
+> **frozen** (M32·1).
+
+### 2.1 frozen seam list (exact C#)
+
+**The `IErrorReportService` surface in M32 — four methods** (the M31 three,
+**unchanged verbatim** — M32·1, unit-series rule 5 — plus the M32 additive
+seam, M32·8):
+
+```csharp
+namespace Kumunita.Core.ErrorReports;
+
+/// <summary>
+/// The read + three audited-write lanes for the ErrorReport doc (ADR 0154
+/// + ADR 0155). The ADR 0006 C3 single-write-lane shape: each audited write
+/// opens one write session that commits the ErrorReport doc + exactly one
+/// AccessAudit row together (invariant C3, strong consistency). Core stays
+/// HTTP-free (ADR 0006-D); the Web layer is the only place the subject /
+/// request context are produced.
+/// </summary>
+public interface IErrorReportService
+{
+    // ── M31 surface (ADR 0154 D4) — UNCHANGED in M32 (M32·1) ─────────────
+
+    /// <summary>
+    /// Store one ErrorReport row (TriageStatus "new") + exactly one
+    /// AccessAudit row in one write session. The Via tag is the M31 §2.1
+    /// pin: AccessVia.Resident for a non-blank SubjectId; AccessVia.Anonymous
+    /// for a blank SubjectId. Never a 500 back to the resident.
+    /// </summary>
+    Task<ErrorReport> CreateAsync(ErrorReportDraft draft, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stamp a new report triaged (TriageStatus / TriagedAt / TriagedBy)
+    /// + exactly one AccessAudit row (Via = Admin) in one write session.
+    /// Returns null (a no-op) when the report is missing or already triaged
+    /// (M31·6 idempotency pin).
+    /// </summary>
+    Task<ErrorReport?> MarkTriagedAsync(string reportId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Newest-first listing for the admin surface. A read, not an access
+    /// decision — no per-row IAuthorizationService call, no AccessAudit row
+    /// (M31·4).
+    /// </summary>
+    Task<IReadOnlyList<ErrorReport>> ListAsync(int maxCount = 100, CancellationToken ct = default);
+
+    // ── M32 additive seam (ADR 0155, M32·8) ───────────────────────────────
+
+    /// <summary>
+    /// Stamp a new/triaged report resolved (TriageStatus = "resolved",
+    /// ResolvedAt = now, ResolvedBy = actorId, ResolutionNote =
+    /// resolutionNote?) + exactly one AccessAudit row (Via = Admin, action
+    /// "errorreport.resolve", TargetKind "error-report") in one write
+    /// session. Returns null (a no-op — no audit row, no state change) when
+    /// the report is missing or already resolved (M32·8 idempotency pin, the
+    /// M31·6 MarkTriagedAsync precedent verbatim).
+    /// </summary>
+    Task<ErrorReport?> MarkResolvedAsync(string reportId, string actorId, string? resolutionNote, CancellationToken ct = default);
+}
+```
+
+**The `ErrorReportDraft` record in M32 — seven members** (the M31 six,
+**unchanged**, plus the M32 additive `Origin` member, the M32·4 pin):
+
+```csharp
+namespace Kumunita.Core.ErrorReports;
+
+/// <summary>
+/// The input to <see cref="IErrorReportService.CreateAsync"/>. The M31 six
+/// members are unchanged (M32·1); M32 adds the additive <c>Origin</c>
+/// member (M32·4 — the M31 500 form passes the "error-page" default; the
+/// M32 /issues/new form passes "general"; the closed set is
+/// {"error-page","general"}).
+/// </summary>
+public sealed record ErrorReportDraft(
+    string SubjectId,          // ClaimTypes.Subject; string.Empty when anonymous
+    string Description,        // required — the resident's free-text "what were you doing"
+    string? ContactEmail,      // optional — for anonymous follow-up
+    string RequestId,          // the HttpContext.TraceIdentifier, for log correlation
+    string? ExceptionType,     // from IExceptionHandlerFeature; null for a general issue
+    string? UserAgent,         // the browser UA, truncated to 256 chars by the caller
+    string Origin = "error-page"); // M32·4 additive member — closed set {"error-page","general"}
+```
+
+> **Note on `CancellationToken`.** The M31 implementation already carries
+> trailing optional `CancellationToken ct = default` parameters (the house
+> style, `AdminOnboardingService` / `SiteContentService`); the `MarkResolvedAsync`
+> signature above matches it. The method name, parameter names
+> (`reportId`, `actorId`, `resolutionNote`, `ct`), the `ErrorReport?` return
+> type, and the `string?` nullability of `resolutionNote` are **frozen**.
+
+**The Web-layer `IEscalationForwarder` seam (the M32·5 pin — the first
+outbound HTTP in the codebase).** Namespace `Kumunita.Web.Services`,
+**not** `Kumunita.Core` (ADR 0006-D — Core stays HTTP-free; unit-series rule
+7 forbids an outbound `HttpClient` call in `Kumunita.Core`):
+
+```csharp
+namespace Kumunita.Web.Services;
+
+/// <summary>
+/// The M32 escalation forwarding lane (ADR 0155, M32·5 / M32·6 / M32·7).
+/// Web-layer HTTP — Core stays HTTP-free (ADR 0006-D). Reads the endpoint
+/// from the KUMUNITA_ESCALATION_ENDPOINT env var (M32·6 — never a DB
+/// column, never a per-row field, never a Marten config row), loads the
+/// report via IErrorReportService (a read — no audit), and POSTs the JSON
+/// payload to the endpoint.
+/// </summary>
+public interface IEscalationForwarder
+{
+    /// <summary>
+    /// Forward the report named by <paramref name="reportId"/> to the
+    /// configured endpoint. Returns Configured == false when the
+    /// KUMUNITA_ESCALATION_ENDPOINT env var is absent (M32·6 pin — the
+    /// Escalate action is then a no-op, the M32-8 FACE). Success == true
+    /// only on a 2xx response (M32·7 pin). A non-2xx response or a
+    /// transport error (HttpRequestException / TaskCanceledException
+    /// timeout) returns Success == false with the Error message — the
+    /// report is NOT stamped resolved in that case (M32·7).
+    /// </summary>
+    Task<EscalationResult> ForwardAsync(string reportId, CancellationToken ct = default);
+}
+
+/// <summary>
+/// The outcome of one <see cref="IEscalationForwarder.ForwardAsync"/> call.
+/// Configured is false when KUMUNITA_ESCALATION_ENDPOINT is absent;
+/// Success is true only on a 2xx response; StatusCode is null when not
+/// Configured (or on a transport error); Error is a short transport-error
+/// message, null on success.
+/// </summary>
+public sealed record EscalationResult(
+    bool Configured,
+    bool Success,
+    int? StatusCode,
+    string? Error);
+```
+
+**The `EscalationForwarder` implementation contract (U05 implements).**
+Constructor `(IConfiguration configuration, IErrorReportService
+errorReports, IHttpClientFactory httpClientFactory)`. `ForwardAsync`
+behavior, pinned step by step:
+
+1. **Read the endpoint** — `configuration["KUMUNITA:ESCALATION_ENDPOINT"]`
+   (the `IConfiguration` mapping of the `KUMUNITA_ESCALATION_ENDPOINT` env
+   var, the M32·6 pin — the `SmtpProbe` `KUMUNITA_SMTP_HEALTH_TIMEOUT_MS`
+   env-var read precedent for the "operator config from the environment"
+   shape). **If absent (null/blank)** → `return new EscalationResult(
+   Configured: false, Success: false, StatusCode: null, Error: null)`
+   (the M32·6 pin, the M32-8 FACE).
+2. **Load the report** — via `IErrorReportService` (a read — no audit, the
+   M31·4 pin; the `ListAsync` read lane is the service's only read seam, so
+   the impl lists and filters to `reportId`). **If missing** → `return new
+   EscalationResult(Configured: true, Success: false, StatusCode: null,
+   Error: "report not found")`.
+3. **POST the payload** — `IHttpClientFactory.CreateClient()` with
+   `Timeout = TimeSpan.FromSeconds(10)` (the `SmtpProbe`
+   `KUMUNITA_SMTP_HEALTH_TIMEOUT_MS` timeout precedent),
+   `PostAsJsonAsync(endpoint, payload, ct)`. The JSON payload is the closed
+   set `{ id, subjectId, description, contactEmail, requestId,
+   exceptionType, origin, created }` (the report's fields — **not** the
+   resolution fields, **not** the endpoint). **If 2xx** → `return new
+   EscalationResult(Configured: true, Success: true, StatusCode:
+   (int)response.StatusCode, Error: null)`. **If non-2xx** → `return new
+   EscalationResult(Configured: true, Success: false, StatusCode:
+   (int)response.StatusCode, Error: response.ReasonPhrase)` (the M32·7
+   pin). **Catch** `TaskCanceledException` (timeout) /
+   `HttpRequestException` → `return new EscalationResult(Configured: true,
+   Success: false, StatusCode: null, Error: ex.Message)` (a transport error
+   is a failed forward, the M32·7 pin, the M32-9 FACE).
+4. **The caller's contract** — the `ErrorReportAdminController.Escalate`
+   action calls `ForwardAsync`, and **only** on `Success == true` calls
+   `IErrorReportService.MarkResolvedAsync(reportId, actor,
+   "Escalated to operator endpoint")` (the M32·7 pin — the status
+   transition + the `errorreport.escalate` audit row are Core's; the HTTP
+   is Web's). `Success == false` or `Configured == false` → **no**
+   `MarkResolvedAsync` call (M32·7).
+
+**The registration contract (U05).** `Program.cs` gains `services.
+AddHttpClient();` (the `IHttpClientFactory` — the M32·5 first-outbound-
+HTTP registration) + `services.AddSingleton<IEscalationForwarder,
+EscalationForwarder>();` (a **singleton** — the `EscalationForwarder` holds
+no per-request state; the `IHttpClientFactory` is a singleton). `Kumunita.
+Core`'s `DependencyInjection.cs` is **unchanged** (M32·1 — the
+`MarkResolvedAsync` seam rides the existing
+`ErrorReports.IErrorReportService` registration; **no** new DI line). The
+`ErrorReportAdminController` ctor gains the **optional**
+`IEscalationForwarder? escalationForwarder = null` parameter (the M31
+`localization` / `translationProvider` optional-ctor-param precedent — any
+test-construction site that builds the controller without the forwarder
+keeps compiling and the Escalate action renders the
+`errorreport.escalate.not_configured` source text via the
+`KnownTranslationKeys.EnValues` floor).
+
+### 2.2 new M32-owned Core types (exact C#)
+
+**The `ErrorReport` doc — the 15-member M32 ceiling (M32·3, ADR 0155 D1).**
+The M31 11 are **frozen** (exact names, types, nullability — M32·1 / M32·3);
+M32 adds **exactly four** fields. No field outside this set may appear in
+the doc; no M31 field is re-shaped. This is the **field ceiling** the U07
+drift pin (`M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling`) asserts.
+
+```csharp
+namespace Kumunita.Core.ErrorReports;
+
+public sealed class ErrorReport
+{
+    // ── M31's 11 (ADR 0154 D1) — UNCHANGED in M32 (M32·1 / M32·3) ─────────
+    public string Id { get; set; } = string.Empty;                 // conventional, Marten-generated
+    public string SubjectId { get; set; } = string.Empty;          // ClaimTypes.Subject; "" when anonymous
+    public string Description { get; set; } = string.Empty;        // required, non-blank
+    public string? ContactEmail { get; set; }                      // optional
+    public string RequestId { get; set; } = string.Empty;          // the TraceIdentifier
+    public string? ExceptionType { get; set; }                     // null for a general issue
+    public string? UserAgent { get; set; }                         // truncated to 256 by the caller
+    public DateTimeOffset Created { get; set; }                    // UTC
+    public string TriageStatus { get; set; } = "new";              // M32·2: {"new","triaged","resolved"}
+    public DateTimeOffset? TriagedAt { get; set; }
+    public string? TriagedBy { get; set; }
+
+    // ── M32's additive 4 (ADR 0155 D1, M32·3) ─────────────────────────────
+    /// <summary>
+    /// Where the report was filed. CLOSED SET {"error-page","general"}
+    /// (M32·4) — the M31 500 form writes "error-page" (the default), the
+    /// M32 /issues/new form writes "general". A string field — ADR 0004
+    /// §B.1 idempotent delta at boot, no migration.
+    /// </summary>
+    public string Origin { get; set; } = "error-page";
+
+    /// <summary>The resolution instant, UTC; null until resolved (M32·8).</summary>
+    public DateTimeOffset? ResolvedAt { get; set; }
+
+    /// <summary>The GlobalAdmin's ClaimTypes.Subject who resolved; null until resolved (M32·8).</summary>
+    public string? ResolvedBy { get; set; }
+
+    /// <summary>The admin's free-text "what was done"; null until resolved (M32·8).</summary>
+    public string? ResolutionNote { get; set; }
+}
+```
+
+**The `TriageStatus` value set in M32** (M32·2, ADR 0155 D2): exactly
+`{"new", "triaged", "resolved"}`. The two M31 values keep their exact
+strings; `"resolved"` is the **terminal** state (no re-open lane — the named
+deferral, §Scope Out).
+
+**The `MarkResolvedAsync` implementation contract (U03 implements, the M31
+`MarkTriagedAsync` idempotent-write-lane shape verbatim — the
+`ErrorReportService.MarkTriagedAsync` in
+`src/Kumunita.Core/ErrorReports/ErrorReportService.cs` is the template):**
+
+1. Open one write `IDocumentSession` (`_store.OpenSession(new
+   Marten.Services.SessionOptions())`, the M31 house shape).
+2. Load the report via `session.LoadAsync<ErrorReport>(reportId, ct)`.
+   **If missing → return `null`** (a no-op — no audit row, no state
+   change).
+3. **If `stored.TriageStatus == "resolved"` → return `null`** (a no-op — the
+   M32·8 idempotency pin, the M31·6 precedent verbatim).
+4. Else stamp `stored.TriageStatus = "resolved"; stored.ResolvedAt =
+   DateTimeOffset.UtcNow; stored.ResolvedBy = actorId; stored.ResolutionNote
+   = resolutionNote;` + `session.Store(stored)`.
+5. Store **exactly one** `AccessAudit` row in the **same session** (the
+   `MarkTriagedAsync` field set, action re-pointed): `Id =
+   Guid.NewGuid().ToString("N")`, `At = DateTimeOffset.UtcNow`, `ActorId =
+   actorId`, `EffectivePrincipalId = actorId`, `Action =
+   "errorreport.resolve"`, `TargetKind = "error-report"`, `TargetId =
+   reportId`, `Via = AccessVia.Admin`, `Outcome = AccessOutcome.Allow`.
+6. `await session.SaveChangesAsync(ct)`; return `stored`.
+
+**The `CreateAsync` implementation in M32** — the M31 shape **plus** one
+additive projection line: `Origin = draft.Origin` (the M31 default
+`"error-page"` flows through unchanged for the M31 500 form — the M32-3
+FACE; the M32 `/issues/new` form passes `"general"` — the M32·4 pin). The
+`AccessAudit` row shape + the `Via` pin (Resident/Anonymous by `SubjectId`)
+are **unchanged** (the M31 D5 pin).
+
+**The `ErrorReportDocTypes` registration surface — UNCHANGED (M32·1).** The
+single `opts.Schema.For<ErrorReport>().Index(x => x.TriageStatus).Index(x =>
+x.Created);` block in
+`src/Kumunita.Core/ErrorReports/ErrorReportDocTypes.cs` is the **only**
+registration surface; the four additive fields are **Marten-detected at
+boot** (the ADR 0004 §B.1 idempotent delta — a new `string` / `string?` /
+`DateTimeOffset?` on an existing doc type, no migration). **No new
+`.Schema.For` call, no new registration surface, no `Kumunita.Core` DI
+change** (M32·1). **No EF migration.**
+
+### 2.3 the closed `issue.*` / `errorreport.resolve.*` / `errorreport.escalate.*` `kw-l` key set
+
+The **19 keys** (verbatim from the register's Assumptions; the exact set is
+**frozen** by the §2.6 drift guard). Each with its **en** value — the source
+text, the ADR 0015 D1 `kw-l` provider-floor discipline. The `de` / `fr` /
+`da` values are **U06's** to author (the M30·6 four-language pin; the
+`KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests` closure
+asserts every key is present, non-empty, in all four languages, M32·9). The
+M31 `errorreport.*` key set (the 20 keys of ADR 0154 D8) is the **floor** —
+M32 **adds** this set, it does **not** re-author or drop any M31 key (M32·1).
+
+| # | Key | en value (source text) |
+|---|-----|------------------------|
+| 1  | `issue.title` | Report an issue |
+| 2  | `issue.intro` | Something not working, or a problem we should know about? Tell us what happened — even if there's no error page in front of you. |
+| 3  | `issue.description.label` | What's the issue? |
+| 4  | `issue.description.placeholder` | e.g. The group calendar page is down, or I can't log in |
+| 5  | `issue.email.label` | Your email (optional) |
+| 6  | `issue.email.placeholder` | you@example.com |
+| 7  | `issue.submit` | Send issue report |
+| 8  | `issue.thanks` | Thanks — your issue has been filed. |
+| 9  | `issue.nav` | Report an issue |
+| 10 | `errorreport.list.status.resolved` | Resolved |
+| 11 | `errorreport.resolve.title` | Resolve this report |
+| 12 | `errorreport.resolve.note.label` | Resolution note |
+| 13 | `errorreport.resolve.note.placeholder` | e.g. Fixed the broken calendar link; nothing to forward. |
+| 14 | `errorreport.resolve.button` | Mark as resolved |
+| 15 | `errorreport.resolve.flash` | Report marked as resolved. |
+| 16 | `errorreport.escalate.button` | Escalate to operator endpoint |
+| 17 | `errorreport.escalate.flash_success` | Report escalated and marked as resolved. |
+| 18 | `errorreport.escalate.flash_failure` | Escalation failed — the report is unchanged. You can retry. |
+| 19 | `errorreport.escalate.not_configured` | Escalation is not configured on this instance (KUMUNITA_ESCALATION_ENDPOINT is not set). |
+
+> **Key-set note.** Keys 1–9 are the public `/issues/new` form (the U04
+> `Views/Issues/New.cshtml` surface) + the nav entry (`issue.nav`, key 9 —
+> the U04/U05 surface's link text). Key 10 is the admin **list** view's new
+> status chip (the `errorreport.list.status.new` / `errorreport.list.
+> status.triaged` chip precedent, the M31 20-key set extended by one
+> additive key — M32·1). Keys 11–15 are the **Resolve** section of the
+> detail view; keys 16–19 are the **Escalate** section (key 19 is the
+> "not configured" message — the M32·6 pin, the M32-8 FACE; key 18 is the
+> failed-forward message — the M32·7 pin, the M32-9 FACE).
+
+### 2.4 pinned seam tests (exact names)
+
+The **19 tests** across four files (U07 implements one test per pinned name;
+U07's `## U07` handoff section lists the 19 verbatim). The test **names**
+are frozen (the §2.6 drift guard); the test **bodies** are U07's.
+
+**`tests/Kumunita.Core.Tests/ErrorReportResolveTests.cs` — 6 tests:**
+
+1. `M32_8_MarkResolved_New_Updates_TriageStatus_And_AuditRow`
+2. `M32_8_MarkResolved_Triaged_Updates_TriageStatus_And_AuditRow`
+3. `M32_8_MarkResolved_AlreadyResolved_Is_NoOp`
+4. `M32_8_MarkResolved_Missing_Returns_Null`
+5. `M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling`
+6. `M32_4_CreateAsync_Origin_General_Stores_ErrorReport`
+
+**`tests/Kumunita.Web.Tests/IssuePageTests.cs` — 5 tests:**
+
+7. `M32_4_Issue_Page_Shows_Issue_Form`
+8. `M32_4_Issue_Post_SignedIn_Creates_ErrorReport_Origin_General`
+9. `M32_4_Issue_Post_Anonymous_Creates_ErrorReport_Origin_General`
+10. `M32_4_Issue_Post_Validation_BlankDescription_Renders_Error`
+11. `M32_4_Issue_Post_Confirmation_Visible`
+
+**`tests/Kumunita.Web.Tests/AdminErrorReportDetailTests.cs` — 7 tests:**
+
+12. `M32_10_Admin_Detail_SignedIn_GlobalAdmin_Sees_Report`
+13. `M32_10_Admin_Detail_NonGlobalAdmin_Denied`
+14. `M32_8_Admin_Resolve_GlobalAdmin_Updates_Row`
+15. `M32_8_Admin_Resolve_AlreadyResolved_NoOp`
+16. `M32_7_Admin_Escalate_Configured_ForwardSucceeds_Resolves_Row`
+17. `M32_7_Admin_Escalate_ForwardFails_NoStateChange`
+18. `M32_6_Admin_Escalate_NotConfigured_NoStateChange`
+
+**`tests/Kumunita.Web.Tests/AdminOnboardingControllerTests.cs` — 1 test
+(new) + the in-place re-point of the M30 step-7 route pin:**
+
+19. `M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports`
+
+> **The step-7 re-point (the M32·11 pin).** The existing M30 test's
+> `Assert.Equal("/admin/announcements", vmCompleted.Steps[6].Route)` becomes
+> `Assert.Equal("/admin/error-reports", vmCompleted.Steps[6].Route)`
+> (U06 updates it in-place alongside the `AdminOnboardingViewModel.
+> ClosedSteps` step-7 `Route` re-point); test 19 is the new pinned seam test
+> asserting the re-point. The seven-step set is **unchanged** (the M30·7
+> closed set); the `adminonboarding.step_escalation` keys are **reused**,
+> not re-authored (M32·11).
+
+### 2.5 acceptance gate (U07 records)
+
+Three-test shape (the three are the **parts**; the 19 in §2.4 are the
+**whole**; all must pass together, the part-vs-whole pin):
+
+- **closed-loop** — an anonymous visitor hits `/issues/new`, submits the
+  form, the `ErrorReport` row (`Origin = "general"`, `SubjectId = ""`,
+  `TriageStatus = "new"`) + exactly one `AccessAudit` row (`Via =
+  AccessVia.Anonymous`, action `errorreport.create`, `TargetKind`
+  "error-report") exist, and the `issue.thanks` confirmation is visible.
+  (Covers FACES M32-2 + M32·4.)
+- **handoff** — a `GlobalAdmin` marks the report `resolved` with a note via
+  `POST /admin/error-reports/{id}/resolve`, `TriageStatus = "resolved"` /
+  `ResolvedAt` / `ResolvedBy` / `ResolutionNote` are stamped, exactly one
+  `AccessAudit` row (`Via = Admin`, action `errorreport.resolve`) is
+  written, and a second `POST` to the same report is a no-op (no second
+  audit row, no state change). (Covers FACES M32-4 / M32-5 / M32-6 + M32·8.)
+- **part-vs-whole** — the 19-test list in §2.4 is the **whole**; the
+  closed-loop + handoff are the **parts**; the gate passes only when all
+  19 are green together (a single red in any of the 19 fails the gate, even
+  if the closed-loop + handoff parts are green).
+
+U07 appends `### Run result (M32 acceptance gate — <date>)` to this design
+doc: the three gate test names, their pass/red status, the 19-test count
+(19/19 expected), and one line per any `## U<m> — Drift pause` section in
+the handoff note (each resolved or still open).
+
+### 2.6 drift-guard (frozen once written)
+
+The following are **frozen pins**; any mismatch found by a later unit is a
+`## U<m> — Drift pause` (unit-series rule §11), not a silent fix:
+
+- **The 12 invariants** — M32·1 through M32·12 (Part 1 §Invariants).
+- **The 10 FACES** — M32-1 through M32-10 (Part 1 §FACES).
+- **The `IErrorReportService` 4-method surface** — the exact signatures in
+  §2.1 (the M31 three — `CreateAsync(ErrorReportDraft, ct)` /
+  `MarkTriagedAsync(string, string, ct)` / `ListAsync(int = 100, ct` —
+  **unchanged**, + the M32 additive `MarkResolvedAsync(string reportId,
+  string actorId, string? resolutionNote, CancellationToken ct = default)`
+  returning `ErrorReport?`).
+- **The `ErrorReport` doc field set** — the 15-member M32 ceiling in §2.2
+  (the M31 11 frozen; the M32 4 additive — `Origin` (string, default
+  `"error-page"`, closed set `{"error-page","general"}`), `ResolvedAt?`,
+  `ResolvedBy?`, `ResolutionNote?`; no field outside the set may appear in
+  the doc; no M31 field is re-shaped).
+- **The `TriageStatus` value set** — `{"new", "triaged", "resolved"}`
+  (M32·2 — the two M31 strings unchanged; `resolved` terminal).
+- **The `ErrorReportDraft` record shape** — the M31 six positional members
+  **unchanged** + the additive `Origin` member (string, default
+  `"error-page"`, §2.1).
+- **The `IEscalationForwarder` shape** — `ForwardAsync(string reportId,
+  CancellationToken ct = default)` returning the `EscalationResult(bool
+  Configured, bool Success, int? StatusCode, string? Error)` record;
+  namespace `Kumunita.Web.Services` (§2.1). **No outbound HTTP in
+  `Kumunita.Core`** (M32·5, unit-series rule 7).
+- **The `ErrorReportDocTypes` registration shape** — the single
+  `.Schema.For<ErrorReport>()` + the `(TriageStatus, Created)` index,
+  **unchanged** (M32·1 — no new registration surface, §2.2).
+- **The `Kumunita.Core` DI surface** — **unchanged** (M32·1 — the
+  `MarkResolvedAsync` seam rides the existing `IErrorReportService`
+  registration; no new DI line).
+- **The escalation endpoint** — read from the
+  `KUMUNITA_ESCALATION_ENDPOINT` env var only (the `KUMUNITA:ESCALATION_
+  ENDPOINT` `IConfiguration` key, §2.1); **never** a DB column, never a
+  per-row `ErrorReport` field, never a Marten config row (M32·6, unit-series
+  rule 8).
+- **The §2.3 `kw-l` key set** — the 19 keys, verbatim (the exact set is
+  frozen; the en values are the source text; the de/fr/da values are U06's;
+  the M31 `errorreport.*` 20-key set is **untouched** — M32·1).
+- **The 19 test names** — §2.4, verbatim (the names are frozen; the bodies
+  are U07's).
+- **The M31 surface** — the M31 `CreateAsync` / `MarkTriagedAsync` /
+  `ListAsync` seams (M32·1, unit-series rule 5), the M31 `errorreport.*`
+  `kw-l` key set, and the M31 500 report form (`POST /Home/Error/Report`)
+  are all **unchanged** by M32 — M32 **adds**, it does not **re-shape**.
+- **The M30 step-7 route re-point** — owned by U06 (unit-series rule 10);
+  the `adminonboarding.step_escalation` keys are **reused** (M32·11).
+- **The named deferrals** — no re-open lane, no resident follow-up lane, no
+  escalation webhook / retry queue, no per-report attachment (Part 1
+  §Scope Out); the `WhatsNew.cs` `0.48.0` entry + the six-member close flip
+  are **U08's** (M32·12).
+
+---
+
+*Part 2 (U02) end. The ADR 0155 (`docs/adr/0155-issue-submission-escalation
+.md`, `Status: Draft`) is the companion document — it names the Decision /
+Consequences that this design doc pins in detail. The ADR index
+(`docs/adr/README.md`) gains the 0155 row (`Status: Draft`).*
