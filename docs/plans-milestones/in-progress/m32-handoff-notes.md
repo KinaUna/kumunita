@@ -408,3 +408,46 @@ the `resolved` state + one `Via = Admin` audit row (action
 `errorreport.resolve` action row; the `errorreport.escalate` action is the
 *Web-layer* marker the register names; U07's test body pins the exact
 assertion). Plan file `in-progress/m32-u05.md` moved to `done/m32/` last.
+
+## U06 — kw-l keys + M30 step-7 re-point
+
+Authored the **closed 19-key `kw-l` set** × en/de/fr/da in
+`KnownTranslationKeys.cs` (M32·9 — every key present, **non-empty, in all
+four** languages; `en` = source text per ADR 0015 D1; `de`/`fr`/`da`
+authored this unit) + re-pointed the **M30 onboarding step-7 route**
+(M32·11). **No Core ErrorReports change** (M32·1), **no Web controller/view
+change** (U05's views already consume the key names — U06 authored only the
+values). (a) **The 19 keys (verbatim):** `issue.title` / `issue.intro` /
+`issue.description.label` / `issue.description.placeholder` / `issue.email.
+label` / `issue.email.placeholder` / `issue.submit` / `issue.thanks` /
+`issue.nav` / `errorreport.list.status.resolved` / `errorreport.resolve.title`
+/ `errorreport.resolve.note.label` / `errorreport.resolve.note.placeholder` /
+`errorreport.resolve.button` / `errorreport.resolve.flash` /
+`errorreport.escalate.button` / `errorreport.escalate.flash_success` /
+`errorreport.escalate.flash_failure` / `errorreport.escalate.not_configured`.
+(b) **Four-language status:** en/de/fr/da **all present, non-empty** in each
+of `EnValues` / `DeValues` / `FrValues` / `DaValues` (the en block after the
+M31 `errorreport.*` set; the de/fr/da blocks likewise) — the
+`KwLRegistryConsistencyTests` (Web) + `KnownTranslationKeys_ParityTests`
+(Core) closure passes. (c) **M31 `errorreport.*` 20-key set unchanged**
+(M32·1 — additive-only; the new 19 are appended after it in each language
+block). (d) **M30 step-7 re-point:** `/admin/announcements` →
+`/admin/error-reports` (the `AdminOnboardingViewModel.ClosedSteps` step-7
+`Route` value; the step-7 `Key`/`LabelKey`/`DescriptionKey` are **reused, not
+re-authored**; the seven-step set is **unchanged** — M30·7 closed set). Also
+updated the step-7 route prose in the `AdminOnboardingViewModel` class +
+`ClosedSteps` doc-comments and the `AdminOnboardingController` doc-comment
+(doc-comment only, code unchanged) so the docs match the re-point; re-pointed
+the existing step-7 route pin **in place** in
+`AdminOnboardingControllerTests.cs` and added the **new pinned test**
+`M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports`. (e) **Test
+evidence (in-process path, the AGENTS.md runner):** `dotnet build Kumunita.
+slnx -c Debug` **0 Error(s)**; `Kumunita.Web.Tests` **978 total, 0 failed, 1
+skipped** (the skip is pre-existing); `AdminOnboardingControllerTests` +
+`KwLRegistryConsistencyTests` 6/6 green in isolation; the new `M32_11` test
+1/1 green in isolation; `KnownTranslationKeys_ParityTests` (Core.Tests) 7/7
+green. (f) **Compile warnings:** none in the 4 touched files — the only
+warnings in the solution build are pre-existing (CS8600/CS8602/CS8604/CS8603/
+xUnit analyzers) in unrelated `Kumunita.Core`/`Kumunita.Web`/test files,
+unchanged by this unit. Plan file `in-progress/m32-u06.md` moved to
+`done/m32/` last.

@@ -107,7 +107,41 @@ public class AdminOnboardingControllerTests
         Assert.Equal("/admin/quiet", vmCompleted.Steps[3].Route);              // notifications
         Assert.Equal("/admin/storage/settings", vmCompleted.Steps[4].Route);   // storage limits
         Assert.Equal("/admin/site", vmCompleted.Steps[5].Route);               // site content
-        Assert.Equal("/admin/announcements", vmCompleted.Steps[6].Route);      // issue escalation (M32 placeholder)
+        Assert.Equal("/admin/error-reports", vmCompleted.Steps[6].Route);      // issue escalation (M32·11 re-point)
+    }
+
+    // ── M32·11 — the M30 onboarding step-7 route re-point (the §2.4 pin 19) ──
+    // M32 "issue submission & escalation" shipped (ADR 0155); U06 re-pointed
+    // the M30 step-7 (issue escalation) route from the
+    // `/admin/announcements` placeholder to the M32 `/admin/error-reports`
+    // surface that owns issue escalation. The step-7 `Key` / `LabelKey` /
+    // `DescriptionKey` are **reused, not re-authored** (the
+    // `adminonboarding.step_escalation` keys); the seven-step set is
+    // **unchanged** (the M30·7 closed set — this is the M32·11 re-point, not
+    // a new step).
+
+    [Fact(DisplayName = "M32·11 AdminOnboarding step-7 route re-points to /admin/error-reports (the M32 surface)")]
+    public async Task M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports()
+    {
+        var (controller, _) = Build(completedAt: null);
+        var view = Assert.IsType<ViewResult>(await controller.Index());
+        var vm = Assert.IsType<AdminOnboardingViewModel>(view.ViewData.Model);
+
+        // The seven-step set is unchanged (M30·7 closed set — the re-point
+        // re-points the route, it does not add a step).
+        Assert.Equal(7, vm.Steps.Count);
+
+        // Step 7 (index 6) — issue escalation — re-points from the M30
+        // `/admin/announcements` placeholder to the M32 `/admin/error-reports`
+        // surface (M32·11, ADR 0155).
+        Assert.Equal("/admin/error-reports", vm.Steps[6].Route);
+
+        // The step-7 `Key` / `LabelKey` / `DescriptionKey` are reused, not
+        // re-authored (M32·11 — the `adminonboarding.step_escalation` keys are
+        // the closed M30 set).
+        Assert.Equal("escalation", vm.Steps[6].Key);
+        Assert.Equal("adminonboarding.step_escalation", vm.Steps[6].LabelKey);
+        Assert.Equal("adminonboarding.desc_escalation", vm.Steps[6].DescriptionKey);
     }
 
     // ── 2 — the POST /admin/onboarding/complete stamps completion through the

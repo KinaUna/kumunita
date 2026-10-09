@@ -2394,6 +2394,36 @@ public static class KnownTranslationKeys
             ["errorreport.list.anonymous"]           = "Anonymous",
             ["errorreport.list.flash_triaged"]       = "Report marked as triaged.",
 
+            // ── M32 (ADR 0155) — issue submission & escalation: the public
+            // /issues/new general-issue lane (keys 1–9, M32·4) + the
+            // /admin/error-reports/{id} detail view's Resolve section
+            // (keys 11–15, M32·8) + Escalate section (keys 16–19, M32·5/·6/·7)
+            // + the new `resolved` list chip (key 10, M32·2). U06 authors the
+            // COMPLETE closed 19-key set; the parity pin
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M32·9). The M31 `errorreport.*`
+            // 20-key set above is the floor, unchanged (M32·1 — additive-only).
+            ["issue.title"]                          = "Report an issue",
+            ["issue.intro"]                          = "Something not working, or a problem we should know about? Tell us what happened — even if there's no error page in front of you.",
+            ["issue.description.label"]              = "What's the issue?",
+            ["issue.description.placeholder"]        = "e.g. The group calendar page is down, or I can't log in",
+            ["issue.email.label"]                    = "Your email (optional)",
+            ["issue.email.placeholder"]              = "you@example.com",
+            ["issue.submit"]                         = "Send issue report",
+            ["issue.thanks"]                         = "Thanks — your issue has been filed.",
+            ["issue.nav"]                            = "Report an issue",
+            ["errorreport.list.status.resolved"]     = "Resolved",
+            ["errorreport.resolve.title"]            = "Resolve this report",
+            ["errorreport.resolve.note.label"]       = "Resolution note",
+            ["errorreport.resolve.note.placeholder"] = "e.g. Fixed the broken calendar link; nothing to forward.",
+            ["errorreport.resolve.button"]           = "Mark as resolved",
+            ["errorreport.resolve.flash"]            = "Report marked as resolved.",
+            ["errorreport.escalate.button"]          = "Escalate to operator endpoint",
+            ["errorreport.escalate.flash_success"]   = "Report escalated and marked as resolved.",
+            ["errorreport.escalate.flash_failure"]   = "Escalation failed — the report is unchanged. You can retry.",
+            ["errorreport.escalate.not_configured"]  = "Escalation is not configured on this instance (KUMUNITA_ESCALATION_ENDPOINT is not set).",
+
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
@@ -4884,6 +4914,33 @@ public static class KnownTranslationKeys
             ["errorreport.list.anonymous"]           = "Anonym",
             ["errorreport.list.flash_triaged"]       = "Meldung als eingearbeitet markiert.",
 
+            // ── M32 (ADR 0155) — Problemübermittlung & Eskalation: die
+            // öffentliche /issues/new Allzweck-Problemlane (Schlüssel 1–9,
+            // M32·4) + die Resolve-Sektion der Detailansicht (Schlüssel 11–15,
+            // M32·8) + die Escalate-Sektion (Schlüssel 16–19, M32·5/·6/·7) +
+            // der neue `resolved`-Listenchip (Schlüssel 10, M32·2). Die M31
+            // `errorreport.*` 20-Schlüssel-Menge oben ist die Untergrenze,
+            // unverändert (M32·1 — nur additiv).
+            ["issue.title"]                          = "Problem melden",
+            ["issue.intro"]                          = "Etwas funktioniert nicht, oder es gibt ein Problem, über das wir Bescheid wissen sollten? Sagen Sie uns, was passiert ist — selbst wenn keine Fehlerseite vor Ihnen liegt.",
+            ["issue.description.label"]              = "Was ist das Problem?",
+            ["issue.description.placeholder"]        = "z. B. Die Gruppenkalender-Seite ist down, oder ich kann mich nicht anmelden",
+            ["issue.email.label"]                    = "Ihre E-Mail (optional)",
+            ["issue.email.placeholder"]              = "sie@beispiel.de",
+            ["issue.submit"]                         = "Problembericht senden",
+            ["issue.thanks"]                         = "Danke — Ihr Problembericht wurde eingereicht.",
+            ["issue.nav"]                            = "Problem melden",
+            ["errorreport.list.status.resolved"]     = "Erledigt",
+            ["errorreport.resolve.title"]            = "Diesen Bericht abschließen",
+            ["errorreport.resolve.note.label"]       = "Auflösungshinweis",
+            ["errorreport.resolve.note.placeholder"] = "z. B. Den defekten Kalendereintrag gefixt; nichts weiterzuleiten.",
+            ["errorreport.resolve.button"]           = "Als erledigt markieren",
+            ["errorreport.resolve.flash"]            = "Bericht als erledigt markiert.",
+            ["errorreport.escalate.button"]          = "An Betreiber-Endpunkt weiterleiten",
+            ["errorreport.escalate.flash_success"]   = "Bericht weitergeleitet und als erledigt markiert.",
+            ["errorreport.escalate.flash_failure"]   = "Weiterleitung fehlgeschlagen — der Bericht wurde nicht geändert. Sie können es erneut versuchen.",
+            ["errorreport.escalate.not_configured"]  = "Weiterleitung ist auf dieser Instanz nicht konfiguriert (KUMUNITA_ESCALATION_ENDPOINT ist nicht gesetzt).",
+
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
@@ -7276,6 +7333,33 @@ public static class KnownTranslationKeys
             ["errorreport.list.anonymous"]           = "Anonyme",
             ["errorreport.list.flash_triaged"]       = "Rapport marqué comme trié.",
 
+            // ── M32 (ADR 0155) — dépôt de signalement & escalade : la voie
+            // publique /issues/new de signalement général (clés 1–9, M32·4) +
+            // la section Résoudre de la vue de détail (clés 11–15, M32·8) +
+            // la section Escalader (clés 16–19, M32·5/·6/·7) + le nouveau
+            // badge `resolved` de la liste (clé 10, M32·2). La plage de 20
+            // clés `errorreport.*` M31 ci-dessus est le plancher, inchangée
+            // (M32·1 — additif uniquement).
+            ["issue.title"]                          = "Signaler un problème",
+            ["issue.intro"]                          = "Quelque chose ne fonctionne pas, ou un problème que nous devrions connaître ? Dites-nous ce qui s'est passé — même s'il n'y a pas de page d'erreur devant vous.",
+            ["issue.description.label"]              = "Quel est le problème ?",
+            ["issue.description.placeholder"]        = "p. ex. La page du calendrier du groupe est down, ou je ne peux pas me connecter",
+            ["issue.email.label"]                    = "Votre e-mail (facultatif)",
+            ["issue.email.placeholder"]              = "vous@exemple.fr",
+            ["issue.submit"]                         = "Envoyer le signalement",
+            ["issue.thanks"]                         = "Merci — votre signalement a été enregistré.",
+            ["issue.nav"]                            = "Signaler un problème",
+            ["errorreport.list.status.resolved"]     = "Résolu",
+            ["errorreport.resolve.title"]            = "Résoudre ce signalement",
+            ["errorreport.resolve.note.label"]       = "Note de résolution",
+            ["errorreport.resolve.note.placeholder"] = "p. ex. Lien de calendrier corrigé ; rien à transmettre.",
+            ["errorreport.resolve.button"]           = "Marquer comme résolu",
+            ["errorreport.resolve.flash"]            = "Signalement marqué comme résolu.",
+            ["errorreport.escalate.button"]          = "Escalader vers le point de terminaison de l'opérateur",
+            ["errorreport.escalate.flash_success"]   = "Signalement transmis et marqué comme résolu.",
+            ["errorreport.escalate.flash_failure"]   = "Échec de l'escalade — le signalement est inchangé. Vous pouvez réessayer.",
+            ["errorreport.escalate.not_configured"]  = "L'escalade n'est pas configurée sur cette instance (KUMUNITA_ESCALATION_ENDPOINT n'est pas défini).",
+
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
@@ -9654,6 +9738,33 @@ public static class KnownTranslationKeys
             ["errorreport.list.created"]             = "Rapporteret",
             ["errorreport.list.anonymous"]           = "Anonym",
             ["errorreport.list.flash_triaged"]       = "Rapport markeret som behandlet.",
+
+            // ── M32 (ADR 0155) — problemsignalering & eskalering: den
+            // offentlige /issues/new generelle problemsignaleringsbane (nøgler
+            // 1–9, M32·4) + Resolve-sektionen af detaljevisningen (nøgler
+            // 11–15, M32·8) + Eskaler-sektionen (nøgler 16–19, M32·5/·6/·7) +
+            // den nye `resolved` liste-badge (nøgle 10, M32·2). Den M31
+            // `errorreport.*` 20-nøgle-sæt ovenfor er gulvet, uændret (M32·1
+            // — kun additivt).
+            ["issue.title"]                          = "Signalér et problem",
+            ["issue.intro"]                          = "Noget virker ikke, eller er der et problem, vi bør vide om? Fortæl os, hvad der skete — selvom der ikke er en fejlside foran dig.",
+            ["issue.description.label"]              = "Hvad er problemet?",
+            ["issue.description.placeholder"]        = "f.eks. Gruppens kalender side er down, eller jeg kan ikke logge ind",
+            ["issue.email.label"]                    = "Din e-mail (valgfri)",
+            ["issue.email.placeholder"]              = "dig@eksempel.dk",
+            ["issue.submit"]                         = "Send problemrapport",
+            ["issue.thanks"]                         = "Tak — din problemrapport er indsendt.",
+            ["issue.nav"]                            = "Signalér et problem",
+            ["errorreport.list.status.resolved"]     = "Løst",
+            ["errorreport.resolve.title"]            = "Løs denne rapport",
+            ["errorreport.resolve.note.label"]       = "Løsningsnote",
+            ["errorreport.resolve.note.placeholder"] = "f.eks. Rettede det brudte kalenderlink; intet at videresende.",
+            ["errorreport.resolve.button"]           = "Marker som løst",
+            ["errorreport.resolve.flash"]            = "Rapport markeret som løst.",
+            ["errorreport.escalate.button"]          = "Eskalér til operatørendepunkt",
+            ["errorreport.escalate.flash_success"]   = "Rapport eskaleret og markeret som løst.",
+            ["errorreport.escalate.flash_failure"]   = "Eskalering fejlede — rapporten er uændret. Du kan prøve igen.",
+            ["errorreport.escalate.not_configured"]  = "Eskalering er ikke konfigureret på denne instans (KUMUNITA_ESCALATION_ENDPOINT er ikke sat).",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;

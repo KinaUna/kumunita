@@ -29,9 +29,11 @@ namespace Kumunita.Web.Models;
 /// → <c>/admin/announcements/comments</c>, notifications →
 /// <c>/admin/quiet</c>, storage limits → <c>/admin/storage/settings</c>,
 /// site content → <c>/admin/site</c>, issue escalation →
-/// <c>/admin/announcements</c> (the M32 placeholder — a future M32 close-
-/// flip re-points this step's route, the register's known deferral, not a
-/// drift). The walk-through is **links-only** (M30·7): it does **not**
+/// <c>/admin/error-reports</c> (the M32 surface — the M30
+/// <c>/admin/announcements</c> placeholder's known deferral is now resolved:
+/// M32 "issue submission & escalation" shipped (ADR 0155) and U06 re-pointed
+/// this step's route, M32·11). The walk-through is **links-only** (M30·7):
+/// it does **not**
 /// inline a control, does **not** add a per-step POST, does **not** persist
 /// a step cursor, does **not** gate the admin surface on completion.
 /// </para>
@@ -71,7 +73,9 @@ public sealed class AdminOnboardingViewModel
     /// <c>/admin/languages</c>, moderation → <c>/admin/announcements/comments</c>,
     /// notifications → <c>/admin/quiet</c>, storage limits →
     /// <c>/admin/storage/settings</c>, site content → <c>/admin/site</c>,
-    /// issue escalation → <c>/admin/announcements</c> (the M32 placeholder).
+    /// issue escalation → <c>/admin/error-reports</c> (the M32 surface —
+    /// the M30 <c>/admin/announcements</c> placeholder's known deferral is
+    /// now resolved, M32·11, ADR 0155).
     /// **Frozen** — the set is the ceiling (the ADR 0153 D1 pin); a future
     /// lane **adds** steps (additive per ADR 0004 §B.1, if the walk-through
     /// ever grows a per-step state), it does **not** re-shape the existing
@@ -129,16 +133,20 @@ public sealed class AdminOnboardingViewModel
             LabelKey:       "adminonboarding.step_sitecontent",
             Route:          "/admin/site",
             DescriptionKey: "adminonboarding.desc_sitecontent"),
-        // 7. Issue escalation → the announcements surface, a **placeholder**
-        //    because M32 "issue submission & escalation" is
-        //    <c>StatusPlanned</c> (not yet shipped) — the register flags
-        //    this as a **known deferral, not a drift**; a future M32
-        //    close-flip re-points this step's route to the M32 surface (the
-        //    register's step 7).
+        // 7. Issue escalation → the /admin/error-reports M32 surface
+        //    (M32·11 — the M30 placeholder's known deferral, now resolved:
+        //    M32 "issue submission & escalation" shipped, ADR 0155, and
+        //    U06 re-pointed this step's route from the M30
+        //    `/admin/announcements` placeholder to the M32
+        //    `/admin/error-reports` surface that owns issue escalation).
+        //    The step-7 `Key` / `LabelKey` / `DescriptionKey` are **unchanged**
+        //    — the `adminonboarding.step_escalation` keys are **reused**, not
+        //    re-authored; the seven-step set is **unchanged** (the M30·7
+        //    closed set).
         new Step(
             Key:            "escalation",
             LabelKey:       "adminonboarding.step_escalation",
-            Route:          "/admin/announcements",
+            Route:          "/admin/error-reports",
             DescriptionKey: "adminonboarding.desc_escalation"),
     ];
 
