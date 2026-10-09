@@ -451,3 +451,60 @@ warnings in the solution build are pre-existing (CS8600/CS8602/CS8604/CS8603/
 xUnit analyzers) in unrelated `Kumunita.Core`/`Kumunita.Web`/test files,
 unchanged by this unit. Plan file `in-progress/m32-u06.md` moved to
 `done/m32/` last.
+
+## U07 — seam tests (19) + gate recorded
+
+Authored the **18 remaining M32 seam tests** (the §2.4 tests 1–18) in three
+**new** files + verified test #19 (`M32_11`, U06) is present + green, and
+reconciled the stale M31 field-set pin (the U03 flag). **No production code
+change** (M32·1 — the U03/U04/U05 surface tested as-is; the escalate tests
+**stub** `IEscalationForwarder`, the `EscalationForwarder` impl is not
+called). **4 test files touched:**
+`tests/Kumunita.Core.Tests/ErrorReportResolveTests.cs` (new, 6) ·
+`tests/Kumunita.Web.Tests/IssuePageTests.cs` (new, 5) ·
+`tests/Kumunita.Web.Tests/AdminErrorReportDetailTests.cs` (new, 7) ·
+`tests/Kumunita.Web.Tests/AdminOnboardingControllerTests.cs` (test #19,
+**present from U06 — not re-added**). (a) **The 19 test names (verbatim):**
+`M32_8_MarkResolved_New_Updates_TriageStatus_And_AuditRow` /
+`M32_8_MarkResolved_Triaged_Updates_TriageStatus_And_AuditRow` /
+`M32_8_MarkResolved_AlreadyResolved_Is_NoOp` /
+`M32_8_MarkResolved_Missing_Returns_Null` /
+`M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` /
+`M32_4_CreateAsync_Origin_General_Stores_ErrorReport` ·
+`M32_4_Issue_Page_Shows_Issue_Form` /
+`M32_4_Issue_Post_SignedIn_Creates_ErrorReport_Origin_General` /
+`M32_4_Issue_Post_Anonymous_Creates_ErrorReport_Origin_General` /
+`M32_4_Issue_Post_Validation_BlankDescription_Renders_Error` /
+`M32_4_Issue_Post_Confirmation_Visible` ·
+`M32_10_Admin_Detail_SignedIn_GlobalAdmin_Sees_Report` /
+`M32_10_Admin_Detail_NonGlobalAdmin_Denied` /
+`M32_8_Admin_Resolve_GlobalAdmin_Updates_Row` /
+`M32_8_Admin_Resolve_AlreadyResolved_NoOp` /
+`M32_7_Admin_Escalate_Configured_ForwardSucceeds_Resolves_Row` /
+`M32_7_Admin_Escalate_ForwardFails_NoStateChange` /
+`M32_6_Admin_Escalate_NotConfigured_NoStateChange` ·
+`M32_11_AdminOnboarding_Step7_Route_Repoints_To_ErrorReports`. (b) **The 19
+pass/red counts: 19/19 green, 0 red.** (c) **The three-test gate (all
+green):** closed-loop (anonymous `/issues/new` → `Origin=general` row +
+`issue.thanks` confirmation — FACES M32-2 / M32·4) · handoff (GlobalAdmin
+`POST …/resolve` → `resolved` + the 4 resolution fields + one `Via=Admin`
+`errorreport.resolve` audit row + a second POST is a no-op — FACES M32-4 /
+M32-5 / M32-6 / M32·8) · part-vs-whole (all 19 green together — 19/19, zero
+red). (d) **The M31 stale test reconciled** (the U03 flag):
+`M31_3_ErrorReport_Doc_FieldSet_Ceiling` in
+`tests/Kumunita.Core.Tests/ErrorReportServiceTests.cs` **retired**
+(`[Fact(Skip = …)]` + a note pointing to its successor) — the 11-member pin
+is stale against the 15-member M32 ceiling (M32·3 / ADR 0155 D1); its
+successor `M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` (this unit) is the
+live 15-member pin. The class-summary bullet was updated to note the
+retirement (a planned successor swap, not a drift). (e) **Test evidence
+(in-process path, the AGENTS.md runner):** `dotnet build Kumunita.slnx
+-c Debug` **Build succeeded, 0 Warning(s), 0 Error(s)**;
+`Kumunita.Web.Tests` **Total: 990, Errors: 0, Failed: 0, Skipped: 1** (the
+1 skip is pre-existing, unrelated to M32); `Kumunita.Core.Tests` **Total:
+1406, Errors: 0, Failed: 0, Skipped: 1** (the 1 skip is the retired M31_3
+pin above); the 19 M32 tests are green, the `M31_3_…` is `[SKIP]` (confirmed
+in the Core log). (f) **Still-open drift:** **none** — no `## U<m> — Drift
+pause` section in the handoff note; the M31_3 retirement is the U03-flag
+successor swap, not a drift. The gate `Run result` is recorded in the design
+doc §2.5. Plan file `in-progress/m32-u07.md` moved to `done/m32/` last.

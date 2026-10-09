@@ -39,10 +39,14 @@ namespace Kumunita.Core.Tests;
 /// <c>ListAsync</c> read returns every report ordered by
 /// <c>Created DESC</c>, a read, not an access decision (no <c>AccessAudit</c>
 /// row) (M31·4).</item>
-/// <item><b>M31_3_ErrorReport_Doc_FieldSet_Ceiling</b> — the <c>ErrorReport</c>
-/// doc carries exactly the 11-member field set pinned in §2.2 (D1) — no
-/// field outside the set, no field in the set dropped (the M31·3 / ADR 0154
-/// D1 ceiling, the drift-guard §2.6 pin) (M31·3 / M31·10).</item>
+/// <item><b>M31_3_ErrorReport_Doc_FieldSet_Ceiling</b> — <b>RETIRED by M32
+/// U07</b> (the U03 flag): the M31 11-member pin is now stale against the
+/// 15-member M32 ceiling (M32·3 / ADR 0155 D1 — the M32 additive 4
+/// <c>Origin</c>/<c>ResolvedAt</c>/<c>ResolvedBy</c>/<c>ResolutionNote</c>).
+/// Its successor is <see cref="ErrorReportResolveTests.
+/// M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling"/>; this method is
+/// <c>[Skipped]</c> (retained as the historical M31 pin, not asserted). The
+/// drift-guard §2.6 pin now lives on the 15-member M32 ceiling.</item>
 /// </list>
 /// </summary>
 /// <para>
@@ -355,7 +359,13 @@ public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<Po
     // no field outside the set, no field in the set dropped. This is the
     // drift-guard §2.6 pin (a re-shape is a `## U<m> — Drift pause`).
 
-    [Fact(DisplayName = "M31_3_ErrorReport_Doc_FieldSet_Ceiling")]
+    // M32 U07 (the U03 flag): this M31 11-member field-set pin is now stale
+    // against the 15-member M32 ceiling (M32·3 / ADR 0155 D1 — the M32
+    // additive 4 Origin/ResolvedAt/ResolvedBy/ResolutionNote). Its successor
+    // is ErrorReportResolveTests.M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling.
+    // Retired (Skipped) so the Core.Tests assembly no longer fails on the
+    // now-15-member doc; the assertion below is intentionally NOT run.
+    [Fact(Skip = "M32 U07 (the U03 flag): superseded by M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling (the 15-member M32 ceiling, M32·3 / ADR 0155 D1) — the M31 11-member pin is stale.")]
     public void M31_3_ErrorReport_Doc_FieldSet_Ceiling()
     {
         var actual = typeof(ErrorReport).GetProperties()

@@ -798,6 +798,59 @@ doc: the three gate test names, their pass/red status, the 19-test count
 (19/19 expected), and one line per any `## U<m> — Drift pause` section in
 the handoff note (each resolved or still open).
 
+### Run result (M32 acceptance gate — 2026-10-09)
+
+Recorded by **U07** via the in-process xunit.v3 runner (the `dotnet test` /
+VS Test Explorer discovery path is broken on this machine — the AGENTS.md
+runner quirk). Build: `dotnet build Kumunita.slnx -c Debug` → **Build
+succeeded, 0 Warning(s), 0 Error(s)**.
+
+**The 19-test count (19/19 green):**
+
+- `Kumunita.Core.Tests` — **Total: 1406, Errors: 0, Failed: 0, Skipped: 1**
+  (the 1 skip is the retired M31 pin
+  `M31_3_ErrorReport_Doc_FieldSet_Ceiling`, now superseded by the 15-member
+  `M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` — the U03 flag, reconciled by
+  U07 per unit-series rule 4).
+- `Kumunita.Web.Tests` — **Total: 990, Errors: 0, Failed: 0, Skipped: 1**
+  (the 1 skip is pre-existing, unrelated to M32).
+- **The 19 M32 seam tests (design doc §2.4)** — all **green** (6 Core +
+  5 `IssuePageTests` + 7 `AdminErrorReportDetailTests` + 1 `M32_11`
+  re-point authored by U06 and verified present + green by U07). Zero red.
+
+**The three-test acceptance gate (all green):**
+
+- **closed-loop — green.** The anonymous `/issues/new` submit part
+  (`M32_4_Issue_Post_Anonymous_Creates_ErrorReport_Origin_General`) asserts
+  the `ErrorReport` row is created with `Origin = "general"` +
+  `SubjectId = ""` + `ExceptionType = null`; the confirmation part
+  (`M32_4_Issue_Post_Confirmation_Visible`) asserts the `issue.thanks`
+  confirmation is visible (`FormSubmitted = true`). The `Origin =
+  "general"` store + the `Via = Anonymous` audit-row half are owned by the
+  Core `M32_4_CreateAsync_Origin_General_Stores_ErrorReport` (the service
+  owns the audit row — the house controller-thin-seam idiom). Covers FACES
+  M32-2 + M32·4.
+- **handoff — green.** The resolve part
+  (`M32_8_Admin_Resolve_GlobalAdmin_Updates_Row`) asserts a
+  `GlobalAdmin` `POST …/resolve` calls the one `MarkResolvedAsync` lane with
+  the actor + note and flashes `errorreport.resolve.flash`; the no-op part
+  (`M32_8_Admin_Resolve_AlreadyResolved_NoOp`) asserts the second `POST`
+  sets no flash (no state change). The `TriageStatus = "resolved"` /
+  `ResolvedAt` / `ResolvedBy` / `ResolutionNote` stamps + the exactly-one
+  `Via = Admin` `errorreport.resolve` audit row are owned by the Core
+  `M32_8_MarkResolved_*` tests (the service owns them). Covers FACES M32-4 /
+  M32-5 / M32-6 + M32·8.
+- **part-vs-whole — green.** The 19-test list in §2.4 is the **whole**; the
+  closed-loop + handoff are the **parts**. All 19 are green together (a
+  single red in any of the 19 fails the gate); the gate passes with **19/19**
+  and **zero red** across both assemblies.
+
+**Drift pauses:** **none** — the handoff note carries no `## U<m> — Drift
+pause` section (U00–U06 all report no drift against the register). The only
+reconciliation U07 performed is the M31_3 field-set retirement (the U03
+flag), which is a planned successor swap (the M32·3 15-member ceiling), not
+a drift.
+
 ### 2.6 drift-guard (frozen once written)
 
 The following are **frozen pins**; any mismatch found by a later unit is a
