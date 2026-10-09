@@ -809,3 +809,154 @@
   instruction) — **not** a drift pause. The single full-suite red is the
   pre-existing IMPROVE close gate (above), not a U05 unit pin. **U06 reads
   only this `## U05` section + its own entry-reads list.****
+
+## U06 — seam tests (13 new) + gate recorded
+
+**Deliverable (U06's unit):** authored the **13 remaining M30 seam tests**
+(5 service + 4 controller + 4 banner), ran the acceptance gate, and recorded
+the gate result. The 3 `AdminOnboardingSeederTests` are **U03's** (present,
+untouched by U06). Together the M30 seam surface is **16 tests** (the
+register's §2.6 pin — U03's count-typo of "15" resolved per U04's note: the
+**pinned names** are authoritative, and they are 16). U06 authored **only**
+the 13 that were not already present (U03 owns the 3 seeder tests); U06 did
+**not** create or modify `AdminOnboardingSeederTests.cs`.
+
+**(a) New test files authored (3):**
+
+- `tests/Kumunita.Core.Tests/AdminOnboardingServiceTests.cs` (5) — direct
+  construction of `AdminOnboarding.AdminOnboardingService` over a fresh
+  Testcontainers `postgres:18` store (`NewDatabaseAsync` + `M1DocTypes` /
+  `M3DocTypes` / `AdminOnboardingDocTypes` + `ApplyAllConfiguredChangesToDatabaseAsync`),
+  mirroring `AdminOnboardingSeederTests.BootStoreAsync`. Pins: `GetAsync`
+  best-effort null (missing store / missing row), `CompleteAsync` writes
+  exactly **one** `AccessAudit` row (`Via = Admin`, action
+  `admin_onboarding.complete`, `TargetKind = "admin-onboarding"`, `TargetId
+  = "singleton"`, `Outcome = Allow`), strong consistency (live on the next
+  `GetAsync`), and upsert-singletone (two `CompleteAsync` → one row).
+- `tests/Kumunita.Web.Tests/AdminOnboardingControllerTests.cs` (4) — the
+  `AdminSiteControllerTests` shape (direct construction, NSubstitute
+  `IAdminOnboardingService` seam, `NoOpTempDataProvider`). Pins: GET seeds
+  the view model from the current `CompletedAt` state + the closed
+  seven-step list (routes in README / `Milestones.cs` order); POST
+  `/admin/onboarding/complete` stamps completion (exactly one
+  `CompleteAsync` call for the signed-in GlobalAdmin) + redirects to
+  `Index` + sets the `adminonboarding.flash_done` flash (`TempData["info"]`
+  = the `KnownTranslationKeys.EnValues` floor, the null-localization test
+  construction); and the surface is `GlobalAdmin`-gated
+  (`[Authorize(Roles = GlobalAdmin)]`, the `POST` action carries no weaker
+  gate of its own).
+- `tests/Kumunita.Web.Tests/AdminOnboardingBannerTests.cs` (4) — the house
+  "structural string pin, no TestServer" idiom (the
+  `BookmarkButtonTests` / `NavMoreFoldTests` / M22 `_OnboardingBanner`
+  precedent). Reads `Shared/_AdminOnboardingBanner.cshtml`, strips the
+  `@*…*@` author-comment block, and pins: the banner renders **iff**
+  GlobalAdmin AND `CompletedAt` is null (the `KumunitaPrincipal.IsGlobalAdmin`
+  + `User.Identity?.IsAuthenticated` gate ANDed with the
+  `AdminOnboarding.GetAsync` `completedAt is null` read, the `@if
+  (bannerEligible)` single render branch); does **not** render for a
+  non-GlobalAdmin (and does not fall back to the M22 resident
+  `OnboardingCompletedAt` / `IUserInfoService` read — M22 / M30 distinction);
+  does not render when completed; and the CTA link points to
+  `/admin/onboarding` (`href="/admin/onboarding"`, the closed
+  `adminonboarding.banner.*` `kw-l` set, the shared
+  `onboarding-banner.js` dismissal, the `data-dismiss-key` sessionStorage
+  flag).
+
+**Existing seeder file (unchanged by U06):** `AdminOnboardingSeederTests.cs`
+(U03's, 3 tests) — **not** created or modified here.
+
+**(b) The 16 pinned test names (design doc §2.6, verbatim):**
+
+- `AdminOnboardingServiceTests` (5): `GetAsync_MissingStore_ReturnsNull` ·
+  `GetAsync_MissingRow_ReturnsNull` · `CompleteAsync_WritesOneAccessAuditRow`
+  · `CompleteAsync_StrongConsistency_LiveOnNextGetAsync` ·
+  `CompleteAsync_UpsertsSingleton_NoDuplicateRow`
+- `AdminOnboardingSeederTests` (3, U03's):
+  `FreshBoot_HasExactlyOneAdminOnboardingRow` ·
+  `FreshBoot_CompletedAtIsNull` · `SecondBoot_IsIdempotent_NoDuplicateRow`
+- `AdminOnboardingControllerTests` (4): `GET_SeesCurrentCompletedAt` ·
+  `POST_Complete_StampsCompletedAt_WritesOneAccessAuditRow` ·
+  `GET_NonGlobalAdmin_IsDenied` · `POST_NonGlobalAdmin_IsDenied`
+- `AdminOnboardingBannerTests` (4): `BannerRenders_ForGlobalAdmin_WhenNotCompleted`
+  · `BannerDoesNotRender_ForNonGlobalAdmin` ·
+  `BannerDoesNotRender_WhenCompleted` · `BannerLinkPointsToAdminOnboarding`
+
+**(c) Pass/fail counts (all 16 PASS):**
+
+- `AdminOnboardingServiceTests` + `AdminOnboardingSeederTests` (8 Core) —
+  **green in isolation**: `dotnet exec Kumunita.Core.Tests.dll` filtered to
+  the two classes → `Total: 8, Errors: 0, Failed: 0`.
+- `AdminOnboardingControllerTests` + `AdminOnboardingBannerTests` (8 Web) —
+  **green in isolation**: `dotnet exec Kumunita.Web.Tests.dll` filtered to
+  the two classes → `Total: 8, Errors: 0, Failed: 0` (`EXIT_CODE=0`).
+
+**(d) Gate status (2026-10-09):**
+
+- **Build** — `dotnet build Kumunita.slnx -c Debug` → **green**
+  (`Build succeeded. 0 Error(s)`).
+- **Full Web suite** — `Total: 969, Errors: 0, Failed: 1` — the single red
+  is the **expected** `ImproveHarnessTests.ImproveCheck_Gate_Passes` (the
+  pre-existing IMPROVE close gate, see (e)); all other 968 pass, including
+  the 8 M30 Web pins, `KwLRegistryConsistencyTests`,
+  `KnownTranslationKeys_ParityTests`, `SiteContentServiceTests`,
+  `AdminSiteControllerTests`, `OnboardingControllerTests`, `MilestonesTests`,
+  `WhatsNewTests`.
+- **Full Core suite** — `Total: 1392, Errors: 0, Failed: 4` — **all 4 are
+  Events-domain flakies, none an `AdminOnboarding` test**:
+  `EventServiceCascadeTests.Head_Edit_Rule_Change_Rematerializes_The_Series`
+  · `EventServiceCascadeTests.Head_Edit_Cascades_Text_Fields_To_All_NonDeleted_Occurrences`
+  (both `Expected: 5, Actual: 4`) ·
+  `EventServiceSkipUndeleteTests.Skip_Occurrence_Sets_IsDeleted_On_That_Row_Only`
+  · `EventServiceCreateRecurrenceTests.Create_With_A_Weekly_Rule_Materializes_All_Occurrences`.
+  **NOT M30's** — U06's change is purely additive (3 new test files in the
+  `AdminOnboarding` namespaces; no existing Core test / service / seeder /
+  Events code touched) and U06's 8 M30 Core tests are green in isolation.
+  The signature (4 Events tests, `Expected: 5 / Actual: 4`, deep Testcontainers
+  `pg_isready` readiness churn, ~233 s) is the known flaky-under-parallel-load
+  form (the M29 close recorded Core as `1384 / 0`; the same Events flakies
+  surface intermittently under load). Carried forward to U07 (the close), not
+  U06's defect.
+
+**(e) Still-open drift / the single expected red (recorded, do NOT fix):**
+
+- **The one expected red — `ImproveHarnessTests.ImproveCheck_Gate_Passes`**
+  (the **IMPROVE lane's close gate**, `improve-check.ps1`), red on exactly
+  two sub-gates, **neither a U06 unit deliverable**, and **already red
+  before U06**:
+  - **gate (a)** — `src/*.cs` over 2000 lines grown past its U00 baseline: 2
+    (`KnownTranslationKeys.cs = 9744`, baseline 9617 — U05's intended 21-key
+    deliverable; `FirstBootSeeder.cs = 4744`, baseline 4663 — U03's seeder
+    step). The `improve-check.ps1` baseline is re-set at the milestone close
+    — **U07's M30 close re-baselines it**; U06 must not touch the baseline.
+  - **gate (g)** — `docs/design/m30-admin-onboarding-design.md (900 lines, no
+    Abstract)` — a **U01/U02** design-doc artifact, outside U06's Deliverables.
+  - All other sub-gates (`b` ADR index · `c` shared headings · `d` handoff
+    TL;DR · `e` `client/*.ts` · `f` views `.cshtml`) are **OK**.
+
+  U06 **records** this red and **does not fix it** (per the U06 spec +
+  U05's handoff); the resolution is U07's M30 close (the `WhatsNew` `0.46.0`
+  entry, the `Milestones` / README / STATUS / ARCHITECTURE close flip, the
+  `done/m30/` move, and the `improve-check.ps1` baseline re-set).
+
+**Drift check:** all Entry reads (the register's U06 entry, U04's / U05's
+handoff `## U04` / `## U05` sections, `AdminOnboardingController.cs` (the
+`FlashAsync` null-localization floor → `KnownTranslationKeys.EnValues`),
+`AdminOnboardingViewModel.cs` (`ClosedSteps` — the 7 step routes in order),
+`_AdminOnboardingBanner.cshtml` (the `KumunitaPrincipal.IsGlobalAdmin` /
+`isGlobalAdmin` / `bannerEligible` / `@if (bannerEligible)` gate + the
+`href="/admin/onboarding"` CTA + the `data-dismiss-key` dismissal),
+`KnownTranslationKeys.cs` (the `adminonboarding.flash_done` key present in
+`EnValues`), `KumunitaPrincipal.cs` (`SubjectId` = the `Kumunita.Sub` claim
+the controller tests set), `ClaimTypes` (`Subject = "Kumunita.Sub"`,
+`Role = "Kumunita.Role"`), `AdminSiteControllerTests.cs` (the controller-test
+shape to mirror), `AdminOnboardingSeederTests.cs` (the `BootStoreAsync`
+harness to mirror — **read only, not modified**), the design doc §2.6 (the
+16 pinned names) + §2.7 (the acceptance gate)) are **consistent with the
+register. No drift pause required; no improvisation** — the one register-vs-
+reality nuance (the M30 full-Core suite red on 4 Events-domain flakies) is
+**not M30's** (U06's 8 M30 Core tests are green in isolation; the 4 are
+pre-existing Events tests U06 did not touch) and is recorded, not silent,
+for U07.
+
+**U07 reads only this `## U06` section + its own entry-reads list + the
+design doc's `### Run result (M30 acceptance gate — 2026-10-09)` section.**

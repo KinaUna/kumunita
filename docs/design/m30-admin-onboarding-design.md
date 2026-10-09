@@ -898,3 +898,108 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 the milestone's decision record (Status: Accepted, created by U02); the
 `Milestones.cs` / README / `MilestonesTests` / `WhatsNew.cs` close flip is
 owned by U07 (M30·8).*
+
+### Run result (M30 acceptance gate — 2026-10-09)
+
+**The acceptance gate (closed-loop / handoff / part-vs-whole):**
+
+- **closed-loop — PASS.** The gate ran end-to-end through the in-process
+  xunit.v3 runner (the AGENTS.md reliable path — not `dotnet test` / VS Test
+  Explorer). Real exit codes + test counts were captured:
+  - `dotnet build Kumunita.slnx -c Debug` → **green** (`Build succeeded.
+    0 Error(s)`; the warnings are pre-existing in unrelated files, none in
+    the 4 U06-touched test files).
+  - `dotnet exec Kumunita.Core.Tests.dll` → **the 8 M30 Core tests green**
+    (confirmed in isolation: `Total: 8, Errors: 0, Failed: 0`; the *full*
+    Core suite is `Total: 1392, Errors: 0, Failed: 4` — see the part-vs-whole
+    note; **none of the 4 is an `AdminOnboarding` test**).
+  - `dotnet exec Kumunita.Web.Tests.dll` → **the 8 M30 Web tests green**
+    (confirmed in isolation: `Total: 8, Errors: 0, Failed: 0`); the *full*
+    Web suite is `Total: 969, Errors: 0, Failed: 1` — the single red is the
+    expected `ImproveHarnessTests.ImproveCheck_Gate_Passes` (see below).
+- **handoff — PASS.** This Run result section + the `## U06 — seam tests
+  (13 new) + gate recorded` section in `m30-handoff-notes.md` are appended
+  (the three-tier contract is complete through U06).
+- **part-vs-whole — PARTIAL (recorded, not silent).** The *part* (M30's 16
+  seam tests) is green; the *whole* carries **two pre-existing red sets that
+  are not M30's tests** (the 4 Events-domain Core flakies + the IMPROVE
+  close gate) — both are carried forward to U07 (see below).
+
+**The 16-test count (all PASS):**
+
+- `AdminOnboardingServiceTests` (Core, 5, **U06's**): `GetAsync_MissingStore_ReturnsNull`
+  / `GetAsync_MissingRow_ReturnsNull` / `CompleteAsync_WritesOneAccessAuditRow`
+  / `CompleteAsync_StrongConsistency_LiveOnNextGetAsync` /
+  `CompleteAsync_UpsertsSingleton_NoDuplicateRow`.
+- `AdminOnboardingSeederTests` (Core, 3, **U03's — untouched by U06**):
+  `FreshBoot_HasExactlyOneAdminOnboardingRow` / `FreshBoot_CompletedAtIsNull`
+  / `SecondBoot_IsIdempotent_NoDuplicateRow`.
+- `AdminOnboardingControllerTests` (Web, 4, **U06's**): `GET_SeesCurrentCompletedAt`
+  / `POST_Complete_StampsCompletedAt_WritesOneAccessAuditRow` /
+  `GET_NonGlobalAdmin_IsDenied` / `POST_NonGlobalAdmin_IsDenied`.
+- `AdminOnboardingBannerTests` (Web, 4, **U06's**):
+  `BannerRenders_ForGlobalAdmin_WhenNotCompleted` /
+  `BannerDoesNotRender_ForNonGlobalAdmin` / `BannerDoesNotRender_WhenCompleted`
+  / `BannerLinkPointsToAdminOnboarding`.
+
+**The pin status (registry-parity / SITE-precedent / `MilestonesTests` / `WhatsNewTests`):**
+
+- **registry parity — GREEN.** `KwLRegistryConsistencyTests` +
+  `KnownTranslationKeys_ParityTests` pass (not in the red set) — the
+  `adminonboarding.*` `kw-l` registry entries are **untouched** (ADR 0153
+  D3, M30·6).
+- **SITE precedent — GREEN.** `SiteContentServiceTests` (Core, in the 1392)
+  + `AdminSiteControllerTests` (Web, not in the red set) pass — the SITE
+  shapes are unchanged (ADR 0150 / ADR 0006 — M30 adds a *new* doc in a
+  *new* context, `AdminOnboarding`).
+- **`MilestonesTests` — GREEN** (not in the red set) — the order +
+  single-in-progress pin is intact through U00–U06 (U07 owns the close flip).
+- **`WhatsNewTests` — GREEN (existing entries unchanged).** The
+  `0.46.0` entry (the required sixth close-flip member, newest-first) is
+  **not yet added** — U07 owns it (the M27 "shipped with no entry until
+  caught in review" lesson, AGENTS.md, held by pinning it to U07).
+
+**The 4 full-Core-suite failures (all pre-existing Events-domain flakies,
+NOT M30's tests — none is an `AdminOnboarding` test; carried forward to U07,
+recorded here per the handoff / part-vs-whole gate):**
+
+1. `EventServiceCascadeTests.Head_Edit_Rule_Change_Rematerializes_The_Series`
+   — `Assert.Equal() Failure: Expected: 5, Actual: 4`.
+2. `EventServiceCascadeTests.Head_Edit_Cascades_Text_Fields_To_All_NonDeleted_Occurrences`
+   — `Assert.Equal() Failure: Expected: 5, Actual: 4`.
+3. `EventServiceSkipUndeleteTests.Skip_Occurrence_Sets_IsDeleted_On_That_Row_Only`.
+4. `EventServiceCreateRecurrenceTests.Create_With_A_Weekly_Rule_Materializes_All_Occurrences`.
+
+All four are in the **Events** domain (the M4 event/recurrence lane, far
+removed from M30) and fail with the same `Expected: 5 / Actual: 4` shape
+under the Testcontainers `postgres:18` parallel load (many concurrent
+`NewDatabaseAsync` scratch DBs racing `pg_isready` readiness) — the
+flaky-under-contention signature, not a deterministic defect. U06's change
+is **purely additive** (three new test files in the `AdminOnboarding`
+namespaces; no existing Core test, service, seeder, or Events code touched),
+and U06's 8 M30 Core tests are **green in isolation** — so the 4 cannot be
+U06's. (The M29 close recorded the Core suite as `Total: 1384, Errors: 0,
+Failed: 0`; the same Events flakies surface intermittently under load.)
+
+**The single expected full-Web-suite red (recorded, do NOT fix):**
+
+- `ImproveHarnessTests.ImproveCheck_Gate_Passes` — the **IMPROVE lane's
+  close gate** (`improve-check.ps1`), failing on 2 sub-gates:
+  - **`a`** — `src/*.cs` over 2000 lines grown past its U00 baseline: 2
+    (`FirstBootSeeder.cs` 4744 lines, baseline 4663; `KnownTranslationKeys.cs`
+    9744 lines, baseline 9617 — both baseline files grew across the M30
+    kw-l + seeder work).
+  - **`g`** — design docs >400 lines without an Abstract (beyond the U07
+    baseline): 1 (`m30-admin-onboarding-design.md`, 900 lines).
+  - All other sub-gates (`b` ADR index / `c` shared headings / `d` handoff
+    TL;DR / `e` `client/*.ts` / `f` views `.cshtml`) are **OK**.
+
+  This is the **pre-existing IMPROVE close gate** the U06 spec named as the
+  one expected red — it is **not a U06 defect** and is **not fixed here**.
+  U07 (the close flip) re-baselines it as part of the M30 close.
+
+*— Run result recorded by U06 (2026-10-09): the 16 M30 seam tests are green
+in isolation (8 Core + 8 Web); the full-suite reds (4 Events-domain Core
+flakies + the single IMPROVE close gate) are recorded, not silent, and are
+not M30's — U07 owns the close flip + the `0.46.0` `WhatsNew` entry + the
+`done/m30/` move.*
