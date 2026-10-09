@@ -38,7 +38,7 @@ public class IssueController : Controller
     [HttpGet("/issues/new")]
     public IActionResult GetNew()
     {
-        return View(new IssueFormModel());
+        return View("New", new IssueFormModel());
     }
 
     /// <summary>
