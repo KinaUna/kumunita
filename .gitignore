@@ -8,6 +8,10 @@ artifacts/
 
 # Node
 node_modules/
+# Stray root-level lockfile (no root package.json); the real ones live in
+# src/Kumunita.Web/ and tests/Kumunita.Web.Tests/. Anchor to the root so those
+# two keep tracking.
+/package-lock.json
 
 # Docker
 .env
