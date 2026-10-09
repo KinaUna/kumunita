@@ -876,3 +876,74 @@ unit-series rule §12):
 acceptance gate, drift-guard. Authored by U02, 2026-10-09. **ADR 0156** is
 `docs/adr/0156-storage-metrics-history.md` (the index row is
 `docs/adr/README.md`).*
+
+### Run result (M33 acceptance gate — 2026-10-09)
+
+**U07 ran the gate** (2026-10-09, in-process xunit.v3 runner per AGENTS.md —
+`dotnet test` discovery is broken on this machine). The **11 pinned seam tests**
+(§2.4) were implemented in `tests/Kumunita.Core.Tests/Usage/
+StorageMetricsHistoryTests.cs` (7) + `tests/Kumunita.Web.Tests/
+AdminStorageMetricsHistoryTests.cs` (4), **all 11 green**:
+
+- **Core** (`dotnet exec Kumunita.Core.Tests.dll -filter /Kumunita.Core.Tests/
+  */StorageMetricsHistoryTests`): **Total: 7, Failed: 0, Skipped: 0** —
+  `M33_2_Capture_Stores_One_Sample_Per_Day` · `M33_5_Capture_SameDayTwice_Dedups`
+  · `M33_4_Capture_Writes_No_AuditRow` · `M33_7_Purge_Deletes_Expired_Samples`
+  · `M33_2_Sample_FieldSet_Snapshot_Shape` ·
+  `M33_8_GetHistory_Returns_Only_Days_Present` ·
+  `M33_8_GetHistory_Unknown_Window_Throws` — **all pass**.
+- **Web** (`dotnet exec Kumunita.Web.Tests.dll -filter /Kumunita.Web.Tests/
+  */AdminStorageMetricsHistoryTests`): **Total: 4, Failed: 0, Skipped: 0** —
+  `M33_9_GlobalAdmin_Sees_Trend_Section` ·
+  `M33_2_Window_Switch_Renders_Chosen_Window` ·
+  `M33_3_Empty_History_Renders_Empty_Message` · `M33_7_NonGlobalAdmin_Denied` —
+  **all pass**.
+
+**The three-test gate (§2.5):**
+
+- **Closed loop** (capture stores one sample + `GetHistoryAsync(90)` returns it
+  + the `/admin/storage` Trend section renders it — the M33·2 / M33·8 / M33·9
+  / M33-1 composite): **PASS** — `M33_2_Capture_Stores_One_Sample_Per_Day` +
+  `M33_8_GetHistory_Returns_Only_Days_Present` +
+  `M33_9_GlobalAdmin_Sees_Trend_Section` all green.
+- **Handoff** (a second-day sample stored + the window shows both days
+  ascending + an expired sample purged — the M33·2 / M33·7 / M33-4 / M33-5
+  composite): **PASS** — `M33_5_Capture_SameDayTwice_Dedups` +
+  `M33_7_Purge_Deletes_Expired_Samples` + `M33_4_Capture_Writes_No_AuditRow`
+  + `M33_2_Sample_FieldSet_Snapshot_Shape` +
+  `M33_8_GetHistory_Returns_Only_Days_Present` all green.
+- **Part-vs-whole** (the 11-test list is the whole; closed-loop + handoff are
+  the parts; all must pass together — M33·12): **PASS** — **11 / 11** of the
+  §2.4 tests are green (the 7 Core + the 4 Web).
+
+**Still-open drift (recorded, NOT U07's to fix — unit-series rule §12):** the
+**11-test M33 gate is green**, but the **full `Kumunita.Web.Tests` assembly
+carries 8 pre-existing failures** that are **outside M33's 11-test scope and
+U07's file budget** (U07 may only touch its 3 files). These will block U08's
+`Kumunita.Web.Tests` green close flip:
+
+1. **7 × `AdminStorageMetricsControllerTests` (M24)** — NRE in
+   `AdminStorageMetricsController.Index` (the `var history = await historyTask;`
+   line). **Root cause: a U05-introduced regression** — U05's additive change
+   added `metrics.GetHistoryAsync(window, ct)` + `await historyTask`, but the
+   M24 tests (which predate the M33 seam and are not in U07's deliverables)
+   never stub `GetHistoryAsync`, so NSubstitute returns `null` and `await null`
+   throws. The failing M24 tests (the 7 that call `Index`):
+   `AdminStorage_GlobalAdmin_Allowed` · `AdminStorage_NoAccessAuditRow` ·
+   `AdminStorage_PerUserTable_RendersWithHasMore` ·
+   `AdminStorage_FourMetrics_Render` ·
+   `AdminStorage_PlatformLimitSet_AvailableCappedToRemainingBudget` ·
+   `AdminStorage_PlatformLimitExceeded_AvailableClampedToZero` ·
+   `AdminStorage_PlatformLimitUnset_AvailableIsPhysicalFreeSpace`
+   (the 8th failure is the M32 `M32_4_Issue_Page_Shows_Issue_Form` below; the
+   M24 gate-only `AdminStorage_NonGlobalAdmin_Forbidden` does not call `Index`
+   and stays green). Fix requires
+   stubbing `GetHistoryAsync` in those M24 tests (a file outside U07's budget)
+   or a `historyTask` null-guard in the controller (a U05 seam change).
+2. **1 × `M32_4_Issue_Page_Shows_Issue_Form` (M32)** —
+   `Views/Issues/New.cshtml` not found (a pre-existing M32 file gap,
+   unrelated to M33).
+
+Neither is an M33 seam/capture/view/`kw-l` defect; both must be resolved before
+U08's `Kumunita.Web.Tests green` close flip. **The M33 11-test gate itself is
+green.**
