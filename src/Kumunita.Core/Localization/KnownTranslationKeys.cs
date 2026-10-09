@@ -2334,6 +2334,37 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Finish setting up your account?",
             ["onboarding.banner.action"]    = "Start setup",
 
+            // ── M30 (ADR 0153) — admin onboarding: the /admin/onboarding
+            // guided walk-through (M30·2/M30·7) + the dismissible admin
+            // banner (M30·5) + the "mark as complete" flash (M30·4). U05
+            // authors the COMPLETE closed set (21 keys: the 14 named in the
+            // register + the 7 adminonboarding.desc_* per-step descriptions
+            // referenced by AdminOnboardingViewModel.Step.DescriptionKey).
+            // The parity pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Set up this community",
+            ["adminonboarding.intro"]              = "A guided walk through the seven most important initial settings for a new administrator. Each step links into the setting that already owns it — visit them in order, then mark the walk-through complete when you're set.",
+            ["adminonboarding.step_communityname"] = "Community name & description",
+            ["adminonboarding.step_languages"]     = "Languages",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_storage"]       = "Storage limits",
+            ["adminonboarding.step_sitecontent"]   = "Site content",
+            ["adminonboarding.step_escalation"]    = "Issue escalation",
+            ["adminonboarding.desc_communityname"] = "What this community is called and how it describes itself — edited within the languages surface.",
+            ["adminonboarding.desc_languages"]     = "The languages residents can use, the translated interface strings, and the static pages.",
+            ["adminonboarding.desc_moderation"]    = "How announcement comments are moderated on this instance.",
+            ["adminonboarding.desc_notifications"] = "How often held notification emails are flushed to residents.",
+            ["adminonboarding.desc_storage"]       = "The per-file size limit and the per-user total content quota.",
+            ["adminonboarding.desc_sitecontent"]   = "The landing surfaces' hero text and the show/hide toggles.",
+            ["adminonboarding.desc_escalation"]    = "Where residents' issues are surfaced and escalated (the announcements surface for now).",
+            ["adminonboarding.visit"]              = "Visit this setting",
+            ["adminonboarding.complete"]           = "Mark as complete",
+            ["adminonboarding.flash_done"]         = "Admin setup complete — the walk-through is done.",
+            ["adminonboarding.banner.text"]        = "Finish setting up this community?",
+            ["adminonboarding.banner.action"]      = "Start setup",
+
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
@@ -4762,6 +4793,38 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Dein Konto fertig einrichten?",
             ["onboarding.banner.action"]    = "Einrichtung starten",
 
+            // ── M30 (ADR 0153) — Admin-Onboarding: der /admin/onboarding-
+            // Rundgang (M30·2/M30·7) + das entfern- und schließbare
+            // Admin-Banner (M30·5) + der „Als abgeschlossen markieren"-
+            // Hinweis (M30·4). U05 verfasst die vollständige geschlossene
+            // Menge (21 Schlüssel: die 14 aus dem Register + die 7
+            // adminonboarding.desc_*-Zeilenumgebungen, die
+            // AdminOnboardingViewModel.Step.DescriptionKey referenziert).
+            // Die Paritäts-Pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) verlangt jeden Schlüssel in
+            // allen vier Sprachen, nicht leer (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Diese Gemeinschaft einrichten",
+            ["adminonboarding.intro"]              = "Ein geführter Rundgang durch die sieben wichtigsten Anfangseinstellungen für eine neue Administratorenin. Jeder Schritt führt in die Einstellung, die es bereits besitzt — besuche sie in der Reihenfolge und markiere den Rundgang als abgeschlossen, wenn du bereit bist.",
+            ["adminonboarding.step_communityname"] = "Name & Beschreibung der Gemeinschaft",
+            ["adminonboarding.step_languages"]     = "Sprachen",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Benachrichtigungen",
+            ["adminonboarding.step_storage"]       = "Speichergrenzen",
+            ["adminonboarding.step_sitecontent"]   = "Website-Inhalte",
+            ["adminonboarding.step_escalation"]    = "Eskalation von Anliegen",
+            ["adminonboarding.desc_communityname"] = "Wie diese Gemeinschaft heißt und wie sie sich beschreibt — in der Sprachoberfläche bearbeitbar.",
+            ["adminonboarding.desc_languages"]     = "Die Sprachen, die Bewohner verwenden können, die übersetzten Interface-Zeichenketten und die statischen Seiten.",
+            ["adminonboarding.desc_moderation"]    = "Wie Ankündigungskommentare auf dieser Instanz moderiert werden.",
+            ["adminonboarding.desc_notifications"] = "Wie oft zurückgehaltene Benachrichtigungs-E-Mails an Bewohner zugestellt werden.",
+            ["adminonboarding.desc_storage"]       = "Die Dateigrößengrenze und das Kontingent pro Nutzer für den gesamten Inhalt.",
+            ["adminonboarding.desc_sitecontent"]   = "Der Hero-Text der Startseiten und die ein-/ausblenden-Schalter.",
+            ["adminonboarding.desc_escalation"]    = "Wo Anliegen von Bewohnern auftauchen und eskaliert werden (vorerst die Ankündigungsfläche).",
+            ["adminonboarding.visit"]              = "Zu dieser Einstellung",
+            ["adminonboarding.complete"]           = "Als abgeschlossen markieren",
+            ["adminonboarding.flash_done"]         = "Admin-Einrichtung abgeschlossen — der Rundgang ist erledigt.",
+            ["adminonboarding.banner.text"]        = "Diese Gemeinschaft fertig einrichten?",
+            ["adminonboarding.banner.action"]      = "Einrichtung starten",
+
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
@@ -7093,6 +7156,38 @@ public static class KnownTranslationKeys
             ["onboarding.banner.text"]      = "Terminer la configuration de ton compte ?",
             ["onboarding.banner.action"]    = "Démarrer la configuration",
 
+            // ── M30 (ADR 0153) — onboarding administrateur : la marche en
+            // avant guidée /admin/onboarding (M30·2/M30·7) + la bannière
+            // admin rétractable (M30·5) + l'accusé « marquer comme terminé »
+            // (M30·4). U05 crée la clôture fermée complète (21 clés : les 14
+            // nommées dans le registre + les 7 adminonboarding.desc_*
+            // décrivant chaque étape, référencées par
+            // AdminOnboardingViewModel.Step.DescriptionKey). L'assurance
+            // parité (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) exige chaque clé présente et
+            // non vide dans les quatre langues (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Configurer cette communauté",
+            ["adminonboarding.intro"]              = "Une marche guidée à travers les sept réglages de départ les plus importants pour un nouvel administrateur. Chaque étape mène au réglage qui l'a déjà — visite-les dans l'ordre, puis marque la marche comme terminée quand tu es prêt.",
+            ["adminonboarding.step_communityname"] = "Nom & description de la communauté",
+            ["adminonboarding.step_languages"]     = "Langues",
+            ["adminonboarding.step_moderation"]    = "Modération",
+            ["adminonboarding.step_notifications"] = "Notifications",
+            ["adminonboarding.step_storage"]       = "Limites de stockage",
+            ["adminonboarding.step_sitecontent"]   = "Contenu du site",
+            ["adminonboarding.step_escalation"]    = "Escalade des problèmes",
+            ["adminonboarding.desc_communityname"] = "Comment cette communauté s'appelle et comment elle se présente — modifiable dans la surface langues.",
+            ["adminonboarding.desc_languages"]     = "Les langues que les résidents peuvent utiliser, les chaînes d'interface traduites et les pages statiques.",
+            ["adminonboarding.desc_moderation"]    = "Comment les commentaires d'annonces sont modérés sur cette instance.",
+            ["adminonboarding.desc_notifications"] = "À quelle fréquence les e-mails de notification retenus sont envoyés aux résidents.",
+            ["adminonboarding.desc_storage"]       = "La limite de taille par fichier et le quota de contenu total par utilisateur.",
+            ["adminonboarding.desc_sitecontent"]   = "Le texte d'accroche des surfaces d'accueil et les interrupteurs afficher/masquer.",
+            ["adminonboarding.desc_escalation"]    = "Où les problèmes des résidents sont signalés et escaladés (pour l'instant la surface annonces).",
+            ["adminonboarding.visit"]              = "Aller à ce réglage",
+            ["adminonboarding.complete"]           = "Marquer comme terminé",
+            ["adminonboarding.flash_done"]         = "Configuration admin terminée — la marche est achevée.",
+            ["adminonboarding.banner.text"]        = "Terminer la configuration de cette communauté ?",
+            ["adminonboarding.banner.action"]      = "Démarrer la configuration",
+
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
@@ -9411,6 +9506,38 @@ public static class KnownTranslationKeys
             ["onboarding.flash_done"]       = "Opsætningen er færdig — velkommen til dit nabolag.",
             ["onboarding.banner.text"]      = "Færdiggøre opsætningen af din konto?",
             ["onboarding.banner.action"]    = "Start opsætning",
+
+            // ── M30 (ADR 0153) — administrator-onboarding: den guidede
+            // rundtur /admin/onboarding (M30·2/M30·7) + det
+            // lukkelige admin-banner (M30·5) + "markér som færdig"-
+            // meddelelsen (M30·4). U05 forfatter den fulde lukke sæt (21
+            // nøgler: de 14 i registeret + de 7 adminonboarding.desc_*
+            // beskrivelser pr. trin, som AdminOnboardingViewModel.Step.
+            // DescriptionKey refererer). Paritets-pinen
+            // (KwLRegistryConsistencyTests + KnownTranslationKeys_ParityTests)
+            // kræver hver nøgle til stede og ikke-tom i alle fire sprog
+            // (M30·6, GATE-6). ──
+            ["adminonboarding.title"]              = "Opsæt dette fællesskab",
+            ["adminonboarding.intro"]              = "En guidet tur gennem de syv vigtigste indledende indstillinger for en ny administrator. Hvert trin henviser til den indstilling, der allerede ejer det — besøg dem i rækkefølge, og markér så runden som færdig, når du er klar.",
+            ["adminonboarding.step_communityname"] = "Fællesskabets navn & beskrivelse",
+            ["adminonboarding.step_languages"]     = "Sprog",
+            ["adminonboarding.step_moderation"]    = "Moderation",
+            ["adminonboarding.step_notifications"] = "Beskedelser",
+            ["adminonboarding.step_storage"]       = "Lagringsgrænser",
+            ["adminonboarding.step_sitecontent"]   = "Sideindhold",
+            ["adminonboarding.step_escalation"]    = "Eskalering af henvendelser",
+            ["adminonboarding.desc_communityname"] = "Hvad dette fællesskab hedder og hvordan det beskriver sig selv — redigér det i sprogfladen.",
+            ["adminonboarding.desc_languages"]     = "De sprog, beboerne kan bruge, de oversatte grænsefladesnore og de statiske sider.",
+            ["adminonboarding.desc_moderation"]    = "Hvordan annoncerkommentarer modereres på denne instans.",
+            ["adminonboarding.desc_notifications"] = "Hvor ofte tilbagelagte beskedelsesmails sendes til beboerne.",
+            ["adminonboarding.desc_storage"]       = "Størrelsesgrænsen pr. fil og den samlede kvote pr. bruger.",
+            ["adminonboarding.desc_sitecontent"]   = "Landesfladens overskriftstekst og vis/skub-omskifterne.",
+            ["adminonboarding.desc_escalation"]    = "Hvor beboernes henvendelser optræder og eskaleres (for nu annoncerfladen).",
+            ["adminonboarding.visit"]              = "Gå til denne indstilling",
+            ["adminonboarding.complete"]           = "Markér som færdig",
+            ["adminonboarding.flash_done"]         = "Admin-opsætning færdig — rundturen er sluttet.",
+            ["adminonboarding.banner.text"]        = "Færdiggøre opsætningen af dette fællesskab?",
+            ["adminonboarding.banner.action"]      = "Start opsætning",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;

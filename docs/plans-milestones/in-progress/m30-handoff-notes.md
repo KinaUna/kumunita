@@ -659,4 +659,153 @@
   author all 21 keys (14 + 7) if the `Step.DescriptionKey` field is kept,
   or drop the field if the `desc_*` keys are out of scope (a drift pause,
   not a silent edit). **U04's deliverable is the controller + view model
-  only — the `kw-l` keys are U05's.**
+  only — the `kw-l` keys are U05's.
+
+## U05 — view + banner + kw-l keys
+
+- **Web implementation authored** (2 new view files + 2 modified files —
+  **no controller change, no Core change, no new test**). **Build green**
+  (`dotnet build Kumunita.slnx -c Debug` — EXIT=0, 0 errors). U05 resolves
+  U04's register-vs-design-doc mismatch (the `desc_*` keys) by **authoring
+  all 21 keys** (the register's 14 + the 7 `adminonboarding.desc_*` keys the
+  `Step.DescriptionKey` field references), per U04's note.
+
+- **(a) The view path + the banner partial path + the `_AdminNav` render
+  line:**
+  - **`src/Kumunita.Web/Views/AdminOnboarding/Index.cshtml`** (new) — the
+    `/admin/onboarding` walk-through view (the M22
+    `Views/Onboarding/Index.cshtml` shape, admin-scope). `@model
+    AdminOnboardingViewModel` + `ViewData["Title"] = "Admin onboarding"` +
+    the `<h1>` (`adminonboarding.title`) + the intro paragraph
+    (`adminonboarding.intro`) + the seven step cards (each a
+    `list-group-item` with a title [`@step.LabelKey` = the
+    `adminonboarding.step_*` key] + a one-line description [`@step.DescriptionKey`
+    = the `adminonboarding.desc_*` key] + a "visit this setting" link
+    [`adminonboarding.visit`] pointing at `@step.Route`) + the ONE write
+    (the "mark as complete" button, `adminonboarding.complete`, a
+    `[ValidateAntiForgeryToken]` POST to `/admin/onboarding/complete`).
+    The copy is the closed `adminonboarding.*` set (M30·6) — the only
+    user-visible copy (the M22 D7 "closed set" pin, admin-scope).
+  - **`src/Kumunita.Web/Views/Shared/_AdminOnboardingBanner.cshtml`** (new)
+    — the admin onboarding banner (the M22 `_OnboardingBanner` partial's
+    admin sibling). Renders **only** when the signed-in actor is a
+    `GlobalAdmin` (`KumunitaPrincipal.IsGlobalAdmin(User)`) AND
+    `AdminOnboarding.CompletedAt` is `null` (`@inject IAdminOnboardingService
+    AdminOnboarding` + `await AdminOnboarding.GetAsync()` — the **same**
+    read-seam U04's controller calls, M30·5). Links to `/admin/onboarding`
+    (`adminonboarding.banner.action` CTA label); copy is
+    `adminonboarding.banner.text`. Dismissible via the M22
+    `onboarding-banner.js` `sessionStorage` flag (`data-dismiss-key` on the
+    `.btn-close`; reuses the shared `.kumunita-onboarding-banner` class so
+    the one shared JS module dismisses it — the M22 D5 "non-blocking" pin,
+    admin-scope; **never** a write to `CompletedAt`).
+  - **`src/Kumunita.Web/Views/Admin/_AdminNav.cshtml`** (modify) — the
+    render line `@await Html.PartialAsync("~/Views/Shared/_AdminOnboardingBanner")`
+    added at the top of the admin sub-nav, **before the nav-tabs**, so it
+    is visible on every `/admin/*` page (the `_AdminNav` scope — the M22
+    `_Layout` `_OnboardingBanner` render shape, admin-scope). Explicit
+    `~/Views/...` path (the codebase's cross-folder partial idiom, e.g.
+    `~/Views/Admin/_AdminNav.cshtml` from `AdminHelp/` / `AdminStorage/`).
+    **Note:** the register's U05 entry names the admin nav partial
+    `Views/Shared/_AdminNav.cshtml`, but the actual file lives at
+    `Views/Admin/_AdminNav.cshtml` (a register location imprecision — the
+    correct file was located via `file_search` and modified there).
+
+- **(b) The 21 `kw-l` keys (by name, all authored × en/de/fr/da, non-empty,
+  in all four languages):** `adminonboarding.title` ·
+  `adminonboarding.intro` · `adminonboarding.step_communityname` ·
+  `adminonboarding.step_languages` · `adminonboarding.step_moderation` ·
+  `adminonboarding.step_notifications` · `adminonboarding.step_storage` ·
+  `adminonboarding.step_sitecontent` · `adminonboarding.step_escalation` ·
+  `adminonboarding.desc_communityname` · `adminonboarding.desc_languages` ·
+  `adminonboarding.desc_moderation` · `adminonboarding.desc_notifications` ·
+  `adminonboarding.desc_storage` · `adminonboarding.desc_sitecontent` ·
+  `adminonboarding.desc_escalation` · `adminonboarding.visit` ·
+  `adminonboarding.complete` · `adminonboarding.flash_done` ·
+  `adminonboarding.banner.text` · `adminonboarding.banner.action`. The 14
+  are the register's named set; the 7 `adminonboarding.desc_*` are the
+  per-step one-line descriptions U04's `Step.DescriptionKey` references
+  (the register's 14-key list omitted them — resolved by authoring all 21,
+  per U04's note + the user's instruction). The `a11y.onboarding_region` /
+  `a11y.onboarding_action` / `a11y.onboarding_dismiss` accessible names are
+  **reused** from the existing closed `a11y.*` set (present in all four
+  languages) — not new keys (the M22 banner's a11y idiom, admin-scope).
+  The `en` values are the source text (the ADR 0015 D1 kw-l
+  provider-floor discipline); `de` / `fr` / `da` are the translations.
+  **Danish terminology aligned to the repo's established word for
+  "community" (`Fællesskab`, per `nav.community` / `community.browse`), not
+  a coinage.**
+
+- **(c) The banner-eligibility read (the `GlobalAdmin`-gated +
+  `CompletedAt = null` pin):** `isGlobalAdmin = User.Identity?.IsAuthenticated
+  == true && KumunitaPrincipal.IsGlobalAdmin(User)` (the standard
+  role read — the thin-token rule, ADR 0001-B; a non-`GlobalAdmin` never
+  sees the banner, M30·3/M30·5). `bannerEligible = (await
+  AdminOnboarding.GetAsync()) is null` (the best-effort read — a missing
+  store / row / read failure degrades to `null` = not-yet-guided, the floor;
+  **the same seam U04's controller + the `/admin/onboarding` view call**, so
+  the banner + the view resolve to the **same** value, M30·5). Never a
+  claim. Non-blocking: sign-in never gated, the route always reachable,
+  dismissal a `sessionStorage` flag — never a write to `CompletedAt`.
+
+- **(d) Compile warnings on the new types:** **zero** (build EXIT=0, 0
+  errors; the new view / partial / key lines introduce no warnings).
+
+- **Exit pins (U05's own — all GREEN):**
+  - `dotnet build Kumunita.slnx -c Debug` → **EXIT=0, 0 errors**.
+  - `KnownTranslationKeys_ParityTests` (Core.Tests) → **7 tests, 0 failed**
+    (the 21 keys present, non-empty, in all four languages — the de/fr/da
+    baselines at full registry parity).
+  - `KwLRegistryConsistencyTests` (Web.Tests) → **1 test, 0 failed** (every
+    `kw-l key="…"` in the new view + banner is registered in
+    `KnownTranslationKeys`).
+  - `git status` clean except: the 2 new Web view files, the 2 modified
+    files (`_AdminNav.cshtml` + `KnownTranslationKeys.cs`), the moved unit
+    plan (`m30-u05.md` → `done/m30/`), and this appended handoff section.
+
+- **One pre-existing close-gate red — recorded, not a U05 unit-pin failure
+  (U06/U07 to consume at close):** the full `Kumunita.Web.Tests` suite runs
+  961 tests with **1 failed** — `ImproveHarnessTests.ImproveCheck_Gate_Passes`
+  (the IMPROVE lane's `improve-check.ps1` **close** gate, not a U05 unit pin).
+  It is red on exactly two counts, **neither a U05 unit deliverable**, and
+  was **already red before U05**:
+  - **gate (a)** — `src/*.cs over 2000 lines (grown past baseline)`:
+    `KnownTranslationKeys.cs = 9744` (baseline was 9617 — **U05's intended
+    21-key deliverable**) **and** `FirstBootSeeder.cs = 4744` (baseline was
+    4663 — **U03's** seeder step, untouched by U05). The `improve-check.ps1`
+    comment says the baseline is re-set at the milestone close ("Re-baselined
+    at the M29 close … the next reduction lane will measure against it") —
+    i.e. **U07's M30 close re-baselines it**; U05 must not touch the baseline
+    (a different unit's file / the register's own U07 close).
+  - **gate (g)** — `docs/design/m30-admin-onboarding-design.md (900 lines, no
+    Abstract)` — a **U01/U02** design-doc artifact U05 did not touch (outside
+    U05's Deliverables).
+  - U05's own exit pins (build + `KwLRegistryConsistencyTests` +
+    `KnownTranslationKeys_ParityTests`) are **all green** — the single red is
+    the close gate, which the register assigns to the close (U07) and which
+    was pre-existing (FirstBootSeeder.cs growth is U03's). **No drift pause
+    required; no improvisation** — the register's U07 close + the
+    `improve-check.ps1` baseline re-set own the resolution.
+
+- **Drift check:** all Entry reads (the register's U05 entry, U04's handoff
+  `## U04` section, `Views/Onboarding/Index.cshtml` (the M22 walk-through
+  shape), `Views/Shared/_OnboardingBanner.cshtml` (the M22 banner shape),
+  `wwwroot/js/lib/onboarding-banner.js` (the dismissal idiom),
+  `Views/Admin/_AdminNav.cshtml` (the admin sub-nav — the actual location,
+  not the register's `Views/Shared/_AdminNav.cshtml`),
+  `KnownTranslationKeys.cs` (the `onboarding.*` set to mirror),
+  `AdminOnboardingViewModel.cs` (U04's `Step` record + `ClosedSteps`),
+  `LocalizeTagHelper.cs` (the `<kw-l>` key attribute),
+  `KwLRegistryConsistencyTests.cs` (the view-scan pin),
+  `KnownTranslationKeys_ParityTests.cs` (the registry-parity pin),
+  the design doc §2.5–§2.6 (the banner-eligibility rule + the closed
+  `kw-l` key set), `KumunitaPrincipal.cs` (the `IsGlobalAdmin` helper)) are
+  consistent with the register. **One register location imprecision recorded
+  (not a blocker):** the register names the admin nav partial at
+  `Views/Shared/_AdminNav.cshtml`, but it actually lives at
+  `Views/Admin/_AdminNav.cshtml` (located via `file_search`, modified there).
+  **U04's register-vs-design-doc mismatch (the 7 `desc_*` keys) is resolved
+  by authoring all 21 keys** (per U04's note + the user's explicit
+  instruction) — **not** a drift pause. The single full-suite red is the
+  pre-existing IMPROVE close gate (above), not a U05 unit pin. **U06 reads
+  only this `## U05` section + its own entry-reads list.****

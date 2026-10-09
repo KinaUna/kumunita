@@ -1,0 +1,67 @@
+@*
+    Index.cshtml — the M30 /admin/onboarding guided walk-through (ADR 0153).
+
+    The GlobalAdmin's sibling of the M22 resident /onboarding page (ADR 0132):
+    a stateless, links-only walk through the seven most important initial
+    settings (community name, languages, moderation, notifications, storage
+    limits, site content, issue escalation — the closed set in the README /
+    Milestones.cs order). Each step card links into the existing admin surface
+    that already owns the setting (M30·7, the M22 D3 "rides frozen lanes" pin,
+    admin-scope) — this view **never** re-implements a write lane.
+
+    The ONLY write is the "mark as complete" button (the adminonboarding.complete
+    kw-l key), a [ValidateAntiForgeryToken] POST to /admin/onboarding/complete
+    (M30·4 — the ADR 0150 single audited write-lane shape). Non-blocking
+    (M30·5): nothing here gates sign-in; the route is always reachable for a
+    GlobalAdmin.
+
+    The copy is the closed adminonboarding.* kw-l key set (M30·6, the 21-key
+    set U05 authored — 14 named in the register + the 7 adminonboarding.desc_*
+    per-step descriptions referenced by the view model's Step.DescriptionKey)
+    — the ONLY user-visible copy on this surface (the M22 D7 "closed set" pin,
+    admin-scope). Every label goes through <kw-l> by key (the kw-l TagHelper
+    floor, ADR 0015 D1).
+*@
+@using Kumunita.Web.Security
+@model AdminOnboardingViewModel
+@{
+    ViewData["Title"] = "Admin onboarding";
+}
+
+<h1><kw-l key="adminonboarding.title">Set up this community</kw-l></h1>
+<p class="text-muted">
+    <kw-l key="adminonboarding.intro">A guided walk through the seven most important initial settings for a new administrator. Each step links into the setting that already owns it — visit them in order, then mark the walk-through complete when you're set.</kw-l>
+</p>
+
+@* The seven step cards (M30·7): the closed set the view model carries, in the
+   README / Milestones.cs order. Each card = a localized title (Step.LabelKey)
+   + a one-line description (Step.DescriptionKey) + the "visit this setting"
+   link (adminonboarding.visit) into the existing admin surface (Step.Route).
+   Links-only (M30·7): no inline control, no per-step POST, no persisted step
+   cursor, no completion gate — the walk-through's *only* write is the
+   CompleteAsync lane (M30·1, M30·6). *@
+<ol class="list-group kmb-admin-onboarding-steps">
+    @foreach (var step in Model.Steps)
+    {
+        <li class="list-group-item d-flex align-items-center gap-2">
+            <span class="me-auto me-2">
+                <span class="d-block fw-semibold"><kw-l key="@step.LabelKey"></kw-l></span>
+                <span class="d-block text-muted small"><kw-l key="@step.DescriptionKey"></kw-l></span>
+            </span>
+            <a class="btn btn-sm btn-outline-primary text-nowrap" href="@step.Route">
+                <kw-l key="adminonboarding.visit">Visit this setting</kw-l>
+            </a>
+        </li>
+    }
+</ol>
+
+@* The ONE write (M30·4): the "mark as complete" button. A
+   [ValidateAntiForgeryToken] POST to /admin/onboarding/complete that stamps
+   AdminOnboarding.CompletedAt = now through the single audited write lane.
+   Non-blocking (M30·5): nothing else on this page writes. *@
+<div class="d-flex flex-wrap gap-2 mt-3 kmb-admin-onboarding-actions">
+    <form method="post" action="/admin/onboarding/complete">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-primary"><kw-l key="adminonboarding.complete">Mark as complete</kw-l></button>
+    </form>
+</div>
