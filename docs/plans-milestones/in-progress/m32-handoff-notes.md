@@ -289,3 +289,39 @@ successor; U07 should re-pin or retire the M31 test alongside authoring it.
 **No new test** added this unit (U07's seam tests are the first M32 tests);
 **no** `IEscalationForwarder` / Web-layer change (U05); the plan file
 `in-progress/m32-u03.md` is moved to `done/m32/` last.
+
+## U04 — public issue submission surface
+
+Shipped the public general issue-submission surface (M32·4 — public,
+anonymous-safe, **no** `[Authorize]` gate; the M31·2 500-form precedent).
+**3 new files, Web-only, no test:**
+(a) **Two routes** — `GET /issues/new` (`IssueController.GetNew` → `View(new
+IssueFormModel())`) + `POST /issues/new` (`IssueController.PostNew`,
+`[ValidateAntiForgeryToken]`; binds `IssueFormModel`, a blank `Description` is a
+form-level 400 re-render — never a 500; on valid model calls
+`IErrorReportService.CreateAsync`, then re-renders `New.cshtml` with
+`FormSubmitted = true` → the `issue.thanks` confirmation — no redirect, no
+modal).
+(b) **`IssueFormModel` — 3 fields:** `Description` (`string`,
+`[Required]` + `[StringLength(2000)]`) · `ContactEmail` (`string?`,
+`[EmailAddress]` + `[MaxLength(254)]`) · `FormSubmitted` (`bool`, default
+`false`).
+(c) **`Origin = "general"` pin (M32·4)** — the `PostNew` action constructs
+`new ErrorReportDraft(SubjectId, Description, ContactEmail, RequestId,
+ExceptionType: null, UserAgent, Origin: "general")`; `SubjectId` =
+`KumunitaPrincipal.SubjectId(User) ?? ""` (anonymous-safe); `RequestId` =
+`Activity.Current?.Id ?? HttpContext.TraceIdentifier`; `UserAgent` =
+`Request.Headers.UserAgent` truncated to 256; a `CreateAsync` failure is
+swallowed (M31·5 "never a 500 back to the resident" pin). `ExceptionType` is
+`null` — a general issue is not tied to an error page.
+(d) **`IssueController` action count: 2** (`GetNew` + `PostNew`).
+`Views/Issues/New.cshtml` consumes the `issue.*` `kw-l` keys 1–8
+(`issue.title` / `intro` / `description.label` / `description.placeholder` /
+`email.label` / `email.placeholder` / `submit` / `thanks`) via the same
+server-side `L()` helper + `KnownTranslationKeys.EnValues` floor as the M31
+`Error.cshtml` house shape (the keys are authored by U06 — M32·9; the view
+renders the en fallback until then).
+(e) **Compile warnings:** none — `dotnet build Kumunita.slnx -c Debug` green,
+0 Warning(s), 0 Error(s). No DI change (the controller injects the existing
+`IErrorReportService` registration — M32·1). Plan file `in-progress/m32-u04.md`
+moved to `done/m32/` last.
