@@ -14,10 +14,10 @@ content in `AGENTS.md`, not here. (De-duplicated by `U03`, IMPROVE lane —
 the previous file carried full copies of each section below; the two had
 drifted in subtle ways.)
 
-- **Running PowerShell commands safely (Windows agents)** — including the
+- **Running terminal commands safely (WSL2 / Linux agents)** — including the
   `$variables`-don't-survive-between-terminal-calls gotcha and the
-  here-string trap. See
-  [AGENTS.md § Running PowerShell commands safely](../AGENTS.md#running-powershell-commands-safely-windows-agents).
+  quoting / multi-line-content rules. See
+  [AGENTS.md § Running terminal commands safely](../AGENTS.md#running-terminal-commands-safely-wsl2--linux-agents).
 - **Razor verification doctrine** — including the four known Razor traps in
   this codebase and the "Getting a live server" paragraph (docker-compose,
   the sample GlobalAdmin credentials, the browser-snapshot evidence rule).
@@ -41,5 +41,4 @@ lane adds a new VS Code- or Copilot-specific rule (e.g. a new
 integrated-browser quirk, a new `.tmp/` harness file, a new task-runner
 convention), add it **here**, in this section, not in `AGENTS.md` (which is
 read by frameworks that may not have VS Code). Keep it to the VS-Code surface
-— general doctrine belongs in `AGENTS.md`, and the `improve-check.ps1` gate
-(c) fails the close if a `##` heading is duplicated between the two files.
+— general doctrine belongs in `AGENTS.md`.
