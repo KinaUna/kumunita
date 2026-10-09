@@ -39,13 +39,18 @@ public class EventServiceSkipUndeleteTests(PostgresFixture fixture) : IClassFixt
 
         // Build a 3-occurrence weekly series via U02's create lane: the head
         // (RecurrenceRule non-null, RecurrenceHeadId null) + 2 siblings
-        // (RecurrenceHeadId == head.Id, RecurrenceRule null).
+        // (RecurrenceHeadId == head.Id, RecurrenceRule null). Anchor a week out
+        // (a clean UTC whole-hour, microsecond-clean value) so every sibling
+        // stays in the future regardless of the clock (the D4 now-floor drops
+        // non-head occurrences whose Start is in the past — the fixed 2026-10-01
+        // dates went stale) and the Postgres timestamptz round-trip is exact.
+        var headStart = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(7), TimeSpan.Zero);
         var head = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "Weekly sync",
             Body = "body",
-            Start = new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 19, 0, 0, TimeSpan.Zero),
+            Start = headStart,
+            End = headStart.AddHours(1),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule { Recurrence = Recurrence.Weekly, Interval = 1, Count = 3 },
         });
@@ -99,12 +104,17 @@ public class EventServiceSkipUndeleteTests(PostgresFixture fixture) : IClassFixt
         var ct = TestContext.Current.CancellationToken;
 
         // Build a 2-row weekly series owned by author A (head + 1 sibling).
+        // Anchor a week out (a clean UTC whole-hour, microsecond-clean value)
+        // so the single sibling stays in the future regardless of the clock
+        // (the fixed 2026-11-01 date went stale) and the Postgres timestamptz
+        // round-trip is exact.
+        var headStart = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(7), TimeSpan.Zero);
         var head = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "Weekly club",
             Body = "body",
-            Start = new DateTimeOffset(2026, 11, 1, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 11, 1, 19, 0, 0, TimeSpan.Zero),
+            Start = headStart,
+            End = headStart.AddHours(1),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule { Recurrence = Recurrence.Weekly, Interval = 1, Count = 2 },
         });

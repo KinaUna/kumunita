@@ -40,9 +40,15 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
 
         // Build a 5-row weekly series via U02's create lane (Weekly/1/5):
         // head (RecurrenceRule non-null, RecurrenceHeadId null) + 4 siblings
-        // (RecurrenceHeadId == head.Id, RecurrenceRule null).
-        var headStart = new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.Zero);
-        var headEnd = new DateTimeOffset(2026, 10, 1, 19, 0, 0, TimeSpan.Zero);
+        // (RecurrenceHeadId == head.Id, RecurrenceRule null). Anchor a week out
+        // (a clean UTC whole-hour, microsecond-clean value) so every sibling
+        // stays in the future regardless of the clock (the D4 now-floor drops
+        // non-head occurrences whose Start is in the past — the fixed 2026-10-01
+        // dates went stale), the Postgres timestamptz (µs-precision) round-trip
+        // is exact (a sub-µs UtcNow would make a timestamp-equality assertion
+        // flaky), and UTC keeps stepping away from any local DST boundary.
+        var headStart = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(7), TimeSpan.Zero);
+        var headEnd = headStart.AddHours(1);
 
         var head = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -92,8 +98,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal(head.Id, updated.Id);
         Assert.Equal("Renamed standup", updated.Title);
         Assert.Equal("Room B", updated.Location);
-        Assert.Equal(headStart, updated.Start);
-        Assert.Equal(headEnd, updated.End);
+        Assert.Equal(headStart.UtcDateTime, updated.Start.UtcDateTime);
+        Assert.Equal(headEnd.UtcDateTime, updated.End.UtcDateTime);
         Assert.NotNull(updated.RecurrenceRule);
         Assert.Equal(Recurrence.Weekly, updated.RecurrenceRule!.Recurrence);
         Assert.Equal(1, updated.RecurrenceRule.Interval);
@@ -111,20 +117,22 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
 
             Assert.Equal(5, all.Count);
 
-            // Expected Starts: 2026-10-01, 08, 15, 22, 29 (weekly, interval 1).
+            // Expected Starts: head + 4 weekly siblings (interval 1), all
+            // derived from the now-relative headStart so the suite stays
+            // green as the clock advances.
             var expectedStarts = new[]
             {
-                new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 10, 8, 18, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 10, 15, 18, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 10, 22, 18, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 10, 29, 18, 0, 0, TimeSpan.Zero),
+                headStart,
+                headStart.AddDays(7),
+                headStart.AddDays(14),
+                headStart.AddDays(21),
+                headStart.AddDays(28),
             };
 
             for (var i = 0; i < 5; i++)
             {
-                Assert.Equal(expectedStarts[i], all[i].Start);
-                Assert.Equal(expectedStarts[i].AddHours(1), all[i].End);  // 1-hour duration preserved.
+                Assert.Equal(expectedStarts[i].UtcDateTime, all[i].Start.UtcDateTime);
+                Assert.Equal(expectedStarts[i].AddHours(1).UtcDateTime, all[i].End.UtcDateTime);  // 1-hour duration preserved.
                 Assert.Equal("Renamed standup", all[i].Title);           // cascaded to all rows.
                 Assert.Equal("Room B", all[i].Location);                 // cascaded to all rows.
             }
@@ -150,10 +158,15 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
         const string author = "m18-gate4b-author";
         var ct = TestContext.Current.CancellationToken;
 
-        // Build a 5-row weekly series (Weekly/1/5): head at 2026-10-01,
-        // siblings at 2026-10-08, 15, 22, 29.
-        var headStart = new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.Zero);
-        var headEnd = new DateTimeOffset(2026, 10, 1, 19, 0, 0, TimeSpan.Zero);
+        // Build a 5-row weekly series (Weekly/1/5): head + 4 weekly
+        // siblings. Anchor a week out (a clean UTC whole-hour, microsecond-
+        // clean value) so every sibling stays in the future regardless of the
+        // clock (the D4 now-floor drops non-head occurrences whose Start is in
+        // the past — the fixed 2026-10-01 dates went stale), the Postgres
+        // timestamptz round-trip is exact, and UTC keeps stepping away from any
+        // local DST boundary.
+        var headStart = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(7), TimeSpan.Zero);
+        var headEnd = headStart.AddHours(1);
 
         var head = await svc.CreateAsync(author, new CreateEventRequest
         {
@@ -182,8 +195,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 .OrderBy(e => e.Start)
                 .ToListAsync(ct)).ToList();
             Assert.Equal(5, pre.Count);
-            var fifthOccurrenceStart = new DateTimeOffset(2026, 10, 29, 18, 0, 0, TimeSpan.Zero);
-            Assert.Equal(fifthOccurrenceStart, pre[4].Start);
+            var fifthOccurrenceStart = headStart.AddDays(28);
+            Assert.Equal(fifthOccurrenceStart.UtcDateTime, pre[4].Start.UtcDateTime);
         }
 
         // Edit the head: change the rule from Weekly/1/5 to Weekly/1/3
@@ -222,11 +235,11 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 .ToListAsync(ct)).ToList();
 
             Assert.Equal(2, liveSiblings.Count);
-            Assert.Equal(new DateTimeOffset(2026, 10, 8, 18, 0, 0, TimeSpan.Zero), liveSiblings[0].Start);
-            Assert.Equal(new DateTimeOffset(2026, 10, 15, 18, 0, 0, TimeSpan.Zero), liveSiblings[1].Start);
+            Assert.Equal(headStart.AddDays(7).UtcDateTime, liveSiblings[0].Start.UtcDateTime);
+            Assert.Equal(headStart.AddDays(14).UtcDateTime, liveSiblings[1].Start.UtcDateTime);
             // End = Start + 1-hour duration preserved.
-            Assert.Equal(liveSiblings[0].Start.AddHours(1), liveSiblings[0].End);
-            Assert.Equal(liveSiblings[1].Start.AddHours(1), liveSiblings[1].End);
+            Assert.Equal(liveSiblings[0].Start.AddHours(1).UtcDateTime, liveSiblings[0].End.UtcDateTime);
+            Assert.Equal(liveSiblings[1].Start.AddHours(1).UtcDateTime, liveSiblings[1].End.UtcDateTime);
             // Siblings have null rule, link to head.
             Assert.All(liveSiblings, s =>
             {
@@ -242,7 +255,7 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
         {
             var oldFifth = await qOld.Query<Event>()
                 .Where(e => e.RecurrenceHeadId == head.Id)
-                .Where(e => e.Start == new DateTimeOffset(2026, 10, 29, 18, 0, 0, TimeSpan.Zero))
+                .Where(e => e.Start == headStart.AddDays(28))
                 .ToListAsync(ct);
             // There may be multiple rows at this Start (old deleted + no new
             // sibling at this date since the new series only goes to 2026-10-15).

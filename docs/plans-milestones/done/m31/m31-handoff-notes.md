@@ -1,5 +1,17 @@
 # M31 — Production error handling — rolling handoff note
 
+> **TL;DR:** Shipped M31 (production error handling, ADR 0154): a
+> report-an-issue form on the 500 error page (a resident says what went
+> wrong, anonymous-safe, non-blocking) + a GlobalAdmin triage surface at
+> `/admin/error-reports` (idempotent mark-as-triaged). One new bounded
+> context `ErrorReports`, one new non-singleton doc `ErrorReport`, one new
+> service `IErrorReportService` (read + two audited-write lanes), the closed
+> `errorreport.*` `kw-l` key set × en/de/fr/da, and the one additive
+> `AccessVia.Anonymous` value — the 16 pinned seam tests green (8 Core /
+> 4 Web page / 4 Web admin), the three-test gate (closed-loop / handoff /
+> part-vs-whole) green, **no `## U<m> — Drift pause`** in this note, and the
+> `Posts/Report` doc (ADR 0023) untouched (M31·10).
+
 > **Milestone open (U00).** This is the **scratch tier** (rolling handoff
 > note) of M31's three-tier contract. One `##` section per unit, appended
 > (never rewritten), in order (U00, U01, … U07). Each unit writes exactly one

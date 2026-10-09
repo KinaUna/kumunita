@@ -1,5 +1,15 @@
 # M31 — Production error handling (design doc)
 
+> **Abstract:** This design settles how a resident reports a platform error
+> (a 500) and how a GlobalAdmin triages it — the intake + triage seam, with
+> resolution/escalation named to M32. The one contract it creates is the
+> `IErrorReportService` read + two audited-write lane on the new
+> `Kumunita.Core.ErrorReports` context (one `ErrorReport` non-singleton doc,
+> one `AccessVia.Anonymous`/`Resident`/`Admin` audit row per write, the
+> closed `TriageStatus = {new, triaged}` set). Out of scope: the general
+> issue-submission lane, the `resolved` status, the escalation forwarding
+> lane, and the per-report detail view with a resolution note — all M32.
+
 > **Milestone M31 — Production error handling.** The README / `Milestones.cs`
 > line, verbatim: "**Production error handling** — a first-class
 > report-an-issue affordance on error pages so a resident can easily say what

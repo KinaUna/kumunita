@@ -37,12 +37,23 @@ public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClass
         var svc = Services(store);
         const string author = "m18-gate2-author";
 
+        // Anchor the series a week out so every sibling stays comfortably in
+        // the future regardless of when the suite runs (the D4 now-floor drops
+        // non-head occurrences whose Start is in the past — the fixed 2026-10-01
+        // dates went stale once the clock passed them, producing an off-by-one).
+        // A clean UTC whole-hour (microsecond-clean) value: Postgres timestamptz
+        // is µs-precision, so a whole-hour anchor round-trips exactly (a
+        // sub-µs UtcNow would round on store and make a timestamp-equality
+        // assertion flaky), and UTC keeps stepping away from any local DST
+        // boundary. The Start/End asserts below compare by UTC instant.
+        var headStart = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(7), TimeSpan.Zero);
+
         var head = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "Weekly standup",
             Body = "body",
-            Start = new DateTimeOffset(2026, 10, 1, 18, 0, 0, TimeSpan.Zero),
-            End = new DateTimeOffset(2026, 10, 1, 19, 0, 0, TimeSpan.Zero),
+            Start = headStart,
+            End = headStart.AddHours(1),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule
             {
@@ -75,18 +86,22 @@ public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClass
 
         Assert.Equal(3, siblings.Count);
 
+        // The 3 siblings, all derived from the now-relative headStart so the
+        // suite stays green as the clock advances (weekly, interval 1).
         var expectedStarts = new[]
         {
-            new DateTimeOffset(2026, 10, 8, 18, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 10, 15, 18, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 10, 22, 18, 0, 0, TimeSpan.Zero),
+            headStart.AddDays(7),
+            headStart.AddDays(14),
+            headStart.AddDays(21),
         };
 
         for (var i = 0; i < 3; i++)
         {
-            Assert.Equal(expectedStarts[i], siblings[i].Start);
+            // Compare by UTC instant — the stored Start carries whatever offset
+            // the DB round-trip returns, but the instant is what the test pins.
+            Assert.Equal(expectedStarts[i].UtcDateTime, siblings[i].Start.UtcDateTime);
             // End = Start + (head.End - head.Start) — the 1-hour duration preserved.
-            Assert.Equal(expectedStarts[i].AddHours(1), siblings[i].End);
+            Assert.Equal(expectedStarts[i].AddHours(1).UtcDateTime, siblings[i].End.UtcDateTime);
             Assert.Null(siblings[i].RecurrenceRule);
             Assert.Equal(head.Id, siblings[i].RecurrenceHeadId);
             Assert.False(siblings[i].IsDraft);
