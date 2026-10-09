@@ -116,3 +116,34 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   per-user table; time series is a future lane (own ADR, the M13 charts
   precedent)." M33 **is** that lane.
 - No code, no build, no test.
+
+## U01 — design doc Part 1
+
+- **Design doc Part 1 authored** — `docs/design/m33-storage-metrics-history-design.md`
+  (the `## Context`, `## Scope` (in + out-of-scope named deferrals),
+  `## Invariants (pinned for M33)`, and `## FACES (pinned, 10)` sections).
+  **Part 2** (seams / contracts / test names / gate / drift-guard + ADR 0156)
+  is U02's — **not** written.
+- **12 invariants pinned (M33·1–M33·12):** M33·1 capability on the M24 `Usage`
+  surface, not a new context · M33·2 the sample is a point-in-time snapshot,
+  one per UTC day (deterministic `Id` dedups) · M33·3 the capture is a
+  Wolverine side-effect, not a middleware · M33·4 zero `AccessAudit` rows, both
+  capture and read · M33·5 Core stays HTTP-free + Wolverine-free · M33·6 the
+  sample never leaves the instance · M33·7 retention is a platform constant,
+  365 days · M33·8 the trend window is a pinned set {30, 90, 180, 365} ·
+  M33·9 the M24 surface is extended additively · M33·10 no new dependency, no
+  JS chart library · M33·11 the closed `storage.trend.*` `kw-l` key set is
+  four-language · M33·12 the six-member close flip is U08's responsibility.
+- **10 FACES pinned (M33-1–M33-10), each bound to invariants:** M33-1 GlobalAdmin
+  sees M24 header + per-user table unchanged + new Trend section (M33·9,
+  M33·10) · M33-2 window switch 30/180/365 reflects the chosen window
+  (`?window=`, M33·8) · M33-3 empty history renders `storage.trend.empty`
+  (M33·11) · M33-4 daily tick stores exactly one sample + purges expired
+  (M33·2, M33·3, M33·7) · M33-5 same-day double-run dedups to one row (M33·2) ·
+  M33-6 capture writes zero `AccessAudit` rows (M33·4) · M33-7 non-GlobalAdmin
+  gets 403 (M33·9) · M33-8 the sample doc field set is the 7-member snapshot
+  shape (M33·2) · M33-9 `GetHistoryAsync(30)` returns only days present, no
+  fabricated zero rows (M33·2, M33·8) · M33-10 `GetHistoryAsync(999)` throws
+  `ArgumentOutOfRangeException` (M33·8).
+- U02 pins these by id in Part 2 (the §2.6 drift-guard re-pins all 12
+  invariants + all 10 FACES). No code, no build, no test.
