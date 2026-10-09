@@ -1,6 +1,6 @@
 # ADR 0155 — Issue submission & escalation (a general issue-submission lane + a GlobalAdmin resolution + escalation surface on the M31 ErrorReports surface)
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-09
 
 ## Context

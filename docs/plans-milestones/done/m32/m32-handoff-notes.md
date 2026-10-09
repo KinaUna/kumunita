@@ -508,3 +508,38 @@ in the Core log). (f) **Still-open drift:** **none** — no `## U<m> — Drift
 pause` section in the handoff note; the M31_3 retirement is the U03-flag
 successor swap, not a drift. The gate `Run result` is recorded in the design
 doc §2.5. Plan file `in-progress/m32-u07.md` moved to `done/m32/` last.
+
+## U08 — close
+
+(a) **`Milestones.cs` flip** — the `M32` row is now `StatusDone` (was
+`StatusNext`) + the `M33` row is now `StatusNext` (was `StatusPlanned`); the
+roadmap order is unchanged (`…"M31","M32","M33","M34"` — the "named lane, not
+a renumber" precedent). (b) **`MilestonesTests` re-pin** — `M32_Is_The_Single_InProgress_Milestone` replaced by `M33_Is_The_Single_InProgress_Milestone` (single `StatusNext` is now `M33`;
+`M34` stays `StatusPlanned`; every other id — now including `M32` — is
+`StatusDone`); the `Shipped_Milestones_Are_Marked_Done` done-list gained
+`"M32"`. (c) **`WhatsNew.cs` `0.48.0` entry** — appended newest-first as the
+registry head (the required sixth close-flip member, the M27 lesson held),
+naming M32 + ADR 0155 (date `2026-10-09`); `WhatsNewTests` head pin re-pointed
+from the M31 `0.47.0` head to the M32 `0.48.0` head (the M31 `0.47.0` entry
+slides one row back, the M30 `0.46.0` two rows back). (d) **Three doc parity
+appends** — `README.md` summary gains the `**M32 is done**` line (and the
+summary's "M32–M34 are planned" line narrows to "M33–M34") + the Roadmap `M32`
+line gains the `**Done.** (ADR 0155)` tail; `docs/STATUS.md` gains the
+`**M32 is done**` line; `docs/ARCHITECTURE.md` gains the `**M32 issue
+submission & escalation is shipped** (ADR 0155)` `ErrorReports/` extension
+line. (e) **ADR 0155** — `Status: Draft` → `Status: Accepted`; the
+`docs/adr/README.md` index row tagged `Accepted — **Done** (M32)` (the M31
+`0154` row shape). (f) **`done/m32/` move** — `git mv` the register
+(`plan-m32-issue-submission-escalation.md`) + the `m32-u08.md` unit plan + the
+`m32-handoff-notes.md` into `docs/plans-milestones/done/m32/` (the `m32-u00`…
+`m32-u07` unit plans were already there); `in-progress/` is now empty (the M31
+close left it empty too — the done/ subfolder holds all M32 artifacts).
+(g) **Test evidence (in-process path, the AGENTS.md runner):** `dotnet build
+Kumunita.slnx -c Debug` **Build succeeded, 0 Error(s)** (56 pre-existing
+warnings, none from the U08 files); `Kumunita.Web.Tests` **Total: 990,
+Errors: 0, Failed: 0, Skipped: 1** (the 1 skip is the U07-retired M31_3 pin,
+pre-existing; the `MilestonesTests` + `WhatsNewTests` pins green — order +
+single-in-progress intact, the `0.48.0` head present, newest-first).
+(h) **Still-open drift:** **none** — no `## U<m> — Drift pause` section in
+this handoff note.
+
