@@ -502,3 +502,161 @@
   `SchemaBootstrap.cs:48` (the existing call, not a new one). This is a
   **register-imprecision, not a drift** — the actual code matches the
   SITE / M29 precedent exactly.
+
+## U04 — AdminOnboardingController + ViewModel
+
+- **Web implementation authored** (2 new files, 1 verify — **no views, no
+  banner, no `kw-l` keys, no new test**). **Build green** (`dotnet build
+  Kumunita.slnx -c Debug` — EXIT=0, 0 errors, **zero** warnings on the two
+  new AdminOnboarding files — confirmed by `Select-String` on a
+  `--no-incremental` build output). U05 can now pin by file.
+
+- **(a) The 2 routes (exact paths, for U05's views):**
+  - `GET /admin/onboarding` — the `AdminOnboardingController.Index` action
+    (the `AdminSiteController.Index` / `OnboardingController.Index` shape —
+    seeds the `AdminOnboardingViewModel` with the `Completed` state (the
+    `IAdminOnboardingService.GetAsync` read's inverse, M30·3 — best-effort:
+    a missing store / missing row / read failure degrades to
+    `Completed = false`, the floor) + the closed seven-step list
+    (`AdminOnboardingViewModel.ClosedSteps`, the M30·7 pin)). The U05
+    `Views/AdminOnboarding/Index.cshtml` view renders from this model.
+  - `POST /admin/onboarding/complete` — the `AdminOnboardingController.Complete`
+    action (the `AdminSiteController.SaveHome` / `OnboardingController.Finish`
+    shape — the **one** write action: calls
+    `IAdminOnboardingService.CompleteAsync(actor)` for the signed-in
+    GlobalAdmin, `[ValidateAntiForgeryToken]`, `TempData["info"] = await
+    FlashAsync("adminonboarding.flash_done")`, `RedirectToAction(nameof(Index))`).
+    The U05 view's "mark as complete" button is a
+    `[ValidateAntiForgeryToken]` POST to this route.
+
+- **(b) The seven `Step` entries (by key + route, in the README /
+  `Milestones.cs` order):**
+  | # | Key | LabelKey | Route | DescriptionKey |
+  |---|-----|----------|-------|----------------|
+  | 1 | `communityname` | `adminonboarding.step_communityname` | `/admin/languages` | `adminonboarding.desc_communityname` |
+  | 2 | `languages` | `adminonboarding.step_languages` | `/admin/languages` | `adminonboarding.desc_languages` |
+  | 3 | `moderation` | `adminonboarding.step_moderation` | `/admin/announcements/comments` | `adminonboarding.desc_moderation` |
+  | 4 | `notifications` | `adminonboarding.step_notifications` | `/admin/quiet` | `adminonboarding.desc_notifications` |
+  | 5 | `storage` | `adminonboarding.step_storage` | `/admin/storage/settings` | `adminonboarding.desc_storage` |
+  | 6 | `sitecontent` | `adminonboarding.step_sitecontent` | `/admin/site` | `adminonboarding.desc_sitecontent` |
+  | 7 | `escalation` | `adminonboarding.step_escalation` | `/admin/announcements` | `adminonboarding.desc_escalation` |
+
+  **Note for U05:** the `LabelKey` + `DescriptionKey` columns name the
+  `adminonboarding.*` `kw-l` keys that U05 must author (M30·6, the closed
+  set parity-pinned in four languages, the M22 D7 "closed set" shape,
+  admin-scope). The register's §"closed `kw-l` key set" table names 14
+  keys: `adminonboarding.title` / `adminonboarding.intro` / the seven
+  `adminonboarding.step_*` / `adminonboarding.visit` /
+  `adminonboarding.complete` / `adminonboarding.flash_done` /
+  `adminonboarding.banner.text` / `adminonboarding.banner.action`. The
+  **seven `adminonboarding.desc_*` keys** (one per step) are **not** in the
+  register's 14-key list — they are the per-step one-line description
+  labels the design doc §2.4 / the U04 view model reference. U05 should
+  confirm with the register whether the `desc_*` keys are in-scope (the
+  register's 14-key set names only the `step_*` labels, not per-step
+  descriptions). **This is a register-vs-design-doc mismatch, not a drift**
+  — the register is authoritative for *which files exist* and *what each
+  unit does*; the design doc is authoritative for the *pinned shapes*. U05
+  should author the keys the register's 14-key set names, and **add** the
+  seven `desc_*` keys if the design doc's `Step.DescriptionKey` field is
+  kept (the design doc's `Step` record carries `DescriptionKey`, so U05
+  must author all 21 keys: 14 + 7). If U05 decides the `desc_*` keys are
+  out of scope, the `Step.DescriptionKey` field should be dropped (a
+  drift pause, not a silent edit).
+
+- **(c) The `Completed` property shape (the `GetAsync` read's inverse):**
+  `public bool Completed { get; init; }` — the
+  `IAdminOnboardingService.GetAsync` read's inverse
+  (`CompletedAt != null`). `true` = `CompletedAt` is non-null (the banner
+  clears); `false` = `CompletedAt` is `null` (the banner shows, the floor).
+  The U05 banner partial reads the **same** `GetAsync` seam (M30·5 — the
+  read is the **single** seam the banner + the view call, so they resolve
+  to the **same** value). Never a claim (the thin-token rule, ADR 0001-B).
+
+- **(d) Compile warnings on the new types:** **zero** (confirmed by
+  `Select-String` on the `--no-incremental` build output for
+  `AdminOnboarding` — 0 matches). The 69 build warnings are all
+  pre-existing xUnit analyzer warnings (`xUnit1051` CancellationToken,
+  `xUnit2017` / `xUnit2029` assert-style) + the pre-existing CS8604 /
+  CS8603 nullable-reference warnings in unrelated files, untouched by U04.
+
+- **Deliverables authored (2 files, new):**
+  1. **`src/Kumunita.Web/Controllers/AdminOnboardingController.cs`**
+     (new) — the `AdminOnboardingController` (the ADR 0150
+     `AdminSiteController` shape, the M22 `OnboardingController` shape):
+     `[Route("admin/onboarding")]` + `[Authorize(Roles =
+     Kumunita.Core.Identity.Roles.GlobalAdmin)]`. Two actions:
+     - `GET /admin/onboarding` (`Index`) — composes the read-seam
+       (`IAdminOnboardingService.GetAsync`) for the `CompletedAt` state +
+       the closed seven-step list
+       (`AdminOnboardingViewModel.ClosedSteps`). The model is built from
+       the **admin-scope read** (the `CompletedAt` value + the static
+       seven-step list — the M22 `OnboardingViewModel` shape, admin-scope).
+     - `POST /admin/onboarding/complete` (`Complete`) — the **one** write
+       action: calls U03's `IAdminOnboardingService.CompleteAsync(actor)`
+       for the signed-in GlobalAdmin, `[ValidateAntiForgeryToken]`,
+       `TempData["info"] = await FlashAsync("adminonboarding.flash_done")`,
+       `RedirectToAction(nameof(Index))` (the
+       `AdminSiteController.SaveHome` / `OnboardingController.Finish` shape).
+     The controller's **only** write is `CompleteAsync` (M30·1, M30·6);
+     every step it surfaces **links into** the existing admin surface that
+     already owns it (the M22 D3 "rides frozen lanes" pin, admin-scope).
+     The `FlashAsync` idiom (the `OnboardingController.FlashAsync` shape,
+     the M22 precedent for M30): guards both `localization` and
+     `translationProvider` with a single `if (localization is null ||
+     translationProvider is null)` → the `KnownTranslationKeys.EnValues`
+     floor; otherwise the `EffectiveLanguageCode.ResolveAsync` +
+     `ITranslationProvider.GetAsync` chain.
+  2. **`src/Kumunita.Web/Models/AdminOnboardingViewModel.cs`** (new) —
+     the `AdminOnboardingViewModel` (the M22 `OnboardingViewModel` shape,
+     admin-scope): `Completed` (bool, the `GetAsync` read's inverse) +
+     `IReadOnlyList<Step> Steps` (the closed seven-step set, each a
+     `(Key, LabelKey, Route, DescriptionKey)` record, in the README /
+     `Milestones.cs` order) + `ClosedSteps` (the static readonly list) +
+     the `Step` record (the four-field tuple). The seven `Step` entries are
+     the closed set (the register's §"closed `kw-l` key set" table, the
+     seven tuples in the README / `Milestones.cs` order).
+
+- **Verify (DI visibility):** **confirmed** — the
+  `IAdminOnboardingService` registration is at
+  `src/Kumunita.Core/DependencyInjection.cs:131` (U03's
+  `AddTransient<AdminOnboarding.IAdminOnboardingService>` — the
+  `ISiteContentService` / `ISurfaceLabelsService` "AddTransient with the
+  store injected" shape). The Web project calls
+  `builder.Services.AddKumunitaCore()` at `Program.cs:262`, which
+  registers the service into the Web's DI container. The
+  `AdminOnboardingController`'s constructor injection
+  (`IAdminOnboardingService adminOnboarding`) resolves at the Web layer
+  via the Core DI registration. **No Web-layer registration needed** (the
+  `src/Kumunita.Web/DependencyInjection.cs` file does **not** exist — the
+  Web DI is in `Program.cs`, which already calls `AddKumunitaCore()`).
+
+- **Drift check:** all Entry reads (the register's U04 entry, U03's
+  handoff `## U03` section, `AdminSiteController.cs` (the ADR 0150
+  `/admin/site` surface — the `GlobalAdmin`-gated dedicated controller +
+  the `[ValidateAntiForgeryToken]` POST + the `TempData["info"]` flash +
+  the `RedirectToAction(nameof(Index))` redirect), `OnboardingController.cs`
+  (the M22 `OnboardingController` — the stateless `/onboarding` page + the
+  `CompleteOnboardingAsync` single-write-lane + the `FlashAsync` idiom +
+  the `KumunitaPrincipal.SubjectId(user)` read),
+  `IAdminOnboardingService.cs` (U03's read-seam + write-lane — the
+  `GetAsync` / `CompleteAsync` shape), `AdminQuietController.cs` (the
+  sibling admin controller with the `FlashAsync` idiom — the canonical
+  pattern for the admin-scope `FlashAsync`), `ITranslationProvider.cs`
+  (the `GetAsync(key, preferredLanguageCode)` signature),
+  `EffectiveLanguageCode.cs` (the `ResolveAsync(request, localization,
+  provider)` signature), `OnboardingViewModel.cs` (the M22 view model
+  shape to mirror), `Program.cs` (the `AddKumunitaCore()` call at line
+  262 — the Web DI visibility), `DependencyInjection.cs` (U03's
+  `AddTransient` registration at line 131 — the Web DI visibility), the
+  design doc §2.3–§2.5 (the exact `AdminOnboardingViewModel` shape + the
+  banner-eligibility rule)) are consistent with the register.
+  **One register-vs-design-doc mismatch noted (not a drift, not a blocker
+  for U04 — U05 should confirm):** the register's 14-key `kw-l` set does
+  not include the seven `adminonboarding.desc_*` keys (one per step
+  description), but the design doc's `Step.DescriptionKey` field + the
+  U04 `AdminOnboardingViewModel.ClosedSteps` reference them. U05 should
+  author all 21 keys (14 + 7) if the `Step.DescriptionKey` field is kept,
+  or drop the field if the `desc_*` keys are out of scope (a drift pause,
+  not a silent edit). **U04's deliverable is the controller + view model
+  only — the `kw-l` keys are U05's.**
