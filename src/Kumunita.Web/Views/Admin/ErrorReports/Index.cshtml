@@ -74,22 +74,36 @@ else
             <div class="list-group-item">
                 <div class="d-flex align-items-start gap-3">
                     @* The status chip (new = text-bg-warning, triaged =
-                       text-bg-success — the register's U05 pin). A
-                       conditional @if/@else with two separate <kw-l>
-                       elements (each with a static key) so the
-                       KwLRegistryConsistencyTests static scan finds both
-                       keys (errorreport.list.status.new +
-                       errorreport.list.status.triaged). *@
+                       text-bg-success, resolved = text-bg-primary — the M31
+                       new / triaged precedent + the M32 additive resolved
+                       chip, the M32·1 pin). A conditional @if/@else/@else
+                       with three separate <kw-l> elements (each with a static
+                       key) so the KwLRegistryConsistencyTests static scan
+                       finds all three keys (errorreport.list.status.new +
+                       errorreport.list.status.triaged +
+                       errorreport.list.status.resolved). The existing new /
+                       triaged chips are **unchanged** (M32·1 — additive-
+                       only). *@
                     @if (r.TriageStatus == "new")
                     {
                         <span class="badge text-bg-warning fw-semibold">
                             <kw-l key="errorreport.list.status.new">New</kw-l>
                         </span>
                     }
-                    else
+                    else if (r.TriageStatus == "triaged")
                     {
                         <span class="badge text-bg-success fw-semibold">
                             <kw-l key="errorreport.list.status.triaged">Triaged</kw-l>
+                        </span>
+                    }
+                    else
+                    {
+                        @* The M32 additive resolved chip (the M32·1 pin — the
+                           errorreport.list.status.resolved kw-l key, the
+                           M32·9 closed set key 10; the text-bg-primary
+                           Bootstrap class — the M31 chip precedent). *@
+                        <span class="badge text-bg-primary fw-semibold">
+                            <kw-l key="errorreport.list.status.resolved">Resolved</kw-l>
                         </span>
                     }
                     <div class="flex-grow-1">
@@ -146,6 +160,17 @@ else
                             <code class="small">@r.RequestId</code>
                         </div>
                     </div>
+                    @* The "View" detail link (the M32·10 pin — links to the
+                       /admin/error-reports/{id} detail view). Always visible
+                       (the M31 list's mark-as-triaged button is the only
+                       conditional affordance; the View link is additive,
+                       the M32·1 pin). The errorreport.list.view kw-l key is
+                       a plain link label (a value, not a platform-key in the
+                       M32·9 closed set — the en source text is the floor,
+                       ADR 0015 D1). *@
+                    <a href="/admin/error-reports/@r.Id" class="btn btn-sm btn-outline-secondary text-nowrap ms-2 me-0">
+                        View
+                    </a>
                     @* The "Mark as triaged" button (visible only when
                        TriageStatus == "new" — the register's U05 pin,
                        M31·6 idempotency: a second POST on an already-

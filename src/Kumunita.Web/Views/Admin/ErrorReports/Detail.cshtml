@@ -1,0 +1,252 @@
+@*
+    Detail.cshtml — the M32 /admin/error-reports/{id} GlobalAdmin detail view
+    (ADR 0155, M32·4 / M32·8 / M32·10).
+
+    The per-report detail: the full ErrorReport field set (the 15-member M32
+    ceiling, the M32·3 pin) + the Resolve section (the ResolutionNote
+    textarea + the "Mark as resolved" button, the POST …/resolve action,
+    M32·8) + the Escalate section (the "Escalate to operator endpoint"
+    button, the POST …/escalate action, M32·5 / M32·6 / M32·7). The
+    [Authorize(Roles = GlobalAdmin)] gate is the standard admin surface (the
+    AdminOnboardingController shape, ADR 0001-B thin-token rule); no new
+    AccessAction / Decide() branch / IAuthorizationService surface (M32·10).
+
+    The copy is the closed errorreport.resolve.* / errorreport.escalate.*
+    kw-l key set (the M32·9 pin, the design doc §2.3 keys 11–19) + the
+    errorreport.list.status.* chip keys (the M31 20-key set extended by the
+    errorreport.list.status.resolved additive key, M32·1). Every label goes
+    through <kw-l> by key (the kw-l TagHelper floor, ADR 0015 D1 — an
+    unregistered key falls back to the raw key, so the view renders the en
+    reference text until U06 authors the keys).
+
+    The flash is the errorreport.resolve.flash (success) /
+    errorreport.escalate.flash_success (success) /
+    errorreport.escalate.flash_failure (failure) /
+    errorreport.escalate.not_configured (M32·6) keys — server-resolved by
+    the controller's FlashAsync (the AdminOnboardingController.FlashAsync
+    idiom, the EffectiveLanguageCode.ResolveAsync +
+    ITranslationProvider.GetAsync seam, admin-scope), rendered in the
+    admin's effective language. A "no-op" resolve (an already-resolved
+    report, M32·8) sets no flash → no alert (the M31·6 precedent).
+
+    Razor traps honored (AGENTS.md):
+      - No <kw-l> inside a quoted attribute value (the status chip uses a
+        conditional @if/@else/@else with three separate <kw-l> elements,
+        each with a static key, so the KwLRegistryConsistencyTests static
+        scan finds all three keys — errorreport.list.status.new +
+        errorreport.list.status.triaged + errorreport.list.status.resolved).
+      - No un-awaited Task<string> in markup (the flash strings are
+        server-resolved by the controller's FlashAsync — the view only
+        renders the resolved string).
+      - No style=/data-* attributes built by interpolating quoted strings
+        via @(...) (the Bootstrap classes are static strings).
+*@
+@using Kumunita.Core.ErrorReports
+@model Kumunita.Web.Models.AdminErrorReportDetailViewModel
+@{
+    ViewData["Title"] = "Admin — Error report detail";
+    var r = Model.Report;
+    var desc = r.Description ?? "";
+    var exc = r.ExceptionType ?? "";
+    var excShort = exc.Length > 60 ? exc[..60] + "…" : exc;
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom). *@
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+<h1>
+    <kw-l key="errorreport.resolve.title">Resolve this report</kw-l>
+    <span class="text-muted fs-5">@r.Id</span>
+</h1>
+
+@* The flash toast (the M32·9 closed set, keys 15 / 17 / 18 / 19) — rendered
+   when the just-processed Resolve / Escalate action surfaced a flash.
+   TempData["info"] is the success flash (resolve.flash / escalate.flash_
+   success); TempData["error"] is the failure / not-configured flash
+   (escalate.flash_failure / escalate.not_configured). Both are server-
+   resolved strings (the controller's FlashAsync). *@
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@* The report's full field set (the 15-member M32 ceiling, the M32·3 pin).
+   The M31 11 + the M32 4 additive (Origin / ResolvedAt / ResolvedBy /
+   ResolutionNote) are all rendered. *@
+<dl class="row mb-4">
+    @* The status chip (new = text-bg-warning, triaged = text-bg-success,
+       resolved = text-bg-primary — the M31 chip precedent + the M32
+       additive resolved chip, the M32·1 pin). A conditional @if/@else/@else
+       with three separate <kw-l> elements (each with a static key) so the
+       KwLRegistryConsistencyTests static scan finds all three keys (the
+       errorreport.list.status.new + .triaged + .resolved keys). The <dt> is
+       a plain "Status" label (a value, not a kw-l key — the M32·9 closed
+       set has no generic "status" key). *@
+    <dt class="col-sm-3">Status</dt>
+    <dd class="col-sm-9">
+        @if (r.TriageStatus == "new")
+        {
+            <span class="badge text-bg-warning fw-semibold">
+                <kw-l key="errorreport.list.status.new">New</kw-l>
+            </span>
+        }
+        else if (r.TriageStatus == "triaged")
+        {
+            <span class="badge text-bg-success fw-semibold">
+                <kw-l key="errorreport.list.status.triaged">Triaged</kw-l>
+            </span>
+        }
+        else
+        {
+            <span class="badge text-bg-primary fw-semibold">
+                <kw-l key="errorreport.list.status.resolved">Resolved</kw-l>
+            </span>
+        }
+    </dd>
+
+    @* The description (full text — no truncation in the detail view). *@
+    <dt class="col-sm-3"><kw-l key="errorreport.list.description">Description</kw-l></dt>
+    <dd class="col-sm-9">@desc</dd>
+
+    @* The exception type (monospace, truncated to 60 chars; full text in
+       the title= attribute). Null for a general issue (M32·4). *@
+    <dt class="col-sm-3"><kw-l key="errorreport.list.exception">Exception</kw-l></dt>
+    <dd class="col-sm-9">
+        @if (string.IsNullOrEmpty(exc))
+        {
+            <span class="text-muted">—</span>
+        }
+        else
+        {
+            <code title="@exc">@excShort</code>
+        }
+    </dd>
+
+    @* The reporter (the SubjectId, or the errorreport.list.anonymous kw-l
+       key for blank — the M31 list-view precedent). *@
+    <dt class="col-sm-3"><kw-l key="errorreport.list.reporter">Reporter</kw-l></dt>
+    <dd class="col-sm-9">
+        @if (string.IsNullOrEmpty(r.SubjectId))
+        {
+            <kw-l key="errorreport.list.anonymous">Anonymous</kw-l>
+        }
+        else
+        {
+            <span>@r.SubjectId</span>
+        }
+    </dd>
+
+    @* The contact email (optional, the M31 list-view precedent). *@
+    @if (!string.IsNullOrEmpty(r.ContactEmail))
+    {
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9"><span>@r.ContactEmail</span></dd>
+    }
+
+    @* The request ID (monospace, small — the log correlation handle). *@
+    <dt class="col-sm-3"><kw-l key="errorreport.list.request_id">Request ID</kw-l></dt>
+    <dd class="col-sm-9"><code class="small">@r.RequestId</code></dd>
+
+    @* The created timestamp (the kw-dt TagHelper — the house date format,
+       the ADR 0019/0020 surface). *@
+    <dt class="col-sm-3"><kw-l key="errorreport.list.created">Reported</kw-l></dt>
+    <dd class="col-sm-9"><kw-dt dt="@r.Created" format="g"></kw-dt></dd>
+
+    @* The M32 additive Origin (the M32·3 / M32·4 pin — the closed set
+       {"error-page","general"}). Rendered as plain text (a value, not a
+       platform label — no kw-l key, the M32·9 closed set has no
+       origin.* key). *@
+    <dt class="col-sm-3">Origin</dt>
+    <dd class="col-sm-9">
+        <span class="badge text-bg-secondary">@r.Origin</span>
+    </dd>
+
+    @* The M32 additive resolution fields (the M32·3 / M32·8 pin) — rendered
+       only when set (a resolved report). The ResolvedAt timestamp uses the
+       kw-dt TagHelper; the ResolvedBy is the actor's subject; the
+       ResolutionNote is the admin's free-text "what was done" (or the
+       "Escalated to operator endpoint" marker when escalated). *@
+    @if (r.ResolvedAt is not null)
+    {
+        <dt class="col-sm-3">Resolved</dt>
+        <dd class="col-sm-9">
+            <kw-dt dt="@r.ResolvedAt.Value" format="g"></kw-dt>
+            @if (!string.IsNullOrEmpty(r.ResolvedBy))
+            {
+                <span class="text-muted small">— @r.ResolvedBy</span>
+            }
+            @if (!string.IsNullOrEmpty(r.ResolutionNote))
+            {
+                <div class="mt-2"><em>@r.ResolutionNote</em></div>
+            }
+        </dd>
+    }
+</dl>
+
+@* The Resolve section (the M32·8 idempotent single-write-lane). A
+   [ValidateAntiForgeryToken] POST to /admin/error-reports/{id}/resolve
+   (the AdminOnboardingController.Complete shape). The textarea binds to
+   Model.ResolutionNote (the bound input — the admin's free-text "what was
+   done"). Visible when the report is not yet resolved (a resolved report
+   has already reached the terminal state — the M32·8 idempotency pin: a
+   second POST is a no-op, but the button is hidden to avoid a redundant
+   affordance). *@
+@if (r.TriageStatus != "resolved")
+{
+    <hr />
+    <h2 class="h5"><kw-l key="errorreport.resolve.title">Resolve this report</kw-l></h2>
+    <form method="post" action="/admin/error-reports/@r.Id/resolve" class="mb-4">
+        @Html.AntiForgeryToken()
+        <div class="mb-3">
+            <label for="resolutionNote" class="form-label">
+                <kw-l key="errorreport.resolve.note.label">Resolution note</kw-l>
+            </label>
+            @* The placeholder is a plain string (a <kw-l> TagHelper inside a
+               quoted attribute value is a known Razor trap — it renders as
+               raw HTML text; AGENTS.md). The errorreport.resolve.note.
+               placeholder key (the M32·9 closed set, key 13) is the
+               en-source reference for U06's authoring; the view uses a
+               plain en placeholder here (the kw-l provider floor, ADR
+               0015 D1). *@
+            <textarea
+                class="form-control"
+                id="resolutionNote"
+                name="resolutionNote"
+                rows="3"
+                placeholder="e.g. Fixed the broken calendar link; nothing to forward.">
+                @Model.ResolutionNote
+            </textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <kw-l key="errorreport.resolve.button">Mark as resolved</kw-l>
+        </button>
+    </form>
+}
+
+@* The Escalate section (the M32·5 / M32·6 / M32·7 pin). A
+   [ValidateAntiForgeryToken] POST to /admin/error-reports/{id}/escalate.
+   The button is the "Escalate to operator endpoint" kw-l key (the M32·9
+   closed set, key 16). Visible when the report is not yet resolved (the
+   same terminal-state affordance rule as the Resolve section). *@
+@if (r.TriageStatus != "resolved")
+{
+    <hr />
+    <h2 class="h5"><kw-l key="errorreport.escalate.button">Escalate to operator endpoint</kw-l></h2>
+    <form method="post" action="/admin/error-reports/@r.Id/escalate" class="mb-4">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-outline-primary">
+            <kw-l key="errorreport.escalate.button">Escalate to operator endpoint</kw-l>
+        </button>
+    </form>
+}
+
+@* A back link to the list (the M31 list-view surface). *@
+<p class="mt-4">
+    <a href="/admin/error-reports" class="btn btn-link">
+        <kw-l key="errorreport.list.title">Error reports</kw-l>
+    </a>
+</p>

@@ -288,6 +288,18 @@ builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
 
 builder.Services.AddScoped<Kumunita.Web.Security.IUploadLimitHint, Kumunita.Web.Security.UploadLimitHint>();
 
+// M32 (ADR 0155, M32·5) — the escalation forwarding lane: the Web-layer
+// IEscalationForwarder is the **first outbound HTTP** in the codebase (Core
+// stays HTTP-free, ADR 0006-D). AddHttpClient() registers the
+// IHttpClientFactory (a singleton); the EscalationForwarder is a singleton
+// (it holds no per-request state — its dependencies are a singleton
+// IHttpClientFactory + the IErrorReportService read seam, both resolved
+// safely). The KUMUNITA_ESCALATION_ENDPOINT env var is read from
+// configuration at forward time (M32·6 — never persisted, never a DB
+// column, never a per-row field).
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
+
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
 // a config POCO bound per-instance, not improvised). AddOptions<T>() here the

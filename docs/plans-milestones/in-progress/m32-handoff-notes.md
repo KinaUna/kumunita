@@ -325,3 +325,86 @@ renders the en fallback until then).
 0 Warning(s), 0 Error(s). No DI change (the controller injects the existing
 `IErrorReportService` registration — M32·1). Plan file `in-progress/m32-u04.md`
 moved to `done/m32/` last.
+
+## U05 — admin detail + resolve + escalate + forwarder
+
+Shipped the enhanced admin surface (M32·5 / M32·6 / M32·7 / M32·8 / M32·10 —
+**Web-only, no test, no Core change** (M32·1); no `kw-l` key authoring — U06
+owns the `errorreport.resolve.*` / `errorreport.escalate.*` /
+`errorreport.list.status.resolved` set, the views *consume* them).
+(a) **5 controller actions** on `ErrorReportAdminController` (the M31 2
+unchanged + the M32 3 additive): `Index` (`GET /admin/error-reports`) +
+`MarkTriaged` (`POST …/{id}/triage`) + **`Detail`**
+(`GET /admin/error-reports/{id}` — load via `ListAsync(100)`, `NotFound()`
+when missing, else `View(new AdminErrorReportDetailViewModel { Report =
+report })`) + **`Resolve`** (`POST …/{id}/resolve`,
+`[ValidateAntiForgeryToken]`, `[FromForm] string? resolutionNote` — call
+`MarkResolvedAsync`; **null** (no-op, M32·8) → redirect with **no** flash,
+**non-null** → `TempData["info"]` = `errorreport.resolve.flash`) +
+**`Escalate`** (`POST …/{id}/escalate` — **forwarder null** (test floor) or
+**`Configured == false`** (M32·6) → `TempData["error"]` =
+`errorreport.escalate.not_configured`, no state change; **`Success == false`**
+(M32·7) → `TempData["error"]` = `errorreport.escalate.flash_failure`, **no**
+state change / **no** `MarkResolvedAsync`; **`Success == true`** →
+`MarkResolvedAsync(id, actor, "Escalated to operator endpoint")` +
+`TempData["info"]` = `errorreport.escalate.flash_success`). The ctor gains
+the **optional** `IEscalationForwarder? escalationForwarder = null` param
+(the M31 optional-ctor-param precedent — existing test constructions keep
+compiling).
+(b) **`IEscalationForwarder.ForwardAsync` signature** (namespace
+`Kumunita.Web.Services`, the M32·5 pin — the first outbound HTTP; Core stays
+HTTP-free, ADR 0006-D):
+`Task<EscalationResult> ForwardAsync(string reportId, CancellationToken ct =
+default)` + `record EscalationResult(bool Configured, bool Success, int?
+StatusCode, string? Error)`. `EscalationForwarder` impl: reads
+`configuration["KUMUNITA:ESCALATION_ENDPOINT"]` (M32·6, never persisted),
+loads the report via `errorReports.ListAsync(100)` + filters to `reportId`
+(missing → `Success: false, Error: "report not found"`), POSTs the closed
+payload `{ id, subjectId, description, contactEmail, requestId,
+exceptionType, origin, created }` via `IHttpClientFactory.CreateClient()`
+with a 10 s timeout (the `SmtpProbe` timeout precedent); 2xx → `Success: true`;
+non-2xx → `Success: false` + `ReasonPhrase`; catches `TaskCanceledException`
+(timeout, not caller cancellation) / `HttpRequestException` →
+`Success: false` (M32·7 — a transport error is a failed forward).
+(c) **`KUMUNITA_ESCALATION_ENDPOINT` config key** — read as
+`configuration["KUMUNITA:ESCALATION_ENDPOINT"]` (the `IConfiguration` mapping
+of the env var; the M32·6 pin — **never** a DB column / per-row field /
+Marten row).
+(d) **`resolved` chip in the list view** — `Index.cshtml` now renders a 3-way
+chip: `new` (text-bg-warning) / `triaged` (text-bg-success) /
+**`resolved`** (text-bg-primary, the `errorreport.list.status.resolved` kw-l
+key — the M32·9 closed set key 10); the existing new/triaged chips are
+**unchanged** (M32·1 — additive-only) + a "View" link per row
+(`/admin/error-reports/{id}` → the detail view).
+(e) **`Detail.cshtml` field render** — renders the **15-member M32 ceiling**
+(M32·3): status chip (3-way) + Description + ExceptionType (monospace,
+truncated; "—" when null) + Reporter (`errorreport.list.anonymous` for blank
+`SubjectId`) + ContactEmail (conditional) + RequestId (monospace) + Created
+(`kw-dt`) + Origin (badge) + ResolvedAt/ResolvedBy/ResolutionNote (conditional,
+only when set). The Resolve section (a `ResolutionNote` `<textarea>` + the
+"Mark as resolved" button, POST …/resolve) + the Escalate section (the
+"Escalate to operator endpoint" button, POST …/escalate) are **visible only
+when `TriageStatus != "resolved"`** (the terminal-state affordance rule,
+M32·8). Flash toasts: `TempData["info"]` → `alert-success`; `TempData["error"]`
+→ `alert-danger`. **New files:** `Services/IEscalationForwarder.cs` +
+`Services/EscalationForwarder.cs` + `Models/AdminErrorReportDetailViewModel.cs`
+(`Report` (init) + `ResolutionNote` (set, default `""`)) +
+`Views/Admin/ErrorReports/Detail.cshtml`. **Modified:**
+`ErrorReportAdminController.cs` (3 actions + optional ctor param + using),
+`Program.cs` (`services.AddHttpClient()` +
+`services.AddSingleton<IEscalationForwarder, EscalationForwarder>()`),
+`Index.cshtml` (resolved chip + View link).
+(f) **Compile warnings:** none in any U05 file — `dotnet build
+Kumunita.slnx -c Debug` green; the Web project builds with **0 Warning(s),
+0 Error(s)**; the only warnings in the full solution build are pre-existing
+in `Kumunita.Core/Bootstrap/SampleDataSeeder.cs` (CS8600) and unrelated
+test files (CS0219/CS8602/CS8714/xUnit2017) — none in the U05 Web files.
+**Note for U07:** the `Escalate` action's `MarkResolvedAsync` call on success
+is expected to be a no-op if the report was already resolved (M32·8
+idempotency, the M31·6 precedent) — U07's
+`M32_7_Admin_Escalate_Configured_ForwardSucceeds_Resolves_Row` should assert
+the `resolved` state + one `Via = Admin` audit row (action
+`errorreport.escalate` — note the Core service writes the
+`errorreport.resolve` action row; the `errorreport.escalate` action is the
+*Web-layer* marker the register names; U07's test body pins the exact
+assertion). Plan file `in-progress/m32-u05.md` moved to `done/m32/` last.
