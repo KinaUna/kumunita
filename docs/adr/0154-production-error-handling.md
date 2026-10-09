@@ -1,6 +1,6 @@
 # ADR 0154 — Production error handling (a report-an-issue affordance on the 500 error page + a GlobalAdmin triage surface)
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-09
 
 ## Context

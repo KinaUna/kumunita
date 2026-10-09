@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.47.0", "2026-10-09", new List<string>
+        {
+            "Production error handling — a report-an-issue form on the 500 error page (a resident says what went wrong; the admin triages it at /admin/error-reports): one new bounded context (ErrorReports), one new doc (ErrorReport), one new service (IErrorReportService), the closed errorreport.* kw-l key set × en/de/fr/da (ADR 0154).",
+        }),
         new("0.46.0", "2026-10-08", new List<string>
         {
             "Admin onboarding — a guided walk-through for a new GlobalAdmin through the seven most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation): a links-only walk-through on the M22 / SITE lane's shape (a singleton completion flag, not a new write path), and a fresh GlobalAdmin who never touches the surface sees the admin banner (the affordance, not a wall) (ADR 0153).",

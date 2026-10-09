@@ -673,3 +673,91 @@ U07 flips it to `M32_...` at close) + the 16 names verbatim.
   M31 + ADR 0154), the README / `STATUS.md` / `ARCHITECTURE.md` parity
   appends, flip ADR 0154 `Draft` → `Accepted` + the index row `**Done**
   (M31)`, and the `done/m31/` move.
+
+## U07 — close
+
+**The six-member close flip lands (M31·8); the milestone is done.** No code
+change (docs + `Milestones.cs` + `MilestonesTests.cs` + `WhatsNew.cs` +
+`WhatsNewTests.cs` only — the M31·8 / hard-rule boundary held: no Core, no
+Web controller/view/service, no register re-shape, no ADR re-write beyond
+the `Draft`→`Accepted` flip + the index tag). All of U06's preconditions held
+(16/16 green, the three-test gate green, no `## U<m> — Drift pause`, no
+still-open drift — so this is a clean close, not a drift pause). U07 is the
+final M31 unit; the register + this note move to `done/m31/` (the `done/m30/`
+/ `done/m29/` subfolder convention).
+
+- **(a) The `Milestones.cs` flip** (`src/Kumunita.Web/Milestones.cs`) — the
+  `M31` row `StatusNext` → **`StatusDone`** + the `M32` row `StatusPlanned`
+  → **`StatusNext`**. The order is **unchanged** (`…"M30","M31","M32"` — the
+  ADR 013/089/093/109 "named lane, not a renumber" precedent; M32 is the
+  next letter in place, not a new letter). `M33`/`M34` remain `StatusPlanned`
+  (untouched).
+- **(b) The `MilestonesTests` re-pin**
+  (`tests/Kumunita.Web.Tests/MilestonesTests.cs`) — `M31_Is_The_Single_
+  InProgress_Milestone` **replaced** with `M32_Is_The_Single_InProgress_
+  Milestone` (the single-`StatusNext` assertion now names `M32`; the
+  `StatusPlanned` set is now `{"M33","M34"}`; the `StatusDone` "not in" set
+  now excludes `M32`) + **`"M31"` appended** to the
+  `Shipped_Milestones_Are_Marked_Done` done-list (after `"M30"`). The
+  `Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_In_Order` order pin is
+  unchanged (the `…,"M30","M31","M32","M33","M34"` sequence is intact — the
+  no-renumber rule).
+- **(c) The `WhatsNew.cs` `0.47.0` entry** (`src/Kumunita.Web/WhatsNew.cs`,
+  **newest-first**, date `2026-10-09`) — the sixth close-flip member (ADR
+  0110 / AGENTS.md), naming M31 + ADR 0154 (the register's exact text: the
+  report-an-issue form on the 500 page, the GlobalAdmin triage at
+  `/admin/error-reports`, one new bounded context `ErrorReports`, one new
+  doc `ErrorReport`, one new service `IErrorReportService`, the closed
+  `errorreport.*` `kw-l` key set × en/de/fr/da). `0.46.0`/M30 slides one row
+  back, `0.45.0`/M29 two rows back. **The `WhatsNewTests` head pin
+  re-pinned** (`The_Improve_Lane_Reduction_Entry_Is_Shipped`) to name the
+  new head: `0.47.0`/`2026-10-09` + the "error handling" capability (M31),
+  `0.46.0`/M30 "admin onboarding" one row back, `0.45.0`/M29 "surface
+  label" two rows back — the head-pin discipline (a copy-paste that drops or
+  re-orders the head is caught) is held, the same way M30's close re-pinned
+  it.
+- **(d) The three parity appends** (the doc↔code parity pair set, AGENTS.md):
+  `README.md` — the status-summary block gains the **`**M31 is done** —
+  production error handling (…; ADR 0154)`** line (the M30 shape) and the
+  planned-line re-scopes to **`**M32–M34 are planned** — three new
+  milestones queued next: … (M32), … (M33), … (M34)`** (M31 removed from the
+  planned set, M32 promoted to next — consistent with the `Milestones.cs`
+  flip); the **Roadmap `M31` line** gains the **`**Done.** (ADR 0154)`** tail
+  (the M30 `**Done.** (ADR 0153)` shape, verbatim). `STATUS.md` — the
+  M30-terminated status line gains the **`**M31 is done** — production error
+  handling (a report-an-issue form on the 500 error page + a GlobalAdmin
+  triage surface at `/admin/error-reports`; one new bounded context, one new
+  doc, one new service; ADR 0154)`** tail (the M30 shape).
+  `ARCHITECTURE.md` — the M30-terminated milestone-status line gains the
+  **`**M31 production error handling is shipped** (ADR 0154) — …`**
+  `ErrorReports/` context line (the M30 `AdminOnboarding/` shape — the new
+  bounded context, the `ErrorReport` non-singleton doc, the
+  `IErrorReportService` read + audited-write seams, the
+  `ErrorReportDocTypes` surface, the `/admin/error-reports`
+  `ErrorReportAdminController`, the public `/Home/Error` report form, the
+  closed `errorreport.*` `kw-l` set, the one additive `AccessVia.Anonymous`
+  value, the `Posts/Report` doc ADR 0023 untouched).
+- **(e) The ADR flip + index tag** — `docs/adr/0154-production-
+  error-handling.md`: **`Status: Draft` → `Status: Accepted`** (the register
+  + design doc §2.6 drift-guard held — no ADR re-write, only the status
+  line). `docs/adr/README.md`: the `0154` index row **`Draft` → `Accepted —
+  **Done** (M31)`** (the M30 `0153` row shape, `Accepted — **Done** (M30)`).
+- **(f) The `done/m31/` move (last)** — `git mv` the register
+  `plan-m31-production-error-handling.md` → `done/m31/` + `git mv` the
+  handoff note `in-progress/m31-handoff-notes.md` → `done/m31/
+  m31-handoff-notes.md`. **Only `m31-u00.md` exists** (already in
+  `done/m31/`); `m31-u04`/`u05`/`u06.md` were never created (the register's
+  "if the file exists" condition not met, consistent with U04/U05/U06), so
+  the only moves are the register + the handoff note. `done/m31/` now holds
+  the register + the unit plan (`m31-u00.md`) + the handoff note (the
+  `done/m30/` / `done/m29/` subfolder convention).
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` **green**; `dotnet exec
+tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll`
+**green** — the `MilestonesTests` single-in-progress pin now on `M32` (the
+order + the done-list hold), the `WhatsNewTests` `0.47.0` newest-first head
+pin green (the head re-pin holds), and the rest of the suite unregressed.
+**The M31 milestone is done — the six-member close flip is the last M31 unit;
+there is no next M31 agent.** The next thing is **M32 (Issue submission &
+escalation)** as a fresh milestone (the `Milestones.cs` `M32` row is now
+`StatusNext`, the roadmap order is frozen at `…M30,M31,M32`).
