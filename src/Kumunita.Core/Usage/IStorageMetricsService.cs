@@ -54,6 +54,22 @@ public interface IStorageMetricsService
     /// </summary>
     Task<AvailablePlatformSpace> GetPlatformSpaceAsync(long platformLimitBytes,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// The M33 history read (ADR 0156, M33·1 / M33·8 — the **5th** method on
+    /// this seam; the 3 M24 methods + the M25 <see cref="GetPlatformSpaceAsync"/>
+    /// ADD are **unchanged**, additive-only M33·1): the
+    /// <see cref="StorageMetricsSample"/> rows whose <c>SampleDate</c> falls
+    /// within the trailing <paramref name="days"/>-day window, **ascending** by
+    /// <c>SampleDate</c>. <paramref name="days"/> is a **pinned** value in
+    /// <c>{30, 90, 180, 365}</c>; an unknown value throws
+    /// <see cref="ArgumentOutOfRangeException"/> (the M13
+    /// <c>IUsageAnalyticsService.GetWindowAsync</c> "unknown value throws, not
+    /// a 0-row query" precedent, M33·8). Read-only, zero writes, zero
+    /// <c>AccessAudit</c> rows (M33·4) — one <c>QuerySession</c>.
+    /// </summary>
+    Task<StorageHistoryResult> GetHistoryAsync(int days,
+        CancellationToken ct = default);
 }
 
 /// <summary>

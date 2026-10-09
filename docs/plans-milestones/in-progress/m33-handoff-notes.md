@@ -213,3 +213,57 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   `GetHistoryAsync` seam + the capture lane + the Trend section + the
   `storage.trend.*` key set, additive-only.
 - **No code, no build, no test.**
+
+## U03 — Core (doc + seam + surface + boot)
+
+- **3 new Core files** (`src/Kumunita.Core/Usage/`):
+  - `StorageMetricsSample.cs` — the 8-member M33·2 ceiling, field set
+    (verbatim): `Id` (string, deterministic) · `SampleDate` (DateTimeOffset,
+    UTC) · `TotalUsedBytes` (long) · `TotalVolumeBytes` (long) ·
+    `FreeVolumeBytes` (long) · `UserContentUsedBytes` (long) ·
+    `TotalUniqueFiles` (int) · `TotalDistinctUsers` (int).
+  - `StorageHistoryDocTypes.cs` — **1** `opts.Schema.For<StorageMetricsSample>();`
+    call (the ADR 0004 §B.1 parallel-surface shape).
+  - `StorageHistoryResult.cs` — `public sealed record StorageHistoryResult(int
+    WindowDays, IReadOnlyList<StorageMetricsSample> Points);` (M13
+    `UsageAnalyticsResult` wrapper precedent).
+- **2 modified Core files:**
+  - `IStorageMetricsService.cs` — now **5 methods** (the 4 existing + `Task<
+    StorageHistoryResult> GetHistoryAsync(int days, CancellationToken ct =
+    default);`); the 3 M24 methods + the M25 `GetPlatformSpaceAsync` ADD are
+    **unchanged** (M33·1 additive-only).
+  - `StorageMetricsService.cs` — `GetHistoryAsync` impl added (the
+    `ArgumentOutOfRangeException` guard on the pinned set `{30, 90, 180, 365}`,
+    M33·8; one `QuerySession`; `SampleDate >= now − days`, **ascending** via
+    one `ToListAsync` + client-side `OrderBy`; returns `new
+    StorageHistoryResult(days, points)`); the 4 existing methods are
+    **unchanged** (M33·1 additive-only).
+- **1 boot-path line** (in `src/Kumunita.Web/Program.cs`, the all-env Marten
+  `Configure(opts => { … })` block, after `StorageSettingsDocTypes.Configure(
+  opts);` ~line 243): `StorageHistoryDocTypes.Configure(opts);` — the M3/Media/
+  Usage/Document precedent comment shape.
+- **DRIFT NOTE (recorded per unit-series rule §12, resolved by
+  codebase-consistency):** the register U03 plan + the U03 agent's brief both
+  named **`SchemaBootstrap.cs`** as the second boot-path target ("add the
+  `using` + the `StorageHistoryDocTypes.Configure(opts);` line next to the
+  existing `StorageSettingsDocTypes` / `UsageDocTypes` calls"). **There is no
+  `StoreOptions`/`opts` in scope in `SchemaBootstrap.cs`, and no
+  `*DocTypes.Configure` call in that file** — verified by grep: all 18 doc-
+  type `Configure(opts)` registrations live in the single all-env block in
+  `Program.cs` (lines 107–254), and `SchemaBootstrap.cs`'s own doc-comment
+  says "Document-shape auto-creation remains the dev-only loop in
+  `Program.cs` (ADR 0004)". `SchemaBootstrap.ApplyAsync` already applies the
+  registered surface via `ApplyAllConfiguredChangesToDatabaseAsync()`, so the
+  **one** line in `Program.cs` covers both the dev loop and the all-env
+  versioned boot. The plan's two-boot-path language is satisfied by a single
+  line at the codebase's single all-env registration point; no line was added
+  to `SchemaBootstrap.cs` (doing so would be a compile error — no `opts` in
+  scope).
+- **DI unchanged flag (M33·1):** `IStorageMetricsService` is already
+  registered in `src/Kumunita.Core/DependencyInjection.cs` (the M24
+  `AddTransient` line ~line 64). The new `GetHistoryAsync` seam rides the
+  existing registration — **no new DI line** added.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (0 Warnings,
+  0 Errors). All six touched/created files report no errors.
+- **No new test (U07's), no capture lane (U04's), no Web surface (U05's),
+  no new kw-l keys (U06's).**

@@ -242,6 +242,16 @@ var marten = builder.Services.AddMarten(opts =>
     // to Marten (the M3/Media/Usage/Document precedent).
     StorageSettingsDocTypes.Configure(opts);
 
+    // M33 (ADR 0156, U03): the storage-history doc (StorageMetricsSample,
+    // ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
+    // StorageSettingsDocTypes, not additive on an existing one: it uses the
+    // conventional string Id, so no non-default convention or business-key
+    // index is pinned). Without this call the doc is invisible to Marten (the
+    // M3/Media/Usage/Document precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    StorageHistoryDocTypes.Configure(opts);
+
     // M31 (ADR 0154 D1, U03): the error-report bounded context's document
     // (ErrorReport, ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
     // M17DocTypes / DocumentDocTypes, not additive on an existing one:
