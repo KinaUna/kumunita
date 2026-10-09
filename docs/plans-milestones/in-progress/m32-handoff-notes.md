@@ -168,3 +168,31 @@ next unit (U01 — design doc Part 1) needs:
     `[Authorize(Roles = GlobalAdmin)]`) · **ADR 0006-D** (Core stays
     HTTP-free — the `IEscalationForwarder` is a Web-layer service) · **ADR
     0154** (the M31 `ErrorReports` surface M32 extends — the frozen base).
+
+## U01 — design doc Part 1
+
+Authored `docs/design/m32-issue-submission-escalation-design.md` Part 1
+(`## Context` / `## Scope` (in + named deferrals) / `## Invariants` /
+`## FACES`), mirroring the M31 design doc structure. **No code, no build.**
+The **12 invariants** U02 pins by id: M32·1 (capability on the M31 surface,
+no new context/doc) · M32·2 (`TriageStatus` extended additively to
+`{new,triaged,resolved}`, `resolved` terminal) · M32·3 (the 15-member M32
+ceiling — M31 11 unchanged + M32 4 additive) · M32·4 (`/issues/new` public,
+anonymous-safe, non-blocking) · M32·5 (Core stays HTTP-free; escalation HTTP
+is Web-layer) · M32·6 (`KUMUNITA_ESCALATION_ENDPOINT` env var, never
+persisted) · M32·7 (a failed forward is a no-op; only a successful forward
+resolves) · M32·8 (the idempotent `MarkResolvedAsync` single-write-lane) ·
+M32·9 (the closed `issue.*` / `errorreport.resolve.*` /
+`errorreport.escalate.*` `kw-l` key set, four languages) · M32·10 (admin
+surface GlobalAdmin-gated; no new authz surface) · M32·11 (the M30 step-7
+route re-point) · M32·12 (the six-member close flip is U08's). The **10
+FACES** U02 pins by id: M32-1 (signed-in `/issues/new` submit →
+`Origin=general`, `SubjectId` set, `Via=Resident`) · M32-2 (anonymous
+`/issues/new` submit → `SubjectId=""`, `Via=Anonymous`) · M32-3 (M31 500 form
+→ `Origin=error-page` default, M31 lane unchanged) · M32-4 (GlobalAdmin sees
+`/admin/error-reports/{id}` detail + Resolve/Escalate) · M32-5 (Resolve →
+`resolved` + one `Via=Admin` audit row) · M32-6 (Resolve on already-resolved
+→ no-op) · M32-7 (Escalate configured + success → `resolved` +
+`errorreport.escalate` audit row) · M32-8 (Escalate unconfigured → no state
+change) · M32-9 (Escalate forward fails → no state change) · M32-10 (non-
+GlobalAdmin → 403).
