@@ -302,3 +302,34 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   adapter, the `UsagePurgeHandler` precedent) · **no** compile warnings (build
   0 Warnings / 0 Errors).
 - **No new test (U07's), no Web surface (U05's), no kw-l keys (U06's).**
+
+## U05 — M24 surface extension
+
+- **Controller** (`src/Kumunita.Web/Controllers/AdminStorageMetricsController.cs`):
+  the `Index` action gains a `[FromQuery] int window = 90` param (M33·8 default)
+  + a `CancellationToken ct = default` param + a **third** concurrent read
+  `var historyTask = metrics.GetHistoryAsync(window, ct);` alongside the
+  **unchanged** M24 `GetSnapshotAsync` + `GetPerUserListAsync` reads (M33·1
+  additive-only); passes `History = history.Points` + `WindowDays = window`
+  into the view model. The `[Authorize(Roles = GlobalAdmin)]` gate is
+  **unchanged** (M33·9).
+- **View model** (`src/Kumunita.Web/Models/AdminStorageMetricsViewModel.cs`):
+  **2 new members** — `IReadOnlyList<StorageMetricsSample> History { get; init;
+  } = Array.Empty<…>()` + `int WindowDays { get; init; } = 90;`; the existing
+  M24 members are **unchanged** (M33·1).
+- **View** (`src/Kumunita.Web/Views/AdminStorageMetrics/Index.cshtml`): a
+  **Trend** section below the M24 four-metric header + per-user table (both
+  **unchanged**, M33·1) — a `TrendPoints` `@functions` helper (server-side
+  `<polyline>` points string, 100×40 viewBox, min/max-normalised — no JS /
+  chart lib, M33·10) + a window selector (four links `?window={30|90|180|365}`,
+  active one marked via a class toggle) + **empty** → the
+  `storage.trend.empty` message (M33-3 FACE) **+ else** a `<table>` (date via
+  `kw-dt` · total used · free, ascending, `Bytes()` helper) + an inline `<svg>`
+  sparkline (`<polyline>`, `viewBox` + `preserveAspectRatio="none"`). All labels
+  are the `storage.trend.*` `kw-l` keys (referenced; **U06 authors the values**).
+- **Flags:** M24 header + per-user table **unchanged** (M33·1) · `GlobalAdmin`
+  gate **unchanged** (M33·9) · no JS / chart lib / npm change (M33·10) · **no**
+  compile warnings in U05's three files (the xUnit1051 warnings in the build
+  are pre-existing, all in test files) · build 0 Errors.
+- **No kw-l key authoring (U06's), no test (U07's), no capture-lane change
+  (U04's).**

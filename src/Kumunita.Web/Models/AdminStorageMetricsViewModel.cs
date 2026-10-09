@@ -44,4 +44,20 @@ public class AdminStorageMetricsViewModel
     public int                              TotalUsers { get; init; }
     public int                              Page       { get; init; }
     public bool                             HasMore    { get; init; }
+
+    // The M33 storage-metrics-history Trend section (M33·1 additive-only, M33·9):
+    // the per-day samples in the chosen window, **ascending** by SampleDate,
+    // **only the days present** (no fabricated zero rows — the M33-9 FACE).
+    // <see cref="History"/> is empty on a fresh instance (no samples captured
+    // yet) — the view then renders the storage.trend.empty message (M33-3).
+    public IReadOnlyList<StorageMetricsSample> History { get; init; } =
+        System.Array.Empty<StorageMetricsSample>();
+
+    /// <summary>
+    /// The trend window the page rendered, in days (the M33·8 pinned set
+    /// {30, 90, 180, 365}, echoed by the read seam's
+    /// <see cref="Kumunita.Core.Usage.StorageHistoryResult.WindowDays"/>).
+    /// Drives the view's window selector (the active one is marked).
+    /// </summary>
+    public int WindowDays { get; init; } = 90;
 }
