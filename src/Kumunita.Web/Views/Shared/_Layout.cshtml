@@ -484,6 +484,16 @@
                         <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
                         <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
                         <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
+                        @* M32 (ADR 0155) — the public "Report an issue" affordance
+                           (the issue.nav key, key 9 of the U06 closed set): links the
+                           M32 /issues/new general issue-submission surface. Linked
+                           unconditionally for every visitor (floor-honesty, the SP U03
+                           shape above) because M32·4 is public/anonymous-safe — the
+                           M31·2 500-form precedent. The design doc §2.3 named it "the
+                           nav entry (issue.nav)"; the footer Platform column is the
+                           public, platform-level seam that matches that intent — the
+                           signed-in-only More menu would gate a public surface. *@
+                        <li><a href="/issues/new"><kw-l key="issue.nav">Report an issue</kw-l></a></li>
                     </ul>
                 </div>
                 <div class="col-6 col-md-4 col-lg-3">
