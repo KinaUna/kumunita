@@ -2630,6 +2630,26 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Start date",
             ["sort.due"]              = "Due date",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — the closed storage.trend.* set
+            // for the M24 /admin/storage Trend section (U05's additive view —
+            // Views/AdminStorageMetrics/Index.cshtml): the section heading,
+            // the four window-selector labels (30/90/180/365), the per-day
+            // table headers, the sparkline legend, and the empty message.
+            // The en values are the view's inner English reference text (the
+            // ADR 0015 D1 provider floor). M33·1 additive-only: the M24
+            // storage.* surface is unchanged.
+            ["storage.trend.title"]     = "Storage trend",
+            ["storage.trend.window.30"] = "30 days",
+            ["storage.trend.window.90"] = "90 days",
+            ["storage.trend.window.180"] = "180 days",
+            ["storage.trend.window.365"] = "365 days",
+            ["storage.trend.col.date"]  = "Date",
+            ["storage.trend.col.used"]  = "Total used",
+            ["storage.trend.col.free"]  = "Free",
+            ["storage.trend.legend.used"] = "Total used over window",
+            ["storage.trend.empty"]     =
+                "No storage trend yet — the daily capture has not stored any samples for this window.",
             ["admin.help.reset_one"]   =
                 "Reset \"{0}\" to its seeded text? This overwrites any hand-edited copy.",
             ["admin.help.reset_all"]   =
@@ -5143,6 +5163,24 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Beginn",
             ["sort.due"]              = "Fällig",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — das geschlossene storage.trend.*-
+            // Set der M24-Fläche /admin/storage (Trend-Abschnitt): Überschrift,
+            // die vier Fensteraufkleber, die Tabellenköpfe, die
+            // Sparkline-Legende und die Leerzustandsmeldung. M33·1
+            // additive-only: die M24 storage.*-Oberfläche bleibt unverändert.
+            ["storage.trend.title"]     = "Speichertrend",
+            ["storage.trend.window.30"] = "30 Tage",
+            ["storage.trend.window.90"] = "90 Tage",
+            ["storage.trend.window.180"] = "180 Tage",
+            ["storage.trend.window.365"] = "365 Tage",
+            ["storage.trend.col.date"]  = "Datum",
+            ["storage.trend.col.used"]  = "Gesamt belegt",
+            ["storage.trend.col.free"]  = "Frei",
+            ["storage.trend.legend.used"] = "Gesamt belegt über das Fenster",
+            ["storage.trend.empty"]     =
+                "Noch kein Speichertrend — die tägliche Erfassung hat für dieses Fenster " +
+                "noch keine Aufnahmen gespeichert.",
         };
 
     /// <summary>
@@ -7565,6 +7603,24 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Date de début",
             ["sort.due"]              = "Échéance",
             ["sort.status"]           = "Statut",
+
+            // ── M33 U06 (ADR 0156, M33·11) — le jeu fermé storage.trend.* de la
+            // surface /admin/storage (section Trend) : le titre, les quatre
+            // libellés de fenêtre, les en-têtes du tableau, la légende de la
+            // sparkline et le message vide. M33·1 additive-only : la surface
+            // storage.* de M24 reste inchangée.
+            ["storage.trend.title"]     = "Tendance de stockage",
+            ["storage.trend.window.30"] = "30 jours",
+            ["storage.trend.window.90"] = "90 jours",
+            ["storage.trend.window.180"] = "180 jours",
+            ["storage.trend.window.365"] = "365 jours",
+            ["storage.trend.col.date"]  = "Date",
+            ["storage.trend.col.used"]  = "Total utilisé",
+            ["storage.trend.col.free"]  = "Libre",
+            ["storage.trend.legend.used"] = "Total utilisé sur la fenêtre",
+            ["storage.trend.empty"]     =
+                "Pas encore de tendance de stockage — la capture quotidienne n'a pas " +
+                "enregistré d'échantillons pour cette fenêtre.",
         };
 
     /// <summary>
@@ -9963,6 +10019,24 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Startdato",
             ["sort.due"]              = "Frist",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — det lukkede storage.trend.*-sæt
+            // for M24-fladen /admin/storage (Trend-sektionen): overskriften,
+            // de fire vinduelabels, tabeloverskrifterne, sparkline-legenden
+            // og tommelfingerbeskeden. M33·1 additive-only: M24's
+            // storage.*-overflade er uændret.
+            ["storage.trend.title"]     = "Lagringstrend",
+            ["storage.trend.window.30"] = "30 dage",
+            ["storage.trend.window.90"] = "90 dage",
+            ["storage.trend.window.180"] = "180 dage",
+            ["storage.trend.window.365"] = "365 dage",
+            ["storage.trend.col.date"]  = "Dato",
+            ["storage.trend.col.used"]  = "I alt brugt",
+            ["storage.trend.col.free"]  = "Fri",
+            ["storage.trend.legend.used"] = "I alt brugt over vinduet",
+            ["storage.trend.empty"]     =
+                "Ingen lagringstrend endnu — den daglige optagelse har ikke gemt " +
+                "noen prøver for dette vindue.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

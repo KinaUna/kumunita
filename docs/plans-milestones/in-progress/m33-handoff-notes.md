@@ -333,3 +333,12 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   are pre-existing, all in test files) · build 0 Errors.
 - **No kw-l key authoring (U06's), no test (U07's), no capture-lane change
   (U04's).**
+
+## U06 — storage.trend.* kw-l keys
+
+- **Keys added (10, verbatim §2.3)** — `storage.trend.title` · `storage.trend.window.30` / `storage.trend.window.90` / `storage.trend.window.180` / `storage.trend.window.365` · `storage.trend.col.date` / `storage.trend.col.used` / `storage.trend.col.free` · `storage.trend.legend.used` · `storage.trend.empty`.
+- **Four-language status** — en/de/fr/da all present, non-empty (the M33·11 pin; the en values match U05's view inner text so the ADR 0015 D1 provider floor reads identically — e.g. `storage.trend.empty` en = the exact fallback string in `Index.cshtml`).
+- **M24 `storage.*` keys unchanged** (M33·1 additive-only — U06 only **adds** the `storage.trend.*` set in all four dictionaries, the M24 `account.storage_*` / admin storage copy untouched).
+- **File** — `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (the only modified file; 10 keys appended to each of `EnValues` / `DeValues` / `FrValues` / `DaValues`).
+- **Build** — `dotnet build Kumunita.slnx -c Debug` green (0 Errors; the 96 warnings are pre-existing xUnit1051/xUnit2031 test-file warnings, none in the registry).
+- **No tests (U07's), no close flip (U08's), no view/seam/capture change.**
