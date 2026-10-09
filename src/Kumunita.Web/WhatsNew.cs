@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.46.0", "2026-10-08", new List<string>
+        {
+            "Admin onboarding — a guided walk-through for a new GlobalAdmin through the seven most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation): a links-only walk-through on the M22 / SITE lane's shape (a singleton completion flag, not a new write path), and a fresh GlobalAdmin who never touches the surface sees the admin banner (the affordance, not a wall) (ADR 0153).",
+        }),
         new("0.45.0", "2026-10-08", new List<string>
         {
             "Admin surface labels — a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface: a label store on the SITE lane's shape (a per-item label, not a re-route), and a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0152).",
