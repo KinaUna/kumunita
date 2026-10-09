@@ -247,3 +247,45 @@ set are all **unchanged**; M32 **adds** the 4 additive fields → the
 `IEscalationForwarder`, the 19-key M32 `kw-l` set, and the `resolved`
 `TriageStatus` value). No drift against the register's §U02 or the U00/U01
 frozen-base facts.
+
+## U03 — Core (additive fields + MarkResolvedAsync)
+
+(a) **4 additive fields** added to `ErrorReport.cs` (the M31 11 unchanged,
+M32·3 — the doc is now the **15-member M32 ceiling**, ADR 0155 D1):
+`Origin` (`string`, default `"error-page"`, closed set
+`{"error-page","general"}` — M32·4) · `ResolvedAt` (`DateTimeOffset?`) ·
+`ResolvedBy` (`string?`) · `ResolutionNote` (`string?`). (b)
+**`ErrorReportDraft.Origin`** member added (string, default `"error-page"`,
+M32·4) — the record is now 7 members (M31 6 unchanged). (c)
+**`MarkResolvedAsync`** seam added to `IErrorReportService` (the exact
+design-doc §2.1 signature:
+`Task<ErrorReport?> MarkResolvedAsync(string reportId, string actorId,
+string? resolutionNote, CancellationToken ct = default)`, M32·8 idempotency
+pin — null = no-op when missing or already `resolved`) + the
+`ErrorReportService.MarkResolvedAsync` impl (the M31 `MarkTriagedAsync`
+idempotent-write-lane shape verbatim: load → null if missing → null if
+already `resolved` → stamp the 4 resolution fields → store doc + **one**
+`AccessAudit` row `Via = Admin`, action `errorreport.resolve`, `TargetKind`
+"error-report" → save). (d) **`ErrorReportDocTypes` unchanged** (M32·1 — the
+4 additive fields ride the existing `.Schema.For<ErrorReport>()` surface,
+ADR 0004 §B.1 idempotent delta at boot, **no** new `.Schema.For` call).
+(e) **`DependencyInjection.cs` unchanged** (M32·1 — the seam rides the
+existing `IErrorReportService` registration, **no** new DI line).
+`CreateAsync` also gained the **additive** `Origin = draft.Origin`
+projection line (design doc §2.2, the M32-3 / M32·4 pins — the signature is
+**unchanged**, M32·1) so the M32 `/issues/new` form's `Origin = "general"`
+stores; this is what U07's `M32_4_CreateAsync_Origin_General_Stores_ErrorReport`
+asserts. (f) **Compile warnings:** none in the 4 touched Core files
+(`dotnet build Kumunita.slnx -c Debug` green; all projects "succeeded"; only
+pre-existing CS8602/CS8604/CS8603 nullability warnings in unrelated
+`Kumunita.Web` view/controller files, unchanged by this unit). **Flag for
+U07:** the M31 test `M31_3_ErrorReport_Doc_FieldSet_Ceiling` in
+`tests/Kumunita.Core.Tests/ErrorReportServiceTests.cs` pins the doc to the
+**11-member** set via `Assert.Equal` on `GetProperties()` — it is now stale
+against the 15-member M32 ceiling (M32·3 / ADR 0155 D1) and will **fail at
+runtime** when the Core.Tests assembly runs. U07's pinned
+`M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` (the new 15-member pin) is its
+successor; U07 should re-pin or retire the M31 test alongside authoring it.
+**No new test** added this unit (U07's seam tests are the first M32 tests);
+**no** `IEscalationForwarder` / Web-layer change (U05); the plan file
+`in-progress/m32-u03.md` is moved to `done/m32/` last.

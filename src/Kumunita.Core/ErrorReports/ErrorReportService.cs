@@ -29,7 +29,12 @@ public sealed class ErrorReportService : IErrorReportService
             ExceptionType = draft.ExceptionType,
             UserAgent     = draft.UserAgent,
             Created       = DateTimeOffset.UtcNow,
-            TriageStatus  = "new"             // the M31 floor; TriagedAt/TriagedBy stay null
+            TriageStatus  = "new",            // the M31 floor; TriagedAt/TriagedBy stay null
+            // M32 additive projection (M32·4) — draft.Origin is "error-page"
+            // (the M31 500 form default, the M32-3 FACE) or "general" (the
+            // M32 /issues/new form). ResolvedAt/ResolvedBy/ResolutionNote
+            // stay null until MarkResolvedAsync (M32·8).
+            Origin        = draft.Origin
         };
 
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
@@ -80,6 +85,42 @@ public sealed class ErrorReportService : IErrorReportService
             ActorId              = actorId,
             EffectivePrincipalId = actorId,
             Action               = "errorreport.triage",
+            TargetKind           = "error-report",
+            TargetId             = reportId,
+            Via                  = AccessVia.Admin,
+            Outcome              = AccessOutcome.Allow
+        });
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return stored;
+    }
+
+    /// <summary>
+    /// Stamp a new/triaged report resolved + exactly one AccessAudit row
+    /// (one session). Returns null (a no-op — no audit row, no state
+    /// change) when the report is missing or already resolved (M32·8
+    /// idempotency pin, the M31·6 MarkTriagedAsync shape verbatim).
+    /// </summary>
+    public async Task<ErrorReport?> MarkResolvedAsync(string reportId, string actorId, string? resolutionNote, CancellationToken ct = default)
+    {
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var stored = await session.LoadAsync<ErrorReport>(reportId, ct).ConfigureAwait(false);
+        if (stored is null || stored.TriageStatus == "resolved")
+        {
+            return null; // no-op — a missing or already-resolved report (M32·8)
+        }
+        stored.TriageStatus   = "resolved";
+        stored.ResolvedAt     = DateTimeOffset.UtcNow;
+        stored.ResolvedBy     = actorId;
+        stored.ResolutionNote = resolutionNote;
+        session.Store(stored);
+        // Exactly one AccessAudit row (Via = Admin — the M32·8 pin).
+        session.Store(new AccessAudit
+        {
+            Id                   = Guid.NewGuid().ToString("N"),
+            At                   = DateTimeOffset.UtcNow,
+            ActorId              = actorId,
+            EffectivePrincipalId = actorId,
+            Action               = "errorreport.resolve",
             TargetKind           = "error-report",
             TargetId             = reportId,
             Via                  = AccessVia.Admin,

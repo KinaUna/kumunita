@@ -1,12 +1,12 @@
 namespace Kumunita.Core.ErrorReports;
 
 /// <summary>
-/// The read + two audited-write lanes for the ErrorReport doc (ADR 0154).
-/// The ADR 0006 C3 single-write-lane shape: each write opens one write
-/// session that commits the ErrorReport doc + exactly one AccessAudit row
-/// together (invariant C3, strong consistency). Core stays HTTP-free
-/// (ADR 0006-D); the Web layer is the only place the subject / request
-/// context are produced.
+/// The read + three audited-write lanes for the ErrorReport doc (ADR 0154
+/// + ADR 0155). The ADR 0006 C3 single-write-lane shape: each audited
+/// write opens one write session that commits the ErrorReport doc + exactly
+/// one AccessAudit row together (invariant C3, strong consistency). Core
+/// stays HTTP-free (ADR 0006-D); the Web layer is the only place the
+/// subject / request context are produced.
 /// </summary>
 public interface IErrorReportService
 {
@@ -34,4 +34,17 @@ public interface IErrorReportService
     /// row (M31·4). Returns an empty list when there are no reports.
     /// </summary>
     Task<IReadOnlyList<ErrorReport>> ListAsync(int maxCount = 100, CancellationToken ct = default);
+
+    // ── M32 additive seam (ADR 0155, M32·8) ───────────────────────────────
+
+    /// <summary>
+    /// Stamp a new/triaged report resolved (TriageStatus = "resolved",
+    /// ResolvedAt = now, ResolvedBy = actorId, ResolutionNote =
+    /// resolutionNote?) + exactly one AccessAudit row (Via = Admin, action
+    /// "errorreport.resolve", TargetKind "error-report") in one write
+    /// session. Returns null (a no-op — no audit row, no state change) when
+    /// the report is missing or already resolved (M32·8 idempotency pin, the
+    /// M31·6 MarkTriagedAsync precedent verbatim).
+    /// </summary>
+    Task<ErrorReport?> MarkResolvedAsync(string reportId, string actorId, string? resolutionNote, CancellationToken ct = default);
 }

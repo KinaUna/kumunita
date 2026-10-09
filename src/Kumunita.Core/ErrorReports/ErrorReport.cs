@@ -1,12 +1,14 @@
 namespace Kumunita.Core.ErrorReports;
 
 /// <summary>
-/// One platform-error report row (ADR 0154, M31·1 — a platform-error
+/// One platform-error report row (ADR 0154 + ADR 0155 — a platform-error
 /// signal, NOT a content-moderation report; the Posts/Report doc, ADR 0023,
 /// is untouched). One row per report (the Usage/UsageEvent row-per-event
 /// shape; the Id is the conventional string identity, Marten-generated).
-/// The field set below is the 11-member ceiling (D1) — no field outside
-/// this set may appear in the doc.
+/// The field set below is the **15-member M32 ceiling** (ADR 0155 D1) — the
+/// M31 11 (ADR 0154 D1) unchanged + the M32 additive 4 (M32·3). No field
+/// outside this set may appear in the doc; no M31 field is re-shaped
+/// (M32·1 / M32·3).
 /// </summary>
 public sealed class ErrorReport
 {
@@ -45,4 +47,23 @@ public sealed class ErrorReport
 
     /// <summary>The GlobalAdmin's ClaimTypes.Subject who triaged; null until triaged.</summary>
     public string? TriagedBy { get; set; }
+
+    // ── M32's additive 4 (ADR 0155 D1, M32·3 — the M31 11 above unchanged) ──
+
+    /// <summary>
+    /// Where the report was filed. CLOSED SET {"error-page","general"}
+    /// (M32·4) — the M31 500 form writes "error-page" (the default), the
+    /// M32 /issues/new form writes "general". A string field — ADR 0004
+    /// §B.1 idempotent delta at boot, no migration.
+    /// </summary>
+    public string Origin { get; set; } = "error-page";
+
+    /// <summary>The resolution instant, UTC; null until resolved (M32·8).</summary>
+    public DateTimeOffset? ResolvedAt { get; set; }
+
+    /// <summary>The GlobalAdmin's ClaimTypes.Subject who resolved; null until resolved (M32·8).</summary>
+    public string? ResolvedBy { get; set; }
+
+    /// <summary>The admin's free-text "what was done"; null until resolved (M32·8).</summary>
+    public string? ResolutionNote { get; set; }
 }
