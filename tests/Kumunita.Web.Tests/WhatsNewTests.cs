@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the M32 0.48.0 entry (M31 0.47.0 + M30 0.46.0 one/two rows back)")]
+    [Fact(DisplayName = "The newest-first head is the M33 0.49.0 entry (M32 0.48.0 + M31 0.47.0 one/two rows back)")]
     public void The_Improve_Lane_Reduction_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,21 +69,28 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. M32 (issue submission & escalation) is the newest
-        // shipped milestone (the 0.48.0 entry, this M32 close flip), so it is
-        // now the head; the M31 (production error handling) 0.47.0 entry
-        // slides one row back, and the M30 (admin onboarding) 0.46.0 entry
+        // slides down. M33 (storage metrics history) is the newest shipped
+        // milestone (the 0.49.0 entry, this M33 close flip), so it is now the
+        // head; the M32 (issue submission & escalation) 0.48.0 entry slides
+        // one row back, and the M31 (production error handling) 0.47.0 entry
         // must remain, two rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.48.0" && head.Date == "2026-10-09",
-            "The M32 0.48.0 (2026-10-09) entry must be the head of the registry; got "
+            head.Version == "0.49.0" && head.Date == "2026-10-10",
+            "The M33 0.49.0 (2026-10-10) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("issue submission", StringComparison.OrdinalIgnoreCase)),
-            "The 0.48.0 head entry must name M32's issue submission & escalation capability.");
+            head.Changes.Any(c => c.Contains("storage metrics history", StringComparison.OrdinalIgnoreCase)),
+            "The 0.49.0 head entry must name M33's storage metrics history capability.");
 
-        // The M31 production-error-handling entry slides one row back from the head.
+        // The M32 issue-submission & escalation entry slides one row back from the head.
+        var m32 = WhatsNew.All.Single(v => v.Version == "0.48.0");
+        Assert.True(
+            m32.Changes.Any(c => c.Contains("issue submission", StringComparison.OrdinalIgnoreCase)),
+            "The 0.48.0 entry must name M32's issue submission & escalation capability.");
+
+        // The M31 production-error-handling entry is still shipped (not dropped by
+        // the M33 close) — two rows back from the head.
         var m31 = WhatsNew.All.Single(v => v.Version == "0.47.0");
         Assert.True(
             m31.Changes.Any(c => c.Contains("error handling", StringComparison.OrdinalIgnoreCase)),

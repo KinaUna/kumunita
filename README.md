@@ -38,7 +38,8 @@ document management (a shared repository for official documents, contracts, etc.
 **M30 is done** — admin onboarding (a guided walk-through for a new GlobalAdmin through the seven most important initial settings — community name, languages, moderation, notifications, storage limits, site content, issue escalation — a links-only walk-through on the M22 / SITE lane's shape, not a new write path; ADR 0153).
 **M31 is done** — production error handling (a report-an-issue form on the 500 error page so a resident can say what went wrong, plus a GlobalAdmin triage surface at /admin/error-reports; one new bounded context, one new doc, one new service; ADR 0154).
 **M32 is done** — issue submission & escalation (a resident submits an issue at /issues/new + a GlobalAdmin resolves it locally or forwards it to a configurable escalation endpoint; the M31 ErrorReports surface extended additively — the resolved TriageStatus value + the Origin/ResolvedAt/ResolvedBy/ResolutionNote fields + the MarkResolvedAsync seam + the IEscalationForwarder + the closed issue.* / errorreport.resolve.* / errorreport.escalate.* kw-l key set; ADR 0155).
-**M33–M34 are planned** — two new milestones queued next: storage metrics history (M33), and analytics history (M34).
+**M33 is done** — storage metrics history (the M24 /admin/storage surface gains a trend view over time — a daily capture tick stores one StorageMetricsSample, a 365-day retention prunes it, and a per-day table + inline sparkline render a pinned 30/90/180/365-day window — so an operator can estimate whether the instance's capacity is sufficient in the future; the M24 Usage surface extended additively — the StorageMetricsSample doc + the StorageHistoryDocTypes surface + the GetHistoryAsync read seam + the StorageMetricsCaptureService tick + the closed storage.trend.* kw-l key set; ADR 0156).
+**M34 is next** — analytics history (the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve).
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -289,7 +290,7 @@ stays trivial and the authorization rules can grow freely.
 - **M30** — Admin onboarding: a guided walk-through for a new GlobalAdmin through the most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation) — the M22 onboarding lane extended to the admin surface (a links-only walk-through on the M22 / SITE lane's shape — a singleton completion flag, not a new write path). **Done.** (ADR 0153)
 - **M31** — Production error handling: a first-class report-an-issue affordance on error pages so a resident can easily say what went wrong, plus a GlobalAdmin surface listing the reports so they can triage and act. **Done.** (ADR 0154)
 - **M32** — Issue submission & escalation: a resident submits an issue; a GlobalAdmin resolves it locally if instance-specific, or forwards it to a configurable escalation endpoint (an environment variable — so a fork or multi-instance operator can redirect where escalations land). **Done.** (ADR 0155)
-- **M33** — Storage metrics history: the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future.
+- **M33** — Storage metrics history: the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future. **Done.** (ADR 0156)
 - **M34** — Analytics history: the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve.
 
 ## Deferred (future, by design)

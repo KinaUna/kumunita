@@ -74,8 +74,8 @@ public static class Milestones
         new("M30", "Admin onboarding — a guided walk-through for a new GlobalAdmin through the most important initial settings (community name, languages, moderation, notifications, storage limits, site content, issue escalation)", StatusDone),
         new("M31", "Production error handling — a first-class report-an-issue affordance on error pages so a resident can easily say what went wrong, plus a GlobalAdmin surface listing the reports so they can triage and act", StatusDone),
         new("M32", "Issue submission & escalation — a resident submits an issue; a GlobalAdmin resolves it locally if instance-specific, or forwards it to a configurable escalation endpoint (an environment variable — so a fork or multi-instance operator can redirect where escalations land)", StatusDone),
-        new("M33", "Storage metrics history — the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future", StatusNext),
-        new("M34", "Analytics history — the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve", StatusPlanned),
+        new("M33", "Storage metrics history — the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future", StatusDone),
+        new("M34", "Analytics history — the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve", StatusNext),
     };
 
     public static string BadgeClass(string status) => status switch

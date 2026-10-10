@@ -1,6 +1,6 @@
 # ADR 0156 — Storage metrics history (M33) — the M24 `/admin/storage` admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-09
 
 The README roadmap names M33 exactly: "**Storage metrics history** — the M24

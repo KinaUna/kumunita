@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.49.0", "2026-10-10", new List<string>
+        {
+            "Storage metrics history — the M24 /admin/storage surface gains a trend view over time (a daily capture tick stores one StorageMetricsSample, a 365-day retention prunes it, and a per-day table + inline sparkline render a pinned 30/90/180/365-day window) so an operator can estimate whether the instance's capacity is sufficient in the future: the M24 Usage surface extended additively (the StorageMetricsSample doc + the StorageHistoryDocTypes surface + the GetHistoryAsync read seam + the StorageMetricsCaptureService tick + the closed storage.trend.* kw-l key set × en/de/fr/da) (ADR 0156).",
+        }),
         new("0.48.0", "2026-10-09", new List<string>
         {
             "Issue submission & escalation — a resident submits an issue at /issues/new (anonymous-safe, not tied to an error page); a GlobalAdmin resolves it locally with a note or forwards it to a configurable escalation endpoint (the KUMUNITA_ESCALATION_ENDPOINT env var — a fork or multi-instance operator redirects where escalations land without a code change): the M31 ErrorReports surface extended additively (the resolved TriageStatus value + the Origin/ResolvedAt/ResolvedBy/ResolutionNote fields + the MarkResolvedAsync seam + the IEscalationForwarder Web-layer HTTP service + the closed issue.* / errorreport.resolve.* / errorreport.escalate.* kw-l key set × en/de/fr/da + the M30 onboarding step-7 route re-point) (ADR 0155).",

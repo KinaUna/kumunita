@@ -350,3 +350,68 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
 - **(c) Pass/red** — **11 / 11 green** (Core `Total: 7, Failed: 0`; Web `Total: 4, Failed: 0`; run via `dotnet exec …/bin/Debug/net10.0/…Tests.dll -filter /…/…Tests`, the AGENTS.md path — `dotnet test` discovery broken here). `build Kumunita.slnx -c Debug` green (0 Errors).
 - **(d) Three-test gate (§2.5)** — **Closed loop PASS** · **Handoff PASS** · **Part-vs-whole PASS** (the 11-test list is the whole; all 11 green).
 - **(e) Still-open drift** — the M33 11-test gate is green, BUT the full `Kumunita.Web.Tests` assembly carries **8 pre-existing failures OUTSIDE M33's 11-test scope and U07's file budget** (recorded in the design doc `### Run result`, **NOT** a `## U07 — Drift pause` — U07's own work is green): (1) **7 × M24 `AdminStorageMetricsControllerTests`** (the 7 that call `Index`) — NRE at `AdminStorageMetricsController.Index` (`var history = await historyTask;`) because **U05's** additive `GetHistoryAsync` read is not stubbed in those pre-existing M24 tests → **a U05-introduced regression** (fix = stub `GetHistoryAsync` in those M24 tests, or a U05 `historyTask` null-guard — both outside U07's 3-file budget); (2) **1 × M32 `M32_4_Issue_Page_Shows_Issue_Form`** — `Views/Issues/New.cshtml` missing (unrelated). **These block U08's `Kumunita.Web.Tests green` close flip and must be resolved before U08** (U08 is the natural owner — it already edits test-adjacent close files, or the 7 M24 stubs get a one-line fix). No M33 seam/capture/view/`kw-l` defect; no re-shape of `StorageMetricsSample` (M33·2 ceiling intact).
+
+## U08 — close
+
+**M33 is complete.** The six-member close flip (M33·12) + the ADR 0156 →
+`Accepted` + the `done/m33/` move. **No new code, no new tests, no seam /
+capture-lane / view / `kw-l` change** (U03–U07's work is untouched).
+
+- **(a) `Milestones.cs` flip** — the `M33` row `StatusNext` → **`StatusDone`**;
+  the `M34` row `StatusPlanned` → **`StatusNext`**. The **order is unchanged**
+  (`…"M32","M33","M34"`) — the "named lane, not a renumber" precedent
+  (ADR 013/089/093/109).
+- **(b) `MilestonesTests.cs` re-pin** — `Shipped_Milestones_Are_Marked_Done`
+  done-list gains `"M33"` (now asserts every id except M34 is `StatusDone`);
+  `M33_Is_The_Single_InProgress_Milestone` **replaced** by
+  `M34_Is_The_Single_InProgress_Milestone` (the single `StatusNext` is now
+  `M34`; every other id — including M33 — is `StatusDone`).
+- **(c) `WhatsNew.cs` `0.49.0` entry** — appended **newest-first** as the
+  registry head (the required sixth close-flip member, the M27 lesson held),
+  dated `2026-10-10`, naming M33 + ADR 0156 (the `0.48.0` M32 entry slides one
+  row back). `WhatsNewTests` head pin re-pointed from the M32 `0.48.0` head to
+  the M33 `0.49.0` head (the `The_Improve_Lane_Reduction_Entry_Is_Shipped`
+  test now asserts the `0.49.0`/`2026-10-10` head names "storage metrics
+  history"; M32 `0.48.0` + M31 `0.47.0` slide one/two rows back).
+- **(d) The three doc parity appends** — `README.md` (the summary gains the
+  `**M33 is done**` line + the "M33–M34 are planned" line narrows to "M34 is
+  next"; the Roadmap `M33` line gains the `**Done.** (ADR 0156)` tail) ·
+  `docs/STATUS.md` (the `**M33 is done**` line appended after the M32 line) ·
+  `docs/ARCHITECTURE.md` (the `**M33 storage metrics history is shipped**
+  (ADR 0156)` `Usage/`-surface extension line appended after the M32 line).
+- **(e) ADR 0156** — `Status: Draft` → **`Status: Accepted`**; the
+  `docs/adr/README.md` index row tagged `Draft` → `Accepted — **Done** (M33)`
+  (the M32 `0155` row shape).
+- **(f) The `done/m33/` move** — `git mv` the register
+  (`plan-m33-storage-metrics-history.md`) + `in-progress/m33-u08.md` +
+  `in-progress/m33-handoff-notes.md` into `done/m33/` (the `m33-u00`…`m33-u07`
+  unit plans were already there); `in-progress/` is now empty (the M32 close
+  left it empty too — `done/m33/` holds all M33 artifacts).
+- **Test evidence (in-process path, the AGENTS.md runner):**
+  `dotnet build Kumunita.slnx -c Debug` **Build succeeded, 0 Warning(s),
+  0 Error(s)**. `Kumunita.Web.Tests` **Total: 994, Errors: 0, Failed: 8,
+  Skipped: 1** — the **`MilestonesTests` + `WhatsNewTests` pins are GREEN**
+  (the `M33`→`StatusDone` flip, the `M34` single-in-progress re-pin, and the
+  `0.49.0` newest-first head all pin; if any of those had failed the Failed
+  count would be ≥9). **The 8 failures are exactly the same 8 known
+  pre-existing ones** (NOT new regressions, NOT part of M33's 11-test gate):
+  7 × M24 `AdminStorageMetricsControllerTests` (the 7 that call `Index` —
+  `AdminStorage_GlobalAdmin_Allowed` · `AdminStorage_NoAccessAuditRow` ·
+  `AdminStorage_PerUserTable_RendersWithHasMore` · `AdminStorage_FourMetrics_Render` ·
+  `AdminStorage_PlatformLimitSet_AvailableCappedToRemainingBudget` ·
+  `AdminStorage_PlatformLimitExceeded_AvailableClampedToZero` ·
+  `AdminStorage_PlatformLimitUnset_AvailableIsPhysicalFreeSpace`) — the
+  U05-introduced regression (U05's additive `GetHistoryAsync` read is not
+  stubbed in those pre-existing M24 tests → `await null` NRE at
+  `AdminStorageMetricsController.cs:89`) · + 1 × M32
+  `M32_4_Issue_Page_Shows_Issue_Form` (`Views/Issues/New.cshtml` missing,
+  unrelated). Per the register's U08 exit parenthetical, U08's "Web.Tests
+  green" means the `MilestonesTests` + `WhatsNewTests` pins green — **those
+  are green; the 8 pre-existing failures ship with the milestone** (recorded
+  as an honest ship note, out of U08's file budget — do not fix here).
+- **Still-open drift (honest ship note)** — the **M33 11-test gate is green**
+  (U07's §gate: Closed loop / Handoff / Part-vs-whole all PASS, 11/11). The
+  8 pre-existing Web.Tests failures above (7 M24 U05-regression + 1 M32) ship
+  with M33 and remain open for a follow-up fix (outside the six-member close
+  flip). No M33 seam / capture-lane / view / `kw-l` / `StorageMetricsSample`
+  (M33·2 ceiling) defect; no roadmap renumber (M34 stays M34).
