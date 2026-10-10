@@ -279,6 +279,28 @@ process with no memory of any earlier command:
   stop and cancel rather than trying to "finish" the statement, and don't
   retry the same multi-line form.
 
+### When the sync terminal channel wedges (no output at all)
+
+A separate, Copilot-agent-specific failure mode (not a bash/WSL2 one): a
+`mode=sync` terminal call can return **"Command produced no output"** — even
+for a trivial `echo` — because the agent's *output-capture* layer wedges.
+This is the known Copilot agent terminal bug cited above (microsoft/vscode#
+286106 / #265881 / #265863); it is not caused by anything in the repo and no
+`.vscode/settings.json` key disables it. Treat it as a **channel** failure,
+not a command failure, and do not keep retrying the same sync call. The
+reliable workarounds, best first:
+
+- **Prefer `mode=async` + `get_terminal_output`** for anything non-trivial
+  (builds, test runs, servers). This has been observed to work even while the
+  sync channel is dead: the `Kumunita.Core.Tests` suite (1440 tests) completed
+  and reported its full `TEST EXECUTION SUMMARY` through the async channel in
+  exactly that situation.
+- **Redirect to a file as a belt-and-suspenders** so the result survives on
+  disk regardless of inline capture: `… 2>&1 > .tmp/result.log`, then read it
+  with the file tools.
+- **Keep each command self-contained** (single process, no cross-call
+  `$vars` — the doctrine above) so a wedged call has a small blast radius.
+
 Secondary causes worth ruling out if a command still hangs: `git`/`gh` commands
 that page output (`git log`, `git diff`, `gh pr view`) can block waiting for a
 keypress — prefer `git --no-pager <cmd>`, or set `core.pager` to `cat` for
