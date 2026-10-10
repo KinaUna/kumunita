@@ -192,3 +192,35 @@ next unit (U01 — design doc Part 1) needs:
     surface ESC reuses + evolves — the `ErrorReport` doc + the
     `IEscalationForwarder` + the `KUMUNITA_ESCALATION_ENDPOINT` env-var
     fallback).
+
+## U01 — design doc Part 1
+
+`docs/design/esc-escalation-authorization-design.md` Part 1 authored
+(Context, Scope incl. named deferrals, Invariants, FACES). **No code, no
+build.** The 13 invariants + 10 FACES are listed **by id** so U02 pins them
+by id:
+
+- **Invariants (13, by id):** ESC·1 (capability on the M31/M32 surface, not a
+  new context) · ESC·2 (19-member ESC ceiling — the M32 15 unchanged + the ESC
+  4 additive + `Origin` gains `"escalated"`) · ESC·3 (receiving-side
+  `EscalationToken` doc — multiple, labeled, individually revocable, SHA-256-
+  hashed at rest, plaintext shown once) · ESC·4 (origin-side
+  `EscalationOutboundConfig` singleton + the env-var fallback) · ESC·5
+  (inbound endpoint public + token-gated; invalid/revoked → 401, no row) ·
+  ESC·6 (token as `Bearer` in both directions; Core stays HTTP-free) · ESC·7
+  (inbound idempotent on `(token, origin-report-id)`) · ESC·8 (received issues
+  in the same `/admin/error-reports` list + chip + filter + detail) · ESC·9
+  (token lifecycle audited; revocation immediate) · ESC·10 (`AccessVia` gains
+  exactly one additive value `Escalation`; the 12 frozen values untouched) ·
+  ESC·11 (closed `escalation.*` `kw-l` key set parity-pinned in en/de/fr/da) ·
+  ESC·12 (admin token/config surface GlobalAdmin-gated; no new authz surface)
+  · ESC·13 (six-member close flip is U09's).
+- **FACES (10, by id):** ESC-1 (generate token → plaintext once + hash row +
+  one audit row) · ESC-2 (hand token out-of-band + origin sets endpoint/token
+  → config row) · ESC-3 (valid escalation → `escalated` row + one audit row +
+  origin `resolved`) · ESC-4 (invalid token → 401, no row, no local
+  `resolved`) · ESC-5 (revoked token → 401, no row) · ESC-6 (no token/endpoint
+  → forwarder no-op, no HTTP) · ESC-7 (revoke → immediate + one audit row) ·
+  ESC-8 (`?filter=received` shows only `escalated` rows with `FromInstance`) ·
+  ESC-9 (re-delivery same token+report → idempotent, no duplicate/second
+  audit) · ESC-10 (non-GlobalAdmin → 403 on both admin surfaces).
