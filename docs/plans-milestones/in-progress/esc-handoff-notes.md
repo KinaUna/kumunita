@@ -603,3 +603,68 @@ Core change.
   the 19-member ESC ceiling; this is a Core field-set test, not a kw-l parity
   test, and is **not** a U07 concern; it lands in U08's `ESC_2_ErrorReport_
   Doc_FieldSet_ESC_Ceiling` re-pin, not the M32 one).
+
+## U08 — seam tests (22) + gate recorded
+
+U08 (the test + gate unit) landed: the **22 pinned seam tests** (design doc
+§2.4, names verbatim) in four files, plus the supersession of the stale M32
+field-set pin, plus the **three-test acceptance gate** recorded in the design
+doc (`### Run result (ESC acceptance gate — 2026-10-10)`, §2.5). No new C#
+logic / controllers / services, no kw-l value changes, no close flip (U09's),
+no Core/Web seam edits (ESC·1 additive-only). **No Drift pauses.**
+
+- **(a) Files (4 test files + 1 modified + 2 docs):**
+  `tests/Kumunita.Core.Tests/EscalationTokenTests.cs` (5, new) ·
+  `tests/Kumunita.Core.Tests/EscalationInboundTests.cs` (5, new) ·
+  `tests/Kumunita.Web.Tests/EscalationTokenPageTests.cs` (5, new) ·
+  `tests/Kumunita.Web.Tests/EscalationInboundEndpointTests.cs` (7, new) ·
+  `tests/Kumunita.Core.Tests/ErrorReportResolveTests.cs` (modified — the
+  superseded `M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling` pinned `[Skip]` with
+  the U08 flag pointing at `ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling`) ·
+  `docs/design/esc-escalation-authorization-design.md` (the `### Run result`
+  gate section) · `docs/plans-milestones/in-progress/esc-handoff-notes.md`
+  (this section).
+- **(b) The 22 test names (verbatim, §2.4):** Core `EscalationTokenTests`:
+  `ESC_3_Token_Generate_Stores_Hash_Not_Plaintext` · `ESC_3_Token_Validate_
+  Valid_Returns_Token` · `ESC_3_Token_Validate_Invalid_Returns_Null` ·
+  `ESC_9_Token_Revoke_Immediate_NoValidate` · `ESC_9_Token_List_Excludes_
+  Plaintext_And_Hash`. Core `EscalationInboundTests`:
+  `ESC_5_AcceptInbound_ValidToken_Creates_Escalated_Origin` ·
+  `ESC_5_AcceptInbound_InvalidToken_Returns_Error_NoRow` ·
+  `ESC_7_AcceptInbound_ReDelivery_Idempotent_NoDuplicate` ·
+  `ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling` ·
+  `ESC_10_AcceptInbound_AuditRow_Via_Escalation`. Web
+  `EscalationTokenPageTests`: `ESC_1_Token_Page_GlobalAdmin_Sees_TokenList` ·
+  `ESC_1_Token_Generate_Plaintext_VisibleOnce` · `ESC_7_Token_Revoke_Succeeds`
+  · `ESC_10_Token_Page_NonGlobalAdmin_Denied` ·
+  `ESC_2_Outbound_Config_Save_Persists_Endpoint_Token_Enabled`. Web
+  `EscalationInboundEndpointTests`: `ESC_5_Inbound_Endpoint_ValidToken_
+  Creates_Row` · `ESC_4_Inbound_Endpoint_InvalidToken_401_NoRow` ·
+  `ESC_6_Forwarder_DB_Config_Sends_Bearer_Token` ·
+  `ESC_4_Forwarder_NoDB_EnvVar_Fallback` · `ESC_6_Forwarder_NoConfig_NoHTTP`
+  · `ESC_8_Received_Filter_Sees_Escalated_Only` · `ESC_8_Detail_Sees_
+  FromInstance`.
+- **(c) Test results (both suites green, 22/22 ESC tests pass):**
+  `dotnet exec Kumunita.Core.Tests` → `Total: 1440, Errors: 0, Failed: 0,
+  Skipped: 2` (the 2 skips = the superseded M32 15-member field-set pin —
+  now re-pinned by the ESC 19-member test — and the `ImproveHarness` pwsh-gate
+  skip; both expected, neither an ESC red). `dotnet exec Kumunita.Web.Tests`
+  → `Total: 1020, Errors: 0, Failed: 0, Skipped: 1` (the 1 skip = the
+  `ImproveHarness` pwsh-gate skip, expected). **22 ESC tests: 22 pass, 0 red.**
+  (One transient Core-suite red — 22 `PostTranslationTests` failing with
+  Docker rootless `bind: address already in use` — was confirmed a Testcontainers
+  port-collision from the two runs' scratch containers overlapping during
+  teardown, not a code regression: a clean `docker container prune` + re-run
+  reported `Failed: 0`.)
+- **(d) Three-test gate:** Closed loop **PASS** · Handoff **PASS** ·
+  Part-vs-whole **PASS** (the 22-test whole passed together in a single run of
+  each suite — see the design doc `### Run result (ESC acceptance gate —
+  2026-10-10)`).
+- **(e) Still-open drift:** none. The only two U08 adjustments were
+  test-side, not Core/Web: `ESC_3_Token_Validate_Valid_Returns_Token`
+  corrected to assert the `LastUsedAt` stamp on the *returned* object (the
+  impl's documented contract) rather than the reloaded row (a Marten
+  detached-entity detail); and `ESC_5_Inbound_Endpoint_ValidToken_Creates_Row`
+  changed from `Assert.IsType<object>` (exact-type, fails on the controller's
+  anonymous type) to `Assert.NotNull` + reflection. Both are within U08's
+  owned test surface; no seam re-shaped.

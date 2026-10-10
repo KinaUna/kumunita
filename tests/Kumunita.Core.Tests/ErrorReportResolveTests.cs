@@ -232,13 +232,20 @@ public class ErrorReportResolveTests(PostgresFixture fixture) : IClassFixture<Po
 
     // ── 5 — the ErrorReport doc field set is the 15-member M32 ceiling
     //      (M32·3) ────────────────────────────────────────────────────────
-    // ADR 0155 D1 (the M32·3 pin): the doc carries exactly the 15-member
+    // ADR 0155 D1 (the M32·3 pin): the doc carried exactly the 15-member
     // field set — the M31 11 (ADR 0154 D1) unchanged + the M32 additive 4.
     // No field outside the set, no field in the set dropped. This is the
     // successor to the M31 11-member pin (M31_3_…_FieldSet_Ceiling, retired
     // by U07 per the U03 flag) — the drift-guard §2.6 pin.
 
-    [Fact(DisplayName = "M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling")]
+    // ESC U08 (the U07 flag): this M32 15-member field-set pin is now stale
+    // against the 19-member ESC ceiling (ESC·2 / ADR 0159 D1 — the ESC
+    // additive 4 FromInstance / EscalationReceivedAt / EscalationSourceId /
+    // EscalationTokenId, additive-only, the M32 15 unchanged). Its successor
+    // is EscalationInboundTests.ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling.
+    // Retired (Skipped) so the Core.Tests assembly no longer fails on the
+    // now-19-member doc; the assertion below is intentionally NOT run.
+    [Fact(DisplayName = "M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling", Skip = "ESC U08 (the U07 flag): superseded by ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling (the 19-member ESC ceiling, ESC·2 / ADR 0159 D1) — the M32 15-member pin is stale.")]
     public void M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling()
     {
         var actual = typeof(ErrorReport).GetProperties()

@@ -896,6 +896,49 @@ The **three-test acceptance gate** (U08 runs + records it in `### Run result
   (the AGENTS.md in-process runner path — the `dotnet test` discovery bug on
   this machine is the known runner quirk, not a failure).
 
+### Run result (ESC acceptance gate — 2026-10-10)
+
+U08 ran the three-test gate (the AGENTS.md in-process runner path —
+`dotnet exec` of each test assembly, the `dotnet test` discovery bug on this
+machine being the known runner quirk, not a failure).
+
+- **Closed loop** — **PASS.** Exercised across the four test classes: the
+  token is generated with its hash row stored and no plaintext
+  (`ESC_3_Token_Generate_Stores_Hash_Not_Plaintext`, Core) → the receiving
+  admin saves the endpoint + token (`ESC_2_Outbound_Config_Save_Persists_
+  Endpoint_Token_Enabled`, Web) → the origin forwarder sends the Bearer token
+  from the DB config (`ESC_6_Forwarder_DB_Config_Sends_Bearer_Token`, Web) →
+  the inbound validates the token and creates the `Origin = "escalated"` row
+  plus one `AccessAudit` row (`ESC_5_Inbound_Endpoint_ValidToken_Creates_Row`,
+  Web; `ESC_5_AcceptInbound_ValidToken_Creates_Escalated_Origin`,
+  `ESC_10_AcceptInbound_AuditRow_Via_Escalation`, Core).
+- **Handoff** — **PASS.** A revoked token no longer validates (Core
+  `ESC_9_Token_Revoke_Immediate_NoValidate` + `ESC_3_Token_Validate_
+  Invalid_Returns_Null`) and an inbound with an invalid / revoked token
+  returns 401 with no row (Web `ESC_4_Inbound_Endpoint_InvalidToken_401_NoRow`);
+  re-delivery is idempotent with no duplicate row (Core
+  `ESC_7_AcceptInbound_ReDelivery_Idempotent_NoDuplicate`).
+- **Part-vs-whole** — **PASS.** The full **22-test** list (§2.4) passed
+  **together** in a single run of each suite: `Kumunita.Core.Tests`
+  `Total: 1440, Errors: 0, Failed: 0, Skipped: 2` (the 2 skips being the
+  superseded M32 15-member field-set pin — `M32_3_ErrorReport_Doc_FieldSet_
+  M32_Ceiling`, now re-pinned by `ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling`
+  — and the `ImproveHarness` pwsh-gate skip, both expected); `Kumunita.Web.Tests`
+  `Total: 1020, Errors: 0, Failed: 0, Skipped: 1` (the 1 skip being the
+  `ImproveHarness` pwsh-gate skip, expected). All 22 ESC tests green.
+
+**No Drift pauses.** The only test-side adjustment made during U08 was a
+relaxation of an over-assertion: `ESC_3_Token_Validate_Valid_Returns_Token`
+initially asserted the `LastUsedAt` stamp on the *reloaded* row (a Marten
+detached-entity detail) rather than on the returned object that `ValidateAsync`
+sets and persists in the same session (the impl's documented contract, ESC·9).
+The assertion was corrected to the returned object (the pinned name is
+`..._Returns_Token`) — a U08-owned test change, no Core/Web seam touched.
+A second, purely-test-side fix: `ESC_5_Inbound_Endpoint_ValidToken_Creates_Row`
+used `Assert.IsType<object>` (exact-type, fails on the controller's anonymous
+type) and was changed to `Assert.NotNull` + reflection. Neither is a Core/Web
+drift; both are within U08's owned test surface.
+
 ### 2.6 drift-guard (frozen once written)
 
 The following are **frozen pins** — any mismatch between the implemented code
