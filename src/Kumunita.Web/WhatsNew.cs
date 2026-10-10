@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.53.0", "2026-10-10", new List<string>
+        {
+            "Nested help guides — each tabbed surface's sub-pages now have a dedicated help page under the surface guide (Projects → To-dos and Boards; Events → Calendar; Settings → Time zone, Date format, Items per page, Home page, Quiet hours, Messaging, Change password; Group → Members and Settings; Admin → Accounts, Communities, Platform, Security, Analytics), so the help tree mirrors the app's own tab structure: the UG guide tree gains a second level (a closed GuideParentMap registry + 18 new nested guide bodies in the en floor + the root help page's guides list extended × en/de/fr/da); the existing 23 top-level guides are untouched (same slugs, same parent, same body), and their de/fr/da baselines are unchanged — the new guides ship the en floor; their localized versions are a Translator lane (ADR 0160).",
+        }),
         new("0.52.0", "2026-10-10", new List<string>
         {
             "Escalation authorization + receiving inbox — a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token at /admin/escalation; when they escalate, the receiving platform validates the token (SHA-256 compare) and only then accepts the issue as an 'escalated' row in the same /admin/error-reports list (a new 'escalated' chip + a local/received filter + the FromInstance on the detail view): the M32 ErrorReports surface extended additively (the EscalationToken + EscalationOutboundConfig docs + the IEscalationTokenService seam + the AcceptInboundAsync seam + the AccessVia.Escalation value + the POST /escalations/inbound public token-gated endpoint + the EscalationForwarder Bearer-token change + the closed escalation.* kw-l key set × en/de/fr/da) (ADR 0159).",

@@ -992,11 +992,37 @@ public static class FirstBootSeeder
             return guidePageIds;   // no canonical `help` page — nothing to hang the guides from.
         }
 
+        // ADR 0160 — nested guide parents: some guides (settings/*, group/*,
+        // admin/*, projects/*) hang from another guide's page rather than
+        // from `help` directly. The parent map tells us which.
+        var parentMap = GuideParentMap();
+
         foreach (var (slug, title, body) in GuidePages())
         {
+            // Resolve the parent: the guide's own parentSlug (a sibling guide)
+            // if present, else the `help` page (top-level guides).
+            string parentId = helpPageId;
+            if (parentMap.TryGetValue(slug, out var parentSlug))
+            {
+                // The parent guide was seeded in this same pass (top-level
+                // guides like `projects`, `settings`, `group`, `admin` come
+                // before their nested children in GuidePages() order).
+                if (!guidePageIds.TryGetValue(parentSlug, out var parentGuideId))
+                {
+                    // Defensive: the parent slug is in GuidePages() but was
+                    // not yet seeded (shouldn't happen — top-level entries
+                    // precede their children). Fall back to `help`.
+                    parentId = helpPageId;
+                }
+                else
+                {
+                    parentId = parentGuideId;
+                }
+            }
+
             var existing = await session
                 .Query<Page>()
-                .Where(p => p.Slug == slug && p.ParentId == helpPageId)
+                .Where(p => p.Slug == slug && p.ParentId == parentId)
                 .FirstOrDefaultAsync(ct)
                 .ConfigureAwait(false);
 
@@ -1006,7 +1032,7 @@ public static class FirstBootSeeder
                 {
                     Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
                     Slug = slug,
-                    ParentId = helpPageId,   // under the canonical `help` page (ADR 0057 D1)
+                    ParentId = parentId,   // under `help` or a top-level guide (ADR 0057 D1 / ADR 0160)
                     Kind = PageKind.System,   // a platform guide (ADR 0040 standing matrix)
                     Title = title,
                     Body = body,
@@ -1164,21 +1190,41 @@ public static class FirstBootSeeder
             return;   // no canonical `help` page to hang the guides from — nothing to backfill.
         }
 
+        // ADR 0160 — nested guide parents: the same closed parent map the
+        // first-boot path reads (SeedUserGuidesAsync), so a warm boot that
+        // predates the nested guide set backfills them under the correct
+        // top-level guide (not directly under `help`). The slug → page-Id map
+        // tracks each guide as it is created / found, so a nested guide's
+        // parent (a top-level guide) is already in the map by the time the
+        // nested guide is reached (top-level entries precede their children).
+        var parentMap = GuideParentMap();
+        var pageIdBySlug = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["help"] = help.Id,
+        };
+
         foreach (var (slug, title, body) in GuidePages())
         {
+            string parentId = help.Id;
+            if (parentMap.TryGetValue(slug, out var parentSlug)
+                && pageIdBySlug.TryGetValue(parentSlug, out var parentGuideId))
+            {
+                parentId = parentGuideId;
+            }
+
             var existing = await session
                 .Query<Page>()
-                .Where(p => p.Slug == slug && p.ParentId == help.Id && p.IsDeleted == false)
+                .Where(p => p.Slug == slug && p.ParentId == parentId && p.IsDeleted == false)
                 .FirstOrDefaultAsync(ct)
                 .ConfigureAwait(false);
 
             if (existing is null)
             {
-                session.Store(new Page
+                var newGuide = new Page
                 {
                     Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
                     Slug = slug,
-                    ParentId = help.Id,   // under the canonical `help` page (ADR 0057 D1)
+                    ParentId = parentId,   // under `help` or a top-level guide (ADR 0057 D1 / ADR 0160)
                     Kind = PageKind.System,   // a platform guide (ADR 0040 standing matrix)
                     Title = title,
                     Body = body,
@@ -1187,9 +1233,15 @@ public static class FirstBootSeeder
                     AuthorId = string.Empty,    // platform content — no resident author
                     Created = now,
                     Modified = now,
-                });
+                };
+                session.Store(newGuide);
+                pageIdBySlug[slug] = newGuide.Id;
             }
-            // else: skip — create-if-missing (never overwrite a community edit; ADR 0042 D1).
+            else
+            {
+                pageIdBySlug[slug] = existing.Id;
+            }
+            // else: skip the store — create-if-missing (never overwrite a community edit; ADR 0042 D1).
         }
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -1257,16 +1309,38 @@ public static class FirstBootSeeder
             return;   // no canonical `help` page — nothing to backfill translations for.
         }
 
+        // ADR 0160 — the backfill must reach BOTH top-level guides (direct
+        // children of `help`) AND the nested guides (children of their top-level
+        // parent). A guide's slug is unique across the whole tree (the
+        // `(ParentId, Slug)` unique index guarantees at most one page per slug
+        // under any single parent, and a guide slug never appears under two
+        // different parents — the ADR 0160 D1 closed-set rule), so a slug-only
+        // query is unambiguous. A defensive id set keeps the query scoped to
+        // the guide subtree in case a non-guide page ever shares a slug.
+        var topLevelGuideIds = (await session
+            .Query<Page>()
+            .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
+            .Select(p => p.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false)).ToList();
+        var allGuideIds = (await session
+            .Query<Page>()
+            .Where(p => (p.ParentId == help.Id || topLevelGuideIds.Contains(p.ParentId))
+                        && p.IsDeleted == false)
+            .Select(p => p.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false)).ToList();
+
         foreach (var (slug, _, _) in GuidePages())
         {
             var guide = await session
                 .Query<Page>()
-                .Where(p => p.Slug == slug && p.ParentId == help.Id && p.IsDeleted == false)
+                .Where(p => p.Slug == slug && allGuideIds.Contains(p.Id) && p.IsDeleted == false)
                 .FirstOrDefaultAsync(ct)
                 .ConfigureAwait(false);
 
             if (guide is null)
-                continue;   // the guide itself is absent; BackfillUserGuidesAsync owns that gap.
+                continue;   // the guide itself is absent (top-level or nested); BackfillUserGuidesAsync owns that gap.
 
             // The de/fr/da baselines for this guide, create-if-missing (ADR 0042 D1).
             foreach (var (code, baselines) in new[]
@@ -1874,7 +1948,447 @@ public static class FirstBootSeeder
              "reopened) or a **hand-over** (a child account's controls come " +
              "back to the child) both keep the account. Only when the account " +
              "is truly done is a deletion the right end.\n"),
+            // ── ADR 0160 — the nested guide sub-pages (the tabbed surfaces) ──
+            // Each top-level surface guide (projects / events / settings /
+            // groups / admins) gains a child guide per tab it does not already
+            // have a dedicated top-level guide for. The `settings` index below
+            // is the container for the /settings tabs; it is seeded before its
+            // children so SeedUserGuidesAsync resolves the parent.
+            ("settings", "Settings",
+             "## Settings\n\n" +
+             "Settings is the one place where the platform follows *you* rather " +
+             "than the neighborhood: your language, your time zone, your date " +
+             "format, how many items a page shows, which home page you open on, " +
+             "your quiet hours, your messaging preferences, your children's " +
+             "accounts, and your password. Everything here is saved on *your* " +
+             "account — the platform's defaults apply only where you have not " +
+             "chosen your own.\n\n" +
+             "**Where to find it.** Open **Settings** in the account menu. Each " +
+             "section below is a tab; the active one is where you land.\n\n" +
+             "**The sections.**\n" +
+             "- **Language** — your interface language. See " +
+             "[Language](/pages/system/help/language).\n" +
+             "- **Time zone** — the zone you see dates and times in. See " +
+             "[Time zone](timezone).\n" +
+             "- **Date & time format** — the shape of a date and a clock time. See " +
+             "[Date & time format](date-format).\n" +
+             "- **Items per page** — how many posts, to-dos, and so on a list shows " +
+             "at once. See [Items per page](page-size).\n" +
+             "- **Home page** — the page you open on when you sign in. See " +
+             "[Home page](home).\n" +
+             "- **Quiet hours** — the window when the platform holds your " +
+             "notifications instead of pinging. See [Quiet hours](quiet-hours).\n" +
+             "- **Messaging** — turn resident-to-resident messages on or off for " +
+             "yourself. See [Messaging](messaging).\n" +
+             "- **Children** — the accounts you set up for a child. See " +
+             "[Child accounts](/pages/system/help/child-accounts).\n" +
+             "- **Change password** — set a new password. See " +
+             "[Change password](change-password).\n" +
+             "- **Delete account** — the permanent end. See " +
+             "[Deleting an account](/pages/system/help/deleting-an-account).\n"),
+            ("todos", "To-dos",
+             "## To-dos\n\n" +
+             "A to-do is a single piece of work the neighborhood has written down — " +
+             "something to fix, to buy, to do. It lives in the **To-dos** tab of " +
+             "Projects.\n\n" +
+             "**To write one.** Open the **To-dos** tab and pick **New to-do**. " +
+             "Give it a title, and a body if you need to explain the why. A to-do " +
+             "is a full piece of work on its own — it can hold subtasks and point " +
+             "at another to-do it is waiting on.\n\n" +
+             "**Assigning it.** A to-do with no assignee is on the table for " +
+             "anyone. Pick a neighbor and it lands in their list; pick a group and " +
+             "it lands in the group's. You can reassign it at any time — the " +
+             "assignment always reflects who you last chose.\n\n" +
+             "**Subtasks.** Break a big to-do into smaller ones. A subtask is a " +
+             "full to-do — its own title, assignee, and status — but it stays kept " +
+             "under the parent, so the big picture and the pieces stay together.\n\n" +
+             "**Status.** A to-do carries a status (the label for where it is at: " +
+             "open, in progress, done). You change it when the work moves. The " +
+             "status is a view of the state, not a lock — nothing is blocked by " +
+             "it.\n\n" +
+             "**Comments.** Anyone who can see the to-do can leave a comment on it, " +
+             "and reply, the way they would on a post.\n\n" +
+             "By default a to-do is visible to everyone in the community. You can " +
+             "narrow who can see it in the audience section, the same way you do " +
+             "for a post — see [Audience](/pages/system/help/audience).\n"),
+            ("boards", "Boards",
+             "## Boards\n\n" +
+             "A board is a wall of lanes that arranges to-dos, so you can see " +
+             "where the work is at at a glance. It lives in the **Boards** tab of " +
+             "Projects.\n\n" +
+             "**To create one.** Open the **Boards** tab and pick **New board**. " +
+             "Give it a name, then add the lanes you want.\n\n" +
+             "**Lanes.** A lane is a vertical column on the board. A lane can " +
+             "carry a status — a to-do moved into it picks that status up — and an " +
+             "optional limit on how many to-dos it holds. Use lanes to *show* " +
+             "where the work is, not to gate it: moving a card is a view of the " +
+             "state, not a lock on it.\n\n" +
+             "**Moving a to-do.** Open a to-do and choose its board lane, or move " +
+             "it on the board. The to-do keeps everything it had (assignee, " +
+             "subtasks, comments) — only its lane, and any lane-carried status, " +
+             "changes.\n\n" +
+             "**Boards and to-dos are the same thing, two views.** A to-do is the " +
+             "work item; a board is one arrangement of to-dos. A to-do can sit on " +
+             "a board or off one — both are valid. See [To-dos](todos).\n\n" +
+             "By default a board is visible to everyone in the community; you can " +
+             "narrow who can see it in the audience section, the same way you do " +
+             "for a post.\n"),
+            ("calendar", "Calendar",
+             "## Calendar\n\n" +
+             "The **Calendar** is the events list arranged by date, so you can see " +
+             "what is coming up in the neighborhood at a glance instead of " +
+             "scrolling a list. It lives in the **Calendar** tab of Events.\n\n" +
+             "**To see it.** Open **Events**, then the **Calendar** tab. The " +
+             "month shows each day, and the events on that day.\n\n" +
+             "**To move through time.** Step to the previous or next month. The " +
+             "events that fall in that month are what you see — the same events " +
+             "as the **Events** list, arranged by their date rather than by " +
+             "recency.\n\n" +
+             "**To join one.** Open an event from the calendar and pick " +
+             "**RSVP**, exactly as on the events list — see " +
+             "[Events](/pages/system/help/events).\n\n" +
+             "The calendar and the list are the same events. If you can see an " +
+             "event in one, you can see it in the other; if it is hidden from " +
+             "you, it is hidden from both.\n"),
+            ("timezone", "Time zone",
+             "## Time zone\n\n" +
+             "Your **time zone** is the zone you see dates and times in across the " +
+             "platform — event times, post timestamps, reminders.\n\n" +
+             "**To set yours.** Open **Settings → Time zone** and pick the zone " +
+             "you live in. It is saved on your account.\n\n" +
+             "**What it changes.** Every time the platform shows you — an event " +
+             "at *what time*, a post from *how long ago* — is rendered in the zone " +
+             "you chose, even if the author lives in a different one. The " +
+             "author's zone is used when *they* read it; you each see the same " +
+             "instant in your own zone.\n\n" +
+             "**What it doesn't change.** It does not move an event. An event at " +
+             "3 p.m. in the platform's default zone is still the same moment for " +
+             "everyone; it is only the *label* on that moment that follows your " +
+             "zone. Two neighbors in different zones both see the event, at the " +
+             "right local hour for each.\n\n" +
+             "If you never set a zone, the platform's default (the operator's " +
+             "choice) applies. See [Language](/pages/system/help/language) for the " +
+             "related language and date-format settings.\n"),
+            ("date-format", "Date & time format",
+             "## Date & time format\n\n" +
+             "Your **date format** is the shape a date and a clock time take when " +
+             "the platform shows them to you — *10 Oct 2026* versus " +
+             "*2026-10-10* versus *10/10/2026*.\n\n" +
+             "**To set yours.** Open **Settings → Date & time format** and pick " +
+             "the shape you read most easily. It is saved on your account.\n\n" +
+             "**What it changes.** Dates and times across the platform — an " +
+             "event's day, a post's timestamp, a reminder — render in the shape " +
+             "you chose.\n\n" +
+             "**What it doesn't change.** It does not change the date itself, and " +
+             "it does not change your time zone (that is a separate setting — see " +
+             "[Time zone](timezone)). The *when* is the same for everyone; only " +
+             "the *way it is written* follows your choice.\n\n" +
+             "If you never set a format, the platform's default applies. See " +
+             "[Language](/pages/system/help/language) for the related language and " +
+             "time-zone settings.\n"),
+            ("page-size", "Items per page",
+             "## Items per page\n\n" +
+             "**Items per page** is how many things a list shows before you " +
+             "scroll to the next page — posts in the feed, to-dos in the list, " +
+             "entries in the directory.\n\n" +
+             "**To set yours.** Open **Settings → Items per page** and pick a " +
+             "number. It is saved on your account.\n\n" +
+             "**What it changes.** The length of every list and feed you read. A " +
+             "larger number shows more at once (fewer page-turns); a smaller one " +
+             "shows less (faster pages). It is a reading preference, not a limit — " +
+             "it never changes *what* you can see, only how much is on a page.\n\n" +
+             "**What it doesn't change.** It does not hide anything and it does " +
+             "not change who can see a thing — the audience still decides that. It " +
+             "is purely a matter of how the list is paginated for you.\n\n" +
+             "If you never set one, the platform's default applies.\n"),
+            ("home", "Home page",
+             "## Home page\n\n" +
+             "Your **home page** is the page that opens when you sign in — the " +
+             "first thing you land on.\n\n" +
+             "**To set yours.** Open **Settings → Home page** and pick which " +
+             "page opens: the community feed, the announcements, or another " +
+             "surface. It is saved on your account.\n\n" +
+             "**What it changes.** Where you land after signing in, and where the " +
+             "platform's **home** link takes you for you. It is a convenience — " +
+             "you can still reach every surface from the top bar any time.\n\n" +
+             "**What it doesn't change.** It does not change what you can see. " +
+             "Every surface is still reachable; the home page only decides which " +
+             "one opens first.\n\n" +
+             "If you never set one, the platform's default home opens.\n"),
+            ("quiet-hours", "Quiet hours",
+             "## Quiet hours\n\n" +
+             "**Quiet hours** are the window of the day when the platform holds " +
+             "your notifications instead of pinging you — so a late reply or an " +
+             "early post doesn't wake you.\n\n" +
+             "**To set yours.** Open **Settings → Quiet hours** and pick the " +
+             "window (in your own time zone). It is saved on your account.\n\n" +
+             "**What it does.** Inside your quiet window, the platform still " +
+             "records every notification — the inbox is complete — but it does not " +
+             "send you a ping. When the window ends, the held notifications are " +
+             "there, waiting in the inbox.\n\n" +
+             "**What it doesn't do.** It does not delete or drop anything, and it " +
+             "does not stop the inbox from recording. It only controls *when* a " +
+             "notification is allowed to alert you.\n\n" +
+             "Quiet hours are yours — the operator and other residents can't set " +
+             "or clear them for you. See [Notifications](/pages/system/help/notifications) " +
+             "for the related preferences and subscriptions.\n"),
+            ("messaging", "Messaging",
+             "## Messaging\n\n" +
+             "**Messaging** is resident-to-resident conversation on the platform " +
+             "— a direct note from one neighbor to another, separate from the " +
+             "public feed and from groups.\n\n" +
+             "**Is it on?** Messaging is an operator switch: the instance decides " +
+             "whether residents may message each other at all. If it is on, you " +
+             "also have your own **on/off** for it — open **Settings → Messaging** " +
+             "and choose. If it is off for you (or off for the instance), the " +
+             "surface is simply absent — there is no explanation, just no entry.\n\n" +
+             "**What it changes.** Turning it on lets you start and read " +
+             "conversations with other residents who also have it allowed. Turning " +
+             "it off stops you from sending or receiving — your existing " +
+             "conversations are kept, not deleted.\n\n" +
+             "**What it doesn't change.** It does not affect posts, groups, " +
+             "announcements, or the feed — those are separate surfaces. A message " +
+             "is private to the two of you (and, for a child account, the " +
+             "guardian's standing follows the [child accounts](/pages/system/help/child-accounts) " +
+             "rules).\n"),
+            ("change-password", "Change password",
+             "## Change password\n\n" +
+             "Changing your **password** is how you set a new one for signing in " +
+             "to your account.\n\n" +
+             "**To change it.** Open **Settings → Change password**. Enter your " +
+             "current password, then the new one, and confirm. It is saved on " +
+             "your account.\n\n" +
+             "**What it does.** From then on, you sign in with the new password; " +
+             "the old one stops working. If you are signed in on other devices, " +
+             "they are asked to sign in again.\n\n" +
+             "**If you forget it.** A forgotten password is handled by the " +
+             "platform's reset flow (or by a global admin, for a child account — " +
+             "see [Child accounts](/pages/system/help/child-accounts)). Changing " +
+             "a password is not the same as deleting an account — your account " +
+             "and your content are untouched; only the sign-in secret changes.\n\n" +
+             "Your password is yours. No one else on the platform — including an " +
+             "admin — can read it; it is used only to check that it matches when " +
+             "you sign in.\n"),
+            ("members", "Group members",
+             "## Group members\n\n" +
+             "The **Members** tab of a group is where the group's people live — " +
+             "who is in it, and (for the owner) who can be added or removed.\n\n" +
+             "**To see who is in it.** Open a group, then the **Members** tab. " +
+             "The list shows the group's members.\n\n" +
+             "**To join a public group.** A **public** group is anyone's to join — " +
+             "pick **Join** and you are in. To **leave**, pick **Leave**; the " +
+             "group keeps its posts, and you are simply out of it.\n\n" +
+             "**To add or remove a member.** The **group owner** (or a global " +
+             "admin) adds and removes members. A member who leaves does so on " +
+             "their own; an owner or admin can also remove a member, or close a " +
+             "group.\n\n" +
+             "**Private groups.** A **private** group is by invitation — only its " +
+             "members can see it, post to it, or be added to a post's audience " +
+             "through it. A member who is removed loses access the same way they " +
+             "gained it: quietly, and without the group losing its history.\n\n" +
+             "See [Groups](/pages/system/help/groups) for how groups work in " +
+             "general, and [Audience](/pages/system/help/audience) for how a " +
+             "group appears as an audience choice when you post.\n"),
+            ("group-settings", "Group settings",
+             "## Group settings\n\n" +
+             "The **Settings** tab of a group is where a group's *own* details are " +
+             "kept — its name, its description, whether it is private, and its " +
+             "translations. It is for the **group**, not for you: it is visible to " +
+             "the group's owner and a global admin.\n\n" +
+             "**The description.** The group's short description is shown where " +
+             "the group appears. The owner (or a global admin) edits it any " +
+             "time.\n\n" +
+             "**Public or private.** Here the owner (or a global admin) sets " +
+             "whether the group is public (anyone's to join) or private (by " +
+             "invitation). Switching it changes who can see and join — see " +
+             "[Group members](members) and [Groups](/pages/system/help/groups).\n\n" +
+             "**Translations.** A **Translator** (or a global admin) can add a " +
+             "language version of the group's name and description, so a " +
+             "resident reading in that language sees the group in their own " +
+             "language. See [Translators](/pages/system/help/translator).\n\n" +
+             "What the Settings tab is not: it does not change the group's " +
+             "members (that is the [Members](members) tab), and it does not touch " +
+             "your own account settings (those are under " +
+             "[Settings](/pages/system/help/settings)).\n"),
+            ("accounts", "Admin: accounts",
+             "## Admin: accounts\n\n" +
+             "The **Accounts** tab is where a global admin keeps the " +
+             "neighborhood's accounts in order — verifying new ones, blocking or " +
+             "unblocking a resident, and deciding who holds which elevated role.\n\n" +
+             "**To verify a new account.** A resident who has signed up is in a " +
+             "pending state until verified. Open the account and confirm the " +
+             "identity, then verify it — the account comes fully online.\n\n" +
+             "**To block or unblock a resident.** A blocked resident can't sign " +
+             "in. Blocking is reversible — unblock when the reason is resolved. " +
+             "Blocking is not the same as deleting: the account and its content " +
+             "are kept.\n\n" +
+             "**To assign an elevated role.** Decide who is a moderator, a " +
+             "translator, or another global admin. Roles are independent and " +
+             "composable — a resident may hold more than one. Removing a role " +
+             "stops the standing; it does not remove the account.\n\n" +
+             "**What keeps it in check.** Every account action is written to the " +
+             "audit trail, and an admin's standing is narrow by design: an admin " +
+             "keeps accounts in order but does not read a resident's content — " +
+             "audience still decides what is visible. See " +
+             "[Admins](/pages/system/help/admins) for the role in full, and " +
+             "[Deleting an account](/pages/system/help/deleting-an-account) for " +
+             "the one action that is permanent.\n"),
+            ("communities", "Admin: communities",
+             "## Admin: communities\n\n" +
+             "The **Communities** tab is where a global admin keeps the " +
+             "neighborhood's communities — the named groups of residents (a " +
+             "building, a street, a shared project) that content can be " +
+             "audience-scoped to.\n\n" +
+             "**To add or edit one.** Create a community, give it a name and a " +
+             "short description, and edit them any time. A community is an " +
+             "organizational unit — not a feed and not a group, but the thing a " +
+             "group, a post, or an audience may point at.\n\n" +
+             "**To set membership.** Decide which residents belong to which " +
+             "community. Membership is what makes a community a real audience: a " +
+             "post scoped to a community is seen by its members (and the author), " +
+             "not by the whole neighborhood.\n\n" +
+             "**What it is not.** A community is not the same as a " +
+             "[group](/pages/system/help/groups) (a group has its own feed and " +
+             "members tab) or a " +
+             "[tag](/pages/system/help/tags) (a tag is a label on content). A " +
+             "community is the standing unit of *who is who* in the " +
+             "neighborhood. See [Audience](/pages/system/help/audience) for how a " +
+             "community appears as an audience choice when you post.\n"),
+            ("platform", "Admin: platform",
+             "## Admin: platform\n\n" +
+             "The **Platform** tab is where a global admin keeps the *platform's " +
+             "own* things in order — the pages it ships, the defaults it applies, " +
+             "and the things it lets residents override.\n\n" +
+             "**The platform pages.** The terms, the help guides, the privacy " +
+             "note, and the code of conduct are the platform's own pages. A " +
+             "global admin can edit them, and reset a page back to its shipped " +
+             "text when they want the latest wording.\n\n" +
+             "**The platform defaults.** Set the default language, time zone, and " +
+             "date format for the instance. Every resident can still override " +
+             "any of these on their own account (see [Settings](/pages/system/help/settings)) " +
+             "— the default is only what applies where a resident has not chosen " +
+             "their own.\n\n" +
+             "**The sign-up gate.** Choose whether new residents can sign up on " +
+             "their own, or only when you invite them.\n\n" +
+             "What this tab is not: it does not manage individual accounts (that " +
+             "is [Accounts](accounts)), communities " +
+             "([Communities](communities)), or the security and audit surface " +
+             "([Security](security)). See [Admins](/pages/system/help/admins) for " +
+             "the role in full.\n"),
+            ("security", "Admin: security",
+             "## Admin: security\n\n" +
+             "The **Security** tab is where a global admin sees the platform's " +
+             "audit trail — the record of every access decision and every admin " +
+             "action — and the break-glass controls for when the ordinary lanes " +
+             "are not enough.\n\n" +
+             "**The audit trail.** Every time a resident reads " +
+             "audience-restricted content, and every admin and moderator action, " +
+             "is written to the trail: who, what, when, and the outcome " +
+             "(allowed or denied). The trail is the platform's proof that " +
+             "audience-by-default held — it is read for review, not for " +
+             "surveillance.\n\n" +
+             "**What the audit is not.** Seeing the trail is not a back-door into " +
+             "a resident's content. An audit row records that an access " +
+             "*happened* and its outcome; it does not carry the content itself. " +
+             "Audience still decides what is visible, and a report or an audit " +
+             "row never reveals a post, a reply, or a profile.\n\n" +
+             "**The break-glass.** When an account or a lane is in trouble, the " +
+             "global admin has the standing to act on it — a narrow, audited " +
+             "override, not a standing power. Every break-glass use is itself " +
+             "written to the trail.\n\n" +
+             "See [Admins](/pages/system/help/admins) for the role in full, and " +
+             "[Moderators](/pages/system/help/moderators) for how a moderator's " +
+             "narrower standing compares.\n"),
+            ("analytics", "Admin: analytics",
+             "## Admin: analytics\n\n" +
+             "The **Analytics** tab is where a global admin sees the instance's " +
+             "own shape over time — how much is being used, how much is stored, " +
+             "and whether the capacity is sufficient for the neighborhood going " +
+             "forward.\n\n" +
+             "**What it shows.** The instance's activity and storage over a " +
+             "window you choose (a recent day, a month, a year): posts written, " +
+             "storage used, and the trend. It is the operator's answer to " +
+             "*is this instance big enough?*\n\n" +
+             "**What it is for.** Capacity planning. A rising storage trend says " +
+             "*back up sooner, and plan for more room*. A flat one says *you are " +
+             "fine*. It is a reading of the instance, not of the residents.\n\n" +
+             "**What it is not.** It does not read or expose any resident's " +
+             "content. Analytics are counts and totals — how many, how much, over " +
+             "when — never *what a specific resident wrote*. The audit trail " +
+             "([Security](security)) is where per-action detail lives.\n\n" +
+             "See [Admins](/pages/system/help/admins) for the role in full.\n"),
         ];
+    }
+
+    /// <summary>
+    /// ADR 0160 — the **nested guide parent map**: for each guide slug that
+    /// is a *child* of another guide (rather than a direct child of
+    /// <c>help</c>), the map gives the slug of its parent guide.
+    /// <para>
+    /// A slug absent from this map hangs directly from the canonical
+    /// <c>help</c> page (the ADR 0057 D1 shape, unchanged for all
+    /// top-level guides). A slug present in this map hangs from the page
+    /// seeded under the parent slug's <c>help</c>-relative path, so a
+    /// resident reads e.g. <c>/pages/system/help/settings/timezone</c>
+    /// (the <c>PagePaths.Derive</c> chain: <c>system → help → settings →
+    /// timezone</c>).
+    /// <para>
+    /// The parent map is a **closed set** (the ADR 0057 "closed set" rule
+    /// applied to nesting): a new nested guide is a new lane, not a silent
+    /// addition. The map is the single source both
+    /// <see cref="SeedUserGuidesAsync"/> and
+    /// <see cref="BackfillUserGuidesAsync"/> read, so the seeder and the
+    /// warm-boot backfill can never drift on the nesting shape.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> GuideParentMap()
+    {
+        // Key = the child guide's <see cref="Kumunita.Core.Pages.Page.Slug"/>
+        // (the leaf slug — the derived path is <c>…/help/{parent}/{slug}</c>,
+        // the PagePaths.Derive chain). Value = the slug of the guide the child
+        // hangs under (a top-level guide, itself a child of <c>help</c>).
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            // Projects (the /projects tabs: Projects · To-dos · Boards).
+            // The <c>projects</c> guide covers the landing tab; the other two
+            // tabs are sub-pages.
+            ["todos"]  = "projects",
+            ["boards"] = "projects",
+
+            // Events (the /events tabs: Events · Calendar).
+            ["calendar"] = "events",
+
+            // Settings (the /settings tabs, the _SettingsTabs strip). The
+            // <c>settings</c> guide (a new top-level index) covers the
+            // section; each tab without its own dedicated top-level guide is
+            // a sub-page. (The <c>language</c> / <c>child-accounts</c> /
+            // <c>deleting-an-account</c> tabs keep their existing top-level
+            // guides — the settings index cross-links them.)
+            ["timezone"]        = "settings",
+            ["date-format"]     = "settings",
+            ["page-size"]       = "settings",
+            ["home"]            = "settings",
+            ["quiet-hours"]     = "settings",
+            ["messaging"]       = "settings",
+            ["change-password"] = "settings",
+
+            // Group detail (the /groups/{id} tabs: Feed · Members · Settings).
+            // The <c>groups</c> guide covers the Feed tab; the other two tabs
+            // are sub-pages. <c>group-settings</c> is distinct from the
+            // top-level <c>settings</c> guide (a slug is unique per parent,
+            // so the two coexist under different parents).
+            ["members"]       = "groups",
+            ["group-settings"] = "groups",
+
+            // Admin (the /admin tabs: Overview · Accounts · Communities ·
+            // Platform · Security · Analytics). The <c>admins</c> guide
+            // covers the Overview tab; the other tabs are sub-pages.
+            ["accounts"]    = "admins",
+            ["communities"] = "admins",
+            ["platform"]    = "admins",
+            ["security"]    = "admins",
+            ["analytics"]   = "admins",
+        };
     }
 
     /// <summary>
@@ -2552,6 +3066,427 @@ public static class FirstBootSeeder
              "zurück zum Kind) lassen das Konto bestehen. Nur wenn ein " +
              "Konto wirklich fertig ist, ist eine Löschung das passende " +
              "Ende.\n"),
+            // ── ADR 0160 — the nested guide sub-pages (the tabbed surfaces) ──
+            // The 17 nested guides + the `settings` index, each a translation of
+            // the <see cref="GuidePages"/>() en body (the ADR 0160 D2 set; the
+            // cross-links use the absolute nested form
+            // <c>/pages/system/help/{parent}/{slug}</c>, which the
+            // MarkdownRenderer <c>IsSafeUrl</c> allowlist accepts).
+            ("settings", "Einstellungen",
+             "## Einstellungen\n\n" +
+             "Einstellungen sind der eine Ort, an dem die Plattform *dir* folgt " +
+             "und nicht dem Viertel: deine Sprache, deine Zeitzone, dein " +
+             "Datumsformat, wie viele Einträge eine Seite zeigt, welche " +
+             "Startseite sich öffnet, deine Ruhezeiten, deine " +
+             "Nachrichteneinstellungen, die Konten deiner Kinder und dein " +
+             "Passwort. Alles hier wird auf *deinem* Konto gespeichert — die " +
+             "Standards der Plattform gelten nur dort, wo du nichts eigenes " +
+             "gewählt hast.\n\n" +
+             "**Wo findest du es.** Öffne **Einstellungen** im Kontomenu. Jeder " +
+             "Bereich unten ist ein Tab; das aktive ist dort, wo du landest.\n\n" +
+             "**Die Bereiche.**\n" +
+             "- **Sprache** — deine Sprache der Oberfläche. Siehe " +
+             "[Sprache](/pages/system/help/language).\n" +
+             "- **Zeitzone** — die Zone, in der du Daten und Uhrzeiten siehst. " +
+             "Siehe [Zeitzone](/pages/system/help/settings/timezone).\n" +
+             "- **Datums- und Uhrzeitformat** — die Gestalt eines Datums und " +
+             "einer Uhrzeit. Siehe [Datums- und Uhrzeitformat]" +
+             "(/pages/system/help/settings/date-format).\n" +
+             "- **Einträge pro Seite** — wie viele Beiträge, To-dos und so weiter " +
+             "eine Liste auf einmal zeigt. Siehe [Einträge pro Seite]" +
+             "(/pages/system/help/settings/page-size).\n" +
+             "- **Startseite** — die Seite, die sich öffnet, wenn du dich " +
+             "einloggst. Siehe [Startseite](/pages/system/help/settings/home).\n" +
+             "- **Ruhezeiten** — das Zeitfenster, in dem die Plattform deine " +
+             "Benachrichtigungen zurückhält statt zu pinggen. Siehe " +
+             "[Ruhezeiten](/pages/system/help/settings/quiet-hours).\n" +
+             "- **Nachrichten** — schalte Nachrichten von Bewohner zu Bewohner " +
+             "für dich an oder aus. Siehe [Nachrichten]" +
+             "(/pages/system/help/settings/messaging).\n" +
+             "- **Kinder** — die Konten, die du für ein Kind eingerichtet " +
+             "hast. Siehe [Kinderkonten](/pages/system/help/child-accounts).\n" +
+             "- **Passwort ändern** — setze ein neues Passwort. Siehe " +
+             "[Passwort ändern](/pages/system/help/settings/change-password).\n" +
+             "- **Konto löschen** — der dauerhafte Schluss. Siehe " +
+             "[Konto löschen](/pages/system/help/deleting-an-account).\n"),
+            ("todos", "To-dos",
+             "## To-dos\n\n" +
+             "Ein To-do ist eine einzelne Sache, die das Viertel aufgeschrieben " +
+             "hat — etwas zu reparieren, zu kaufen, zu erledigen. Es lebt im " +
+             "**To-dos**-Tab von Projekten.\n\n" +
+             "**So schreibst du eines.** Öffne den **To-dos**-Tab und wähle " +
+             "**Neues To-do**. Gib ihm einen Titel und, falls nötig, einen " +
+             "Text, der das Warum erklärt. Ein To-do ist eine eigene vollständige " +
+             "Arbeitseinheit — es kann Unteraufgaben halten und auf ein anderes " +
+             "To-do verweisen, auf das es wartet.\n\n" +
+             "**So weist du es zu.** Ein To-do ohne Zuständigen liegt für jeden " +
+             "auf dem Tisch. Wähle eine Nachbarin oder einen Nachbarn, und es " +
+             "landet in deren Liste; wähle eine Gruppe, und es landet in der der " +
+             "Gruppe. Du kannst es jederzeit neu zuweisen — die Zuweisung zeigt " +
+             "immer, wen du zuletzt gewählt hast.\n\n" +
+             "**Unteraufgaben.** Teile ein großes To-do in kleinere auf. Eine " +
+             "Unteraufgabe ist ein vollständiges To-do — eigener Titel, eigener " +
+             "Zuständiger, eigener Status — aber sie bleibt unter dem " +
+             "übergeordneten gehalten, damit Gesamtbild und Teile zusammenbleiben.\n\n" +
+             "**Status.** Ein To-do hat einen Status (das Etikett für den Stand: " +
+             "offen, in Arbeit, erledigt). Du änderst ihn, wenn die Arbeit " +
+             "vorankommt. Der Status ist ein Blick auf den Zustand, kein Schloss " +
+             "— nichts wird dadurch blockiert.\n\n" +
+             "**Kommentare.** Jede Person, die das To-do sehen darf, kann " +
+             "kommentieren und antworten, wie bei einem Beitrag.\n\n" +
+             "Standardmäßig sieht ein To-do jeder im Viertel. Du kannst " +
+             "eingrenzen, wer es sieht, im Zielgruppen-Bereich — so wie bei einem " +
+             "Beitrag. Siehe [Zielgruppe](/pages/system/help/audience).\n"),
+            ("boards", "Boards",
+             "## Boards\n\n" +
+             "Ein Board ist eine Wand mit Spuren, die To-dos anordnet, damit du " +
+             "auf einen Blick siehst, wo die Arbeit steht. Es lebt im **Boards**-" +
+             "Tab von Projekten.\n\n" +
+             "**So erstellst du eines.** Öffne den **Boards**-Tab und wähle " +
+             "**Neues Board**. Gib ihm einen Namen und füge dann die Spuren " +
+             "hinzu, die du willst.\n\n" +
+             "**Spuren.** Eine Spur ist eine vertikale Spalte auf dem Board. " +
+             "Eine Spur kann einen Status tragen — ein To-do, das hineinbewegt " +
+             "wird, übernimmt diesen — und ein optionales Limit, wie viele To-dos " +
+             "sie hält. Nutze Spuren, um zu *zeigen*, wo die Arbeit ist, nicht " +
+             "um sie zu sperren: eine Karte zu bewegen ist ein Blick auf den " +
+             "Zustand, kein Schloss darauf.\n\n" +
+             "**Ein To-do bewegen.** Öffne ein To-do und wähle seine Board-Spur, " +
+             "oder bewege es auf dem Board. Das To-do behält alles, was es hatte " +
+             "(Zuständiger, Unteraufgaben, Kommentare) — nur seine Spur und ein " +
+             "spurgetragener Status ändern sich.\n\n" +
+             "**Boards und To-dos sind dasselbe, zwei Ansichten.** Ein To-do ist " +
+             "die Arbeitseinheit; ein Board ist eine Anordnung von To-dos. Ein " +
+             "To-do kann auf einem Board stehen oder auch nicht — beides ist " +
+             "gültig. Siehe [To-dos](/pages/system/help/projects/todos).\n\n" +
+             "Standardmäßig sieht ein Board jeder im Viertel; du kannst " +
+             "eingrenzen, wer es sieht, im Zielgruppen-Bereich — so wie bei einem " +
+             "Beitrag.\n"),
+            ("calendar", "Kalender",
+             "## Kalender\n\n" +
+             "Der **Kalender** ist die Ereignisliste nach Datum geordnet, damit " +
+             "du auf einen Blick siehst, was im Viertel ansteht, statt eine Liste " +
+             "durchzuscrollen. Er lebt im **Kalender**-Tab von Ereignissen.\n\n" +
+             "**So siehst du ihn.** Öffne **Ereignisse**, dann den **Kalender**-" +
+             "Tab. Der Monat zeigt jeden Tag und die Ereignisse an diesem Tag.\n\n" +
+             "**So bewegst du dich durch die Zeit.** Gehe einen Monat zurück " +
+             "oder vor. Die Ereignisse, die in diesen Monat fallen, siehst du — " +
+             "dieselben Ereignisse wie in der **Ereignisse**-Liste, nur nach " +
+             "Datum geordnet statt nach Aktualität.\n\n" +
+             "**So trittst du einem bei.** Öffne ein Ereignis aus dem Kalender " +
+             "und wähle **Anmelden**, genau wie in der Ereignisliste — siehe " +
+             "[Ereignisse](/pages/system/help/events).\n\n" +
+             "Der Kalender und die Liste zeigen dieselben Ereignisse. Was du in " +
+             "der einen sehen kannst, kannst du auch in der anderen sehen; was " +
+             "dir verdeckt ist, ist beides verdeckt.\n"),
+            ("timezone", "Zeitzone",
+             "## Zeitzone\n\n" +
+             "Deine **Zeitzone** ist die Zone, in der du Daten und Uhrzeiten auf " +
+             "der ganzen Plattform siehst — Ereigniszeiten, Beitragsstempel, " +
+             "Erinnerungen.\n\n" +
+             "**So setzt du deine.** Öffne **Einstellungen → Zeitzone** und wähle " +
+             "die Zone, in der du lebst. Sie wird auf deinem Konto gespeichert.\n\n" +
+             "**Was sie ändert.** Jede Zeit, die dir die Plattform zeigt — ein " +
+             "Ereignis um *welcher Stunde*, ein Beitrag von *vor wie lange* — " +
+             "wird in der Zone gerendert, die du gewählt hast, auch wenn die " +
+             "Autorin in einer anderen lebt. Die Zone der Autorin gilt, wenn *sie* " +
+             "es liest; ihr seht denselben Augenblick in euren eigenen Zonen.\n\n" +
+             "**Was sie nicht ändert.** Sie verschiebt kein Ereignis. Ein " +
+             "Ereignis um 15 Uhr in der Standardzone der Plattform ist für alle " +
+             "derselbe Moment; nur das *Etikett* auf diesem Moment folgt deiner " +
+             "Zone. Zwei Nachbarinnen in verschiedenen Zonen sehen beide das " +
+             "Ereignis, jeweils um die richtige lokale Stunde.\n\n" +
+             "Wenn du keine Zone wählst, gilt die Standardzone der Plattform " +
+             "(die Wahl der Betreiberin). Siehe [Sprache](/pages/system/help/language) " +
+             "für die verwandten Einstellungen zu Sprache und Datumsformat.\n"),
+            ("date-format", "Datums- und Uhrzeitformat",
+             "## Datums- und Uhrzeitformat\n\n" +
+             "Dein **Datumsformat** ist die Gestalt, die ein Datum und eine Uhrzeit " +
+             "annehmen, wenn die Plattform sie dir zeigt — *10. Okt. 2026* statt " +
+             "*2026-10-10* statt *10/10/2026*.\n\n" +
+             "**So setzt du dein.** Öffne **Einstellungen → Datums- und " +
+             "Uhrzeitformat** und wähle die Gestalt, die dir am leichtesten zu " +
+             "lesen ist. Sie wird auf deinem Konto gespeichert.\n\n" +
+             "**Was es ändert.** Daten und Uhrzeiten auf der ganzen Plattform — " +
+             "der Tag eines Ereignisses, der Stempel eines Beitrags, eine " +
+             "Erinnerung — werden in der Gestalt gerendert, die du gewählt " +
+             "hast.\n\n" +
+             "**Was es nicht ändert.** Es ändert das Datum selbst nicht und " +
+             "ändert auch nicht deine Zeitzone (das ist eine eigene Einstellung " +
+             "— siehe [Zeitzone](/pages/system/help/settings/timezone)). Das *wann* " +
+             "ist für alle dasselbe; nur die *Art, wie es geschrieben wird*, " +
+             "folgt deiner Wahl.\n\n" +
+             "Wenn du kein Format wählst, gilt das Standard der Plattform. Siehe " +
+             "[Sprache](/pages/system/help/language) für die verwandten " +
+             "Einstellungen zu Sprache und Zeitzone.\n"),
+            ("page-size", "Einträge pro Seite",
+             "## Einträge pro Seite\n\n" +
+             "**Einträge pro Seite** bestimmt, wie viele Dinge eine Liste zeigt, " +
+             "bevor du zur nächsten Seite scrollest — Beiträge im Feed, To-dos " +
+             "in der Liste, Einträge im Verzeichnis.\n\n" +
+             "**So setzt du deine.** Öffne **Einstellungen → Einträge pro Seite** " +
+             "und wähle eine Zahl. Sie wird auf deinem Konto gespeichert.\n\n" +
+             "**Was sie ändert.** Die Länge jeder Liste und jedes Feeds, die du " +
+             "liest. Eine größere Zahl zeigt mehr auf einmal (weniger " +
+             "Seitenumblätterungen); eine kleinere zeigt weniger (schnellere " +
+             "Seiten). Es ist eine Lese-Einstellung, kein Limit — es ändert nie " +
+             "*was* du sehen kannst, nur wie viel auf einer Seite steht.\n\n" +
+             "**Was sie nicht ändert.** Sie versteckt nichts und ändert nicht, " +
+             "wer etwas sehen kann — die Zielgruppe entscheidet das. Es geht rein " +
+             "darum, wie dir die Liste paginiert wird.\n\n" +
+             "Wenn du keine wählst, gilt die Standard der Plattform.\n"),
+            ("home", "Startseite",
+             "## Startseite\n\n" +
+             "Deine **Startseite** ist die Seite, die sich öffnet, wenn du dich " +
+             "einloggst — das erste, worauf du landest.\n\n" +
+             "**So setzt du deine.** Öffne **Einstellungen → Startseite** und " +
+             "wähle, welche Seite sich öffnet: der Gemeinschafts-Feed, die " +
+             "Ankündigungen oder eine andere Oberfläche. Sie wird auf deinem " +
+             "Konto gespeichert.\n\n" +
+             "**Was sie ändert.** Wo du nach der Anmeldung landest, und wohin " +
+             "der **Start**-Link der Plattform für dich führt. Es ist eine " +
+             "Bequemlichkeit — jede Oberfläche erreichst du trotzdem jederzeit " +
+             "über die obere Leiste.\n\n" +
+             "**Was sie nicht ändert.** Sie ändert nicht, was du sehen kannst. " +
+             "Jede Oberfläche bleibt erreichbar; die Startseite entscheidet nur, " +
+             "welche zuerst aufmacht.\n\n" +
+             "Wenn du keine wählst, öffnet sich die Standard-Startseite der " +
+             "Plattform.\n"),
+            ("quiet-hours", "Ruhezeiten",
+             "## Ruhezeiten\n\n" +
+             "**Ruhezeiten** sind das Zeitfenster des Tages, in dem die Plattform " +
+             "deine Benachrichtigungen zurückhält, statt dich zu pinggen — damit " +
+             "eine späte Antwort oder ein früher Beitrag dich nicht weckt.\n\n" +
+             "**So setzt du deine.** Öffne **Einstellungen → Ruhezeiten** und " +
+             "wähle das Fenster (in deiner eigenen Zeitzone). Es wird auf deinem " +
+             "Konto gespeichert.\n\n" +
+             "**Was es tut.** Innerhalb deines Ruhefensters erfasst die Plattform " +
+             "jede Benachrichtigung — das Postfach ist vollständig — aber es " +
+             "schickt dir keinen Pingen. Wenn das Fenster endet, sind die " +
+             "zurückgehaltenen Benachrichtigungen da, und warten im Postfach.\n\n" +
+             "**Was es nicht tut.** Es löscht oder verwirft nichts und stoppt " +
+             "nicht die Erfassung im Postfach. Es steuert nur *wann* eine " +
+             "Benachrichtigung dich benachrichtigen darf.\n\n" +
+             "Ruhezeiten sind deine — die Betreiberin und andere Bewohner können " +
+             "sie nicht für dich setzen oder aufheben. Siehe " +
+             "[Benachrichtigungen](/pages/system/help/notifications) für die " +
+             "verwandten Einstellungen und Abos.\n"),
+            ("messaging", "Nachrichten",
+             "## Nachrichten\n\n" +
+             "**Nachrichten** sind Gespräche von Bewohner zu Bewohner auf der " +
+             "Plattform — eine direkte Notiz von einer Nachbarin zur anderen, " +
+             "abgetrennt vom öffentlichen Feed und von Gruppen.\n\n" +
+             "**Ist es an?** Nachrichten sind ein Schalter der Betreiberin: die " +
+             "Instanz entscheidet, ob Bewohner einander überhaupt Nachrichten " +
+             "senden dürfen. Wenn es an ist, hast du auch deinen eigenen " +
+             "**An/Aus**-Schalter dafür — öffne **Einstellungen → Nachrichten** " +
+             "und wähle. Wenn es für dich aus ist (oder für die Instanz), fehlt " +
+             "die Oberfläche einfach — keine Erklärung, einfach kein Eintrag.\n\n" +
+             "**Was es ändert.** Es an zu schalten lässt dir, mit anderen " +
+             "Bewohnern zu schreiben und zu lesen, die es ebenfalls dürfen. Es " +
+             "aus zu schalten stoppt, dass du sendest oder empfängst — deine " +
+             "bestehenden Gespräche werden behalten, nicht gelöscht.\n\n" +
+             "**Was es nicht ändert.** Es betrifft nicht Beiträge, Gruppen, " +
+             "Ankündigungen oder den Feed — das sind eigene Oberflächen. Eine " +
+             "Nachricht ist privat zwischen euch beiden (und bei einem " +
+             "Kinderkonto folgen die Rechte der Vormundin den Regeln für " +
+             "[Kinderkonten](/pages/system/help/child-accounts)).\n"),
+            ("change-password", "Passwort ändern",
+             "## Passwort ändern\n\n" +
+             "Dein **Passwort** zu ändern ist, wie du ein neues für die Anmeldung " +
+             "an deinem Konto setzt.\n\n" +
+             "**So änderst du es.** Öffne **Einstellungen → Passwort ändern**. " +
+             "Gib dein aktuelles Passwort ein, dann das neue, und bestätige. Es " +
+             "wird auf deinem Konto gespeichert.\n\n" +
+             "**Was es tut.** Du meldest dich von da an mit dem neuen Passwort " +
+             "an; das alte hört auf zu funktionieren. Wenn du auf anderen " +
+             "Geräten angemeldet bist, werden sie aufgefordert, sich erneut " +
+             "anzumelden.\n\n" +
+             "**Wenn du es vergisst.** Ein vergessenes Passwort wird über den " +
+             "Reset-Vorgang der Plattform behandelt (oder, bei einem Kinderkonto, " +
+             "von einer Global-Admin — siehe [Kinderkonten]" +
+             "(/pages/system/help/child-accounts)). Ein Passwort zu ändern ist " +
+             "nicht dasselbe wie ein Konto zu löschen — dein Konto und dein " +
+             "Inhalt bleiben unangetastet; nur das Anmeldegeheimnis ändert sich.\n\n" +
+             "Dein Passwort ist deins. Niemand anderes auf der Plattform — auch " +
+             "keine Admin — kann es lesen; es wird nur dazu genutzt, beim " +
+             "Anmelden zu prüfen, dass es passt.\n"),
+            ("members", "Gruppenmitglieder",
+             "## Gruppenmitglieder\n\n" +
+             "Der **Mitglieder**-Tab einer Gruppe ist, wo die Leute der Gruppe " +
+             "leben — wer drin ist und (für die Besitzerin) wer hinzugefügt oder " +
+             "entfernt werden kann.\n\n" +
+             "**So siehst du, wer drin ist.** Öffne eine Gruppe, dann den " +
+             "**Mitglieder**-Tab. Die Liste zeigt die Mitglieder der Gruppe.\n\n" +
+             "**So trittst du einer öffentlichen Gruppe bei.** Eine " +
+             "**öffentliche** Gruppe kann jeder beitreten — wähle **Beitreten** " +
+             "und du bist drin. Zum **Verlassen** wählst du **Verlassen**; die " +
+             "Gruppe behält ihre Beiträge, und du bist einfach nicht mehr dabei.\n\n" +
+             "**So fügst du ein Mitglied hinzu oder entfernst es.** Die " +
+             "**Gruppenbesitzerin** (oder eine Global-Admin) fügt Mitglieder " +
+             "hinzu und entfernt sie. Ein Mitglied, das geht, tut das von sich " +
+             "aus; eine Besitzerin oder Admin kann ein Mitglied auch entfernen " +
+             "oder eine Gruppe schließen.\n\n" +
+             "**Private Gruppen.** Eine **private** Gruppe ist auf Einladung — " +
+             "nur ihre Mitglieder können sie sehen, darauf posten oder sie über " +
+             "einen Beitrag in die Zielgruppe nehmen. Ein entferntes Mitglied " +
+             "verliert den Zugang genauso, wie es ihn bekommen hat: still, und " +
+             "ohne dass die Gruppe ihre Geschichte verliert.\n\n" +
+             "Siehe [Gruppen](/pages/system/help/groups) dafür, wie Gruppen im " +
+             "Allgemeinen funktionieren, und [Zielgruppe](/pages/system/help/audience) " +
+             "dafür, wie eine Gruppe als Zielgruppen-Wahl erscheint, wenn du " +
+             "postest.\n"),
+            ("group-settings", "Gruppeneinstellungen",
+             "## Gruppeneinstellungen\n\n" +
+             "Der **Einstellungen**-Tab einer Gruppe ist, wo die *eigenen* " +
+             "Angaben der Gruppe aufbewahrt werden — ihr Name, ihre " +
+             "Beschreibung, ob sie privat ist und ihre Übersetzungen. Er ist " +
+             "für die **Gruppe**, nicht für dich: er ist der Besitzerin der " +
+             "Gruppe und einer Global-Admin sichtbar.\n\n" +
+             "**Die Beschreibung.** Die kurze Beschreibung der Gruppe wird dort " +
+             "gezeigt, wo die Gruppe erscheint. Die Besitzerin (oder eine " +
+             "Global-Admin) bearbeitet sie jederzeit.\n\n" +
+             "**Öffentlich oder privat.** Hier setzt die Besitzerin (oder eine " +
+             "Global-Admin), ob die Gruppe öffentlich (von jedem beitreten) oder " +
+             "privat (auf Einladung) ist. Umzuschalten ändert, wer sie sehen und " +
+             "beitreten kann — siehe [Gruppenmitglieder]" +
+             "(/pages/system/help/groups/members) und [Gruppen]" +
+             "(/pages/system/help/groups).\n\n" +
+             "**Übersetzungen.** Eine **Übersetzerin** (oder eine Global-Admin) " +
+             "kann eine Sprachversion des Gruppennamens und der Beschreibung " +
+             "hinzufügen, damit eine Bewohnerin, die in dieser Sprache liest, " +
+             "die Gruppe in ihrer eigenen Sprache sieht. Siehe " +
+             "[Übersetzerinnen](/pages/system/help/translator).\n\n" +
+             "Was der Einstellungen-Tab nicht ist: Er ändert nicht die Mitglieder " +
+             "der Gruppe (das ist der [Mitglieder](/pages/system/help/groups/members)" +
+             "-Tab) und rührt deine eigenen Kontoeinstellungen nicht an (die " +
+             "liegen unter [Einstellungen](/pages/system/help/settings)).\n"),
+            ("accounts", "Admin: Konten",
+             "## Admin: Konten\n\n" +
+             "Der **Konten**-Tab ist, wo eine Global-Admin die Konten des " +
+             "Viertels in Ordnung hält — neue verifiziert, eine Bewohnerin " +
+             "sperrt oder entsperrt, und entscheidet, wer welche erhöhte Rolle " +
+             "trägt.\n\n" +
+             "**So verifizierst du ein neues Konto.** Eine Bewohnerin, die sich " +
+             "angemeldet hat, ist in einem ausstehenden Zustand, bis sie " +
+             "verifiziert ist. Öffne das Konto, bestätige die Identität, und " +
+             "verifiziere es — das Konto geht vollständig online.\n\n" +
+             "**So sperrst du oder entsperrst du eine Bewohnerin.** Eine " +
+             "gesperrte Bewohnerin kann sich nicht anmelden. Sperren ist " +
+             "umkehrbar — entsperre, wenn der Grund behoben ist. Sperren ist " +
+             "nicht dasselbe wie Löschen: das Konto und sein Inhalt werden " +
+             "behalten.\n\n" +
+             "**So weist du eine erhöhte Rolle zu.** Entscheide, wer Moderatorin, " +
+             "Übersetzerin oder eine andere Global-Admin ist. Rollen sind " +
+             "unabhängig und kombinierbar — eine Bewohnerin kann mehrere tragen. " +
+             "Eine Rolle zu entfernen beendet das Recht; sie entfernt nicht das " +
+             "Konto.\n\n" +
+             "**Was es in Ordnung hält.** Jede Kontoaktion wird in die " +
+             "Revisionsprotokolle geschrieben, und das Recht einer Admin ist " +
+             "nach Design schmal: eine Admin hält Konten in Ordnung, liest aber " +
+             "nicht den Inhalt einer Bewohnerin — die Zielgruppe entscheidet " +
+             "weiter, was sichtbar ist. Siehe [Admins](/pages/system/help/admins) " +
+             "für die Rolle im Ganzen und [Konto löschen]" +
+             "(/pages/system/help/deleting-an-account) für die eine dauerhafte " +
+             "Aktion.\n"),
+            ("communities", "Admin: Gemeinschaften",
+             "## Admin: Gemeinschaften\n\n" +
+             "Der **Gemeinschaften**-Tab ist, wo eine Global-Admin die " +
+             "Gemeinschaften des Viertels hält — die benannten Gruppen von " +
+             "Bewohnern (ein Gebäude, eine Straße, ein gemeinsames Projekt), " +
+             "auf die eine Zielgruppe eingeschränkt werden kann.\n\n" +
+             "**So fügst du eine hinzu oder bearbeitest du sie.** Erstelle eine " +
+             "Gemeinschaft, gib ihr einen Namen und eine kurze Beschreibung, und " +
+             "bearbeite sie jederzeit. Eine Gemeinschaft ist eine " +
+             "Organisationseinheit — kein Feed und keine Gruppe, sondern das, " +
+             "worauf eine Gruppe, ein Beitrag oder eine Zielgruppe verweisen " +
+             "kann.\n\n" +
+             "**So setzt du die Zugehörigkeit.** Entscheide, welche Bewohner zu " +
+             "welcher Gemeinschaft gehören. Zugehörigkeit macht aus einer " +
+             "Gemeinschaft eine echte Zielgruppe: ein auf eine Gemeinschaft " +
+             "beschränkter Beitrag wird von ihren Mitgliedern (und der Autorin) " +
+             "gesehen, nicht vom ganzen Viertel.\n\n" +
+             "**Was sie nicht ist.** Eine Gemeinschaft ist nicht dasselbe wie " +
+             "eine [Gruppe](/pages/system/help/groups) (eine Gruppe hat ihren " +
+             "eigenen Feed und ihren Mitglieder-Tab) oder ein [Tag]" +
+             "(/pages/system/help/tags) (ein Tag ist ein Etikett auf Inhalt). " +
+             "Eine Gemeinschaft ist die Einheit von *wer wer ist* im Viertel. " +
+             "Siehe [Zielgruppe](/pages/system/help/audience) dafür, wie eine " +
+             "Gemeinschaft als Zielgruppen-Wahl erscheint, wenn du postest.\n"),
+            ("platform", "Admin: Plattform",
+             "## Admin: Plattform\n\n" +
+             "Der **Plattform**-Tab ist, wo eine Global-Admin die *eigenen* " +
+             "Dinge der Plattform in Ordnung hält — die Seiten, die sie " +
+             "mitliefert, die Standards, die sie anwendet, und die Dinge, die " +
+             "sie Bewohnern erlaubt zu überschreiben.\n\n" +
+             "**Die Plattformseiten.** Die Nutzungsbedingungen, die Hilfen, der " +
+             "Datenschutzhinweis und der Verhaltenskodex sind die eigenen Seiten " +
+             "der Plattform. Eine Global-Admin kann sie bearbeiten und eine " +
+             "Seite auf ihren mitgelieferten Text zurücksetzen, wenn sie die " +
+             "neueste Formulierung will.\n\n" +
+             "**Die Plattformstandards.** Setze die Standardsprache, die " +
+             "Standardzeitzone und das Standard-Datumsformat für die Instanz. " +
+             "Jede Bewohnerin kann trotzdem jede davon auf ihrem eigenen Konto " +
+             "überschreiben (siehe [Einstellungen](/pages/system/help/settings)) " +
+             "— der Standard gilt nur dort, wo eine Bewohnerin nichts eigenes " +
+             "gewählt hat.\n\n" +
+             "**Das Anmelde-Gate.** Wähle, ob neue Bewohner sich von selbst " +
+             "anmelden dürfen, oder nur, wenn du sie einlädst.\n\n" +
+             "Was dieser Tab nicht ist: Er verwaltet keine einzelnen Konten (das " +
+             "ist [Konten](/pages/system/help/admins/accounts)), Gemeinschaften " +
+             "([Gemeinschaften](/pages/system/help/admins/communities)) oder die " +
+             "Sicherheits- und Revisions-Oberfläche ([Sicherheit]" +
+             "(/pages/system/help/admins/security)). Siehe [Admins]" +
+             "(/pages/system/help/admins) für die Rolle im Ganzen.\n"),
+            ("security", "Admin: Sicherheit",
+             "## Admin: Sicherheit\n\n" +
+             "Der **Sicherheit**-Tab ist, wo eine Global-Admin die " +
+             "Revisionsprotokolle der Plattform sieht — das Protokoll über jede " +
+             "Zugriffsentscheidung und jede Admin-Aktion — und die Notfallschalter " +
+             "für den Fall, dass die gewöhnlichen Wege nicht ausreichen.\n\n" +
+             "**Das Revisionsprotokoll.** Jedes Mal, wenn eine Bewohnerin " +
+             "zielgruppenbeschränkten Inhalt liest, und jede Admin- und " +
+             "Moderatortätigkeit, wird ins Protokoll geschrieben: wer, was, wann " +
+             "und das Ergebnis (erlaubt oder verweigert). Das Protokoll ist der " +
+             "Nachweis der Plattform, dass das Zielgruppen-Standard hielt — es " +
+             "wird zur Prüfung gelesen, nicht zur Überwachung.\n\n" +
+             "**Was das Protokoll nicht ist.** Das Protokoll zu sehen ist kein " +
+             "Hintertür in den Inhalt einer Bewohnerin. Eine Protokollzeile " +
+             "erfasst, dass ein Zugriff *stattfand* und sein Ergebnis; sie trägt " +
+             "den Inhalt selbst nicht. Die Zielgruppe entscheidet weiter, was " +
+             "sichtbar ist, und ein Bericht oder eine Protokollzeile offenbart " +
+             "nie einen Beitrag, eine Antwort oder ein Profil.\n\n" +
+             "**Der Notfallschalter.** Wenn ein Konto oder ein Weg in " +
+             "Schwierigkeiten ist, hat die Global-Admin das Recht darauf zu " +
+             "handeln — ein schmales, protokolliertes Überschreiben, kein " +
+             "stehendes Recht. Jede Nutzung des Notfallschalters wird selbst ins " +
+             "Protokoll geschrieben.\n\n" +
+             "Siehe [Admins](/pages/system/help/admins) für die Rolle im Ganzen " +
+             "und [Moderatoren](/pages/system/help/moderators) dafür, wie das " +
+             "schmalere Recht einer Moderatorin verglichen wird.\n"),
+            ("analytics", "Admin: Analysen",
+             "## Admin: Analysen\n\n" +
+             "Der **Analysen**-Tab ist, wo eine Global-Admin die eigene Form " +
+             "der Instanz über die Zeit sieht — wie viel genutzt wird, wie viel " +
+             "gespeichert ist, und ob die Kapazität für das Viertel nach vorne " +
+             "ausreicht.\n\n" +
+             "**Was sie zeigt.** Die Aktivität und Speicherung der Instanz über " +
+             "ein Fenster, das du wählst (ein jüngerer Tag, ein Monat, ein " +
+             "Jahr): geschriebene Beiträge, genutzter Speicher und der Trend. " +
+             "Es ist die Antwort der Betreiberin auf *ist diese Instanz groß " +
+             "genug?*\n\n" +
+             "**Wofür sie da ist.** Kapazitätsplanung. Ein steigender " +
+             "Speichertrend sagt *früher sichern und mehr Raum einplanen*. Ein " +
+             "flacher sagt *du bist gut dabei*. Es ist eine Lektüre der Instanz, " +
+             "nicht der Bewohner.\n\n" +
+             "**Was sie nicht ist.** Sie liest oder offenbart den Inhalt keiner " +
+             "Bewohnerin. Analysen sind Zählungen und Summen — wie viele, wie " +
+             "viel, über wann — nie *was eine bestimmte Bewohnerin schrieb*. " +
+             "Das Revisionsprotokoll ([Sicherheit]" +
+             "(/pages/system/help/admins/security)) ist, wo die Detail-je-Aktion " +
+             "lebt.\n\n" +
+             "Siehe [Admins](/pages/system/help/admins) für die Rolle im " +
+             "Ganzen.\n"),
         ];
     }
 
@@ -3211,6 +4146,482 @@ public static class FirstBootSeeder
              "et un **transfert** (les contrôles d'un compte enfant " +
              "reviennent à l'enfant) gardent le compte. Seule la fin " +
              "vraiment achevée justifie une suppression.\n"),
+            // ── ADR 0160 — the nested guide sub-pages (the tabbed surfaces) ──
+            // The 17 nested guides + the `settings` index, each a translation of
+            // the <see cref="GuidePages"/>() en body (the ADR 0160 D2 set; the
+            // cross-links use the absolute nested form
+            // <c>/pages/system/help/{parent}/{slug}</c>, which the
+            // MarkdownRenderer <c>IsSafeUrl</c> allowlist accepts).
+            ("settings", "Paramètres",
+             "## Paramètres\n\n" +
+             "Les paramètres sont le seul endroit où la plateforme te *suit* " +
+             "plutôt que le quartier : ta langue, ton fuseau horaire, ton format " +
+             "de date, combien d'éléments une page affiche, quelle page " +
+             "d'accueil s'ouvre, tes heures de silence, tes préférences de " +
+             "messagerie, les comptes de tes enfants et ton mot de passe. Tout " +
+             "ici est enregistré sur *ton* compte — les valeurs par défaut de la " +
+             "plateforme ne s'appliquent que là où tu n'as rien choisi de " +
+             "ton côté.\n\n" +
+             "**Où les trouver.** Ouvre **Paramètres** dans le menu du compte. " +
+             "Chaque section ci-dessous est un onglet ; l'onglet actif est " +
+             "celui où tu arrives.\n\n" +
+             "**Les sections.**\n" +
+             "- **Langue** — ta langue d'interface. Voir " +
+             "[Langue](/pages/system/help/language).\n" +
+             "- **Fuseau horaire** — la zone dans laquelle tu vois les dates et " +
+             "l'heure. Voir [Fuseau horaire]" +
+             "(/pages/system/help/settings/timezone).\n" +
+             "- **Format de date et d'heure** — la forme d'une date et d'une " +
+             "heure. Voir [Format de date et d'heure]" +
+             "(/pages/system/help/settings/date-format).\n" +
+             "- **Éléments par page** — combien de publications, de tâches et " +
+             "ainsi de suite une liste affiche à la fois. Voir [Éléments par " +
+             "page](/pages/system/help/settings/page-size).\n" +
+             "- **Page d'accueil** — la page qui s'ouvre quand tu te connectes. " +
+             "Voir [Page d'accueil](/pages/system/help/settings/home).\n" +
+             "- **Heures de silence** — la fenêtre pendant laquelle la " +
+             "plateforme retient tes notifications au lieu de t'alerter. Voir " +
+             "[Heures de silence](/pages/system/help/settings/quiet-hours).\n" +
+             "- **Messagerie** — active ou désactive les messages entre " +
+             "résidents pour toi-même. Voir [Messagerie]" +
+             "(/pages/system/help/settings/messaging).\n" +
+             "- **Enfants** — les comptes que tu as créés pour un enfant. Voir " +
+             "[Comptes enfants](/pages/system/help/child-accounts).\n" +
+             "- **Changer le mot de passe** — définir un nouveau mot de passe. " +
+             "Voir [Changer le mot de passe]" +
+             "(/pages/system/help/settings/change-password).\n" +
+             "- **Supprimer le compte** — la fin permanente. Voir " +
+             "[Supprimer un compte](/pages/system/help/deleting-an-account).\n"),
+            ("todos", "Tâches",
+             "## Tâches\n\n" +
+             "Une tâche est un morceau de travail que le quartier a noté — " +
+             "quelque chose à réparer, à acheter, à faire. Elle vit dans " +
+             "l'onglet **Tâches** de Projets.\n\n" +
+             "**Comment en écrire une.** Ouvre l'onglet **Tâches** et choisis " +
+             "**Nouvelle tâche**. Donne-lui un titre, et un corps si tu " +
+             "besoin d'expliquer le pourquoi. Une tâche est un morceau " +
+             "complet de travail en soi — elle peut porter des sous-tâches et " +
+             "pointer vers une autre tâche sur laquelle elle attend.\n\n" +
+             "**Comment l'assigner.** Une tâche sans assigné est posée sur la " +
+             "table pour n'importe qui. Choisis un voisin ou une voisine et " +
+             "elle atterrit dans sa liste ; choisis un groupe et elle atterrit " +
+             "dans celle du groupe. Tu peux la réassigner à tout moment — " +
+             "l'assignation reflète toujours la dernière personne que tu as " +
+             "choisie.\n\n" +
+             "**Sous-tâches.** Découpe une grande tâche en plus petites. Une " +
+             "sous-tâche est une tâche complète — son propre titre, assigné, " +
+             "statut — mais elle reste rangée sous la parente, pour que " +
+             "l'ensemble et les morceaux restent ensemble.\n\n" +
+             "**Statut.** Une tâche porte un statut (l'étiquette de " +
+             "l'avancement : ouverte, en cours, terminée). Tu le changes quand " +
+             "le travail avance. Le statut est une vue de l'état, pas un " +
+             "verrou — rien n'est bloqué par lui.\n\n" +
+             "**Commentaires.** Quiconque peut voir la tâche peut y laisser " +
+             "un commentaire et répondre, comme sur une publication.\n\n" +
+             "Par défaut, une tâche est visible par tous dans la communauté. " +
+             "Tu peux restreindre qui la voit dans la section public — de la " +
+             "même manière que pour une publication. Voir " +
+             "[Public](/pages/system/help/audience).\n"),
+            ("boards", "Tableaux",
+             "## Tableaux\n\n" +
+             "Un tableau est un mur de colonnes qui arrange les tâches, pour " +
+             "que tu voies d'un coup d'œil où en est le travail. Il vit dans " +
+             "l'onglet **Tableaux** de Projets.\n\n" +
+             "**Comment en créer un.** Ouvre l'onglet **Tableaux** et choisis " +
+             "**Nouveau tableau**. Donne-lui un nom, puis ajoute les colonnes " +
+             "que tu veux.\n\n" +
+             "**Colonnes.** Une colonne est un pilier vertical du tableau. Une " +
+             "colonne peut porter un statut — une tâche qui y entre reprend " +
+             "ce statut — et une limite optionnelle sur le nombre de tâches " +
+             "qu'elle retient. Utilise les colonnes pour *montrer* où est le " +
+             "travail, pas pour le verrouiller : déplacer une carte est une " +
+             "vue de l'état, pas un verrou dessus.\n\n" +
+             "**Déplacer une tâche.** Ouvre une tâche et choisis sa colonne " +
+             "de tableau, ou déplace-la sur le tableau. La tâche garde tout " +
+             "ce qu'elle avait (assigné, sous-tâches, commentaires) — seule " +
+             "sa colonne, et le statut porté par la colonne, changent.\n\n" +
+             "**Tableaux et tâches sont la même chose, deux vues.** Une tâche " +
+             "est l'unité de travail ; un tableau est une disposition de " +
+             "tâches. Une tâche peut être sur un tableau ou en dehors — les " +
+             "deux sont valides. Voir [Tâches]" +
+             "(/pages/system/help/projects/todos).\n\n" +
+             "Par défaut, un tableau est visible par tous dans la communauté ; " +
+             "tu peux restreindre qui le voit dans la section public — de la " +
+             "même manière que pour une publication.\n"),
+            ("calendar", "Calendrier",
+             "## Calendrier\n\n" +
+             "Le **Calendrier** est la liste des événements rangée par date, " +
+             "pour que tu voies d'un coup d'œil ce qui arrive dans le quartier " +
+             "plutôt que de faire défiler une liste. Il vit dans l'onglet " +
+             "**Calendrier** d'Événements.\n\n" +
+             "**Comment le voir.** Ouvre **Événements**, puis l'onglet " +
+             "**Calendrier**. Le mois montre chaque jour et les événements " +
+             "de ce jour.\n\n" +
+             "**Pour te déplacer dans le temps.** Passe au mois précédent ou " +
+             "suivant. Les événements qui tombent dans ce mois sont ceux que " +
+             "tu vois — les mêmes événements que la liste **Événements**, " +
+             "rangés par leur date plutôt que par récence.\n\n" +
+             "**Pour en rejoindre un.** Ouvre un événement depuis le " +
+             "calendrier et choisis **Inscris-toi**, exactement comme dans " +
+             "la liste des événements — voir " +
+             "[Événements](/pages/system/help/events).\n\n" +
+             "Le calendrier et la liste sont les mêmes événements. Si tu peux " +
+             "voir un événement dans l'un, tu peux le voir dans l'autre ; si " +
+             "il te est masqué, il l'est dans les deux.\n"),
+            ("timezone", "Fuseau horaire",
+             "## Fuseau horaire\n\n" +
+             "Ton **fuseau horaire** est la zone dans laquelle tu vois les " +
+             "dates et l'heure sur toute la plateforme — heures des " +
+             "événements, horodatage des publications, rappels.\n\n" +
+             "**Comment le définir.** Ouvre **Paramètres → Fuseau horaire** " +
+             "et choisis la zone où tu vis. Elle est enregistrée sur ton " +
+             "compte.\n\n" +
+             "**Ce qu'il change.** Chaque heure que la plateforme te montre — " +
+             "un événement à *quelle heure*, une publication de *il y a " +
+             "combien de temps* — est rendue dans la zone que tu as choisie, " +
+             "même si l'auteur vit dans une autre. La zone de l'auteur est " +
+             "utilisée quand *lui* lit ; vous voyez chacun le même instant " +
+             "dans votre propre zone.\n\n" +
+             "**Ce qu'il ne change pas.** Il ne déplace pas un événement. " +
+             "Un événement à 15 h dans la zone par défaut de la plateforme " +
+             "est le même moment pour tout le monde ; seule *l'étiquette* sur " +
+             "ce moment suit ta zone. Deux voisins dans des zones différentes " +
+             "voient tous deux l'événement, à l'heure locale juste pour " +
+             "chacun.\n\n" +
+             "Si tu n'en defines jamais un, la zone par défaut de la " +
+             "plateforme (le choix de l'exploitant) s'applique. Voir " +
+             "[Langue](/pages/system/help/language) pour les paramètres " +
+             "connexes de langue et de format de date.\n"),
+            ("date-format", "Format de date et d'heure",
+             "## Format de date et d'heure\n\n" +
+             "Ton **format de date** est la forme qu'une date et une heure " +
+             "prennent quand la plateforme te les montre — *10 oct. 2026* " +
+             "au lieu de *2026-10-10* au lieu de *10/10/2026*.\n\n" +
+             "**Comment le définir.** Ouvre **Paramètres → Format de date et " +
+             "d'heure** et choisis la forme que tu lis le plus facilement. " +
+             "Elle est enregistrée sur ton compte.\n\n" +
+             "**Ce qu'il change.** Les dates et heures sur toute la " +
+             "plateforme — le jour d'un événement, l'horodatage d'une " +
+             "publication, un rappel — sont rendus dans la forme que tu as " +
+             "choisie.\n\n" +
+             "**Ce qu'il ne change pas.** Il ne change pas la date elle-même " +
+             "et ne change pas ton fuseau horaire (c'est un paramètre " +
+             "séparé — voir [Fuseau horaire]" +
+             "(/pages/system/help/settings/timezone)). Le *quand* est le " +
+             "même pour tous ; seule *la façon dont il est écrit* suit ton " +
+             "choix.\n\n" +
+             "Si tu n'en defines jamais un, le format par défaut de la " +
+             "plateforme s'applique. Voir " +
+             "[Langue](/pages/system/help/language) pour les paramètres " +
+             "connexes de langue et de fuseau horaire.\n"),
+            ("page-size", "Éléments par page",
+             "## Éléments par page\n\n" +
+             "**Éléments par page** est le nombre de choses qu'une liste " +
+             "affiche avant que tu passes à la page suivante — publications " +
+             "du flux, tâches de la liste, entrées de l'annuaire.\n\n" +
+             "**Comment le définir.** Ouvre **Paramètres → Éléments par " +
+             "page** et choisis un nombre. Il est enregistré sur ton " +
+             "compte.\n\n" +
+             "**Ce qu'il change.** La longueur de chaque liste et de chaque " +
+             "flux que tu lis. Un plus grand nombre montre plus à la fois " +
+             "(moins de passages de page) ; un plus petit montre moins " +
+             "(des pages plus rapides). C'est une préférence de lecture, " +
+             "pas une limite — il ne change jamais *ce* que tu peux voir, " +
+             "seulement combien il y en a par page.\n\n" +
+             "**Ce qu'il ne change pas.** Il ne masque rien et ne change pas " +
+             "qui peut voir une chose — le public décide ça. C'est purement " +
+             "une question de la façon dont la liste est paginée pour " +
+             "toi.\n\n" +
+             "Si tu n'en defines jamais un, le format par défaut de la " +
+             "plateforme s'applique.\n"),
+            ("home", "Page d'accueil",
+             "## Page d'accueil\n\n" +
+             "Ta **page d'accueil** est la page qui s'ouvre quand tu te " +
+             "connectes — la première chose où tu arrives.\n\n" +
+             "**Comment la définir.** Ouvre **Paramètres → Page d'accueil** " +
+             "et choisis quelle page s'ouvre : le flux communautaire, les " +
+             "annonces, ou une autre surface. Elle est enregistrée sur ton " +
+             "compte.\n\n" +
+             "**Ce qu'elle change.** Où tu arrives après la connexion, et " +
+             "où le lien **accueil** de la plateforme te mène. C'est une " +
+             "pratique — tu peux tout de même atteindre chaque surface " +
+             "depuis la barre du haut à tout moment.\n\n" +
+             "**Ce qu'elle ne change pas.** Elle ne change pas ce que tu " +
+             "peux voir. Chaque surface reste atteignable ; la page " +
+             "d'accueil ne décide que de laquelle s'ouvre d'abord.\n\n" +
+             "Si tu n'en defines jamais une, la page d'accueil par défaut " +
+             "de la plateforme s'ouvre.\n"),
+            ("quiet-hours", "Heures de silence",
+             "## Heures de silence\n\n" +
+             "Les **heures de silence** sont la fenêtre de la journée " +
+             "pendant laquelle la plateforme retient tes notifications " +
+             "au lieu de t'alerter — pour qu'une réponse tardive ou une " +
+             "publication matinale ne te réveille pas.\n\n" +
+             "**Comment les définir.** Ouvre **Paramètres → Heures de " +
+             "silence** et choisis la fenêtre (dans ton propre fuseau " +
+             "horaire). Elle est enregistrée sur ton compte.\n\n" +
+             "**Ce qu'elles font.** Pendant ta fenêtre de silence, la " +
+             "plateforme enregistre encore chaque notification — la boîte " +
+             "est complète — mais elle ne t'envoie pas d'alerte. Quand la " +
+             "fenêtre se termine, les notifications retenues sont là, en " +
+             "attente dans la boîte.\n\n" +
+             "**Ce qu'elles ne font pas.** Elles ne suppriment ni ne " +
+             "laissent rien, et elles n'arrêtent pas la boîte " +
+             "d'enregistrement. Elles ne contrôlent que *quand* une " +
+             "notification est autorisée à t'alerter.\n\n" +
+             "Les heures de silence sont à toi — l'exploitant et les autres " +
+             "résidents ne peuvent pas les définir ou les effacer pour " +
+             "toi. Voir [Notifications](/pages/system/help/notifications) " +
+             "pour les préférences et les abonnements connexes.\n"),
+            ("messaging", "Messagerie",
+             "## Messagerie\n\n" +
+             "La **messagerie** est la conversation entre résidents sur la " +
+             "plateforme — une note directe d'un voisin à l'autre, " +
+             "séparée du flux public et des groupes.\n\n" +
+             "**Est-elle activée ?** La messagerie est un interrupteur " +
+             "d'exploitant : l'instance décide si les résidents peuvent " +
+             "s'envoyer des messages du tout. Si elle est activée, tu as " +
+             "aussi ton propre **oui/non** — ouvre **Paramètres → " +
+             "Messagerie** et choisis. Si elle est désactivée pour toi " +
+             "(ou pour l'instance), la surface est simplement absente — " +
+             "pas d'explication, juste pas d'entrée.\n\n" +
+             "**Ce qu'elle change.** L'activer te laisse démarrer et lire " +
+             "des conversations avec d'autres résidents qui l'ont aussi " +
+             "autorisée. La désactiver t'arrête d'envoyer ou de recevoir — " +
+             "tes conversations existantes sont conservées, pas " +
+             "supprimées.\n\n" +
+             "**Ce qu'elle ne change pas.** Elle n'affecte pas les " +
+             "publications, les groupes, les annonces ou le flux — ce sont " +
+             "des surfaces séparées. Un message est privé entre vous deux " +
+             "(et, pour un compte enfant, le droit du tuteur suit les " +
+             "règles des [comptes enfants]" +
+             "(/pages/system/help/child-accounts)).\n"),
+            ("change-password", "Changer le mot de passe",
+             "## Changer le mot de passe\n\n" +
+             "Changer ton **mot de passe** est comment tu définis un " +
+             "nouveau pour te connecter à ton compte.\n\n" +
+             "**Comment le changer.** Ouvre **Paramètres → Changer le mot " +
+             "de passe**. Entre ton mot de passe actuel, puis le nouveau, " +
+             "et confirme. Il est enregistré sur ton compte.\n\n" +
+             "**Ce qu'il fait.** À partir de là, tu te connectes avec le " +
+             "nouveau mot de passe ; l'ancien cesse de fonctionner. Si tu " +
+             "es connecté sur d'autres appareils, ils sont invités à se " +
+             "reconnecter.\n\n" +
+             "**Si tu l'oublies.** Un mot de passe oublié est géré par le " +
+             "flux de réinitialisation de la plateforme (ou par un " +
+             "administrateur global, pour un compte enfant — voir " +
+             "[Comptes enfants](/pages/system/help/child-accounts)). " +
+             "Changer un mot de passe n'est pas la même chose que " +
+             "supprimer un compte — ton compte et ton contenu restent " +
+             "intacts ; seul le secret de connexion change.\n\n" +
+             "Ton mot de passe est à toi. Personne d'autre sur la " +
+             "plateforme — y compris un administrateur — ne peut le lire ; " +
+             "il est seulement utilisé pour vérifier qu'il correspond " +
+             "quand tu te connectes.\n"),
+            ("members", "Membres du groupe",
+             "## Membres du groupe\n\n" +
+             "L'onglet **Membres** d'un groupe est où vivent les gens du " +
+             "groupe — qui y est, et (pour le propriétaire) qui peut " +
+             "être ajouté ou retiré.\n\n" +
+             "**Pour voir qui y est.** Ouvre un groupe, puis l'onglet " +
+             "**Membres**. La liste montre les membres du groupe.\n\n" +
+             "**Pour rejoindre un groupe public.** Un groupe **public** " +
+             "est ouvert à quiconque — choisis **Rejoindre** et tu " +
+             "y es. Pour **quitter**, choisis **Quitter** ; le groupe " +
+             "garde ses publications, et toi tu en es simplement " +
+             "sorti.\n\n" +
+             "**Pour ajouter ou retirer un membre.** Le **propriétaire " +
+             "du groupe** (ou un administrateur global) ajoute et " +
+             "retire des membres. Un membre qui part le fait de son " +
+             "chef ; un propriétaire ou un administrateur peut aussi " +
+             "retirer un membre, ou fermer un groupe.\n\n" +
+             "**Groupes privés.** Un groupe **privé** est sur " +
+             "invitation — seuls ses membres peuvent le voir, y poster, " +
+             "ou le prendre dans le public d'une publication. Un " +
+             "membre retiré perd l'accès de la même façon qu'il " +
+             "l'a obtenue : silencieusement, et sans que le groupe " +
+             "perde son historique.\n\n" +
+             "Voir [Groupes](/pages/system/help/groups) pour comment " +
+             "les groupes fonctionnent en général, et " +
+             "[Public](/pages/system/help/audience) pour comment un " +
+             "groupe apparaît comme un choix de public quand tu " +
+             "publies.\n"),
+            ("group-settings", "Paramètres du groupe",
+             "## Paramètres du groupe\n\n" +
+             "L'onglet **Paramètres** d'un groupe est où sont conservés " +
+             "les détails *propres* du groupe — son nom, sa description, " +
+             "s'il est privé, et ses traductions. C'est pour le " +
+             "**groupe**, pas pour toi : il est visible par le " +
+             "propriétaire du groupe et un administrateur global.\n\n" +
+             "**La description.** La courte description du groupe est " +
+             "montrée là où le groupe apparaît. Le propriétaire (ou un " +
+             "administrateur global) la modifie à tout moment.\n\n" +
+             "**Public ou privé.** Ici le propriétaire (ou un " +
+             "administrateur global) définit si le groupe est public " +
+             "(ouvert à quiconque) ou privé (sur invitation). " +
+             "Basculer change qui peut voir et rejoindre — voir " +
+             "[Membres du groupe](/pages/system/help/groups/members) " +
+             "et [Groupes](/pages/system/help/groups).\n\n" +
+             "**Traductions.** Un **traducteur** (ou un " +
+             "administrateur global) peut ajouter une version en " +
+             "langue du nom et de la description du groupe, pour qu'un " +
+             "résident lisant dans cette langue voie le groupe dans sa " +
+             "propre langue. Voir " +
+             "[Traducteurs](/pages/system/help/translator).\n\n" +
+             "Ce que l'onglet Paramètres n'est pas : il ne change pas " +
+             "les membres du groupe (c'est l'onglet [Membres]" +
+             "(/pages/system/help/groups/members)), et il ne touche pas " +
+             "à tes propres paramètres de compte (ceux-ci sont sous " +
+             "[Paramètres](/pages/system/help/settings)).\n"),
+            ("accounts", "Admin : comptes",
+             "## Admin : comptes\n\n" +
+             "L'onglet **Comptes** est où un administrateur global " +
+             "tient les comptes du quartier en ordre — la vérification " +
+             "des nouveaux, le blocage ou déblocage d'un résident, et " +
+             "la décision de qui tient quel rôle élevé.\n\n" +
+             "**Pour vérifier un nouveau compte.** Un résident qui s'est " +
+             "inscrit est dans un état en attente jusqu'à vérification. " +
+             "Ouvre le compte, confirme l'identité, puis vérifie — le " +
+             "compte est entièrement en ligne.\n\n" +
+             "**Pour bloquer ou débloquer un résident.** Un résident " +
+             "bloqué ne peut pas se connecter. Le blocage est " +
+             "réversible — débloque quand la raison est résolue. Le " +
+             "blocage n'est pas la même chose que la suppression : le " +
+             "compte et son contenu sont conservés.\n\n" +
+             "**Pour attribuer un rôle élevé.** Décide qui est " +
+             "modérateur, traducteur, ou un autre administrateur " +
+             "global. Les rôles sont indépendants et combinables — " +
+             "un résident peut en tenir plus d'un. Retirer un rôle " +
+             "arrête le droit ; il ne retire pas le compte.\n\n" +
+             "**Ce qui le tient en ordre.** Chaque action de compte " +
+             "est écrite dans la piste d'audit, et le droit d'un " +
+             "administrateur est étroit par conception : un " +
+             "administrateur tient les comptes en ordre mais ne lit " +
+             "pas le contenu d'un résident — le public décide encore " +
+             "de ce qui est visible. Voir " +
+             "[Administrateurs](/pages/system/help/admins) pour le " +
+             "rôle complet, et [Supprimer un compte]" +
+             "(/pages/system/help/deleting-an-account) pour l'unique " +
+             "action permanente.\n"),
+            ("communities", "Admin : communautés",
+             "## Admin : communautés\n\n" +
+             "L'onglet **Communautés** est où un administrateur global " +
+             "tient les communautés du quartier — les groupes nommés " +
+             "de résidents (un bâtiment, une rue, un projet commun) " +
+             "auxquels le contenu peut être restreint.\n\n" +
+             "**Pour en ajouter ou modifier une.** Crée une communauté, " +
+             "donne-lui un nom et une courte description, et modifie-les " +
+             "à tout moment. Une communauté est une unité " +
+             "d'organisation — ni un flux ni un groupe, mais ce sur " +
+             "quoi un groupe, une publication ou un public peuvent " +
+             "pointer.\n\n" +
+             "**Pour définir l'adhésion.** Décide quels résidents " +
+             "appartiennent à quelle communauté. L'adhésion est ce " +
+             "qui fait d'une communauté un public réel : une " +
+             "publication restreinte à une communauté est vue par " +
+             "ses membres (et l'auteur), pas par tout le " +
+             "quartier.\n\n" +
+             "**Ce qu'elle n'est pas.** Une communauté n'est pas la " +
+             "même chose qu'un [groupe]" +
+             "(/pages/system/help/groups) (un groupe a son propre " +
+             "flux et son onglet membres) ou un [tag]" +
+             "(/pages/system/help/tags) (un tag est une étiquette " +
+             "sur le contenu). Une communauté est l'unité " +
+             "fonctionnelle de *qui est qui* dans le quartier. Voir " +
+             "[Public](/pages/system/help/audience) pour comment une " +
+             "communauté apparaît comme un choix de public quand tu " +
+             "publies.\n"),
+            ("platform", "Admin : plateforme",
+             "## Admin : plateforme\n\n" +
+             "L'onglet **Plateforme** est où un administrateur global " +
+             "tient les choses *propres* de la plateforme en ordre — " +
+             "les pages qu'elle fournit, les valeurs par défaut " +
+             "qu'elle applique, et les choses qu'elle permet aux " +
+             "résidents de surcharger.\n\n" +
+             "**Les pages de la plateforme.** Les conditions, les " +
+             "guides d'aide, la note de confidentialité et le code de " +
+             "conduite sont les pages propres de la plateforme. Un " +
+             "administrateur global peut les modifier, et réinitialiser " +
+             "une page à son texte fourni quand il veut la formulation " +
+             "la plus récente.\n\n" +
+             "**Les valeurs par défaut de la plateforme.** Définis la " +
+             "langue par défaut, le fuseau horaire par défaut et le " +
+             "format de date par défaut pour l'instance. Chaque " +
+             "résident peut encore surcharger n'importe laquelle " +
+             "d'elles sur son propre compte (voir " +
+             "[Paramètres](/pages/system/help/settings)) — la valeur " +
+             "par défaut n'est que ce qui s'applique là où un " +
+             "résident n'a rien choisi de son côté.\n\n" +
+             "**Le contrôle d'inscription.** Choisis si de nouveaux " +
+             "résidents peuvent s'inscrire d'eux-mêmes, ou seulement " +
+             "quand tu les invites.\n\n" +
+             "Ce que cet onglet n'est pas : il ne gère pas des comptes " +
+             "individuels (c'est [Comptes]" +
+             "(/pages/system/help/admins/accounts)), les " +
+             "communautés ([Communautés]" +
+             "(/pages/system/help/admins/communities)), ou la surface " +
+             "de sécurité et d'audit ([Sécurité]" +
+             "(/pages/system/help/admins/security)). Voir " +
+             "[Administrateurs](/pages/system/help/admins) pour le " +
+             "rôle complet.\n"),
+            ("security", "Admin : sécurité",
+             "## Admin : sécurité\n\n" +
+             "L'onglet **Sécurité** est où un administrateur global " +
+             "voit la piste d'audit de la plateforme — le registre de " +
+             "chaque décision d'accès et de chaque action " +
+             "d'administrateur — et les commandes de rupture de " +
+             "verrou pour quand les voies ordinaires ne suffisent " +
+             "pas.\n\n" +
+             "**La piste d'audit.** Chaque fois qu'un résident lit du " +
+             "contenu restreint, et chaque action d'administrateur et " +
+             "de modérateur, est écrite dans la piste : qui, quoi, " +
+             "quand, et l'issue (autorisée ou refusée). La piste est " +
+             "la preuve de la plateforme que le public-par-défaut " +
+             "tenait — elle est lue pour revue, pas pour " +
+             "surveillance.\n\n" +
+             "**Ce que l'audit n'est pas.** Voir la piste n'est pas " +
+             "une porte dérobée dans le contenu d'un résident. Une " +
+             "ligne d'audit enregistre qu'un accès *s'est produit* et " +
+             "son issue ; elle ne porte pas le contenu lui-même. Le " +
+             "public décide encore de ce qui est visible, et un " +
+             "rapport ou une ligne d'audit ne révèle jamais une " +
+             "publication, une réponse ou un profil.\n\n" +
+             "**La rupture de verrou.** Quand un compte ou une voie " +
+             "est en difficulté, l'administrateur global a le droit " +
+             "d'agir dessus — une surcharge étroite, auditée, pas un " +
+             "droit permanent. Chaque usage de la rupture de verrou " +
+             "est lui-même écrit dans la piste.\n\n" +
+             "Voir [Administrateurs](/pages/system/help/admins) pour " +
+             "le rôle complet, et " +
+             "[Modérateurs](/pages/system/help/moderators) pour " +
+             "comparer le droit plus étroit d'un modérateur.\n"),
+            ("analytics", "Admin : analyses",
+             "## Admin : analyses\n\n" +
+             "L'onglet **Analyses** est où un administrateur global " +
+             "voit la forme propre de l'instance au fil du temps — " +
+             "combien est utilisé, combien est stocké, et si la " +
+             "capacité est suffisante pour le quartier à " +
+             "l'avenir.\n\n" +
+             "**Ce qu'elle montre.** L'activité et le stockage de " +
+             "l'instance sur une fenêtre que tu choisis (un jour " +
+             "récent, un mois, une année) : publications écrites, " +
+             "stockage utilisé, et la tendance. C'est la réponse de " +
+             "l'exploitant à *cette instance est-elle assez " +
+             "grande ?*\n\n" +
+             "**À quoi elle sert.** La planification de capacité. " +
+             "Une tendance de stockage en hausse dit *sauvegarde " +
+             "plus tôt et prévois plus de place*. Une plate " +
+             "dit *tu vas bien*. C'est une lecture de " +
+             "l'instance, pas des résidents.\n\n" +
+             "**Ce qu'elle n'est pas.** Elle ne lit ni ne révèle le " +
+             "contenu d'aucun résident. Les analyses sont des " +
+             "comptes et des totaux — combien, combien, sur " +
+             "quand — jamais *ce qu'un résident en particulier a " +
+             "écrit*. La piste d'audit ([Sécurité]" +
+             "(/pages/system/help/admins/security)) est où vit le " +
+             "détail par action.\n\n" +
+             "Voir [Administrateurs](/pages/system/help/admins) pour " +
+             "le rôle complet.\n"),
         ];
     }
 
@@ -3839,6 +5250,434 @@ public static class FirstBootSeeder
              "kontroller kommer tilbage til barnet) bevarer begge " +
              "kontoen. Kun når kontoen virkelig er færdig, er en " +
              "sletning den rette afslutning.\n"),
+            // ── ADR 0160 — the nested guide sub-pages (the tabbed surfaces) ──
+            // The 17 nested guides + the `settings` index, each a translation of
+            // the <see cref="GuidePages"/>() en body (the ADR 0160 D2 set; the
+            // cross-links use the absolute nested form
+            // <c>/pages/system/help/{parent}/{slug}</c>, which the
+            // MarkdownRenderer <c>IsSafeUrl</c> allowlist accepts).
+            ("settings", "Indstillinger",
+             "## Indstillinger\n\n" +
+             "Indstillinger er det ene sted, hvor platformen følger *dig* " +
+             "snarere end kvarteret: dit sprog, din tidszone, dit datumsformat, " +
+             "hvor mange poster en side viser, hvilken startside der åbnes, " +
+             "dine stille timer, dine beskedindstillinger, dine børns konti og " +
+             "dit adgangskode. Alt her gemmes på *din* konto — platformens " +
+             "standardværdier gælder kun der, hvor du ikke har valgt noget eget.\n\n" +
+             "**Hvor finder du det.** Åbn **Indstillinger** i kontomenuen. " +
+             "Hvert afsnit nedenfor er en fane; den aktive er den, du lander på.\n\n" +
+             "**Afsnittene.**\n" +
+             "- **Sprog** — dit grænsefladesprog. Se " +
+             "[Sprog](/pages/system/help/language).\n" +
+             "- **Tidszone** — den zone, du ser datoer og klokkeslæt i. Se " +
+             "[Tidszone](/pages/system/help/settings/timezone).\n" +
+             "- **Datum- og tidsformat** — formen på en dato og et " +
+             "klokkeslæt. Se [Datum- og tidsformat]" +
+             "(/pages/system/help/settings/date-format).\n" +
+             "- **Poster pr. side** — hvor mange indlæg, to-dos osv. en liste " +
+             "viser ad gangen. Se [Poster pr. side]" +
+             "(/pages/system/help/settings/page-size).\n" +
+             "- **Startside** — den side, der åbnes, når du logger ind. Se " +
+             "[Startside](/pages/system/help/settings/home).\n" +
+             "- **Stille timer** — vinduet, hvor platformen holder dine " +
+             "notifikationer frem for at alarmere. Se [Stille timer]" +
+             "(/pages/system/help/settings/quiet-hours).\n" +
+             "- **Beskeder** — slå beskedudveksling mellem beboere til eller " +
+             "fra for dig selv. Se [Beskeder]" +
+             "(/pages/system/help/settings/messaging).\n" +
+             "- **Børn** — de konti, du har oprettet for et barn. Se " +
+             "[Børnkonti](/pages/system/help/child-accounts).\n" +
+             "- **Skift adgangskode** — sæt en ny adgangskode. Se " +
+             "[Skift adgangskode]" +
+             "(/pages/system/help/settings/change-password).\n" +
+             "- **Slet konto** — den varige afslutning. Se " +
+             "[Slet en konto](/pages/system/help/deleting-an-account).\n"),
+            ("todos", "To-dos",
+             "## To-dos\n\n" +
+             "En to-do er et enkelt stykke arbejde, kvarteret har skrevet " +
+             "ned — noget at reparere, at købe, at lave. Den lever i " +
+             "**To-dos**-fanen i Projekter.\n\n" +
+             "**Sådan skriver du én.** Åbn **To-dos**-fanen og vælg " +
+             "**Ny to-do**. Giv den en titel, og en brødtekst, hvis du " +
+             "skal forklare hvorfor. En to-do er et fuldt stykke arbejde i " +
+             "sig selv — den kan bære undertasks og pege på en anden to-do, " +
+             "den venter på.\n\n" +
+             "**Sådan tildeler du den.** En to-do uden en tilordnet ligger " +
+             "på bordet for alle. Vælg en nabo, og den lander i deres liste; " +
+             "vælg en gruppe, og den lander i gruppens. Du kan tildele den " +
+             "på ny til enhver tid — tildelingen afspejler altid den " +
+             "sidste, du valgte.\n\n" +
+             "**Undertasks.** Del en stor to-do op i mindre. En undertask " +
+             "er en fuld to-do — sin egen titel, sin egen tilordnede, sin " +
+             "egen status — men den holdes under den overordnede, så helbilledet " +
+             "og stykkerne forbliver sammen.\n\n" +
+             "**Status.** En to-do har en status (etiketten for hvor den er: " +
+             "åben, i gang, færdig). Du skifter den, når arbejdet " +
+             "fremskridter. Statusen er et blik på tilstanden, ikke et lås — " +
+             "intet blokeres af den.\n\n" +
+             "**Kommentarer.** Enhver, der kan se to-do'en, kan efterlade " +
+             "en kommentar og svare, som ved et indlæg.\n\n" +
+             "Som udgangspunkt kan alle i fællesskabet se en to-do. Du kan " +
+             "indsnævre, hvem der kan se den, i publikumsafsnittet — som ved " +
+             "et indlæg. Se [Publikum](/pages/system/help/audience).\n"),
+            ("boards", "Brætter",
+             "## Brætter\n\n" +
+             "En bræt er en væg med baner, der arrangerer to-dos, så du kan " +
+             "se på et blik, hvor arbejdet står. Den lever i **Brætter**-" +
+             "fanen i Projekter.\n\n" +
+             "**Sådan opretter du en.** Åbn **Brætter**-fanen og vælg " +
+             "**Ny bræt**. Giv den et navn, og tilføj så de baner, du " +
+             "vil have.\n\n" +
+             "**Baner.** En bane er en lodret søjle på brættet. En bane " +
+             "kan bære en status — en to-do, der flyttes ind, tager den " +
+             "status — og en valgfri begrænsning på hvor mange to-dos den " +
+             "holder. Brug baner til at *vise*, hvor arbejdet er, ikke til " +
+             "at låse det: at flytte et kort er et blik på tilstanden, ikke " +
+             "et lås på den.\n\n" +
+             "**Flyt en to-do.** Åbn en to-do og vælg dens brætbane, eller " +
+             "flyt den på brættet. To-do'en beholder alt, hvad den havde " +
+             "(tilordnet, undertasks, kommentarer) — kun dens bane, og en " +
+             "banebåret status, ændres.\n\n" +
+             "**Brætter og to-dos er det samme, to udsigter.** En to-do er " +
+             "arbejdsenheten; en bræt er én udgang af to-dos. En to-do kan " +
+             "stå på en bræt eller uden for én — begge er gyldige. Se " +
+             "[To-dos](/pages/system/help/projects/todos).\n\n" +
+             "Som udgangspunkt kan alle i fællesskabet se en bræt; du kan " +
+             "indsnævre, hvem der kan se den, i publikumsafsnittet — som ved " +
+             "et indlæg.\n"),
+            ("calendar", "Kalender",
+             "## Kalender\n\n" +
+             "**Kalenderen** er hændelseslisten arrangeret efter dato, så " +
+             "du kan se på et blik, hvad der melder sig i kvarteret, frem " +
+             "for at scrolle en liste. Den lever i **Kalender**-fanen i " +
+             "Hændelser.\n\n" +
+             "**Sådan ser du den.** Åbn **Hændelser**, så **Kalender**-" +
+             "fanen. Månen viser hver dag, og hændelserne på den dag.\n\n" +
+             "**Sådan bevæger du dig gennem tiden.** Gå til forrige eller " +
+             "næste måned. De hændelser, der falder i den måned, er dem, " +
+             "du ser — de samme hændelser som i **Hændelser**-listen, " +
+             "arrangeret efter deres dato snarere end efter nyhed.\n\n" +
+             "**Sådan deltager du i én.** Åbn en hændelse fra kalenderen " +
+             "og vælg **Tilmeld**, netop som i hændelseslisten — se " +
+             "[Hændelser](/pages/system/help/events).\n\n" +
+             "Kalenderen og listen er de samme hændelser. Hvis du kan se " +
+             "en hændelse i den ene, kan du se den i den anden; hvis den " +
+             "er skjult for dig, er den skjult for begge.\n"),
+            ("timezone", "Tidszone",
+             "## Tidszone\n\n" +
+             "Din **tidszone** er den zone, du ser datoer og klokkeslæt i " +
+             "gennem hele platformen — hændelsestider, indlægstidsstempler, " +
+             "påmindelser.\n\n" +
+             "**Sådan sætter du din.** Åbn **Indstillinger → Tidszone** og " +
+             "vælg den zone, du bor i. Den gemmes på din konto.\n\n" +
+             "**Hvad den ændrer.** Hvert klokkeslæt, platformen viser dig — " +
+             "en hændelse kl. *hvornår*, et indlæg fra *for hvor længe " +
+             "siden* — renderes i den zone, du valgte, selv om forfatteren " +
+             "bor i en anden. Forfatterens zone bruges, når *de* læser; I " +
+             "ser hvert jeres samme øjeblik i jeres egen zone.\n\n" +
+             "**Hvad den ikke ændrer.** Den flytter ikke en hændelse. En " +
+             "hændelse kl. 15 i platformens standardzone er stadig det " +
+             "samme øjeblik for alle; kun *etiketten* på det øjeblik følger " +
+             "din zone. To naboer i forskellige zoner ser begge " +
+             "hændelsen, ved den rette lokale time for hver.\n\n" +
+             "Hvis du aldrig sætter en zone, gælder platformens standard " +
+             "(operatørens valg). Se [Sprog](/pages/system/help/language) " +
+             "for de tilknyttede sprog- og datumsformatindstillinger.\n"),
+            ("date-format", "Datum- og tidsformat",
+             "## Datum- og tidsformat\n\n" +
+             "Dit **datumsformat** er den form, en dato og et klokkeslæt " +
+             "tager, når platformen viser dem til dig — *10. okt. 2026* " +
+             "i stedet for *2026-10-10* i stedet for *10/10/2026*.\n\n" +
+             "**Sådan sætter du dit.** Åbn **Indstillinger → Datum- og " +
+             "tidsformat** og vælg den form, du bedst kan læse. Den " +
+             "gemmes på din konto.\n\n" +
+             "**Hvad den ændrer.** Datoer og klokkeslæt gennem hele " +
+             "platformen — en hændelses dag, et indlægs tidsstempel, en " +
+             "påmindelse — renderes i den form, du valgte.\n\n" +
+             "**Hvad den ikke ændrer.** Den ændrer ikke datoen selv, og " +
+             "den ændrer ikke din tidszone (det er en separat " +
+             "indstilling — se [Tidszone]" +
+             "(/pages/system/help/settings/timezone)). *Når* er det " +
+             "samme for alle; kun *hvordan det skrives* følger dit valg.\n\n" +
+             "Hvis du aldrig sætter et format, gælder platformens " +
+             "standard. Se [Sprog](/pages/system/help/language) for de " +
+             "tilknyttede sprog- og tidszoneindstillinger.\n"),
+            ("page-size", "Poster pr. side",
+             "## Poster pr. side\n\n" +
+             "**Poster pr. side** er hvor mange ting, en liste viser, " +
+             "inden du scroller til næste side — indlæg i feeden, to-dos " +
+             "i listen, indgange i kataloget.\n\n" +
+             "**Sådan sætter du din.** Åbn **Indstillinger → Poster pr. " +
+             "side** og vælg et tal. Det gemmes på din konto.\n\n" +
+             "**Hvad den ændrer.** Længden af hver liste og feed, du " +
+             "læser. Et større tal viser mere ad gangen (færre " +
+             "sideomslutninger); et mindre viser mindre (faster siden). " +
+             "Det er en læseindstilling, ikke en begrænsning — den " +
+             "ændrer aldrig *hvad* du kan se, kun hvor meget der er på " +
+             "en side.\n\n" +
+             "**Hvad den ikke ændrer.** Den skjuler intet, og den " +
+             "ændrer ikke, hvem der kan se noget — publikum bestemmer " +
+             "det. Det er ren paginering af listen for dig.\n\n" +
+             "Hvis du aldrig sætter en, gælder platformens standard.\n"),
+            ("home", "Startside",
+             "## Startside\n\n" +
+             "Din **startside** er den side, der åbnes, når du logger " +
+             "ind — det første, du lander på.\n\n" +
+             "**Sådan sætter du din.** Åbn **Indstillinger → Startside** " +
+             "og vælg, hvilken side der åbnes: fællesfeeden, " +
+             "meddelelserne, eller en anden overflade. Den gemmes på " +
+             "din konto.\n\n" +
+             "**Hvad den ændrer.** Hvor du lander efter at have logget " +
+             "ind, og hvor platformens **start**-link tager dig hen. " +
+             "Det er en bekvemmelighed — du kan stadig nå hver overflade " +
+             "fra topp bjælken til enhver tid.\n\n" +
+             "**Hvad den ikke ændrer.** Den ændrer ikke, hvad du kan se. " +
+             "Hver overflade er stadig nåelig; startside afgør kun, " +
+             "hvilken der åbnes først.\n\n" +
+             "Hvis du aldrig sætter en, åbnes platformens standardstart.\n"),
+            ("quiet-hours", "Stille timer",
+             "## Stille timer\n\n" +
+             "**Stille timer** er vinduet af dagen, hvor platformen " +
+             "holder dine notifikationer frem for at alarmere dig — så en " +
+             "sen svar eller et tidligt indlæg ikke vækker dig.\n\n" +
+             "**Sådan sætter du dine.** Åbn **Indstillinger → Stille " +
+             "timer** og vælg vinduet (i din egen tidszone). Det gemmes " +
+             "på din konto.\n\n" +
+             "**Hvad de gør.** Indeni dit stille vindue optager " +
+             "platformen stadig hver notifikation — indbakken er " +
+             "fuldstændig — men den sender dig ikke en alarm. Når " +
+             "vinduet slutter, er de heldne notifikationer der, og " +
+             "venter i indbakken.\n\n" +
+             "**Hvad de ikke gør.** De sletter eller smider intet, og " +
+             "de stopper ikke indbakken fra at optage. De styrer kun " +
+             "*hvornår* en notifikation må alarmere dig.\n\n" +
+             "Stille timer er dine — operatøren og andre beboere kan " +
+             "ikke sætte eller fjerne dem for dig. Se " +
+             "[Notifikationer](/pages/system/help/notifications) for de " +
+             "tilknyttede indstillinger og abonnementer.\n"),
+            ("messaging", "Beskeder",
+             "## Beskeder\n\n" +
+             "**Beskeder** er beboer-til-beboer samtale på platformen — " +
+             "et direkte notat fra den ene nabo til den anden, adskilt " +
+             "fra den offentlige feed og fra grupper.\n\n" +
+             "**Er den til?** Beskeder er et operatørswitch: " +
+             "instansen afgør, om beboere må sende beskeder til hinanden " +
+             "overhovedet. Hvis den er til, har du også din egen **til/" +
+             "fra** — åbn **Indstillinger → Beskeder** og vælg. Hvis den " +
+             "er fra for dig (eller for instansen), er overfladen " +
+             "enkeltvis fraværende — ingen forklaring, bare ingen indgang.\n\n" +
+             "**Hvad den ændrer.** At slå den til lader dig starte og " +
+             "læse samtaler med andre beboere, der også har den tilladt. " +
+             "At slå den fra stopper dig fra at sende eller modtage — " +
+             "dine eksisterende samtaler beholdes, ikke slettes.\n\n" +
+             "**Hvad den ikke ændrer.** Den påvirker ikke indlæg, grupper, " +
+             "meddelelser eller feeden — det er separate overflader. En " +
+             "besked er privat mellem jer to (og, for en børnekonti, " +
+             "følger formynders rettigheder reglerne for [børnkonti]" +
+             "(/pages/system/help/child-accounts)).\n"),
+            ("change-password", "Skift adgangskode",
+             "## Skift adgangskode\n\n" +
+             "At skifte din **adgangskode** er, hvordan du sætter en ny " +
+             "til at logge ind på din konto.\n\n" +
+             "**Sådan skifter du den.** Åbn **Indstillinger → Skift " +
+             "adgangskode**. Indtast din nuværende adgangskode, så den " +
+             "nye, og bekræft. Den gemmes på din konto.\n\n" +
+             "**Hvad den gør.** Fra det tidspunkt logger du ind med den " +
+             "nye adgangskode; den gamle holder op med at virke. Hvis du " +
+             "er logget ind på andre enheder, bedes de logge ind igen.\n\n" +
+             "**Hvis du glemmer den.** En glemt adgangskode håndteres af " +
+             "platformens nulstilningsforløb (eller, for en børnekonti, " +
+             "af en global admin — se [Børnkonti]" +
+             "(/pages/system/help/child-accounts)). At skifte en " +
+             "adgangskode er ikke det samme som at slette en konto — " +
+             "din konto og dit indhold røres ikke; kun " +
+             "loginhemmeligheden ændres.\n\n" +
+             "Din adgangskode er din. Ingen andre på platformen — heller " +
+             "ikke en admin — kan læse den; den bruges kun til at tjekke, " +
+             "at den matcher, når du logger ind.\n"),
+            ("members", "Gruppemedlemmer",
+             "## Gruppemedlemmer\n\n" +
+             "**Medlemmer**-fanen i en gruppe er, hvor gruppens " +
+             "mennesker lever — hvem der er i den, og (for ejeren) hvem " +
+             "der kan tilføjes eller fjernes.\n\n" +
+             "**Sådan ser du, hvem der er i den.** Åbn en gruppe, så " +
+             "**Medlemmer**-fanen. Listen viser gruppens medlemmer.\n\n" +
+             "**Sådan deltager du i en offentlig gruppe.** En " +
+             "**offentlig** gruppe kan alle deltage i — vælg " +
+             "**Deltag**, og du er med. For at **forlade**, vælg " +
+             "**Forlad**; gruppen beholder sine indlæg, og du er " +
+             "enkeltvis uden for den.\n\n" +
+             "**Sådan tilføjer eller fjerner du et medlem.** " +
+             "**Gruppeejeren** (eller en global admin) tilføjer og " +
+             "fjerner medlemmer. Et medlem, der forlader, gør det af " +
+             "sig selv; en ejer eller admin kan også fjerne et medlem " +
+             "eller lukke en gruppe.\n\n" +
+             "**Private grupper.** En **privat** gruppe er på " +
+             "invitation — kun dens medlemmer kan se den, poste i den " +
+             "eller tage den i et indlægs publikum. Et fjernet medlem " +
+             "taber adgangen på samme måde, som det fik den: stille, og " +
+             "uden at gruppen mister sin historie.\n\n" +
+             "Se [Grupper](/pages/system/help/groups) for hvordan " +
+             "grupper generelt virker, og [Publikum]" +
+             "(/pages/system/help/audience) for hvordan en gruppe " +
+             "optræder som et publikumvalg, når du poster.\n"),
+            ("group-settings", "Gruppeindstillinger",
+             "## Gruppeindstillinger\n\n" +
+             "**Indstillinger**-fanen i en gruppe er, hvor gruppens " +
+             "*egne* detaljer gemmes — dens navn, dens beskrivelse, om " +
+             "den er privat, og dens oversættelser. Den er for " +
+             "**gruppen**, ikke for dig: den er synlig for " +
+             "gruppeejeren og en global admin.\n\n" +
+             "**Beskrivelsen.** Gruppens korte beskrivelse vises, hvor " +
+             "gruppen optræder. Ejeren (eller en global admin) " +
+             "redigerer den til enhver tid.\n\n" +
+             "**Offentlig eller privat.** Her sætter ejeren (eller en " +
+             "global admin), om gruppen er offentlig (alle kan " +
+             "deltage) eller privat (på invitation). At skifte " +
+             "ændrer, hvem der kan se og deltage — se " +
+             "[Gruppemedlemmer](/pages/system/help/groups/members) " +
+             "og [Grupper](/pages/system/help/groups).\n\n" +
+             "**Oversættelser.** En **oversætter** (eller en global " +
+             "admin) kan tilføje en sprogversion af gruppens navn og " +
+             "beskrivelse, så en beboer, der læser på det sprog, ser " +
+             "gruppen på sit eget sprog. Se " +
+             "[Oversættere](/pages/system/help/translator).\n\n" +
+             "Hvad Indstillinger-fanen ikke er: Den ændrer ikke " +
+             "gruppens medlemmer (det er [Medlemmer]-fanen)" +
+             "(/pages/system/help/groups/members), og den rører ikke " +
+             "dine egen kontoindstillinger (de ligger under " +
+             "[Indstillinger](/pages/system/help/settings)).\n"),
+            ("accounts", "Admin: konti",
+             "## Admin: konti\n\n" +
+             "**Konti**-fanen er, hvor en global admin holder " +
+             "kvarterets konti i orden — verificere nye, blokere eller " +
+             "afblokke en beboer, og afgøre, hvem der bærer hvilken " +
+             "højtstående rolle.\n\n" +
+             "**Sådan verificerer du en ny konto.** En beboer, der har " +
+             "skrevet sig op, er i en vventende tilstand, indtil " +
+             "verificeret. Åbn kontoen, bekræft identiteten, og " +
+             "verificer — kontoen kommer fuldt online.\n\n" +
+             "**Sådan blokerer eller afblokerer du en beboer.** En " +
+             "blokeret beboer kan ikke logge ind. Blokering er " +
+             "omvendelig — afblock, når grunden er løst. Blokering er " +
+             "ikke det samme som sletning: kontoen og dens indhold " +
+             "beholdes.\n\n" +
+             "**Sådan tildeler du en højtstående rolle.** Afgør, hvem " +
+             "der er moderator, oversætter, eller en anden global " +
+             "admin. Roller er uafhængige og kombinerbare — en beboer " +
+             "kan bære mere end én. At fjerne en rolle stopper " +
+             "rettigheden; den fjerner ikke kontoen.\n\n" +
+             "**Hvad der holder det i orden.** Hver kontoaktion " +
+             "skrives i revisionstraden, og en admins rettighed er " +
+             "smal ved design: en admin holder konti i orden, men " +
+             "læser ikke en beboers indhold — publikum afgør stadig, " +
+             "hvad der er synligt. Se [Admins](/pages/system/help/admins) " +
+             "for rollen i fulde drag, og [Slet en konto]" +
+             "(/pages/system/help/deleting-an-account) for den ene " +
+             "varige handling.\n"),
+            ("communities", "Admin: fællesskaber",
+             "## Admin: fællesskaber\n\n" +
+             "**Fællesskaber**-fanen er, hvor en global admin holder " +
+             "kvarterets fællesskaber — de navngivne grupper af " +
+             "beboere (et bygning, en gade, et fælles projekt), som " +
+             "indhold kan publikum-begrænse til.\n\n" +
+             "**Sådan tilføjer eller redigerer du én.** Opret et " +
+             "fællesskab, giv det et navn og en kort beskrivelse, og " +
+             "rediger dem til enhver tid. Et fællesskab er en " +
+             "organisationsenhed — ikke en feed og ikke en gruppe, men " +
+             "det, en gruppe, et indlæg eller et publikum kan pege på.\n\n" +
+             "**Sådan sætter du medlemskab.** Afgør, hvilke beboere der " +
+             "hører til i hvilket fællesskab. Medlemskab er det, der " +
+             "gør et fællesskab til et rigtigt publikum: et indlæg, " +
+             "begrænset til et fællesskab, ses af dets medlemmer (og " +
+             "forfatteren), ikke af hele kvarteret.\n\n" +
+             "**Hvad det ikke er.** Et fællesskab er ikke det samme som " +
+             "en [gruppe](/pages/system/help/groups) (en gruppe har " +
+             "sin egen feed og sin medlemmerfane) eller et [tag]" +
+             "(/pages/system/help/tags) (et tag er en etikette på " +
+             "indhold). Et fællesskab er enheden af *hvem der er hvem* " +
+             "i kvarteret. Se [Publikum](/pages/system/help/audience) " +
+             "for hvordan et fællesskab optræder som et publikumvalg, " +
+             "når du poster.\n"),
+            ("platform", "Admin: platform",
+             "## Admin: platform\n\n" +
+             "**Platform**-fanen er, hvor en global admin holder " +
+             "platformens *egne* ting i orden — de sider, den leverer, " +
+             "standardværdierne, den anvender, og de ting, den lader " +
+             "beboere overskrive.\n\n" +
+             "**Platformsiderne.** Betingelserne, hjælpeguiderne, " +
+             "privacybemærkningen og adfærdsretningslinjerne er " +
+             "platformens egne sider. En global admin kan redigere " +
+             "dem, og nulstille en side til dens leverede tekst, når " +
+             "de vil have den nyeste ordlyd.\n\n" +
+             "**Platformstandarderne.** Sæt standardsproget, " +
+             "standardtidszonen og datumsformatet for instansen. " +
+             "Hver beboer kan stadig overskrive alle af disse på sin " +
+             "egen konto (se [Indstillinger](/pages/system/help/settings)) " +
+             "— standardværdien er kun det, der gælder, hvor en " +
+             "beboer ikke har valgt noget eget.\n\n" +
+             "**Tilmeldingsport.** Vælg, om nye beboere kan " +
+             "skrive sig op af sig selv, eller kun, når du inviterer " +
+             "dem.\n\n" +
+             "Hvad denne fane ikke er: Den administrerer ikke " +
+             "enkeltkonti (det er [Konti](/pages/system/help/admins/accounts)), " +
+             "fællesskaber ([Fællesskaber]" +
+             "(/pages/system/help/admins/communities)), eller " +
+             "sikkerheds- og revisionsoverfladen ([Sikkerhed]" +
+             "(/pages/system/help/admins/security)). Se " +
+             "[Admins](/pages/system/help/admins) for rollen i " +
+             "fulde drag.\n"),
+            ("security", "Admin: sikkerhed",
+             "## Admin: sikkerhed\n\n" +
+             "**Sikkerhed**-fanen er, hvor en global admin ser " +
+             "platformens revisionstrad — optagelsen af hver " +
+             "adgangsbeslutning og hver adminhandling — og " +
+             "nødfunktionerne, når de almindelige kanaler ikke " +
+             "recker.\n\n" +
+             "**Revisionstraden.** Hver gang, en beboer læser " +
+             "publikumsbegrænset indhold, og hver admin- og " +
+             "moderatorhandling, skrives i traden: hvem, hvad, hvornår, " +
+             "og udfaldet (tilladt eller nægtet). Traden er " +
+             "platformens bevis for at publikums-default holdt — den " +
+             "læses til gennemgang, ikke til overvågning.\n\n" +
+             "**Hvad revisionen ikke er.** At se traden er ikke en " +
+             "hemmelig dør ind i en beboers indhold. En " +
+             "revisionlinje optager, at en adgang *skete* og dens " +
+             "udfald; den bærer ikke selve indholdet. Publikum afgør " +
+             "stadig, hvad der er synligt, og en rapport eller en " +
+             "revisionlinje afslører aldrig et indlæg, et svar eller " +
+             "en profil.\n\n" +
+             "**Nødfunktionen.** Når en konto eller en kanal er i " +
+             "besvær, har global admin rettigheden til at handle på " +
+             "den — en smal, revideret overskridelse, ikke en " +
+             "stående magt. Hver brug af nødfunktionen skrives " +
+             "selv i traden.\n\n" +
+             "Se [Admins](/pages/system/help/admins) for rollen i " +
+             "fulde drag, og [Moderatorer](/pages/system/help/moderators) " +
+             "for hvordan en modersators smale rettighed sammenlignes.\n"),
+            ("analytics", "Admin: analyser",
+             "## Admin: analyser\n\n" +
+             "**Analyser**-fanen er, hvor en global admin ser " +
+             "instansens egen form over tid — hvor meget der bruges, " +
+             "hvor meget der er opbevaret, og om kapaciteten er " +
+             "tilstrækkelig til kvarteret fremad.\n\n" +
+             "**Hvad den viser.** Instansens aktivitet og opbevaring " +
+             "over et vindue, du vælger (en nylig dag, en måned, et " +
+             "år): skrevne indlæg, brugt lagerplads, og trenden. Det " +
+             "er operatørens svar på *er denne instans stor " +
+             "nok?*\n\n" +
+             "**Hvad den er til.** Kapacitetsplanlægning. En stigende " +
+             "lagertrend siger *sikker tidlig, og planlæg mere " +
+             "rum*. En flad siger *du er okay*. Det er en læsning af " +
+             "instansen, ikke af beboerne.\n\n" +
+             "**Hvad den ikke er.** Den læser eller afslører intet " +
+             "af en beboers indhold. Analyser er tællinger og " +
+             "summer — hvor mange, hvor meget, over hvornår — aldrig " +
+             "*hvad en bestemt beboer skrev*. Revisionstraden " +
+             "([Sikkerhed](/pages/system/help/admins/security)) er, " +
+             "hvor detaljen pr. handling bor.\n\n" +
+             "Se [Admins](/pages/system/help/admins) for rollen i " +
+             "fulde drag.\n"),
         ];
     }
 
@@ -3894,17 +5733,35 @@ public static class FirstBootSeeder
              "- [Getting started](/pages/system/help/getting-started) — your first ten minutes\n" +
              "- [Posts](/pages/system/help/posts) — writing, replying, editing, deleting, attaching files\n" +
              "- [Groups](/pages/system/help/groups) — public and private groups, group posts\n" +
+             "  - [Members](/pages/system/help/groups/members) — who is in a group, and who can be added\n" +
+             "  - [Settings](/pages/system/help/groups/group-settings) — a group's name, description, privacy, and translations\n" +
              "- [Drafts](/pages/system/help/drafts) — save without publishing\n" +
              "- [Audience](/pages/system/help/audience) — choosing who can see a post\n" +
-             "- [Language](/pages/system/help/language) — your language, time zone, and date format\n" +
+             "- [Language](/pages/system/help/language) — your language\n" +
              "- [Events](/pages/system/help/events) — the feed, RSVP, reminders\n" +
+             "  - [Calendar](/pages/system/help/events/calendar) — the events by date\n" +
+             "- [Settings](/pages/system/help/settings) — the one place the platform follows you\n" +
+             "  - [Time zone](/pages/system/help/settings/timezone) — the zone you see times in\n" +
+             "  - [Date & time format](/pages/system/help/settings/date-format) — the shape of a date and time\n" +
+             "  - [Items per page](/pages/system/help/settings/page-size) — how many a list shows\n" +
+             "  - [Home page](/pages/system/help/settings/home) — the page you open on\n" +
+             "  - [Quiet hours](/pages/system/help/settings/quiet-hours) — when notifications wait\n" +
+             "  - [Messaging](/pages/system/help/settings/messaging) — resident-to-resident messages\n" +
+             "  - [Change password](/pages/system/help/settings/change-password) — set a new sign-in password\n" +
              "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
              "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
              "- [Deleting an account](/pages/system/help/deleting-an-account) — what deleting removes, who may do it, and how\n" +
              "- [Admins](/pages/system/help/admins) — what a global admin does, and what keeps it in check\n" +
+             "  - [Accounts](/pages/system/help/admins/accounts) — verifying, blocking, and assigning roles\n" +
+             "  - [Communities](/pages/system/help/admins/communities) — the named groups of residents\n" +
+             "  - [Platform](/pages/system/help/admins/platform) — the platform's own pages, defaults, and sign-up\n" +
+             "  - [Security](/pages/system/help/admins/security) — the audit trail and the break-glass\n" +
+             "  - [Analytics](/pages/system/help/admins/analytics) — the instance's shape over time\n" +
              "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n" +
              "- [Projects](/pages/system/help/projects) — to-dos, assignments, boards, and the neighborhood's shared work\n" +
+             "  - [To-dos](/pages/system/help/projects/todos) — the neighborhood's work items\n" +
+             "  - [Boards](/pages/system/help/projects/boards) — lanes that arrange to-dos\n" +
              "- [Announcements](/pages/system/help/announcements) — pinned notes, public or resident-scoped\n" +
              "- [Directory](/pages/system/help/directory) — the residents on the platform and what they share\n" +
              "- [People](/pages/system/help/people) — finding people by tag or bio\n" +
@@ -4001,17 +5858,35 @@ public static class FirstBootSeeder
              "- [Erste Schritte](/pages/system/help/getting-started) — deine ersten zehn Minuten\n" +
              "- [Beiträge](/pages/system/help/posts) — Schreiben, Antworten, Bearbeiten, Löschen, Dateien anhängen\n" +
              "- [Gruppen](/pages/system/help/groups) — Öffentliche und private Gruppen, Gruppenbeiträge\n" +
+             "  - [Mitglieder](/pages/system/help/groups/members) — Wer in einer Gruppe ist, und wer hinzugefügt werden kann\n" +
+             "  - [Gruppeneinstellungen](/pages/system/help/groups/group-settings) — Name, Beschreibung, Privatsphäre und Übersetzungen einer Gruppe\n" +
              "- [Entwürfe](/pages/system/help/drafts) — Speichern ohne zu veröffentlichen\n" +
              "- [Zielgruppe](/pages/system/help/audience) — Wer darf einen Beitrag sehen\n" +
-             "- [Sprache](/pages/system/help/language) — Deine Sprache, Zeitzone und das Datumsformat\n" +
+             "- [Sprache](/pages/system/help/language) — Deine Sprache\n" +
              "- [Termine](/pages/system/help/events) — Der Feed, RSVP, Erinnerungen\n" +
+             "  - [Kalender](/pages/system/help/events/calendar) — Die Termine nach Datum\n" +
+             "- [Einstellungen](/pages/system/help/settings) — Der eine Ort, an dem die Plattform dir folgt\n" +
+             "  - [Zeitzone](/pages/system/help/settings/timezone) — Die Zone, in der du Zeiten siehst\n" +
+             "  - [Datums- und Zeitformat](/pages/system/help/settings/date-format) — Das Format eines Datums und einer Uhrzeit\n" +
+             "  - [Elemente pro Seite](/pages/system/help/settings/page-size) — Wie viele eine Liste zeigt\n" +
+             "  - [Startseite](/pages/system/help/settings/home) — Die Seite, die du aufmachst\n" +
+             "  - [Stillezeiten](/pages/system/help/settings/quiet-hours) — Wann Benachrichtigungen warten\n" +
+             "  - [Nachrichten](/pages/system/help/settings/messaging) — Nachrichten zwischen Bewohner:innen\n" +
+             "  - [Passwort ändern](/pages/system/help/settings/change-password) — Ein neues Anmeldepasswort setzen\n" +
              "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
              "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
              "- [Ein Konto löschen](/pages/system/help/deleting-an-account) — Was eine Löschung entfernt, wer sie darf und wie\n" +
              "- [Administratoren](/pages/system/help/admins) — Was ein globaler Admin macht, und was die Rolle bremst\n" +
+             "  - [Konten](/pages/system/help/admins/accounts) — Bestätigen, Sperrung und Zuweisen von Rollen\n" +
+             "  - [Gemeinschaften](/pages/system/help/admins/communities) — Die benannten Gruppen von Bewohner:innen\n" +
+             "  - [Plattform](/pages/system/help/admins/platform) — Die eigenen Seiten, Standardeinstellungen und Anmeldung\n" +
+             "  - [Sicherheit](/pages/system/help/admins/security) — Das Prüfprotokoll und der Notfallzugang\n" +
+             "  - [Statistik](/pages/system/help/admins/analytics) — Die Form der Instanz über die Zeit\n" +
              "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n" +
              "- [Projekte](/pages/system/help/projects) — Aufgaben, Zuweisungen, Boards und die gemeinsame Arbeit des Viertels\n" +
+             "  - [Aufgaben](/pages/system/help/projects/todos) — Die Arbeitsvorhaben des Viertels\n" +
+             "  - [Boards](/pages/system/help/projects/boards) — Spuren, die Aufgaben anordnen\n" +
              "- [Ankündigungen](/pages/system/help/announcements) — Wichtige Hinweise, öffentlich oder nur für Bewohner\n" +
              "- [Verzeichnis](/pages/system/help/directory) — Die Bewohner der Plattform und was sie teilen\n" +
              "- [Menschen](/pages/system/help/people) — Menschen nach Tag oder Biografie finden\n" +
@@ -4113,17 +5988,35 @@ public static class FirstBootSeeder
              "- [Premiers pas](/pages/system/help/getting-started) — tes dix premières minutes\n" +
              "- [Messages](/pages/system/help/posts) — Écrire, répondre, modifier, supprimer, joindre des fichiers\n" +
              "- [Groupes](/pages/system/help/groups) — Groupes publics et privés, messages de groupe\n" +
+             "  - [Membres](/pages/system/help/groups/members) — Qui est dans le groupe, et qui peut être ajouté\n" +
+             "  - [Paramètres](/pages/system/help/groups/group-settings) — Nom, description, confidentialité et traductions d'un groupe\n" +
              "- [Brouillons](/pages/system/help/drafts) — Sauvegarder sans publier\n" +
              "- [Audience](/pages/system/help/audience) — Qui peut voir un message\n" +
-             "- [Langue](/pages/system/help/language) — Ta langue, ton fuseau horaire et ton format de date\n" +
+             "- [Langue](/pages/system/help/language) — Ta langue\n" +
              "- [Événements](/pages/system/help/events) — Le fil, la participation, les rappels\n" +
+             "  - [Calendrier](/pages/system/help/events/calendar) — Les événements par date\n" +
+             "- [Paramètres](/pages/system/help/settings) — Le seul endroit où la plateforme te suit\n" +
+             "  - [Fuseau horaire](/pages/system/help/settings/timezone) — La zone dans laquelle tu vois les heures\n" +
+             "  - [Format de date et d'heure](/pages/system/help/settings/date-format) — La forme d'une date et d'une heure\n" +
+             "  - [Éléments par page](/pages/system/help/settings/page-size) — Combien une liste affiche\n" +
+             "  - [Page d'accueil](/pages/system/help/settings/home) — La page qui s'ouvre en premier\n" +
+             "  - [Heures de calme](/pages/system/help/settings/quiet-hours) — Quand les notifications attendent\n" +
+             "  - [Messagerie](/pages/system/help/settings/messaging) — Les messages entre résidents\n" +
+             "  - [Changer le mot de passe](/pages/system/help/settings/change-password) — Définir un nouveau mot de passe\n" +
              "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
              "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
              "- [Supprimer un compte](/pages/system/help/deleting-an-account) — Ce qu'une suppression retire, qui peut le faire et comment\n" +
              "- [Administrateurs](/pages/system/help/admins) — Ce qu'un administrateur global fait, et ce qui freine le rôle\n" +
+             "  - [Comptes](/pages/system/help/admins/accounts) — Vérifier, bloquer et assigner les rôles\n" +
+             "  - [Communautés](/pages/system/help/admins/communities) — Les groupes nommés de résidents\n" +
+             "  - [Plateforme](/pages/system/help/admins/platform) — Les pages de la plateforme, les valeurs par défaut et l'inscription\n" +
+             "  - [Sécurité](/pages/system/help/admins/security) — Le journal et le recours d'urgence\n" +
+             "  - [Statistiques](/pages/system/help/admins/analytics) — La forme de l'instance dans le temps\n" +
              "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n" +
              "- [Projets](/pages/system/help/projects) — les tâches, les attributions, les tableaux et le travail partagé du quartier\n" +
+             "  - [Tâches](/pages/system/help/projects/todos) — Les pièces de travail du quartier\n" +
+             "  - [Tableaux](/pages/system/help/projects/boards) — Les couloirs qui organisent les tâches\n" +
              "- [Annonces](/pages/system/help/announcements) — Les notes épinglées, publiques ou réservées aux résidents\n" +
              "- [Annuaire](/pages/system/help/directory) — Les résidents de la plateforme et ce qu'ils partagent\n" +
              "- [Personnes](/pages/system/help/people) — Trouver des personnes par tag ou par bio\n" +
@@ -4222,17 +6115,35 @@ public static class FirstBootSeeder
              "- [Første skridt](/pages/system/help/getting-started) — dine første ti minutter\n" +
              "- [Indlæg](/pages/system/help/posts) — Skrive, svare, redigere, slette, vedhæfte filer\n" +
              "- [Grupper](/pages/system/help/groups) — Offentlige og private grupper, gruppeindlæg\n" +
+             "  - [Medlemmer](/pages/system/help/groups/members) — Hvem der er i gruppen, og hvem der kan tilføjes\n" +
+             "  - [Gruppeindstillinger](/pages/system/help/groups/group-settings) — En gruppes navn, beskrivelse, privatliv og oversættelser\n" +
              "- [Udkast](/pages/system/help/drafts) — Gemme uden at publicere\n" +
              "- [Modtagerkreds](/pages/system/help/audience) — Hvem der kan se et indlæg\n" +
-             "- [Sprog](/pages/system/help/language) — Dit sprog, din tidzone og dit datoformat\n" +
+             "- [Sprog](/pages/system/help/language) — Dit sprog\n" +
              "- [Begivenheder](/pages/system/help/events) — Feeden, deltagelse, påmindelser\n" +
+             "  - [Kalendarium](/pages/system/help/events/calendar) — Begivenhederne efter dato\n" +
+             "- [Indstillinger](/pages/system/help/settings) — Det eneste sted, hvor platformen følger dig\n" +
+             "  - [Tidzone](/pages/system/help/settings/timezone) — Zonen, du ser tidspunkter i\n" +
+             "  - [Dato- og tidformat](/pages/system/help/settings/date-format) — Formet på en dato og et klokkeslæt\n" +
+             "  - [Elementer pr. side](/pages/system/help/settings/page-size) — Hvor mange en liste viser\n" +
+             "  - [Homeside](/pages/system/help/settings/home) — Siden, der åbner først\n" +
+             "  - [Stille timer](/pages/system/help/settings/quiet-hours) — Hvornår beskeder venter\n" +
+             "  - [Beskeder](/pages/system/help/settings/messaging) — Beskeder mellem beboere\n" +
+             "  - [Skift adgangskode](/pages/system/help/settings/change-password) — Sæt en ny login-adgangskode\n" +
              "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
              "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +
              "- [Slet en konto](/pages/system/help/deleting-an-account) — Hvad en sletning fjerner, hvem der kan det og hvordan\n" +
              "- [Administrerende](/pages/system/help/admins) — Hvad en global admin gør, og hvad der holder rollen i skak\n" +
+             "  - [Konti](/pages/system/help/admins/accounts) — Bekræftelse, blokering og rolletildeling\n" +
+             "  - [Fællesskaber](/pages/system/help/admins/communities) — De benævnte grupper af beboere\n" +
+             "  - [Platform](/pages/system/help/admins/platform) — Platformens egne sider, standarder og tilmelding\n" +
+             "  - [Sikkerhed](/pages/system/help/admins/security) — Protokolloggen og nødløsningsadgangen\n" +
+             "  - [Analysen](/pages/system/help/admins/analytics) — Instansens form over tid\n" +
              "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n" +
              "- [Projekter](/pages/system/help/projects) — opgaver, tildelelser, brætter og nabolagets fælles arbejde\n" +
+             "  - [Opgaver](/pages/system/help/projects/todos) — Nabolagets arbejdsenheder\n" +
+             "  - [Brætter](/pages/system/help/projects/boards) — Spor, der ordner opgaver\n" +
              "- [Bekendtgørelser](/pages/system/help/announcements) — Vigtige meddelelser, offentlige eller kun for beboerne\n" +
              "- [Kontaktliste](/pages/system/help/directory) — Platformens beboere og hvad de deler\n" +
              "- [Personer](/pages/system/help/people) — Find personer efter tag eller bio\n" +

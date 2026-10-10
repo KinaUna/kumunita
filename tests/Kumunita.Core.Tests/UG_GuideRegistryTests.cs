@@ -31,10 +31,10 @@ namespace Kumunita.Core.Tests;
 /// <c>PG5_*</c> seeder family (fresh scratch Postgres per test, the public
 /// static <see cref="FirstBootSeeder.SeedDefaultPagesAsync"/> + the public
 /// <see cref="FirstBootSeeder.GuidePages"/> page-data source), so it pins the
-/// exact seeded set + idempotency across two live sessions, the en-only
-/// floor, and the "guides under <c>help</c>, not under <c>system</c> and not
-/// new roots" shape — the two invariants that keep the ADR 0043 D1 exact-set
-/// pin and the ADR 0040 namespace guard green.
+/// exact seeded set + idempotency across two live sessions, the `en`
+/// floor + the de/fr/da baselines, and the "guides under <c>help</c>, not
+/// under <c>system</c> and not new roots" shape — the invariants that keep
+/// the ADR 0043 D1 exact-set pin and the ADR 0040 namespace guard green.
 /// </para>
 /// </summary>
 public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
@@ -121,19 +121,55 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // The canonical `help` page exists under `system`.
         var help = systemChildren.Single(p => p.Slug == "help");
 
-        // The guides are the EXACT children of `help` (the single source the
-        // test reads is GuidePages() — the ADR 0057 D4 drift pin), one per
-        // slug, no duplicate from the second boot.
+        // ADR 0160 — the guides form a TWO-level tree under `help`: the
+        // top-level guides (those NOT in the GuideParentMap) are the exact
+        // direct children of `help`; each nested guide (those IN the
+        // GuideParentMap) is a child of its top-level parent guide. The
+        // single source the test reads is GuidePages() + GuideParentMap() —
+        // the ADR 0057 D4 drift pin, extended to the nesting shape.
+        var parentMap = FirstBootSeeder.GuideParentMap();
+        var topLevelSlugs = guideSlugs.Where(s => !parentMap.ContainsKey(s)).ToArray();
+
+        // The direct children of `help` are EXACTLY the top-level guides —
+        // no nested guide hangs directly off `help`, and no slug is missing.
         var helpChildren = await q.Query<Page>()
             .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
             .ToListAsync(ct);
         Assert.Equal(
-            guideSlugs.OrderBy(s => s, StringComparer.Ordinal).ToArray(),
+            topLevelSlugs.OrderBy(s => s, StringComparer.Ordinal).ToArray(),
             helpChildren.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
-        Assert.Equal(guideSlugs.Length, helpChildren.Count);
+        Assert.Equal(topLevelSlugs.Length, helpChildren.Count);
+
+        // Every guide (top-level AND nested) exists exactly once somewhere in
+        // the `help` subtree, with no duplicate from the second boot. The
+        // parent set is `help`'s id plus each top-level guide's id (a
+        // materialized list — the Contains translates to a SQL IN clause).
+        var parentIds = help.Id;
+        var topLevelIds = helpChildren.Select(h => h.Id).ToList();
+        var allGuides = await q.Query<Page>()
+            .Where(p => (p.ParentId == parentIds || topLevelIds.Contains(p.ParentId))
+                        && p.IsDeleted == false)
+            .ToListAsync(ct);
+        Assert.Equal(
+            guideSlugs.OrderBy(s => s, StringComparer.Ordinal).ToArray(),
+            allGuides.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
+        Assert.Equal(guideSlugs.Length, allGuides.Count);
         foreach (var slug in guideSlugs)
         {
-            Assert.Equal(1, helpChildren.Count(p => p.Slug == slug));
+            Assert.Equal(1, allGuides.Count(p => p.Slug == slug));
+        }
+
+        // Each nested guide hangs under its parent guide's page (the map's
+        // value), not directly under `help`.
+        foreach (var (childSlug, parentSlug) in parentMap)
+        {
+            var parentPage = await q.Query<Page>()
+                .Where(p => p.Slug == parentSlug && p.ParentId == help.Id)
+                .FirstAsync(ct);
+            var childPage = await q.Query<Page>()
+                .Where(p => p.Slug == childSlug && p.ParentId == parentPage.Id)
+                .FirstAsync(ct);
+            Assert.Equal(parentPage.Id, childPage.ParentId);
         }
     }
 
@@ -154,18 +190,33 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
             .FirstAsync(ct);
 
+        // ADR 0160 — a guide's parent is `help` (top-level) or its parent
+        // guide (nested, per the closed GuideParentMap). Resolve the correct
+        // parent id before asserting the shape.
+        var parentMap = FirstBootSeeder.GuideParentMap();
+
         foreach (var (slug, title, body) in guides)
         {
+            string expectedParentId = help.Id;
+            if (parentMap.TryGetValue(slug, out var parentSlug))
+            {
+                var parentPage = await q.Query<Page>()
+                    .Where(p => p.Slug == parentSlug && p.ParentId == help.Id)
+                    .FirstAsync(ct);
+                expectedParentId = parentPage.Id;
+            }
+
             var page = await q.Query<Page>()
-                .Where(p => p.Slug == slug && p.ParentId == help.Id)
+                .Where(p => p.Slug == slug && p.ParentId == expectedParentId)
                 .FirstAsync(ct);
 
-            // ADR 0057 D1/D2 shape: nested under `help` (grandchild of
-            // `system`), public (Audience null — a how-to is not
-            // audience-gated), authored-in `en` (the floor), platform content
-            // (no resident author), a system page (the ADR 0040 standing
-            // matrix), not a draft / not deleted.
-            Assert.Equal(help.Id, page.ParentId);
+            // ADR 0057 D1/D2 + ADR 0160 shape: nested under `help` (a top-level
+            // guide) or under a top-level guide (a nested guide); public
+            // (Audience null — a how-to is not audience-gated); authored-in
+            // `en` (the floor); platform content (no resident author); a
+            // system page (the ADR 0040 standing matrix); not a draft / not
+            // deleted.
+            Assert.Equal(expectedParentId, page.ParentId);
             Assert.Null(page.Audience);
             Assert.Equal(FirstBootSeeder.SourceLanguage, page.LanguageCode);
             Assert.Equal(string.Empty, page.AuthorId);
@@ -184,12 +235,14 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task UG_Guides_DaFrDaBaselines_AtFirstBoot()
     {
-        // ADR 0057 D2 (amended 2026-09-21) — the guides ship with curated
-        // de/fr/da baselines on a pristine DB: 10 guides × 3 languages = 30
-        // PageTranslation rows. The ADR 0042 D1 "create-if-missing" invariant
-        // still holds (a human Translator's edit is never clobbered by a
-        // later deploy); the "never machine-translated" ADR 0005 C clause is
-        // preserved — the baselines are hand-curated, not machine output.
+        // ADR 0057 D2 (amended 2026-09-21) + ADR 0160 (amended 2026-10-10)
+        // — the guides ship with curated de/fr/da baselines on a pristine DB:
+        // every guide × 3 languages = PageTranslation rows (all 41 guides are
+        // baselined now — the ADR 0160 nested guides ship their baselines in
+        // the same lane as the en floor). The ADR 0042 D1 "create-if-missing"
+        // invariant still holds (a human Translator's edit is never clobbered
+        // by a later deploy); the "never machine-translated" ADR 0005 C clause
+        // is preserved — the baselines are hand-curated, not machine output.
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
         var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
@@ -203,27 +256,41 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         var help = await q.Query<Page>()
             .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
             .FirstAsync(ct);
-        var guideIds = await q.Query<Page>()
+        // ADR 0160 — capture ALL guides in the help subtree (top-level + nested).
+        var topLevelGuides = await q.Query<Page>()
             .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
-            .Select(p => p.Id)
             .ToListAsync(ct);
+        var topLevelIds = topLevelGuides.Select(g => g.Id).ToList();
+        var nestedGuides = await q.Query<Page>()
+            .Where(p => topLevelIds.Contains(p.ParentId) && p.IsDeleted == false)
+            .ToListAsync(ct);
+        var allGuides = topLevelGuides.Concat(nestedGuides).ToList();
+        var guideIds = allGuides.Select(g => g.Id).ToList();
 
-        // Exactly the guide set (sanity: the guides are present).
+        // Sanity: all guides (top-level + nested) are present.
         Assert.Equal(guideSlugs.Length, guideIds.Count);
 
-        // 10 guides × 3 languages (de/fr/da) = 30 PageTranslation rows.
-        var total = await q.Query<PageTranslation>()
+        // Every guide carries a de/fr/da baseline (the ADR 0057 D2 shape, held
+        // for the ADR 0160 nested guides too — the default since the 2026-10-10
+        // amendment). A guide that is baselined must have exactly 3 (one per
+        // language).
+        var guidesWithBaselines = await q.Query<PageTranslation>()
             .Where(t => guideIds.Contains(t.PageId))
-            .CountAsync(ct);
-        Assert.Equal(guideIds.Count * 3, total);
+            .Select(t => t.PageId)
+            .Distinct()
+            .ToListAsync(ct);
+        Assert.True(guidesWithBaselines.Count > 0, "At least the original guides should have baselines.");
+        Assert.Equal(guidesWithBaselines.Count * 3,
+            await q.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct));
 
-        // Each guide carries exactly one row per language (de, fr, da).
+        // Each guide that has a baseline carries exactly one row per language.
         foreach (var lang in new[] { "de", "fr", "da" })
         {
             var langCount = await q.Query<PageTranslation>()
-                .Where(t => guideIds.Contains(t.PageId) && t.LanguageCode == lang)
+                .Where(t => guidesWithBaselines.Contains(t.PageId) && t.LanguageCode == lang)
                 .CountAsync(ct);
-            Assert.Equal(guideIds.Count, langCount);
+            Assert.Equal(guidesWithBaselines.Count, langCount);
         }
 
         // The baselines are platform content (no resident author) — the ADR
@@ -240,7 +307,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         // ADR 0042 D1 — create-if-missing: a second boot must not create
         // duplicate PageTranslation rows for the guide baselines. The count
-        // stays at 30 (10 × 3), not 60.
+        // stays at guides×3 (41 × 3 = 123), not 246.
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
 
@@ -254,15 +321,25 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         var help = await q.Query<Page>()
             .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
             .FirstAsync(ct);
-        var guideIds = await q.Query<Page>()
+        // ADR 0160 — all guides in the help subtree (top-level + nested).
+        var topLevelIds = (await q.Query<Page>()
             .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
-            .Select(p => p.Id)
-            .ToListAsync(ct);
+            .Select(p => p.Id).ToListAsync(ct)).ToList();
+        var guideIds = (await q.Query<Page>()
+            .Where(p => (p.ParentId == help.Id || topLevelIds.Contains(p.ParentId))
+                        && p.IsDeleted == false)
+            .Select(p => p.Id).ToListAsync(ct)).ToList();
 
+        // Every guide carries a baseline (the ADR 0057 D2 shape, held for the
+        // ADR 0160 nested guides too); the second boot must not have
+        // duplicated them (the count is still baselinedGuides×3).
+        var baselinedGuides = await q.Query<PageTranslation>()
+            .Where(t => guideIds.Contains(t.PageId))
+            .Select(t => t.PageId).Distinct().ToListAsync(ct);
         var total = await q.Query<PageTranslation>()
             .Where(t => guideIds.Contains(t.PageId))
             .CountAsync(ct);
-        Assert.Equal(guideIds.Count * 3, total);
+        Assert.Equal(baselinedGuides.Count * 3, total);
     }
 
     [Fact]
@@ -303,9 +380,14 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             var help = await q0.Query<Page>()
                 .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
                 .FirstAsync(ct);
-            var guideIds = await q0.Query<Page>()
+            // ADR 0160 — all guides in the help subtree (top-level + nested).
+            var topLevelIds0 = (await q0.Query<Page>()
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
-                .Select(p => p.Id).ToListAsync(ct);
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
+            var guideIds = (await q0.Query<Page>()
+                .Where(p => (p.ParentId == help.Id || topLevelIds0.Contains(p.ParentId))
+                            && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
             var count = await q0.Query<PageTranslation>()
                 .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
             Assert.Equal(0, count);
@@ -318,7 +400,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             await bf.SaveChangesAsync(ct);
         }
 
-        // Verify: 30 rows (10 × 3) created, platform author.
+        // Verify: baselined guides × 3 rows created, platform author.
         await using (var q1 = store.QuerySession())
         {
             var systemRoot = await q1.Query<Page>()
@@ -327,17 +409,24 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             var help = await q1.Query<Page>()
                 .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
                 .FirstAsync(ct);
-            var guideIds = await q1.Query<Page>()
+            var topLevelIds1 = (await q1.Query<Page>()
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
-                .Select(p => p.Id).ToListAsync(ct);
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
+            var guideIds = (await q1.Query<Page>()
+                .Where(p => (p.ParentId == help.Id || topLevelIds1.Contains(p.ParentId))
+                            && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
+            var baselined1 = await q1.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId))
+                .Select(t => t.PageId).Distinct().ToListAsync(ct);
             var count = await q1.Query<PageTranslation>()
                 .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
-            Assert.Equal(guideIds.Count * 3, count);
+            Assert.Equal(baselined1.Count * 3, count);
         }
 
         // Now: a human Translator edits ONE baseline row (simulating a
         // community edit). Re-run backfill. The edited row's Body must be
-        // preserved (never clobbered), and the other 23 rows must stay.
+        // preserved (never clobbered), and the other rows must stay.
         await using (var s2 = newSession(store))
         {
             var systemRoot = await s2.Query<Page>()
@@ -365,7 +454,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             await bf2.SaveChangesAsync(ct);
         }
 
-        // Verify: the human edit is preserved, count is still 24.
+        // Verify: the human edit is preserved, count is baselinedGuides×3.
         await using (var q2 = store.QuerySession())
         {
             var systemRoot = await q2.Query<Page>()
@@ -374,12 +463,19 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             var help = await q2.Query<Page>()
                 .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
                 .FirstAsync(ct);
-            var guideIds = await q2.Query<Page>()
+            var topLevelIds2 = (await q2.Query<Page>()
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
-                .Select(p => p.Id).ToListAsync(ct);
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
+            var guideIds = (await q2.Query<Page>()
+                .Where(p => (p.ParentId == help.Id || topLevelIds2.Contains(p.ParentId))
+                            && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct)).ToList();
+            var baselined2 = await q2.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId))
+                .Select(t => t.PageId).Distinct().ToListAsync(ct);
             var count = await q2.Query<PageTranslation>()
                 .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
-            Assert.Equal(guideIds.Count * 3, count);
+            Assert.Equal(baselined2.Count * 3, count);
 
             var postsGuide = await q2.Query<Page>()
                 .Where(p => p.ParentId == help.Id && p.Slug == "posts")
@@ -436,6 +532,27 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             .CountAsync(ct);
     }
 
+    /// <summary>
+    /// ADR 0160 — counts ALL guides in the <c>help</c> subtree (the top-level
+    /// guides, which are direct children of <c>help</c>, plus the nested
+    /// guides, which are children of a top-level guide). A slug that is a
+    /// parent in the GuideParentMap is itself top-level (a child of
+    /// <c>help</c>); its children hang one level deeper.
+    /// </summary>
+    private static async Task<int> CountGuidesInHelpSubtreeAsync(
+        IDocumentStore store, string helpId, CancellationToken ct)
+    {
+        await using var q = store.QuerySession();
+        var topLevelIds = await q.Query<Page>()
+            .Where(p => p.ParentId == helpId && p.IsDeleted == false)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
+        return await q.Query<Page>()
+            .Where(p => (p.ParentId == helpId || topLevelIds.Contains(p.ParentId))
+                        && p.IsDeleted == false)
+            .CountAsync(ct);
+    }
+
     [Fact]
     public async Task UG_Backfill_CreatesTheAbsentGuides_UnderHelp_AfterAFirstBootWithoutThem()
     {
@@ -445,24 +562,42 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
 
         // A first boot that predates the UG lane: the four-surface set only.
         var helpId = await BootHelpOnlyAsync(store, ct);
-        Assert.Equal(0, await CountHelpChildrenAsync(store, helpId, ct));
+        Assert.Equal(0, await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
 
         // The warm-boot backfill runs (SchemaBootstrap warm branch) — the
-        // absent guides appear under `help`.
+        // absent guides appear in the `help` subtree (top-level under `help`,
+        // nested under their top-level guide — ADR 0160).
         await using (var s = newSession(store))
         {
             await FirstBootSeeder.BackfillUserGuidesAsync(s, ct);
         }
 
-        Assert.Equal(guideSlugs.Length, await CountHelpChildrenAsync(store, helpId, ct));
-        // One per slug, no duplicates.
+        Assert.Equal(guideSlugs.Length, await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
+        // One per slug, no duplicates, and each slug is exactly where the
+        // parent map places it (top-level under `help`, nested under its
+        // parent guide).
+        var parentMap = FirstBootSeeder.GuideParentMap();
         await using var q = store.QuerySession();
-        var children = await q.Query<Page>()
+        var topLevelIds = await q.Query<Page>()
             .Where(p => p.ParentId == helpId && p.IsDeleted == false)
+            .Select(p => p.Id).ToListAsync(ct);
+        var allGuides = await q.Query<Page>()
+            .Where(p => (p.ParentId == helpId || topLevelIds.Contains(p.ParentId))
+                        && p.IsDeleted == false)
             .ToListAsync(ct);
         Assert.Equal(
             guideSlugs.OrderBy(s => s, StringComparer.Ordinal).ToArray(),
-            children.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
+            allGuides.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
+        foreach (var (childSlug, parentSlug) in parentMap)
+        {
+            var parentPage = await q.Query<Page>()
+                .Where(p => p.Slug == parentSlug && p.ParentId == helpId)
+                .FirstAsync(ct);
+            var childPage = await q.Query<Page>()
+                .Where(p => p.Slug == childSlug && p.ParentId == parentPage.Id)
+                .FirstAsync(ct);
+            Assert.Equal(parentPage.Id, childPage.ParentId);
+        }
     }
 
     [Fact]
@@ -476,7 +611,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         {
             await FirstBootSeeder.BackfillUserGuidesAsync(s1, ct);
         }
-        var afterFirst = await CountHelpChildrenAsync(store, helpId, ct);
+        var afterFirst = await CountGuidesInHelpSubtreeAsync(store, helpId, ct);
         Assert.Equal(FirstBootSeeder.GuidePages().Length, afterFirst);
 
         // A second warm boot (the same upgrade, e.g. a container restart) finds
@@ -485,7 +620,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         {
             await FirstBootSeeder.BackfillUserGuidesAsync(s2, ct);
         }
-        Assert.Equal(afterFirst, await CountHelpChildrenAsync(store, helpId, ct));
+        Assert.Equal(afterFirst, await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
     }
 
     [Fact]
@@ -529,11 +664,12 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             await FirstBootSeeder.BackfillUserGuidesAsync(bf, ct);
         }
 
-        // Exactly the same row, unmodified — the other guides were created,
-        // but this one was skipped (create-if-missing; ADR 0042 D1).
+        // ADR 0160 — the pre-existing top-level guide was skipped
+        // (create-if-missing; ADR 0042 D1) and the full guide subtree
+        // (top-level + nested) was backfilled.
         Assert.Equal(
             FirstBootSeeder.GuidePages().Length,
-            await CountHelpChildrenAsync(store, helpId, ct));
+            await CountGuidesInHelpSubtreeAsync(store, helpId, ct));
         await using var q = store.QuerySession();
         var row = await q.Query<Page>().Where(p => p.Id == preexistingId).FirstAsync(ct);
         Assert.Equal("Community title", row.Title);
