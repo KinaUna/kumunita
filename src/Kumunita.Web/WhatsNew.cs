@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.51.0", "2026-10-10", new List<string>
+        {
+            "Surface label translations — a GlobalAdmin can now add / edit / remove translations of the 13 top-navigation surface labels from /admin/labels, and a resident reading in that language sees the translated labels in the nav and in each surface's page header: the LBL lane's ADR 0152 §D8 \"future LBL-2 translation lane\" (the SurfaceLabelTranslation row shape, one row per language on the SurfaceLabelsDocTypes surface) implemented on the ADR 0157 SITE-2 shape (the GetTranslationsAsync read seam + the Add / Update / RemoveTranslationAsync write lanes, GlobalAdmin-only standing, one surface_labels_translation.* AccessAudit row per write), with the per-language overlay on the existing GetLabelAsync resolver (translation → singleton → kw-l floor — the 14 nav + header views are untouched, so a rename stays consistent across the surface) — a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0158).",
+        }),
         new("0.50.0", "2026-10-10", new List<string>
         {
             "Site content hero translations — a GlobalAdmin can now add / edit / remove translations of the two landing surfaces' hero eyebrow + lead (home + about) from /admin/site, and a resident reading in that language sees the translated hero text: the SITE lane's ADR 0150 §D5 \"future SITE-2 translation lane\" (the SiteContentTranslation row shape, one row per language on the SiteContentDocTypes surface) implemented on the ADR 0022 / ADR 0048 post-translation shape (the GetTranslationsAsync read seam + the Add / Update / RemoveTranslationAsync write lanes, GlobalAdmin-only standing, one site.save-style AccessAudit row per write), with the hero render overlay on / and /about (a blank hero field falls back to the singleton's value, then to the shipped kw-l floor) — a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0157).",

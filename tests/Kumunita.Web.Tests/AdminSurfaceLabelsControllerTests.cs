@@ -47,11 +47,14 @@ public class AdminSurfaceLabelsControllerTests
     }
 
     private static (AdminSurfaceLabelsController controller, ISurfaceLabelsService labels) Build(
-        SurfaceLabels? current)
+        SurfaceLabels? current,
+        IReadOnlyList<SurfaceLabelTranslation>? translations = null)
     {
         var labels = Substitute.For<ISurfaceLabelsService>();
         labels.GetAsync(Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(current ?? new SurfaceLabels()));
+        labels.GetTranslationsAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(translations ?? new List<SurfaceLabelTranslation>()));
 
         var controller = new AdminSurfaceLabelsController(labels);
 
@@ -199,5 +202,169 @@ public class AdminSurfaceLabelsControllerTests
         Assert.Null(vm.Tags);
         Assert.Null(vm.Directory);
         Assert.Null(vm.People);
+    }
+
+    // ── ADR 0158 — the LBL-2 surface-label translation write-lane pins ─────
+    // The three dedicated POST actions (add / update / remove) delegate to
+    // the service's single audited write lanes
+    // (surface_labels_translation.add / .update / .remove); the GlobalAdmin
+    // gate is the standing (the ADR 0152 D8 pin — the surface labels have no
+    // per-resident owner, so the Translator standing does not qualify, ADR
+    // 0021). The service's audit-row shape is pinned in
+    // SurfaceLabelsServiceTests; here the controller is the thin seam (the
+    // call log is the assertion target). The exact
+    // AdminSiteControllerTests translation-pin idiom (ADR 0157) carried over.
+
+    // ── 5 — the POST /translations adds a translation + delegates ──────────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations adds a translation and redirects")]
+    public async Task POST_AddTranslation_Delegates_WritesRedirect()
+    {
+        var (controller, labels) = Build(null);
+
+        var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
+        {
+            LanguageCode = "de",
+            Announcements = "Meldungen",
+            People        = "Nachbarn",
+        };
+        var action = await controller.AddTranslation(form);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
+
+        await labels.Received(1).AddTranslationAsync(
+            "de",
+            Arg.Is<SurfaceLabelTranslation>(t => t.Announcements == "Meldungen" && t.People == "Nachbarn"),
+            Admin);
+    }
+
+    // ── 6 — the POST /translations validation: all blank ───────────────────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations rejects a fully-blank translation")]
+    public async Task POST_AddTranslation_AllBlank_Rejected_NoServiceCall()
+    {
+        var (controller, labels) = Build(null);
+
+        var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
+        {
+            LanguageCode = "de",
+            Home = " ",
+        };
+        var action = await controller.AddTranslation(form);
+        Assert.IsType<RedirectToActionResult>(action);
+
+        // No write lane was called (the validation short-circuits).
+        await labels.DidNotReceiveWithAnyArgs().AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>());
+    }
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations rejects a missing language")]
+    public async Task POST_AddTranslation_NoLanguage_Rejected_NoServiceCall()
+    {
+        var (controller, labels) = Build(null);
+
+        var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
+        {
+            LanguageCode = null,
+            Home = "Erste",
+        };
+        var action = await controller.AddTranslation(form);
+        Assert.IsType<RedirectToActionResult>(action);
+
+        await labels.DidNotReceiveWithAnyArgs().AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>());
+    }
+
+    // ── 7 — the POST /translations/update edits a translation ──────────────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations/update updates a translation and redirects")]
+    public async Task POST_UpdateTranslation_Delegates_WritesRedirect()
+    {
+        var (controller, labels) = Build(null);
+
+        var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
+        {
+            LanguageCode = "de",
+            Home = "Zweite",
+            People = "Nachbarn",
+        };
+        var action = await controller.UpdateTranslation(form);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
+
+        await labels.Received(1).UpdateTranslationAsync(
+            "de",
+            Arg.Is<SurfaceLabelTranslation>(t => t.Home == "Zweite" && t.People == "Nachbarn"),
+            Admin);
+    }
+
+    // ── 8 — the POST /translations/update missing-row shape is a flash ─────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations/update on a missing row flashes + redirects")]
+    public async Task POST_UpdateTranslation_MissingRow_Flashes_Redirects()
+    {
+        var (controller, labels) = Build(null);
+
+        // A missing-row shape (the service's KeyNotFoundException) is caught by
+        // the controller and surfaced as a flash + redirect (not an exception).
+        labels.UpdateTranslationAsync(
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>())
+            .Returns(throwingTask<SurfaceLabelTranslation>());
+
+        var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
+        {
+            LanguageCode = "xx",
+            Home = "eyebrow",
+        };
+        var action = await controller.UpdateTranslation(form);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
+    }
+
+    // ── 9 — the POST /translations/remove removes a translation ────────────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations/remove removes a translation and redirects")]
+    public async Task POST_RemoveTranslation_Delegates_WritesRedirect()
+    {
+        var (controller, labels) = Build(null);
+
+        var action = await controller.RemoveTranslation("de");
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
+
+        await labels.Received(1).RemoveTranslationAsync("de", Admin);
+    }
+
+    // ── 10 — the POST /translations/remove missing-row shape is a flash ────
+
+    [Fact(DisplayName = "ADR0158 AdminLabels POST /translations/remove on a missing row flashes + redirects")]
+    public async Task POST_RemoveTranslation_MissingRow_Flashes_Redirects()
+    {
+        var (controller, labels) = Build(null);
+        labels.RemoveTranslationAsync(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(throwingTask());
+
+        var action = await controller.RemoveTranslation("xx");
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
+    }
+
+    /// <summary>A <c>Task</c> that throws on await — the
+    /// <see cref="KeyNotFoundException"/> shape the controller catches on the
+    /// missing-row path. The generic form returns a <c>Task&lt;T&gt;</c>; the
+    /// non-generic form a plain <c>Task</c> (for
+    /// <c>RemoveTranslationAsync</c>, which returns <c>Task</c>).</summary>
+    private static Task<T> throwingTask<T>()
+    {
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        tcs.SetException(new KeyNotFoundException("missing"));
+        return tcs.Task;
+    }
+
+    private static Task throwingTask()
+    {
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        tcs.SetException(new KeyNotFoundException("missing"));
+        return tcs.Task;
     }
 }

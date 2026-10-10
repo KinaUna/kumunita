@@ -1,4 +1,5 @@
 @model Kumunita.Web.Controllers.AdminSurfaceLabelsController.AdminSurfaceLabelsViewModel
+@using Kumunita.Core.SurfaceLabels
 @{
     ViewData["Title"] = "Admin — Surface labels";
 }
@@ -18,6 +19,10 @@
 @if (TempData["info"] is string info)
 {
     <div class="alert alert-info">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
 }
 
 <form method="post" action="/admin/labels">
@@ -78,3 +83,152 @@
 
     <button type="submit" class="btn btn-primary"><kw-l key="labels.save">Save labels</kw-l></button>
 </form>
+
+@* ADR 0158 — the LBL-2 surface-label translation section (the ADR 0152 §D8
+   "future LBL-2 translation lane" that the M29 register named). The 13 surface
+   labels are translated into a resident's language and shown in the nav + each
+   surface's page header when that language is active; the singleton's value
+   (saved above) is the fallback for any surface left blank on a translation
+   row, and the shipped kw-l floor is the fallback below that. Mirrors the
+   SITE-2 hero-translation section (ADR 0157) and the post-translation lane
+   (ADR 0022 / ADR 0048) — add a language, edit the existing row for a language,
+   or remove it. Only enabled languages are offered. *@
+<h2 class="h5 mt-4">Surface label translations</h2>
+<p class="text-muted">
+    Translate the surface labels into a resident's language. A resident reading
+    the platform in that language sees the translated labels in the nav and in
+    each surface's page header; any surface left blank falls back to the value
+    saved above (then to the platform's shipped name). Save a translation
+    separately — it does not touch the English labels above.
+</p>
+
+@{
+    // The set of enabled languages that already have a translation row (the
+    // "existing translations" list) and the candidate list for "add a
+    // translation" (the enabled languages that do not — the ADR 0157 / ADR
+    // 0027 missing-languages shape).
+    var existing = Model.Translations.OrderBy(t => t.LanguageCode).ToList();
+    var addable = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    string LangName(string code) =>
+        Model.Languages.FirstOrDefault(l => l.Code.Equals(code, System.StringComparison.OrdinalIgnoreCase))?.NativeName ?? code;
+
+    // The 13 surface-label fields, as a (FormName, KwLKey, Route) set — the
+    // same 13 keys / routes as the form above (the ADR 0157 hero-field idiom
+    // carried to the 13 surface labels, but data-driven: a local Razor
+    // function cannot carry HTML in its body, so the loop is the idiom).
+    var surfaceFields = new (string Name, string KwLKey, string Route)[]
+    {
+        ("Home",          "labels.home",          "/"),
+        ("Announcements","labels.announcements", "/announcements"),
+        ("Community",     "labels.community",     "/community"),
+        ("Groups",        "labels.groups",        "/groups"),
+        ("Events",        "labels.events",        "/events"),
+        ("Projects",      "labels.projects",      "/projects/todos"),
+        ("Inventory",     "labels.inventory",     "/inventory"),
+        ("Bookmarks",     "labels.bookmarks",     "/bookmarks"),
+        ("Documents",     "labels.documents",     "/documents"),
+        ("Pages",         "labels.pages",         "/pages"),
+        ("Tags",          "labels.tags",          "/tags"),
+        ("Directory",     "labels.directory",     "/directory"),
+        ("People",        "labels.people",        "/people"),
+    };
+    // The stored value for a surface field on a given translation row (null
+    // when the row leaves it blank — the singleton's value is the fallback).
+    string? FieldValue(SurfaceLabelTranslation t, string name) => name switch
+    {
+        "Home"          => t.Home,
+        "Announcements" => t.Announcements,
+        "Community"     => t.Community,
+        "Groups"        => t.Groups,
+        "Events"        => t.Events,
+        "Projects"      => t.Projects,
+        "Inventory"     => t.Inventory,
+        "Bookmarks"     => t.Bookmarks,
+        "Documents"     => t.Documents,
+        "Pages"         => t.Pages,
+        "Tags"          => t.Tags,
+        "Directory"     => t.Directory,
+        "People"        => t.People,
+        _               => null,
+    };
+}
+
+@if (existing.Count > 0)
+{
+    <div class="d-flex flex-column gap-3">
+        @foreach (var t in existing)
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">@LangName(t.LanguageCode)</span>
+                    <span class="text-muted small">Translation</span>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="/admin/labels/translations/update">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="LanguageCode" value="@t.LanguageCode" />
+                        <div class="row g-3">
+                            @foreach (var f in surfaceFields)
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label"><kw-l key="@f.KwLKey">@f.Name</kw-l> <span class="text-muted small">(<code>@f.Route</code>)</span></label>
+                                    <input class="form-control" type="text" name="@f.Name" value="@(FieldValue(t, f.Name))" />
+                                </div>
+                            }
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary btn-sm">Save translation</button>
+                        </div>
+                    </form>
+                    <form method="post" action="/admin/labels/translations/remove"
+                          class="mt-3 d-flex align-items-center gap-2"
+                          onsubmit="return confirm('Remove this translation?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (addable.Count > 0)
+    {
+        <hr class="my-3" />
+    }
+}
+
+@if (addable.Count > 0)
+{
+    <div class="card">
+        <div class="card-header fw-semibold">Add a translation</div>
+        <div class="card-body">
+            <form method="post" action="/admin/labels/translations">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label for="new-translation-language" class="form-label">Language</label>
+                    <select class="form-select" id="new-translation-language" name="LanguageCode">
+                        @foreach (var lang in addable)
+                        {
+                            <option value="@lang.Code">@lang.NativeName</option>
+                        }
+                    </select>
+                </div>
+                <div class="row g-3">
+                    @foreach (var f in surfaceFields)
+                    {
+                        <div class="col-md-6">
+                            <label class="form-label"><kw-l key="@f.KwLKey">@f.Name</kw-l> <span class="text-muted small">(<code>@f.Route</code>)</span></label>
+                            <input class="form-control" type="text" name="@f.Name" />
+                        </div>
+                    }
+                </div>
+                <p class="form-text text-muted mt-2 mb-2">
+                    Leave a surface blank to keep that surface in the language of
+                    the labels saved above. At least one surface is required.
+                </p>
+                <button type="submit" class="btn btn-primary">Add translation</button>
+            </form>
+        </div>
+    </div>
+}
