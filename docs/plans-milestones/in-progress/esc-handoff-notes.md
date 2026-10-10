@@ -224,3 +224,78 @@ by id:
   ESC-8 (`?filter=received` shows only `escalated` rows with `FromInstance`) ·
   ESC-9 (re-delivery same token+report → idempotent, no duplicate/second
   audit) · ESC-10 (non-GlobalAdmin → 403 on both admin surfaces).
+
+## U02 — design doc Part 2 + ADR 0159
+
+`docs/design/esc-escalation-authorization-design.md` Part 2 appended
+(`## Seams & contracts (Part 2, written by U2)` — §2.1 frozen seam list,
+§2.2 new ESC-owned Core types, §2.3 the closed `escalation.*` `kw-l` key set,
+§2.4 the 22 pinned seam tests, §2.5 the three-test acceptance gate, §2.6 the
+drift-guard) + **ADR 0159** drafted (`docs/adr/0159-escalation-authorization.md`,
+`Status: Draft`, Context / Decision D1–D13 / Consequences) + the **0159 index
+row** (`docs/adr/README.md`, `Draft`). **No code, no build, no test.** The
+sealed seams + test names U03–U08 implement against:
+
+- **Sealed seam signatures (the exact C# in design doc §2.1 / §2.2):** the
+  `IEscalationTokenService` seam — `ListAsync()` / `GenerateAsync(label,
+  actorId)` → `(string Plaintext, EscalationTokenSummary Stored)` /
+  `RevokeAsync(tokenId, actorId)` → `bool` / `ValidateAsync(plaintextToken)`
+  → `EscalationToken?` (the `EscalationTokenSummary` read-model: `Id` /
+  `Label` / `TokenPrefix` / `Created` / `LastUsedAt?` / `RevokedAt?` /
+  `RevokedBy?` — no plaintext, no hash) · the `IErrorReportService` **5th**
+  method `AcceptInboundAsync(InboundReport draft)` → `InboundResult` (the
+  `InboundReport` 9-member record + the `InboundResult` `Created`/`Row`/`Error?`
+  record — the M31/M32 4-method surface **unchanged**, ESC·1) · the
+  `EscalationForwarder` change — `ForwardAsync(reportId)` signature
+  **unchanged** (ESC·6) + the `EscalationResult` additive member
+  `string? ConfiguredSource` (`"db"` / `"env"` / `null`, the M32 4 members
+  unchanged) · the `EscalationToken` 9-member doc + the
+  `EscalationOutboundConfig` 6-member doc + the four additive `ErrorReport`
+  fields (`FromInstance?` / `EscalationReceivedAt?` / `EscalationSourceId?` /
+  `EscalationTokenId?`, the **19-member ESC ceiling**, ESC·2) + the
+  `EscalationDocTypes` registration (the two new docs on a **new** parallel
+  surface; the M32 `ErrorReportDocTypes` untouched) + the
+  `AccessVia.Escalation` additive value (the 12 frozen values untouched,
+  ESC·10).
+- **The 22 pinned test names (design doc §2.4, verbatim — U08 implements
+  exactly these):** 1 `ESC_3_Token_Generate_Stores_Hash_Not_Plaintext` · 2
+  `ESC_3_Token_Validate_Valid_Returns_Token` · 3
+  `ESC_3_Token_Validate_Invalid_Returns_Null` · 4
+  `ESC_9_Token_Revoke_Immediate_NoValidate` · 5
+  `ESC_9_Token_List_Excludes_Plaintext_And_Hash` · 6
+  `ESC_5_AcceptInbound_ValidToken_Creates_Escalated_Origin` · 7
+  `ESC_5_AcceptInbound_InvalidToken_Returns_Error_NoRow` · 8
+  `ESC_7_AcceptInbound_ReDelivery_Idempotent_NoDuplicate` · 9
+  `ESC_2_ErrorReport_Doc_FieldSet_ESC_Ceiling` · 10
+  `ESC_10_AcceptInbound_AuditRow_Via_Escalation` · 11
+  `ESC_1_Token_Page_GlobalAdmin_Sees_TokenList` · 12
+  `ESC_1_Token_Generate_Plaintext_VisibleOnce` · 13
+  `ESC_7_Token_Revoke_Succeeds` · 14 `ESC_10_Token_Page_NonGlobalAdmin_Denied`
+  · 15 `ESC_2_Outbound_Config_Save_Persists_Endpoint_Token_Enabled` · 16
+  `ESC_5_Inbound_Endpoint_ValidToken_Creates_Row` · 17
+  `ESC_4_Inbound_Endpoint_InvalidToken_401_NoRow` · 18
+  `ESC_6_Forwarder_DB_Config_Sends_Bearer_Token` · 19
+  `ESC_4_Forwarder_NoDB_EnvVar_Fallback` · 20
+  `ESC_6_Forwarder_NoConfig_NoHTTP` · 21 `ESC_8_Received_Filter_Sees_Escalated_Only`
+  · 22 `ESC_8_Detail_Sees_FromInstance`.
+- **The three-test acceptance gate (design doc §2.5, by name):** **closed
+  loop** (generate token → origin sets endpoint+token → origin escalates →
+  receiving inbound creates an `Origin="escalated"` row + the `Via=Escalation`
+  audit row → origin `resolved`) · **handoff** (receiving admin revokes the
+  token → a subsequent inbound with that token → **401**, no row) · **part-vs-
+  whole** (the 22-test list is the whole; closed-loop + handoff are the parts;
+  all must pass together).
+- **ADR 0159** (the next free number after 0158) is **`Draft`** + the index
+  row is present. The **M32 surface is reused** (ESC·1 — the `ErrorReport`
+  doc + `IErrorReportService` + `EscalationForwarder` + `ErrorReports` context
+  are extended additively, **not** re-shaped; no new bounded context) and the
+  **`KUMUNITA_ESCALATION_ENDPOINT` env var is the unauthenticated
+  fallback** (ESC·4 — preserved when the DB config is absent/disabled; a
+  deliberate evolution of the M32·6 "env var, never persisted" pin). The
+  `escalation.*` `kw-l` namespace is the **new** ESC·11 surface (the M31/M32
+  `errorreport.*` / `issue.*` floor untouched). **Drift note:** the register's
+  Assumptions name "~24 keys" but the U05/U06/U07 deliverables consume **25**
+  (the `escalation.inbound.received` confirmation is the 25th); design doc
+  §2.3 resolves the set to the exact 25-key list (additive — it never re-
+  shapes the M31/M32 floor). U03–U07 implement against the pinned C# in §2.1 /
+  §2.2 without re-deriving a decision.
