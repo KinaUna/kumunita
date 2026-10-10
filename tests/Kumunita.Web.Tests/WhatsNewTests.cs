@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the LBL-2 0.51.0 entry (SITE-2 0.50.0 + M33 0.49.0 + M32 0.48.0 + M31 0.47.0 one/two/three/four rows back)")]
+    [Fact(DisplayName = "The newest-first head is the ESC 0.52.0 entry (LBL-2 0.51.0 + SITE-2 0.50.0 + M33 0.49.0 + M32 0.48.0 one/two/three/four rows back)")]
     public void The_Improve_Lane_Reduction_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,51 +69,61 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The LBL-2 surface-label translation lane (ADR 0158,
-        // the ADR 0152 §D8 "future LBL-2 translation lane") is the newest
-        // shipped named lane (the 0.51.0 entry, this close flip), so it is
-        // now the head; the SITE-2 hero-translation lane (ADR 0157) 0.50.0
-        // entry slides one row back, the M33 (storage metrics history)
-        // 0.49.0 entry two rows back, the M32 (issue submission &
-        // escalation) 0.48.0 entry three rows back, and the M31
-        // (production error handling) 0.47.0 entry must remain, four rows
-        // back.
+        // slides down. The ESC escalation-authorization + receiving-inbox lane
+        // (ADR 0159, the M32 ErrorReports surface extended additively) is the
+        // newest shipped named lane (the 0.52.0 entry, this close flip), so it
+        // is now the head; the LBL-2 surface-label-translation lane (ADR 0158,
+        // the ADR 0152 §D8 "future LBL-2 translation lane") 0.51.0 entry slides
+        // one row back, the SITE-2 hero-translation lane (ADR 0157) 0.50.0 entry
+        // two rows back, the M33 (storage metrics history) 0.49.0 entry three
+        // rows back, the M32 (issue submission & escalation) 0.48.0 entry four
+        // rows back, and the M31 (production error handling) 0.47.0 entry must
+        // remain, five rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.51.0" && head.Date == "2026-10-10",
-            "The LBL-2 0.51.0 (2026-10-10) entry must be the head of the registry; got "
+            head.Version == "0.52.0" && head.Date == "2026-10-10",
+            "The ESC 0.52.0 (2026-10-10) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("surface label translations", StringComparison.OrdinalIgnoreCase)),
-            "The 0.51.0 head entry must name the LBL-2 surface label translations capability.");
+            head.Changes.Any(c => c.Contains("escalation authorization", StringComparison.OrdinalIgnoreCase)),
+            "The 0.52.0 head entry must name the ESC escalation authorization capability.");
 
-        // The SITE-2 site-content hero-translation entry slides one row back
+        // The LBL-2 surface-label-translation entry slides one row back from
+        // the head.
+        var lbl2 = WhatsNew.All.Single(v => v.Version == "0.51.0");
+        Assert.True(
+            lbl2.Changes.Any(c => c.Contains("surface label translations", StringComparison.OrdinalIgnoreCase)),
+            "The 0.51.0 entry must name the LBL-2 surface label translations capability.");
+
+        // The SITE-2 site-content hero-translation entry slides two rows back
         // from the head.
         var site2 = WhatsNew.All.Single(v => v.Version == "0.50.0");
         Assert.True(
             site2.Changes.Any(c => c.Contains("site content hero translations", StringComparison.OrdinalIgnoreCase)),
             "The 0.50.0 entry must name the SITE-2 site content hero translations capability.");
 
-        // The M33 storage-metrics-history entry slides one row back from the head.
+        // The M33 storage-metrics-history entry slides three rows back from
+        // the head.
         var m33 = WhatsNew.All.Single(v => v.Version == "0.49.0");
         Assert.True(
             m33.Changes.Any(c => c.Contains("storage metrics history", StringComparison.OrdinalIgnoreCase)),
             "The 0.49.0 entry must name M33's storage metrics history capability.");
 
-        // The M32 issue-submission & escalation entry slides two rows back.
+        // The M32 issue-submission & escalation entry slides four rows back
+        // from the head.
         var m32 = WhatsNew.All.Single(v => v.Version == "0.48.0");
         Assert.True(
             m32.Changes.Any(c => c.Contains("issue submission", StringComparison.OrdinalIgnoreCase)),
             "The 0.48.0 entry must name M32's issue submission & escalation capability.");
 
-        // The M31 production-error-handling entry is still shipped — three rows
+        // The M31 production-error-handling entry is still shipped — five rows
         // back from the head.
         var m31 = WhatsNew.All.Single(v => v.Version == "0.47.0");
         Assert.True(
             m31.Changes.Any(c => c.Contains("error handling", StringComparison.OrdinalIgnoreCase)),
             "The M31 0.47.0 entry must name M31's production error handling capability.");
 
-        // The M30 admin-onboarding entry is still shipped — four rows back from
+        // The M30 admin-onboarding entry is still shipped — six rows back from
         // the head.
         var m30 = WhatsNew.All.Single(v => v.Version == "0.46.0");
         Assert.True(

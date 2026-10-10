@@ -1,6 +1,6 @@
 # ADR 0159 — Escalation authorization + receiving inbox (a token-gated acceptance lane + the receiving inbox + the outbound config page on the M32 ErrorReports surface)
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-10
 
 ## Context

@@ -668,3 +668,56 @@ no Core/Web seam edits (ESC·1 additive-only). **No Drift pauses.**
   changed from `Assert.IsType<object>` (exact-type, fails on the controller's
   anonymous type) to `Assert.NotNull` + reflection. Both are within U08's
   owned test surface; no seam re-shaped.
+
+## U09 — close
+
+The six-member close flip (ESC·13, the `AGENTS.md` contract) + the `done/esc/`
+move. **No C#/Web/Core logic change, no kw-l value change, no new tests** —
+only the two allowed code edits (`Milestones.cs` row + `MilestonesTests.cs`
+done-list append) and the ADR 0159 status flip + index tag. **No Drift pause.**
+
+- **(a) `Milestones.cs` ESC lane row:** added as `StatusDone`, **immediately
+  after the M32 row** (the "named lane, not a renumber" precedent, ADR
+  013/089/093/109) — the M33 / M34 rows and their order are **unchanged** (M34
+  stays the single `StatusNext`).
+- **(b) `MilestonesTests.cs`:** `"ESC"` appended to **both** the
+  `Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_In_Order` list (after
+  `"M32"`) and the `Shipped_Milestones_Are_Marked_Done` done-list (after
+  `"M32"`) — the exact-order test pins the position. The
+  `M34_Is_The_Single_InProgress_Milestone` pin is **unchanged** (M34 the only
+  `StatusNext`; the new `"ESC"` is `StatusDone`, so the
+  `Single(x => x.Status == StatusNext)` + the `is not "M34"` assert both hold).
+- **(c) `WhatsNew.cs`:** the `0.52.0` / `2026-10-10` entry appended
+  **newest-first** (before `0.51.0`), naming ESC + ADR 0159 (the
+  `WhatsNewTests` newest-first pin held).
+- **(d) README / `STATUS.md` / `ARCHITECTURE.md` parity:** the ESC Roadmap
+  bullet (`**Done.** (ADR 0159)`, after the M32 bullet) + the ESC
+  `**ESC is done**` line (after the M33 entry) + the `ErrorReports/`
+  (ESC extension) line (after the M33 entry) all appended — the three doc
+  surfaces now name the ESC lane.
+- **(e) ADR 0159:** `Status: Draft` → `Status: Accepted` + the `docs/adr/
+  README.md` index row tagged `Accepted — **Done** (ESC)` (the M32 `0155` /
+  M33 `0156` row shape).
+- **(f) `done/esc/` move (the `done/m32/` subfolder convention, `git mv`):**
+  `plan-esc-escalation-authorization.md` + `esc-handoff-notes.md` + `esc-u00.md`
+  (the only per-unit plan file — there is no `esc-u01`…`esc-u08`, verified
+  with `ls` before moving) all moved to `docs/plans-milestones/done/esc/`.
+- **(g) Reconciliation (third test-file edit, documented — not a silent
+  re-shape):** the U09 spec allowed two code edits (`Milestones.cs` row +
+  `MilestonesTests.cs` done-list). A **third** test-file edit was required in
+  `tests/Kumunita.Web.Tests/WhatsNewTests.cs` — the
+  `The_Improve_Lane_Reduction_Entry_Is_Shipped` head-pin, which hard-pinned
+  `0.51.0` (LBL-2) as the newest-first head. That test's **own doc comment**
+  names it the *"required sixth close-flip member"* whose purpose is exactly
+  *"when a milestone ships it becomes the head and the previous head slides
+  down"* — and the U09 exit criteria **requires** both the `0.52.0` entry
+  present newest-first **and** `WhatsNewTests` green, which is impossible
+  unless the head-pin slides (the same edit every prior close flip made:
+  M31→M32→M33→SITE-2→LBL-2). The slide is minimal + precise: head → `0.52.0`
+  ESC (`escalation authorization`), `0.51.0` LBL-2 → one row back, the
+  `0.50.0`/`0.49.0`/`0.48.0`/`0.47.0`/`0.46.0` rows re-keyed two/three/four/
+  five/six rows back (all assertions are version-keyed via
+  `Single(v => v.Version == …)`, so behavior is unchanged — only the head
+  moved). **Result: `Kumunita.Web.Tests` Total 1020, Failed 0, Skipped 1**
+  (the 1 skip = the `ImproveHarness` pwsh-gate skip, expected). `dotnet build`
+  0 Error(s).

@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.52.0", "2026-10-10", new List<string>
+        {
+            "Escalation authorization + receiving inbox — a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token at /admin/escalation; when they escalate, the receiving platform validates the token (SHA-256 compare) and only then accepts the issue as an 'escalated' row in the same /admin/error-reports list (a new 'escalated' chip + a local/received filter + the FromInstance on the detail view): the M32 ErrorReports surface extended additively (the EscalationToken + EscalationOutboundConfig docs + the IEscalationTokenService seam + the AcceptInboundAsync seam + the AccessVia.Escalation value + the POST /escalations/inbound public token-gated endpoint + the EscalationForwarder Bearer-token change + the closed escalation.* kw-l key set × en/de/fr/da) (ADR 0159).",
+        }),
         new("0.51.0", "2026-10-10", new List<string>
         {
             "Surface label translations — a GlobalAdmin can now add / edit / remove translations of the 13 top-navigation surface labels from /admin/labels, and a resident reading in that language sees the translated labels in the nav and in each surface's page header: the LBL lane's ADR 0152 §D8 \"future LBL-2 translation lane\" (the SurfaceLabelTranslation row shape, one row per language on the SurfaceLabelsDocTypes surface) implemented on the ADR 0157 SITE-2 shape (the GetTranslationsAsync read seam + the Add / Update / RemoveTranslationAsync write lanes, GlobalAdmin-only standing, one surface_labels_translation.* AccessAudit row per write), with the per-language overlay on the existing GetLabelAsync resolver (translation → singleton → kw-l floor — the 14 nav + header views are untouched, so a rename stays consistent across the surface) — a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0158).",
