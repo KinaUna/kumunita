@@ -71,7 +71,23 @@ public enum AccessVia
     /// gate (M31·9 — no new <c>AccessAction</c> / <c>Decide()</c> branch /
     /// <c>IAuthorizationService</c> surface).
     /// </summary>
-    Anonymous
+    Anonymous,
+    /// <summary>
+    /// The M2M escalation standing (ADR 0159, ESC·10): a receiving platform
+    /// accepted a report escalated over a valid <c>EscalationToken</c> — the
+    /// **origin platform** is the actor, not a local resident/admin (the
+    /// <c>AccessVia</c> of the <c>errorreport.inbound</c> audit row is the only
+    /// row that carries this value). None of the twelve frozen values fits
+    /// (an unsigned origin platform holds no local standing), so the
+    /// least-distortion slot is a new value — the ADR 0013
+    /// <see cref="Group"/> / ADR 0028 <see cref="Guardian"/> / ADR 0036
+    /// <see cref="Community"/> / ADR 0041 <see cref="Resident"/> / M31
+    /// <see cref="Anonymous"/> additive-append precedent, the twelve frozen
+    /// values untouched. This is a <c>record</c> of "by what right," not a
+    /// gate (ESC·12 — no new <c>AccessAction</c> / <c>Decide()</c> branch /
+    /// <c>IAuthorizationService</c> surface).
+    /// </summary>
+    Escalation
 }
 
 /// <summary>The outcome an audited decision produced.</summary>

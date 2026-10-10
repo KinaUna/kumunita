@@ -146,6 +146,20 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ErrorReports.IErrorReportService>(sp => new ErrorReports.ErrorReportService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // ESC (ADR 0159, U03): the escalation-authorization seam — the
+        // receiving-side EscalationToken doc's read + two audited-write lanes
+        // (the ADR 0154 single-write-lane shape, the LocaleSettings-parallel
+        // bounded context Kumunita.Core.ErrorReports). The same
+        // "AddTransient with the store injected" shape as IErrorReportService
+        // above: composes the host-registered Marten IDocumentStore (reads
+        // open a QuerySession, the audited write opens a write session —
+        // invariant C3). Core stays HTTP-free (ADR 0006-D / ESC·6): the Web
+        // inbound endpoint (U06) is the only place the Bearer token is parsed
+        // from the request. Fully qualified ErrorReports.IEscalationTokenService
+        // for the type/namespace-collision idiom (like IErrorReportService).
+        services.AddTransient<ErrorReports.IEscalationTokenService>(sp => new ErrorReports.EscalationTokenService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the

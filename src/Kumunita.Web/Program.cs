@@ -262,6 +262,18 @@ var marten = builder.Services.AddMarten(opts =>
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
     ErrorReportDocTypes.Configure(opts);
+
+    // ESC (ADR 0159, ESC·1): the escalation-authorization bounded context's
+    // **two new** docs (EscalationToken + EscalationOutboundConfig) on a
+    // **new** parallel surface (the ErrorReportDocTypes / UsageDocTypes
+    // parallel-surface precedent — ADR 0004 §B.1). Without this call the two
+    // new docs are invisible to Marten (the M3/Media/Usage/Document
+    // precedent). The M32 ErrorReportDocTypes surface is **untouched** (ESC·1)
+    // — the four additive ErrorReport fields (ESC·2) ride its existing
+    // .Schema.For<ErrorReport>() (the idempotent delta at boot). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    EscalationDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

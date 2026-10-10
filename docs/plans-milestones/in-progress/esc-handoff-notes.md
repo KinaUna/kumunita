@@ -299,3 +299,57 @@ sealed seams + test names U03–U08 implement against:
   §2.3 resolves the set to the exact 25-key list (additive — it never re-
   shapes the M31/M32 floor). U03–U07 implement against the pinned C# in §2.1 /
   §2.2 without re-deriving a decision.
+
+## U03 — Core (tokens + config docs + service)
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 warning, 0 error)**. No new
+tests (U08's), no Web surface / inbound endpoint yet (U04/U06), no kw-l keys
+(U07). Deliverables landed:
+
+- **Docs (2, both `Kumunita.Core.ErrorReports`):** `EscalationToken` — the
+  **9-member** ESC·3 doc (`Id`/`Label`/`TokenHash`/`TokenPrefix`/`Created`/
+  `CreatedBy`/`LastUsedAt?`/`RevokedAt?`/`RevokedBy?`; **hash-only-at-rest**,
+  plaintext never a member) · `EscalationOutboundConfig` — the **6-member**
+  ESC·4 singleton (`Id`/`Endpoint`/`Token`/`Enabled`/`Updated`/`UpdatedBy`;
+  the `Token` is the plaintext *outgoing* secret).
+- **Seam + impl:** `IEscalationTokenService` + the `EscalationTokenSummary`
+  read-model record (`Id`/`Label`/`TokenPrefix`/`Created`/`LastUsedAt?`/
+  `RevokedAt?`/`RevokedBy?` — no plaintext, no hash) · `EscalationTokenService`
+  impl — four lanes `ListAsync` / `GenerateAsync(label, actorId)` /
+  `RevokeAsync(tokenId, actorId)` / `ValidateAsync(plaintextToken)`. Generate
+  + Revoke are single-write-lane (doc + one `AccessAudit` row, `Via = Admin`,
+  `TargetKind` "escalation-token"); Validate is a constant-time SHA-256 hash
+  compare that stamps `LastUsedAt` (no audit row); List projects to the
+  summary (no plaintext/hash). Token = `kesc_` + 32 CSPRNG bytes base64url
+  (256 bits, the `IdentityService.NewSecret` CSPRNG precedent).
+- **Registration surface:** `EscalationDocTypes` (`Kumunita.Core`) — the two
+  new docs on a **new** parallel surface; the M32 `ErrorReportDocTypes`
+  surface is **untouched** (ESC·1). **Wire point deviation (recorded):** the
+  `EscalationDocTypes.Configure(opts)` call is wired in
+  `src/Kumunita.Web/Program.cs` (next to the `ErrorReportDocTypes.Configure(opts)`
+  line at ~264) — **not** `DependencyInjection.cs` as the register's U03
+  Deliverables bullet named; that bullet conflated the two `Configure` sites
+  (the register's own U00 handoff note + the design doc §2.2.6 both name the
+  `ErrorReportDocTypes` wire point, and the only site that calls it is
+  `Program.cs`). The DI line for the **seam** (`IEscalationTokenService`) is
+  in `DependencyInjection.cs` as pinned.
+- **`AccessVia.Escalation`** appended as the **13th** value in
+  `src/Kumunita.Core/Authorization/Decision.cs` (ESC·10 — the 12 frozen values
+  unchanged; doc-comment names the ESC lane + the ADR 0159 standing).
+- **DI line:** `services.AddTransient<ErrorReports.IEscalationTokenService>(sp
+  => new ErrorReports.EscalationTokenService(sp.GetRequiredService<Marten.
+  IDocumentStore>()))` in `src/Kumunita.Core/DependencyInjection.cs` (the
+  `IErrorReportService` registration shape, the type/namespace-collision
+  idiom).
+- **Compile warnings:** none (the build log's `0 Warning(s)` / `0 Error(s)`).
+  **Drift note (non-blocking):** the design doc §2.2.6 wrote the
+  multi-column index as the tuple form `.Index((t) => (t.RevokedAt, t.Created))`;
+  the repo's Marten 9.31.2 / Weasel 9.29.0 does not accept that form (the
+  M5DocTypes U02 NOTE documents the same CS1501 hit + the workaround). U03
+  used the anonymous-object form `.Index(t => new { t.RevokedAt, t.Created })`
+  (the M5/M6/M17 precedent — the M17 Bookmark `(OwnerId, Created)` / M6
+  Notification `(RecipientId, Created)` feed-ordering-index shape). The
+  semantic intent (index the `(RevokedAt, Created)` pair for the token-list
+  ordering) is unchanged; the auto-derived name stays under Postgres'
+  64-char NAMEDATALEN cap (the M5 NOTE's idiom). U04–U06 should continue to
+  mirror this idiom if any future ESC surface needs a multi-column index.
