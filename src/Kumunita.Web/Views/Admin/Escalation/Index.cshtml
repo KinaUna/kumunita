@@ -1,0 +1,137 @@
+@*
+    Index.cshtml — the ESC /admin/escalation outbound-config form (ADR 0159,
+    ESC·4 / ESC·12).
+
+    The origin GlobalAdmin's own outgoing settings: the receiving platform's
+    inbound Endpoint (the escalation.outbound.endpoint.label field), the
+    plaintext access Token the origin admin was handed out-of-band (the
+    escalation.outbound.token.label field, rendered as a password input — the
+    ESC·4 outgoing secret, **not** a secret of the receiving platform,
+    contrast the receiving-side EscalationToken.TokenHash which is hash-only-
+    at-rest, ESC·3), and an Enabled switch (the
+    escalation.outbound.enabled.label field). When Enabled is false the M32·6
+    env var KUMUNITA_ESCALATION_ENDPOINT remains the unauthenticated operator-
+    override / fallback (the EscalationForwarder, U06).
+
+    The [Authorize(Roles = GlobalAdmin)] gate is the standard admin surface
+    (the ErrorReportAdminController shape, the ADR 0001-B thin-token rule);
+    no new AccessAction / Decide() branch / IAuthorizationService surface
+    (ESC·12). The save is the ESC·4 single-write-lane (the
+    EscalationOutboundConfig doc + one AccessAudit row, Via = Admin, action
+    escalation.outbound.save) in one write session (the ADR 0006 C3 shape, the
+    ErrorReportService.MarkResolvedAsync precedent).
+
+    The copy is the closed escalation.outbound.* kw-l key set (the U07 closed
+    set, ESC·11 — the register's §2.3 keys 1–9). Every label goes through
+    <kw-l> by key (the kw-l TagHelper floor, ADR 0015 D1 — an unregistered key
+    falls back to the raw key, so the view renders the en reference text until
+    U07 authors the values).
+
+    Razor traps honored (AGENTS.md):
+      - No <kw-l> inside a quoted attribute value (the field placeholders use
+        the en source text as a literal attribute value, not a <kw-l> element
+        inside a quoted attribute — AGENTS.md Razor trap #3).
+      - No un-awaited Task<string> in markup (the flash strings are
+        server-resolved by the controller's FlashAsync — the view only renders
+        the resolved string).
+      - No style=/data-* attributes built by interpolating quoted strings via
+        @(...) (the Bootstrap classes are static strings).
+*@
+@model Kumunita.Web.Models.EscalationConfigFormModel
+@{
+    ViewData["Title"] = "Admin — Escalation settings";
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the page.
+   This view sits in Views/Admin/Escalation/, so the shared partial — which
+   lives in Views/Admin/ (the AdminController's own section) — must be
+   referenced absolutely (the AdminStorage/Index.cshtml precedent). *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1><kw-l key="escalation.title">Escalation</kw-l></h1>
+
+<p class="lead">
+    <kw-l key="escalation.intro">Authorize other platforms to escalate issues to this instance, and generate the access tokens they present.</kw-l>
+</p>
+
+@* The success flash (the escalation.outbound.saved key, the U07 closed set,
+   ESC·11) — rendered when the just-processed Save action succeeded (the
+   Model.Saved flag, the register's "re-render with the Saved flag" shape). *@
+@if (Model.Saved)
+{
+    <div class="alert alert-success">
+        <kw-l key="escalation.outbound.saved">Escalation settings saved.</kw-l>
+    </div>
+}
+
+@* The validation error flash (the M32·4 / M31·6 no-op shape — a blank or
+   invalid Endpoint when Enabled is true). Server-resolved by the controller
+   (the AdminOnboardingController.FlashAsync idiom). *@
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@* The outbound-config form (the ESC·4 pin — the Endpoint + Token + Enabled
+   fields). A [ValidateAntiForgeryToken] POST to /admin/escalation (the
+   register's "re-render with the Saved flag" shape). Server-side validation
+   is the gate (the EscalationConfigController.Save, the
+   AdminStorageController precedent — the form model carries no [Required] /
+   [Url] attributes); the conditional attributes below are a bare-expression
+   idiom so an empty value renders **no** attribute (a bare required="" /
+   checked="" would still count as present in HTML — avoided). *@
+@{
+    var endpointRequired = Model.Enabled ? " required" : string.Empty;
+    var enabledChecked   = Model.Enabled ? " checked"  : string.Empty;
+}
+<form method="post" action="/admin/escalation" class="card card-body mb-4">
+    @Html.AntiForgeryToken()
+
+    @* The receiving platform endpoint (the
+       escalation.outbound.endpoint.label kw-l key, the U07 closed set).
+       A <input type="url">. The placeholder is the en source text as a
+       literal attribute value (AGENTS.md Razor trap #3 — no <kw-l> inside a
+       quoted attribute). The required= attribute is present only when
+       Enabled (the bare-expression idiom above). *@
+    <div class="mb-3">
+        <label class="form-label" for="endpoint">
+            <kw-l key="escalation.outbound.endpoint.label">Receiving platform endpoint</kw-l>
+        </label>
+        <input type="url" class="form-control" id="endpoint" name="Endpoint"
+               value="@Model.Endpoint"
+               placeholder="https://receiving.example/escalations/inbound"@endpointRequired />
+    </div>
+
+    @* The access token (the escalation.outbound.token.label kw-l key, the U07
+       closed set). A <input type="password"> — the ESC·4 outgoing secret (the
+       plaintext the origin admin was handed; stored on the
+       EscalationOutboundConfig doc, not on the receiving side, ESC·3). The
+       placeholder is the en source text as a literal attribute value (AGENTS.
+       md Razor trap #3). *@
+    <div class="mb-3">
+        <label class="form-label" for="token">
+            <kw-l key="escalation.outbound.token.label">Access token (issued by the receiving admin)</kw-l>
+        </label>
+        <input type="password" class="form-control" id="token" name="Token"
+               value="@Model.Token"
+               placeholder="kesc_…"
+               autocomplete="new-password" />
+    </div>
+
+    @* The enable switch (the escalation.outbound.enabled.label kw-l key, the
+       U07 closed set). A <input type="checkbox"> — the checked= attribute is
+       present only when Enabled (the bare-expression idiom above). *@
+    <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="enabled" name="Enabled"
+               value="true"@enabledChecked />
+        <label class="form-check-label" for="enabled">
+            <kw-l key="escalation.outbound.enabled.label">Enable escalation</kw-l>
+        </label>
+    </div>
+
+    @* The submit button (the escalation.outbound.save kw-l key, the U07
+       closed set). *@
+    <button type="submit" class="btn btn-primary">
+        <kw-l key="escalation.outbound.save">Save escalation settings</kw-l>
+    </button>
+</form>

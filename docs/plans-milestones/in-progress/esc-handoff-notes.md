@@ -398,6 +398,61 @@ Deliverables landed:
 - **`DependencyInjection.cs` (modify):** the `IErrorReportService` line now
   passes the `IEscalationTokenService` (the seam, already registered by U03)
   as the second ctor arg.
+
+## U05 — Web (outbound config + receiving tokens pages)
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 warning, 0 error)**. No new
+tests (U08's), no inbound endpoint / forwarder change (U06), no kw-l key
+values (U07 — this unit consumes the §2.3 key names only), no Core change
+(U03/U04's — the frozen `IEscalationTokenService` 4-method seam is **called**,
+not re-shaped, ESC·1). Deliverables landed (6 files, all in
+`Kumunita.Web`):
+
+- **(a) Two admin routes:** `GET/POST /admin/escalation` (the
+  `EscalationConfigController`, the ESC·4 outbound-config surface) +
+  `GET/POST /admin/escalation/tokens` + `POST …/tokens/generate` +
+  `POST …/tokens/{id}/revoke` (the `EscalationTokenController`, the ESC·3
+  receiving-token surface). Both `[Route(...)]` +
+  `[Authorize(Roles = GlobalAdmin)]` (the ESC·12 standard admin gate — no new
+  authz surface).
+- **(b) `EscalationConfigFormModel` fields (4):** `Endpoint` (string) /
+  `Token?` (string?) / `Enabled` (bool, default false) / `Saved` (bool,
+  default false). Server-side validation in the controller (the
+  `AdminStorageController` precedent): when `Enabled` is true the
+  `Endpoint` is required + a valid `http://`/`https://` URL; when false both
+  are optional. The `EscalationOutboundConfig` singleton is read via a
+  `QuerySession` + written via an `OpenSession` (the C3 single-write-lane —
+  one `AccessAudit` row `Via = Admin`, action `escalation.outbound.save`,
+  `TargetKind` "escalation-outbound-config") in **one** write session. The
+  fixed singleton id is `"outbound-config"`.
+- **(c) `EscalationTokenViewModel` fields (4):** `Tokens` (IReadOnlyList of
+  `EscalationTokenSummary`) / `NewTokenPlaintext?` (string?) / `Flash?`
+  (string?) / `Error?` (string?).
+- **(d) Token generate / revoke action names:** `Generate(label)` — calls
+  `IEscalationTokenService.GenerateAsync(label.Trim(), actor)` → returns the
+  plaintext (shown once via `Model.NewTokenPlaintext`, the ESC·3 pin) + the
+  refreshed list. `Revoke(id)` — calls
+  `IEscalationTokenService.RevokeAsync(id, actor)` → `TempData["info"]` flash
+  (the `escalation.tokens.revoked` kw-l key) + redirect to the list. Both
+  `[ValidateAntiForgeryToken]`.
+- **(e) `plaintext-shown-once` pin (ESC·3):** the `NewTokenPlaintext` is set
+  **only** on the re-render immediately after a `Generate` action; it is
+  **never** populated on a subsequent `GET` (a fresh `ListAsync` projects to
+  the `EscalationTokenSummary` read-model — no plaintext, no `TokenHash`).
+  The view renders it in a `<code>` block + a copy button + the
+  `escalation.tokens.show_once` warning (the U07 kw-l key, ESC·11).
+- **(f) Compile warnings:** none (the build log's `0 Warning(s)` /
+  `0 Error(s)`).
+- **(g) Drift note (non-blocking):** the design doc §2.1.3 names "the read
+  seam the U03 design pins" for the outbound config; U03 added the
+  `IEscalationTokenService` 4-method token seam but **not** an outbound-
+  config read/write seam (the U05 Deliverables list is 6 Web files, no new
+  Core file). This unit resolves it as a **direct `IDocumentStore`
+  read/write in the Web controller** (the `AdminStorageController` precedent
+  — the controller owns the write session, the C3 same-transaction lane). The
+  `IEscalationTokenService` token seam (generate / list / revoke) is **called**,
+  never re-shaped (ESC·1).
+
 - **Compile warnings:** none (the build log's `0 Warning(s)` / `0 Error(s)`).
   **Reconciliation (non-blocking):** design doc §2.2.5 step 1 names
   `ValidateAsync` (which takes a *plaintext* token), but the pinned
