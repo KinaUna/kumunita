@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.50.0", "2026-10-10", new List<string>
+        {
+            "Site content hero translations — a GlobalAdmin can now add / edit / remove translations of the two landing surfaces' hero eyebrow + lead (home + about) from /admin/site, and a resident reading in that language sees the translated hero text: the SITE lane's ADR 0150 §D5 \"future SITE-2 translation lane\" (the SiteContentTranslation row shape, one row per language on the SiteContentDocTypes surface) implemented on the ADR 0022 / ADR 0048 post-translation shape (the GetTranslationsAsync read seam + the Add / Update / RemoveTranslationAsync write lanes, GlobalAdmin-only standing, one site.save-style AccessAudit row per write), with the hero render overlay on / and /about (a blank hero field falls back to the singleton's value, then to the shipped kw-l floor) — a fresh instance that never touches the surface looks exactly the same as it does today (ADR 0157).",
+        }),
         new("0.49.0", "2026-10-10", new List<string>
         {
             "Storage metrics history — the M24 /admin/storage surface gains a trend view over time (a daily capture tick stores one StorageMetricsSample, a 365-day retention prunes it, and a per-day table + inline sparkline render a pinned 30/90/180/365-day window) so an operator can estimate whether the instance's capacity is sufficient in the future: the M24 Usage surface extended additively (the StorageMetricsSample doc + the StorageHistoryDocTypes surface + the GetHistoryAsync read seam + the StorageMetricsCaptureService tick + the closed storage.trend.* kw-l key set × en/de/fr/da) (ADR 0156).",

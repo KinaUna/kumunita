@@ -174,6 +174,167 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("Second lead", rows[0].HomeHeroLead);
     }
 
+    // ── ADR 0157 — the SITE-2 hero-translation lanes ──────────────────────
+    // Mirrors the ADR 0022 / ADR 0048 post-translation lane shape, adapted to
+    // the singleton: add (upsert) / update / remove on the (LanguageCode) key,
+    // a best-effort read, at-least-one-non-blank enforcement, and exactly one
+    // AccessAudit row per write (sitetranslation.add / .update / .remove,
+    // Via = Admin, TargetKind "site").
+
+    // ── 5 — add a translation: one row per language + one audit row ────────
+
+    [Fact(DisplayName = "U08 AddTranslationAsync upserts the (LanguageCode) row and writes one audit row")]
+    public async Task AddTranslation_UpsertsRow_WritesOneAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+
+        const string actor = "admin-u08-trans-add";
+        var added = await svc.AddTranslationAsync(
+            "pl", "Naszyj dom", "Cichy kąt", "Prywatność", "Dom dla wszystkich", actor, ct);
+
+        // One row for the language, the four fields verbatim.
+        await using var q = store.QuerySession();
+        var rows = await q.Query<SiteContent.SiteContentTranslation>()
+            .Where(t => t.LanguageCode == "pl").ToListAsync(ct);
+        Assert.Single(rows);
+        Assert.Equal("Naszyj dom", rows[0].HomeHeroEyebrow);
+        Assert.Equal("Cichy kąt", rows[0].HomeHeroLead);
+        Assert.Equal("Prywatność", rows[0].AboutHeroEyebrow);
+        Assert.Equal("Dom dla wszystkich", rows[0].AboutHeroLead);
+        Assert.Equal(actor, added.AuthorId);
+
+        // Exactly one audit row: sitetranslation.add, site, Admin.
+        var audits = await q.Query<AccessAudit>()
+            .Where(a => a.Action == "sitetranslation.add" && a.TargetKind == "site")
+            .ToListAsync(ct);
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via);
+        Assert.Equal(actor, audits[0].ActorId);
+    }
+
+    // ── 6 — re-adding a language overwrites that row (upsert, no duplicate) ─
+
+    [Fact(DisplayName = "U08 AddTranslationAsync re-adding a language overwrites (two adds, one row)")]
+    public async Task AddTranslation_ReAdd_Overwrites_NoDuplicateRow()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+        const string actor = "admin-u08-trans-overwrite";
+
+        await svc.AddTranslationAsync("fr", "Premier eyebrow", "Premier lead", null, null, actor, ct);
+        await svc.AddTranslationAsync("fr", "Second eyebrow", "Second lead", null, null, actor, ct);
+
+        await using var q = store.QuerySession();
+        var rows = await q.Query<SiteContent.SiteContentTranslation>()
+            .Where(t => t.LanguageCode == "fr").ToListAsync(ct);
+        Assert.Single(rows);
+        Assert.Equal("Second eyebrow", rows[0].HomeHeroEyebrow);
+        Assert.Equal("Second lead", rows[0].HomeHeroLead);
+    }
+
+    // ── 7 — an empty translation (all four blank) is rejected ──────────────
+
+    [Fact(DisplayName = "U08 AddTranslationAsync rejects a fully-blank translation")]
+    public async Task AddTranslation_AllBlank_Throws()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.AddTranslationAsync(
+            "pl", " ", "  ", null, null, "actor", ct));
+    }
+
+    // ── 8 — update replaces the four fields + writes one audit row ─────────
+
+    [Fact(DisplayName = "U08 UpdateTranslationAsync replaces fields and writes one audit row")]
+    public async Task UpdateTranslation_ReplacesFields_WritesOneAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+        const string actor = "admin-u08-trans-update";
+
+        await svc.AddTranslationAsync("da", "Old eyebrow", "Old lead", null, null, actor, ct);
+        await svc.UpdateTranslationAsync("da", "New eyebrow", "New lead", "Ny about", null, actor, ct);
+
+        await using var q = store.QuerySession();
+        var row = await q.Query<SiteContent.SiteContentTranslation>()
+            .Where(t => t.LanguageCode == "da").FirstAsync(ct);
+        Assert.Equal("New eyebrow", row.HomeHeroEyebrow);
+        Assert.Equal("New lead", row.HomeHeroLead);
+        Assert.Equal("Ny about", row.AboutHeroEyebrow);
+        // A blank field clears the override (stored null — the singleton is
+        // the fallback for that hero).
+        Assert.Null(row.AboutHeroLead);
+
+        var audits = await q.Query<AccessAudit>()
+            .Where(a => a.Action == "sitetranslation.update" && a.TargetKind == "site")
+            .ToListAsync(ct);
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via);
+    }
+
+    // ── 9 — update / remove a missing row throws KeyNotFound ───────────────
+
+    [Fact(DisplayName = "U08 UpdateTranslationAsync on a missing row throws KeyNotFound")]
+    public async Task UpdateTranslation_MissingRow_Throws()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.UpdateTranslationAsync(
+            "xx", "eyebrow", "lead", null, null, "actor", ct));
+    }
+
+    // ── 10 — remove deletes the row + writes one audit row ─────────────────
+
+    [Fact(DisplayName = "U08 RemoveTranslationAsync deletes the row and writes one audit row")]
+    public async Task RemoveTranslation_DeletesRow_WritesOneAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+        const string actor = "admin-u08-trans-remove";
+
+        await svc.AddTranslationAsync("fr", "eyebrow", "lead", null, null, actor, ct);
+        await svc.RemoveTranslationAsync("fr", actor, ct);
+
+        await using var q = store.QuerySession();
+        var rows = await q.Query<SiteContent.SiteContentTranslation>()
+            .Where(t => t.LanguageCode == "fr").ToListAsync(ct);
+        Assert.Empty(rows);
+
+        var audits = await q.Query<AccessAudit>()
+            .Where(a => a.Action == "sitetranslation.remove" && a.TargetKind == "site")
+            .ToListAsync(ct);
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via);
+    }
+
+    // ── 11 — GetTranslationsAsync returns the rows ordered by language ─────
+
+    [Fact(DisplayName = "U08 GetTranslationsAsync returns rows ordered by language")]
+    public async Task GetTranslations_ReturnsRows_OrderedByLanguage()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var svc = new SiteContent.SiteContentService(store);
+        const string actor = "admin-u08-trans-read";
+
+        await svc.AddTranslationAsync("fr", "fr eyebrow", null, null, null, actor, ct);
+        await svc.AddTranslationAsync("pl", "pl eyebrow", null, null, null, actor, ct);
+
+        var result = await svc.GetTranslationsAsync(ct);
+        Assert.Equal(2, result.Count);
+        Assert.Equal("fr", result[0].LanguageCode);
+        Assert.Equal("pl", result[1].LanguageCode);
+    }
+
     // ─── Shared helpers ────────────────────────────────────────────────────
 
     /// <summary>

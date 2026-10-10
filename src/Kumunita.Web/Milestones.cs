@@ -68,6 +68,7 @@ public static class Milestones
         new("M26", "Sorting — feeds, lists & search results are sortable by various properties in increasing or decreasing order", StatusDone),
         new("M27", "User-scoped portability — a resident exports / backs up their own data; on import they manually resolve conflicts, choosing per entity to add it elsewhere or discard it (imports may not fit the community's structure and authorization)", StatusDone),
         new("SITE", "Site content customization — the landing surfaces' hero text is admin-editable + the sections are show/hide (ADR 0150)", StatusDone),
+        new("SITE-2", "Site content hero translations — a GlobalAdmin adds / edits / removes translations of the two heroes' eyebrow + lead (home + about) from /admin/site, and a resident reading in that language sees the translated hero text (ADR 0157)", StatusDone),
         new("M28", "Guardian time limits — for a child's account, a parent/guardian sets when the child may use the platform: allow or block certain hours of each day and days of the week", StatusDone),
         new("IMPROVE", "Integration audit — the platform's own integration pass (a named lane, not a milestone): the codebase is measurably smaller, the docs measurably more navigable, the seams measurably more tested — no new feature (the close of U00–U09)", StatusDone),
         new("M29", "Admin surface labels — a GlobalAdmin edits the display name of each top-navigation item and the related page header follows the choice, so a rename stays consistent across the surface", StatusDone),

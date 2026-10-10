@@ -2,6 +2,7 @@
 @using Kumunita.Web.Security
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.SiteContent.ISiteContentService SiteContentService
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.HomeViewModel
 @{
@@ -23,6 +24,29 @@
     // — screen readers prefer short over the visible heading wording).
     string ariaFeatures = await Translation.GetAsync("a11y.about_features", effLang);
     string ariaWhatsNew = await Translation.GetAsync("whatsnew.heading", effLang);
+
+    // ADR 0157 — the SITE-2 hero-translation overlay (the ADR 0150 §D5 "future
+    // SITE-2 translation lane"). When the effective language has a
+    // SiteContentTranslation row, its hero field renders in place of the
+    // singleton's value; a null / blank hero field falls back to the singleton
+    // value, then to the in-code floor (the byte-identical shipped kw-l text —
+    // SITE·3 / SITE·1: never a blank page). Best-effort read: a missing seam or
+    // a read failure yields the singleton value (the page always renders).
+    // A public landing-surface read (ADR 0150 D2) — never a decision, audited
+    // at the write only (the ADR 0022 "a read, not a decision" pin).
+    Kumunita.Core.SiteContent.SiteContentTranslation? heroTrans = null;
+    try {
+        var siteTranslations = await SiteContentService.GetTranslationsAsync().ConfigureAwait(false);
+        heroTrans = siteTranslations.FirstOrDefault(x =>
+            System.String.Equals(x.LanguageCode, effLang, System.StringComparison.OrdinalIgnoreCase));
+    }
+    catch { heroTrans = null; }
+    string HomeHeroEyebrow =
+        !string.IsNullOrWhiteSpace(heroTrans?.HomeHeroEyebrow) ? heroTrans!.HomeHeroEyebrow!
+        : Model.Site?.HomeHeroEyebrow ?? "A private home for one neighbourhood";
+    string HomeHeroLead =
+        !string.IsNullOrWhiteSpace(heroTrans?.HomeHeroLead) ? heroTrans!.HomeHeroLead!
+        : Model.Site?.HomeHeroLead ?? "One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.";
 }
 
 @* ADR 0149 D1 + SITE (ADR 0150) — the signed-in resident's hide-home-intro
@@ -42,10 +66,10 @@
     <div class="container">
         <div class="row justify-content-center text-center">
             <div class="col-12 col-lg-9">
-                <div class="eyebrow">@(Model.Site?.HomeHeroEyebrow ?? "A private home for one neighbourhood")</div>
+                <div class="eyebrow">@HomeHeroEyebrow</div>
                 <h1 class="display-5 mb-4">@Model.CommunityName</h1>
                 <p class="kmb-hero-lead mx-auto mb-3" style="max-width: 42rem;">
-                    @(Model.Site?.HomeHeroLead ?? "One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.")
+                    @HomeHeroLead
                 </p>
                 <p class="kmb-hero-sub mx-auto mb-1" style="max-width: 42rem;">
                     <kw-l key="platform.scope_home">Kumunita started out as a home for one neighbourhood — but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.</kw-l>

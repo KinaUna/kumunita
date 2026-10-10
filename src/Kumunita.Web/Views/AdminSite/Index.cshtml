@@ -18,6 +18,10 @@
 {
     <div class="alert alert-info">@info</div>
 }
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
 
 <h2 class="h5 mt-4">Home page (<code>/</code>)</h2>
 <p class="text-muted">
@@ -119,3 +123,130 @@
     </div>
     <button type="submit" class="btn btn-primary">Save about page</button>
 </form>
+
+<hr />
+
+@* ADR 0157 — the SITE-2 hero-translation section (the ADR 0150 §D5 "future
+   SITE-2 translation lane"). The two heroes' eyebrow + lead (home + about)
+   are translated into a resident's language and shown on / and /about when
+   that language is active; the singleton's value is the fallback for any
+   hero field left blank on a translation row. Mirrors the post-translation
+   lane (ADR 0022 / ADR 0048) — add a language, edit the existing row for a
+   language, or remove it. Only enabled languages are offered. *@
+<h2 class="h5 mt-4">Hero text translations</h2>
+<p class="text-muted">
+    Translate the two heroes' eyebrow and lead into a resident's language. A
+    resident reading the site in that language sees the translated text on
+    <code>/</code> and <code>/about</code>; any hero field left blank falls
+    back to the value saved above. Save a translation separately — it does not
+    touch the English hero text.
+</p>
+
+@{
+    // The set of enabled languages that already have a translation row (the
+    // "existing translations" list) and the candidate list for "add a
+    // translation" (the enabled languages that do not — the ADR 0022 / ADR
+    // 0027 missing-languages shape).
+    var existing = Model.Translations.OrderBy(t => t.LanguageCode).ToList();
+    var addable = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    string LangName(string code) =>
+        Model.Languages.FirstOrDefault(l => l.Code.Equals(code, System.StringComparison.OrdinalIgnoreCase))?.NativeName ?? code;
+}
+
+@if (existing.Count > 0)
+{
+    <div class="d-flex flex-column gap-3">
+        @foreach (var t in existing)
+        {
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">@LangName(t.LanguageCode)</span>
+                    <span class="text-muted small">Translation</span>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="/admin/site/translations/update">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Home eyebrow <span class="text-muted small">(optional)</span></label>
+                                <input class="form-control" type="text" name="homeHeroEyebrow" value="@t.HomeHeroEyebrow" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Home lead <span class="text-muted small">(optional)</span></label>
+                                <textarea class="form-control" name="homeHeroLead" rows="2">@t.HomeHeroLead</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">About eyebrow <span class="text-muted small">(optional)</span></label>
+                                <input class="form-control" type="text" name="aboutHeroEyebrow" value="@t.AboutHeroEyebrow" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">About lead <span class="text-muted small">(optional)</span></label>
+                                <textarea class="form-control" name="aboutHeroLead" rows="2">@t.AboutHeroLead</textarea>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="submit" class="btn btn-primary btn-sm">Save translation</button>
+                        </div>
+                    </form>
+                    <form method="post" action="/admin/site/translations/remove"
+                          class="mt-3 d-flex align-items-center gap-2"
+                          onsubmit="return confirm('Remove this translation?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (addable.Count > 0)
+    {
+        <hr class="my-3" />
+    }
+}
+
+@if (addable.Count > 0)
+{
+    <div class="card">
+        <div class="card-header fw-semibold">Add a translation</div>
+        <div class="card-body">
+            <form method="post" action="/admin/site/translations">
+                @Html.AntiForgeryToken()
+                <div class="mb-3">
+                    <label for="new-translation-language" class="form-label">Language</label>
+                    <select class="form-select" id="new-translation-language" name="languageCode">
+                        @foreach (var lang in addable)
+                        {
+                            <option value="@lang.Code">@lang.NativeName</option>
+                        }
+                    </select>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Home eyebrow <span class="text-muted small">(optional)</span></label>
+                        <input class="form-control" type="text" name="homeHeroEyebrow" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Home lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control" name="homeHeroLead" rows="2"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">About eyebrow <span class="text-muted small">(optional)</span></label>
+                        <input class="form-control" type="text" name="aboutHeroEyebrow" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">About lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control" name="aboutHeroLead" rows="2"></textarea>
+                    </div>
+                </div>
+                <p class="form-text text-muted mt-2 mb-2">
+                    Leave a hero field blank to keep that hero in the language of the
+                    English text saved above. At least one field is required.
+                </p>
+                <button type="submit" class="btn btn-primary">Add translation</button>
+            </form>
+        </div>
+    </div>
+}
