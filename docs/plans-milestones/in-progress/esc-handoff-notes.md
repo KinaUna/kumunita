@@ -545,3 +545,61 @@ Deliverables landed (7 files, all in `Kumunita.Web`):
 - **(f) Compile warnings:** none from the ESC·U06 files (the full-solution
   build's 100 warnings are all pre-existing in unrelated files — a grep for
   the 7 ESC·U06 filenames against the build log finds zero warnings).
+
+## U07 — kw-l keys
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 Warning(s), 0 Error(s))**.
+Deliverable landed (1 file, modify):
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the **closed
+`escalation.*` `kw-l` key set** (the design doc §2.3 authoritative **25 keys**
+— the register's "~24" resolves to 25, `escalation.inbound.received` the 25th)
+added to **all four** value dictionaries (`EnValues` + `DeValues` + `FrValues`
++ `DaValues`), additive-only, each inserted immediately after the M32
+`errorreport.escalate.not_configured` floor entry in that dictionary. No C#
+logic, no new controllers/services, no view edits, no new tests (U08's), no
+Core change.
+
+- **(a) The 25 `escalation.*` key names (verbatim, design doc §2.3):**
+  `escalation.title` · `escalation.intro` · `escalation.outbound.endpoint.
+  label` · `escalation.outbound.endpoint.placeholder` ·
+  `escalation.outbound.token.label` · `escalation.outbound.token.placeholder`
+  · `escalation.outbound.enabled.label` · `escalation.outbound.save` ·
+  `escalation.outbound.saved` · `escalation.tokens.title` ·
+  `escalation.tokens.generate.button` · `escalation.tokens.label.label` ·
+  `escalation.tokens.show_once` · `escalation.tokens.copy` ·
+  `escalation.tokens.revoke.button` · `escalation.tokens.revoked` ·
+  `escalation.tokens.none` · `escalation.tokens.last_used` ·
+  `escalation.list.status.escalated` · `escalation.list.filter.all` ·
+  `escalation.list.filter.received` · `escalation.list.filter.local` ·
+  `escalation.detail.from_instance` · `escalation.inbound.invalid_token` ·
+  `escalation.inbound.received`.
+- **(b) Four-language status:** the 25 keys are present, **non-empty, in all
+  four** languages (en/de/fr/da) — `en` is the §2.3 source text (ADR 0015 D1
+  provider-floor discipline); the `de` / `fr` / `da` values are U07's
+  authored translations (the M30·6 four-language pin, ESC·11). A source grep
+  confirms **exactly 25 `escalation.*` entries per dictionary** (4 × 25 = 100,
+  no missing, no extra, no duplicates, no empty values).
+- **(c) M31/M32 `errorreport.*` / `issue.*` keys unchanged (ESC·1):** the
+  insertion is purely additive — the M32 `errorreport.*` floor (incl.
+  `errorreport.escalate.*`) and the M31/M32 `issue.*` sets are **untouched**;
+  ESC adds the new `escalation.*` namespace, it does not re-shape the floor.
+- **(d) `escalation.*` namespace new (U00 "free" confirmation):** the
+  `escalation.*` namespace is **new** to the registry (the U00 kickoff
+  "free" flag held) — the M32 `errorreport.escalate.*` keys are a different
+  namespace and are not touched.
+- **(e) Compile warnings / drift:** none (the build log's `0 Warning(s)` /
+  `0 Error(s)`); **no drift** (the §2.3 set matched the U05/U06 consuming
+  surfaces exactly — the 25-key count is the register's "~24" resolved to the
+  precise 25, per the design doc §2.3 note).
+- **Closure tests (both PASS):** `KwLRegistryConsistencyTests`
+  (`Kumunita.Web.Tests` — green within the full suite: **Total 1008, Errors 0,
+  Failed 0, Skipped 1**) + `KnownTranslationKeys_ParityTests`
+  (`Kumunita.Core.Tests` — run in isolation via `-class
+  Kumunita.Core.Tests.KnownTranslationKeys_ParityTests`: **Total 7, Errors 0,
+  Failed 0, exit 0**). **Note (out-of-scope, for U08/U09):** the full
+  `Kumunita.Core.Tests` suite shows one unrelated red —
+  `M32_3_ErrorReport_Doc_FieldSet_M32_Ceiling [FAIL]` (the M32 15-member
+  field-set pin is broken by U04's additive ESC·2 four fields — the doc is now
+  the 19-member ESC ceiling; this is a Core field-set test, not a kw-l parity
+  test, and is **not** a U07 concern; it lands in U08's `ESC_2_ErrorReport_
+  Doc_FieldSet_ESC_Ceiling` re-pin, not the M32 one).

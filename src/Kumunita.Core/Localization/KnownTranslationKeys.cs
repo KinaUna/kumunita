@@ -2424,6 +2424,33 @@ public static class KnownTranslationKeys
             ["errorreport.escalate.flash_failure"]   = "Escalation failed — the report is unchanged. You can retry.",
             ["errorreport.escalate.not_configured"]  = "Escalation is not configured on this instance (KUMUNITA_ESCALATION_ENDPOINT is not set).",
 
+            // ── ESC — the closed escalation.* kw-l key set (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Escalation",
+            ["escalation.intro"] = "Authorize other platforms to escalate issues to this instance, and generate the access tokens they present.",
+            ["escalation.outbound.endpoint.label"] = "Receiving platform endpoint",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Access token (issued by the receiving admin)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Enable escalation",
+            ["escalation.outbound.save"] = "Save escalation settings",
+            ["escalation.outbound.saved"] = "Escalation settings saved.",
+            ["escalation.tokens.title"] = "Receiving access tokens",
+            ["escalation.tokens.generate.button"] = "Generate a new token",
+            ["escalation.tokens.label.label"] = "Label (e.g. the origin platform's name)",
+            ["escalation.tokens.show_once"] = "Copy this token now — it is shown only once and never stored in plain text.",
+            ["escalation.tokens.copy"] = "Copy",
+            ["escalation.tokens.revoke.button"] = "Revoke",
+            ["escalation.tokens.revoked"] = "Token revoked. It can no longer be used to escalate.",
+            ["escalation.tokens.none"] = "No access tokens yet. Generate one to authorize an origin platform.",
+            ["escalation.tokens.last_used"] = "Last used",
+            ["escalation.list.status.escalated"] = "Escalated",
+            ["escalation.list.filter.all"] = "All",
+            ["escalation.list.filter.received"] = "Received",
+            ["escalation.list.filter.local"] = "Local",
+            ["escalation.detail.from_instance"] = "Received from",
+            ["escalation.inbound.invalid_token"] = "Invalid access token.",
+            ["escalation.inbound.received"] = "Escalation received.",
+
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
             // /me/children/{id} curation surface) ──
@@ -4961,6 +4988,33 @@ public static class KnownTranslationKeys
             ["errorreport.escalate.flash_failure"]   = "Weiterleitung fehlgeschlagen — der Bericht wurde nicht geändert. Sie können es erneut versuchen.",
             ["errorreport.escalate.not_configured"]  = "Weiterleitung ist auf dieser Instanz nicht konfiguriert (KUMUNITA_ESCALATION_ENDPOINT ist nicht gesetzt).",
 
+            // ── ESC — das geschlossene escalation.* kw-l-Schlüsselsatz (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Eskalation",
+            ["escalation.intro"] = "Autorisiere andere Plattformen, Probleme an diese Instanz zu eskalieren, und erstelle die Zugriffstokens, die sie vorlegen.",
+            ["escalation.outbound.endpoint.label"] = "Endpunkt der empfangenden Plattform",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Zugriffstoken (ausgestellt vom empfangenden Administrator)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Eskalation aktivieren",
+            ["escalation.outbound.save"] = "Eskalationseinstellungen speichern",
+            ["escalation.outbound.saved"] = "Eskalationseinstellungen gespeichert.",
+            ["escalation.tokens.title"] = "Empfangene Zugriffstokens",
+            ["escalation.tokens.generate.button"] = "Neues Token erstellen",
+            ["escalation.tokens.label.label"] = "Bezeichnung (z. B. der Name der Ursprungsplattform)",
+            ["escalation.tokens.show_once"] = "Kopiere dieses Token jetzt — es wird nur einmal angezeigt und nie im Klartext gespeichert.",
+            ["escalation.tokens.copy"] = "Kopieren",
+            ["escalation.tokens.revoke.button"] = "Widerrufen",
+            ["escalation.tokens.revoked"] = "Token widerrufen. Es kann nicht mehr zur Eskalation verwendet werden.",
+            ["escalation.tokens.none"] = "Noch keine Zugriffstokens. Erstelle eines, um eine Ursprungsplattform zu autorisieren.",
+            ["escalation.tokens.last_used"] = "Zuletzt verwendet",
+            ["escalation.list.status.escalated"] = "Eskaliert",
+            ["escalation.list.filter.all"] = "Alle",
+            ["escalation.list.filter.received"] = "Empfangen",
+            ["escalation.list.filter.local"] = "Lokal",
+            ["escalation.detail.from_instance"] = "Empfangen von",
+            ["escalation.inbound.invalid_token"] = "Ungültiges Zugriffstoken.",
+            ["escalation.inbound.received"] = "Eskalation empfangen.",
+
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
             // translation; the ADR 0015 provider floor resolves them). ──
@@ -7398,6 +7452,33 @@ public static class KnownTranslationKeys
             ["errorreport.escalate.flash_failure"]   = "Échec de l'escalade — le signalement est inchangé. Vous pouvez réessayer.",
             ["errorreport.escalate.not_configured"]  = "L'escalade n'est pas configurée sur cette instance (KUMUNITA_ESCALATION_ENDPOINT n'est pas défini).",
 
+            // ── ESC — le jeu fermé de clés kw-l escalation.* (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Escalade",
+            ["escalation.intro"] = "Autorisez d'autres plateformes à escalader des signalements vers cette instance, et générez les jetons d'accès qu'elles présentent.",
+            ["escalation.outbound.endpoint.label"] = "Point de terminaison de la plateforme réceptrice",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Jeton d'accès (émis par l'administrateur récepteur)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Activer l'escalade",
+            ["escalation.outbound.save"] = "Enregistrer les paramètres d'escalade",
+            ["escalation.outbound.saved"] = "Paramètres d'escalade enregistrés.",
+            ["escalation.tokens.title"] = "Jetons d'accès reçus",
+            ["escalation.tokens.generate.button"] = "Générer un nouveau jeton",
+            ["escalation.tokens.label.label"] = "Étiquette (p. ex. le nom de la plateforme d'origine)",
+            ["escalation.tokens.show_once"] = "Copie ce jeton maintenant — il n'est affiché qu'une seule fois et n'est jamais stocké en texte brut.",
+            ["escalation.tokens.copy"] = "Copier",
+            ["escalation.tokens.revoke.button"] = "Révoquer",
+            ["escalation.tokens.revoked"] = "Jeton révoqué. Il ne peut plus être utilisé pour escalader.",
+            ["escalation.tokens.none"] = "Aucun jeton d'accès pour le moment. Générez-en un pour autoriser une plateforme d'origine.",
+            ["escalation.tokens.last_used"] = "Dernière utilisation",
+            ["escalation.list.status.escalated"] = "Escaladé",
+            ["escalation.list.filter.all"] = "Tous",
+            ["escalation.list.filter.received"] = "Reçus",
+            ["escalation.list.filter.local"] = "Local",
+            ["escalation.detail.from_instance"] = "Reçu de",
+            ["escalation.inbound.invalid_token"] = "Jeton d'accès invalide.",
+            ["escalation.inbound.received"] = "Escalade reçue.",
+
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
             // traducteur ; le plancher du fournisseur ADR 0015 les résout). ──
@@ -9821,6 +9902,33 @@ public static class KnownTranslationKeys
             ["errorreport.escalate.flash_success"]   = "Rapport eskaleret og markeret som løst.",
             ["errorreport.escalate.flash_failure"]   = "Eskalering fejlede — rapporten er uændret. Du kan prøve igen.",
             ["errorreport.escalate.not_configured"]  = "Eskalering er ikke konfigureret på denne instans (KUMUNITA_ESCALATION_ENDPOINT er ikke sat).",
+
+            // ── ESC — det lukkede escalation.* kw-l-nøglesæt (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Eskalering",
+            ["escalation.intro"] = "Autoriser andre platforme til at eskalere problemer til denne instans, og generér adgangstokens, de fremlægger.",
+            ["escalation.outbound.endpoint.label"] = "Modtagende platformendepunkt",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Adgangstoken (udstedt af den modtagende administrator)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Aktivér eskalering",
+            ["escalation.outbound.save"] = "Gem eskaleringsindstillinger",
+            ["escalation.outbound.saved"] = "Eskaleringsindstillinger gemt.",
+            ["escalation.tokens.title"] = "Modtagne adgangstokens",
+            ["escalation.tokens.generate.button"] = "Generér en ny token",
+            ["escalation.tokens.label.label"] = "Etiket (f.eks. oprindelsesplatformens navn)",
+            ["escalation.tokens.show_once"] = "Kopiér denne token nu — den vises kun én gang og opbevares aldrig i ren tekst.",
+            ["escalation.tokens.copy"] = "Kopiér",
+            ["escalation.tokens.revoke.button"] = "Træk tilbage",
+            ["escalation.tokens.revoked"] = "Token trukket tilbage. Den kan ikke længere bruges til at eskalere.",
+            ["escalation.tokens.none"] = "Ingen adgangstokens endnu. Generér én for at autorisere en oprindelsesplatform.",
+            ["escalation.tokens.last_used"] = "Sidst brugt",
+            ["escalation.list.status.escalated"] = "Eskaleret",
+            ["escalation.list.filter.all"] = "Alle",
+            ["escalation.list.filter.received"] = "Modtaget",
+            ["escalation.list.filter.local"] = "Lokal",
+            ["escalation.detail.from_instance"] = "Modtaget fra",
+            ["escalation.inbound.invalid_token"] = "Ugyldig adgangstoken.",
+            ["escalation.inbound.received"] = "Eskalering modtaget.",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;
