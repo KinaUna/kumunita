@@ -638,6 +638,29 @@ builder.UseWolverine(opts =>
     opts.OnException<MailKit.Net.Smtp.SmtpCommandException>().RetryWithCooldown(backoff);
     opts.OnException<MailKit.Net.Smtp.SmtpProtocolException>().RetryWithCooldown(backoff);
     opts.OnException<MailKit.ProtocolException>().RetryWithCooldown(backoff);
+    // Per-type service-location opt-ins (Wolverine 6.x default is
+    // ServiceLocationPolicy.NotAllowed; 5.x was AllowedButWarn — see
+    // WolverineOptions.ServiceLocationPolicy XML doc + wolverine#2584). The
+    // three services below are registered in Kumunita.Core/DependencyInjection.cs
+    // as opaque lambda factories (or, for IUserInfoService, the impl's ctor
+    // takes IServiceProvider? as a circular-dependency escape hatch — see
+    // UserInfoService.cs lines 57-71), so the generated handler code cannot
+    // inline-construct them via ctor injection. Opting them in here — per the
+    // XML doc's "opt specific types in with AlwaysUseServiceLocationFor only
+    // when you have to" — is the surgical alternative to a global
+    // ServiceLocationPolicy change: the strict default stays in force for every
+    // future opaque service (which will still fail fast at first dispatch), but
+    // these three known-good services are allowed to be service-located.
+    //
+    // The failing handlers (EventReminderTick, NotificationFlushTick) are the
+    // only two §6.4 jobs whose handler signatures cross into opaque-land — the
+    // other three (AuditPurgeTick / UsagePurgeTick / StorageMetricsCaptureTick)
+    // take only IDocumentStore + IOptions<T>, both transparent. See the app
+    // log: "InvalidServiceLocationException … ServiceLocationPolicy.NotAllowed
+    // is in effect" on the first dispatch of each.
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IMailerStage>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
 });
 
 var app = builder.Build();
