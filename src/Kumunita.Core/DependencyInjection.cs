@@ -144,7 +144,8 @@ public static class ServiceCollectionExtensions
         // ErrorReports.IErrorReportService for the type/namespace-collision
         // idiom (like SiteContent.ISiteContentService).
         services.AddTransient<ErrorReports.IErrorReportService>(sp => new ErrorReports.ErrorReportService(
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<ErrorReports.IEscalationTokenService>()));
 
         // ESC (ADR 0159, U03): the escalation-authorization seam — the
         // receiving-side EscalationToken doc's read + two audited-write lanes

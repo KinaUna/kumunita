@@ -14,7 +14,21 @@ public sealed class ErrorReportService : IErrorReportService
 {
     private readonly IDocumentStore _store;
 
-    public ErrorReportService(IDocumentStore store) => _store = store;
+    /// <summary>
+    /// The escalation-authorization seam (ADR 0159, U04) — present on an
+    /// instance with the ESC lane wired (the DI line), <c>null</c> on a
+    /// test-construction site that builds the service with only the store
+    /// (the M31 localization / translationProvider floor precedent). When
+    /// <c>null</c>, <see cref="AcceptInboundAsync"/> short-circuits to
+    /// <c>Error: "token service absent"</c> so those sites keep compiling.
+    /// </summary>
+    private readonly IEscalationTokenService? _tokenService;
+
+    public ErrorReportService(IDocumentStore store, IEscalationTokenService? tokenService = null)
+    {
+        _store        = store;
+        _tokenService = tokenService;
+    }
 
     /// <summary>Store one ErrorReport row (new) + exactly one AccessAudit row (one session).</summary>
     public async Task<ErrorReport> CreateAsync(ErrorReportDraft draft, CancellationToken ct = default)
@@ -138,5 +152,97 @@ public sealed class ErrorReportService : IErrorReportService
             .OrderByDescending(x => x.Created)   // the repo's pinned ordering shape (AnnouncementService/MessagingService/UserInfoService .OrderByDescending(.Created))
             .Take(maxCount)
             .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Accept an inbound (escalated) report (ADR 0159, ESC·5 / ESC·7) — the
+    /// M32 <c>MarkResolvedAsync</c> idempotent-write-lane shape (the ADR 0006
+    /// C3 single-write-lane): re-validate the token → the idempotent lookup →
+    /// the blank-description guard → store the received row + **one**
+    /// <c>AccessAudit</c> row (<c>Via = Escalation</c>) in one write session.
+    /// The M31 3 + the M32 1 methods are **unchanged** (ESC·1). Core stays
+    /// HTTP-free (ESC·6 / ADR 0006-D): the Web inbound endpoint resolved the
+    /// presented <c>Bearer</c> plaintext to <paramref name="draft"/>.
+    /// <c>TokenId</c> / <c>FromInstance</c> before this call.
+    /// </summary>
+    public async Task<InboundResult> AcceptInboundAsync(InboundReport draft, CancellationToken ct = default)
+    {
+        if (_tokenService is null)
+        {
+            return new InboundResult(Created: false, Row: null!, Error: "token service absent");
+        }
+
+        // ESC·5 — confirm the token row still exists and is non-revoked before
+        // creating a row (the Web endpoint resolved the Bearer plaintext to
+        // draft.TokenId via ValidateAsync; a revoked / unknown token →
+        // "invalid token", which the Web endpoint maps to a 401 — no row, no
+        // audit row). ESC·7 — the idempotent lookup on (EscalationTokenId,
+        // EscalationSourceId): a re-delivery of the same origin report under
+        // the same token returns the existing row, not a duplicate.
+        using (var session = _store.QuerySession())
+        {
+            var token = await session.LoadAsync<EscalationToken>(draft.TokenId, ct).ConfigureAwait(false);
+            if (token is null || token.RevokedAt is not null)
+            {
+                return new InboundResult(Created: false, Row: null!, Error: "invalid token");
+            }
+            var existing = await session.Query<ErrorReport>()
+                .Where(r => r.EscalationTokenId == draft.TokenId && r.EscalationSourceId == draft.SourceReportId)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (existing is not null)
+            {
+                return new InboundResult(Created: false, Row: existing, Error: null);
+            }
+        }
+
+        // ESC·5 / M32·4 — the blank-description guard (no row, no audit row).
+        if (string.IsNullOrWhiteSpace(draft.Description))
+        {
+            return new InboundResult(Created: false, Row: null!, Error: "description required");
+        }
+
+        // ESC·5 — store the received row + exactly one AccessAudit row in ONE
+        // write session (the ADR 0006 C3 single-write-lane, the M32·8
+        // precedent).
+        var now = DateTimeOffset.UtcNow;
+        var report = new ErrorReport
+        {
+            Id                   = Guid.NewGuid().ToString("N"),
+            SubjectId            = draft.OriginSubjectId,
+            Description          = draft.Description,
+            ContactEmail         = draft.ContactEmail,
+            RequestId            = draft.RequestId,
+            ExceptionType        = draft.ExceptionType,
+            // UserAgent stays null — the origin's payload doesn't carry a UA
+            // (the M32 8-field forward shape); the triage / resolve fields
+            // stay null until the local admin acts on the row.
+            Created              = draft.OriginCreated,
+            TriageStatus         = "new",              // the M31 default
+            Origin               = "escalated",        // the ESC·2 additive value
+            FromInstance         = draft.FromInstance, // the accepting token's Label (ESC·8 display)
+            EscalationReceivedAt = now,
+            EscalationSourceId   = draft.SourceReportId,
+            EscalationTokenId    = draft.TokenId
+        };
+
+        await using var writeSession = _store.OpenSession(new Marten.Services.SessionOptions());
+        writeSession.Store(report);
+        // Exactly one AccessAudit row (Via = Escalation — the ESC·10 pin; the
+        // M2M standing: the receiving admin is not the actor, the origin
+        // platform is).
+        writeSession.Store(new AccessAudit
+        {
+            Id                   = Guid.NewGuid().ToString("N"),
+            At                   = now,
+            ActorId              = draft.OriginSubjectId,
+            EffectivePrincipalId = draft.OriginSubjectId,
+            Action               = "errorreport.inbound",
+            TargetKind           = "error-report",
+            TargetId             = report.Id,
+            Via                  = AccessVia.Escalation,
+            Outcome              = AccessOutcome.Allow
+        });
+        await writeSession.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new InboundResult(Created: true, Row: report, Error: null);
     }
 }

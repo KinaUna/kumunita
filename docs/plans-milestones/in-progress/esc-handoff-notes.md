@@ -353,3 +353,62 @@ tests (U08's), no Web surface / inbound endpoint yet (U04/U06), no kw-l keys
   ordering) is unchanged; the auto-derived name stays under Postgres'
   64-char NAMEDATALEN cap (the M5 NOTE's idiom). U04–U06 should continue to
   mirror this idiom if any future ESC surface needs a multi-column index.
+
+## U04 — Core (additive fields + AcceptInboundAsync)
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 warning, 0 error)**. No new
+tests (U08's), no Web surface / inbound endpoint yet (U06), no kw-l keys
+(U07), no token/config docs (U03's). The frozen M32 15 `ErrorReport` fields,
+the M31/M32 4-method surface (the 5th added, the four untouched), and the 12
+frozen `AccessVia` values are **unchanged** (ESC·1 / ESC·2 / ESC·10).
+Deliverables landed:
+
+- **`ErrorReports/ErrorReport.cs` (modify):** the **4 additive** ESC·2 fields
+  — `FromInstance?` (the accepting token's `Label`) · `EscalationReceivedAt?`
+  (the receive instant) · `EscalationSourceId?` (the origin's report id — the
+  ESC·7 idempotency key) · `EscalationTokenId?` (which token accepted it) —
+  each null for locally-filed rows, appended **after** the M32 15 (the
+  **19-member ESC ceiling**). The `Origin` doc-comment closed set extended to
+  `{"error-page","general","escalated"}` (a string field — ADR 0004 §B.1
+  idempotent delta, **no migration**).
+- **`ErrorReports/InboundReport.cs` (new):** the `InboundReport` record
+  (9 members: `TokenId` / `SourceReportId` / `FromInstance` / `Description` /
+  `ContactEmail?` / `OriginSubjectId` / `RequestId` / `ExceptionType?` /
+  `OriginCreated`) + the `InboundResult` record (`Created` / `Row` / `Error?`)
+  — a **separate** record, not a re-shape of `ErrorReportDraft` (design doc
+  §2.1.2 verbatim).
+- **`IErrorReportService.cs` (modify):** the 5th seam `Task<InboundResult>
+  AcceptInboundAsync(InboundReport draft, CancellationToken ct = default);`
+  (the M31 3 + M32 1 + ESC 1; the M31/M32 four untouched, ESC·1).
+- **`ErrorReportService.cs` (modify):** the `AcceptInboundAsync` impl (the M32
+  `MarkResolvedAsync` idempotent-write-lane shape): (1) re-confirm the token
+  row exists + non-revoked → else `Error: "invalid token"` (Web maps to a
+  401, ESC·5); (2) idempotent lookup on `(EscalationTokenId == draft.TokenId,
+  EscalationSourceId == draft.SourceReportId)` → found → `Created: false`
+  (no second audit row, ESC·7); (3) blank-description guard → `Error:
+  "description required"`, no row (M32·4); (4) else store a new `ErrorReport`
+  (`Origin = "escalated"`, `TriageStatus = "new"`, the ESC·2/·4/·7 fields set,
+  `Created = draft.OriginCreated`) + **one** `AccessAudit` row (`Via =
+  Escalation`, action `"errorreport.inbound"`, `TargetKind` "error-report") in
+  **one** write session (ADR 0006 C3) + return `Created: true`. The ctor gains
+  the **optional** `IEscalationTokenService? tokenService = null` param (the
+  M31 floor precedent — test-construction sites without it keep compiling;
+  `AcceptInboundAsync` returns `Error: "token service absent"` when the seam
+  is null).
+- **`DependencyInjection.cs` (modify):** the `IErrorReportService` line now
+  passes the `IEscalationTokenService` (the seam, already registered by U03)
+  as the second ctor arg.
+- **Compile warnings:** none (the build log's `0 Warning(s)` / `0 Error(s)`).
+  **Reconciliation (non-blocking):** design doc §2.2.5 step 1 names
+  `ValidateAsync` (which takes a *plaintext* token), but the pinned
+  `InboundReport` record carries only `TokenId` (the register's U06 has the
+  Web inbound endpoint resolve the Bearer plaintext → `TokenId` via
+  `ValidateAsync` *before* calling `AcceptInboundAsync` — Core stays
+  HTTP-free, ESC·6). U04 therefore re-validates **by Id** (the only
+  identifier in the record) and returns `Error: "invalid token"` for a
+  missing/revoked token — this satisfies the pinned record + the U08 Core test
+  `ESC_5_AcceptInbound_InvalidToken_Returns_Error_NoRow`, and keeps Core
+  HTTP-free. `LastUsedAt` is stamped by the Web endpoint's prior
+  `ValidateAsync` call (the ESC·9 read-then-write); U04's impl does **not**
+  double-stamp it (no audit row either way, per the M31·4 "read is not an
+  access decision" precedent).

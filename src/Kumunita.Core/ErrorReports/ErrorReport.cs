@@ -5,10 +5,12 @@ namespace Kumunita.Core.ErrorReports;
 /// signal, NOT a content-moderation report; the Posts/Report doc, ADR 0023,
 /// is untouched). One row per report (the Usage/UsageEvent row-per-event
 /// shape; the Id is the conventional string identity, Marten-generated).
-/// The field set below is the **15-member M32 ceiling** (ADR 0155 D1) — the
-/// M31 11 (ADR 0154 D1) unchanged + the M32 additive 4 (M32·3). No field
-/// outside this set may appear in the doc; no M31 field is re-shaped
-/// (M32·1 / M32·3).
+/// The field set below is the **19-member ESC ceiling** (ADR 0159 D1, ESC·2)
+/// — the M32 15 (ADR 0155 D1) unchanged (the M31 11 [ADR 0154 D1] + the M32
+/// additive 4 [M32·3]) + the ESC additive 4 (ESC·2). No field outside this
+/// set may appear in the doc; no M31 / M32 field is re-shaped (M32·1 /
+/// M32·3 / ESC·2). The four ESC additive fields are each null for
+/// locally-filed rows.
 /// </summary>
 public sealed class ErrorReport
 {
@@ -51,10 +53,13 @@ public sealed class ErrorReport
     // ── M32's additive 4 (ADR 0155 D1, M32·3 — the M31 11 above unchanged) ──
 
     /// <summary>
-    /// Where the report was filed. CLOSED SET {"error-page","general"}
-    /// (M32·4) — the M31 500 form writes "error-page" (the default), the
-    /// M32 /issues/new form writes "general". A string field — ADR 0004
-    /// §B.1 idempotent delta at boot, no migration.
+    /// Where the report was filed. CLOSED SET (M32·4) extended
+    /// additively in ESC to {"error-page","general","escalated"} (ESC·2)
+    /// — the M31 500 form writes "error-page" (the default), the M32
+    /// /issues/new form writes "general", and a received (escalated) row
+    /// writes "escalated" (the accepting token's origin). The two M31 / M32
+    /// values keep their exact strings. A string field — ADR 0004 §B.1
+    /// idempotent delta at boot, no migration.
     /// </summary>
     public string Origin { get; set; } = "error-page";
 
@@ -66,4 +71,20 @@ public sealed class ErrorReport
 
     /// <summary>The admin's free-text "what was done"; null until resolved (M32·8).</summary>
     public string? ResolutionNote { get; set; }
+
+    // ── ESC's additive 4 (ADR 0159 D1, ESC·2 — the M32 15 above unchanged) ──
+    // Each is null for locally-filed rows; a non-null FromInstance marks a
+    // received (escalated) row (Origin == "escalated").
+
+    /// <summary>The accepting token's Label — the origin platform's identity (ESC·2 / ESC·8); null for locally-filed.</summary>
+    public string? FromInstance { get; set; }
+
+    /// <summary>The receive instant, UTC (ESC·2); null for locally-filed.</summary>
+    public DateTimeOffset? EscalationReceivedAt { get; set; }
+
+    /// <summary>The origin's report id — the inbound idempotency key (ESC·2 / ESC·7); null for locally-filed.</summary>
+    public string? EscalationSourceId { get; set; }
+
+    /// <summary>Which EscalationToken accepted it (ESC·2 / ESC·7); null for locally-filed.</summary>
+    public string? EscalationTokenId { get; set; }
 }

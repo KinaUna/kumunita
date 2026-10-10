@@ -47,4 +47,31 @@ public interface IErrorReportService
     /// M31·6 MarkTriagedAsync precedent verbatim).
     /// </summary>
     Task<ErrorReport?> MarkResolvedAsync(string reportId, string actorId, string? resolutionNote, CancellationToken ct = default);
+
+    // ── ESC additive seam (ADR 0159, ESC·5 / ESC·7) ──────────────────────
+
+    /// <summary>
+    /// Accept an inbound (escalated) report from an authorized origin
+    /// platform (ADR 0159, ESC·5 / ESC·7). The 5th method on this surface
+    /// (the M31 3 + the M32 1 + the ESC 1 — the M31 / M32 four are
+    /// **unchanged**, ESC·1). <paramref name="draft"/> is a
+    /// <see cref="InboundReport"/> — a **separate** record, not a re-shape of
+    /// the <see cref="ErrorReportDraft"/>. The Web inbound endpoint presents
+    /// the <c>Bearer</c> plaintext to <see cref="IEscalationTokenService.
+    /// ValidateAsync"/> and resolves the <c>TokenId</c> + <c>FromInstance</c>
+    /// before this call (Core stays HTTP-free, ESC·6 / ADR 0006-D).
+    /// <para>
+    /// Returns <c>InboundResult(Created: true, Row)</c> when a new
+    /// <c>Origin = "escalated"</c> <see cref="ErrorReport"/> row + exactly one
+    /// <c>AccessAudit</c> row (<c>Via = Escalation</c>, action
+    /// "errorreport.inbound", <c>TargetKind</c> "error-report") were written
+    /// in one write session (the ADR 0006 C3 single-write-lane, the M32·8
+    /// precedent); <c>InboundResult(Created: false, Row)</c> on the ESC·7
+    /// idempotent path (the existing row, no duplicate, no second audit row);
+    /// and <c>InboundResult(Error: …)</c> (no row, no audit row) when the
+    /// token is invalid / revoked (the Web endpoint maps this to a 401, ESC·5)
+    /// or the description is blank (the M32·4 pin).
+    /// </para>
+    /// </summary>
+    Task<InboundResult> AcceptInboundAsync(InboundReport draft, CancellationToken ct = default);
 }
