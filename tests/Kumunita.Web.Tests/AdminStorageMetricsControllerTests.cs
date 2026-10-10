@@ -407,6 +407,15 @@ public class AdminStorageMetricsControllerTests
     {
         metrics ??= Substitute.For<IStorageMetricsService>();
 
+        // M33-post: the U05 additive GetHistoryAsync read (M33·1) is not stubbed
+        // in the pre-existing M24 tests, so NSubstitute returns null → the
+        // controller's `await historyTask` throws NRE at Index line 89. Stub it
+        // to an empty 90-day history here (shared setup) so all 7 Index tests
+        // inherit it. The 3 M24 methods' pins are unchanged.
+        metrics
+            .GetHistoryAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new StorageHistoryResult(90, Array.Empty<StorageMetricsSample>()));
+
         var controller = new AdminStorageMetricsController(
             metrics,
             Microsoft.Extensions.Options.Options.Create(

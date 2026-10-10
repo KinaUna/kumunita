@@ -76,8 +76,14 @@ public class IssuePageTests
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AGENTS.md")))
             dir = dir.Parent;
         Assert.NotNull(dir);
-        var path = Path.Combine(dir!.FullName, "src", "Kumunita.Web", "Views", "Issues", "New.cshtml");
-        Assert.True(File.Exists(path), $"Views/Issues/New.cshtml not found at {path}");
+        // M33-post: the production view lives at Views/Issue/New.cshtml (singular)
+        // — matching the singular IssueController class name (MVC's default
+        // Views/{Controller}/{Action}.cshtml resolution). The live app serves
+        // GET /issues/new with a 200 from exactly this path, so the test's
+        // earlier plural path (Views/Issues/) pointed at a file that never
+        // existed. Pin the real production view, not a dead plural duplicate.
+        var path = Path.Combine(dir!.FullName, "src", "Kumunita.Web", "Views", "Issue", "New.cshtml");
+        Assert.True(File.Exists(path), $"Views/Issue/New.cshtml not found at {path}");
         return File.ReadAllText(path);
     }
 
