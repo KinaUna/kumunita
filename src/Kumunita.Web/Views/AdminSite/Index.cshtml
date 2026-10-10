@@ -38,25 +38,26 @@
     </div>
     <div class="mb-3">
         <label for="HomeShowAboutButton" class="form-label d-block">"What it is &amp; how it works" button</label>
-        @* A hidden "false" precedes each checkbox: an unchecked box posts
-           nothing, and a bool property with no posted value keeps its
-           default (true) — so without this, unchecking would silently
-           re-check on the next load. The hidden field always posts
-           "false"; the checkbox, when checked, posts "true" and wins. *@
-        <input type="hidden" name="HomeShowAboutButton" value="false" />
+        @* The checkbox precedes its hidden "false" fallback. ASP.NET Core binds a
+           repeated form key to the FIRST posted value, so a checked box (which
+           posts "true") must come before the hidden "false" — otherwise the
+           hidden field always wins and every box saves as false. An unchecked
+           box posts nothing, leaving the hidden "false" as the sole value, so
+           unchecking still works. *@
         <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @checked(Model.Home.HomeShowAboutButton) />
+        <input type="hidden" name="HomeShowAboutButton" value="false" />
         <span class="form-text text-muted">Show the hero's link to the about page.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowFeatures" class="form-label d-block">Intro sections</label>
-        <input type="hidden" name="HomeShowFeatures" value="false" />
         <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @checked(Model.Home.HomeShowFeatures) />
+        <input type="hidden" name="HomeShowFeatures" value="false" />
         <span class="form-text text-muted">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowRoadmap" class="form-label d-block">"The plan" section</label>
-        <input type="hidden" name="HomeShowRoadmap" value="false" />
         <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @checked(Model.Home.HomeShowRoadmap) />
+        <input type="hidden" name="HomeShowRoadmap" value="false" />
         <span class="form-text text-muted">Show the roadmap of what the platform ships next.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save home page</button>
@@ -82,38 +83,38 @@
     </div>
     <div class="mb-3">
         <label for="AboutShowFeatures" class="form-label d-block">Feature cards</label>
-        <input type="hidden" name="AboutShowFeatures" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @checked(Model.About.AboutShowFeatures) />
+        <input type="hidden" name="AboutShowFeatures" value="false" />
         <span class="form-text text-muted">Show the three cards describing what the platform is.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowScope" class="form-label d-block">Scope band</label>
-        <input type="hidden" name="AboutShowScope" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @checked(Model.About.AboutShowScope) />
+        <input type="hidden" name="AboutShowScope" value="false" />
         <span class="form-text text-muted">Show the "one neighborhood" scope band.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowPhilosophy" class="form-label d-block">Philosophy band</label>
-        <input type="hidden" name="AboutShowPhilosophy" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @checked(Model.About.AboutShowPhilosophy) />
+        <input type="hidden" name="AboutShowPhilosophy" value="false" />
         <span class="form-text text-muted">Show the FIG-philosophy band (Fair, Invisible, Generous).</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowProject" class="form-label d-block">Code &amp; docs band</label>
-        <input type="hidden" name="AboutShowProject" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @checked(Model.About.AboutShowProject) />
+        <input type="hidden" name="AboutShowProject" value="false" />
         <span class="form-text text-muted">Show the links to the project's code and documentation.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowWhatsNew" class="form-label d-block">"What's new" changelog</label>
-        <input type="hidden" name="AboutShowWhatsNew" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @checked(Model.About.AboutShowWhatsNew) />
+        <input type="hidden" name="AboutShowWhatsNew" value="false" />
         <span class="form-text text-muted">Show the list of recent changes.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowContactCta" class="form-label d-block">Contact band</label>
-        <input type="hidden" name="AboutShowContactCta" value="false" />
         <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @checked(Model.About.AboutShowContactCta) />
+        <input type="hidden" name="AboutShowContactCta" value="false" />
         <span class="form-text text-muted">Show the "something missing?" contact call-to-action.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save about page</button>
