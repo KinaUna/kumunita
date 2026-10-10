@@ -36,4 +36,19 @@ public sealed class AdminErrorReportViewModel
     /// false — no flash, no second audit row.
     /// </summary>
     public bool FlashTriaged { get; init; }
+
+    /// <summary>
+    /// The bound <c>?filter=</c> selector value (ESC·8 — the received-issues
+    /// filter). One of <c>"all"</c> (the default — every report),
+    /// <c>"received"</c> (only the <c>Origin = "escalated"</c> rows, the
+    /// received inbox, FACES ESC-8), or <c>"local"</c> (only the locally-filed
+    /// rows, <c>Origin != "escalated"</c>). The controller applies the filter
+    /// to the <see cref="Reports"/> projection server-side; the view renders
+    /// the bound value as the selected <c>&lt;option&gt;</c> (the
+    /// <c>escalation.list.filter.*</c> kw-l keys, the U07 closed set, ESC·11).
+    /// The M31 <see cref="Reports"/> field is **unchanged** (ESC·1 — the
+    /// filter is an additive view-model member, not a re-shape of the M31
+    /// list).
+    /// </summary>
+    public string Filter { get; init; } = "all";
 }

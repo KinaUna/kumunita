@@ -44,9 +44,24 @@ public interface IEscalationForwarder
 /// absent; <c>Success</c> is true only on a 2xx response; <c>StatusCode</c> is
 /// null when not Configured (or on a transport error); <c>Error</c> is a short
 /// transport-error message, null on success.
+/// <para>
+/// <b>ESC·4 additive (ADR 0159, ESC·4).</b> The M32 four members above are
+/// **unchanged** (the M32·1 / M32·3 additive-only pin, ESC·6 — the
+/// <see cref="ForwardAsync"/> signature is untouched). ESC adds exactly one
+/// additive member, <see cref="ConfiguredSource"/> (the M32·3 additive
+/// precedent), so the admin flash can name the channel the endpoint came
+/// from: <c>"db"</c> when the endpoint was read from the
+/// <see cref="Kumunita.Core.ErrorReports.EscalationOutboundConfig"/>
+/// singleton (the admin-managed, token-authenticated channel — the token is
+/// sent as a <c>Bearer</c> header, ESC·6), <c>"env"</c> when it fell back to
+/// the <c>KUMUNITA_ESCALATION_ENDPOINT</c> env var (the unauthenticated M32-
+/// style forward, endpoint only, no token, the ESC·4 fallback), and
+/// <c>null</c> when neither is present (the M32 no-op, FACES ESC-6).
+/// </para>
 /// </summary>
 public sealed record EscalationResult(
     bool Configured,
     bool Success,
     int? StatusCode,
-    string? Error);
+    string? Error,
+    string? ConfiguredSource = null);

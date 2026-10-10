@@ -157,13 +157,39 @@
     <dd class="col-sm-9"><kw-dt dt="@r.Created" format="g"></kw-dt></dd>
 
     @* The M32 additive Origin (the M32·3 / M32·4 pin — the closed set
-       {"error-page","general"}). Rendered as plain text (a value, not a
-       platform label — no kw-l key, the M32·9 closed set has no
-       origin.* key). *@
+       {"error-page","general"} extended additively to "escalated" in ESC·2).
+       Rendered as plain text (a value, not a platform label — no kw-l key,
+       the M32·9 closed set has no origin.* key). *@
     <dt class="col-sm-3">Origin</dt>
     <dd class="col-sm-9">
         <span class="badge text-bg-secondary">@r.Origin</span>
     </dd>
+
+    @* The ESC·8 additive received fields (ADR 0159) — rendered **only when
+       set** (a received row, Origin == "escalated"; the locally-filed rows
+       have FromInstance / EscalationReceivedAt null, the ESC·2 pin — each
+       field is null for locally-filed rows). The FromInstance is the
+       accepting token's Label (which origin platform this escalated issue
+       came from, the ESC·8 / FACES ESC-8 pin) — the
+       escalation.detail.from_instance kw-l key (the U07 closed set, ESC·11 —
+       the value is U07's to author; the en source text here is the floor,
+       ADR 0015 D1). The EscalationReceivedAt is the receive instant — the
+       kw-dt TagHelper (the house date format, the ADR 0019/0020 surface, the
+       register's U06 pin). The existing M31 / M32 fields above are
+       **unchanged** (ESC·1 — additive-only). *@
+    @if (!string.IsNullOrEmpty(r.FromInstance))
+    {
+        <dt class="col-sm-3"><kw-l key="escalation.detail.from_instance">Received from</kw-l></dt>
+        <dd class="col-sm-9"><span>@r.FromInstance</span></dd>
+    }
+
+    @if (r.EscalationReceivedAt is not null)
+    {
+        <dt class="col-sm-3">Received</dt>
+        <dd class="col-sm-9">
+            <kw-dt dt="@r.EscalationReceivedAt.Value" format="g"></kw-dt>
+        </dd>
+    }
 
     @* The M32 additive resolution fields (the M32·3 / M32·8 pin) — rendered
        only when set (a resolved report). The ResolvedAt timestamp uses the

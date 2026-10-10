@@ -42,6 +42,34 @@
 
 <h1><kw-l key="errorreport.list.title">Error reports</kw-l></h1>
 
+@* The ESC·8 received-issues filter (ADR 0159) — a GET form over
+   /admin/error-reports bound to the ?filter= selector (the
+   AdminErrorReportViewModel.Filter value, the controller's Index
+   [FromQuery] param). The closed set is {"all","received","local"} (the
+   controller normalizes an unknown value to "all", the M31·4 unfiltered
+   listing shape, ESC·1). The three options use the U07
+   escalation.list.filter.* kw-l keys (ESC·11 — the values are U07's to
+   author; the en source text in the <kw-l> is the floor, ADR 0015 D1). The
+   Inventory/List.cshtml filter-form idiom (a <form method="get"> + a
+   <select name="filter"> with a selected= conditional + a submit button) is
+   mirrored here. The existing M31/M32 list shape is **unchanged** (ESC·1 —
+   the filter is additive). *@
+<form method="get" action="/admin/error-reports" class="mb-4">
+    <div class="d-flex gap-2 align-items-end flex-wrap">
+        <div>
+            <label class="form-label" for="error-report-filter" style="font-weight:600;">
+                <kw-l key="escalation.list.filter.all">All</kw-l>
+            </label>
+            <select class="form-select" id="error-report-filter" name="filter">
+                <option value="all" selected="@(Model.Filter == "all" ? "selected" : null)"><kw-l key="escalation.list.filter.all">All</kw-l></option>
+                <option value="received" selected="@(Model.Filter == "received" ? "selected" : null)"><kw-l key="escalation.list.filter.received">Received</kw-l></option>
+                <option value="local" selected="@(Model.Filter == "local" ? "selected" : null)"><kw-l key="escalation.list.filter.local">Local</kw-l></option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+    </div>
+</form>
+
 @* The flash toast (the errorreport.list.flash_triaged key, the U05 closed
    set, M31·7) — rendered when the just-processed MarkTriaged action was
    effective (a "new" → "triaged" transition). The AdminSite/Index.cshtml
@@ -104,6 +132,24 @@ else
                            Bootstrap class — the M31 chip precedent). *@
                         <span class="badge text-bg-primary fw-semibold">
                             <kw-l key="errorreport.list.status.resolved">Resolved</kw-l>
+                        </span>
+                    }
+                    @* The ESC·8 additive "escalated" chip (ADR 0159) — rendered
+                       only for a received row (Origin == "escalated"), next to
+                       the triage status chip (a received row can be any triage
+                       state, so the two chips coexist). The
+                       escalation.list.status.escalated kw-l key is the U07
+                       closed set (ESC·11 — the value is U07's to author; the
+                       en source text here is the floor, ADR 0015 D1). The
+                       text-bg-info Bootstrap class (the register's U06 pin —
+                       the M32 new / triaged / resolved chip precedent). The
+                       existing new / triaged / resolved chips are **unchanged**
+                       (ESC·1 — additive-only; the KwLRegistryConsistencyTests
+                       static scan finds the new key via its static <kw-l>). *@
+                    @if (r.Origin == "escalated")
+                    {
+                        <span class="badge text-bg-info fw-semibold">
+                            <kw-l key="escalation.list.status.escalated">Escalated</kw-l>
                         </span>
                     }
                     <div class="flex-grow-1">

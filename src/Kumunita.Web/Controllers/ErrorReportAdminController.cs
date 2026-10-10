@@ -111,12 +111,54 @@ public sealed class ErrorReportAdminController(
     /// U05 closed set, M31·7) is surfaced when the just-processed
     /// <c>MarkTriaged</c> action was effective (a <c>"new"</c> →
     /// <c>"triaged"</c> transition).
+    /// <para>
+    /// <b>ESC·8 (ADR 0159) — the received-issues filter (additive).</b> A
+    /// bound <c>?filter=</c> selector (the <see cref="AdminErrorReportViewModel.Filter"/>
+    /// value) narrows the listing: <c>"received"</c> shows only the
+    /// <c>Origin = "escalated"</c> rows (the received inbox — the
+    /// <see cref="ErrorReport"/> rows the receiving platform accepted over a
+    /// token-gated escalation, the FACES ESC-8 pin), <c>"local"</c> shows only
+    /// the locally-filed rows (<c>Origin != "escalated"</c>), and
+    /// <c>"all"</c> (the default) shows every row. The filter is applied to
+    /// the <see cref="IErrorReportService.ListAsync"/> read server-side (a
+    /// read — no audit, the M31·4 pin; the M31/M32 <c>errorreport.*</c>
+    /// <c>kw-l</c> floor is untouched, ESC·1); the view renders the
+    /// <c>escalated</c> chip per <c>Origin == "escalated"</c> row (the
+    /// <c>escalation.list.status.escalated</c> kw-l key, the U07 closed set,
+    /// ESC·11) + the <c>escalation.list.filter.*</c> selector. The existing
+    /// five actions (<c>Index</c> / <c>MarkTriaged</c> / <c>Detail</c> /
+    /// <c>Resolve</c> / <c>Escalate</c>) are **unchanged** (ESC·1 — additive-
+    /// only); <c>Index</c> gains only the additive <c>?filter=</c> parameter.
+    /// </para>
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index([FromQuery] string? filter = null)
     {
-        var reports = await errorReports.ListAsync(100);
-        return View(new AdminErrorReportViewModel { Reports = reports });
+        // ESC·8 — normalize the bound ?filter= value to the closed set
+        // {"all", "received", "local"} (the default is "all"; an unknown
+        // value degrades to the unfiltered listing, the M31·4 read shape).
+        var normalized = (filter ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalized is not ("all" or "received" or "local"))
+        {
+            normalized = "all";
+        }
+
+        var all = await errorReports.ListAsync(100);
+        var reports = normalized switch
+        {
+            // ESC·8 — the received inbox: only the Origin = "escalated" rows
+            // (the FACES ESC-8 pin — the receiving admin sees the issues that
+            // arrived over a token-gated escalation).
+            "received" => all.Where(r => r.Origin == "escalated").ToList(),
+            // ESC·8 — the locally-filed rows (the M31 500 form's
+            // "error-page" + the M32 /issues/new "general" rows).
+            "local"    => all.Where(r => r.Origin != "escalated").ToList(),
+            // The default — every row (the M31·4 unfiltered listing, unchanged
+            // in shape, ESC·1).
+            _          => all.ToList()
+        };
+
+        return View(new AdminErrorReportViewModel { Reports = reports, Filter = normalized });
     }
 
     // ── POST /admin/error-reports/{id}/triage — the idempotent write (M31·6) ─

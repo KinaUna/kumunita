@@ -467,3 +467,81 @@ not re-shaped, ESC·1). Deliverables landed (6 files, all in
   `ValidateAsync` call (the ESC·9 read-then-write); U04's impl does **not**
   double-stamp it (no audit row either way, per the M31·4 "read is not an
   access decision" precedent).
+
+## U06 — Web (inbound endpoint + forwarder token + received view)
+
+`dotnet build Kumunita.slnx -c Debug` **green (0 error; the 100 warnings are
+all pre-existing in unrelated files — none from the ESC·U06 files)**. No new
+tests (U08's), no kw-l key *values* (U07's — this unit consumes the §2.3 key
+names only; a missing value at runtime is expected, the gate here is the C#
+build), no Core change (U03/U04's — the `AcceptInboundAsync` /
+`IEscalationTokenService` seams are **called**, never re-shaped, ESC·1).
+Deliverables landed (7 files, all in `Kumunita.Web`):
+
+- **(a) The inbound endpoint route + token-gate pin (ESC·5):** `POST
+  /escalations/inbound` on the **new** `EscalationInboundController`
+  (`Controllers/EscalationInboundController.cs`) — `[Route("escalations")]`,
+  **no `[Authorize]` session gate** (public + token-gated — the token is the
+  credential, the M2M standing, ESC·5). Flow: parse `Authorization: Bearer
+  <token>` (ESC·6) → blank description → **400** (never a row) →
+  `IEscalationTokenService.ValidateAsync(plaintext)` (Core — called, not
+  re-shaped, ESC·1) → `null` → **401**, no row (ESC·5 / ESC·9) → build the
+  `InboundReport` (the U04 record, called not re-shaped: `TokenId` = the
+  validated token's `Id`, `FromInstance` = its `Label`, the rest = the origin's
+  M32 8-field payload) → `IErrorReportService.AcceptInboundAsync(report)` →
+  `result.Error != null` → **401**; `result.Created == true` → **200**
+  `{ id, received: true }` (ESC·5); `result.Created == false` (idempotent) →
+  **200** `{ id, received: false }` (ESC·7 — the existing row, no duplicate).
+  A **Web-layer** binding record `InboundEscalationPayload` (the closed M32
+  8-field shape) carries the JSON body (Core stays HTTP-free, ESC·6 / ADR
+  0006-D). The endpoint's JSON messages resolve the `escalation.inbound.*`
+  keys via the `KnownTranslationKeys.EnValues` floor (the U07 values are not
+  yet registered, so the en source text / key is the floor).
+- **(b) The forwarder `Bearer` + DB-config + env-var-fallback pins (ESC·4 /
+  ESC·6):** `Services/EscalationForwarder.cs` — `ForwardAsync(reportId)`
+  **signature unchanged** (M32·5); the 8-field payload **unchanged** (M32·1).
+  New ctor param `IDocumentStore? store = null` (the M31 optional-ctor-param
+  floor precedent the register cites — a null store degrades to the env-var
+  channel, matching the U08 `ESC_4_Forwarder_NoDB_EnvVar_Fallback` +
+  `ESC_6_Forwarder_NoConfig_NoHTTP` test shape; the direct `IDocumentStore`
+  read mirrors U05's `EscalationConfigController` singleton idiom, the
+  design doc §2.1.3 read-seam resolution). New helper
+  `ResolveOutboundTargetAsync(ct)`: (1) the DB
+  `EscalationOutboundConfig` singleton (fixed id `"outbound-config"`, the U05
+  write id) — present + enabled + non-blank endpoint → `("db", Endpoint,
+  Token)`; (2) absent/disabled → the M32·6 env var
+  `KUMUNITA:ESCALATION_ENDPOINT` → `("env", Endpoint, null)` (endpoint only,
+  **no** token, the ESC·4 fallback); (3) neither → `null` (the M32 no-op,
+  FACES ESC-6). When the token is present the forward sets
+  `client.DefaultRequestHeaders.Authorization = Bearer <token>` (ESC·6).
+- **(c) The `ConfiguredSource` member (ESC·4):**
+  `Services/IEscalationForwarder.cs` — `EscalationResult` gains the single
+  additive member `string? ConfiguredSource = null` (`"db"` / `"env"` /
+  `null`); the M32 4 members + the `ForwardAsync` signature are **unchanged**.
+  All forward result paths now thread `ConfiguredSource`.
+- **(d) The `?filter=` values (`all` / `received` / `local`, ESC·8):**
+  `Controllers/ErrorReportAdminController.cs` — the `Index` action gains
+  `[FromQuery] string? filter = null` (the default keeps the M31 direct-call
+  test sites compiling); it normalizes to `{"all","received","local"}` (an
+  unknown value degrades to `"all"`) and filters the `ListAsync` read on
+  `Origin == "escalated"` (received) / `!= "escalated"` (local). The five
+  actions are **unchanged** (ESC·1 — additive-only; `Index` gains only the
+  additive param). `Models/AdminErrorReportViewModel.cs` gains the `Filter`
+  field (string, default `"all"`); the M31 `Reports` field is **unchanged**
+  (ESC·1). The `Detail` action is **unchanged** — it already passes the full
+  19-member `ErrorReport`, so the view renders the new fields directly.
+- **(e) The `escalated` chip + the `FromInstance` / `EscalationReceivedAt`
+  detail fields (ESC·8):** `Views/Admin/ErrorReports/Index.cshtml` — a
+  `GET /admin/error-reports` filter `<select name="filter">` (the
+  `escalation.list.filter.all/received/local` kw-l keys, the Inventory/List
+  filter-form idiom, `common.filter` submit key) + the `escalated` chip per
+  `Origin == "escalated"` row (the `escalation.list.status.escalated` kw-l
+  key, `text-bg-info` — the M32 chip precedent); the existing `new` /
+  `triaged` / `resolved` chips are **unchanged** (ESC·1).
+  `Views/Admin/ErrorReports/Detail.cshtml` — the `FromInstance` field
+  (`escalation.detail.from_instance` kw-l key, rendered when non-null) + the
+  `EscalationReceivedAt` field (the `kw-dt` TagHelper, rendered when
+  non-null); the existing M32 fields are **unchanged** (ESC·1).
+- **(f) Compile warnings:** none from the ESC·U06 files (the full-solution
+  build's 100 warnings are all pre-existing in unrelated files — a grep for
+  the 7 ESC·U06 filenames against the build log finds zero warnings).
