@@ -76,8 +76,8 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
         // business-key shape: lowercase + trimmed).
         await using (var q = store.QuerySession())
         {
-            var bylaws = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "bylaws");
-            var gov = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "governance");
+            var bylaws = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "bylaws", TestContext.Current.CancellationToken);
+            var gov = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "governance", TestContext.Current.CancellationToken);
             Assert.NotNull(bylaws);
             Assert.NotNull(gov);
             Assert.Equal(actor, bylaws!.CreatedBy);   // the actor is the tag's CreatedBy (the creator)

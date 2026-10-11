@@ -82,7 +82,7 @@ public class EscalationInboundEndpointTests(PostgresFixture fixture) : IClassFix
     {
         const string token = "kesc_secret-16";
         var tokens = Substitute.For<IEscalationTokenService>();
-        tokens.ValidateAsync(token).Returns(new EscalationToken { Id = "tok-16", Label = "Origin platform P" });
+        tokens.ValidateAsync(token, Arg.Any<CancellationToken>()).Returns(new EscalationToken { Id = "tok-16", Label = "Origin platform P" });
 
         // The row the Core AcceptInboundAsync lane would create (Origin =
         // "escalated" — the ESC·5 / ESC·2 pin).
@@ -144,7 +144,7 @@ public class EscalationInboundEndpointTests(PostgresFixture fixture) : IClassFix
     {
         const string badToken = "kesc_bad-17";
         var tokens = Substitute.For<IEscalationTokenService>();
-        tokens.ValidateAsync(badToken).Returns((EscalationToken?)null);
+        tokens.ValidateAsync(badToken, Arg.Any<CancellationToken>()).Returns((EscalationToken?)null);
 
         var svc = Substitute.For<IErrorReportService>();
 

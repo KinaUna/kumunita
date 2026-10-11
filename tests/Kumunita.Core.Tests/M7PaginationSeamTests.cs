@@ -244,7 +244,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
 
         await PlantPublicEvents(store, 5, "u-m7-c5");
 
-        var page = await events.ListUpcomingAsync(null, actor, page: 99);
+        var page = await events.ListUpcomingAsync(null, actor, page: 99, TestContext.Current.CancellationToken);
         Assert.Empty(page.Items);
         Assert.False(page.HasMore);
 
@@ -267,7 +267,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
 
         await PlantPublicEvents(store, 31, "u-m7-ev1");
 
-        var page = await events.ListUpcomingAsync(null, actor, page: 1);
+        var page = await events.ListUpcomingAsync(null, actor, page: 1, TestContext.Current.CancellationToken);
         Assert.Equal(PageSize, page.Items.Count);
         Assert.True(page.HasMore);
     }
@@ -286,7 +286,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
 
         await PlantPublicEvents(store, 5, "u-m7-ev2");
 
-        var page = await events.ListUpcomingAsync(null, actor, page: 1);
+        var page = await events.ListUpcomingAsync(null, actor, page: 1, TestContext.Current.CancellationToken);
         Assert.Equal(5, page.Items.Count);
         Assert.False(page.HasMore);
     }
@@ -306,7 +306,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
 
         await PlantPublicTodos(store, 31, "u-m7-t1");
 
-        var page = await projects.ListTodosAsync(null, null, actor, page: 1);
+        var page = await projects.ListTodosAsync(null, null, actor, page: 1, ct: TestContext.Current.CancellationToken);
         Assert.Equal(PageSize, page.Items.Count);
         Assert.True(page.HasMore);
     }
@@ -326,7 +326,7 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
 
         await PlantPublicTodos(store, 5, "u-m7-t2");
 
-        var page = await projects.ListTodosAsync(null, null, actor, page: 99);
+        var page = await projects.ListTodosAsync(null, null, actor, page: 99, ct: TestContext.Current.CancellationToken);
         Assert.Empty(page.Items);
         Assert.False(page.HasMore);
     }
@@ -359,11 +359,11 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
             });
 
         var roles = new HashSet<string>();
-        var page1 = await announcements.ListVisiblePagedAsync("u-m7-ann-resident", roles, page: 1);
+        var page1 = await announcements.ListVisiblePagedAsync("u-m7-ann-resident", roles, page: 1, TestContext.Current.CancellationToken);
         Assert.Equal(PageSize, page1.Items.Count);
         Assert.True(page1.HasMore);
 
-        var page2 = await announcements.ListVisiblePagedAsync("u-m7-ann-resident", roles, page: 2);
+        var page2 = await announcements.ListVisiblePagedAsync("u-m7-ann-resident", roles, page: 2, TestContext.Current.CancellationToken);
         Assert.Single(page2.Items);
         Assert.False(page2.HasMore);
     }
@@ -400,11 +400,11 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
                 TagIds = [tagId],
             });
 
-        var page1 = await tags.ListPostsByTagPagedAsync("clean", actor, page: 1);
+        var page1 = await tags.ListPostsByTagPagedAsync("clean", actor, page: 1, ct: TestContext.Current.CancellationToken);
         Assert.Equal(PageSize, page1.Items.Count);
         Assert.True(page1.HasMore);
 
-        var page2 = await tags.ListPostsByTagPagedAsync("clean", actor, page: 2);
+        var page2 = await tags.ListPostsByTagPagedAsync("clean", actor, page: 2, ct: TestContext.Current.CancellationToken);
         Assert.Single(page2.Items);
         Assert.False(page2.HasMore);
     }

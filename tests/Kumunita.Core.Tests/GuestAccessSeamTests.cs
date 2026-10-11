@@ -53,7 +53,7 @@ public class GuestAccessSeamTests(PostgresFixture fixture) : IClassFixture<Postg
                 DisplayName = "A Consultant",
                 Verified = true
             });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         // One call to the single write lane (GATE-3) settles the standing.

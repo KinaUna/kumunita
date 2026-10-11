@@ -42,7 +42,7 @@ public class MilestonesTests
         // is the single in-progress milestone promoted to StatusNext. The
         // roadmap order is unchanged ("…M32","M33","M34" — the "named lane,
         // not a renumber" precedent).
-        var next = Assert.Single(Milestones.All.Where(m => m.Status == Milestones.StatusNext));
+        var next = Assert.Single(Milestones.All, m => m.Status == Milestones.StatusNext);
         Assert.Equal("M34", next.Id);
         Assert.All(Milestones.All.Where(m => m.Id is not "M34"),
             m => Assert.Equal(Milestones.StatusDone, m.Status));

@@ -235,7 +235,7 @@ public class AdminSurfaceLabelsControllerTests
         await labels.Received(1).AddTranslationAsync(
             "de",
             Arg.Is<SurfaceLabelTranslation>(t => t.Announcements == "Meldungen" && t.People == "Nachbarn"),
-            Admin);
+            Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 6 — the POST /translations validation: all blank ───────────────────
@@ -255,7 +255,7 @@ public class AdminSurfaceLabelsControllerTests
 
         // No write lane was called (the validation short-circuits).
         await labels.DidNotReceiveWithAnyArgs().AddTranslationAsync(
-            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>());
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact(DisplayName = "ADR0158 AdminLabels POST /translations rejects a missing language")]
@@ -272,7 +272,7 @@ public class AdminSurfaceLabelsControllerTests
         Assert.IsType<RedirectToActionResult>(action);
 
         await labels.DidNotReceiveWithAnyArgs().AddTranslationAsync(
-            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>());
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     // ── 7 — the POST /translations/update edits a translation ──────────────
@@ -295,7 +295,7 @@ public class AdminSurfaceLabelsControllerTests
         await labels.Received(1).UpdateTranslationAsync(
             "de",
             Arg.Is<SurfaceLabelTranslation>(t => t.Home == "Zweite" && t.People == "Nachbarn"),
-            Admin);
+            Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 8 — the POST /translations/update missing-row shape is a flash ─────
@@ -308,7 +308,7 @@ public class AdminSurfaceLabelsControllerTests
         // A missing-row shape (the service's KeyNotFoundException) is caught by
         // the controller and surfaced as a flash + redirect (not an exception).
         labels.UpdateTranslationAsync(
-            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>())
+            Arg.Any<string>(), Arg.Any<SurfaceLabelTranslation>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(throwingTask<SurfaceLabelTranslation>());
 
         var form = new AdminSurfaceLabelsController.SurfaceLabelTranslationForm
@@ -332,7 +332,7 @@ public class AdminSurfaceLabelsControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminSurfaceLabelsController.Index), redirect.ActionName);
 
-        await labels.Received(1).RemoveTranslationAsync("de", Admin);
+        await labels.Received(1).RemoveTranslationAsync("de", Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 10 — the POST /translations/remove missing-row shape is a flash ────
@@ -341,7 +341,7 @@ public class AdminSurfaceLabelsControllerTests
     public async Task POST_RemoveTranslation_MissingRow_Flashes_Redirects()
     {
         var (controller, labels) = Build(null);
-        labels.RemoveTranslationAsync(Arg.Any<string>(), Arg.Any<string>())
+        labels.RemoveTranslationAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(throwingTask());
 
         var action = await controller.RemoveTranslation("xx");

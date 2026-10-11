@@ -54,7 +54,7 @@ public class AdminStorageMetricsHistoryTests
 
         // M24 snapshot + per-user reads (unchanged, M33·1):
         StubSnapshot(metrics, used: 10_000, free: 90_000, files: 5, users: 2);
-        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+        metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
             new[]
             {
                 new PerUserStorageRow("user-a", 6_000, 3),
@@ -71,7 +71,7 @@ public class AdminStorageMetricsHistoryTests
         metrics.GetHistoryAsync(90, Arg.Any<CancellationToken>())
                .Returns(new StorageHistoryResult(90, history));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var view = Assert.IsType<ViewResult>(action);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(view.Model);
 
@@ -89,8 +89,8 @@ public class AdminStorageMetricsHistoryTests
         Assert.Equal(2,  model.History.Count);
         Assert.Equal(90, model.WindowDays);
 
-        await metrics.Received(1).GetSnapshotAsync();
-        await metrics.Received(1).GetPerUserListAsync(1, 25);
+        await metrics.Received(1).GetSnapshotAsync(Arg.Any<CancellationToken>());
+        await metrics.Received(1).GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>());
         await metrics.Received(1).GetHistoryAsync(90, Arg.Any<CancellationToken>());
 
         // The view renders the Trend section (the storage.trend.title kw-l
@@ -116,7 +116,7 @@ public class AdminStorageMetricsHistoryTests
         {
             var (controller, metrics) = Build(role: Kumunita.Core.Identity.Roles.GlobalAdmin);
             StubSnapshot(metrics, used: 1_000, free: 9_000, files: 1, users: 1);
-            metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+            metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
                 Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
 
             var history = new List<StorageMetricsSample>
@@ -126,7 +126,7 @@ public class AdminStorageMetricsHistoryTests
             metrics.GetHistoryAsync(window, Arg.Any<CancellationToken>())
                    .Returns(new StorageHistoryResult(window, history));
 
-            var action = await controller.Index(page: 1, window: window);
+            var action = await controller.Index(page: 1, window: window, ct: TestContext.Current.CancellationToken);
             var model = Assert.IsType<AdminStorageMetricsViewModel>(
                 Assert.IsType<ViewResult>(action).Model);
 
@@ -153,14 +153,14 @@ public class AdminStorageMetricsHistoryTests
     {
         var (controller, metrics) = Build(role: Kumunita.Core.Identity.Roles.GlobalAdmin);
         StubSnapshot(metrics, used: 0, free: 0, files: 0, users: 0);
-        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+        metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
             Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
 
         // An EMPTY history (no samples for the window) — the M33-3 FACE.
         metrics.GetHistoryAsync(90, Arg.Any<CancellationToken>())
                .Returns(new StorageHistoryResult(90, Array.Empty<StorageMetricsSample>()));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(
             Assert.IsType<ViewResult>(action).Model);
 
@@ -247,7 +247,7 @@ public class AdminStorageMetricsHistoryTests
     private static void StubSnapshot(IStorageMetricsService metrics,
         long used, long free, int files, int users)
     {
-        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+        metrics.GetSnapshotAsync(Arg.Any<CancellationToken>()).Returns(new StorageMetricsSnapshot(
             TotalUsedBytes:       used,
             TotalVolumeBytes:     used + free,
             FreeVolumeBytes:      free,

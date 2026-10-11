@@ -1306,7 +1306,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         await svc.SetChildCommunityBlockAsync(child, comp, true, guardian);
         Assert.DoesNotContain(comp, await svc.GetEffectiveCommunityIdsAsync(child));
         Assert.Contains(comp, await svc.GetCommunityIdsAsync(child));
-        Assert.True((await svc.GetProfileAsync(child))!.BlockedCommunityIds.Contains(comp));
+        Assert.Contains(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
         var blockRow = (await AuditsFor(store, guardian, "guardian.community_block")).Single(a => a.TargetId == comp);
         Assert.Equal(AccessVia.Guardian, blockRow.Via);
         Assert.Equal(guardian, blockRow.ActorId);
@@ -1314,7 +1314,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // Unblock — the effective set is restored (full access again).
         await svc.SetChildCommunityBlockAsync(child, comp, false, guardian);
         Assert.Contains(comp, await svc.GetEffectiveCommunityIdsAsync(child));
-        Assert.False((await svc.GetProfileAsync(child))!.BlockedCommunityIds.Contains(comp));
+        Assert.DoesNotContain(comp, (await svc.GetProfileAsync(child))!.BlockedCommunityIds);
         var unblockRow = (await AuditsFor(store, guardian, "guardian.community_unblock")).Single(a => a.TargetId == comp);
         Assert.Equal(AccessVia.Guardian, unblockRow.Via);
     }

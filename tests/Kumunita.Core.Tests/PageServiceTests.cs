@@ -1809,7 +1809,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             // gone — destructive by design, ADR 0058).
             await using (var q2 = store.QuerySession())
             {
-                var after = await q2.LoadAsync<Page>(termsId);
+                var after = await q2.LoadAsync<Page>(termsId, TestContext.Current.CancellationToken);
                 Assert.Equal(seededEn.Body, after!.Body);
                 Assert.Equal(seededEn.Title, after.Title);
                 Assert.Equal(FirstBootSeeder.SourceLanguage, after.LanguageCode);
@@ -1998,7 +1998,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
         await using (var q = store.QuerySession())
         {
-            var after = await q.LoadAsync<Page>("pg6-res-blog");
+            var after = await q.LoadAsync<Page>("pg6-res-blog", TestContext.Current.CancellationToken);
             var seeded = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
             Assert.Equal(seeded.Body, after!.Body);
 

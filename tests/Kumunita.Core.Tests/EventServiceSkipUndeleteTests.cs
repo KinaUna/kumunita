@@ -53,7 +53,8 @@ public class EventServiceSkipUndeleteTests(PostgresFixture fixture) : IClassFixt
             End = headStart.AddHours(1),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule { Recurrence = Recurrence.Weekly, Interval = 1, Count = 3 },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
@@ -117,7 +118,8 @@ public class EventServiceSkipUndeleteTests(PostgresFixture fixture) : IClassFixt
             End = headStart.AddHours(1),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule { Recurrence = Recurrence.Weekly, Interval = 1, Count = 2 },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await using var q = store.QuerySession();
         var sibling = (await q.Query<Event>()

@@ -234,7 +234,7 @@ public sealed class UserPortabilityClassifyTests(PostgresFixture fixture) : ICla
         };
         using var archive = await BuildArchiveAsync([archivePost], resident);
 
-        var plan = await boot.service.ClassifyAsync(resident, archive);
+        var plan = await boot.service.ClassifyAsync(resident, archive, TestContext.Current.CancellationToken);
 
         Assert.True(plan.Ok);
         Assert.Empty(plan.Failures);
@@ -279,7 +279,7 @@ public sealed class UserPortabilityClassifyTests(PostgresFixture fixture) : ICla
         };
         using var archive = await BuildArchiveAsync([archivePost], resident);
 
-        var plan = await boot.service.ClassifyAsync(resident, archive);
+        var plan = await boot.service.ClassifyAsync(resident, archive, TestContext.Current.CancellationToken);
 
         Assert.True(plan.Ok);
         Assert.Single(plan.Entities);
@@ -316,7 +316,7 @@ public sealed class UserPortabilityClassifyTests(PostgresFixture fixture) : ICla
         };
         using var archive = await BuildArchiveAsync([archivePost], resident);
 
-        var plan = await boot.service.ClassifyAsync(resident, archive);
+        var plan = await boot.service.ClassifyAsync(resident, archive, TestContext.Current.CancellationToken);
 
         Assert.True(plan.Ok);
         Assert.Single(plan.Entities);
@@ -371,7 +371,7 @@ public sealed class UserPortabilityClassifyTests(PostgresFixture fixture) : ICla
         };
         using var archive = await BuildArchiveAsync([archivePost], resident);
 
-        var plan = await boot.service.ClassifyAsync(resident, archive);
+        var plan = await boot.service.ClassifyAsync(resident, archive, TestContext.Current.CancellationToken);
         Assert.True(plan.Ok);
         Assert.Equal(UserPortabilityEntityStatus.Conflict,
             Assert.Single(plan.Entities).Status);

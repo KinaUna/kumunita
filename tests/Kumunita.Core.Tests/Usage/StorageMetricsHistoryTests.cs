@@ -33,7 +33,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
 
         var now = DateTimeOffset.UtcNow;
 
-        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
 
         var rows = await AllSamples(store);
         var expectedId = "smh-" + now.ToUniversalTime().Date.ToString("yyyy-MM-dd");
@@ -57,8 +57,8 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
 
         // Two runs for the same UTC day — both resolve to the same
         // deterministic Id, so the second run overwrites the first.
-        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
-        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
 
         var rows = await AllSamples(store);
         var expectedId = "smh-" + now.ToUniversalTime().Date.ToString("yyyy-MM-dd");
@@ -81,7 +81,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
         var svc = BuildService(store);
 
         var now = DateTimeOffset.UtcNow;
-        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
 
         // The capture stores exactly one sample (sanity) and ZERO audit rows.
         Assert.Single(await AllSamples(store));
@@ -111,7 +111,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
         // The capture run: store today's sample + purge rows older than
         // now − RetentionDays (the expired one is deleted, the recent one
         // survives).
-        var purged = await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
+        var purged = await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
         Assert.Equal(1, purged);
 
         var ids = (await AllSamples(store)).Select(s => s.Id).ToHashSet();
@@ -142,7 +142,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
         await PlantMedia(store, sizeBytes: 200, createdById: "u2");
 
         var now = DateTimeOffset.UtcNow;
-        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now);
+        await StorageMetricsCaptureService.CaptureAndPurgeAsync(store, svc, now, TestContext.Current.CancellationToken);
 
         var sample = (await AllSamples(store)).Single();
         // The 8-member ceiling (design doc §2.2): Id + SampleDate + the 7 data
@@ -175,7 +175,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
         await PlantSample(store, now.AddDays(-5));
         await PlantSample(store, now.AddDays(-20));
 
-        var result = await svc.GetHistoryAsync(days: 30);
+        var result = await svc.GetHistoryAsync(days: 30, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Points.Count);
         // Ascending by SampleDate (the §2.1 seam pin): the older day first.
@@ -196,7 +196,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
         var svc = BuildService(store);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => svc.GetHistoryAsync(days: 999));
+            () => svc.GetHistoryAsync(days: 999, TestContext.Current.CancellationToken));
         await store.DisposeAsync();
     }
 

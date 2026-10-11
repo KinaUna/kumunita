@@ -87,7 +87,7 @@ public sealed class GuardianCommunityBlockTests(PostgresFixture fixture) : IClas
         Assert.Equal(Child, redirect.RouteValues["childId"]);
 
         // The block is live on the very next read (C4).
-        Assert.True((await userInfo.GetProfileAsync(Child))!.BlockedCommunityIds.Contains(Community));
+        Assert.Contains(Community, (await userInfo.GetProfileAsync(Child))!.BlockedCommunityIds);
 
         // The audit row (guardian.community_block, Via: Guardian, targeting the
         // community).
@@ -107,7 +107,7 @@ public sealed class GuardianCommunityBlockTests(PostgresFixture fixture) : IClas
 
         // Block first.
         await controller.SetChildCommunityBlock(Child, Community, blocked: true);
-        Assert.True((await userInfo.GetProfileAsync(Child))!.BlockedCommunityIds.Contains(Community));
+        Assert.Contains(Community, (await userInfo.GetProfileAsync(Child))!.BlockedCommunityIds);
 
         // Unblock — the block set is empty again (full access restored).
         var result = await controller.SetChildCommunityBlock(Child, Community, blocked: false);

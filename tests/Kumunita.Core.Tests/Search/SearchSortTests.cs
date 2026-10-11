@@ -52,7 +52,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         await Ann(store, "s0-c", now.AddDays(-2), "mike");
 
         var page = await svc.SearchSurfaceAsync(
-            SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1);
+            SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
+                ct: TestContext.Current.CancellationToken);
 
         // Created-desc (the current per-surface order, untouched): s0-b > s0-c > s0-a
         Assert.Equal(new[] { "s0-b", "s0-c", "s0-a" }, page.Hits.Select(h => h.Id).ToList());
@@ -73,7 +74,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var page = await svc.SearchSurfaceAsync(
             SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
-            sort: new SortSpec("created", false));
+            sort: new SortSpec("created", false),
+                ct: TestContext.Current.CancellationToken);
 
         // Created-asc: s1-a < s1-c < s1-b
         Assert.Equal(new[] { "s1-a", "s1-c", "s1-b" }, page.Hits.Select(h => h.Id).ToList());
@@ -95,7 +97,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var page = await svc.SearchSurfaceAsync(
             SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
-            sort: new SortSpec("title", false));
+            sort: new SortSpec("title", false),
+                ct: TestContext.Current.CancellationToken);
 
         // Apple, banana, cherry (OrdinalIgnoreCase asc)
         Assert.Equal(new[] { "s2-b", "s2-a", "s2-c" }, page.Hits.Select(h => h.Id).ToList());
@@ -119,7 +122,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var page = await svc.SearchSurfaceAsync(
             SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
-            sort: new SortSpec("relevance", false));   // outside the allowlist, dir=asc → still the created,**desc** default
+            sort: new SortSpec("relevance", false),
+                ct: TestContext.Current.CancellationToken);   // outside the allowlist, dir=asc → still the created,**desc** default
 
         // Default order (created, desc — the spec's own `asc` direction is
         // meaningless for an out-of-allowlist key): s3-b > s3-c > s3-a
@@ -146,7 +150,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var page = await svc.SearchSurfaceAsync(
             SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
-            sort: new SortSpec("created", false));
+            sort: new SortSpec("created", false),
+                ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { "s4-a", "s4-m", "s4-z" }, page.Hits.Select(h => h.Id).ToList());
     }
@@ -171,7 +176,8 @@ public class SearchSortTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         var page = await svc.SearchSurfaceAsync(
             SearchService.AnnouncementsSurface, "the", SearchScope.Community, Actor, 1,
-            sort: new SortSpec("relevance", false));   // not offered — M8 frozen
+            sort: new SortSpec("relevance", false),
+                ct: TestContext.Current.CancellationToken);   // not offered — M8 frozen
 
         // No relevance order is invented: the surface default (created, desc)
         // applies — the same order as `sort = null`.

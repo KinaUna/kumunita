@@ -63,7 +63,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 Interval = 1,
                 Count = 5,
             },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // Verify the pre-edit state: exactly 5 non-deleted rows (head + 4 siblings).
         await using (var q0 = store.QuerySession())
@@ -91,7 +92,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 Interval = 1,
                 Count = 5,
             },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The returned head: new Title / Location, rule unchanged (Weekly/1/5),
         // Start / End unchanged, Id stable.
@@ -181,7 +183,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 Interval = 1,
                 Count = 5,
             },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         var headIdBefore = head.Id;
 
@@ -213,7 +216,8 @@ public class EventServiceCascadeTests(PostgresFixture fixture) : IClassFixture<P
                 Interval = 1,
                 Count = 3,
             },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The head's Id is stable (D4 — never reassigned).
         Assert.Equal(headIdBefore, updated.Id);

@@ -43,7 +43,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "s1-b", "b", member, start: s3));
         await Plant(store, Upcoming(author, "s1-c", "c", member, start: s2));
 
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: null);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: null, ct: TestContext.Current.CancellationToken);
 
         // Start-asc: s3 (s1-b) < s2 (s1-c) < s1 (s1-a)  →  earliest first
         Assert.Equal(new[] { "s1-b", "s1-c", "s1-a" }, feed.Items.Select(e => e.Id).ToList());
@@ -72,7 +72,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Past(author, "s2-b", s3, "b", member));
         await Plant(store, Past(author, "s2-c", s2, "c", member));
 
-        var feed = await svc.ListPastAsync(null, member, page: 1, sort: null);
+        var feed = await svc.ListPastAsync(null, member, page: 1, sort: null, ct: TestContext.Current.CancellationToken);
 
         // Start-desc: s1 (s2-a) > s2 (s2-c) > s3 (s2-b) → most recent first
         Assert.Equal(new[] { "s2-a", "s2-c", "s2-b" }, feed.Items.Select(e => e.Id).ToList());
@@ -100,7 +100,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "s3-c", "c", member, t2));
 
         var spec = new SortSpec("created", false); // asc
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created-asc: t1 (s3-a) < t2 (s3-c) < t3 (s3-b)
         Assert.Equal(new[] { "s3-a", "s3-c", "s3-b" }, feed.Items.Select(e => e.Id).ToList());
@@ -127,7 +127,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "s4-c", "c", member, t2));
 
         var spec = new SortSpec("created", true); // desc
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created-desc: t3 (s4-b) > t2 (s4-c) > t1 (s4-a)
         Assert.Equal(new[] { "s4-b", "s4-c", "s4-a" }, feed.Items.Select(e => e.Id).ToList());
@@ -154,7 +154,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "s5-b", "Banana", member));
 
         var spec = new SortSpec("title", false); // asc, OrdinalIgnoreCase
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // OrdinalIgnoreCase asc: "apple" (s5-a) < "banana" (s5-b)
         Assert.Equal(new[] { "s5-a", "s5-b" }, feed.Items.Select(e => e.Id).ToList());
@@ -179,7 +179,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Past(author, "s6-b", start, "Banana", member));
 
         var spec = new SortSpec("title", false); // asc, OrdinalIgnoreCase
-        var feed = await svc.ListPastAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListPastAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // OrdinalIgnoreCase asc: "apple" (s6-a) < "banana" (s6-b)
         Assert.Equal(new[] { "s6-a", "s6-b" }, feed.Items.Select(e => e.Id).ToList());
@@ -207,7 +207,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "s7-b", "b", member, start: s2));
 
         var spec = new SortSpec("bogus", true); // not in allowlist → _ branch
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Upcoming default = Start-asc: s2 (s7-b) < s1 (s7-a)
         Assert.Equal(new[] { "s7-b", "s7-a" }, feed.Items.Select(e => e.Id).ToList());
@@ -234,7 +234,7 @@ public class EventSortTests(PostgresFixture fixture) : IClassFixture<PostgresFix
         await Plant(store, Upcoming(author, "tie-a", "a", member, start: sharedStart));
 
         var spec = new SortSpec("start", false); // start asc — the tie is what matters
-        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec);
+        var feed = await svc.ListUpcomingAsync(null, member, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Start ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, feed.Items.Select(e => e.Id).ToList());

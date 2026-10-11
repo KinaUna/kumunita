@@ -55,7 +55,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPost(store, "s1-b", now.AddDays(-1), viewer);
         await TagPost(store, "s1-c", now.AddDays(-2), viewer);
 
-        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: null);
+        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: null, TestContext.Current.CancellationToken);
 
         // Created-asc (the current order): s1-a < s1-c < s1-b
         Assert.Equal(new[] { "s1-a", "s1-c", "s1-b" }, page.Items.Select(p => p.Id).ToList());
@@ -79,7 +79,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPost(store, "s2-c", now, viewer, modified: now.AddDays(-1));
 
         var spec = new SortSpec("modified", true); // desc
-        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Sentinel desc: most-recent first (s2-c > s2-b), null last (s2-a)
         Assert.Equal(new[] { "s2-c", "s2-b", "s2-a" }, page.Items.Select(p => p.Id).ToList());
@@ -102,7 +102,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPost(store, "s3-c", now, viewer, title: "cherry");
 
         var spec = new SortSpec("title", false); // asc
-        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Apple, banana, cherry (case-insensitive)
         Assert.Equal(new[] { "s3-b", "s3-a", "s3-c" }, page.Items.Select(p => p.Id).ToList());
@@ -125,7 +125,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPost(store, "s4-c", now.AddDays(-2), viewer);
 
         var spec = new SortSpec("rating", true); // not in the allowlist
-        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Default: created-asc — s4-a < s4-c < s4-b
         Assert.Equal(new[] { "s4-a", "s4-c", "s4-b" }, page.Items.Select(p => p.Id).ToList());
@@ -146,7 +146,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPost(store, "tie-a", now, viewer);
 
         var spec = new SortSpec("created", false); // asc — equal values
-        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPostsByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Created ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, page.Items.Select(p => p.Id).ToList());
@@ -170,7 +170,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPage(store, "s1-b", now.AddDays(-1), viewer);
         await TagPage(store, "s1-c", now.AddDays(-2), viewer);
 
-        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: null);
+        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: null, TestContext.Current.CancellationToken);
 
         // Created-asc (the current order): s1-a < s1-c < s1-b
         Assert.Equal(new[] { "s1-a", "s1-c", "s1-b" }, page.Items.Select(p => p.Id).ToList());
@@ -190,7 +190,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPage(store, "s2-c", now, viewer, modified: now.AddDays(-1));
 
         var spec = new SortSpec("modified", true); // desc
-        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Sentinel desc: most-recent first (s2-c > s2-b), null last (s2-a)
         Assert.Equal(new[] { "s2-c", "s2-b", "s2-a" }, page.Items.Select(p => p.Id).ToList());
@@ -210,7 +210,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPage(store, "s3-c", now, viewer, title: "cherry");
 
         var spec = new SortSpec("title", false); // asc
-        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Apple, banana, cherry (case-insensitive)
         Assert.Equal(new[] { "s3-b", "s3-a", "s3-c" }, page.Items.Select(p => p.Id).ToList());
@@ -230,7 +230,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPage(store, "s4-c", now.AddDays(-2), viewer);
 
         var spec = new SortSpec("rating", true); // not in the allowlist
-        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Default: created-asc — s4-a < s4-c < s4-b
         Assert.Equal(new[] { "s4-a", "s4-c", "s4-b" }, page.Items.Select(p => p.Id).ToList());
@@ -249,7 +249,7 @@ public class TagPeopleSortTests(PostgresFixture fixture) : IClassFixture<Postgre
         await TagPage(store, "tie-a", now, viewer);
 
         var spec = new SortSpec("created", false); // asc — equal values
-        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec);
+        var page = await svc.ListPagesByTagPagedAsync("sorttag", viewer, page: 1, sort: spec, TestContext.Current.CancellationToken);
 
         // Created ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, page.Items.Select(p => p.Id).ToList());

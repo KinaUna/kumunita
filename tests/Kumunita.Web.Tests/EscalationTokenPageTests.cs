@@ -263,7 +263,6 @@ public class EscalationTokenPageTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal(model.Token, stored.Token);
         Assert.True(stored.Enabled);
         Assert.Equal(Admin, stored.UpdatedBy);
-        Assert.NotNull(stored.Updated);
     }
 
     // ─── Shared helpers ────────────────────────────────────────────────────

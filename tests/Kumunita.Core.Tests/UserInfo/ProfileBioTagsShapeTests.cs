@@ -73,7 +73,7 @@ public sealed class ProfileBioTagsShapeTests(PostgresFixture fixture)
             Bio = bio,
             TagIds = tagIds,
         });
-        await session.SaveChangesAsync();
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // The fresh read through the service's own read lane is the persistence
         // proof: the two new columns exist and come back verbatim.
@@ -99,7 +99,7 @@ public sealed class ProfileBioTagsShapeTests(PostgresFixture fixture)
             DisplayName = "Resident " + subject,
             Verified = true,
         });
-        await session.SaveChangesAsync();
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // The additive no-reseed pin (ADR 0004 §B.1): a profile created before
         // / without the two new fields reads back with <c>null</c> bio and an

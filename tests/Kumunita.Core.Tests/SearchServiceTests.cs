@@ -67,7 +67,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("PICNIC", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("PICNIC", SearchScope.Community, actor, TestContext.Current.CancellationToken);
 
         // "picnic" (uppercased query) matches the title case-insensitively and
         // the body case-insensitively — both posts are hits.
@@ -108,7 +108,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = new Audience(), DeletedAt = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var posts = result.Sections["posts"];
 
         Assert.Contains("t2-live", posts.Select(h => h.Id));
@@ -146,7 +146,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, other)]),
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var posts = result.Sections["posts"];
 
         Assert.Contains("t3-mine", posts.Select(h => h.Id));
@@ -179,7 +179,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("   ", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("   ", SearchScope.Community, actor, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Sections);
         Assert.Empty(await SearchAudit(store, "search:posts"));
@@ -206,10 +206,10 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = new Audience(),
         });
 
-        _ = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        _ = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.Single(await SearchAudit(store, "search:posts"));
 
-        _ = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        _ = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var rows = await SearchAudit(store, "search:posts");
         Assert.Equal(2, rows.Count);
         Assert.All(rows, a => Assert.Equal("search:posts", a.TargetKind));
@@ -244,7 +244,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actor, TestContext.Current.CancellationToken);
         var posts = result.Sections["posts"];
 
         Assert.Contains("t6-group-post", posts.Select(h => h.Id));
@@ -275,7 +275,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actor, TestContext.Current.CancellationToken);
 
         Assert.False(result.Sections.ContainsKey("posts"));
         Assert.Empty(await SearchAudit(store, "search:posts"));
@@ -302,7 +302,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actorId: null);
+        var result = await svc.SearchAsync("picnic", SearchScope.Groups, actorId: null, TestContext.Current.CancellationToken);
 
         Assert.False(result.Sections.ContainsKey("posts"));
     }
@@ -335,7 +335,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             IsDraft = false, Audience = null,
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null, TestContext.Current.CancellationToken);
         var events = result.Sections["events"];
 
         Assert.Contains("t9-community", events.Select(h => h.Id));
@@ -375,7 +375,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null, TestContext.Current.CancellationToken);
         var events = result.Sections["events"];
 
         Assert.Contains("t10-live", events.Select(h => h.Id));
@@ -411,7 +411,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             IsDraft = true,
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var pages = result.Sections["pages"];
 
         Assert.Contains("t11-published", pages.Select(h => h.Id));
@@ -447,14 +447,14 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
         });
 
         // Anonymous: only the public one (D7 — a pure check, no audit row).
-        var anon = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null);
+        var anon = await svc.SearchAsync("picnic", SearchScope.Community, actorId: null, TestContext.Current.CancellationToken);
         var anonAnn = anon.Sections["announcements"];
         Assert.Contains("t12-public", anonAnn.Select(h => h.Id));
         Assert.DoesNotContain("t12-community", anonAnn.Select(h => h.Id));
         Assert.Empty(await SearchAudit(store, "search:announcements"));
 
         // Signed-in: both.
-        var authed = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        var authed = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var authedAnn = authed.Sections["announcements"];
         Assert.Contains("t12-public", authedAnn.Select(h => h.Id));
         Assert.Contains("t12-community", authedAnn.Select(h => h.Id));
@@ -484,7 +484,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("picnic", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var hit = result.Sections["posts"].Single(h => h.Id == "t13-post");
 
         Assert.NotNull(hit.BodyExcerpt);
@@ -524,20 +524,23 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             });
 
         var page1 = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
-            SearchScope.Community, actor, page: 1);
+            SearchScope.Community, actor, page: 1,
+                TestContext.Current.CancellationToken);
         Assert.Equal(SearchService.PageSize, page1.Hits.Count);
         Assert.True(page1.HasMore);
         Assert.Equal(1, page1.Page);
 
         var page2 = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
-            SearchScope.Community, actor, page: 2);
+            SearchScope.Community, actor, page: 2,
+                TestContext.Current.CancellationToken);
         Assert.Single(page2.Hits);
         Assert.False(page2.HasMore);
         Assert.Equal(2, page2.Page);
 
         // Page floors to 1 (C-M7·2 / ADR 0090).
         var floored = await svc.SearchSurfaceAsync(SearchService.EventsSurface, "picnic",
-            SearchScope.Community, actor, page: 0);
+            SearchScope.Community, actor, page: 0,
+                TestContext.Current.CancellationToken);
         Assert.Equal(1, floored.Page);
     }
 
@@ -566,7 +569,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("projects"));
         var projects = result.Sections["projects"];
         Assert.Contains("t15-title", projects.Select(h => h.Id));
@@ -591,7 +594,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Audience = null,
         });
 
-        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null);
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null, TestContext.Current.CancellationToken);
         Assert.False(result.Sections.ContainsKey("projects"));
     }
 
@@ -619,7 +622,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             IsDeleted = true,
         });
 
-        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var projects = result.Sections["projects"];
         Assert.Contains("t17-live", projects.Select(h => h.Id));
         Assert.DoesNotContain("t17-deleted", projects.Select(h => h.Id));
@@ -641,7 +644,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("boards"));
         Assert.Contains("t18-title", result.Sections["boards"].Select(h => h.Id));
     }
@@ -668,7 +671,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("todos"));
         var todos = result.Sections["todos"];
         Assert.Contains("t19-title", todos.Select(h => h.Id));
@@ -697,7 +700,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("inventory"));
         var inv = result.Sections["inventory"];
         Assert.Contains("t20-name", inv.Select(h => h.Id));
@@ -721,7 +724,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("GARDEN", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("documents"));
         Assert.Contains("t21-title", result.Sections["documents"].Select(h => h.Id));
     }
@@ -754,7 +757,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Bio = "my garden is the best",
         });
 
-        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         Assert.True(result.Sections.ContainsKey("people"));
         var people = result.Sections["people"];
         Assert.Contains(actor, people.Select(h => h.Id));
@@ -775,7 +778,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Bio = "x",
         });
 
-        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null);
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actorId: null, TestContext.Current.CancellationToken);
         Assert.False(result.Sections.ContainsKey("people"));
     }
 
@@ -802,7 +805,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Bio = "x",
         });
 
-        var result = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("garden", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var people = result.Sections["people"];
         Assert.Contains("u-m8-t24-live", people.Select(h => h.Id));
         Assert.DoesNotContain("u-m8-t24-blocked", people.Select(h => h.Id));
@@ -833,7 +836,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow, Audience = new Audience(),
         });
 
-        var result = await svc.SearchAsync("TOMATO", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("TOMATO", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var posts = result.Sections["posts"];
         Assert.Contains("t25-tagged", posts.Select(h => h.Id));
     }
@@ -859,7 +862,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Created = DateTimeOffset.UtcNow,
         });
 
-        var result = await svc.SearchAsync("SPRINKLER", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("SPRINKLER", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var todos = result.Sections["todos"];
         Assert.Contains("t26-tagged", todos.Select(h => h.Id));
     }
@@ -887,7 +890,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Bio = "hello", TagIds = ["tag-bees"],
         });
 
-        var result = await svc.SearchAsync("BEE", SearchScope.Community, actor);
+        var result = await svc.SearchAsync("BEE", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var people = result.Sections["people"];
         Assert.Contains(other, people.Select(h => h.Id));
     }
@@ -915,12 +918,14 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             });
 
         var page1 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
-            SearchScope.Community, actor, page: 1);
+            SearchScope.Community, actor, page: 1,
+                TestContext.Current.CancellationToken);
         Assert.Equal(SearchService.PageSize, page1.Hits.Count);
         Assert.True(page1.HasMore);
 
         var page2 = await svc.SearchSurfaceAsync(SearchService.ProjectsSurface, "garden",
-            SearchScope.Community, actor, page: 2);
+            SearchScope.Community, actor, page: 2,
+                TestContext.Current.CancellationToken);
         Assert.Single(page2.Hits);
         Assert.False(page2.HasMore);
     }
@@ -943,7 +948,7 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
             Title = "garden plan", Description = "x", Created = DateTimeOffset.UtcNow,
         });
 
-        _ = await svc.SearchAsync("garden", SearchScope.Community, actor);
+        _ = await svc.SearchAsync("garden", SearchScope.Community, actor, TestContext.Current.CancellationToken);
         var row = (await SearchAudit(store, "search:projects")).Single();
         Assert.Null(row.TargetId);
         Assert.Equal(1, row.VisibleCount);

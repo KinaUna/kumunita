@@ -260,7 +260,7 @@ public class AdminSiteControllerTests
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
 
         await site.Received(1).AddTranslationAsync(
-            "pl", "Naszyj dom", "Cichy kąt", "Zakres", "FIG", "Prywatność", "Dom dla wszystkich", Admin);
+            "pl", "Naszyj dom", "Cichy kąt", "Zakres", "FIG", "Prywatność", "Dom dla wszystkich", Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 6 — the POST /translations validation: no language / all blank ─────
@@ -277,7 +277,7 @@ public class AdminSiteControllerTests
         await site.DidNotReceiveWithAnyArgs().AddTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>());
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact(DisplayName = "U08 AdminSite POST /translations rejects a missing language")]
@@ -292,7 +292,7 @@ public class AdminSiteControllerTests
         await site.DidNotReceiveWithAnyArgs().AddTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>());
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     // ── 7 — the POST /translations/update edits a translation ──────────────
@@ -308,7 +308,7 @@ public class AdminSiteControllerTests
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
 
         await site.Received(1).UpdateTranslationAsync(
-            "pl", "New eyebrow", "New lead", null, null, null, null, Admin);
+            "pl", "New eyebrow", "New lead", null, null, null, null, Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 8 — the POST /translations/update missing-row shape is a flash ─────
@@ -323,7 +323,7 @@ public class AdminSiteControllerTests
         site.UpdateTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string>())
+            Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(throwingTask<SiteContentTranslation>());
 
         var action = await controller.UpdateTranslation(
@@ -362,7 +362,7 @@ public class AdminSiteControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
 
-        await site.Received(1).RemoveTranslationAsync("pl", Admin);
+        await site.Received(1).RemoveTranslationAsync("pl", Admin, Arg.Any<CancellationToken>());
     }
 
     // ── 10 — the POST /translations/remove missing-row shape is a flash ────
@@ -371,7 +371,7 @@ public class AdminSiteControllerTests
     public async Task POST_RemoveTranslation_MissingRow_Flashes_Redirects()
     {
         var (controller, site) = Build(null);
-        site.RemoveTranslationAsync(Arg.Any<string>(), Arg.Any<string>())
+        site.RemoveTranslationAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(throwingTask());
 
         var action = await controller.RemoveTranslation("xx");

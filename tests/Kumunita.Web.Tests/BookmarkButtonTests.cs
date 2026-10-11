@@ -148,7 +148,7 @@ public sealed class BookmarkButtonTests
         // The caller owned the session (the C3 commit — the U02
         // RunInSession shape: the service stores into the caller's
         // session, the caller commits).
-        await session.Received(2).SaveChangesAsync();
+        await session.Received(2).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     // ── 2 — F2_Invisible_Target_Refused_404_No_Row_Survives ────────────────
@@ -298,7 +298,7 @@ public sealed class BookmarkButtonTests
             actor, targetKind, targetId, Arg.Any<Marten.IDocumentSession>());
 
         // The caller owned the session (the C3 commit).
-        await session.Received(1).SaveChangesAsync();
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     // ── 5 — BmButton_Partial_Renders_Correct_Lane_For_State ───────────────

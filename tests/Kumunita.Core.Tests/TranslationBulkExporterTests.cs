@@ -47,7 +47,7 @@ public class TranslationBulkExporterTests(PostgresFixture fixture) : IClassFixtu
         }
 
         var svc = new LocalizationService(store);
-        var matrix = await svc.GetBulkTranslationMatrixAsync();
+        var matrix = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         var codes = (await svc.ListLanguagesAsync())
             .OrderBy(c => c.SortOrder)
             .Select(c => c.Id)
@@ -94,7 +94,7 @@ public class TranslationBulkExporterTests(PostgresFixture fixture) : IClassFixtu
         await UpsertTranslation(store, key0, "en", "present-en");
 
         var svc = new LocalizationService(store);
-        var matrix = await svc.GetBulkTranslationMatrixAsync();
+        var matrix = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         var codes = (await svc.ListLanguagesAsync()).OrderBy(c => c.SortOrder).Select(c => c.Id).ToList();
 
         // The M·12 floor: the row is present, its Key/SourceText non-null.
@@ -142,7 +142,7 @@ public class TranslationBulkExporterTests(PostgresFixture fixture) : IClassFixtu
         // Reorder: en, qq, zz (the default seed order is en, zz, qq).
         await svc.ReorderLanguagesAsync(new[] { "en", "qq", "zz" }, "admin-seed");
 
-        var matrix = await svc.GetBulkTranslationMatrixAsync();
+        var matrix = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         var codes = (await svc.ListLanguagesAsync()).OrderBy(c => c.SortOrder).Select(c => c.Id).ToList();
         Assert.Equal(new[] { "en", "qq", "zz" }, codes);
 
@@ -197,12 +197,12 @@ public class TranslationBulkExporterTests(PostgresFixture fixture) : IClassFixtu
         // read may emit none; the `language.add` rows above are from this
         // test's own `AddLanguage` seeding (a different, already-audited seam)
         // and are intentionally out of scope for this pin.
-        var matrix = await svc.GetBulkTranslationMatrixAsync();
+        var matrix = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         Assert.Equal(KnownTranslationKeys.AllKeys.Count, matrix.Count);
         Assert.Empty(await AuditRows(store, targetKind: "translation"));
 
         // Re-reading is equally audit-free (a repeated read is still a read).
-        await svc.GetBulkTranslationMatrixAsync();
+        await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         Assert.Empty(await AuditRows(store, targetKind: "translation"));
     }
 

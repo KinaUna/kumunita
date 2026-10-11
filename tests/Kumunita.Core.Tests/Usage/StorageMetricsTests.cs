@@ -34,7 +34,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 200, createdById: "u2");
         await PlantMedia(store, sizeBytes: 50,  createdById: null);
 
-        var snap = await svc.GetSnapshotAsync();
+        var snap = await svc.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(350, snap.TotalUsedBytes);
         await store.DisposeAsync();
@@ -54,7 +54,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 120, createdById: "u1");
         await PlantMedia(store, sizeBytes: 30,  createdById: "u2");
 
-        var snap = await svc.GetSnapshotAsync();
+        var snap = await svc.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(snap.TotalUsedBytes, snap.UserContentUsedBytes);
         Assert.Equal(150, snap.UserContentUsedBytes);
@@ -79,7 +79,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 100, createdById: "u1");
         await PlantMedia(store, sizeBytes: 200, createdById: "u2");
 
-        var snap = await svc.GetSnapshotAsync();
+        var snap = await svc.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         // The volume totals are exactly the fake volume's canned values (read
         // from IMediaFileStore, not the session), and are NOT the catalog sum
@@ -105,7 +105,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 100, createdById: "u3");
         await PlantMedia(store, sizeBytes: 200, createdById: "u4");
 
-        var page1 = await svc.GetPerUserListAsync(page: 1, pageSize: 2);
+        var page1 = await svc.GetPerUserListAsync(page: 1, pageSize: 2, TestContext.Current.CancellationToken);
 
         Assert.Equal(4, page1.TotalUsers);
         Assert.True(page1.HasMore);
@@ -114,7 +114,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         Assert.Equal(300, page1.Items[0].Bytes);
         Assert.Equal(200, page1.Items[1].Bytes);
 
-        var page2 = await svc.GetPerUserListAsync(page: 2, pageSize: 2);
+        var page2 = await svc.GetPerUserListAsync(page: 2, pageSize: 2, TestContext.Current.CancellationToken);
         Assert.False(page2.HasMore);
         Assert.Equal(100, page2.Items[0].Bytes);
         Assert.Equal(50,  page2.Items[1].Bytes);
@@ -136,7 +136,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 40, createdById: "");   // "" sentinel
         await PlantMedia(store, sizeBytes: 50, createdById: "u1"); // a known user
 
-        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10);
+        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10, TestContext.Current.CancellationToken);
 
         // null + "" merged into ONE row; its bytes are the grouped sum (60 + 40).
         var unknown = Assert.Single(page.Items, r => r.CreatedById is null);
@@ -159,7 +159,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 0,   createdById: "ghost"); // only a zero-byte row
         await PlantMedia(store, sizeBytes: 100, createdById: "real");  // a real row
 
-        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10);
+        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10, TestContext.Current.CancellationToken);
 
         // "ghost" (only a zero-byte row) is excluded entirely; "real" remains.
         Assert.Single(page.Items);
@@ -184,8 +184,8 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         await PlantMedia(store, sizeBytes: 50,  createdById: "alice");
         await PlantMedia(store, sizeBytes: 999, createdById: "bob");
 
-        Assert.Equal(150, await svc.GetPerUserUsageBytesAsync("alice"));
-        Assert.Equal(999, await svc.GetPerUserUsageBytesAsync("bob"));
+        Assert.Equal(150, await svc.GetPerUserUsageBytesAsync("alice", TestContext.Current.CancellationToken));
+        Assert.Equal(999, await svc.GetPerUserUsageBytesAsync("bob", TestContext.Current.CancellationToken));
         await store.DisposeAsync();
     }
 
@@ -201,7 +201,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
 
         await PlantMedia(store, sizeBytes: 100, createdById: "alice");
 
-        Assert.Equal(0, await svc.GetPerUserUsageBytesAsync("nobody"));
+        Assert.Equal(0, await svc.GetPerUserUsageBytesAsync("nobody", TestContext.Current.CancellationToken));
         await store.DisposeAsync();
     }
 
@@ -215,7 +215,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         var store = await BootStoreAsync();
         var svc = new StorageMetricsService(store, new FakeVolume(total: 0, free: 0));
 
-        var snap = await svc.GetSnapshotAsync();
+        var snap = await svc.GetSnapshotAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(0, snap.TotalUsedBytes);
         Assert.Equal(0, snap.UserContentUsedBytes);
@@ -239,7 +239,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
             await PlantMedia(store, sizeBytes: b, createdById: null);
         await PlantMedia(store, sizeBytes: 100, createdById: "u1");
 
-        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10);
+        var page = await svc.GetPerUserListAsync(page: 1, pageSize: 10, TestContext.Current.CancellationToken);
 
         // 5 distinct null-created rows collapse to exactly ONE "unknown" row.
         Assert.Single(page.Items, r => r.CreatedById is null);
@@ -262,7 +262,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         var svc = new StorageMetricsService(
             store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 1_000));
 
-        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0);
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0, TestContext.Current.CancellationToken);
 
         Assert.False(sp.IsFull);
         Assert.Equal(0, sp.LimitBytes);
@@ -279,7 +279,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         var svc = new StorageMetricsService(
             store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor - 1_000));
 
-        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0);
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 0, TestContext.Current.CancellationToken);
 
         Assert.True(sp.IsFull);
         Assert.Equal(MediaOptions.MinFreeSpaceFloor - 1_000, sp.FreeVolumeBytes);
@@ -298,7 +298,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
             store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 10_000));
 
         // used (1000) == limit (1000) → "at or above" → full.
-        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 1000);
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 1000, TestContext.Current.CancellationToken);
 
         Assert.True(sp.IsFull);
         Assert.Equal(1000, sp.UsedBytes);
@@ -316,7 +316,7 @@ public sealed class StorageMetricsTests(PostgresFixture fixture) : IClassFixture
         var svc = new StorageMetricsService(
             store, new FakeVolume(total: 1_000_000, free: MediaOptions.MinFreeSpaceFloor + 10_000));
 
-        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 500);   // 100 < 500
+        var sp = await svc.GetPlatformSpaceAsync(platformLimitBytes: 500, TestContext.Current.CancellationToken);   // 100 < 500
 
         Assert.False(sp.IsFull);
         Assert.Equal(100, sp.UsedBytes);

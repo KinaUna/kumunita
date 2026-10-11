@@ -60,7 +60,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "w-in", authorInside, now.AddHours(23));
         await PlantEvent(store, "w-out", authorOutside, now.AddHours(25));
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // 23 h out (inside the window) → the author is reminded.
         Assert.Contains(staged, s => s.Key == $"remind:w-in:{authorInside}");
@@ -95,7 +95,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantRsvp(store, "g-ev", maybe, RsvpStatus.Maybe);
         await PlantRsvp(store, "g-ev", no, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{goer}");          // Going → reminded
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{author}");        // author always (T21)
@@ -123,7 +123,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         // The author RSVPed "No" — but the author is still a reminder recipient.
         await PlantRsvp(store, "a-ev", author, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(staged, s => s.Key == $"remind:a-ev:{author}");
         // Exactly one row for the author (no double-send via the Going path).
@@ -151,7 +151,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "k-ev", author, now.AddHours(5));
         await PlantRsvp(store, "k-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // Exactly one staged email per (event, recipient); the key is the
         // §6.2 per-email shape remind:{eventId}:{userId}.
@@ -183,7 +183,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "n-ev", author, now.AddHours(8));
         await PlantRsvp(store, "n-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // The reminder actually staged emails (the test is not vacuous).
         Assert.Equal(2, staged.Count);
@@ -218,7 +218,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "pz-ev", paris, start);
         await PlantRsvp(store, "pz-ev", plain, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // The UTC wall time of the event instant = the plain recipient's view
         // (the platform default here is the UTC zone); the Paris recipient's

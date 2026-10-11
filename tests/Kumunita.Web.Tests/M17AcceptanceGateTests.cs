@@ -129,7 +129,7 @@ public sealed class M17AcceptanceGateTests
         // The caller owned the session commits (the C3 same-transaction
         // lane — the controller commits, the service never does).
         // toggle×2 (each commits) + remove×1 (commits) = 3 commits.
-        await session.Received(3).SaveChangesAsync();
+        await session.Received(3).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     // ── (b) Handoff authorization boundary ────────────────────────────────
@@ -232,7 +232,7 @@ public sealed class M17AcceptanceGateTests
 
         // No session commit (the Refused path does not commit — the row
         // was never created).
-        await session.DidNotReceive().SaveChangesAsync();
+        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
 
         // 2 — The owner's list loads with zero rows (the row was never
         //    created) and commits zero AccessAudit rows (C-M17·2: the

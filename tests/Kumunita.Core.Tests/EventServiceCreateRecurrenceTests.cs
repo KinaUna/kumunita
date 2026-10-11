@@ -61,7 +61,8 @@ public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClass
                 Interval = 1,
                 Count = 4,
             },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The returned head: rule non-null (Weekly/1/4/null), no series link, not a draft.
         Assert.NotNull(head.RecurrenceRule);
@@ -137,7 +138,8 @@ public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClass
             End = new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Recurrence = null,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Null(ev1.RecurrenceRule);
         Assert.Null(ev1.RecurrenceHeadId);
@@ -156,7 +158,8 @@ public class EventServiceCreateRecurrenceTests(PostgresFixture fixture) : IClass
             End = new DateTimeOffset(2026, 11, 2, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false,
             Recurrence = new EventRecurrenceRule { Recurrence = Recurrence.None, Interval = 1 },
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Null(ev2.RecurrenceRule);
         Assert.Null(ev2.RecurrenceHeadId);
