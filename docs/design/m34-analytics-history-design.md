@@ -622,3 +622,68 @@ rule §13):
 `analytics.trend.*` `kw-l` key set, the 11 pinned test names, the
 three-test acceptance gate, the drift-guard). Authored by U02, 2026-10-11.
 Companion ADR: `docs/adr/0162-analytics-history.md` (Draft).*
+
+### Run result (M34 acceptance gate — 2026-10-11)
+
+**(a) Three-test gate (§2.5)** — **Closed loop PASS** · **Handoff PASS** ·
+**Part-vs-whole PASS** (the 11-test list is the whole; all 11 green).
+Evidence: `M34_8_GlobalAdmin_Sees_Trend_Section` (a `GlobalAdmin` on
+`/admin/analytics` sees the Trend section + the M13 surface-rank table +
+distinct-actor header unchanged — the full request → read → render loop) ·
+the 6 Core derived-read pins (the stored-`UsageEvent`-rows →
+`UsageDailyTotal` / `UsageHistoryResult` handoff) · the 11-test run green
+together.
+
+**(b) 11-test part-vs-whole (verbatim §2.4)** — **11 / 11 GREEN**:
+- **Core (6), `Kumunita.Core.Tests.Usage.UsageHistoryTests`:**
+  `M34_1_GetHistory_Returns_One_Total_Per_Present_Day` ·
+  `M34_7_GetHistory_Returns_Only_Days_Present` ·
+  `M34_7_GetHistory_Points_Ascending_By_Date` ·
+  `M34_7_GetHistory_Unknown_Window_Throws` ·
+  `M34_4_GetHistory_Writes_No_AuditRow` · `M34_1_M13_Methods_Unchanged`.
+  Run: `dotnet exec Kumunita.Core.Tests.dll -class
+  "Kumunita.Core.Tests.Usage.UsageHistoryTests"` → **Total: 6, Errors: 0,
+  Failed: 0** (Testcontainers `postgres:18`).
+- **Web (5), `Kumunita.Web.Tests.AdminAnalyticsHistoryTests`:**
+  `M34_8_GlobalAdmin_Sees_Trend_Section` ·
+  `M34_2_Window_Switch_Renders_Chosen_Window` ·
+  `M34_3_Empty_History_Renders_Empty_Message` ·
+  `M34_7_NonGlobalAdmin_Denied` · `M34_4_Export_Still_One_AuditRow`.
+  Run: `dotnet exec Kumunita.Web.Tests.dll -class
+  "Kumunita.Web.Tests.AdminAnalyticsHistoryTests"` → **Total: 5, Errors: 0,
+  Failed: 0**.
+
+**(c) Still-open drift (per the handoff note)** —
+- **U01 drift pause — RESOLVED.** The invariant-ID inconsistency (the
+  "12 invariants" vs. the 9 that exist) was resolved by **option 2**: the
+  invariant set is the **9** — M34·1, M34·4, M34·5, M34·6, M34·7, M34·8,
+  M34·9, M34·11, M34·12 — and §2.6 freezes that 9-set (not a 12-set). The
+  gate records the 9-set as frozen.
+- **U06 180/365 window tension — STILL OPEN (option A, red pin / known-
+  deferred).** The M34 pinned window set is `{7, 30, 90, 180, 365}` (M34·7)
+  and is admitted **at the `GetHistoryAsync` seam** (the Core
+  `NormalizeHistoryWindow` guard — `GetHistoryAsync(180)` /
+  `GetHistoryAsync(365)` work at the Core level, and the 6 Core derived-read
+  pins pass). But the **frozen** M13 `GetWindowAsync` read (`NormalizeWindow`)
+  admits **only {7, 30, 90}**, and per M34·8 the two reads share the one
+  `?window=` param — so in production `?window=180` / `?window=365` **400
+  from the M13 read before the M34 read renders**. U06's
+  `M34_2_Window_Switch_Renders_Chosen_Window` (Web) therefore pins **7/30/90**
+  (the windows the frozen M13 read admits end-to-end), not 180/365. **This
+  gate does NOT mark the 180/365 *end-to-end Web* render as passing.** The
+  180/365 end-to-end render is a **known-deferred / red pin**: resolving it
+  requires a Core/design-doc reconciliation (widen the M13 window set, or a
+  M34-only Trend window param) — a U08/author decision, not a U07 gate
+  fabrication.
+
+**(d) Consistency with §2.6's frozen pins.** The gate is consistent with
+§2.6: the 9-invariant set (not a 12-set) is honoured (the U01 resolution
+stands); the 11 test names are verbatim (§2.4); the closed loop + handoff are
+the parts, the 11-test list is the whole (all green). The **only** open item
+is the U06 180/365 window tension, which §2.6 does **not** pin as an
+end-to-end Web render (it freezes the M34·7 pinned window set
+`{7, 30, 90, 180, 365}` as the `GetHistoryAsync` seam contract, which the
+Core pins already pass) — so recording the 180/365 end-to-end Web render as
+a known-deferred red pin is consistent, not a drift. No `## U07 — Drift
+pause` is recorded (U07's own work is green; the open item is inherited from
+U06, already recorded there).

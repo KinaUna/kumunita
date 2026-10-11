@@ -489,3 +489,24 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
 - **No production code change** (the two new test files + this handoff note +
   the `m34-u06.md` move only). **No gate recorded** (U07's — §2.5).
 
+## U07 — gate recorded
+
+- **Three-test gate (§2.5, recorded in the design doc `### Run result (M34
+  acceptance gate — 2026-10-11)`)** — **Closed loop PASS** · **Handoff PASS**
+  · **Part-vs-whole PASS** (the 11-test list is the whole; all 11 green).
+- **11-test part-vs-whole** — **11 / 11 GREEN** (6 Core
+  `UsageHistoryTests` → Total: 6, Failed: 0; 5 Web
+  `AdminAnalyticsHistoryTests` → Total: 5, Failed: 0; run via the in-process
+  `dotnet exec …/bin/Debug/net10.0/*.dll -class "…"` path, the AGENTS.md
+  runner).
+- **Drift status** — **U01 drift RESOLVED** (option 2, the 9-invariant set,
+  §2.6 frozen) · **U06 180/365 window tension STILL OPEN** (option A, red pin
+  / known-deferred — the frozen M13 `GetWindowAsync` read admits only 7/30/90
+  end-to-end, so `?window=180` / `?window=365` 400 before the M34 read
+  renders; the gate does **not** mark the 180/365 end-to-end Web render as
+  passing). No `## U07 — Drift pause` recorded (U07's own work is green; the
+  open item is inherited from U06, already recorded there).
+- **Gate consistent with §2.6's frozen pins.** No code, no build (this unit
+  appends the design-doc `### Run result` section + this handoff section +
+  the `m34-u07.md` move only).
+
