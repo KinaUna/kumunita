@@ -107,6 +107,121 @@ public class AdminControllerPlatformPagesTests
         Assert.Null(bySlug["help"].PageId);
     }
 
+    // ─── ADR 0161 — the per-page translation surface ─────────────────────────
+    //
+    // ADR 0161 adds a per-page translations dropdown to the /admin/platform
+    // table. The composition seam (BuildPlatformPageTranslationsAsync) resolves
+    // each Page-backed surface once (id + title + stored translations + the
+    // enabled-language candidate list), skipping the about view (no Page doc).
+    // The pins below exercise the four Page-backed surfaces and the about
+    // skip.
+
+    [Fact(DisplayName = "ADR 0161: four Page-backed surfaces resolve to translation rows; about is skipped")]
+    public async Task ADR0161_SeededPages_FourTranslationRows_AboutSkipped()
+    {
+        // Four Page-backed surfaces (terms / help / privacy / conduct); about
+        // is a view, not a Page doc (ADR 0043 D1), so it is skipped.
+        var pages = SeedPagesWithTranslations(new[] { "terms", "help", "privacy", "conduct" });
+
+        var rows = await AdminController.BuildPlatformPageTranslationsAsync(pages);
+
+        // Exactly four rows (about is absent).
+        Assert.Equal(4, rows.Count);
+        // Each slug resolves to a PageId (id-{slug}).
+        var bySlug = rows.ToDictionary(r => r.Slug);
+        foreach (var slug in new[] { "terms", "help", "privacy", "conduct" })
+        {
+            Assert.True(bySlug.TryGetValue(slug, out var row), $"missing row for '{slug}'");
+            Assert.Equal($"id-{slug}", row.PageId);
+            Assert.Equal("Title-" + slug, row.Title);
+        }
+        // about is absent from the result.
+        Assert.False(bySlug.ContainsKey("about"));
+    }
+
+    [Fact(DisplayName = "ADR 0161: stored translations surface on the row; candidate list excludes already-translated languages")]
+    public async Task ADR0161_StoredTranslations_On_Row_CandidateList_ExcludesTranslating()
+    {
+        // `privacy` has a stored de translation → the candidate list does NOT
+        // include de, but does include the other enabled languages. `terms`
+        // has no stored translation → all enabled languages are candidates.
+        var pages = SeedPagesWithTranslations(new[] { "privacy", "terms" });
+        // A fake language catalog (enabled: en, de, fr).
+        var loc = Substitute.For<Kumunita.Core.Localization.ILocalizationService>();
+        loc.ListLanguagesAsync().Returns(new[]
+        {
+            new Kumunita.Core.Localization.LanguageCatalog { Id = "en", NativeName = "English", Enabled = true, SortOrder = 1 },
+            new Kumunita.Core.Localization.LanguageCatalog { Id = "de", NativeName = "Deutsch", Enabled = true, SortOrder = 2 },
+            new Kumunita.Core.Localization.LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 3 },
+        });
+
+        var rows = await AdminController.BuildPlatformPageTranslationsAsync(pages, loc);
+        var bySlug = rows.ToDictionary(r => r.Slug);
+
+        // privacy: the stored de translation is on the row; the candidate list
+        // has en + fr (de is already translated, so excluded).
+        var privacy = bySlug["privacy"];
+        var privacyTrans = privacy.Translations.Select(t => t.LanguageCode).ToList();
+        Assert.Contains("de", privacyTrans);
+        Assert.DoesNotContain("de", privacy.MissingLanguages.Select(l => l.Code).ToList());
+        Assert.Contains("fr", privacy.MissingLanguages.Select(l => l.Code).ToList());
+
+        // terms: no stored translation → the candidate list has all enabled
+        // languages (en, de, fr).
+        var terms = bySlug["terms"];
+        Assert.Empty(terms.Translations);
+        Assert.Equal(3, terms.MissingLanguages.Count);
+    }
+
+    [Fact(DisplayName = "ADR 0161: an absent page (no Page doc) is skipped")]
+    public async Task ADR0161_About_View_Skipped()
+    {
+        // An empty tree → no pages resolve → an empty list.
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync(Arg.Any<string>())
+            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
+        var rows = await AdminController.BuildPlatformPageTranslationsAsync(pages);
+        Assert.Empty(rows);
+    }
+
+    // ── Harness ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A seeded <see cref="IPageService"/>: <paramref name="seeded"/> slugs
+    /// resolve under <c>system/{slug}</c> (the ADR 0040 canonical path) with
+    /// a deterministic id (<c>id-{slug}</c>) + title (<c>Title-{slug}</c>);
+    /// <c>system/privacy</c> additionally has a stored <c>de</c>
+    /// <see cref="PageTranslation"/> row (the ADR 0161 candidate-list-excludes
+    /// pin). Everything else is absent (<see cref="KeyNotFoundException"/>).
+    /// </summary>
+    private static IPageService SeedPagesWithTranslations(string[] seeded)
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync(Arg.Any<string>()).Returns(ci =>
+        {
+            var path = ci.ArgAt<string>(0);
+            var slug = path.StartsWith("system/") ? path["system/".Length..] : path;
+            return seeded.Contains(slug)
+                ? Task.FromResult(new Page { Id = $"id-{slug}", Slug = slug, Title = "Title-" + slug })
+                : Task.FromException<Page>(new KeyNotFoundException());
+        });
+        // The ADR 0161 candidate-list pin: privacy has a stored de translation.
+        pages.GetTranslationsAsync("id-privacy").Returns(new List<PageTranslation>
+        {
+            new PageTranslation
+            {
+                Id = "pg-trans-privacy-de", PageId = "id-privacy",
+                LanguageCode = "de", Title = "Datenschutz", Body = "Privacy body",
+                AuthorId = "u-admin", Created = DateTimeOffset.UtcNow
+            },
+        });
+        // Every other page has no stored translations.
+        pages.GetTranslationsAsync(Arg.Is<string>(id => id != "id-privacy"))
+            .Returns(new List<PageTranslation>());
+        return pages;
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────────
 
     /// <summary>

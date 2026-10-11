@@ -574,6 +574,71 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.False(PageService.CanTranslatePage("u-member", RolesSet(Roles.Member), flat));
     }
 
+    // ─── ADR 0161 — the author-of-a-blog-page branch (an editor can translate) ─
+    //
+    // ADR 0161 closes the "a user who can edit a page should also be able to
+    // add/edit/remove translations" gap: the author of a PageKind.User (blog)
+    // page now qualifies for the translation standing — the same branch the
+    // edit standing uses (a blog page's edit standing is author ∪ GlobalAdmin,
+    // ADR 0040). A system page's author is an audit identity, not a standing
+    // branch (a system page is GlobalAdmin-only), so the branch is scoped to
+    // the User kind.
+
+    [Fact]
+    public void PG6_CanTranslatePage_AuthorOfBlogPage_Allows()
+    {
+        // A plain resident (no elevated role) who is the author of a blog
+        // page may translate it — the ADR 0161 author branch (the same branch
+        // as the edit standing).
+        var blogPage = new Page
+        {
+            Id = "pg6-t-auth-b", Kind = PageKind.User,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        Assert.True(PageService.CanTranslatePage("u-author", RolesSet(Roles.Member), blogPage));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_AuthorOfSystemPage_Denies()
+    {
+        // A system page's author is an audit identity, not a standing branch
+        // (a system page is GlobalAdmin-only, ADR 0040) — the ADR 0161 author
+        // branch is scoped to the User kind, so a plain resident who happens
+        // to be the stored author of a system page still cannot translate it.
+        var systemPage = new Page
+        {
+            Id = "pg6-t-auth-s", Kind = PageKind.System,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        Assert.False(PageService.CanTranslatePage("u-author", RolesSet(Roles.Member), systemPage));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_NonAuthorOfBlogPage_Denies()
+    {
+        // The author branch is author-specific: a plain resident who is NOT
+        // the blog page's author has no translation standing on it.
+        var blogPage = new Page
+        {
+            Id = "pg6-t-notauth", Kind = PageKind.User,
+            AuthorId = "u-someone-else", ComponentId = "comp-x",
+        };
+        Assert.False(PageService.CanTranslatePage("u-resident", RolesSet(Roles.Member), blogPage));
+    }
+
+    [Fact]
+    public void PG6_CheckTranslateStanding_AuthorOfBlogPage_Allows()
+    {
+        // The write-lane gate accepts the author of a blog page (ADR 0161) —
+        // no exception thrown.
+        var blogPage = new Page
+        {
+            Id = "pg6-t-gate-auth", Kind = PageKind.User,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        PageService.CheckTranslateStanding("u-author", RolesSet(Roles.Member), blogPage);
+    }
+
     [Fact]
     public void PG6_CanTranslatePage_NullPageOrBlankActor_Denies()
     {

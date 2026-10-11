@@ -170,11 +170,14 @@ public sealed record PageShowViewModel(
     /// <see cref="Kumunita.Core.Pages.PageService.CanTranslatePage"/>, the
     /// same rule the <c>AddTranslationAsync</c> write-lane gate re-checks
     /// server-side): a GlobalAdmin / a Translator may add a translation of
-    /// any page; a community Moderator only of a page scoped to their
-    /// community (a flat/public page has no community to moderate). <c>true</c>
-    /// ⇒ the post view renders the "add a translation" form (gated on this
-    /// flag), the candidate list drawn from <see cref="Languages"/> excluding
-    /// the authored-in language + any already-translated code (the ADR 0027
+    /// any page, and — since ADR 0161 — the <b>author</b> of a
+    /// <see cref="Kumunita.Core.Pages.PageKind.User"/> (blog) page may
+    /// translate their own page (the same branch as the edit standing, so an
+    /// editor can translate); a community Moderator has no translation
+    /// standing on either kind. <c>true</c> ⇒ the post view renders the
+    /// translation add / edit / remove lanes (gated on this flag), the
+    /// candidate list drawn from <see cref="Languages"/> excluding the
+    /// authored-in language + any already-translated code (the ADR 0027
     /// "candidate list excludes the item's own language" rule).
     /// </summary>
     bool CanTranslate,
@@ -203,6 +206,34 @@ public sealed record PageShowViewModel(
     /// until an explicit row says otherwise).
     /// </summary>
     bool Subscribed);
+
+/// <summary>
+/// The model the <c>Views/Shared/_PageTranslationModals</c> partial renders
+/// (ADR 0161) — the shared Bootstrap modals for a page's translation add /
+/// edit lanes. Extracted from <c>Views/Page/Show.cshtml</c> so both the page
+/// detail surface and the <c>/admin/platform</c> platform-pages table render
+/// the same modals without duplication.
+/// <para>
+/// <see cref="IdPrefix"/> disambiguates the modal / form / field element ids
+/// when the same partial renders for multiple pages on one document (the
+/// /admin/platform table has one row per system page) — each id is
+/// <c>{IdPrefix}-trans-{edit|add}-{languageCode}-…</c>. <see cref="Title"/>
+/// is the page's authored-in title, pre-filled into each "add a translation"
+/// modal's title field (the ADR 0022 / ADR 0048 shape). <see cref="Translations"/>
+/// is the page's stored <see cref="Kumunita.Core.Pages.PageTranslation"/> rows
+/// (one "edit" modal each); <see cref="MissingLanguages"/> is the candidate
+/// list (enabled catalog languages with no stored row and not the authored-in
+/// language) — one "add" modal each. <see cref="LangNames"/> maps a BCP-47
+/// code to its native display name (the chip / modal-title label).
+/// </para>
+/// </summary>
+public sealed record PageTranslationModalsModel(
+    string IdPrefix,
+    string PageId,
+    string Title,
+    IReadOnlyList<Kumunita.Core.Pages.PageTranslation> Translations,
+    IReadOnlyList<LanguageOption> MissingLanguages,
+    IReadOnlyDictionary<string, string> LangNames);
 
 /// <summary>
 /// The composer form-bound model — <c>GET/POST /pages/new</c> and

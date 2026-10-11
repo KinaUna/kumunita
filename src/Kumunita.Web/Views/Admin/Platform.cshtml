@@ -1,6 +1,30 @@
 @model Kumunita.Web.Models.AdminPlatformViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Admin — Platform";
+
+    // ADR 0161 — the per-page translation surface (the /admin/platform
+    // platform-pages table gains a translations ⋮ dropdown per page, the
+    // posts/announcements pattern). The remove-translation form's data-confirm
+    // (the ADR 0072 attribute idiom — confirm.js reads the attribute verbatim;
+    // the kw-l TagHelper can't wrap an attribute) is resolved server-side; the
+    // en floor is the server fallback (a null provider — a non-HTTP render —
+    // degrades to en).
+    string confirmRemoveTrans = "Remove this translation?";
+    if (Translation is not null)
+    {
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", effLang);
+    }
+
+    // The per-page translation surface keyed by slug (a quick lookup for the
+    // row loop below). A platform page with no Page doc (about) or no
+    // translation data has no entry here — its row renders Preview / Edit only.
+    var transBySlug = Model.PlatformPageTranslations.ToDictionary(
+        p => p.Slug, StringComparer.OrdinalIgnoreCase);
 }
 
 @* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
@@ -124,17 +148,107 @@
         }
         @foreach (var row in Model.PlatformPages)
         {
+            // ADR 0161 — a platform page with translation data (a Page doc
+            // resolved to a PageId) gets the translations ⋮ dropdown; about is
+            // preview-only (no Page doc) so it has none.
+            var pageTrans = transBySlug.TryGetValue(row.Slug, out var pt) ? pt : null;
+            var langNames = pageTrans?.LangNames ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
             <tr>
                 <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
                 <td><code>@row.Route</code></td>
-                <td class="text-end">
+                <td class="text-end d-inline-flex align-items-center gap-2 justify-content-end flex-wrap">
                     <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
                     @if (row.PageId is not null)
                     {
                         <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    }
+
+                    @* ADR 0161 — the per-page translations dropdown (the
+                       posts/announcements pattern): add / edit each open a
+                       modal (the shared _PageTranslationModals partial, id-
+                       prefixed by the slug); remove is a confirm form in the
+                       menu. The service's write-lane re-check at POST is the
+                       real gate (C3) — the /admin GlobalAdmin gate + the
+                       PageController standing are the authority. *@
+                    @if (pageTrans is not null
+                        && (pageTrans.Translations.Count > 0 || pageTrans.MissingLanguages.Count > 0))
+                    {
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="Translations for @(platformLabels.TryGetValue(row.Slug, out var tl) ? tl : row.Slug)">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                @foreach (var existing in pageTrans.Translations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#{row.Slug}-trans-edit-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @foreach (var lang in pageTrans.MissingLanguages)
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#{row.Slug}-trans-add-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @if (pageTrans.Translations.Count > 0)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in pageTrans.Translations.OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/pages/{row.PageId}/translations/remove")"
+                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            </ul>
+                        </div>
                     }
                 </td>
             </tr>
         }
     </tbody>
 </table>
+
+@* ADR 0161 — the per-page translation modals (the shared partial, one per
+   Page-backed platform page, id-prefixed by the slug so the dropdown's
+   data-bs-target references resolve). Only rendered when at least one page
+   has a translation surface (a stored row or a candidate language). *@
+@if (Model.PlatformPageTranslations.Any())
+{
+    foreach (var pageTrans in Model.PlatformPageTranslations)
+    {
+        <partial name="_PageTranslationModals" model="new Kumunita.Web.Models.PageTranslationModalsModel(
+            pageTrans.Slug,
+            pageTrans.PageId,
+            pageTrans.Title,
+            pageTrans.Translations,
+            pageTrans.MissingLanguages,
+            pageTrans.LangNames)" />
+    }
+}
+
+@section Scripts {
+    @* ADR 0161 — the rich editor (client/lib/rich-editor.ts, tsc-built) is
+       needed by the per-page translation modals (each carries a .rc-editor
+       block). bindRichEditor self-wires every .rc-editor on the page at
+       module load, so the modals work without any extra wiring. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}
