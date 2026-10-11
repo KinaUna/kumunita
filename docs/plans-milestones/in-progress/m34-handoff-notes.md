@@ -153,3 +153,115 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   lane**, own ADR." M34 **is** that lane (and, being *derived, not
   captured*, it needs no capture doc at all).
 - No code, no build, no test.
+
+## U01 — Drift pause (entry reads contradict the register — invariant ID set is internally inconsistent)
+
+**Stop point.** U01 (design doc Part 1) is blocked on a contradiction in the
+register's invariant ID set. Per the unit-series drift rule (register §unit-
+series rules: "if entry reads reveal the design doc is out of date, the unit
+pauses and records `## U<m> — Drift pause`") and the U01 exit criteria
+("the 12 invariants and 10 FACES are present so U02 can pin them by id"), I
+am **stopping rather than fabricating invariant text**. **No design doc
+authored**; `in-progress/m34-u01.md` **not** moved (the unit did not complete).
+
+**The contradiction (verified against `plan-m34-analytics-history.md`):**
+
+- The unit plan (`m34-u01.md` L5–6, L85, L94), the user brief, and the
+  register (L404, L553, L617, L744 — "the 12-invariant table (U01)") all
+  require **12 invariants, M34·1 through M34·12**, "verbatim from the
+  register's 'one thing' section."
+- The register's "one thing" section (L119–L230) defines **only 9 distinct
+  invariant IDs**: **M34·1** (three bullets — "capability, not a new
+  context", "**derived, not captured**", "minimal per-day projection" — **all
+  tagged M34·1**, not 1/2/3), **M34·4** (zero audit rows), **M34·5** (data
+  never leaves the instance), **M34·6** (Core HTTP-free + Wolverine-free),
+  **M34·7** (pinned window set), **M34·8** (surface extended additively),
+  **M34·9** (no new dep / no chart lib), **M34·11** (closed kw-l key set
+  four-language), **M34·12** (six-member close flip).
+- **M34·2 and M34·3 do not appear anywhere** in the register (grep
+  `M34·2|M34·3` → 0 matches across `docs/`). The three bullets the "12" count
+  seems to assume are **all tagged M34·1** in the section.
+- **M34·10 appears only as a "named deferral" pointer** (L86, L155, L167 —
+  "a named deferral (M34·10)"), **never as a defined invariant**. It is
+  referenced as if it governs a deferral, but no invariant M34·10 exists.
+- The register's **own header** (L46) says "invariants **M34·1–M34·10**" — a
+  third, distinct number, inconsistent with the "M34·1–M34·12" the rest of the
+  register uses.
+
+**Why I stopped instead of authoring:** U02's drift guard (L744) will re-pin
+"the 12-invariant table (U01)", and the FACES (M34-1–M34-10) bind to
+invariant IDs **by number**. To hit "12" I would have to **invent** the text
+for **M34·2, M34·3, and M34·10** — none of which the register defines. That
+violates unit-series rule §12/§13 (no inventing invariant IDs beyond the
+frozen text) and would corrupt the three-tier contract every downstream unit
+depends on (U02's drift guard, U03–U06 code, U08 close). The honest move is to
+surface the numbering for the author / U00 / U02 to resolve.
+
+**Two clean resolutions (pick one):**
+
+1. **Split M34·1 into three + define M34·10** — re-tag the three M34·1 bullets
+   as **M34·1** (capability, not a new context), **M34·2** (derived, not
+   captured), **M34·3** (minimal per-day projection), **and** author an
+   **M34·10** invariant (the per-surface-per-day deferral / "no per-surface
+   over-time chart in v1" is the natural home, currently only a deferral
+   pointer at L86/L155/L167). That yields the 12 the count expects (the
+   M33·1–M33·12 model to mirror). **The M34·10 text is the only invented
+   piece** — everything else is a mechanical re-tag.
+2. **Reconcile the count down to the 9 that exist** — change the register's
+   "M34·1–M34·12" / "12 invariants" (L404, L553, L617, L744) and `m34-u01.md`'s
+   "12 invariants (M34·1–M34·12)" to "**9 invariants** (M34·1, M34·4, M34·5,
+   M34·6, M34·7, M34·8, M34·9, M34·11, M34·12)", and re-home the "M34·10"
+   deferral pointers (L86, L155, L167) onto M34·1 or the §Scope deferral list.
+
+**Unaffected (verified, ready to author once resolved):** the **Context**, the
+**Scope** (in + the named deferrals), and the **10 FACES** (M34-1–M34-10,
+register L620–L650) are all fully defined and each binds to one of the **9
+existing IDs** (M34·1 / M34·4 / M34·7 / M34·8 / M34·9 / M34·11) or to C-M13·3 —
+**no FACE references M34·2 / M34·3 / M34·10**. So the FACES section is
+unblocked; **only the Invariants section's ID count is in dispute**.
+
+**No code, no build, no test.** `in-progress/m34-u01.md` left in place (unit
+not complete). Awaiting the resolution above before U01 authors Part 1.
+
+**Resolution (recorded by the author, 2026-10-11):** Option **2** was chosen
+and applied **as an edit to the register + `m34-u01.md`** — reconcile the
+invariant set down to the **9 that actually exist**: **M34·1, M34·4, M34·5,
+M34·6, M34·7, M34·8, M34·9, M34·11, M34·12**. `M34·1` stays the umbrella for
+the three M34·1 bullets (capability-not-new-context · **derived, not
+captured** · minimal per-day projection). The "M34·10" deferral pointers were
+re-homed (L86 "no successor" → M34·12; L155/L167 "per-surface over-time
+chart" → §Scope). All `M34·1–M34·12` / "12 invariants" / "12-invariant"
+references were reconciled to the 9-set. Rationale: it is semantically
+honest (M34 has *fewer* invariants than M33 precisely because it has **no
+capture lane** — the gaps M34·2/M34·3/M34·10 map exactly to the capture-lane
+invariants M34 lacks), it preserves the meaning of every existing "M34·1"
+reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
+**U02's Part 2 §2.6 drift-guard must pin the 9-set, not a 12-set.**
+
+## U01 — design doc Part 1 (authored after the drift resolution)
+
+- **Deliverable:** `docs/design/m34-analytics-history-design.md` Part 1 —
+  `## Context`, `## Scope` (in + the named deferrals), `## Invariants (pinned
+  for M34)`, `## FACES (pinned, 10)`. Mirrors the M33 design doc shape,
+  leading with the **derived, not captured** distinction (M34·1) that
+  separates M34 from M33. **No code, no build, no test.**
+- **9 invariants (by id):** M34·1 (capability on the M13 `Usage` surface, not
+  a new context · **derived, not captured** · minimal per-day projection — the
+  M34·2/M34·3/M34·10 gaps are *deliberate*: M34 has no capture lane) · M34·4
+  (zero `AccessAudit` rows, the read) · M34·5 (data never leaves the
+  instance) · M34·6 (Core HTTP-free + Wolverine-free) · M34·7 (pinned window
+  set {7,30,90,180,365}, default 30, only days present) · M34·8 (M13 surface
+  extended additively) · M34·9 (no new dependency, no JS chart library) ·
+  M34·11 (closed `analytics.trend.*` `kw-l` key set, four-language) · M34·12
+  (six-member close flip is U08's; **M34 is the last milestone** — no
+  successor to promote).
+- **10 FACES (M34-1–M34-10):** M34-1 (Trend section renders, M13 surface
+  unchanged) · M34-2 (window switch 7/90/180/365) · M34-3 (empty history →
+  `analytics.trend.empty`) · M34-4 (one `UsageDailyTotal` per present day) ·
+  M34-5 (gaps → only days present) · M34-6 (read writes zero audit rows) ·
+  M34-7 (non-GlobalAdmin → 403) · M34-8 (M13 CSV export still one audit row) ·
+  M34-9 (no per-account row in the trend) · M34-10 (`GetHistoryAsync(999)` →
+  `ArgumentOutOfRangeException`).
+- **Drift status:** the U01 Drift pause is **resolved** (option 2, recorded
+  above); U02 may proceed to Part 2 pinning the **9-invariant** set.
+  `in-progress/m34-u01.md` moved to `done/m34/`.

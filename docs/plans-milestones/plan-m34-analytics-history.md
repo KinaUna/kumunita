@@ -43,7 +43,8 @@
 > the M33 `StorageMetricsSample`/`GetHistoryAsync`/`StorageHistoryResult`
 > shapes as the structural template + the ADR index — confirm **0162** is
 > free) and authors the handoff-note skeleton. **U01/U02** author the
-> primary-tier design doc (invariants M34·1–M34·10 + FACES M34-1–M34-10 +
+> primary-tier design doc (the 9 invariants M34·1, M34·4–M34·9, M34·11,
+> M34·12 + FACES M34-1–M34-10 +
 > the `UsageDailyTotal` / `UsageHistoryResult` DTO shapes + the
 > `GetHistoryAsync` seam + the M13 surface extension + the closed
 > `analytics.trend.*` `kw-l` key set + the pinned test names + the acceptance
@@ -83,7 +84,7 @@
 > migration** (there is **no** new doc to register — the M13 `UsageEvent`
 > doc + `UsageDocTypes` surface are **untouched**, M34·1). **No roadmap
 > letter moves** (M34 is the last milestone; the close flip promotes **no**
-> successor, M34·10). **Core stays HTTP-free + Wolverine-free** (M34·1 — the
+> successor, M34·12). **Core stays HTTP-free + Wolverine-free** (M34·1 — the
 > new read seam is on the existing M13 service; the service is already a
 > Wolverine-free read; no `HttpClient` in Core, ADR 0006-D).
 
@@ -152,8 +153,9 @@ library, no audit rows, no EF migration**.
   `UsageEvent.At`'s UTC date, the M13 `UsageCsvRow.Date` precedent) +
   `Total` (the count of `UsageEvent` rows on that day, the M13 `UsageCsvRow`
   / `SurfaceRow.Total` count precedent). The **optional** surface breakdown
-  (one row per (day, surface) pair) is a **named deferral** (M34·10) — M34
-  v1 renders the **total per day** (the sparkline's line + the table's
+  (one row per (day, surface) pair) is a **named deferral** (§Scope — the
+  per-surface over-time chart) — M34 v1 renders the **total per day** (the
+  sparkline's line + the table's
   `total` column); the per-surface-per-day breakdown is already available in
   the M13 CSV export (the `UsageCsvRow` rows) and is **not** re-rendered as
   a chart in M34 v1.
@@ -164,7 +166,7 @@ library, no audit rows, no EF migration**.
   (`/admin/analytics/export`) and its **one** `AccessAudit` row
   (`TargetKind "analytics"` + `Action "analytics.export"`) are **untouched**
   (M34·1 additive-only) — M34 does **not** add an export of the history (a
-  named deferral, M34·10).
+  named deferral, §Scope).
 - **Core stays HTTP-free + Wolverine-free (M34·1 / M34·6).** The
   `GetHistoryAsync` impl lives on the **existing** `IUsageAnalyticsService`
   impl (the M13 "interface + one impl + DI registration" shape — the
@@ -375,8 +377,9 @@ retention + the `UsageDocTypes` registration surface + the
 `AdminAnalyticsController` + the M33 `StorageMetricsSample` /
 `GetHistoryAsync` / `StorageHistoryResult` shapes as the structural template
 + the ADR index — confirm **0162** is free) + authors the handoff-note
-skeleton. **U01/U02** author the primary-tier design doc (invariants
-M34·1–M34·12 + FACES M34-1–M34-10 + the `UsageDailyTotal` /
+skeleton. **U01/U02** author the primary-tier design doc (the 9 invariants
+M34·1, M34·4–M34·9, M34·11, M34·12 + FACES M34-1–M34-10 + the
+`UsageDailyTotal` /
 `UsageHistoryResult` DTO shapes + the `GetHistoryAsync` seam + the M13
 surface extension + the closed `analytics.trend.*` key set + the pinned test
 names + the acceptance gate + the drift guard) and draft **ADR 0162**.
@@ -401,8 +404,9 @@ below), one unit per fresh agent with a ~32K context window.
 **Shared state (three-tier contract):**
 - **Primary — the design doc**
   (`docs/design/m34-analytics-history-design.md`, U01/U02 author) — pins
-  the invariants (M34·1–M34·12), the FACES (M34-1–M34-10), the
-  `UsageDailyTotal` / `UsageHistoryResult` DTO shapes (the M34·1 2-member
+  the invariants (the 9: M34·1, M34·4–M34·9, M34·11, M34·12), the FACES
+  (M34-1–M34-10), the `UsageDailyTotal` /
+  `UsageHistoryResult` DTO shapes (the M34·1 2-member
   ceilings), the `GetHistoryAsync` seam, the M13 surface extension, the
   closed `analytics.trend.*` key set, the pinned test names, the acceptance
   gate, and the drift guard.
@@ -550,7 +554,8 @@ records `## U<m> — Drift pause` in the handoff note.
 
 - **Goal:** author `docs/design/m34-analytics-history-design.md` Part 1 —
   **Context, Scope (in/out incl. the named deferral list), Invariants pinned
-  for M34 (M34·1–M34·12), FACES (10)**. **No code, no build.**
+  for M34 (the 9: M34·1, M34·4–M34·9, M34·11, M34·12), FACES (10)**. **No
+  code, no build.**
 - **Entry reads:**
   `docs/plans-milestones/plan-m34-analytics-history.md` (this register —
   the Understanding, the "one thing" section, the Assumptions);
@@ -614,8 +619,9 @@ records `## U<m> — Drift pause` in the handoff note.
     history (M34 is `GlobalAdmin`-gated), the multi-week / month
     aggregation (M34 v1 is daily granularity), and the `Milestones.cs` /
     README / `MilestonesTests` trio until the milestone *ships* (U08 owns it).
-  - `## Invariants (pinned for M34)` — M34·1 through M34·12, each with a
-    one-line M34 note (verbatim from the register's "one thing" section).
+  - `## Invariants (pinned for M34)` — the **9 invariants** (M34·1, M34·4,
+    M34·5, M34·6, M34·7, M34·8, M34·9, M34·11, M34·12), each with a one-line
+    M34 note (verbatim from the register's "one thing" section).
   - `## FACES (pinned, 10)` — M34-1 through M34-10, each bound to
     invariants:
     - **M34-1** a GlobalAdmin visits `/admin/analytics` → the M13
@@ -741,7 +747,7 @@ records `## U<m> — Drift pause` in the handoff note.
       to the rendered trend), **part-vs-whole** (the 11-test pin list is
       the whole; closed-loop + handoff are the parts; all must pass
       together).
-    - `### 2.6 drift-guard (frozen once written)` — the 12-invariant table
+    - `### 2.6 drift-guard (frozen once written)` — the 9-invariant table
       (U01), the 10 FACES (U01), the `IUsageAnalyticsService` frozen
       surface + the `GetHistoryAsync` ADD, the `UsageDailyTotal` /
       `UsageHistoryResult` shapes, the M13 surface extension, the closed
