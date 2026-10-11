@@ -23,11 +23,12 @@ public class MilestonesTests
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        // M33 (storage metrics history) is now the last shipped milestone
-        // (closed in this M33 close unit, ADR 0156); M34 (analytics history)
-        // is the single in-progress milestone, so the asserted set is every
-        // id except M34.
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33" })
+        // M34 (analytics history) is now the last shipped milestone (closed in
+        // this M34 close unit, ADR 0162) and is the **last** milestone on the
+        // roadmap — there is **no** successor to promote (the register's
+        // M34·12 / last-milestone framing). The asserted set is therefore
+        // **every** id: all shipped, all StatusDone.
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -35,16 +36,15 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M34_Is_The_Single_InProgress_Milestone()
+    public void No_Milestone_Is_InProgress()
     {
-        // M33 (storage metrics history) is now the last shipped milestone
-        // (closed in this M33 close unit, ADR 0156); M34 (analytics history)
-        // is the single in-progress milestone promoted to StatusNext. The
-        // roadmap order is unchanged ("…M32","M33","M34" — the "named lane,
-        // not a renumber" precedent).
-        var next = Assert.Single(Milestones.All, m => m.Status == Milestones.StatusNext);
-        Assert.Equal("M34", next.Id);
-        Assert.All(Milestones.All.Where(m => m.Id is not "M34"),
+        // M34 (analytics history) is the **last** milestone on the roadmap
+        // (closed in this M34 close unit, ADR 0162). The close flips M34 to
+        // StatusDone and promotes **no** successor, so there is **no**
+        // StatusNext milestone at all. The roadmap order is unchanged
+        // ("…M32","M33","M34" — the "named lane, not a renumber" precedent).
+        Assert.Empty(Milestones.All.Where(m => m.Status == Milestones.StatusNext));
+        Assert.All(Milestones.All,
             m => Assert.Equal(Milestones.StatusDone, m.Status));
     }
 

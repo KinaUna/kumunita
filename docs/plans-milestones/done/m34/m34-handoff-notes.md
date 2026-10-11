@@ -510,3 +510,86 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
   appends the design-doc `### Run result` section + this handoff section +
   the `m34-u07.md` move only).
 
+## U08 — close
+
+**M34 is complete.** The six-member close flip (M34·12) + the ADR 0162 →
+`Accepted` + the `done/m34/` move. **M34 is the last milestone** — the close
+flips `M34` → `StatusDone` and promotes **no** successor (the M34·10 /
+last-milestone framing). **No new code, no new tests, no seam / view / `kw-l`
+change** (U03–U07's work is untouched — the six-member flip touches only the
+close-flip files + the ADR + the `done/` move).
+
+- **(a) `Milestones.cs` flip** — the `M34` row `StatusNext` → **`StatusDone`**.
+  **No** successor row to promote (M34 is the last milestone). The **order is
+  unchanged** (`…"M32","M33","M34"` — the "named lane, not a renumber"
+  precedent).
+- **(b) `MilestonesTests.cs` re-pin** — `Shipped_Milestones_Are_Marked_Done`
+  done-list now asserts **every** id is `StatusDone` (gains `"M34"` — the
+  last milestone, so the set is now the whole roadmap). `M34_Is_The_Single_
+  InProgress_Milestone` **removed** and replaced by a new
+  `No_Milestone_Is_InProgress` test (asserts
+  `Milestones.All.Where(m => m.Status == StatusNext)` is **empty** + every
+  id is `StatusDone`). The `Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_
+  In_Order` pin is **untouched** (the order is unchanged).
+- **(c) `WhatsNew.cs` `0.55.0` entry** — appended **newest-first** as the
+  registry head (the required sixth close-flip member, the M27 lesson held),
+  dated `2026-10-11`, naming M34 + ADR 0162 (the `0.54.0` M32/ADR-0161 entry
+  slides one row back). `WhatsNewTests` head pin re-pointed from the ADR 0161
+  `0.54.0` head to the M34 `0.55.0` head (the `The_Improve_Lane_Reduction_
+  Entry_Is_Shipped` test now asserts the `0.55.0`/`2026-10-11` head names
+  "analytics history"; `0.54.0` ADR 0161 + `0.53.0` ADR 0160 slide one/two
+  rows back, the rest re-counted).
+- **(d) The three doc parity appends** — `README.md` (the summary's
+  `**M34 is next**` line → `**M34 is done**` + the "roadmap is complete" tail;
+  the Roadmap `M34` line gains the `**Done.** (ADR 0162)` tail) ·
+  `docs/STATUS.md` (the `**M34 is done**` line appended after the ESC line) ·
+  `docs/ARCHITECTURE.md` (the `**M34 analytics history is shipped** (ADR 0162)`
+  `Usage/`-surface extension line appended after the ESC extension line —
+  **derived, not captured**).
+- **(e) ADR 0162** — `Status: Draft` → **`Status: Accepted`**; the
+  `docs/adr/README.md` index row added as `| 0162 | … | Accepted — **Done**
+  (M34) |` (the M33 `0156` row shape).
+- **(f) The `done/m34/` move** — `git mv` the register
+  (`plan-m34-analytics-history.md`) + `in-progress/m34-u08.md` +
+  `in-progress/m34-handoff-notes.md` into `done/m34/` (the `m34-u00`…`m34-u07`
+  unit plans were already there — `done/m34/` holds all M34 artifacts).
+- **Test evidence (in-process path, the AGENTS.md runner):**
+  `dotnet build Kumunita.slnx -c Debug` **Build succeeded, 0 Warning(s),
+  0 Error(s)**. The **`MilestonesTests` + `WhatsNewTests` pins are GREEN**
+  (`dotnet exec Kumunita.Web.Tests.dll -class …MilestonesTests -class
+  …WhatsNewTests` → **Total: 11, Errors: 0, Failed: 0** — the `M34` →
+  `StatusDone` flip, the `No_Milestone_Is_InProgress` assertion, and the
+  `0.55.0` newest-first head all pin). Full `Kumunita.Web.Tests` assembly:
+  **Total: 1029, Errors: 0, Failed: 1, Skipped: 1**.
+- **Still-open (honest ship note — record, do not fix here):**
+  1. **1 × M13 `AdminAnalyticsControllerTests.AdminAnalytics_Route_Exists_And_
+     GlobalAdmin_Only` — a U04-introduced regression** (the pre-existing M13
+     D7 pin) — its `Build()`/`Index(window:30)` harness stubs only
+     `GetWindowAsync(30)`, but U04's additive `Index` action now also awaits
+     `analytics.GetHistoryAsync(window)` (line `var history = await
+     analytics.GetHistoryAsync(window);`) — the unstubbed NSubstitute returns
+     null → NRE at `history.Points`. This is exactly the **M33 U05-introduced
+     M24 regression shape** (an additive `GetHistoryAsync` read not stubbed in
+     a pre-existing controller test), which M33's U08 recorded as an honest
+     ship note and did **not** fix (outside the six-member close-flip file
+     budget). The fix (stub `GetHistoryAsync` in that one M13 test) is outside
+     U08's deliverables (six-member flip + ADR + move only) + unit-series
+     rule §1 (never modify a file not in your deliverables) — it ships with
+     M34 and remains open for a follow-up fix. **Not a U08-introduced
+     regression; not part of M34's 11-test gate** (the gate's 5 Web pins live in
+     `AdminAnalyticsHistoryTests`, all green).
+  2. **U06 180/365 window tension — STILL OPEN (known-deferred)** (inherited
+     from U06, already recorded in the design doc `### Run result` (c)): the
+     frozen M13 `GetWindowAsync` read admits only {7,30,90} end-to-end, so
+     `?window=180`/`?window=365` 400 from the M13 read before the M34 read
+     renders — the M34 pinned window set {7,30,90,180,365} is admitted **at the
+     `GetHistoryAsync` seam** (the 6 Core derived-read pins pass). A U08/author
+     decision (widen the M13 window set, or a M34-only Trend window param), not
+     a U07/U08 close flip.
+  3. **No M34 seam / DTO / view / `kw-l` defect** (the 11-test gate is green —
+     U07's §gate: Closed loop / Handoff / Part-vs-whole all PASS, 11/11). No
+     roadmap renumber (M34 stays M34 — and is now the last milestone). The
+     180/365 end-to-end Web render + the 1 M13 test stub are the only open
+     items; both are recorded, not resolved, consistent with the register's
+     U08 "record, don't fix" parenthetical.
+

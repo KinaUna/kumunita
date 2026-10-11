@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.55.0", "2026-10-11", new List<string>
+        {
+            "Analytics history — the M13 /admin/analytics surface gains a trend view over time (a derived read over the existing UsageEvent rows — one UsageDailyTotal per UTC day over a pinned window — + a per-day table + an inline sparkline over a pinned 7/30/90/180/365-day window) so an operator can see usage patterns evolve: the M13 Usage surface extended additively (the UsageDailyTotal + UsageHistoryResult DTOs + the GetHistoryAsync read seam + the closed analytics.trend.* kw-l key set × en/de/fr/da) (ADR 0162).",
+        }),
         new("0.54.0", "2026-10-11", new List<string>
         {
             "Page translations for editors + platform-pages translation surface — the editor of a page can now add / edit / remove translations of their own page (the ADR 0040 standing matrix gains the author branch on blog pages, mirroring the edit standing — a system page's author is still an audit identity, not a standing branch, and a community Moderator still has no translation standing on either kind), and the /admin/platform platform pages table gains a per-page Translations ⋮ dropdown (the posts/announcements pattern) for the four Page-backed surfaces (about stays preview-only, ADR 0043 D1) — the shared _PageTranslationModals partial extracted from the page detail surface so both render the same add / edit / remove modals without duplication (the PageTranslationModalsModel view-model + the AdminPlatformViewModel.PlatformPage row + the BuildPlatformPageTranslationsAsync composition seam + the ILocalizationService optional ctor field on AdminController; the PageController.Show ⋮ dropdown is unchanged — same items, same pg id-prefix — only the standing now lets a blog author see them) (ADR 0161).",

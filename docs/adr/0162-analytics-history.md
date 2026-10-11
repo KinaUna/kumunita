@@ -1,6 +1,6 @@
 # ADR 0162 — Analytics history (M34) — the M13 `/admin/analytics` admin surface gains a trend view over time so an operator can see usage patterns evolve
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-11
 
 The README roadmap names M34 exactly: "**Analytics history** — the M13

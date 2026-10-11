@@ -39,7 +39,7 @@ document management (a shared repository for official documents, contracts, etc.
 **M31 is done** — production error handling (a report-an-issue form on the 500 error page so a resident can say what went wrong, plus a GlobalAdmin triage surface at /admin/error-reports; one new bounded context, one new doc, one new service; ADR 0154).
 **M32 is done** — issue submission & escalation (a resident submits an issue at /issues/new + a GlobalAdmin resolves it locally or forwards it to a configurable escalation endpoint; the M31 ErrorReports surface extended additively — the resolved TriageStatus value + the Origin/ResolvedAt/ResolvedBy/ResolutionNote fields + the MarkResolvedAsync seam + the IEscalationForwarder + the closed issue.* / errorreport.resolve.* / errorreport.escalate.* kw-l key set; ADR 0155).
 **M33 is done** — storage metrics history (the M24 /admin/storage surface gains a trend view over time — a daily capture tick stores one StorageMetricsSample, a 365-day retention prunes it, and a per-day table + inline sparkline render a pinned 30/90/180/365-day window — so an operator can estimate whether the instance's capacity is sufficient in the future; the M24 Usage surface extended additively — the StorageMetricsSample doc + the StorageHistoryDocTypes surface + the GetHistoryAsync read seam + the StorageMetricsCaptureService tick + the closed storage.trend.* kw-l key set; ADR 0156).
-**M34 is next** — analytics history (the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve).
+**M34 is done** — analytics history (the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve — a derived read over the existing UsageEvent rows, one UsageDailyTotal per UTC day over a pinned window, + a per-day table + an inline sparkline; the M13 Usage surface extended additively — the UsageDailyTotal + UsageHistoryResult DTOs + the GetHistoryAsync read seam + the closed analytics.trend.* kw-l key set; ADR 0162). The roadmap is complete — M34 is the last milestone.
 (see the "Roadmap" below).
 
 The detailed status report lives in [`docs/STATUS.md`](docs/STATUS.md); the
@@ -293,7 +293,7 @@ stays trivial and the authorization rules can grow freely.
 - **M32** — Issue submission & escalation: a resident submits an issue; a GlobalAdmin resolves it locally if instance-specific, or forwards it to a configurable escalation endpoint (an environment variable — so a fork or multi-instance operator can redirect where escalations land). **Done.** (ADR 0155)
 - **ESC** — Escalation authorization + receiving inbox: a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token; when they escalate, the receiving platform validates the token and only then accepts the issue as an 'escalated' row in the same admin list (the M32 ErrorReports surface extended additively). **Done.** (ADR 0159)
 - **M33** — Storage metrics history: the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future. **Done.** (ADR 0156)
-- **M34** — Analytics history: the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve.
+- **M34** — Analytics history: the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve. **Done.** (ADR 0162)
 
 ## Deferred (future, by design)
 
