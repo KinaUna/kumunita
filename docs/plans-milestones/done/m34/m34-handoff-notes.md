@@ -593,3 +593,62 @@ close-flip files + the ADR + the `done/` move).
      items; both are recorded, not resolved, consistent with the register's
      U08 "record, don't fix" parenthetical.
 
+---
+
+## Post-close (2026-10-11) — option-B resolution of both open items
+
+> **Appended after the close** (a fresh agent, not a U-unit). The two
+> "recorded, not resolved" items from the U08 close section (1) and (2) above
+> are **now both resolved** — the M13 `?window=` contract is **untouched**
+> throughout (M34·1 additive-only held).
+
+- **Open item (2) — the 180/365 window tension — RESOLVED by option B**
+  (the "M34-only Trend window param" of the U06 decision note; the user chose
+  option B). The Trend section now reads its **own** window over a separate
+  `?trendwindow=` param (`AdminAnalyticsController.Index`'s `trendWindow`
+  parameter, default 30), **independent of** the M13 `?window=` read (pinned
+  {7, 30, 90}). The two reads no longer share a param, so
+  `?trendwindow=180` / `?trendwindow=365` render the Trend end-to-end (**200**,
+  not a M13 400) without touching the frozen M13 window set.
+  - **Code (4 files):** `AdminAnalyticsController.Index` — `GetHistoryAsync`
+    now takes `trendWindow` (was `window`); `AnalyticsViewModel` — gains a
+    `TrendWindowDays` label member (the M13 `WindowDays` is **unchanged**,
+    still the `?window=` label; `History` unchanged);
+    `Views/AdminAnalytics/Index.cshtml` — the Trend selector's five links now
+    point at `?window=@Model.WindowDays&trendwindow=@win` (was
+    `?window=@win`), active-state uses `Model.TrendWindowDays`.
+  - **Test (2 files):** `AdminAnalyticsHistoryTests.M34_2_
+    Window_Switch_Renders_Chosen_Window` **rewritten** (Option-B) — asserts
+    (a) the frozen M13 `?window=` read stays 7/30/90 **and** (b) the full
+    7/30/90/180/365 set renders end-to-end over `?trendwindow=`
+    (`Index(window: 30, trendWindow: tw)` → 200 for each `tw`); the view
+    selector's string-pin now expects `trendwindow=` (the Trend param is the
+    *second* query param, rendered `&trendwindow=`) + `?window=` (frozen M13
+    seam).
+  - **Docs:** design doc §M34·7/§M34·8/§M34-2/§2.4-pin-8/§2.6 + the
+    `### Run result` (c)/(d) blocks (the "STILL OPEN" block is now
+    **RESOLVED**; the 180/365 end-to-end Web render is **PASSING**); ADR 0162
+    D3 + D4 (the `?trendwindow=` Option-B seam). All additive — the 9-invariant
+    set, the 11 frozen test names, the M13 `?window=` contract, and the M13
+    `WindowDays` member are all **untouched**.
+
+- **Open item (1) — the M13 D7 pin NRE — RESOLVED by a one-stub**
+  (a fresh agent, not a U-unit). `AdminAnalyticsControllerTests.
+  AdminAnalytics_Route_Exists_And_GlobalAdmin_Only` (the M13 D7 pin) now
+  stubs the additive `GetHistoryAsync(30)` read (returns an empty
+  `UsageHistoryResult`) alongside the M13 `GetWindowAsync(30)` stub — the
+  additive `Index` action no longer NREs on `history.Points`. The D7 pin's
+  assertions (the 200 ViewResult + `store.DidNotReceive().
+  LightweightSession()`) are **unchanged** and still hold (the
+  `GetHistoryAsync` read is a read — no store).
+
+- **Verification (post-close, this session):** `dotnet build Kumunita.slnx`
+  green (0 errors; the one `xUnit2029` warning is pre-existing in
+  `MilestonesTests.cs`, not this change). **Full `Kumunita.Web.Tests` suite:
+  Total 1029, Failed 0, Skipped 1** (the skip is
+  `ImproveHarnessTests.ImproveCheck_Gate_Passes` — `pwsh` not on PATH, a
+  pre-existing environment skip, unrelated to M34). The 6 `UsageHistoryTests`
+  (Core, Testcontainers `postgres:18`) + the 5 `AdminAnalyticsHistoryTests`
+  (Web) M34 pins all green. **Both U08 open items are now resolved; the M34
+  surface is fully green end-to-end, including `?trendwindow=180` / `365`.**
+

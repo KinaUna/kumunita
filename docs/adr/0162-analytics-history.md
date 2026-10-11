@@ -147,7 +147,8 @@ multi-week/month aggregation (the named deferrals, §Consequences).
   the M13 pinned 7/30/90 set **extended** with the 180/365 days the
   over-time view needs, M34·7). The **default** rendered window on the
   surface is **30 days** (the M13 `GetWindowAsync` default). The window is
-  a query param (`?window=30`), never a DB column. The impl is on the
+  a query param — the Trend section's **own** `?trendwindow=` param (the
+  Option-B seam, D4), never a DB column. The impl is on the
   **existing** `UsageAnalyticsService` (the `AddTransient` registration
   already exists — **no** new DI line, M34·6): one `QuerySession` over the
   `UsageEvent` rows with `At >= now − days`, grouped by `At`'s UTC date →
@@ -155,16 +156,23 @@ multi-week/month aggregation (the named deferrals, §Consequences).
   `Date`, wrapped in `UsageHistoryResult`. **Zero** `AccessAudit` rows
   (M34·4). The 2 M13 methods are **unchanged** (M34·1 additive-only).
 - **The M13 `/admin/analytics` surface is extended additively** (D4, M34·8).
-  `AdminAnalyticsController.Index` gains a `GetHistoryAsync(window)` read (a
-  second read alongside the M13 `GetWindowAsync` read — the M13 read is
-  **unchanged**); the `AnalyticsViewModel` gains an
-  `IReadOnlyList<UsageDailyTotal> History` member (the M13 `WindowDays`
-  member is **reused**, not duplicated). `Views/AdminAnalytics/Index.cshtml`
+  `AdminAnalyticsController.Index` gains a `GetHistoryAsync(trendWindow)`
+  read (a second read alongside the M13 `GetWindowAsync` read — the M13 read
+  is **unchanged**); the `AnalyticsViewModel` gains an
+  `IReadOnlyList<UsageDailyTotal> History` member + a `TrendWindowDays`
+  label member. **Option-B seam (the close resolution):** the Trend section
+  reads its **own** window over a separate `?trendwindow=` param (pinned
+  {7, 30, 90, 180, 365}), **independent of** the M13 `?window=` read (pinned
+  {7, 30, 90}) — the two reads no longer share a param, so `?trendwindow=180`
+  / `?trendwindow=365` render the Trend end-to-end (**200**) without tripping
+  the frozen M13 `GetWindowAsync` window guard (resolving the red pin the
+  U06/U07 gate had recorded). `Views/AdminAnalytics/Index.cshtml`
   gains a **Trend** section (a `<table>` — date · total, ascending — + an
   inline `<svg>` sparkline — a `<polyline>` over the window's daily-total
   points, `viewBox` + `preserveAspectRatio`, **no** JS, **no** chart lib —
   the M34·9 pin — + the `analytics.trend.*` `kw-l` keys + a window selector
-  — five links: 7/30/90/180/365). When `History` is empty, the
+  — five links: 7/30/90/180/365 over `?trendwindow=`). When `History` is
+  empty, the
   `analytics.trend.empty` message renders (the M34-3 FACE). The M13
   surface-rank table + the distinct-actor header markup are **unchanged**
   (M34·1 additive-only). The M13 `GlobalAdmin` gate is **unchanged** (a

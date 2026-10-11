@@ -20,9 +20,10 @@ namespace Kumunita.Web.Tests;
 /// The 5 pinned M34 Web tests (design doc §2.4, verbatim names) — the
 /// M34·8 additive <c>Trend</c> section on the M13 <c>/admin/analytics</c>
 /// surface: the <see cref="AdminAnalyticsController.Index"/> second read
-/// (<c>GetHistoryAsync</c>), the <c>?window=</c> param (M34·7), the
+/// (<c>GetHistoryAsync</c>), the <c>?trendwindow=</c> param (M34·7 — the
+/// Option-B independent Trend seam, ADR 0162), the
 /// <see cref="AnalyticsViewModel.History"/> /
-/// <see cref="AnalyticsViewModel.WindowDays"/> projection, the
+/// <see cref="AnalyticsViewModel.TrendWindowDays"/> projection, the
 /// <c>analytics.trend.empty</c> empty-state (M34-3 FACE), the unchanged M13
 /// <c>GlobalAdmin</c> gate (M34·8), and the unchanged M13 CSV export lane's
 /// <b>exactly one</b> <see cref="AccessAudit"/> row (M34·4 / M13 D4).
@@ -117,18 +118,22 @@ public class AdminAnalyticsHistoryTests
     // GetHistoryAsync), but the **frozen** M13 GetWindowAsync read admits
     // **only** {7,30,90} (NormalizeWindow throws for 180/365). Per M34·8 the
     // two reads share the one ?window= param, so in production
-    // ?window=180 / ?window=365 400 from the M13 read before the M34 read
-    // renders. This unit honours the M34·1 additive-only pin (it does NOT
-    // widen the M13 read) and therefore pins the windows the M13 read
-    // admits — 7/30/90 — which render end-to-end. The 180/365 gap is a
-    // red pin / known-deferred for U07's gate + U02's drift-guard (option
-    // (A) of the U06 decision note).
+    // **Option-B resolution (ADR 0162 close):** the Trend section now reads
+    // its **own** ?trendwindow= param (pinned {7, 30, 90, 180, 365}) rather
+    // than sharing the frozen M13 ?window= param (pinned {7, 30, 90}). The two
+    // reads are independent, so ?trendwindow=180 / ?trendwindow=365 render
+    // the Trend end-to-end **without** tripping the frozen M13 GetWindowAsync
+    // window guard — the 180/365 red pin the U06/U07 gate recorded is now
+    // resolved (option B of the U06 decision note). This pin asserts both:
+    // (a) the M13 ?window= read stays frozen at 7/30/90, and (b) the full
+    // 7/30/90/180/365 M34 trend set renders end-to-end over ?trendwindow=.
 
     [Fact]
     public async Task M34_2_Window_Switch_Renders_Chosen_Window()
     {
-        // For each window the **frozen M13 read admits** (7/30/90), the Index
-        // action threads it into both reads + projects it to the model.
+        // (a) The frozen M13 ?window= read (7/30/90) is unchanged: for each,
+        //     GetWindowAsync(window) is threaded into the M13 read, while the
+        //     Trend read uses its own ?trendwindow= (default 30).
         foreach (var window in new[] { 7, 30, 90 })
         {
             var (controller, analytics, _, _) = Build();
@@ -147,28 +152,74 @@ public class AdminAnalyticsHistoryTests
             {
                 new() { Date = new DateTimeOffset(DateTime.UtcNow.AddDays(-1).Date, TimeSpan.Zero), Total = 3 },
             };
-            analytics.GetHistoryAsync(window, Arg.Any<CancellationToken>())
-                     .Returns(new UsageHistoryResult(window, history));
+            analytics.GetHistoryAsync(30, Arg.Any<CancellationToken>())
+                     .Returns(new UsageHistoryResult(30, history));
 
             var action = await controller.Index(window: window);
             var model = Assert.IsType<AnalyticsViewModel>(
                 Assert.IsType<ViewResult>(action).Model);
 
-            // The chosen window renders (M34·7): the model carries it + the
-            // history for it (WindowDays reused, not duplicated — M34·8).
+            // The M13 window renders (M34·1 additive-only — the frozen read);
+            // the Trend window is its own ?trendwindow= (default 30).
             Assert.Equal(window, model.WindowDays);
+            Assert.Equal(30, model.TrendWindowDays);
             Assert.Single(model.History);
             await analytics.Received(1).GetWindowAsync(window);
-            await analytics.Received(1).GetHistoryAsync(window, Arg.Any<CancellationToken>());
+            await analytics.Received(1).GetHistoryAsync(30, Arg.Any<CancellationToken>());
         }
 
-        // The view's window selector offers the full M34 pinned set as links
-        // (the string-pin idiom) — the analytics.trend.window.* prefix + the
-        // ?window= link prefix (the five-link 7/30/90/180/365 selector the
-        // M34·8 Trend section renders, the M33 selector idiom):
+        // (b) The M34 ?trendwindow= read admits the **full** pinned set
+        //     (7/30/90/180/365) and — the previously-red 180/365 end-to-end
+        //     render — works end-to-end: Index(window: 30, trendWindow: tw)
+        //     → GetWindowAsync(30) [valid M13] + GetHistoryAsync(tw) [valid
+        //     M34] → a 200 ViewResult, no throw (the M13 guard is never hit
+        //     because the two windows no longer share a param). The Core
+        //     UsageHistoryTests prove GetHistoryAsync(180)/(365) do not throw
+        //     at the real service, so the production path 30 + 180/365 → 200.
+        foreach (var tw in new[] { 7, 30, 90, 180, 365 })
+        {
+            var (controller, analytics, _, _) = Build();
+
+            analytics.GetWindowAsync(30).Returns(new UsageAnalyticsResult
+            {
+                WindowDays         = 30,
+                Total              = 3,
+                AuthenticatedTotal = 2,
+                AnonymousTotal     = 1,
+                DistinctActors     = 2,
+                SurfaceRanking     = new[] { new SurfaceRow { Surface = "posts", Total = 3 } }
+            });
+
+            var history = new List<UsageDailyTotal>
+            {
+                new() { Date = new DateTimeOffset(DateTime.UtcNow.AddDays(-1).Date, TimeSpan.Zero), Total = 3 },
+            };
+            analytics.GetHistoryAsync(tw, Arg.Any<CancellationToken>())
+                     .Returns(new UsageHistoryResult(tw, history));
+
+            var action = await controller.Index(window: 30, trendWindow: tw);
+            var model = Assert.IsType<AnalyticsViewModel>(
+                Assert.IsType<ViewResult>(action).Model);
+
+            // The two windows are independent (Option-B): the M13 read stays
+            // 30, the Trend section carries tw (180/365 included) — no 400.
+            Assert.Equal(30, model.WindowDays);
+            Assert.Equal(tw, model.TrendWindowDays);
+            Assert.Single(model.History);
+            await analytics.Received(1).GetWindowAsync(30);
+            await analytics.Received(1).GetHistoryAsync(tw, Arg.Any<CancellationToken>());
+        }
+
+        // (c) The view's Trend selector points at the independent trendwindow
+        //     seam (the string-pin idiom) — the analytics.trend.window.* key
+        //     prefix + the trendwindow= link param (the five-link 7/30/90/180/
+        //     365 selector, M34·8). The Trend param is the *second* query param
+        //     in the link (?window=…&trendwindow=…) so it renders as
+        //     &trendwindow= — pin the param name, not the leading '?'.
         var html = ViewSource();
         Assert.Contains("analytics.trend.window.", html);   // the window-key prefix (M34·7 / M34·8)
-        Assert.Contains("?window=", html);                   // the selector link prefix
+        Assert.Contains("trendwindow=", html);              // the independent Trend seam (Option-B)
+        Assert.Contains("?window=", html);                   // the frozen M13 seam (unchanged)
     }
 
     // ── Pin 9 ─────────────────────────────────────────────────────────────

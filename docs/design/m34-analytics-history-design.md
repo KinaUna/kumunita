@@ -206,11 +206,13 @@ multi-week/month aggregation (the named deferrals, §Scope).
 - the **M13 surface extension** — the `AdminAnalyticsController.Index` gains
   the history read (a second read alongside the M13 `GetWindowAsync` read;
   the M13 read is **unchanged**) + the `AnalyticsViewModel` gains a `History`
-  member (the M13 `WindowDays` member is **reused**, not duplicated) + the
+  member + a `TrendWindowDays` label member (**Option-B seam, ADR 0162
+  close resolution** — the Trend section's own `?trendwindow=` window,
+  independent of the M13 `?window=` read) + the
   `Views/AdminAnalytics/Index.cshtml` gains a **Trend** section (a per-day
   table + an inline `<svg>` sparkline + a window selector — five links
-  7/30/90/180/365; the M13 surface-rank table + distinct-actor header are
-  **unchanged**, M34·8);
+  7/30/90/180/365 over `?trendwindow=`; the M13 surface-rank table +
+  distinct-actor header are **unchanged**, M34·8);
 - the **closed `analytics.trend.*` `kw-l` key set** × en/de/fr/da (~10 keys,
   the M34·11 pin — authored by U05, consumed by U04's trend section); and
 - the **test pins** (the `UsageHistoryTests` / `AdminAnalyticsHistoryTests`
@@ -316,11 +318,16 @@ capture tick, M33·7 retention constant); M34 has no capture lane to pin.
   days present** in the window (no fabricated zero rows — the M33-9 FACE
   precedent; a day with zero `UsageEvent` rows is **not** in the result).
 - **M34·8 — The M13 surface is extended additively.**
-  `AdminAnalyticsController.Index` gains a `GetHistoryAsync(window)` read (a
-  second read alongside the M13 `GetWindowAsync` read — the M13 read is
-  **unchanged**); `AnalyticsViewModel` gains an `IReadOnlyList<
-  UsageDailyTotal> History` member (+ the window — the M13 `WindowDays`
-  member is **reused**, not duplicated). `Views/AdminAnalytics/Index.cshtml`
+  `AdminAnalyticsController.Index` gains a `GetHistoryAsync(trendWindow)`
+  read (a second read alongside the M13 `GetWindowAsync` read — the M13 read
+  is **unchanged**); `AnalyticsViewModel` gains an `IReadOnlyList<
+  UsageDailyTotal> History` member + a `TrendWindowDays` label member
+  (**Option-B seam, the ADR 0162 close resolution** — the Trend section
+  carries its **own** window over a separate `?trendwindow=` param, pinned
+  {7, 30, 90, 180, 365}, so it is **independent** of the M13 `WindowDays`
+  member over `?window=` (pinned {7, 30, 90}); the two reads no longer
+  share a param, so `?trendwindow=180` / `?trendwindow=365` render the Trend
+  end-to-end without tripping the M13 `GetWindowAsync` window guard). `Views/AdminAnalytics/Index.cshtml`
   gains a **Trend** section (a `<table>` — date · total, ascending — + an
   inline `<svg>` sparkline — a `<polyline>` over the window's daily-total
   points, `viewBox` + `preserveAspectRatio`, **no** JS, **no** chart lib —
@@ -366,8 +373,9 @@ written; the drift-guard (U02 + U08) re-pins them.
   renders (the 30-day per-day table + the inline `<svg>` sparkline) (M34·8,
   M34·9).
 - **M34-2 — A GlobalAdmin switches the trend window to 7/90/180/365.** The
-  table + sparkline reflect the chosen window (the `?window=` query param)
-  (M34·7).
+  table + sparkline reflect the chosen window (the `?trendwindow=` query
+  param — the Option-B independent Trend seam, ADR 0162 close resolution;
+  the M13 `?window=` read stays 7/30/90) (M34·7).
 - **M34-3 — The history is empty** (a fresh instance, no `UsageEvent` rows
   yet) → the "Trend" section renders the `analytics.trend.empty` message (not
   a blank, not an error) (M34·11).
@@ -553,9 +561,10 @@ shape):
    `/admin/analytics` sees the **Trend** section (the
    `analytics.trend.title` key present in the HTML) + the M13 surface-rank
    table + distinct-actor header still render (M34·8, FACE M34-1).
-8. `M34_2_Window_Switch_Renders_Chosen_Window` — the `?window=7` /
-   `?window=180` / `?window=365` params render the chosen window (M34·7,
-   FACE M34-2).
+8. `M34_2_Window_Switch_Renders_Chosen_Window` — the frozen M13 `?window=`
+   read (7/30/90) is unchanged + the M34 `?trendwindow=` read admits the
+   full {7, 30, 90, 180, 365} set end-to-end (M34·7, FACE M34-2, the
+   Option-B independent Trend seam).
 9. `M34_3_Empty_History_Renders_Empty_Message` — an **empty** history
    renders the `analytics.trend.empty` message (M34·11, FACE M34-3).
 10. `M34_7_NonGlobalAdmin_Denied` — a non-`GlobalAdmin` (signed-in
@@ -606,10 +615,12 @@ rule §13):
   + `UsageHistoryResult` 2 members (`WindowDays`, `Points`); no field
   outside either set.
 - **The M13 surface extension (M34·8)** — `Index` gains the second read +
-  the `History` view-model member (`WindowDays` reused) + the Trend section
-  (table + sparkline + five window links + the `analytics.trend.empty`
-  empty-state); the M13 surface-rank table + distinct-actor header + `Export`
-  lane + `GlobalAdmin` gate **unchanged**.
+  the `History` view-model member + the `TrendWindowDays` label member
+  (**Option-B seam, ADR 0162 close resolution** — the Trend section's own
+  `?trendwindow=` window, independent of the M13 `?window=` read) + the
+  Trend section (table + sparkline + five window links over `?trendwindow=`
+  + the `analytics.trend.empty` empty-state); the M13 surface-rank table +
+  distinct-actor header + `Export` lane + `GlobalAdmin` gate **unchanged**.
 - **The closed `analytics.trend.*` key set (§2.3)** — exactly **10 keys**,
   four-language, the M13 `admin.analytics_*` set **untouched**.
 - **The 11 test names (§2.4)** — verbatim, in the two named files/classes;
@@ -659,28 +670,30 @@ together.
   invariant set is the **9** — M34·1, M34·4, M34·5, M34·6, M34·7, M34·8,
   M34·9, M34·11, M34·12 — and §2.6 freezes that 9-set (not a 12-set). The
   gate records the 9-set as frozen.
-- **U06 180/365 window tension — STILL OPEN (option A, red pin / known-
-  deferred).** The M34 pinned window set is `{7, 30, 90, 180, 365}` (M34·7)
+- **U06 180/365 window tension — RESOLVED (option B, the close resolution).** The M34 pinned window set is `{7, 30, 90, 180, 365}` (M34·7)
   and is admitted **at the `GetHistoryAsync` seam** (the Core
   `NormalizeHistoryWindow` guard — `GetHistoryAsync(180)` /
   `GetHistoryAsync(365)` work at the Core level, and the 6 Core derived-read
-  pins pass). But the **frozen** M13 `GetWindowAsync` read (`NormalizeWindow`)
-  admits **only {7, 30, 90}**, and per M34·8 the two reads share the one
-  `?window=` param — so in production `?window=180` / `?window=365` **400
-  from the M13 read before the M34 read renders**. U06's
-  `M34_2_Window_Switch_Renders_Chosen_Window` (Web) therefore pins **7/30/90**
-  (the windows the frozen M13 read admits end-to-end), not 180/365. **This
-  gate does NOT mark the 180/365 *end-to-end Web* render as passing.** The
-  180/365 end-to-end render is a **known-deferred / red pin**: resolving it
-  requires a Core/design-doc reconciliation (widen the M13 window set, or a
-  M34-only Trend window param) — a U08/author decision, not a U07 gate
-  fabrication.
-
-**(d) Consistency with §2.6's frozen pins.** The gate is consistent with
-§2.6: the 9-invariant set (not a 12-set) is honoured (the U01 resolution
-stands); the 11 test names are verbatim (§2.4); the closed loop + handoff are
-the parts, the 11-test list is the whole (all green). The **only** open item
-is the U06 180/365 window tension, which §2.6 does **not** pin as an
+  pins pass). The **frozen** M13 `GetWindowAsync` read (`NormalizeWindow`)
+  admits **only {7, 30, 90}**. **Resolution (option B):** the Trend section
+  now reads its **own** window over a separate `?trendwindow=` param (the
+  `AdminAnalyticsController.Index` `trendWindow` parameter, default 30),
+  **independent of** the M13 `?window=` read — the two reads no longer share
+  a param, so `?trendwindow=180` / `?trendwindow=365` render the Trend
+  end-to-end (**200**, not a M13 400) without touching the frozen M13 window
+  set. The `AnalyticsViewModel` gains a `TrendWindowDays` label member (the
+  M13 `WindowDays` member is **unchanged**, still the `?window=` label), and
+  the Trend selector's five links point at
+  `?window=@Model.WindowDays&trendwindow=@win`. U06's
+  `M34_2_Window_Switch_Renders_Chosen_Window` (rewritten, Option-B) now
+  asserts (a) the frozen M13 `?window=` read stays 7/30/90 and (b) the full
+  7/30/90/180/365 set renders end-to-end over `?trendwindow=` (`Index(window:
+  30, trendWindow: tw)` → 200 for each `tw`). **This gate now marks the
+  180/365 end-to-end Web render as PASSING** (*resolved, nformer open item —
+the U06 180/365 window tension — is **now resolved by the Option-B
+`?trendwindow=` seam** (the independent Trend window param, the M13 `?window=`
+contract untouched), so §2.6's M34·8 surface pin is satisfied and no red pin
+remains. No `## U07 — Drift pause` is recorded (U07's own work is greenension, which §2.6 does **not** pin as an
 end-to-end Web render (it freezes the M34·7 pinned window set
 `{7, 30, 90, 180, 365}` as the `GetHistoryAsync` seam contract, which the
 Core pins already pass) — so recording the 180/365 end-to-end Web render as

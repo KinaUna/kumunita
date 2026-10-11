@@ -122,18 +122,24 @@
 <h2 class="h5 mt-5"><kw-l key="analytics.trend.title">Trend</kw-l></h2>
 
 @* The window selector — five links (7/30/90/180/365, the M34·7 pinned set),
-   the active one (Model.WindowDays) marked via the btn-primary style rather
-   than btn-outline (a plain class toggle, no kw-l dependency on the state).
-   A plain class toggle + ?window= link (the M33 selector idiom); no kw-l tag
-   inside a quoted attribute value (the Razor attribute trap). *@
+   the active one (Model.TrendWindowDays) marked via the btn-primary style
+   rather than btn-outline (a plain class toggle, no kw-l dependency on the
+   state). **Option-B seam (ADR 0162 close resolution):** the links point at
+   the Trend section's **own** <c>?trendwindow=</c> param (pinned
+   {7, 30, 90, 180, 365}), preserving the M13 <c>?window=</c> value — so
+   180/365 render the Trend end-to-end without tripping the frozen M13
+   <c>GetWindowAsync</c> window guard (the red pin the U06/U07 gate recorded
+   is resolved by this decoupling). A plain class toggle + ?trendwindow=
+   link (the M33 selector idiom); no kw-l tag inside a quoted attribute value
+   (the Razor attribute trap). *@
 <div class="d-flex align-items-center gap-2 mb-3">
-    @{ int wd = Model.WindowDays; }
+    @{ int tw = Model.TrendWindowDays; }
     @for (int w = 0; w < 5; w++)
     {
         int win = new[] { 7, 30, 90, 180, 365 }[w];
         string key = "analytics.trend.window." + win;
-        string cls = (win == wd) ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
-        <a class="@cls" href="/admin/analytics?window=@win"><kw-l key="@key">@win days</kw-l></a>
+        string cls = (win == tw) ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
+        <a class="@cls" href="/admin/analytics?window=@Model.WindowDays&trendwindow=@win"><kw-l key="@key">@win days</kw-l></a>
     }
 </div>
 
