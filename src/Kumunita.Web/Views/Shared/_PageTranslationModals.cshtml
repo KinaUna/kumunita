@@ -34,12 +34,12 @@
 
 @foreach (var t in existing)
 {
-    string code = t.LanguageCode;
-    string formId = $"{prefix}-trans-edit-form-{code}";
-    string bodyId = $"{prefix}-trans-edit-body-{code}";
-    string titleId = $"{prefix}-trans-edit-title-{code}";
-    string labelId = $"{prefix}-trans-edit-label-{code}";
-    string modalId = $"{prefix}-trans-edit-{code}";
+    string languageCode = t.LanguageCode;
+    string formId = $"{prefix}-trans-edit-form-{languageCode}";
+    string bodyId = $"{prefix}-trans-edit-body-{languageCode}";
+    string titleId = $"{prefix}-trans-edit-title-{languageCode}";
+    string labelId = $"{prefix}-trans-edit-label-{languageCode}";
+    string modalId = $"{prefix}-trans-edit-{languageCode}";
 
     <div class="modal fade" id="@modalId" tabindex="-1"
          aria-labelledby="@labelId" aria-hidden="true">
@@ -47,17 +47,17 @@
             <div class="modal-content">
                 <form method="post" action="@($"/pages/{pid}/translations/update")" id="@formId">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="languageCode" value="@code" />
+                    <input type="hidden" name="languageCode" value="@languageCode" />
                     <div class="modal-header">
                         <h5 class="modal-title" id="@labelId">
-                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(code)</b>
+                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(languageCode)</b>
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label" for="@titleId">
-                                @LangName(code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                @LangName(languageCode) <kw-l key="posts.translation_title_label">title</kw-l>
                                 <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                             </label>
                             <input class="form-control" type="text" name="title"
@@ -104,12 +104,12 @@
 
 @foreach (var lang in addable)
 {
-    string code = lang.Code;
-    string formId = $"{prefix}-trans-add-form-{code}";
-    string bodyId = $"{prefix}-trans-add-body-{code}";
-    string titleId = $"{prefix}-trans-add-title-{code}";
-    string labelId = $"{prefix}-trans-add-label-{code}";
-    string modalId = $"{prefix}-trans-add-{code}";
+    string langCode = lang.Code;
+    string formId = $"{prefix}-trans-add-form-{langCode}";
+    string bodyId = $"{prefix}-trans-add-body-{langCode}";
+    string titleId = $"{prefix}-trans-add-title-{langCode}";
+    string labelId = $"{prefix}-trans-add-label-{langCode}";
+    string modalId = $"{prefix}-trans-add-{langCode}";
 
     <div class="modal fade" id="@modalId" tabindex="-1"
          aria-labelledby="@labelId" aria-hidden="true">
@@ -117,17 +117,17 @@
             <div class="modal-content">
                 <form method="post" action="@($"/pages/{pid}/translations")" id="@formId">
                     @Html.AntiForgeryToken()
-                    <input type="hidden" name="languageCode" value="@code" />
+                    <input type="hidden" name="languageCode" value="@langCode" />
                     <div class="modal-header">
                         <h5 class="modal-title" id="@labelId">
-                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(code)</b>
+                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(langCode)</b>
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label" for="@titleId">
-                                @LangName(code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                @LangName(langCode) <kw-l key="posts.translation_title_label">title</kw-l>
                                 <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
                             </label>
                             <input class="form-control" type="text" name="title"
