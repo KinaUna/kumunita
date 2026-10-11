@@ -19,4 +19,15 @@ public class AnalyticsViewModel
     public int                          DistinctActors     { get; init; }
     public IReadOnlyList<SurfaceRow>    SurfaceRanking     { get; init; } =
         System.Array.Empty<SurfaceRow>();
+
+    // The M34 analytics-history Trend section (M34·8 additive-only, M34·1
+    // derived, not captured): the per-day usage totals in the chosen window,
+    // **ascending** by Date, **only the days present** (no fabricated zero
+    // rows — the M34·7 / M33-9 FACE pin). <see cref="History"/> is empty on a
+    // fresh instance (no <c>UsageEvent</c> rows in the window yet) — the view
+    // then renders the analytics.trend.empty message (M34-3 FACE).
+    // <see cref="WindowDays"/> (above) is **reused** for the Trend section's
+    // window label — M34 does **not** add a second window member (M34·8).
+    public IReadOnlyList<UsageDailyTotal> History { get; init; } =
+        System.Array.Empty<UsageDailyTotal>();
 }

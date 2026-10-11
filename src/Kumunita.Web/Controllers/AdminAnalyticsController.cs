@@ -63,6 +63,16 @@ public sealed class AdminAnalyticsController(
     public async Task<IActionResult> Index([FromQuery] int window = 30)
     {
         var result = await analytics.GetWindowAsync(window);
+
+        // M34 additive (M34·8, ADR 0162) — the second read: the over-time
+        // history over the **same** pinned window. The M13 read above is
+        // **unchanged** (M34·1 additive-only); this is an additive second
+        // read on the same <c>?</c><c>window=</c> param. Its pinned set
+        // {7, 30, 90, 180, 365} is enforced by <c>GetHistoryAsync</c>
+        // (M34·7 — an unknown value throws ArgumentOutOfRangeException, the
+        // M13/M33 error posture). A read — zero AccessAudit rows (M34·4).
+        var history = await analytics.GetHistoryAsync(window);
+
         return View(new AnalyticsViewModel
         {
             WindowDays         = result.WindowDays,
@@ -70,7 +80,12 @@ public sealed class AdminAnalyticsController(
             AuthenticatedTotal = result.AuthenticatedTotal,
             AnonymousTotal     = result.AnonymousTotal,
             DistinctActors     = result.DistinctActors,
-            SurfaceRanking     = result.SurfaceRanking
+            SurfaceRanking     = result.SurfaceRanking,
+            // M34 additive (M34·8): the Trend section projection. The M13
+            // <c>WindowDays</c> member (above) is **reused** as the Trend
+            // section's window label — M34 adds the <c>History</c> member,
+            // not a second window member.
+            History            = history.Points
         });
     }
 

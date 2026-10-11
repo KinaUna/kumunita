@@ -360,3 +360,59 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
   (0 warnings, 0 errors). **No** new test (U06's pinned tests are the
   first M34 tests). **No** new compile warnings on the new types.
 
+## U04 — M13 surface extension
+
+- **(a) `AdminAnalyticsController` action count:** still **2** (`Index` +
+  `Export`). The `Export` action is **unchanged** (the M13 CSV export lane +
+  its **one** `AccessAudit` row preserved — M34·4 / M34·1). The `Index`
+  action gains a **second** read — `GetHistoryAsync(window)` — alongside the
+  **unchanged** M13 `GetWindowAsync(window)` read (M34·8 additive-only); it
+  passes `history.Points` to the view model's new `History` member.
+- **(b) `AnalyticsViewModel` member count:** the M13 6 (`WindowDays` /
+  `Total` / `AuthenticatedTotal` / `AnonymousTotal` / `DistinctActors` /
+  `SurfaceRanking`) + the M34 1 `History` = **7**. The M13 `WindowDays`
+  member is **reused** for the Trend section's window label (M34·8 — **no**
+  second window member added). `History` is
+  `IReadOnlyList<UsageDailyTotal>` with an empty default (the M34-3 FACE
+  empty branch reads `Model.History.Count == 0`).
+- **(c) Trend section shape** (`Views/AdminAnalytics/Index.cshtml`, appended
+  after the unchanged M13 surface-rank table + distinct-actor header +
+  export link — the M13 markup is **unchanged**, M34·1): a `<table>`
+  (date · total, ascending — one row per present day, `Date` via the
+  `kw-dt` TagHelper, `Total` the per-day aggregate — **no** per-account row,
+  C-M13·3 / M34·9) + an inline `<svg>` `<polyline>` sparkline (a
+  `TrendPoints` `@functions` helper normalising to a 100×40 viewBox,
+  `preserveAspectRatio="none"` — **no** JS, **no** chart lib, M34·9 — the
+  M33 sparkline shape verbatim) + the closed `analytics.trend.*` `<kw-l>`
+  keys (the 10 keys referenced by name — `title` / `window.7|30|90|180|365`
+  / `col.date` / `col.total` / `legend.total` / `empty`) + a **window
+  selector — five links** (7/30/90/180/365, the `analytics.trend.window.*`
+  keys, the active one marked via a plain `btn-primary` class toggle). When
+  `History` is empty, the `analytics.trend.empty` message renders (M34-3
+  FACE, M34·11).
+- **(d) No JS / no npm package confirmation (M34·9 pin):** **no** new JS
+  file, **no** new npm package, **no** chart library — the sparkline is a
+  server-rendered inline `<svg>` `<polyline>` driven by a C# `@functions`
+  helper; `package.json` / the `wwwroot/js` build are **untouched**. The
+  `kw-dt` + `kw-l` TagHelpers are existing M13/M33 surfaces.
+- **(e) Build + warnings:** `dotnet build Kumunita.slnx -c Debug` **green**
+  (0 warnings, 0 errors). `git status` clean except the 3 U04 files
+  (controller + view model + view) — `Milestones.cs` / README / `STATUS.md` /
+  `ARCHITECTURE.md` / `MilestonesTests.cs` / `WhatsNew.cs` are **untouched**
+  (the M34·12 six-member close flip is U08's).
+- **(f) Design-tension flagged for the author / U02 / U06 (not a Web-surface
+  blocker, U04 implemented per the M34·8 / M34·1 pin):** the M34 pinned
+  window set is `{7, 30, 90, 180, 365}` (M34·7, enforced by
+  `GetHistoryAsync`), but the **frozen** M13 `GetWindowAsync` read admits
+  **only** `{7, 30, 90}` (`NormalizeWindow` throws
+  `ArgumentOutOfRangeException` for 180/365). Per M34·8 the two reads share
+  the **one** `?window=` param, so `?window=180` / `?window=365` currently
+  400 from the M13 read before the M34 read renders. U04 honoured the pins
+  as written: the M13 read is **unchanged** (M34·1 additive-only — U04 must
+  not widen it) and the M34 selector offers all five links (M34·8 / FACE
+  M34-2). Resolving the 180/365 window (e.g. a M13 window-set extension, or
+  a M34-only window param for the Trend section) is a **Core / design-doc
+  reconciliation** — it must land with U06's `M34_2_Window_Switch_
+  Renders_Chosen_Window` pin, not in this Web unit. Recorded here so U06 /
+  U02 / the author see it before the gate.
+
