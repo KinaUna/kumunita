@@ -41,27 +41,35 @@
         <textarea class="form-control" name="HomeHeroLead" id="HomeHeroLead" rows="3">@Model.Home.HomeHeroLead</textarea>
     </div>
     <div class="mb-3">
+        <label for="HomeHeroSub1" class="form-label">Hero sub — scope line</label>
+        <textarea class="form-control" name="HomeHeroSub1" id="HomeHeroSub1" rows="2">@Model.Home.HomeHeroSub1</textarea>
+        <span class="form-text text-muted">The first supporting line under the hero lead ("Kumunita started out as…").</span>
+    </div>
+    <div class="mb-3">
+        <label for="HomeHeroSub2" class="form-label">Hero sub — FIG line</label>
+        <textarea class="form-control" name="HomeHeroSub2" id="HomeHeroSub2" rows="2">@Model.Home.HomeHeroSub2</textarea>
+        <span class="form-text text-muted">The second supporting line under the hero lead ("It is built on the Fractal Integration Guidelines…").</span>
+    </div>
+    @* The checkboxes use the repo's proven convention (the
+       AdminGuestsController / LocaleController shape): a single checkbox
+       value="true" with NO hidden "false" fallback, bound to a bool that
+       defaults to false when absent. A checked box posts "true"; an unchecked
+       box posts nothing → the bool is false. (The old "checkbox + hidden
+       false" dual-value pattern was the only one in the codebase and was the
+       source of the de-selected-checkboxes bug.) *@
+    <div class="mb-3">
         <label for="HomeShowAboutButton" class="form-label d-block">"What it is &amp; how it works" button</label>
-        @* The checkbox precedes its hidden "false" fallback. ASP.NET Core binds a
-           repeated form key to the FIRST posted value, so a checked box (which
-           posts "true") must come before the hidden "false" — otherwise the
-           hidden field always wins and every box saves as false. An unchecked
-           box posts nothing, leaving the hidden "false" as the sole value, so
-           unchecking still works. *@
         <input class="form-check-input" type="checkbox" name="HomeShowAboutButton" id="HomeShowAboutButton" value="true" @checked(Model.Home.HomeShowAboutButton) />
-        <input type="hidden" name="HomeShowAboutButton" value="false" />
         <span class="form-text text-muted">Show the hero's link to the about page.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowFeatures" class="form-label d-block">Intro sections</label>
         <input class="form-check-input" type="checkbox" name="HomeShowFeatures" id="HomeShowFeatures" value="true" @checked(Model.Home.HomeShowFeatures) />
-        <input type="hidden" name="HomeShowFeatures" value="false" />
         <span class="form-text text-muted">Show the hero band and the feature cards together. Hiding them also hides the hero's eyebrow and lead.</span>
     </div>
     <div class="mb-3">
         <label for="HomeShowRoadmap" class="form-label d-block">"The plan" section</label>
         <input class="form-check-input" type="checkbox" name="HomeShowRoadmap" id="HomeShowRoadmap" value="true" @checked(Model.Home.HomeShowRoadmap) />
-        <input type="hidden" name="HomeShowRoadmap" value="false" />
         <span class="form-text text-muted">Show the roadmap of what the platform ships next.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save home page</button>
@@ -88,37 +96,31 @@
     <div class="mb-3">
         <label for="AboutShowFeatures" class="form-label d-block">Feature cards</label>
         <input class="form-check-input" type="checkbox" name="AboutShowFeatures" id="AboutShowFeatures" value="true" @checked(Model.About.AboutShowFeatures) />
-        <input type="hidden" name="AboutShowFeatures" value="false" />
         <span class="form-text text-muted">Show the three cards describing what the platform is.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowScope" class="form-label d-block">Scope band</label>
         <input class="form-check-input" type="checkbox" name="AboutShowScope" id="AboutShowScope" value="true" @checked(Model.About.AboutShowScope) />
-        <input type="hidden" name="AboutShowScope" value="false" />
         <span class="form-text text-muted">Show the "one neighborhood" scope band.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowPhilosophy" class="form-label d-block">Philosophy band</label>
         <input class="form-check-input" type="checkbox" name="AboutShowPhilosophy" id="AboutShowPhilosophy" value="true" @checked(Model.About.AboutShowPhilosophy) />
-        <input type="hidden" name="AboutShowPhilosophy" value="false" />
         <span class="form-text text-muted">Show the FIG-philosophy band (Fair, Invisible, Generous).</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowProject" class="form-label d-block">Code &amp; docs band</label>
         <input class="form-check-input" type="checkbox" name="AboutShowProject" id="AboutShowProject" value="true" @checked(Model.About.AboutShowProject) />
-        <input type="hidden" name="AboutShowProject" value="false" />
         <span class="form-text text-muted">Show the links to the project's code and documentation.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowWhatsNew" class="form-label d-block">"What's new" changelog</label>
         <input class="form-check-input" type="checkbox" name="AboutShowWhatsNew" id="AboutShowWhatsNew" value="true" @checked(Model.About.AboutShowWhatsNew) />
-        <input type="hidden" name="AboutShowWhatsNew" value="false" />
         <span class="form-text text-muted">Show the list of recent changes.</span>
     </div>
     <div class="mb-3">
         <label for="AboutShowContactCta" class="form-label d-block">Contact band</label>
         <input class="form-check-input" type="checkbox" name="AboutShowContactCta" id="AboutShowContactCta" value="true" @checked(Model.About.AboutShowContactCta) />
-        <input type="hidden" name="AboutShowContactCta" value="false" />
         <span class="form-text text-muted">Show the "something missing?" contact call-to-action.</span>
     </div>
     <button type="submit" class="btn btn-primary">Save about page</button>
@@ -135,118 +137,292 @@
    language, or remove it. Only enabled languages are offered. *@
 <h2 class="h5 mt-4">Hero text translations</h2>
 <p class="text-muted">
-    Translate the two heroes' eyebrow and lead into a resident's language. A
-    resident reading the site in that language sees the translated text on
-    <code>/</code> and <code>/about</code>; any hero field left blank falls
-    back to the value saved above. Save a translation separately — it does not
-    touch the English hero text.
+    Translate the two heroes' eyebrow and lead — and the home hero's two
+    supporting lines — into a resident's language. Use the language chips to
+    preview each version, and the ⋮ menu to add a translation (if a language is
+    missing), edit one (if it exists), or remove it. A resident reading the
+    site in that language sees the translated text on <code>/</code> and
+    <code>/about</code>; any field left blank falls back to the English text
+    saved above.
 </p>
 
 @{
     // The set of enabled languages that already have a translation row (the
-    // "existing translations" list) and the candidate list for "add a
-    // translation" (the enabled languages that do not — the ADR 0022 / ADR
-    // 0027 missing-languages shape).
+    // "existing translations") and the candidate list for "add a translation"
+    // (the enabled languages that do not — the ADR 0022 / ADR 0027
+    // missing-languages shape). The default (English) chip is the singleton's
+    // own values; one chip + one preview per translation. The swap JS
+    // (client/lib/translation-swap.ts, loaded in _Layout) flips the
+    // .td-variant containers by data-td-variant — the same mechanism the
+    // posts/announcements detail surface uses.
     var existing = Model.Translations.OrderBy(t => t.LanguageCode).ToList();
     var addable = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    const string DefaultLang = "en";
     string LangName(string code) =>
         Model.Languages.FirstOrDefault(l => l.Code.Equals(code, System.StringComparison.OrdinalIgnoreCase))?.NativeName ?? code;
 }
 
-@if (existing.Count > 0)
-{
-    <div class="d-flex flex-column gap-3">
+<div data-td-group="site-hero" class="card">
+    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+        <span class="fw-semibold">Hero preview</span>
+        @* The ⋮ action surface (the posts/announcements ADR 0082 shape): add a
+           translation (per missing enabled language), edit (per existing
+           row), remove (per existing row). Edit / add each open a Bootstrap
+           modal; remove is a confirm form in the menu. *@
+        <div class="dropdown">
+            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false" aria-label="Translation actions">⋮</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                @foreach (var lang in addable)
+                {
+                    <li>
+                        <button type="button" class="dropdown-item text-dark"
+                                data-bs-toggle="modal" data-bs-target="@($"#site-trans-add-{lang.Code}")">
+                            Add — <b>@LangName(lang.Code)</b>
+                        </button>
+                    </li>
+                }
+                @foreach (var t in existing)
+                {
+                    <li>
+                        <button type="button" class="dropdown-item text-dark"
+                                data-bs-toggle="modal" data-bs-target="@($"#site-trans-edit-{t.LanguageCode}")">
+                            Edit — <b>@LangName(t.LanguageCode)</b>
+                        </button>
+                    </li>
+                }
+                @if (existing.Count > 0)
+                {
+                    <li><hr class="dropdown-divider" /></li>
+                    @foreach (var t in existing)
+                    {
+                        <li>
+                            <form method="post" action="/admin/site/translations/remove"
+                                  data-confirm="Remove this translation?" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                <button type="submit" class="dropdown-item text-danger">
+                                    Remove — <b>@LangName(t.LanguageCode)</b>
+                                </button>
+                            </form>
+                        </li>
+                    }
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="card-body">
+        @* Chip row — the language selector (default + one per translation).
+           The swap JS (translation-swap.ts) shows the matching .td-variant
+           and hides the rest. With JS off the default stays visible and every
+           variant is present in the DOM (progressive enhancement). *@
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="text-muted small fw-semibold">Language</span>
+            <button type="button" class="badge text-bg-light border"
+                    data-translation-chip data-td-group="site-hero" data-td-variant="@DefaultLang">
+                @LangName(DefaultLang)
+            </button>
+            @foreach (var t in existing)
+            {
+                <button type="button" class="badge text-bg-light border"
+                        data-translation-chip data-td-group="site-hero" data-td-variant="@t.LanguageCode">
+                    @LangName(t.LanguageCode)
+                </button>
+            }
+        </div>
+
+        @* Default (English) variant — the singleton's own hero text. Each
+           field renders as a label + value; a blank value shows the fallback
+           placeholder. Razor HTML-encodes @value, so resident-supplied text is
+           XSS-safe. *@
+        <div class="td-variant" data-td-variant="@DefaultLang">
+            <div class="d-flex flex-column gap-2">
+                @* Inline field renderer: label above, value below; a blank value
+                   shows the "(falls back to the English text saved above)"
+                   placeholder in italics. *@
+                <div>
+                    <div class="text-muted small">Home hero — eyebrow</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroEyebrow) ? Model.Home.HomeHeroEyebrow : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+                <div>
+                    <div class="text-muted small">Home hero — lead</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroLead) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroLead) ? Model.Home.HomeHeroLead : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+                <div>
+                    <div class="text-muted small">Home hero — scope line</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub1) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub1) ? Model.Home.HomeHeroSub1 : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+                <div>
+                    <div class="text-muted small">Home hero — FIG line</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub2) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.Home.HomeHeroSub2) ? Model.Home.HomeHeroSub2 : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+                <div>
+                    <div class="text-muted small">About hero — eyebrow</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.About.AboutHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.About.AboutHeroEyebrow) ? Model.About.AboutHeroEyebrow : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+                <div>
+                    <div class="text-muted small">About hero — lead</div>
+                    <div class="@(string.IsNullOrWhiteSpace(Model.About.AboutHeroLead) ? "text-muted fst-italic" : "") mt-0">
+                        @(!string.IsNullOrWhiteSpace(Model.About.AboutHeroLead) ? Model.About.AboutHeroLead : "(falls back to the English text saved above)")
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* One preview variant per translation (a blank field falls back to the
+           English text). Hidden by default; the chip row / swap JS reveals
+           them. *@
         @foreach (var t in existing)
         {
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span class="fw-semibold">@LangName(t.LanguageCode)</span>
-                    <span class="text-muted small">Translation</span>
-                </div>
-                <div class="card-body">
-                    <form method="post" action="/admin/site/translations/update">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="languageCode" value="@t.LanguageCode" />
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Home eyebrow <span class="text-muted small">(optional)</span></label>
-                                <input class="form-control" type="text" name="homeHeroEyebrow" value="@t.HomeHeroEyebrow" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Home lead <span class="text-muted small">(optional)</span></label>
-                                <textarea class="form-control" name="homeHeroLead" rows="2">@t.HomeHeroLead</textarea>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">About eyebrow <span class="text-muted small">(optional)</span></label>
-                                <input class="form-control" type="text" name="aboutHeroEyebrow" value="@t.AboutHeroEyebrow" />
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">About lead <span class="text-muted small">(optional)</span></label>
-                                <textarea class="form-control" name="aboutHeroLead" rows="2">@t.AboutHeroLead</textarea>
-                            </div>
+            <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none;">
+                <div class="d-flex flex-column gap-2">
+                    <div>
+                        <div class="text-muted small">Home hero — eyebrow</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.HomeHeroEyebrow) ? t.HomeHeroEyebrow : "(falls back to the English text saved above)")
                         </div>
-                        <div class="d-flex gap-2 mt-3">
-                            <button type="submit" class="btn btn-primary btn-sm">Save translation</button>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Home hero — lead</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroLead) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.HomeHeroLead) ? t.HomeHeroLead : "(falls back to the English text saved above)")
                         </div>
-                    </form>
-                    <form method="post" action="/admin/site/translations/remove"
-                          class="mt-3 d-flex align-items-center gap-2"
-                          onsubmit="return confirm('Remove this translation?');">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="languageCode" value="@t.LanguageCode" />
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
-                    </form>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Home hero — scope line</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroSub1) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.HomeHeroSub1) ? t.HomeHeroSub1 : "(falls back to the English text saved above)")
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Home hero — FIG line</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.HomeHeroSub2) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.HomeHeroSub2) ? t.HomeHeroSub2 : "(falls back to the English text saved above)")
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">About hero — eyebrow</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.AboutHeroEyebrow) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.AboutHeroEyebrow) ? t.AboutHeroEyebrow : "(falls back to the English text saved above)")
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">About hero — lead</div>
+                        <div class="@(string.IsNullOrWhiteSpace(t.AboutHeroLead) ? "text-muted fst-italic" : "") mt-0">
+                            @(!string.IsNullOrWhiteSpace(t.AboutHeroLead) ? t.AboutHeroLead : "(falls back to the English text saved above)")
+                        </div>
+                    </div>
                 </div>
             </div>
         }
     </div>
+</div>
 
-    @if (addable.Count > 0)
-    {
-        <hr class="my-3" />
-    }
+@* The translation modals (referenced by the ⋮ dropdown above), one add modal
+   per missing language + one edit modal per existing row. Each posts to the
+   matching write lane; the six hero fields are optional (a blank one keeps
+   the English text). The add modal is pre-filled with the English values as a
+   starting point (the posts add-modal prefill shape). *@
+@foreach (var lang in addable)
+{
+    <div class="modal fade" id="@($"site-trans-add-{lang.Code}")" tabindex="-1"
+         aria-labelledby="@($"site-trans-add-label-{lang.Code}")" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="/admin/site/translations"
+                      id="@($"site-trans-add-form-{lang.Code}")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="@($"site-trans-add-label-{lang.Code}")">
+                            Add — <b>@LangName(lang.Code)</b>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @* Six hero fields, each optional (a blank one falls back
+                           to the English text). Prefilled from the English
+                           singleton as a starting point. *@
+                        <label class="form-label">Home hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroEyebrow" rows="2">@Model.Home.HomeHeroEyebrow</textarea>
+                        <label class="form-label">Home hero — lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroLead" rows="3">@Model.Home.HomeHeroLead</textarea>
+                        <label class="form-label">Home hero — scope line <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroSub1" rows="2">@Model.Home.HomeHeroSub1</textarea>
+                        <label class="form-label">Home hero — FIG line <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroSub2" rows="2">@Model.Home.HomeHeroSub2</textarea>
+                        <label class="form-label">About hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="aboutHeroEyebrow" rows="2">@Model.About.AboutHeroEyebrow</textarea>
+                        <label class="form-label">About hero — lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control" name="aboutHeroLead" rows="3">@Model.About.AboutHeroLead</textarea>
+                        <p class="form-text text-muted mt-2 mb-0">
+                            Leave a field blank to keep that hero in the English text
+                            saved above. At least one field is required.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" form="@($"site-trans-add-form-{lang.Code}")">Add translation</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 }
 
-@if (addable.Count > 0)
+@foreach (var t in existing)
 {
-    <div class="card">
-        <div class="card-header fw-semibold">Add a translation</div>
-        <div class="card-body">
-            <form method="post" action="/admin/site/translations">
-                @Html.AntiForgeryToken()
-                <div class="mb-3">
-                    <label for="new-translation-language" class="form-label">Language</label>
-                    <select class="form-select" id="new-translation-language" name="languageCode">
-                        @foreach (var lang in addable)
-                        {
-                            <option value="@lang.Code">@lang.NativeName</option>
-                        }
-                    </select>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Home eyebrow <span class="text-muted small">(optional)</span></label>
-                        <input class="form-control" type="text" name="homeHeroEyebrow" />
+    <div class="modal fade" id="@($"site-trans-edit-{t.LanguageCode}")" tabindex="-1"
+         aria-labelledby="@($"site-trans-edit-label-{t.LanguageCode}")" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="/admin/site/translations/update"
+                      id="@($"site-trans-edit-form-{t.LanguageCode}")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="@($"site-trans-edit-label-{t.LanguageCode}")">
+                            Edit — <b>@LangName(t.LanguageCode)</b>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Home lead <span class="text-muted small">(optional)</span></label>
-                        <textarea class="form-control" name="homeHeroLead" rows="2"></textarea>
+                    <div class="modal-body">
+                        @* Six hero fields, each optional (a blank one clears that
+                           override → the English text is the fallback again).
+                           Pre-filled from the existing row. *@
+                        <label class="form-label">Home hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroEyebrow" rows="2">@t.HomeHeroEyebrow</textarea>
+                        <label class="form-label">Home hero — lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroLead" rows="3">@t.HomeHeroLead</textarea>
+                        <label class="form-label">Home hero — scope line <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroSub1" rows="2">@t.HomeHeroSub1</textarea>
+                        <label class="form-label">Home hero — FIG line <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="homeHeroSub2" rows="2">@t.HomeHeroSub2</textarea>
+                        <label class="form-label">About hero — eyebrow <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control mb-3" name="aboutHeroEyebrow" rows="2">@t.AboutHeroEyebrow</textarea>
+                        <label class="form-label">About hero — lead <span class="text-muted small">(optional)</span></label>
+                        <textarea class="form-control" name="aboutHeroLead" rows="3">@t.AboutHeroLead</textarea>
+                        <p class="form-text text-muted mt-2 mb-0">
+                            Leave a field blank to revert that hero to the English
+                            text saved above. At least one field is required.
+                        </p>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">About eyebrow <span class="text-muted small">(optional)</span></label>
-                        <input class="form-control" type="text" name="aboutHeroEyebrow" />
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" form="@($"site-trans-edit-form-{t.LanguageCode}")">Save translation</button>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">About lead <span class="text-muted small">(optional)</span></label>
-                        <textarea class="form-control" name="aboutHeroLead" rows="2"></textarea>
-                    </div>
-                </div>
-                <p class="form-text text-muted mt-2 mb-2">
-                    Leave a hero field blank to keep that hero in the language of the
-                    English text saved above. At least one field is required.
-                </p>
-                <button type="submit" class="btn btn-primary">Add translation</button>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 }

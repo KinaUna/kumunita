@@ -116,6 +116,8 @@ public sealed class AdminSiteController(
             {
                 HomeHeroEyebrow     = current.HomeHeroEyebrow,
                 HomeHeroLead        = current.HomeHeroLead,
+                HomeHeroSub1        = current.HomeHeroSub1,
+                HomeHeroSub2        = current.HomeHeroSub2,
                 HomeShowAboutButton = current.HomeShowAboutButton,
                 HomeShowFeatures    = current.HomeShowFeatures,
                 HomeShowRoadmap     = current.HomeShowRoadmap,
@@ -156,13 +158,16 @@ public sealed class AdminSiteController(
         var current = await site.GetAsync();
         await site.SaveAsync(new SiteContent
         {
-            // The Home section's 5 fields, verbatim from the form.
+            // The Home section's text fields + section toggles, verbatim from
+            // the form.
             HomeHeroEyebrow     = home.HomeHeroEyebrow,
             HomeHeroLead        = home.HomeHeroLead,
+            HomeHeroSub1        = home.HomeHeroSub1,
+            HomeHeroSub2        = home.HomeHeroSub2,
             HomeShowAboutButton = home.HomeShowAboutButton,
             HomeShowFeatures    = home.HomeShowFeatures,
             HomeShowRoadmap     = home.HomeShowRoadmap,
-            // The About section's 8 fields, unchanged (the save is partial).
+            // The About section's fields, unchanged (the save is partial).
             AboutHeroEyebrow    = current.AboutHeroEyebrow,
             AboutHeroLead       = current.AboutHeroLead,
             AboutShowFeatures   = current.AboutShowFeatures,
@@ -201,9 +206,11 @@ public sealed class AdminSiteController(
             AboutShowProject    = about.AboutShowProject,
             AboutShowWhatsNew   = about.AboutShowWhatsNew,
             AboutShowContactCta = about.AboutShowContactCta,
-            // The Home section's 5 fields, unchanged (the save is partial).
+            // The Home section's fields, unchanged (the save is partial).
             HomeHeroEyebrow     = current.HomeHeroEyebrow,
             HomeHeroLead        = current.HomeHeroLead,
+            HomeHeroSub1        = current.HomeHeroSub1,
+            HomeHeroSub2        = current.HomeHeroSub2,
             HomeShowAboutButton = current.HomeShowAboutButton,
             HomeShowFeatures    = current.HomeShowFeatures,
             HomeShowRoadmap     = current.HomeShowRoadmap,
@@ -238,6 +245,8 @@ public sealed class AdminSiteController(
         [FromForm] string? languageCode,
         [FromForm] string? homeHeroEyebrow,
         [FromForm] string? homeHeroLead,
+        [FromForm] string? homeHeroSub1,
+        [FromForm] string? homeHeroSub2,
         [FromForm] string? aboutHeroEyebrow,
         [FromForm] string? aboutHeroLead)
     {
@@ -248,6 +257,8 @@ public sealed class AdminSiteController(
         }
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
             string.IsNullOrWhiteSpace(homeHeroLead) &&
+            string.IsNullOrWhiteSpace(homeHeroSub1) &&
+            string.IsNullOrWhiteSpace(homeHeroSub2) &&
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
         {
@@ -257,7 +268,9 @@ public sealed class AdminSiteController(
 
         var actor = ActorId(User) ?? string.Empty;
         await site.AddTranslationAsync(
-            languageCode, homeHeroEyebrow, homeHeroLead, aboutHeroEyebrow, aboutHeroLead, actor);
+            languageCode, homeHeroEyebrow, homeHeroLead,
+            homeHeroSub1, homeHeroSub2,
+            aboutHeroEyebrow, aboutHeroLead, actor);
 
         var name = await LanguageName(languageCode);
         TempData["info"] = $"Translation added ({name}).";
@@ -281,6 +294,8 @@ public sealed class AdminSiteController(
         [FromForm] string? languageCode,
         [FromForm] string? homeHeroEyebrow,
         [FromForm] string? homeHeroLead,
+        [FromForm] string? homeHeroSub1,
+        [FromForm] string? homeHeroSub2,
         [FromForm] string? aboutHeroEyebrow,
         [FromForm] string? aboutHeroLead)
     {
@@ -291,6 +306,8 @@ public sealed class AdminSiteController(
         }
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
             string.IsNullOrWhiteSpace(homeHeroLead) &&
+            string.IsNullOrWhiteSpace(homeHeroSub1) &&
+            string.IsNullOrWhiteSpace(homeHeroSub2) &&
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
         {
@@ -302,7 +319,9 @@ public sealed class AdminSiteController(
         try
         {
             await site.UpdateTranslationAsync(
-                languageCode, homeHeroEyebrow, homeHeroLead, aboutHeroEyebrow, aboutHeroLead, actor);
+                languageCode, homeHeroEyebrow, homeHeroLead,
+                homeHeroSub1, homeHeroSub2,
+                aboutHeroEyebrow, aboutHeroLead, actor);
         }
         catch (KeyNotFoundException)
         {
@@ -388,40 +407,53 @@ public sealed class AdminSiteController(
         [Microsoft.AspNetCore.Mvc.ModelBinding.BindNever]
         public IReadOnlyList<SiteContentTranslation> Translations { get; init; } = [];
 
-        /// <summary>The <c>/home</c> form section — the 5 Home fields
-        /// (the 2 text fields + the 3 section toggles).</summary>
+        /// <summary>The <c>/home</c> form section — the Home text fields
+        /// (eyebrow + lead + the two hero sub lines) + the 3 section toggles.
+        /// The bool initializers are <c>false</c> (the repo's checkbox
+        /// convention — the <c>AdminGuestsController</c> / <c>LocaleController</c>
+        /// shape: a checkbox that posts nothing binds to <c>false</c>). The
+        /// GET seeds them from the singleton, so the bound value is the
+        /// stored value, not the initializer — an unchecked checkbox is a
+        /// correct <c>false</c>, never a silent <c>true</c>.</summary>
         public sealed class HomeSection
         {
             public string HomeHeroEyebrow { get; init; } = string.Empty;
 
             public string HomeHeroLead { get; init; } = string.Empty;
 
-            public bool HomeShowAboutButton { get; init; } = true;
+            public string HomeHeroSub1 { get; init; } = string.Empty;
 
-            public bool HomeShowFeatures { get; init; } = true;
+            public string HomeHeroSub2 { get; init; } = string.Empty;
 
-            public bool HomeShowRoadmap { get; init; } = true;
+            public bool HomeShowAboutButton { get; init; }
+
+            public bool HomeShowFeatures { get; init; }
+
+            public bool HomeShowRoadmap { get; init; }
         }
 
-        /// <summary>The <c>/about</c> form section — the 8 About fields
-        /// (the 2 text fields + the 6 section toggles).</summary>
+        /// <summary>The <c>/about</c> form section — the About text fields
+        /// (eyebrow + lead) + the 6 section toggles. Bool initializers are
+        /// <c>false</c> (the repo's checkbox convention, see
+        /// <see cref="HomeSection"/>) — an unchecked checkbox is a correct
+        /// <c>false</c>.</summary>
         public sealed class AboutSection
         {
             public string AboutHeroEyebrow { get; init; } = string.Empty;
 
             public string AboutHeroLead { get; init; } = string.Empty;
 
-            public bool AboutShowFeatures { get; init; } = true;
+            public bool AboutShowFeatures { get; init; }
 
-            public bool AboutShowScope { get; init; } = true;
+            public bool AboutShowScope { get; init; }
 
-            public bool AboutShowPhilosophy { get; init; } = true;
+            public bool AboutShowPhilosophy { get; init; }
 
-            public bool AboutShowProject { get; init; } = true;
+            public bool AboutShowProject { get; init; }
 
-            public bool AboutShowWhatsNew { get; init; } = true;
+            public bool AboutShowWhatsNew { get; init; }
 
-            public bool AboutShowContactCta { get; init; } = true;
+            public bool AboutShowContactCta { get; init; }
         }
     }
 }

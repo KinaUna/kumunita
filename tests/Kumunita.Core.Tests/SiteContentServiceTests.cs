@@ -192,15 +192,17 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
 
         const string actor = "admin-u08-trans-add";
         var added = await svc.AddTranslationAsync(
-            "pl", "Naszyj dom", "Cichy kąt", "Prywatność", "Dom dla wszystkich", actor, ct);
+            "pl", "Naszyj dom", "Cichy kąt", "Zakres", "FIG", "Prywatność", "Dom dla wszystkich", actor, ct);
 
-        // One row for the language, the four fields verbatim.
+        // One row for the language, the six fields verbatim.
         await using var q = store.QuerySession();
         var rows = await q.Query<SiteContent.SiteContentTranslation>()
             .Where(t => t.LanguageCode == "pl").ToListAsync(ct);
         Assert.Single(rows);
         Assert.Equal("Naszyj dom", rows[0].HomeHeroEyebrow);
         Assert.Equal("Cichy kąt", rows[0].HomeHeroLead);
+        Assert.Equal("Zakres", rows[0].HomeHeroSub1);
+        Assert.Equal("FIG", rows[0].HomeHeroSub2);
         Assert.Equal("Prywatność", rows[0].AboutHeroEyebrow);
         Assert.Equal("Dom dla wszystkich", rows[0].AboutHeroLead);
         Assert.Equal(actor, added.AuthorId);
@@ -224,8 +226,8 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
         const string actor = "admin-u08-trans-overwrite";
 
-        await svc.AddTranslationAsync("fr", "Premier eyebrow", "Premier lead", null, null, actor, ct);
-        await svc.AddTranslationAsync("fr", "Second eyebrow", "Second lead", null, null, actor, ct);
+        await svc.AddTranslationAsync("fr", "Premier eyebrow", "Premier lead", null, null, null, null, actor, ct);
+        await svc.AddTranslationAsync("fr", "Second eyebrow", "Second lead", null, null, null, null, actor, ct);
 
         await using var q = store.QuerySession();
         var rows = await q.Query<SiteContent.SiteContentTranslation>()
@@ -245,7 +247,7 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
 
         await Assert.ThrowsAsync<ArgumentException>(() => svc.AddTranslationAsync(
-            "pl", " ", "  ", null, null, "actor", ct));
+            "pl", " ", "  ", null, null, null, null, "actor", ct));
     }
 
     // ── 8 — update replaces the four fields + writes one audit row ─────────
@@ -258,8 +260,8 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
         const string actor = "admin-u08-trans-update";
 
-        await svc.AddTranslationAsync("da", "Old eyebrow", "Old lead", null, null, actor, ct);
-        await svc.UpdateTranslationAsync("da", "New eyebrow", "New lead", "Ny about", null, actor, ct);
+        await svc.AddTranslationAsync("da", "Old eyebrow", "Old lead", null, null, null, null, actor, ct);
+        await svc.UpdateTranslationAsync("da", "New eyebrow", "New lead", null, null, "Ny about", null, actor, ct);
 
         await using var q = store.QuerySession();
         var row = await q.Query<SiteContent.SiteContentTranslation>()
@@ -288,7 +290,7 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.UpdateTranslationAsync(
-            "xx", "eyebrow", "lead", null, null, "actor", ct));
+            "xx", "eyebrow", "lead", null, null, null, null, "actor", ct));
     }
 
     // ── 10 — remove deletes the row + writes one audit row ─────────────────
@@ -301,7 +303,7 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
         const string actor = "admin-u08-trans-remove";
 
-        await svc.AddTranslationAsync("fr", "eyebrow", "lead", null, null, actor, ct);
+        await svc.AddTranslationAsync("fr", "eyebrow", "lead", null, null, null, null, actor, ct);
         await svc.RemoveTranslationAsync("fr", actor, ct);
 
         await using var q = store.QuerySession();
@@ -326,8 +328,8 @@ public class SiteContentServiceTests(PostgresFixture fixture) : IClassFixture<Po
         var svc = new SiteContent.SiteContentService(store);
         const string actor = "admin-u08-trans-read";
 
-        await svc.AddTranslationAsync("fr", "fr eyebrow", null, null, null, actor, ct);
-        await svc.AddTranslationAsync("pl", "pl eyebrow", null, null, null, actor, ct);
+        await svc.AddTranslationAsync("fr", "fr eyebrow", null, null, null, null, null, actor, ct);
+        await svc.AddTranslationAsync("pl", "pl eyebrow", null, null, null, null, null, actor, ct);
 
         var result = await svc.GetTranslationsAsync(ct);
         Assert.Equal(2, result.Count);

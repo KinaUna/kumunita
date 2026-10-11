@@ -59,9 +59,11 @@ public sealed class SiteContentService : ISiteContentService
             return; // a missing row is a no-op — the lane never load-or-creates (SITE·6)
         }
 
-        // The full 13-field set, verbatim from the caller's SiteContent.
+        // The full field set, verbatim from the caller's SiteContent.
         stored.HomeHeroEyebrow     = content.HomeHeroEyebrow;
         stored.HomeHeroLead        = content.HomeHeroLead;
+        stored.HomeHeroSub1        = content.HomeHeroSub1;
+        stored.HomeHeroSub2        = content.HomeHeroSub2;
         stored.HomeShowAboutButton = content.HomeShowAboutButton;
         stored.HomeShowFeatures    = content.HomeShowFeatures;
         stored.HomeShowRoadmap     = content.HomeShowRoadmap;
@@ -129,6 +131,8 @@ public sealed class SiteContentService : ISiteContentService
         string languageCode,
         string? homeHeroEyebrow,
         string? homeHeroLead,
+        string? homeHeroSub1,
+        string? homeHeroSub2,
         string? aboutHeroEyebrow,
         string? aboutHeroLead,
         string actorBy,
@@ -139,11 +143,13 @@ public sealed class SiteContentService : ISiteContentService
         if (string.IsNullOrEmpty(actorBy))
             throw new ArgumentException("An acting actor is required.", nameof(actorBy));
 
-        // At least one of the four hero fields must be non-blank (a
+        // At least one of the six hero fields must be non-blank (a
         // translation with nothing in it is not a translation — the ADR 0026
         // "at least one non-blank" rule, enforced by the write seam).
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
             string.IsNullOrWhiteSpace(homeHeroLead) &&
+            string.IsNullOrWhiteSpace(homeHeroSub1) &&
+            string.IsNullOrWhiteSpace(homeHeroSub2) &&
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
             throw new ArgumentException("A translation needs at least one hero field.", nameof(homeHeroEyebrow));
@@ -169,6 +175,8 @@ public sealed class SiteContentService : ISiteContentService
         translation.LanguageCode = languageCode;
         translation.HomeHeroEyebrow = BlankToNull(homeHeroEyebrow);
         translation.HomeHeroLead    = BlankToNull(homeHeroLead);
+        translation.HomeHeroSub1    = BlankToNull(homeHeroSub1);
+        translation.HomeHeroSub2    = BlankToNull(homeHeroSub2);
         translation.AboutHeroEyebrow = BlankToNull(aboutHeroEyebrow);
         translation.AboutHeroLead    = BlankToNull(aboutHeroLead);
 
@@ -183,6 +191,8 @@ public sealed class SiteContentService : ISiteContentService
         string languageCode,
         string? homeHeroEyebrow,
         string? homeHeroLead,
+        string? homeHeroSub1,
+        string? homeHeroSub2,
         string? aboutHeroEyebrow,
         string? aboutHeroLead,
         string actorBy,
@@ -194,6 +204,8 @@ public sealed class SiteContentService : ISiteContentService
             throw new ArgumentException("An acting actor is required.", nameof(actorBy));
         if (string.IsNullOrWhiteSpace(homeHeroEyebrow) &&
             string.IsNullOrWhiteSpace(homeHeroLead) &&
+            string.IsNullOrWhiteSpace(homeHeroSub1) &&
+            string.IsNullOrWhiteSpace(homeHeroSub2) &&
             string.IsNullOrWhiteSpace(aboutHeroEyebrow) &&
             string.IsNullOrWhiteSpace(aboutHeroLead))
             throw new ArgumentException("A translation needs at least one hero field.", nameof(homeHeroEyebrow));
@@ -211,6 +223,8 @@ public sealed class SiteContentService : ISiteContentService
 
         row.HomeHeroEyebrow  = BlankToNull(homeHeroEyebrow);
         row.HomeHeroLead     = BlankToNull(homeHeroLead);
+        row.HomeHeroSub1     = BlankToNull(homeHeroSub1);
+        row.HomeHeroSub2     = BlankToNull(homeHeroSub2);
         row.AboutHeroEyebrow = BlankToNull(aboutHeroEyebrow);
         row.AboutHeroLead    = BlankToNull(aboutHeroLead);
 

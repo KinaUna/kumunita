@@ -47,6 +47,16 @@
     string HomeHeroLead =
         !string.IsNullOrWhiteSpace(heroTrans?.HomeHeroLead) ? heroTrans!.HomeHeroLead!
         : Model.Site?.HomeHeroLead ?? "One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.";
+    // The two hero sub lines (the scope line + the FIG line) — the same
+    // translation-overlay / singleton / in-code-floor shape as the eyebrow +
+    // lead. The in-code floors are the byte-identical shipped kw-l text
+    // (platform.scope_home / platform.fig_home — SITE·3: never a blank page).
+    string HomeHeroSub1 =
+        !string.IsNullOrWhiteSpace(heroTrans?.HomeHeroSub1) ? heroTrans!.HomeHeroSub1!
+        : Model.Site?.HomeHeroSub1 ?? "Kumunita started out as a home for one neighbourhood — but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.";
+    string HomeHeroSub2 =
+        !string.IsNullOrWhiteSpace(heroTrans?.HomeHeroSub2) ? heroTrans!.HomeHeroSub2!
+        : Model.Site?.HomeHeroSub2 ?? "It is built on the Fractal Integration Guidelines (FIG): the idea that a group's real value lives in the links between its people and parts, not in the parts themselves. Kumunita is the software that builds and holds those links.";
 }
 
 @* ADR 0149 D1 + SITE (ADR 0150) — the signed-in resident's hide-home-intro
@@ -71,11 +81,15 @@
                 <p class="kmb-hero-lead mx-auto mb-3" style="max-width: 42rem;">
                     @HomeHeroLead
                 </p>
+                @* The two hero sub lines — admin-customizable + translatable
+                   (the ADR 0157 SITE-2 hero-translation overlay), resolved above
+                   from the translation row → the singleton → the in-code floor
+                   (the byte-identical shipped kw-l text). *@
                 <p class="kmb-hero-sub mx-auto mb-1" style="max-width: 42rem;">
-                    <kw-l key="platform.scope_home">Kumunita started out as a home for one neighbourhood — but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.</kw-l>
+                    @HomeHeroSub1
                 </p>
                 <p class="kmb-hero-sub mx-auto mb-4" style="max-width: 42rem;">
-                    <kw-l key="platform.fig_home">It is built on the Fractal Integration Guidelines (FIG): the idea that a group's real value lives in the links between its people and parts, not in the parts themselves. Kumunita is the software that builds and holds those links.</kw-l>
+                    @HomeHeroSub2
                 </p>
 @* The "What it is & how it works" CTA is show/hide only (SITE·3 — the hero's
    own shape is unchanged; only its button + text are governed by SiteContent).

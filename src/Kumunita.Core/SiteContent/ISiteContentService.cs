@@ -58,7 +58,8 @@ public interface ISiteContentService
     /// <see cref="Posts.PostService.AddPostTranslationAsync"/> shape, minus
     /// the parent standing — the site has no per-resident owner, so the
     /// standing is a GlobalAdmin only, enforced by the Web gate, ADR 0150
-    /// D8). **At least one** of the four hero fields must be non-blank
+    /// D8). **At least one** of the six hero fields (the two heroes'
+    /// eyebrow + lead + the home hero's two sub lines) must be non-blank
     /// (a translation with nothing in it is rejected, the ADR 0026 "at
     /// least one non-blank" rule); blank fields are stored as
     /// <c>null</c> (the singleton's value is the fallback for that field).
@@ -74,6 +75,8 @@ public interface ISiteContentService
         string languageCode,
         string? homeHeroEyebrow,
         string? homeHeroLead,
+        string? homeHeroSub1,
+        string? homeHeroSub2,
         string? aboutHeroEyebrow,
         string? aboutHeroLead,
         string actorBy,
@@ -83,17 +86,19 @@ public interface ISiteContentService
     /// **Updates** the existing <see cref="SiteContentTranslation"/> row for
     /// <paramref name="languageCode"/> (ADR 0157; the ADR 0048
     /// <see cref="Posts.PostService.UpdatePostTranslationAsync"/> shape). The
-    /// four hero fields are replaced verbatim (a blank field clears that
-    /// field's override → the singleton's value is the fallback again);
-    /// **at least one** must be non-blank (a caller error otherwise). A
-    /// missing row is a <see cref="KeyNotFoundException"/>. One
-    /// <c>AccessAudit</c> row (action <c>sitetranslation.update</c>,
-    /// <c>Via = Admin</c>).
+    /// six hero fields (the two heroes' eyebrow + lead + the home hero's two
+    /// sub lines) are replaced verbatim (a blank field clears that field's
+    /// override → the singleton's value is the fallback again); **at least
+    /// one** must be non-blank (a caller error otherwise). A missing row is
+    /// a <see cref="KeyNotFoundException"/>. One <c>AccessAudit</c> row
+    /// (action <c>sitetranslation.update</c>, <c>Via = Admin</c>).
     /// </summary>
     Task<SiteContentTranslation> UpdateTranslationAsync(
         string languageCode,
         string? homeHeroEyebrow,
         string? homeHeroLead,
+        string? homeHeroSub1,
+        string? homeHeroSub2,
         string? aboutHeroEyebrow,
         string? aboutHeroLead,
         string actorBy,

@@ -66,6 +66,17 @@ public sealed class SiteContentTranslation
     /// <see cref="SiteContent.HomeHeroLead"/> is the fallback when absent).</summary>
     public string? HomeHeroLead { get; set; }
 
+    /// <summary>The translated home hero's first sub line (the "scope" line;
+    /// optional — the singleton's <see cref="SiteContent.HomeHeroSub1"/> is the
+    /// fallback when absent). One of the six fields must be non-blank (the
+    /// write seam enforces it).</summary>
+    public string? HomeHeroSub1 { get; set; }
+
+    /// <summary>The translated home hero's second sub line (the "FIG" line;
+    /// optional — the singleton's <see cref="SiteContent.HomeHeroSub2"/> is the
+    /// fallback when absent).</summary>
+    public string? HomeHeroSub2 { get; set; }
+
     /// <summary>The translated about hero eyebrow (optional — the singleton's
     /// <see cref="SiteContent.AboutHeroEyebrow"/> is the fallback when absent).</summary>
     public string? AboutHeroEyebrow { get; set; }

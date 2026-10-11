@@ -255,12 +255,12 @@ public class AdminSiteControllerTests
         var (controller, site) = Build(null);
 
         var action = await controller.AddTranslation(
-            "pl", "Naszyj dom", "Cichy kąt", "Prywatność", "Dom dla wszystkich");
+            "pl", "Naszyj dom", "Cichy kąt", "Zakres", "FIG", "Prywatność", "Dom dla wszystkich");
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
 
         await site.Received(1).AddTranslationAsync(
-            "pl", "Naszyj dom", "Cichy kąt", "Prywatność", "Dom dla wszystkich", Admin);
+            "pl", "Naszyj dom", "Cichy kąt", "Zakres", "FIG", "Prywatność", "Dom dla wszystkich", Admin);
     }
 
     // ── 6 — the POST /translations validation: no language / all blank ─────
@@ -270,13 +270,14 @@ public class AdminSiteControllerTests
     {
         var (controller, site) = Build(null);
 
-        var action = await controller.AddTranslation("pl", " ", "  ", null, null);
+        var action = await controller.AddTranslation("pl", " ", "  ", null, null, null, null);
         Assert.IsType<RedirectToActionResult>(action);
 
         // No write lane was called (the validation short-circuits).
         await site.DidNotReceiveWithAnyArgs().AddTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>());
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string>());
     }
 
     [Fact(DisplayName = "U08 AdminSite POST /translations rejects a missing language")]
@@ -285,12 +286,13 @@ public class AdminSiteControllerTests
         var (controller, site) = Build(null);
 
         var action = await controller.AddTranslation(
-            null, "eyebrow", "lead", null, null);
+            null, "eyebrow", "lead", null, null, null, null);
         Assert.IsType<RedirectToActionResult>(action);
 
         await site.DidNotReceiveWithAnyArgs().AddTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>());
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string>());
     }
 
     // ── 7 — the POST /translations/update edits a translation ──────────────
@@ -301,12 +303,12 @@ public class AdminSiteControllerTests
         var (controller, site) = Build(null);
 
         var action = await controller.UpdateTranslation(
-            "pl", "New eyebrow", "New lead", null, null);
+            "pl", "New eyebrow", "New lead", null, null, null, null);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
 
         await site.Received(1).UpdateTranslationAsync(
-            "pl", "New eyebrow", "New lead", null, null, Admin);
+            "pl", "New eyebrow", "New lead", null, null, null, null, Admin);
     }
 
     // ── 8 — the POST /translations/update missing-row shape is a flash ─────
@@ -320,11 +322,12 @@ public class AdminSiteControllerTests
         // the controller and surfaced as a flash + redirect (not an exception).
         site.UpdateTranslationAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(),
-            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>())
+            Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+            Arg.Any<string>())
             .Returns(throwingTask<SiteContentTranslation>());
 
         var action = await controller.UpdateTranslation(
-            "xx", "eyebrow", "lead", null, null);
+            "xx", "eyebrow", "lead", null, null, null, null);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminSiteController.Index), redirect.ActionName);
     }
