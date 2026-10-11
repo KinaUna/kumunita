@@ -69,9 +69,12 @@ public static class EffectiveLanguageCode
     /// <c>en</c> floor — M·1/M·9).</param>
     public static async Task<string> ResolveAsync(
         HttpRequest? request,
-        ILocalizationService localization,
-        ITranslationProvider provider)
+        ILocalizationService? localization,
+        ITranslationProvider? provider)
     {
+        if (localization is null || provider is null)
+            return "en";
+
         // Mirror the <c>&lt;kw-l&gt;</c> TagHelper's three-branch chain exactly
         // (TagHelpers/LocalizeTagHelper.cs), but return the resolved **code**
         // rather than a string, so a content surface can pick which of an item's

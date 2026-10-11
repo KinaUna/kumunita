@@ -97,7 +97,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         // The redirect goes back to the Detail page (the standard
         // "save + back to curation" shape, the SetChildMessaging idiom).
         Assert.Equal(nameof(GuardianController.Detail), redirect.ActionName);
-        Assert.Equal(Child, redirect.RouteValues["childId"]);
+        Assert.Equal(Child, redirect.RouteValues!["childId"]);
 
         // The mode is live on the very next read (C4).
         Assert.Equal(mode, (await userInfo.GetProfileAsync(Child))!.EventRsvpMode);

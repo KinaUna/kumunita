@@ -1145,7 +1145,7 @@ public static class SampleDataSeeder
         foreach (var existing in existingTags) tagsBySlug[existing.Slug] = existing.Id;
         foreach (var tag in doc.Tags)
         {
-            string id;
+            string? id;
             if (!tagsBySlug.TryGetValue(tag.Slug, out id))
             {
                 id = Id();
@@ -1186,7 +1186,7 @@ public static class SampleDataSeeder
         foreach (var existing in existingGroups) groupsByTitle[existing.Name] = existing.Id;
         foreach (var group in doc.Groups)
         {
-            string id;
+            string? id;
             if (!groupsByTitle.TryGetValue(group.Name, out id))
             {
                 id = Id();
@@ -1281,7 +1281,7 @@ public static class SampleDataSeeder
         foreach (var announcement in doc.Announcements)
         {
             var key = announcement.Title + "|" + (announcement.ComponentId ?? "_");
-            string id;
+            string? id;
             if (!announcementsByTitle.TryGetValue(key, out id))
             {
                 id = Id();
@@ -1353,7 +1353,7 @@ public static class SampleDataSeeder
             var lane = groupLane ? "G:" + groupPostId
                                  : "C:" + (samplePost.ComponentId ?? "_");
             var key = samplePost.Title + "|" + lane;
-            string id;
+            string? id;
             if (!postsByTitle.TryGetValue(key, out id))
             {
                 id = Id();
@@ -1447,7 +1447,7 @@ public static class SampleDataSeeder
         foreach (var existing in existingEvents) eventsByTitle[existing.Title] = existing.Id;
         foreach (var sampleEvent in doc.Events)
         {
-            string id;
+            string? id;
             if (!eventsByTitle.TryGetValue(sampleEvent.Title, out id))
             {
                 id = Id();
@@ -1524,7 +1524,7 @@ public static class SampleDataSeeder
             pagesBySlug[existing.Slug] = existing.Id;
         foreach (var page in doc.Pages)
         {
-            string id;
+            string? id;
             if (!pagesBySlug.TryGetValue(page.Slug, out id))
             {
                 id = Id();
@@ -1710,7 +1710,7 @@ public static class SampleDataSeeder
         foreach (var b in existingBoards) boardsByTitle[b.Title] = b.Id;
         foreach (var sampleBoard in doc.Boards)
         {
-            string boardId;
+            string? boardId;
             if (!boardsByTitle.TryGetValue(sampleBoard.Title, out boardId))
             {
                 boardId = Id();
@@ -1813,7 +1813,7 @@ public static class SampleDataSeeder
         foreach (var i in existingInventory) inventoryByName[i.Name] = i.Id;
         foreach (var sampleItem in doc.InventoryItems)
         {
-            string itemId;
+            string? itemId;
             if (!inventoryByName.TryGetValue(sampleItem.Name, out itemId))
             {
                 itemId = Id();

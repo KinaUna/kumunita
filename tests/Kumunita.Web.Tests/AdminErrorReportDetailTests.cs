@@ -232,7 +232,7 @@ public class AdminErrorReportDetailTests
         var action = await controller.Resolve(reportId, resolutionNote: "Restarted the worker");
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(ErrorReportAdminController.Detail), redirect.ActionName);
-        Assert.Equal(reportId, redirect.RouteValues["id"]);
+        Assert.Equal(reportId, redirect.RouteValues!["id"]);
 
         // The one write lane was called exactly once for the signed-in
         // GlobalAdmin (M32·8 — the single audited write-lane shape). The
@@ -264,7 +264,7 @@ public class AdminErrorReportDetailTests
         var action = await controller.Resolve(reportId, resolutionNote: "Second note");
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(ErrorReportAdminController.Detail), redirect.ActionName);
-        Assert.Equal(reportId, redirect.RouteValues["id"]);
+        Assert.Equal(reportId, redirect.RouteValues!["id"]);
 
         // The write lane was called exactly once (the controller does not
         // double-call on a no-op) — but it returned null (the already-
@@ -302,7 +302,7 @@ public class AdminErrorReportDetailTests
         var action = await controller.Escalate(reportId);
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(ErrorReportAdminController.Detail), redirect.ActionName);
-        Assert.Equal(reportId, redirect.RouteValues["id"]);
+        Assert.Equal(reportId, redirect.RouteValues!["id"]);
 
         // The successful forward stamps resolved via the one MarkResolvedAsync
         // lane (the "Escalated to operator endpoint" marker — the M32·8 pin).

@@ -2260,7 +2260,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 .ToListAsync(ct);
             var pageIds = pages.Select(p => p.Id).ToHashSet();
             var audits = await q.Query<AccessAudit>()
-                .Where(a => a.Action == "page.reset" && pageIds.Contains(a.TargetId))
+                .Where(a => a.Action == "page.reset" && pageIds.Contains(a.TargetId!))
                 .ToListAsync(ct);
             Assert.Empty(audits);
         }

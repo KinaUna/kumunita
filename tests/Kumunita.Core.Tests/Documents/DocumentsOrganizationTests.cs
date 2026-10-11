@@ -401,6 +401,7 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
             // here" convention — the PostService.CreatePostAsync idiom); re-store
             // + save here to persist the mutation.
             var d = await s.LoadAsync<Document>(doc.Id);
+            if (d is null) throw new InvalidOperationException("Document not found");
             d.TagIds = r.Select(t => t.Id).ToList();
             s.Store(d);
             await s.SaveChangesAsync();

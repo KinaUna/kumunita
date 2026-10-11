@@ -41,8 +41,12 @@
     // board is kw-l-wrapped). Resolved the same way the optional status
     // placeholder above is: provider by the effective language, the
     // provider floor (en registry) is the backstop.
-    var addTodoPlaceholder = await Translation.GetAsync("projects.board.lane.add_todo_placeholder", _kwL);
-    var addLanePlaceholder = await Translation.GetAsync("projects.board.lane.add_lane_placeholder", _kwL);
+    var addTodoPlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.board.lane.add_todo_placeholder"]
+        : await Translation.GetAsync("projects.board.lane.add_todo_placeholder", _kwL);
+    var addLanePlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.board.lane.add_lane_placeholder"]
+        : await Translation.GetAsync("projects.board.lane.add_lane_placeholder", _kwL);
     // The copy-to / move-to pickers need the *other* boards (the target
     // board option list). The frozen view model carries no such list
     // (C-M5·3: a board detail is board-scoped), so this is a read-only

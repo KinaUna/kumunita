@@ -158,8 +158,10 @@ public sealed class PostsController(
         // it even though their implicit membership cannot be removed (ADR 0012).
         // Admin/moderator standing is unaffected (they still manage it) — the
         // block is the child's personal ceiling, read from the child's profile.
-        if (actor is not null
-            && !KumunitaPrincipal.IsGlobalAdmin(User)
+        // (`actor` is non-nullable by construction — `SubjectId(User) ?? string.Empty` —
+        // so the `actor is not null` guard it carried before was always true; dropping
+        // it also clears a Roslyn dataflow quirk (CS8604) that only this site tripped.)
+        if (!KumunitaPrincipal.IsGlobalAdmin(User)
             && !KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId)))
         {
             var effective = await userInfo.GetEffectiveCommunityIdsAsync(actor);

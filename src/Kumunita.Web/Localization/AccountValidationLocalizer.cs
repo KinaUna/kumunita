@@ -59,7 +59,7 @@ public static class AccountValidationLocalizer
         object model,
         ModelStateDictionary? modelState,
         HttpRequest? request,
-        ILocalizationService localization,
+        ILocalizationService? localization,
         ITranslationProvider provider)
     {
         if (model is null || modelState is null || modelState.Count == 0 ||

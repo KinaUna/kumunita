@@ -85,7 +85,7 @@ public sealed class GuardianMessagingRestrictionTests(PostgresFixture fixture) :
         // The redirect goes back to the Detail page (the standard
         // "save + back to curation" shape, the Suspend/Unsuspend idiom).
         Assert.Equal(nameof(GuardianController.Detail), redirect.ActionName);
-        Assert.Equal(Child, redirect.RouteValues["childId"]);
+        Assert.Equal(Child, redirect.RouteValues!["childId"]);
 
         // The ceiling is live on the very next read (C4).
         Assert.True((await userInfo.GetProfileAsync(Child))!.MessagingRestricted);

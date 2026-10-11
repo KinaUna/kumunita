@@ -119,7 +119,6 @@ public class PostEventSortWebTests
         // F1 / C-SORT·2 — an absent sort param → null SortSpec (the seam
         // keeps its pinned Created-desc order exactly) and the pager carries
         // no sort/dir pair (byte-identical to pre-M26, D9 — ?page=N only).
-        const int page = 2;
 
         var sortSpec = ParseFeedSort(sort: null, dir: null,
             PostFeedAllowed, PostFeedDefaultKey, PostFeedDefaultDir);
@@ -190,7 +189,6 @@ public class PostEventSortWebTests
         // posts section keeps its pinned Created-desc order exactly) and the
         // section's pager carries no sort/dir pair (byte-identical to
         // pre-M26, D9 — ?page=N only).
-        const int page = 2;
 
         var sortSpec = ParseFeedSort(sort: null, dir: null,
             PostFeedAllowed, PostFeedDefaultKey, PostFeedDefaultDir);

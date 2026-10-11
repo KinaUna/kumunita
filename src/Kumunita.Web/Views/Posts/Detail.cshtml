@@ -33,7 +33,9 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
-    var reportReasonPlaceholder = await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
+    var reportReasonPlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["posts.report_reason_placeholder"]
+        : await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
     // Author avatar monogram fallback (the Directory pattern — avatar.ts hides
     // the <img> on the 404 the serving lane fails closed to; see site.css).
     string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)

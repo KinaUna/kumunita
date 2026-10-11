@@ -461,7 +461,6 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
 
         const string assigningGuardian = "ga-read-assigning";
         const string assignedGuardian = "ga-read-assigned";
-        const string otherGuardian  = "ga-read-other";
         const string child          = "ga-read-child";
 
         await SeedChildProfileAsync(store, child, ct);

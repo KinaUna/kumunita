@@ -1325,7 +1325,7 @@ public static class FirstBootSeeder
             .ConfigureAwait(false)).ToList();
         var allGuideIds = (await session
             .Query<Page>()
-            .Where(p => (p.ParentId == help.Id || topLevelGuideIds.Contains(p.ParentId))
+            .Where(p => (p.ParentId == help.Id || topLevelGuideIds.Contains(p.ParentId!))
                         && p.IsDeleted == false)
             .Select(p => p.Id)
             .ToListAsync(ct)

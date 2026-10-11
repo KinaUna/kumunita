@@ -181,7 +181,7 @@ public class AdminStorageMetricsControllerTests
         // never calls SaveChangesAsync.
         store.DidNotReceive().LightweightSession();
         session.DidNotReceive().Store(Arg.Any<object>());
-        session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
 
         await metrics.Received(1).GetSnapshotAsync(Arg.Any<CancellationToken>());
         await metrics.Received(1).GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>());

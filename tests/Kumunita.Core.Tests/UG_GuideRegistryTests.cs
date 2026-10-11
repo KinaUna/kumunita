@@ -147,7 +147,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         var parentIds = help.Id;
         var topLevelIds = helpChildren.Select(h => h.Id).ToList();
         var allGuides = await q.Query<Page>()
-            .Where(p => (p.ParentId == parentIds || topLevelIds.Contains(p.ParentId))
+            .Where(p => (p.ParentId == parentIds || topLevelIds.Contains(p.ParentId!))
                         && p.IsDeleted == false)
             .ToListAsync(ct);
         Assert.Equal(
@@ -262,7 +262,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             .ToListAsync(ct);
         var topLevelIds = topLevelGuides.Select(g => g.Id).ToList();
         var nestedGuides = await q.Query<Page>()
-            .Where(p => topLevelIds.Contains(p.ParentId) && p.IsDeleted == false)
+            .Where(p => topLevelIds.Contains(p.ParentId!) && p.IsDeleted == false)
             .ToListAsync(ct);
         var allGuides = topLevelGuides.Concat(nestedGuides).ToList();
         var guideIds = allGuides.Select(g => g.Id).ToList();
@@ -326,7 +326,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
             .Select(p => p.Id).ToListAsync(ct)).ToList();
         var guideIds = (await q.Query<Page>()
-            .Where(p => (p.ParentId == help.Id || topLevelIds.Contains(p.ParentId))
+            .Where(p => (p.ParentId == help.Id || topLevelIds.Contains(p.ParentId!))
                         && p.IsDeleted == false)
             .Select(p => p.Id).ToListAsync(ct)).ToList();
 
@@ -385,7 +385,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var guideIds = (await q0.Query<Page>()
-                .Where(p => (p.ParentId == help.Id || topLevelIds0.Contains(p.ParentId))
+                .Where(p => (p.ParentId == help.Id || topLevelIds0.Contains(p.ParentId!))
                             && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var count = await q0.Query<PageTranslation>()
@@ -413,7 +413,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var guideIds = (await q1.Query<Page>()
-                .Where(p => (p.ParentId == help.Id || topLevelIds1.Contains(p.ParentId))
+                .Where(p => (p.ParentId == help.Id || topLevelIds1.Contains(p.ParentId!))
                             && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var baselined1 = await q1.Query<PageTranslation>()
@@ -467,7 +467,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
                 .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var guideIds = (await q2.Query<Page>()
-                .Where(p => (p.ParentId == help.Id || topLevelIds2.Contains(p.ParentId))
+                .Where(p => (p.ParentId == help.Id || topLevelIds2.Contains(p.ParentId!))
                             && p.IsDeleted == false)
                 .Select(p => p.Id).ToListAsync(ct)).ToList();
             var baselined2 = await q2.Query<PageTranslation>()

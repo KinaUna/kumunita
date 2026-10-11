@@ -21,7 +21,9 @@
     {
         confirmReset = await Translation.GetAsync("pages.reset_confirm", _kwL);
     }
-    var tagsExample = await Translation.GetAsync("tags.pages_example", _kwL);
+    var tagsExample = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["tags.pages_example"]
+        : await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
 <div class="row justify-content-center">

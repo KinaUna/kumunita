@@ -511,7 +511,7 @@ public sealed class ProjectsController : Controller
     // M7 community filter + the sort/dir pairs only when the request carried
     // them (the U10/U11 pager-carry rule, U11's SortFilterParams helper —
     // reused, not re-derived).
-    private static IReadOnlyDictionary<string, string> BuildBoardFilterParams(
+    private static IReadOnlyDictionary<string, string>? BuildBoardFilterParams(
         string? componentId, string? sort, string? dir)
     {
         var p = new Dictionary<string, string>();
@@ -525,7 +525,7 @@ public sealed class ProjectsController : Controller
     // FilterParams: the same frozen M7 community filter + the sort/dir pairs
     // (each section's own pager carries its own copy — both sections read
     // the request's single ?sort=/?dir= pair, so both pagers carry it).
-    private static IReadOnlyDictionary<string, string> BuildLandingFilterParams(
+    private static IReadOnlyDictionary<string, string>? BuildLandingFilterParams(
         string? componentId, string? sort, string? dir)
     {
         var p = new Dictionary<string, string>();
