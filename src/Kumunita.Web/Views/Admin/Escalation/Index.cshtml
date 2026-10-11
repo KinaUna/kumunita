@@ -51,8 +51,32 @@
 <h1><kw-l key="escalation.title">Escalation</kw-l></h1>
 
 <p class="lead">
-    <kw-l key="escalation.intro">Authorize other platforms to escalate issues to this instance, and generate the access tokens they present.</kw-l>
+    <kw-l key="escalation.intro">Escalation moves an issue from one Kumunita instance to another. This page sets up sending — where this instance forwards escalated issues and the token that authorizes it. The other direction, receiving, is managed on the Receiving access tokens page.</kw-l>
 </p>
+
+@* The "how it works" explainer (the escalation.how.* kw-l keys — the U07-style
+   closed set this lane adds to the ESC·11 escalation.* set). This is the
+   clarification the user asked for: the page mixes two directions, so the card
+   names both and points to the sibling page that owns the other one. The
+   "receiving" sentence is plain copy + a bare <a> (no <kw-l> inside an
+   attribute — the AGENTS.md Razor trap #3; the link label is a separate
+   <kw-l> element sitting outside the link's quoted attributes). The card is a
+   static <section> with Bootstrap classes (no interpolated style=/data-* —
+   the AGENTS.md Razor trap #2). *@
+<div class="card kmb-escalation-how mb-4">
+    <div class="card-header fw-semibold">
+        <kw-l key="escalation.how.heading">How escalation works</kw-l>
+    </div>
+    <div class="card-body">
+        <p class="mb-2">
+            <kw-l key="escalation.how.outbound">This page is for sending: when an admin escalates a report from the Error reports page, it is forwarded to another instance's queue. Fill in the receiving instance's inbound endpoint and the access token its admin shared with you, then turn escalation on. While it is off, escalating a report does nothing.</kw-l>
+        </p>
+        <p class="mb-3">
+            <kw-l key="escalation.how.inbound">The other direction is receiving: to let other instances escalate issues to this one, generate an access token for each of them and share it with their admin, who enters it on their own copy of this page.</kw-l>
+            <a class="ms-1" href="/admin/escalation/tokens"><kw-l key="escalation.tokens.title">Receiving access tokens</kw-l> →</a>
+        </p>
+    </div>
+</div>
 
 @* The success flash (the escalation.outbound.saved key, the U07 closed set,
    ESC·11) — rendered when the just-processed Save action succeeded (the
@@ -100,6 +124,13 @@
         <input type="url" class="form-control" id="endpoint" name="Endpoint"
                value="@Model.Endpoint"
                placeholder="https://receiving.example/escalations/inbound"@endpointRequired />
+        @* The endpoint help line (the escalation.outbound.endpoint.help kw-l key).
+           A <div class="form-text"> below the input — the house help-text idiom
+           (the BreakGlass token hint). The text is platform copy, so it goes
+           through <kw-l> by key (the kw-l floor, ADR 0015 D1). *@
+        <div class="form-text">
+            <kw-l key="escalation.outbound.endpoint.help">The receiving instance's inbound URL — they give it to you. It is the address your escalated issues are delivered to (it ends in /escalations/inbound).</kw-l>
+        </div>
     </div>
 
     @* The access token (the escalation.outbound.token.label kw-l key, the U07
@@ -116,6 +147,10 @@
                value="@Model.Token"
                placeholder="kesc_…"
                autocomplete="new-password" />
+        @* The token help line (the escalation.outbound.token.help kw-l key). *@
+        <div class="form-text">
+            <kw-l key="escalation.outbound.token.help">The access token the receiving instance's admin generated for you and shared out-of-band. It is sent as a Bearer credential so the receiving instance knows you are authorized to send.</kw-l>
+        </div>
     </div>
 
     @* The enable switch (the escalation.outbound.enabled.label kw-l key, the
@@ -127,6 +162,10 @@
         <label class="form-check-label" for="enabled">
             <kw-l key="escalation.outbound.enabled.label">Enable escalation</kw-l>
         </label>
+        @* The enable help line (the escalation.outbound.enabled.help kw-l key). *@
+        <div class="form-text">
+            <kw-l key="escalation.outbound.enabled.help">Turn this on once both fields above are filled in. While it is off, escalating a report does nothing.</kw-l>
+        </div>
     </div>
 
     @* The submit button (the escalation.outbound.save kw-l key, the U07

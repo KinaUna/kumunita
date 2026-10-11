@@ -2429,7 +2429,13 @@ public static class KnownTranslationKeys
 
             // ── ESC — the closed escalation.* kw-l key set (ADR 0159 ESC·11) ──
             ["escalation.title"] = "Escalation",
-            ["escalation.intro"] = "Authorize other platforms to escalate issues to this instance, and generate the access tokens they present.",
+            ["escalation.intro"] = "Escalation moves an issue from one Kumunita instance to another. This page sets up sending — where this instance forwards escalated issues and the token that authorizes it. The other direction, receiving, is managed on the Receiving access tokens page.",
+            ["escalation.how.heading"] = "How escalation works",
+            ["escalation.how.outbound"] = "This page is for sending: when an admin escalates a report from the Error reports page, it is forwarded to another instance's queue. Fill in the receiving instance's inbound endpoint and the access token its admin shared with you, then turn escalation on. While it is off, escalating a report does nothing.",
+            ["escalation.how.inbound"] = "The other direction is receiving: to let other instances escalate issues to this one, generate an access token for each of them and share it with their admin, who enters it on their own copy of this page.",
+            ["escalation.outbound.endpoint.help"] = "The receiving instance's inbound URL — they give it to you. It is the address your escalated issues are delivered to (it ends in /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "The access token the receiving instance's admin generated for you and shared out-of-band. It is sent as a Bearer credential so the receiving instance knows you are authorized to send.",
+            ["escalation.outbound.enabled.help"] = "Turn this on once both fields above are filled in. While it is off, escalating a report does nothing.",
             ["escalation.outbound.endpoint.label"] = "Receiving platform endpoint",
             ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
             ["escalation.outbound.token.label"] = "Access token (issued by the receiving admin)",
@@ -4996,7 +5002,13 @@ public static class KnownTranslationKeys
 
             // ── ESC — das geschlossene escalation.* kw-l-Schlüsselsatz (ADR 0159 ESC·11) ──
             ["escalation.title"] = "Eskalation",
-            ["escalation.intro"] = "Autorisiere andere Plattformen, Probleme an diese Instanz zu eskalieren, und erstelle die Zugriffstokens, die sie vorlegen.",
+            ["escalation.intro"] = "Eskalation überträgt ein Problem von einer Kumunita-Instanz zu einer anderen. Diese Seite richtet das Senden ein – wohin diese Instanz eskalierte Probleme weiterleitet und das Token, das sie dazu berechtigt. Die andere Richtung, das Empfangen, wird auf der Seite der empfangenen Zugriffstokens verwaltet.",
+            ["escalation.how.heading"] = "So funktioniert Eskalation",
+            ["escalation.how.outbound"] = "Diese Seite dient zum Senden: Wenn ein Administrator einen Bericht von der Seite Fehlerberichte eskaliert, wird er an die Warteschlange einer anderen Instanz weitergeleitet. Tragen Sie den Eingangsendpunkt der empfangenden Instanz und das Zugriffstoken ein, das deren Administrator Ihnen mitgeteilt hat, und aktivieren Sie die Eskalation. Solange sie aus ist, ändert das Eskalieren eines Berichts nichts.",
+            ["escalation.how.inbound"] = "Die andere Richtung ist das Empfangen: Um anderen Instanzen zu gestatten, Probleme an diese Instanz zu eskalieren, erstellen Sie für jede ein Zugriffstoken und teilen Sie es deren Administrator mit, der es auf seiner eigenen Kopie dieser Seite einträgt.",
+            ["escalation.outbound.endpoint.help"] = "Der Eingangsendpunkt der empfangenden Instanz – sie teilt ihn Ihnen mit. Das ist die Adresse, an die Ihre eskalierten Probleme geliefert werden (endet auf /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Das Zugriffstoken, das der Administrator der empfangenden Instanz für Sie erstellt und Ihnen außerhalb des Systems mitgeteilt hat. Es wird als Bearer-Nachweis gesendet, damit die empfangende Instanz weiß, dass Sie zum Senden berechtigt sind.",
+            ["escalation.outbound.enabled.help"] = "Aktivieren Sie dies, sobald beide Felder oben ausgefüllt sind. Solange es aus ist, ändert das Eskalieren eines Berichts nichts.",
             ["escalation.outbound.endpoint.label"] = "Endpunkt der empfangenden Plattform",
             ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
             ["escalation.outbound.token.label"] = "Zugriffstoken (ausgestellt vom empfangenden Administrator)",
@@ -7463,7 +7475,13 @@ public static class KnownTranslationKeys
 
             // ── ESC — le jeu fermé de clés kw-l escalation.* (ADR 0159 ESC·11) ──
             ["escalation.title"] = "Escalade",
-            ["escalation.intro"] = "Autorisez d'autres plateformes à escalader des signalements vers cette instance, et générez les jetons d'accès qu'elles présentent.",
+            ["escalation.intro"] = "L'escalade transmet un signalement d'une instance Kumunita à une autre. Cette page configure l'envoi — vers quelle instance cette instance transmet les signalements et le jeton qui y autorise. L'autre sens, la réception, se gère sur la page Jetons d'accès reçus.",
+            ["escalation.how.heading"] = "Comment fonctionne l'escalade",
+            ["escalation.how.outbound"] = "Cette page sert à l'envoi : lorsqu'un administrateur escalade un signalement depuis la page Signalements, il est transmis à la file d'attente d'une autre instance. Renseignez le point de terminaison d'entrée de l'instance réceptrice et le jeton d'accès que son administrateur vous a communiqué, puis activez l'escalade. Tant qu'elle est désactivée, l'escalade d'un signalement ne fait rien.",
+            ["escalation.how.inbound"] = "L'autre sens est la réception : pour autoriser d'autres instances à escalader des signalements vers celle-ci, générez un jeton d'accès pour chacune et communiquez-le à leur administrateur, qui le saisit sur sa propre copie de cette page.",
+            ["escalation.outbound.endpoint.help"] = "Le point de terminaison d'entrée de l'instance réceptrice — elle vous le communique. C'est l'adresse à laquelle vos signalements sont livrés (il se termine par /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Le jeton d'accès que l'administrateur de l'instance réceptrice a généré pour vous et vous a communiqué hors système. Il est envoyé comme preuve Bearer afin que l'instance réceptrice sache que vous êtes autorisé à envoyer.",
+            ["escalation.outbound.enabled.help"] = "Activez ceci une fois les deux champs ci-dessus renseignés. Tant qu'il est désactivé, l'escalade d'un signalement ne fait rien.",
             ["escalation.outbound.endpoint.label"] = "Point de terminaison de la plateforme réceptrice",
             ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
             ["escalation.outbound.token.label"] = "Jeton d'accès (émis par l'administrateur récepteur)",
@@ -9917,7 +9935,13 @@ public static class KnownTranslationKeys
 
             // ── ESC — det lukkede escalation.* kw-l-nøglesæt (ADR 0159 ESC·11) ──
             ["escalation.title"] = "Eskalering",
-            ["escalation.intro"] = "Autoriser andre platforme til at eskalere problemer til denne instans, og generér adgangstokens, de fremlægger.",
+            ["escalation.intro"] = "Eskalering flytter en sag fra én Kumunita-instans til en anden. Denne side opsætter afsendelse – hvor denne instans videresender eskalerede sager og den token, der autoriserer det. Den anden retning, modtagelse, administreres på siden Modtagne adgangstokens.",
+            ["escalation.how.heading"] = "Sådan virker eskalering",
+            ["escalation.how.outbound"] = "Denne side er til afsendelse: Når en administrator eskalerer en rapport fra siden Fejlrapporter, videresendes den til en anden instans' kø. Udfyld den modtagende instans' indgangsendepunkt og den adgangstoken, deres administrator har delt med dig, og tænd for eskalering. Mens den er slukket, gør det ingenting at eskalere en rapport.",
+            ["escalation.how.inbound"] = "Den anden retning er modtagelse: For at lade andre instanser eskalere sager til denne instans, generér en adgangstoken for hver af dem og del den med deres administrator, der indtaster den på deres egen kopi af denne side.",
+            ["escalation.outbound.endpoint.help"] = "Den modtagende instans' indgangsendepunkt – de deler det med dig. Det er adressen, dine eskalerede sager leveres til (slutter med /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Den adgangstoken, den modtagende instans' administrator har genereret til dig og delt uden for systemet. Den sendes som Bearer-besked, så den modtagende instans ved, at du er autoriseret til at sende.",
+            ["escalation.outbound.enabled.help"] = "Tænd for dette, når begge felter ovenfor er udfyldt. Mens det er slukket, gør det ingenting at eskalere en rapport.",
             ["escalation.outbound.endpoint.label"] = "Modtagende platformendepunkt",
             ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
             ["escalation.outbound.token.label"] = "Adgangstoken (udstedt af den modtagende administrator)",
