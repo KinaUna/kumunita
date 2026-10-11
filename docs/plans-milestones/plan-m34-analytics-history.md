@@ -41,14 +41,14 @@
 > `UsageEvent` doc + `UsagePurgeService` retention + the
 > `UsageDocTypes` registration surface + the `AdminAnalyticsController` +
 > the M33 `StorageMetricsSample`/`GetHistoryAsync`/`StorageHistoryResult`
-> shapes as the structural template + the ADR index — confirm **0161** is
+> shapes as the structural template + the ADR index — confirm **0162** is
 > free) and authors the handoff-note skeleton. **U01/U02** author the
 > primary-tier design doc (invariants M34·1–M34·10 + FACES M34-1–M34-10 +
 > the `UsageDailyTotal` / `UsageHistoryResult` DTO shapes + the
 > `GetHistoryAsync` seam + the M13 surface extension + the closed
 > `analytics.trend.*` `kw-l` key set + the pinned test names + the acceptance
-> gate + the drift guard) and draft **ADR 0161** (the next free number after
-> 0160). **U03** implements the Core read seam + the two new DTOs on the
+> gate + the drift guard) and draft **ADR 0162** (the next free number after
+> 0161 — 0161 is the page-translation lane). **U03** implements the Core read seam + the two new DTOs on the
 > existing M13 service. **U04** extends the M13 Web surface (the controller
 > + the view model + the trend section in the view — table + sparkline).
 > **U05** authors the **closed `analytics.trend.*` `kw-l` key set** ×
@@ -118,7 +118,7 @@ library, no audit rows, no EF migration**.
 
 ## The one thing every unit must respect
 
-**Analytics-history semantics (locked in ADR 0161, U00):**
+**Analytics-history semantics (locked in ADR 0162, U00):**
 
 - **M34 is a capability on the M13 `Kumunita.Core.Usage` surface, not a new
   context (M34·1).** M34 rides the **existing** `Kumunita.Core.Usage`
@@ -222,7 +222,7 @@ library, no audit rows, no EF migration**.
   `Milestones.cs` / README / `STATUS.md` / `ARCHITECTURE.md` /
   `MilestonesTests.cs` / `WhatsNew.cs` six-member close flip lands in U08
   (the M33·12 precedent). The `WhatsNew.cs` registry gains one new entry
-  (newest-first, the `0.54.0` row) naming M34 + ADR 0161. **M34 is the last
+  (newest-first, the `0.55.0` row) naming M34 + ADR 0162. **M34 is the last
   milestone** — the close flips `M34` from `StatusNext` to `StatusDone` and
   promotes **no** successor (the `M34_Is_The_Single_InProgress_Milestone`
   pin is **removed** and replaced with a "no in-progress milestone"
@@ -374,12 +374,12 @@ sequenced. **U00** verifies the surface (the M13 `IUsageAnalyticsService`
 retention + the `UsageDocTypes` registration surface + the
 `AdminAnalyticsController` + the M33 `StorageMetricsSample` /
 `GetHistoryAsync` / `StorageHistoryResult` shapes as the structural template
-+ the ADR index — confirm **0161** is free) + authors the handoff-note
++ the ADR index — confirm **0162** is free) + authors the handoff-note
 skeleton. **U01/U02** author the primary-tier design doc (invariants
 M34·1–M34·12 + FACES M34-1–M34-10 + the `UsageDailyTotal` /
 `UsageHistoryResult` DTO shapes + the `GetHistoryAsync` seam + the M13
 surface extension + the closed `analytics.trend.*` key set + the pinned test
-names + the acceptance gate + the drift guard) and draft **ADR 0161**.
+names + the acceptance gate + the drift guard) and draft **ADR 0162**.
 **U03** implements the Core read seam + the two new DTOs on the existing M13
 service. **U04** extends the M13 Web surface (the controller `Index` action
 + the view model + the trend section in the view — table + sparkline).
@@ -469,7 +469,7 @@ records `## U<m> — Drift pause` in the handoff note.
   + the `UsageDocTypes` registration surface + the `AdminAnalyticsController`
   + the M33 `StorageMetricsSample` / `GetHistoryAsync` /
   `StorageHistoryResult` shapes as the structural template + the ADR index —
-  confirm **0161** is free) and author the handoff-note skeleton (the
+  confirm **0162** is free) and author the handoff-note skeleton (the
   "Milestone open" section). **No code, no build, no test.**
 - **Entry reads:**
   `src/Kumunita.Core/Usage/IUsageAnalyticsService.cs` (the M13 seam M34
@@ -499,7 +499,7 @@ records `## U<m> — Drift pause` in the handoff note.
   (the "Charts" deferral M34 settles) + `docs/adr/0156-storage-metrics-
   history.md` (the M33 ADR — the structural template + the "derived vs
   captured" distinction M34 relies on);
-  `docs/adr/README.md` (the ADR index — confirm **0161** is free after the
+  `docs/adr/README.md` (the ADR index — confirm **0162** is free after the
   0160 row; 0160 = the UG nested-help lane, the current highest);
   `docs/plans-milestones/done/m33/plan-m33-storage-metrics-history.md` (the
   M33 register — the structural template for this register).
@@ -530,15 +530,16 @@ records `## U<m> — Drift pause` in the handoff note.
   **no** new surface — M34·1), (e) the `AdminAnalyticsController` +
   `Views/AdminAnalytics/Index.cshtml` (the M34·8 additive target), (f) the
   M33 `StorageHistoryResult` / `GetHistoryAsync` shapes (the structural
-  template), (g) the **ADR 0161** (the next free number after 0160 — the
-  ADR index in `docs/adr/README.md` confirms 0160 is the current highest).
+  template), (g) the **ADR 0162** (the next free number after 0161 — 0161 is
+  the page-translation lane; the ADR index in `docs/adr/README.md` confirms
+  0161 is the current highest).
   Handoff note: a `## U00 — Kickoff verified` section with the current
   surface shape (the `IUsageAnalyticsService` method count [2:
   `GetWindowAsync` + `GetCsvRowsAsync`], the `UsageEvent` member count [4],
   the `UsagePurgeService.RetentionDays` value [365], the
   `UsageDocTypes` line count [1 `.Schema.For<UsageEvent>`], the
   `AdminAnalyticsController` action count [2: `Index` + `Export`], the M33
-  template file paths, the ADR number [0161] + the precedent ADR list [0004
+  template file paths, the ADR number [0162] + the precedent ADR list [0004
   §B.1, 0114 [the M13 charts deferral M34 settles + the `GetWindowAsync`
   window precedent], 0156 [the M33 structural template], 0006-D [Core
   HTTP-free], 0015 [the `kw-l` registry]]). Move this unit plan
@@ -576,7 +577,7 @@ records `## U<m> — Drift pause` in the handoff note.
   surface M34 extends);
   `docs/adr/0114-logging-and-usage-analytics.md` (the M13 ADR — the M34
   boundary context + the "Charts" deferral M34 settles + the format to
-  mirror for ADR 0161);
+  mirror for ADR 0162);
   `docs/adr/0156-storage-metrics-history.md` (the M33 ADR — the structural
   template + the "derived vs captured" distinction).
 - **Deliverables (1 file, new):**
@@ -656,7 +657,7 @@ records `## U<m> — Drift pause` in the handoff note.
 - **Goal:** append `## Seams & contracts (Part 2, written by U02)` to the
   design doc — the exact C# shapes U03–U06 must match, the closed `kw-l`
   key set, the **pinned seam-test names**, the **three-test acceptance
-  gate**, and the **drift-guard**. Draft **ADR 0161**. **No code, no build.**
+  gate**, and the **drift-guard**. Draft **ADR 0162**. **No code, no build.**
 - **Entry reads:**
   U01's Part 1 (the invariant table is the primary source);
   `src/Kumunita.Core/Usage/UsageEvent.cs` (the M13 doc the read `GROUP`s);
@@ -680,10 +681,10 @@ records `## U<m> — Drift pause` in the handoff note.
   `IUsageAnalyticsService` registration — confirm M34 needs **no** new DI
   line, the seam is on the existing service);
   `docs/adr/0114-logging-and-usage-analytics.md` (the M13 ADR — the format
-  to mirror for ADR 0161);
+  to mirror for ADR 0162);
   `docs/adr/0156-storage-metrics-history.md` (the M33 ADR — the structural
   template + the "derived vs captured" distinction);
-  `docs/adr/README.md` (the ADR index — the 0161 row to add).
+  `docs/adr/README.md` (the ADR index — the 0162 row to add).
 - **Deliverables (2 files: 1 append + 1 new):**
   - `docs/design/m34-analytics-history-design.md` (append). Sub-sections:
     - `### 2.1 frozen seam list (exact C#)` — the M34 additive seam
@@ -746,17 +747,17 @@ records `## U<m> — Drift pause` in the handoff note.
       `UsageHistoryResult` shapes, the M13 surface extension, the closed
       `analytics.trend.*` key set, and the 11 test names — all frozen pins;
       any mismatch is a `## U<m> — Drift pause` per unit-series rule §13.
-  - `docs/adr/0161-analytics-history.md` (new, **Draft**) — the ADR 0161,
+  - `docs/adr/0162-analytics-history.md` (new, **Draft**) — the ADR 0162,
     mirroring the ADR 0156 shape (the M33 ADR — the structural template)
     but with the **derived, not captured** framing (the M34·1 pin). Status:
     **Draft** (U08 flips it to `Accepted` at the close).
-- **Exit:** file exists with all Part 2 sub-sections + the ADR 0161 Draft
+- **Exit:** file exists with all Part 2 sub-sections + the ADR 0162 Draft
   is present. **No build.** Handoff note: 6–8 lines starting
-  `## U02 — design doc Part 2 + ADR 0161 Draft`, listing (a) the sealed seam
+  `## U02 — design doc Part 2 + ADR 0162 Draft`, listing (a) the sealed seam
   signatures (the one ADD line — `GetHistoryAsync`), (b) the two DTO shapes
   (the `UsageDailyTotal` 2-member + the `UsageHistoryResult` 2-member
   ceilings), (c) the 11 test names by id, (d) the three-test gate (by name),
-  (e) the ADR 0161 Draft path + the "derived, not captured" framing (the
+  (e) the ADR 0162 Draft path + the "derived, not captured" framing (the
   M34·1 pin), (f) the closed `analytics.trend.*` key set count (~10).
 
 ### U03 — Core: the `UsageDailyTotal` / `UsageHistoryResult` DTOs + the `GetHistoryAsync` seam + impl
@@ -801,7 +802,7 @@ records `## U<m> — Drift pause` in the handoff note.
   - `src/Kumunita.Core/Usage/IUsageAnalyticsService.cs` — append the
     **exact** M34 ADD (verbatim from the design doc §2.1) with a
     doc-comment anchoring M34·1 + the M34·7 pinned-window pin (annotated
-    "M34 additions (ADR 0161)" block *above* the existing M13 block). The
+    "M34 additions (ADR 0162)" block *above* the existing M13 block). The
     2 M13 methods are **unchanged**.
   - `src/Kumunita.Core/Usage/UsageAnalyticsService.cs` — implement
     `GetHistoryAsync(int days, CancellationToken ct)`: (1) guard the pinned
@@ -1032,16 +1033,16 @@ records `## U<m> — Drift pause` in the handoff note.
      `M34_Is_The_Single_InProgress_Milestone` pin to **remove** + the
      `Shipped_Milestones_Are_Marked_Done` done-list to append `"M34"` to +
      a new "no in-progress milestone" assertion to **add**.
-  5. `src/Kumunita.Web/WhatsNew.cs` — the `0.54.0` entry to append,
+  5. `src/Kumunita.Web/WhatsNew.cs` — the `0.55.0` entry to append,
      newest-first.
   6. `README.md` — the `M34` Roadmap line to append the `**Done.** (ADR
-     0161)` tail.
+     0162)` tail.
   7. `docs/STATUS.md` — the `M34` line to append.
   8. `docs/ARCHITECTURE.md` — the `Usage/` line to append (the M34
      extension).
-  9. `docs/adr/0161-analytics-history.md` — the ADR 0161 to flip to
+  9. `docs/adr/0162-analytics-history.md` — the ADR 0162 to flip to
      `Accepted` + the index row to tag `**Done** (M34)`.
-  10. `docs/adr/README.md` — the ADR 0161 index row to tag `**Done** (M34)`.
+  10. `docs/adr/README.md` — the ADR 0162 index row to tag `**Done** (M34)`.
 - **Deliverables (7 files, modify + 1 move):**
   1. **`src/Kumunita.Web/Milestones.cs`** (modify) — the `M34` row:
      `new("M34", "Analytics history — …", StatusDone)` (was `StatusNext`).
@@ -1054,9 +1055,9 @@ records `## U<m> — Drift pause` in the handoff note.
      `Milestones.All.Where(m => m.Status == Milestones.StatusNext)` is
      **empty**). The `Roadmap_Covers_M0_Through_M34_Plus_Named_Lanes_In_
      Order` pin is **untouched** (the order is unchanged).
-  3. **`src/Kumunita.Web/WhatsNew.cs`** (modify) — append the `0.54.0`
-     entry (newest-first, naming M34 + ADR 0161):
-     `new("0.54.0", "2026-10-11", new List<string> { "Analytics history —
+  3. **`src/Kumunita.Web/WhatsNew.cs`** (modify) — append the `0.55.0`
+     entry (newest-first, naming M34 + ADR 0162):
+     `new("0.55.0", "2026-10-11", new List<string> { "Analytics history —
      the M13 /admin/analytics surface gains a trend view over time (a derived
      read over the existing UsageEvent rows — one UsageDailyTotal per UTC
      day over a pinned window — + a per-day table + an inline sparkline over
@@ -1064,9 +1065,9 @@ records `## U<m> — Drift pause` in the handoff note.
      patterns evolve: the M13 Usage surface extended additively (the
      UsageDailyTotal + UsageHistoryResult DTOs + the GetHistoryAsync read
      seam + the closed analytics.trend.* kw-l key set × en/de/fr/da) (ADR
-     0161)." })`.
+     0162)." })`.
   4. **`README.md`** (modify) — the `M34` Roadmap line: append the
-     `**Done.** (ADR 0161)` tail (the M33 `**Done.** (ADR 0156)` shape).
+     `**Done.** (ADR 0162)` tail (the M33 `**Done.** (ADR 0156)` shape).
   5. **`docs/STATUS.md`** (modify) — the `M34` line: append the
      `**M34 is done** — analytics history (the M13 /admin/analytics surface
      gains a trend view over time — a derived read over the existing
@@ -1075,11 +1076,11 @@ records `## U<m> — Drift pause` in the handoff note.
      day window — so an operator can see usage patterns evolve; the M13
      Usage surface extended additively — the UsageDailyTotal +
      UsageHistoryResult DTOs + the GetHistoryAsync read seam + the closed
-     analytics.trend.* kw-l key set × en/de/fr/da; ADR 0161)` line (the M33
+     analytics.trend.* kw-l key set × en/de/fr/da; ADR 0162)` line (the M33
      shape).
   6. **`docs/ARCHITECTURE.md`** (modify) — the `Usage/` line: append the
      `**Usage/** (M34 extension) — the M34 analytics-history lane (ADR
-     0161): the `UsageDailyTotal` + `UsageHistoryResult` DTOs + the
+     0162): the `UsageDailyTotal` + `UsageHistoryResult` DTOs + the
      `IUsageAnalyticsService.GetHistoryAsync` read seam (the 3rd method,
      pinned {7,30,90,180,365} window) + the M13 surface extension (the
      controller + the view model + the `Views/AdminAnalytics/Index.cshtml`
@@ -1087,9 +1088,9 @@ records `## U<m> — Drift pause` in the handoff note.
      the M13 analytics surface; **derived, not captured** (the M13
      `UsageEvent` doc + `UsagePurgeService` retention are **reused**, not
      re-added)` line (the M33 `Usage/` shape, extended).
-  7. **`docs/adr/0161-analytics-history.md`** (modify) — the ADR 0161: flip
+  7. **`docs/adr/0162-analytics-history.md`** (modify) — the ADR 0162: flip
      `Status: Draft` → `Status: Accepted` + the `docs/adr/README.md` index
-     row: tag the `0161` row `**Done** (M34)` (the M33 `0156` row shape).
+     row: tag the `0162` row `**Done** (M34)` (the M33 `0156` row shape).
      **Plus** the `done/m34/` move:
      `git mv docs/plans-milestones/plan-m34-analytics-history.md
      docs/plans-milestones/done/m34/` + `git mv
@@ -1104,10 +1105,10 @@ records `## U<m> — Drift pause` in the handoff note.
   - `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.
     Tests.dll` green (the `MilestonesTests` + `WhatsNewTests` pins green —
     the order pin is intact, the `No_Milestone_Is_InProgress` assertion is
-    green, the new `0.54.0` entry is present, newest-first).
+    green, the new `0.55.0` entry is present, newest-first).
   - The `Milestones.cs` `M34` row is `StatusDone` (**no** successor row).
     The README / `STATUS.md` / `ARCHITECTURE.md` parity is held. The ADR
-    0161 is `Accepted` + the index row is tagged `**Done** (M34)`. The
+    0162 is `Accepted` + the index row is tagged `**Done** (M34)`. The
     `done/m34/` subfolder is present (the register + the unit plans + the
     handoff notes).
   - Handoff note: a `## U08 — close` section — (a) the `Milestones.cs` flip
@@ -1115,7 +1116,7 @@ records `## U<m> — Drift pause` in the handoff note.
     `MilestonesTests` re-pin (the `M34_Is_The_Single_InProgress_Milestone`
     removed + the `No_Milestone_Is_InProgress` added + the
     `Shipped_Milestones_Are_Marked_Done` done-list appended with `"M34"`),
-    (c) the `WhatsNew.cs` `0.54.0` entry (newest-first), (d) the README /
+    (c) the `WhatsNew.cs` `0.55.0` entry (newest-first), (d) the README /
     `STATUS.md` / `ARCHITECTURE.md` parity (the three line appends), (e) the
-    ADR 0161 `Accepted` + the index row `**Done** (M34)`, (f) the
+    ADR 0162 `Accepted` + the index row `**Done** (M34)`, (f) the
     `done/m34/` move (the `git mv` commands).
