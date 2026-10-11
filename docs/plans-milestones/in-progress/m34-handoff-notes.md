@@ -315,3 +315,48 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
   **not** a 12-set — M34·2 / M34·3 / M34·10 are the *deliberate* gaps
   (derived, not captured removes the capture-lane invariants). No
   contradictions found in entry reads; the U01 drift resolution stands.
+
+## U03 — DTOs + GetHistoryAsync seam + impl
+
+- **(a) `IUsageAnalyticsService` public-method count:** **3** (the 2 M13
+  methods — `GetWindowAsync` + `GetCsvRowsAsync` — **unchanged**, the M34·1
+  additive-only pin; the M34 **ADD** is `GetHistoryAsync(int days,
+  CancellationToken ct = default)`, the 3rd method, the exact signature
+  from the design doc §2.1). The interface doc-comment was extended to name
+  the 3 methods and the M34·7 pinned-window set {7, 30, 90, 180, 365}.
+- **(b) Two new DTO files (both in `Kumunita.Core.Usage`):**
+  - `src/Kumunita.Core/Usage/UsageDailyTotal.cs` — `sealed class`, **2
+    members** (`Date` `DateTimeOffset` + `Total` `int`); the M34·1
+    2-member ceiling; doc-comment pins M34·1 (derived, not captured) +
+    the M13 `UsageCsvRow` precedent + "not an `IAuditableResource`" +
+    "not a Marten document".
+  - `src/Kumunita.Core/Usage/UsageHistoryResult.cs` — `sealed record`,
+    **2 members** (`WindowDays` `int` + `Points` `IReadOnlyList<
+    UsageDailyTotal>`); mirrors the M33 `StorageHistoryResult` wrapper
+    verbatim; doc-comment pins M34·1 (derived, not captured) + M34·4
+    (zero `AccessAudit` rows) + the M34·7 / M33-9 FACE "no fabricated
+    zero rows" pin.
+- **(c) Pinned-window set + zero-audit note:**
+  `NormalizeHistoryWindow(int days)` (a **separate** private helper from
+  the M13 `NormalizeWindow`, which admits only 7/30/90) guards
+  `{7, 30, 90, 180, 365}` — unknown ⇒ `ArgumentOutOfRangeException` (M34·7,
+  not a 0-row query). The impl opens **one** `QuerySession`,
+  `Query<UsageEvent>().Where(e => e.At >= cutoff).ToListAsync(ct)` →
+  `GroupBy(e => e.At.Date)` → `Select(g => new UsageDailyTotal { Date =
+  new DateTimeOffset(g.Key, TimeSpan.Zero), Total = g.Count() })` →
+  `OrderBy(p => p.Date).ToList()` → `return new UsageHistoryResult(days,
+  points)`. **Zero** `AccessAudit` rows (M34·4 — the read is not an
+  auditable resource; the M13 CSV export's **one** row is **untouched**).
+  **No** `ActorId` / `RouteTemplate` is exposed (C-M13·3 — the per-day
+  `Total` is an aggregate).
+- **(d) M34·1 "derived, not captured" confirmation:** **no** new doc,
+  **no** new `*DocTypes` surface, **no** new capture tick / handler /
+  boot-seed, **no** new DI line (`DependencyInjection.cs` **untouched** —
+  the `IUsageAnalyticsService` `AddTransient` registration already covers
+  the new method on the existing service), **no** new retention constant
+  (the M13 `UsagePurgeService.RetentionDays = 365` is **reused** as the
+  window bound).
+- **(e) Build + warnings:** `dotnet build Kumunita.slnx -c Debug` **green**
+  (0 warnings, 0 errors). **No** new test (U06's pinned tests are the
+  first M34 tests). **No** new compile warnings on the new types.
+

@@ -121,6 +121,40 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService
             .ToList();
     }
 
+    /// <inheritdoc/>
+    public async Task<UsageHistoryResult> GetHistoryAsync(int days,
+        CancellationToken ct = default)
+    {
+        // The M34·7 pinned-window guard (the M13 windowDays precedent — an
+        // unknown value throws, not a 0-row query). The M34 pinned set is
+        // {7, 30, 90, 180, 365} — a **separate** guard from the M13
+        // NormalizeWindow (which admits only 7/30/90; the M34 set is the
+        // M13 set extended with 180/365 for the over-time view).
+        _ = NormalizeHistoryWindow(days);
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+
+        // One QuerySession (M34·4 — read-only, zero writes, zero AccessAudit
+        // rows): the UsageEvent rows in the trailing window, then a
+        // client-side GroupBy over the UTC day (recorded fallback, see class
+        // doc) — one UsageDailyTotal per **present** day, Total = the count
+        // for that day; ascending by Date; only days present (no fabricated
+        // zero rows, the M34·7 / M33-9 FACE pin).
+        await using var session = _store.QuerySession();
+        var points = (await session.Query<UsageEvent>()
+                                 .Where(e => e.At >= cutoff)
+                                 .ToListAsync(ct))
+                     .GroupBy(e => e.At.Date)
+                     .Select(g => new UsageDailyTotal
+                     {
+                         Date = new DateTimeOffset(g.Key, TimeSpan.Zero),
+                         Total = g.Count()
+                     })
+                     .OrderBy(p => p.Date)
+                     .ToList();
+        return new UsageHistoryResult(days, points);
+    }
+
     /// <summary>
     /// The D3 window pin: one of 7/30/90; an unknown value throws
     /// <see cref="ArgumentOutOfRangeException"/> (not a 0-row query).
@@ -138,6 +172,31 @@ public sealed class UsageAnalyticsService : IUsageAnalyticsService
                     nameof(windowDays),
                     windowDays,
                     "The usage window is pinned to 7, 30, or 90 days (ADR 0114 D3).");
+        }
+    }
+
+    /// <summary>
+    /// The M34·7 window pin (ADR 0162): one of 7/30/90/180/365; an unknown
+    /// value throws <see cref="ArgumentOutOfRangeException"/> (not a 0-row
+    /// query). A **separate** guard from <see cref="NormalizeWindow"/>
+    /// (which admits only 7/30/90 — the M34 set is the M13 set extended with
+    /// 180/365 for the over-time view).
+    /// </summary>
+    private static int NormalizeHistoryWindow(int days)
+    {
+        switch (days)
+        {
+            case 7:
+            case 30:
+            case 90:
+            case 180:
+            case 365:
+                return days;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(days),
+                    days,
+                    "The analytics history window is pinned to 7, 30, 90, 180, or 365 days (ADR 0162 M34·7).");
         }
     }
 }
