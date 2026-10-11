@@ -435,3 +435,57 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
   warnings, 0 errors). `git status` clean except the one modified registry
   file + this handoff note.
 
+## U06 — pinned test pins (11)
+
+- **(a) Two test files created (only the two new test files touched — no
+  production code change, M34·1 / M34·9):**
+  - `tests/Kumunita.Core.Tests/Usage/UsageHistoryTests.cs` — the 6 M34 Core
+    seam pins (the M33 `StorageMetricsHistoryTests` `PostgresFixture`
+    seed-and-assert shape; `UsageEvent` rows planted with `At` spanning the
+    window — present days, gap days — asserting `GetHistoryAsync` on the
+    *result*, the M13 D7 "assert the result, not the query shape" precedent).
+  - `tests/Kumunita.Web.Tests/AdminAnalyticsHistoryTests.cs` — the 5 M34 Web
+    controller pins (the M33 `AdminStorageMetricsHistoryTests` NSubstitute +
+    `DefaultHttpContext` direct-construction shape; the view `kw-l` string
+    pins read `Views/AdminAnalytics/Index.cshtml` as a string — no TestServer).
+- **(b) The 11 pinned names (verbatim from §2.4):**
+  - **Core (6), `Kumunita.Core.Tests.Usage.UsageHistoryTests`:**
+    `M34_1_GetHistory_Returns_One_Total_Per_Present_Day` ·
+    `M34_7_GetHistory_Returns_Only_Days_Present` ·
+    `M34_7_GetHistory_Points_Ascending_By_Date` ·
+    `M34_7_GetHistory_Unknown_Window_Throws` ·
+    `M34_4_GetHistory_Writes_No_AuditRow` ·
+    `M34_1_M13_Methods_Unchanged`.
+  - **Web (5), `Kumunita.Web.Tests.AdminAnalyticsHistoryTests`:**
+    `M34_8_GlobalAdmin_Sees_Trend_Section` ·
+    `M34_2_Window_Switch_Renders_Chosen_Window` ·
+    `M34_3_Empty_History_Renders_Empty_Message` ·
+    `M34_7_NonGlobalAdmin_Denied` ·
+    `M34_4_Export_Still_One_AuditRow`.
+- **(c) 6 + 5 pass/red counts (for U07 to consume):** `dotnet exec
+  Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.Usage.UsageHistoryTests"`
+  → **Total: 6, Errors: 0, Failed: 0** (8.9 s, Testcontainers `postgres:18`).
+  `dotnet exec Kumunita.Web.Tests.dll -class "Kumunita.Web.Tests.
+  AdminAnalyticsHistoryTests"` → **Total: 5, Errors: 0, Failed: 0** (0.4 s).
+  **All 11 GREEN.** `dotnet build Kumunita.slnx -c Debug` **green** (0
+  warnings, 0 errors).
+- **(d) U04-flagged 180/365 window tension — **option (A)** taken (recorded
+  per the U06 decision note):** `M34_2_Window_Switch_Renders_Chosen_Window`
+  pins the windows the **frozen M13 `GetWindowAsync` read admits** —
+  **7/30/90** — which render end-to-end (both reads thread the one
+  `?window=` param). The M34 pinned set is `{7,30,90,180,365}` (M34·7,
+  enforced by `GetHistoryAsync`), but the frozen M13 `NormalizeWindow`
+  admits only `{7,30,90}` (throws for 180/365), and per M34·8 the two reads
+  share the one `?window=` param — so in production `?window=180` /
+  `?window=365` **400 from the M13 read before the M34 read renders**. This
+  unit honours the M34·1 additive-only pin (it does **not** widen the M13
+  read) and therefore does **not** pin 180/365 end-to-end. **The 180/365
+  gap is a RED PIN / known-deferred for U07's gate + U02's drift-guard** —
+  U07 should expect `?window=180`/`?window=365` to 400 in a live-server
+  closed-loop unless U02 lands a design reconciliation (widen the M13 window
+  set, or a M34-only Trend window param). **U07's gate should NOT mark the
+  180/365 windows as a pass**; the 11-pin part-vs-whole evidence is
+  7/30/90-window coverage (all green) + the 6 Core derived-read pins.
+- **No production code change** (the two new test files + this handoff note +
+  the `m34-u06.md` move only). **No gate recorded** (U07's — §2.5).
+
