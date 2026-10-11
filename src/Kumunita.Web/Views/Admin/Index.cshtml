@@ -164,6 +164,19 @@
             </div>
         </a>
     </div>
+    @* ESC (ADR 0159) — the issue-escalation configuration surface:
+       the operator endpoint + the token-gated inbound escalation.
+       Sits on the /admin/escalation controller (GlobalAdmin-gated, the
+       ErrorReportAdminController shape); the hub itself is GlobalAdmin-gated,
+       so the card renders unconditionally like the other core sections. *@
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/escalation">
+            <div class="card-body">
+                <div class="fw-semibold">Escalation</div>
+                <small class="text-muted">Configure the operator escalation endpoint and the tokens other platforms present to escalate issues to this instance.</small>
+            </div>
+        </a>
+    </div>
     @* M19 (ADR 0120, D6) — the guest accounts affordance. Hidden-not-disabled
        (the ADR 0050 rule): the link renders only for GlobalAdmin actors (a
        non-GlobalAdmin actor's /admin index renders no guest link). The

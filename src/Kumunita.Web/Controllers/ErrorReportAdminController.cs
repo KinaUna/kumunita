@@ -158,7 +158,12 @@ public sealed class ErrorReportAdminController(
             _          => all.ToList()
         };
 
-        return View(new AdminErrorReportViewModel { Reports = reports, Filter = normalized });
+        // The view lives at the mandated Views/Admin/ErrorReports/ path — outside
+        // this controller's default Views/ErrorReportAdmin/ convention, so it is
+        // referenced by explicit virtual path (the UserPortabilityController
+        // "~/Views/...cshtml" idiom; the extension is part of the name under the
+        // published precompiled-assembly deployment — see _AdminNav.cshtml).
+        return View("~/Views/Admin/ErrorReports/Index.cshtml", new AdminErrorReportViewModel { Reports = reports, Filter = normalized });
     }
 
     // ── POST /admin/error-reports/{id}/triage — the idempotent write (M31·6) ─
@@ -220,7 +225,7 @@ public sealed class ErrorReportAdminController(
         var report = reports.FirstOrDefault(r => r.Id == id);
         if (report is null)
             return NotFound();
-        return View(new AdminErrorReportDetailViewModel { Report = report });
+        return View("~/Views/Admin/ErrorReports/Detail.cshtml", new AdminErrorReportDetailViewModel { Report = report });
     }
 
     /// <summary>

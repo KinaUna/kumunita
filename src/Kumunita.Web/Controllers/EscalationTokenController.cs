@@ -106,9 +106,15 @@ public sealed class EscalationTokenController(
         // The test-construction floor (the M31 optional-ctor-param precedent —
         // the tokens seam is optional, default null). Renders an empty list +
         // the source-text floor; no exception.
+        // The view lives at the mandated Views/Admin/Escalation/Tokens.cshtml
+        // path — outside this controller's default Views/EscalationToken/
+        // convention, so every View(...) call in this controller references it
+        // by explicit virtual path (the UserPortabilityController
+        // "~/Views/...cshtml" idiom; the extension is part of the name under
+        // the published precompiled-assembly deployment — see _AdminNav.cshtml).
         if (tokens is null)
         {
-            return View(new EscalationTokenViewModel
+            return View("~/Views/Admin/Escalation/Tokens.cshtml", new EscalationTokenViewModel
             {
                 Tokens = [],
                 Flash  = null,
@@ -117,7 +123,7 @@ public sealed class EscalationTokenController(
         }
 
         var list = await tokens.ListAsync();
-        return View(new EscalationTokenViewModel
+        return View("~/Views/Admin/Escalation/Tokens.cshtml", new EscalationTokenViewModel
         {
             Tokens = list,
             // A one-shot flash carried over from the just-processed Revoke
@@ -160,7 +166,7 @@ public sealed class EscalationTokenController(
         // the tokens seam is optional, default null).
         if (tokens is null)
         {
-            return View(new EscalationTokenViewModel
+            return View("~/Views/Admin/Escalation/Tokens.cshtml", new EscalationTokenViewModel
             {
                 Tokens = [],
                 Error  = "The token service is unavailable.",
@@ -172,7 +178,7 @@ public sealed class EscalationTokenController(
         if (string.IsNullOrWhiteSpace(label))
         {
             var blankList = await tokens.ListAsync();
-            return View(new EscalationTokenViewModel
+            return View("~/Views/Admin/Escalation/Tokens.cshtml", new EscalationTokenViewModel
             {
                 Tokens = blankList,
                 Error  = await FlashAsync("escalation.tokens.label.label"),
@@ -185,7 +191,7 @@ public sealed class EscalationTokenController(
         // once, never persisted — ESC·3).
         var (plaintext, _) = await tokens.GenerateAsync(label.Trim(), actor);
         var generatedList = await tokens.ListAsync();
-        return View(new EscalationTokenViewModel
+        return View("~/Views/Admin/Escalation/Tokens.cshtml", new EscalationTokenViewModel
         {
             Tokens            = generatedList,
             NewTokenPlaintext = plaintext,   // the ESC·3 one-shot (show once)

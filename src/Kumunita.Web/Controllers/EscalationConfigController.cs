@@ -134,7 +134,11 @@ public sealed class EscalationConfigController(
         {
             model.Saved = true;
         }
-        return View(model);
+        // The view lives at the mandated Views/Admin/Escalation/ path — outside
+        // this controller's default Views/EscalationConfig/ convention, so it is
+        // referenced by explicit virtual path (the UserPortabilityController
+        // "~/Views/...cshtml" idiom).
+        return View("~/Views/Admin/Escalation/Index.cshtml", model);
     }
 
     // ── POST /admin/escalation — the single-write-lane save (ESC·4) ────────
@@ -184,7 +188,7 @@ public sealed class EscalationConfigController(
                 model.Saved = false;
                 TempData["error"] =
                     "The receiving platform endpoint is required and must be a valid http:// or https:// URL when escalation is enabled.";
-                return View(model);
+                return View("~/Views/Admin/Escalation/Index.cshtml", model);
             }
         }
 
@@ -228,6 +232,6 @@ public sealed class EscalationConfigController(
 
         model.Saved = true;
         TempData["info"] = await FlashAsync("escalation.outbound.saved");
-        return View(model);
+        return View("~/Views/Admin/Escalation/Index.cshtml", model);
     }
 }
