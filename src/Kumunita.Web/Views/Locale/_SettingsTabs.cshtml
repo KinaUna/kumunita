@@ -25,12 +25,18 @@
         ("settings.messaging.title", "Messaging",         "/settings/messaging"),
         ("nav.children",             "Children",          "/me/children"),
         ("nav.change_password",      "Change password",   "/account/password"),
+        // M27 (ADR 0148) — the resident's own backup/restore surface: export
+        // their authored content to a *.kumunita archive, or import one back.
+        ("nav.my_data",              "My data",           "/account/portability"),
         ("nav.delete_account",       "Delete account",    "/account/delete"),
     };
     var activeLabel = (controller, action) switch
     {
         ("Guardian", _)                   => "Children",
         ("Account",  "ChangePassword")    => "Change password",
+        // M27 (ADR 0148) — the UserPortability index (the /account/portability
+        // "My data" page, the resident's backup/restore surface).
+        ("UserPortability", "Index")      => "My data",
         ("Account",  "Delete")            => "Delete account",
         ("Locale",   "SettingsTimezone")  => "Time zone",
         ("Locale",   "SettingsDateFormat")=> "Date & time format",

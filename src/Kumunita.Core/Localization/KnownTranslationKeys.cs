@@ -928,6 +928,10 @@ public static class KnownTranslationKeys
                 "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
                 "own account — contact an administrator to remove the account.",
 
+            // M27 (ADR 0148) — the settings-tab link to the resident's own
+            // backup/restore surface (/account/portability, the "My data" page).
+            ["nav.my_data"]          = "My data",
+
             ["nav.delete_account"] = "Delete account",
 
             ["admin.delete_account_label"] = "Delete account",
@@ -3605,6 +3609,10 @@ public static class KnownTranslationKeys
                 "sein eigenes Konto nicht löschen — wende dich an einen " +
                 "Administrator, um das Konto entfernen zu lassen.",
 
+            // M27 (ADR 0148) — der Einstellungen-Tab-Link zur eigenen
+            // Backup-/Restore-Oberfläche (/account/portability, "Meine Daten").
+            ["nav.my_data"]          = "Meine Daten",
+
             ["nav.delete_account"] = "Konto löschen",
 
             ["admin.delete_account_label"] = "Konto löschen",
@@ -6072,6 +6080,11 @@ public static class KnownTranslationKeys
                 "administrateurs globaux. Un résident non-administrateur " +
                 "ne peut pas supprimer son propre compte — contacte un " +
                 "administrateur pour supprimer le compte.",
+
+            // M27 (ADR 0148) — le lien d'onglet vers la surface de
+            // sauvegarde/restauration du résident (/account/portability,
+            // "Mes données").
+            ["nav.my_data"]          = "Mes données",
 
             ["nav.delete_account"] = "Supprimer le compte",
 
@@ -8545,6 +8558,10 @@ public static class KnownTranslationKeys
                 "GlobalAdmin. En beboer, der ikke er GlobalAdmin, kan ikke " +
                 "slette sin egen konto — kontakt en administrator for at " +
                 "fjerne kontoen.",
+
+            // M27 (ADR 0148) — indstillingsskabelinket til beboerens egen
+            // backup-/restore-overflade (/account/portability, "Mine data").
+            ["nav.my_data"]          = "Mine data",
 
             ["nav.delete_account"] = "Slet konto",
 
