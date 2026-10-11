@@ -66,7 +66,16 @@ public sealed record PageNode(
     /// view's.
     /// </summary>
     bool IsSystem,
-    IReadOnlyList<PageNode> Children);
+    IReadOnlyList<PageNode> Children,
+    /// <summary>
+    /// The node's depth in the tree (0 = top-level, 1 = one level in, and so on).
+    /// Display-only: emitted as a CSS custom property (--kmb-page-depth) in the
+    /// view so the CSS can indent each level cumulatively (a branch and its
+    /// sub-pages each sit one step further in than their parent) via a single
+    /// calc() rule that handles any depth. Not part of the domain document or
+    /// any stored shape.
+    /// </summary>
+    int Depth);
 
 /// <summary>
 /// The <c>GET /pages</c> read surface (the tree browse): the caller-visible

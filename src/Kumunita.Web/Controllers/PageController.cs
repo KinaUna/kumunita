@@ -145,7 +145,7 @@ public sealed class PageController(
 
         // The forest: a visible page's children are the visible pages nested
         // under it; a visible page whose parent is absent (denied) is a root.
-        PageNode ToNode(Page p)
+        PageNode ToNode(Page p, int depth = 0)
         {
             var kids = visible
                 .Where(c => string.Equals(c.ParentId, p.Id, StringComparison.Ordinal))
@@ -154,7 +154,8 @@ public sealed class PageController(
             return new PageNode(
                 p.Id, title, PagePaths.Href(byId, p), p.IsDraft,
                 p.Kind == PageKind.System,
-                kids.Select(ToNode).ToList());
+                kids.Select(c => ToNode(c, depth + 1)).ToList(),
+                depth);
         }
 
         // ADR 0043/0057 — the seeder's `system` root is a *container*: an
