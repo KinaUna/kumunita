@@ -265,3 +265,53 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
 - **Drift status:** the U01 Drift pause is **resolved** (option 2, recorded
   above); U02 may proceed to Part 2 pinning the **9-invariant** set.
   `in-progress/m34-u01.md` moved to `done/m34/`.
+
+## U02 — design doc Part 2 + ADR 0162 Draft
+
+- **Deliverables:** `docs/design/m34-analytics-history-design.md` Part 2
+  (§2.1–§2.6 appended) + `docs/adr/0162-analytics-history.md` (new,
+  **Draft**, "derived, not captured" framing mirroring ADR 0156). **No
+  code, no build, no test.**
+- **(a) Sealed seam — one ADD** (§2.1): `Task<UsageHistoryResult>
+  IUsageAnalyticsService.GetHistoryAsync(int days, CancellationToken ct =
+  default);` — the **3rd** method; `days` pinned `{7, 30, 90, 180, 365}`,
+  unknown ⇒ `ArgumentOutOfRangeException` (M34·7); the 2 M13 methods
+  (`GetWindowAsync` + `GetCsvRowsAsync`) **unchanged** (M34·1); **no**
+  capture-lane shapes (no tick / handler / boot-seed / retention constant /
+  doc-type surface — the M34·1 "derived, not captured" pin; the M13
+  `UsagePurgeService.RetentionDays = 365` is **reused** as the window bound).
+- **(b) Two DTO shapes** (§2.2, the M34·1 2-member ceilings):
+  `UsageDailyTotal` — `Date` (DateTimeOffset, UTC) + `Total` (int);
+  `UsageHistoryResult` — `WindowDays` (int) + `Points`
+  (`IReadOnlyList<UsageDailyTotal>`, ascending, only days present). Impl
+  shape pinned: guard the M34 window set → one `QuerySession` over
+  `UsageEvent` rows `At >= now − days` → group by `At`'s UTC date → order
+  ascending → return the wrapper; **zero** `AccessAudit` rows (M34·4);
+  **no** new DI line.
+- **(c) 11 test names** (§2.4, verbatim): `UsageHistoryTests` (Core, 6) —
+  `M34_1_GetHistory_Returns_One_Total_Per_Present_Day` ·
+  `M34_7_GetHistory_Returns_Only_Days_Present` ·
+  `M34_7_GetHistory_Points_Ascending_By_Date` ·
+  `M34_7_GetHistory_Unknown_Window_Throws` ·
+  `M34_4_GetHistory_Writes_No_AuditRow` · `M34_1_M13_Methods_Unchanged`;
+  `AdminAnalyticsHistoryTests` (Web, 5) — `M34_8_GlobalAdmin_Sees_Trend_Section`
+  · `M34_2_Window_Switch_Renders_Chosen_Window` ·
+  `M34_3_Empty_History_Renders_Empty_Message` ·
+  `M34_7_NonGlobalAdmin_Denied` · `M34_4_Export_Still_One_AuditRow`.
+- **(d) Three-test gate** (§2.5): **closed loop** (GlobalAdmin on
+  `/admin/analytics` → M13 table unchanged + Trend section renders) ·
+  **handoff** (the derived read over stored `UsageEvent` rows) ·
+  **part-vs-whole** (the 11-test list is the whole; all must pass together).
+- **(e) ADR 0162 Draft:** `docs/adr/0162-analytics-history.md` (new,
+  **Draft**; U08 flips to `Accepted` at the close) — mirrors ADR 0156's
+  shape with the **derived, not captured** inversion front and center
+  (M34·1; the thing that separates M34 from the M33 precedent).
+- **(f) Closed `analytics.trend.*` key set:** **10 keys** (§2.3, en values
+  pinned; de/fr/da are U05's) — `title` / `window.7|30|90|180|365` /
+  `col.date` / `col.total` / `legend.total` / `empty`; the M13
+  `admin.analytics_*` set is **untouched** (M34·11 additive-only).
+- **Drift-guard pin** (§2.6): U02's drift guard pins the **9-invariant**
+  set (M34·1, M34·4, M34·5, M34·6, M34·7, M34·8, M34·9, M34·11, M34·12),
+  **not** a 12-set — M34·2 / M34·3 / M34·10 are the *deliberate* gaps
+  (derived, not captured removes the capture-lane invariants). No
+  contradictions found in entry reads; the U01 drift resolution stands.

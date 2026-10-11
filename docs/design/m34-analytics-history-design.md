@@ -393,8 +393,232 @@ written; the drift-guard (U02 + U08) re-pins them.
 
 ---
 
-*Part 1 — Context, Scope, Invariants, FACES. Authored by U01, 2026-10-11.
-Part 2 (Seams & contracts — the exact `UsageDailyTotal` / `UsageHistoryResult`
-DTO shapes, the `GetHistoryAsync` seam, the M13 surface extension, the closed
-`analytics.trend.*` `kw-l` key set, the 11 pinned test names, the three-test
-acceptance gate, the drift-guard) is authored by U02 + **ADR 0162**.*
+*Part 1 — Context, Scope, Invariants, FACES. Authored by U01, 2026-10-11.*
+
+## Seams & contracts (Part 2, written by U02)
+
+This part freezes the **exact shapes** U03–U06 must match, the closed `kw-l`
+key set, the **11 pinned test names**, the **three-test acceptance gate**, and
+the **drift-guard**. U03 (Core seam + DTOs), U04 (Web surface), U05 (kw-l
+keys), and U06 (test pins) each read **their** sub-section of this part as the
+primary source; the register
+(`docs/plans-milestones/plan-m34-analytics-history.md`) wins for *which files
+exist* and *what each unit does*. **No code, no build** in U02.
+
+### 2.1 frozen seam list (exact C#)
+
+M34's **only** surface addition — one method on the **existing**
+`IUsageAnalyticsService` (the `AddTransient` registration in
+`DependencyInjection.cs` already exists; M34 adds **no** new DI line, M34·1):
+
+```csharp
+// src/Kumunita.Core/Usage/IUsageAnalyticsService.cs — M34 ADD (ADR 0162)
+Task<UsageHistoryResult> GetHistoryAsync(int days, CancellationToken ct = default);
+```
+
+- `days` is a **pinned** value in `{7, 30, 90, 180, 365}`; an unknown value
+  throws `ArgumentOutOfRangeException` (**not** a 0-row query) — the M34·7
+  pin, the M13 `GetWindowAsync` "unknown value throws" precedent (the M13
+  7/30/90 set **extended** with 180/365 for the over-time view). The default
+  rendered window is **30** (the M13 `GetWindowAsync` default). The window is
+  a query param (`?window=30`), never a DB column.
+- Returns `UsageHistoryResult` with `Points` **ascending** by `Date`,
+  **only the days present** in the window (no fabricated zero rows — the
+  M34·7 / M33-9 FACE pin).
+- The **2 M13 methods** (`GetWindowAsync` + `GetCsvRowsAsync`) are
+  **unchanged** (the M34·1 additive-only pin). The `IUsageAnalyticsService`
+  surface is **3 methods** after M34 (the 2 existing + the M34 ADD).
+- **No capture-lane shapes.** The M34·1 "derived, not captured" pin: the M13
+  `UsagePurgeService.RetentionDays = 365` retention is **reused** (it bounds
+  the window), **not re-added**; M34 adds **no** tick, **no** handler, **no**
+  boot-seed line, **no** retention constant, and **no** new doc-type surface.
+
+### 2.2 new M34-owned Core types (exact C#)
+
+Two new POCOs in namespace `Kumunita.Core.Usage`, each with a **2-member
+ceiling** (no field outside the set may appear — the M34·1 pin):
+
+```csharp
+// src/Kumunita.Core/Usage/UsageDailyTotal.cs (new file) — the per-day
+// projection (the 2-member M34·1 ceiling; the M13 UsageCsvRow projection
+// precedent, minus the Surface column — the per-surface breakdown is a
+// named deferral, §Scope).
+public sealed class UsageDailyTotal
+{
+    /// <summary>The UTC day — the <see cref="UsageEvent.At"/>'s UTC date (the M13 UsageCsvRow.Date precedent).</summary>
+    public DateTimeOffset Date  { get; init; }
+
+    /// <summary>The count of <see cref="UsageEvent"/> rows whose <c>At</c> falls on that UTC day (the M13 UsageCsvRow.Total / SurfaceRow.Total count precedent). An aggregate — never a per-account row (C-M13·3).</summary>
+    public int            Total { get; init; }
+}
+```
+
+`UsageDailyTotal` is **not** an `IAuditableResource` (the M13 C-M13·6 "the
+`UsageEvent` row is not an auditable resource" precedent; the read emits
+**zero** `AccessAudit` rows, M34·4). It is **not** a Marten document (there
+is **no** doc-type surface to register — M34·1).
+
+```csharp
+// src/Kumunita.Core/Usage/UsageHistoryResult.cs (new file) — the wrapper
+// (the M33 StorageHistoryResult shape verbatim, the M13
+// UsageAnalyticsResult.WindowDays precedent).
+public sealed record UsageHistoryResult(int WindowDays,
+    IReadOnlyList<UsageDailyTotal> Points);
+```
+
+- `WindowDays` echoes the pinned window the caller passed (so the view can
+  label the section without re-deriving it).
+- `Points` is **ascending** by `Date`, **only the days present** (no
+  fabricated zero rows — the M34·7 / M33-9 FACE pin).
+
+**The `UsageAnalyticsService.GetHistoryAsync` impl shape** (added to the
+**existing** `UsageAnalyticsService`; the M13 `GetWindowAsync` aggregation
+shape, the M34·1 derived pin):
+
+1. **Guard the pinned window** — `days` must be in `{7, 30, 90, 180, 365}`;
+   otherwise throw `ArgumentOutOfRangeException` (**not** a 0-row query — the
+   M34·7 pin; note the M13 `NormalizeWindow` switch admits only 7/30/90, so
+   the M34 guard is its own, extended, switch on the M34 pinned set).
+2. **One `QuerySession`**: `Query<UsageEvent>().Where(e => e.At >=
+   DateTimeOffset.UtcNow.AddDays(-days)).ToListAsync()`, then **group** the
+   window's rows by `e.At.Date` (UTC day) — one `UsageDailyTotal` per
+   present day, `Total` = the count of rows on that day (the M13
+   `GetWindowAsync` Linq-to-objects-over-the-window-rows shape, the recorded
+   Marten-parser-fallback precedent in the class doc — the pin asserts the
+   *results*, not the query shape).
+3. **Order ascending** by `Date`.
+4. **Return** `new UsageHistoryResult(days, points)`.
+
+**Zero** `AccessAudit` rows (M34·4). **No** `ActorId` / `RouteTemplate` is
+exposed (C-M13·3 — the per-day `Total` is an **aggregate**; the per-account
+boundary holds). **No** new doc, **no** new `*DocTypes` surface, **no** new
+capture tick / handler / boot-seed, **no** new DI line (the M34·1 pin).
+
+### 2.3 the closed `analytics.trend.*` `kw-l` key set
+
+**10 keys**, each present, **non-empty, in all four** languages (en/de/fr/da),
+pinned by `KwLRegistryConsistencyTests` (Web.Tests) +
+`KnownTranslationKeys_ParityTests` (Core.Tests) (the M34·11 pin, the M33·11
+closed-set precedent). The `en` values below are the **source text** (the
+ADR 0015 D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da` values
+are U05's to author (the M34·11 four-language pin). The M13
+`admin.analytics_*` key set is **untouched** (the M34·1 additive-only pin —
+M34 **adds** this set, it does not re-author the M13 set):
+
+| Key | en value (source text) | Consumed by (U04's Trend section) |
+| --- | --- | --- |
+| `analytics.trend.title` | Trend | the section heading |
+| `analytics.trend.window.7` | 7 days | window selector link |
+| `analytics.trend.window.30` | 30 days | window selector link (default) |
+| `analytics.trend.window.90` | 90 days | window selector link |
+| `analytics.trend.window.180` | 180 days | window selector link |
+| `analytics.trend.window.365` | 365 days | window selector link |
+| `analytics.trend.col.date` | Date | table column header |
+| `analytics.trend.col.total` | Total requests | table column header |
+| `analytics.trend.legend.total` | Total requests per day | sparkline legend |
+| `analytics.trend.empty` | No usage recorded in this window yet. | the empty-state message (M34-3 FACE) |
+
+### 2.4 pinned seam tests (exact names)
+
+**11 pinned tests** — no unit may introduce a test whose exact name is not in
+this list (unit-series rule §3). **6 Core** in
+`tests/Kumunita.Core.Tests/Usage/UsageHistoryTests.cs` (the M33
+`StorageMetricsHistoryTests` `PostgresFixture` seed-and-assert shape), **5
+Web** in `tests/Kumunita.Web.Tests/AdminAnalyticsHistoryTests.cs` (the M33
+`AdminStorageMetricsHistoryTests` NSubstitute + minimal-`WebApplication`
+shape):
+
+`tests/Kumunita.Core.Tests/Usage/UsageHistoryTests.cs`:
+
+1. `M34_1_GetHistory_Returns_One_Total_Per_Present_Day` —
+   `GetHistoryAsync(30)` over a window with `UsageEvent` rows returns one
+   `UsageDailyTotal` per **present** UTC day, `Total` = the per-day count
+   (M34·1, FACE M34-4).
+2. `M34_7_GetHistory_Returns_Only_Days_Present` — over a window with **gaps**
+   (some days with zero rows) returns **only the days present** (no
+   fabricated zero rows) (M34·7, FACE M34-5).
+3. `M34_7_GetHistory_Points_Ascending_By_Date` — `Points` is **ascending**
+   by `Date` (M34·7).
+4. `M34_7_GetHistory_Unknown_Window_Throws` — `GetHistoryAsync(999)` throws
+   `ArgumentOutOfRangeException` (M34·7, FACE M34-10).
+5. `M34_4_GetHistory_Writes_No_AuditRow` — the read commits **zero**
+   `AccessAudit` rows (M34·4, FACE M34-6).
+6. `M34_1_M13_Methods_Unchanged` — the M13 `GetWindowAsync` +
+   `GetCsvRowsAsync` behave **unchanged** (a `Received` count assertion —
+   the M34·1 additive-only pin).
+
+`tests/Kumunita.Web.Tests/AdminAnalyticsHistoryTests.cs`:
+
+7. `M34_8_GlobalAdmin_Sees_Trend_Section` — a `GlobalAdmin` on
+   `/admin/analytics` sees the **Trend** section (the
+   `analytics.trend.title` key present in the HTML) + the M13 surface-rank
+   table + distinct-actor header still render (M34·8, FACE M34-1).
+8. `M34_2_Window_Switch_Renders_Chosen_Window` — the `?window=7` /
+   `?window=180` / `?window=365` params render the chosen window (M34·7,
+   FACE M34-2).
+9. `M34_3_Empty_History_Renders_Empty_Message` — an **empty** history
+   renders the `analytics.trend.empty` message (M34·11, FACE M34-3).
+10. `M34_7_NonGlobalAdmin_Denied` — a non-`GlobalAdmin` (signed-in
+    resident) gets a **403** on `/admin/analytics` (the M13 gate unchanged —
+    M34·8, FACE M34-7).
+11. `M34_4_Export_Still_One_AuditRow` — the M13 CSV export lane
+    (`/admin/analytics/export`) still commits **exactly one** `AccessAudit`
+    row (`TargetKind "analytics"` + `Action "analytics.export"`) (M34·4,
+    FACE M34-8).
+
+### 2.5 acceptance gate (U07 records)
+
+The **three-test shape** (U07 executes and records it in §"Run result";
+*using* the 11 §2.4 tests as the part-vs-whole evidence):
+
+- **Closed loop** — a `GlobalAdmin` visits `/admin/analytics` with
+  `UsageEvent` rows planted → the M13 surface-rank table renders
+  **unchanged** + the new Trend section renders with the per-day table + the
+  sparkline (the full request → read → render loop end-to-end).
+- **Handoff** — the `GetHistoryAsync` read over a window with `UsageEvent`
+  rows returns one `UsageDailyTotal` per present day — the derived read is
+  the "handoff" from the stored M13 rows to the rendered M34 trend (the
+  stored-rows → DTO contract).
+- **Part-vs-whole** — the **11-test pin list is the whole**; the closed-loop
+  + handoff are the parts; **all must pass together** (a green 11-test run
+  *is* the gate evidence).
+
+### 2.6 drift-guard (frozen once written)
+
+The following are **frozen pins**. Any unit that finds a mismatch between
+these and the register, the handoff note, or the code is in drift and must
+record a `## U<m> — Drift pause` in the handoff note and stop (unit-series
+rule §13):
+
+- **The 9-invariant set (U01's table, Part 1)** — **M34·1, M34·4, M34·5,
+  M34·6, M34·7, M34·8, M34·9, M34·11, M34·12** — and **not a 12-set**: the
+  ids **M34·2, M34·3, M34·10 do not exist** and no unit may introduce them as
+  invariant ids (they are the *deliberate* gaps — "derived, not captured"
+  removes the capture-lane invariants M34 has no lane to pin). Any text that
+  reads "the 12 invariants" / "M34·1–M34·12" / "M34·2" / "M34·3" / "M34·10"
+  (as invariant ids, not as FACE ids) is a drift.
+- **The 10 FACES (U01's list)** — M34-1 through M34-10, verbatim, each bound
+  to the invariant ids stated above.
+- **The frozen seam list (§2.1)** — exactly **one** ADD
+  (`GetHistoryAsync(int days, CancellationToken ct = default)`); the 2 M13
+  methods **unchanged**; no capture-lane shapes.
+- **The DTO shapes (§2.2)** — `UsageDailyTotal` 2 members (`Date`, `Total`)
+  + `UsageHistoryResult` 2 members (`WindowDays`, `Points`); no field
+  outside either set.
+- **The M13 surface extension (M34·8)** — `Index` gains the second read +
+  the `History` view-model member (`WindowDays` reused) + the Trend section
+  (table + sparkline + five window links + the `analytics.trend.empty`
+  empty-state); the M13 surface-rank table + distinct-actor header + `Export`
+  lane + `GlobalAdmin` gate **unchanged**.
+- **The closed `analytics.trend.*` key set (§2.3)** — exactly **10 keys**,
+  four-language, the M13 `admin.analytics_*` set **untouched**.
+- **The 11 test names (§2.4)** — verbatim, in the two named files/classes;
+  no test name outside the list.
+
+---
+
+*Part 2 — Seams & contracts (the `GetHistoryAsync` seam, the
+`UsageDailyTotal` / `UsageHistoryResult` DTO shapes, the closed
+`analytics.trend.*` `kw-l` key set, the 11 pinned test names, the
+three-test acceptance gate, the drift-guard). Authored by U02, 2026-10-11.
+Companion ADR: `docs/adr/0162-analytics-history.md` (Draft).*
