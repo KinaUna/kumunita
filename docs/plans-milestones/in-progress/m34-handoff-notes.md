@@ -416,3 +416,22 @@ reference, and it matches the 9 IDs the U00 kickoff note already enumerated.
   Renders_Chosen_Window` pin, not in this Web unit. Recorded here so U06 /
   U02 / the author see it before the gate.
 
+## U05 — analytics.trend.* kw-l key set
+
+- **(a) Key count:** **10** `analytics.trend.*` keys added
+  (`title` · `window.7` / `window.30` / `window.90` / `window.180` /
+  `window.365` · `col.date` · `col.total` · `legend.total` · `empty`) — the
+  §2.3 closed set, no key outside it.
+- **(b) Four-language parity:** all **10** keys present, **non-empty, in all
+  four** languages (en/de/fr/da) — each key appears **exactly 4** times in
+  `KnownTranslationKeys.cs` (verified by per-key grep: 4/4/4/4/4/4/4/4/4/4).
+- **(c) M13 `admin.analytics_*` keys untouched:** `git diff` is **pure
+  additions** — 48 insertions, 0 deletions; zero lines touching
+  `admin.analytics_*` (the M34·11 additive-only pin holds).
+- **(d) Two parity test files green:** `KnownTranslationKeys_ParityTests`
+  (Core.Tests) **7/7 pass** + `KwLRegistryConsistencyTests` (Web.Tests)
+  **1/1 pass**, both run via the in-process `dotnet exec …/bin/Debug/
+  net10.0/*.dll` path. `dotnet build Kumunita.slnx -c Debug` green (0
+  warnings, 0 errors). `git status` clean except the one modified registry
+  file + this handoff note.
+

@@ -1507,6 +1507,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Count",
             ["admin.analytics_export"] = "Export CSV",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Trend",
+            ["analytics.trend.window.7"] = "7 days",
+            ["analytics.trend.window.30"] = "30 days",
+            ["analytics.trend.window.90"] = "90 days",
+            ["analytics.trend.window.180"] = "180 days",
+            ["analytics.trend.window.365"] = "365 days",
+            ["analytics.trend.col.date"] = "Date",
+            ["analytics.trend.col.total"] = "Total requests",
+            ["analytics.trend.legend.total"] = "Total requests per day",
+            ["analytics.trend.empty"] = "No usage recorded in this window yet.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Granted at (UTC)",
@@ -4154,6 +4166,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Anzahl",
             ["admin.analytics_export"] = "CSV exportieren",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Trend",
+            ["analytics.trend.window.7"] = "7 Tage",
+            ["analytics.trend.window.30"] = "30 Tage",
+            ["analytics.trend.window.90"] = "90 Tage",
+            ["analytics.trend.window.180"] = "180 Tage",
+            ["analytics.trend.window.365"] = "365 Tage",
+            ["analytics.trend.col.date"] = "Datum",
+            ["analytics.trend.col.total"] = "Gesamtanfragen",
+            ["analytics.trend.legend.total"] = "Gesamtanfragen pro Tag",
+            ["analytics.trend.empty"] = "In diesem Zeitfenster wurden noch keine Anfragen aufgezeichnet.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Gewährt am (UTC)",
@@ -6628,6 +6652,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Nombre",
             ["admin.analytics_export"] = "Exporter CSV",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Tendance",
+            ["analytics.trend.window.7"] = "7 jours",
+            ["analytics.trend.window.30"] = "30 jours",
+            ["analytics.trend.window.90"] = "90 jours",
+            ["analytics.trend.window.180"] = "180 jours",
+            ["analytics.trend.window.365"] = "365 jours",
+            ["analytics.trend.col.date"] = "Date",
+            ["analytics.trend.col.total"] = "Requêtes totales",
+            ["analytics.trend.legend.total"] = "Requêtes totales par jour",
+            ["analytics.trend.empty"] = "Aucune utilisation enregistrée dans cette fenêtre pour le moment.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Accordé à (UTC)",
@@ -9099,6 +9135,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_surface"] = "Overflade",
             ["admin.analytics_count"] = "Antal",
             ["admin.analytics_export"] = "Eksportér CSV",
+
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Tendens",
+            ["analytics.trend.window.7"] = "7 dage",
+            ["analytics.trend.window.30"] = "30 dage",
+            ["analytics.trend.window.90"] = "90 dage",
+            ["analytics.trend.window.180"] = "180 dage",
+            ["analytics.trend.window.365"] = "365 dage",
+            ["analytics.trend.col.date"] = "Dato",
+            ["analytics.trend.col.total"] = "Samtlige anmodninger",
+            ["analytics.trend.legend.total"] = "Samtlige anmodninger pr. dag",
+            ["analytics.trend.empty"] = "Ingen brug er registreret i dette vindue endnu.",
 
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
