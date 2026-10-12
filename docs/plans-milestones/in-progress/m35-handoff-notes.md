@@ -751,3 +751,47 @@ or simply re-point the iframe — both re-run the frozen seam).
   build step (M35·7). **Total U07 code files touched: 3** (the `kiosk.ts` new
   + the `site.css` + `_Layout.cshtml` additive edits) — within the ≤ 3-file
   constraint.
+
+## U08 — pinned test pins (12)
+
+> **Test-only unit — no production code changed.** Authored the 12 pinned test
+> pins from the design doc §2.5, mirroring the M33
+> `StorageMetricsHistoryTests` / `AdminStorageMetricsHistoryTests` shapes.
+> **No gate recorded** (that is U09). **No drift** (no test surfaced a real
+> production defect — all 12 pins are green against the shipped kiosk code).
+
+- **(a) Two new test files (both new; nothing else touched):**
+  - `tests/Kumunita.Core.Tests/Kiosk/KioskServiceTests.cs` — 6 seam pins.
+  - `tests/Kumunita.Web.Tests/KioskControllerTests.cs` — 6 controller pins.
+- **(b) The 12 names (verbatim, one test per name — nothing else added):**
+  - **Core (6):** `M35_2_GetPlaylist_NoRow_ReturnsNull`,
+    `M35_2_GetPlaylist_Configured_ReturnsRow`,
+    `M35_5_GetPlaylist_WritesNoAuditRow`,
+    `M35_5_SavePlaylist_OneKioskSaveAuditRow`,
+    `M35_2_SavePlaylist_NoRow_CreatesSingleton`,
+    `M35_SavePlaylist_AtomicInCallerSession`.
+  - **Web (6):** `M35_3_SignedIn_Sees_ChromeHidden_FirstSlide`,
+    `M35_3_Anonymous_RedirectedToSignIn`,
+    `M35_5_SlideDenied_SignsInViewer_SeesDeniedShape`,
+    `M35_7_NonGlobalAdmin_AdminKiosk_403`,
+    `M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists`,
+    `M35_6_ExistingSurfaces_RenderUnchanged`.
+- **(c) Pass/red counts (for U09's gate to consume):** **Core 6 / 6 green**
+  (`Kumunita.Core.Tests` suite **1465 total, 0 failed, 0 errors**;
+  `RUN_EXIT=0`). **Web 6 / 6 green** (`Kumunita.Web.Tests` suite **1039
+  total, 0 failed, 0 errors**; the 1 skip is pre-existing; `RUN_EXIT=0`).
+- **(d) Discipline confirmed:** `grep` of both new files shows **exactly the
+  12 pinned `M35_*` test methods** — no test name outside the §2.5 list. **No
+  production file modified** (`git status` limited to the two new test files +
+  this handoff note + the `m35-u08.md` plan move).
+- **Harness notes (for U09 / future Web controller tests):** the Web pins use
+  **direct construction** (`KioskController` + NSubstitute seams + a real
+  `ServiceCollection` provider) — `AddControllers()` in isolation does **not**
+  wire `ITempDataDictionaryFactory` / `IUrlHelperFactory`, so the working set
+  is `AddHttpContextAccessor()` + an `InMemoryTempDataProvider` +
+  `TempDataDictionaryFactory` + a stub `IModelMetadataProvider` + a concrete
+  `StubUrlHelper`/`StubUrlHelperFactory` (`.NET 10` dropped the old
+  `UrlValue` type — `IUrlHelper.Action`/`Content`/`RouteUrl`/`Link` now return
+  `string`). This is a test-harness requirement, not a production defect.
+  **Builds:** `dotnet build Kumunita.slnx -c Debug` **green** (0 errors; 8
+  pre-existing nullability warnings on the Web stub are benign).
