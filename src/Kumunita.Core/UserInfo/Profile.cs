@@ -341,6 +341,31 @@ public sealed class Profile
     /// delta-detected, idempotent, no re-seed, no EF migration.
     /// </summary>
     public bool HideHomeIntro { get; set; } = false;
+
+    // ADD (the home "upcoming" display preference; ADR 0004 §B.1 additive —
+    // the 14th additive Profile field, the HideHomeIntro / PageSize
+    // single-write-lane shape, ADR 0149 / ADR 0019 precedent):
+    /// <summary>
+    /// The resident's **home "upcoming" display preference** — whether the
+    /// home page shows the "Upcoming" section (the next upcoming
+    /// <c>Events</c> + the top <c>to-dos</c>, rendered just above the
+    /// "What's new" feed). <c>true</c> = show that section for this
+    /// resident; <c>false</c> (the default) = hide it, exactly as before the
+    /// preference existed (a fresh account never sees the section until it
+    /// opts in). This is a pure *display* preference — it changes what this
+    /// resident sees on <c>/</c>, never any authorization or data (a row is
+    /// visible in the section only when the viewer could already see it in
+    /// its own surface's feed — the <see cref="HideHomeIntro"/> / ADR 0149
+    /// "display read only" posture). Written only by the owner-scope
+    /// <see cref="IUserInfoService.SetProfileHomeShowUpcomingAsync"/> lane
+    /// (the <see cref="IUserInfoService.SetProfileHideHomeIntroAsync"/>
+    /// single-write-lane shape — the self-scope check happens at the Web
+    /// boundary); read by the
+    /// <see cref="Kumunita.Web.Controllers.HomeController"/> per request. An
+    /// *additive* field (ADR 0004 §B.1), like <see cref="HideHomeIntro"/>:
+    /// delta-detected, idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public bool HomeShowUpcoming { get; set; } = false;
 }
 
 /// <summary>

@@ -156,6 +156,145 @@
 </section>
 }
 
+@* ══════════ 2b. Upcoming (the next events + to-dos, above the feed) ══════════
+   The resident's Profile.HomeShowUpcoming preference (the home.settings
+   "show upcoming" checkbox). Model.Upcoming is null for a signed-out visitor,
+   a resident who has not opted in, or a missing seam — the section is not in
+   the DOM at all (a fresh account sees exactly the pre-feature home page).
+   Each column renders the first HomeUpcoming.Columns (5) rows; overflow rows
+   carry the native `hidden` attribute (a JS-less visitor still sees the first
+   five + the whole list stays in the markup for screen-reader users), and the
+   "show more" button reveals the rest in batches via home-upcoming-more.js
+   (the mine-more / roadmap-more disclosure idiom). The localized "{n} …"
+   label is resolved server-side (kw-l can't substitute {n}) with the en floor
+   as the in-code fallback. *@
+@if (Model.Upcoming is { } upcoming)
+{
+    string ariaUpcoming = await Translation.GetAsync("home.upcoming_title", effLang);
+    string _huShowMoreRaw = (await Translation.GetAsync("home.upcoming_show_more", effLang)) ?? "";
+    string _huShowMore = (string.IsNullOrWhiteSpace(_huShowMoreRaw) || _huShowMoreRaw == "home.upcoming_show_more")
+        ? "Show the {n} more" : _huShowMoreRaw;
+
+    <section class="kmb-section" aria-label="@ariaUpcoming">
+        <div class="container">
+            <div class="row mb-4">
+                <div>
+                    <h2 class="h3"><kw-l key="home.upcoming_title">Coming up</kw-l></h2>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                @* ── Events column (rendered only when it has rows — the
+                   feed's feed.Posts.Count > 0 idiom) ── *@
+                @if (upcoming.Events.Count > 0)
+                {
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.upcoming_events">Events</kw-l></h3>
+                        <a href="/events" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
+                    </div>
+                    <div class="list-group list-group-flush" id="home-upcoming-events-list">
+                        @for (int _eu = 0; _eu < upcoming.Events.Count; _eu++)
+                        {
+                            var evRow = upcoming.Events[_eu];
+                            <div class="list-group-item px-0" @(_eu >= HomeUpcoming.Columns ? "hidden" : null)>
+                                <a href="@evRow.Href" class="text-decoration-none">
+                                    <span class="fw-semibold d-block mb-1">@evRow.Title</span>
+                                </a>
+                                @if (!string.IsNullOrWhiteSpace(evRow.Preview))
+                                {
+                                    <p class="small text-secondary mb-1">@evRow.Preview</p>
+                                }
+                                @if (evRow.When is { } evWhen)
+                                {
+                                    <div class="small text-secondary">
+                                        <kw-dt dt="@evWhen" format="g"></kw-dt>
+                                        @if (!string.IsNullOrWhiteSpace(evRow.Meta))
+                                        {
+                                            <span class="ms-1">· @evRow.Meta</span>
+                                        }
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(evRow.Meta))
+                                {
+                                    <div class="small text-secondary">@evRow.Meta</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (upcoming.Events.Count > HomeUpcoming.Columns)
+                    {
+                        int _evHidden = upcoming.Events.Count - HomeUpcoming.Columns;
+                        <div class="text-center mt-3" id="home-upcoming-events-more-wrap">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    data-hu-batch-size="5"
+                                    data-hu-label="@_huShowMore"
+                                    aria-label="@_huShowMore.Replace("{n}", _evHidden.ToString())">
+                                @_huShowMore.Replace("{n}", _evHidden.ToString())
+                            </button>
+                        </div>
+                    }
+                </div>
+                }
+
+                @* ── To-dos column (rendered only when it has rows) ── *@
+                @if (upcoming.Todos.Count > 0)
+                {
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.upcoming_todos">To-dos</kw-l></h3>
+                        <a href="/projects/todos" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
+                    </div>
+                    <div class="list-group list-group-flush" id="home-upcoming-todos-list">
+                        @for (int _tu = 0; _tu < upcoming.Todos.Count; _tu++)
+                        {
+                            var tdRow = upcoming.Todos[_tu];
+                            <div class="list-group-item px-0" @(_tu >= HomeUpcoming.Columns ? "hidden" : null)>
+                                <a href="@tdRow.Href" class="text-decoration-none">
+                                    <span class="fw-semibold d-block mb-1">@tdRow.Title</span>
+                                </a>
+                                @if (!string.IsNullOrWhiteSpace(tdRow.Preview))
+                                {
+                                    <p class="small text-secondary mb-1">@tdRow.Preview</p>
+                                }
+                                @if (tdRow.When is { } tdWhen)
+                                {
+                                    <div class="small text-secondary">
+                                        <kw-dt dt="@tdWhen" format="g"></kw-dt>
+                                        @if (!string.IsNullOrWhiteSpace(tdRow.Meta))
+                                        {
+                                            <span class="ms-1">· @tdRow.Meta</span>
+                                        }
+                                    </div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(tdRow.Meta))
+                                {
+                                    <div class="small text-secondary">@tdRow.Meta</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    @if (upcoming.Todos.Count > HomeUpcoming.Columns)
+                    {
+                        int _tdHidden = upcoming.Todos.Count - HomeUpcoming.Columns;
+                        <div class="text-center mt-3" id="home-upcoming-todos-more-wrap">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    data-hu-batch-size="5"
+                                    data-hu-label="@_huShowMore"
+                                    aria-label="@_huShowMore.Replace("{n}", _tdHidden.ToString())">
+                                @_huShowMore.Replace("{n}", _tdHidden.ToString())
+                            </button>
+                        </div>
+                    }
+                </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
 <!-- ══════════ 3. What's new (signed-in visitors only) ══════════ -->
 @if (Model.Feed is { } feed)
 {

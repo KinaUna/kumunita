@@ -580,6 +580,12 @@
          beyond the first five in batches of 5 on click. Self-guards: no-op
          on pages without #events-mine-more-wrap (≤5 own events → no button). -->
     <script type="module" src="~/js/lib/mine-more.js"></script>
+    <!-- Home "upcoming" load-more (the Upcoming section on /, the resident's
+         Profile.HomeShowUpcoming preference): reveals the hidden event +
+         to-do rows beyond the first five of each column in batches of 5 on
+         click. Self-guards: no-op on pages without the Upcoming section
+         (signed-out / not opted in) and per-column where ≤5 rows → no button. -->
+    <script type="module" src="~/js/lib/home-upcoming-more.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class

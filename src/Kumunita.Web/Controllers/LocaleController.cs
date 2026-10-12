@@ -311,6 +311,12 @@ public sealed class LocaleController(
             // resident's Profile.HideHomeIntro flag (a simple on/off; the
             // floor is false = show the intro). No subject → the floor.
             HideHomeIntro = profile?.HideHomeIntro ?? false,
+
+            // The home "upcoming" display preference: the resident's
+            // Profile.HomeShowUpcoming flag (a simple on/off; the floor is
+            // false = hide the section, so a fresh account sees the
+            // pre-feature home page). No subject → the floor.
+            HomeShowUpcoming = profile?.HomeShowUpcoming ?? false,
         };
     }
 
@@ -580,21 +586,32 @@ public sealed class LocaleController(
 
     /// <summary>
     /// <c>POST /settings/home</c> — the home-page display preference save
-    /// (ADR 0149 D1, the <c>SavePageSize</c> shape simplified to a single
-    /// on/off checkbox). With a <c>hideHomeIntro</c> form value of
-    /// <c>"true"</c>: <see cref="IUserInfoService
-    /// .SetProfileHideHomeIntroAsync"/> sets the flag (hide both intro
-    /// sections); with no value: the same lane with <c>false</c> (show the
-    /// intro — the "reset" action, no <c>clear=1</c> needed since
-    /// un-checked is the floor). The change is live on the very next home
-    /// page visit (data, not config — no rebuild / restart). A missing
-    /// profile (a pre-bootstrap edge) fails closed: the lane throws
-    /// <c>KeyNotFoundException</c> and we surface the error + redirect (the
-    /// <c>SetProfileTimezoneAsync</c> pin).
+    /// (the <c>SavePageSize</c> shape, a pair of on/off checkboxes). Two
+    /// independent flags, each saved through its own single-write-lane seam:
+    /// <list type="bullet">
+    ///   <item><c>hideHomeIntro</c> (ADR 0149 D1) →
+    ///     <see cref="IUserInfoService.SetProfileHideHomeIntroAsync"/>
+    ///     (<c>"true"</c> = hide both intro sections; absent = show them).</item>
+    ///   <item><c>homeShowUpcoming</c> →
+    ///     <see cref="IUserInfoService.SetProfileHomeShowUpcomingAsync"/>
+    ///     (<c>"true"</c> = show the "Upcoming" events + to-dos section on
+    ///     the home page; absent = hide it — the pre-feature default).</item>
+    /// </list>
+    /// Each unchecked checkbox simply does not post its value, so
+    /// <c>"true"</c> is the only affirmative state (the <c>SavePageSize</c>
+    /// "un-checked is the floor" idiom, no <c>clear=1</c> needed). Both
+    /// writes run in the same action; a missing profile (a pre-bootstrap
+    /// edge) fails closed on the first lane — the lane throws
+    /// <c>KeyNotFoundException</c> and we surface the error + redirect
+    /// (the <c>SetProfileTimezoneAsync</c> pin), so neither flag is half-
+    /// written. A single <c>settings.home_flash_saved</c> confirmation
+    /// covers every toggle combination (the form is one save button). The
+    /// change is live on the very next home page visit (data, not config —
+    /// no rebuild / restart).
     /// </summary>
     [HttpPost("/settings/home")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveHome(string? hideHomeIntro)
+    public async Task<IActionResult> SaveHome(string? hideHomeIntro, string? homeShowUpcoming)
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
@@ -603,9 +620,8 @@ public sealed class LocaleController(
         try
         {
             await userInfo.SetProfileHideHomeIntroAsync(subject, hideHomeIntro == "true", subject);
-            TempData["info"] = hideHomeIntro == "true"
-                ? await FlashAsync("settings.home_flash_hide")
-                : await FlashAsync("settings.home_flash_show");
+            await userInfo.SetProfileHomeShowUpcomingAsync(subject, homeShowUpcoming == "true", subject);
+            TempData["info"] = await FlashAsync("settings.home_flash_saved");
         }
         catch (KeyNotFoundException)
         {
@@ -763,6 +779,16 @@ public sealed class LocaleController(
         /// <see cref="Kumunita.Core.UserInfo.Profile.HideHomeIntro"/> flag
         /// (a simple on/off — no picker, unlike the other sections).</summary>
         public bool HideHomeIntro { get; init; }
+
+        /// <summary>The home "upcoming" display preference — whether the
+        /// resident's home page shows the "Upcoming" section (the next
+        /// events + to-dos, rendered just above the "What's new" feed).
+        /// Mirrors the flat
+        /// <see cref="Kumunita.Core.UserInfo.Profile.HomeShowUpcoming"/> flag
+        /// (a simple on/off, like <see cref="HideHomeIntro"/> — no picker).
+        /// The floor is <c>false</c> (hide the section — a fresh account
+        /// sees exactly the pre-feature home page).</summary>
+        public bool HomeShowUpcoming { get; init; }
 
         // ── M20 (ADR 0121, D7) — the quiet-hours section (the 5th resident
         // section). Flat fields (the ADR 0019 time-zone section's shape,

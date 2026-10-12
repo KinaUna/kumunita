@@ -66,6 +66,14 @@ public class HomeController : Controller
     /// constructions; the 500 page still renders and the form is still shown —
     /// a submit with no seam degrades to a 500-safe confirmation, never a crash
     /// (M31·5 "never a 500 back to the resident").</param>
+    /// <param name="events">Optional — the upcoming-events feed seam
+    /// (<see cref="Kumunita.Core.Events.IEventService.ListUpcomingAsync"/>),
+    /// the same read the /events surface uses. Null in test constructions;
+    /// the home "upcoming" events column degrades to empty.</param>
+    /// <param name="projects">Optional — the to-dos feed seam
+    /// (<see cref="Kumunita.Core.Projects.IProjectService.ListTodosAsync"/>),
+    /// the same read the /projects/todos surface uses. Null in test
+    /// constructions; the home "upcoming" to-dos column degrades to empty.</param>
     public HomeController(
         ILogger<HomeController> logger,
         IOptions<CommunityOptions> community,
@@ -77,7 +85,9 @@ public class HomeController : Controller
         IUserInfoService? userInfo = null,
         ITranslationProvider? translationProvider = null,
         ISiteContentService? siteContent = null,
-        IErrorReportService? errorReports = null)
+        IErrorReportService? errorReports = null,
+        Kumunita.Core.Events.IEventService? events = null,
+        Kumunita.Core.Projects.IProjectService? projects = null)
     {
         _logger = logger;
         _community = community.Value;
@@ -90,6 +100,8 @@ public class HomeController : Controller
         TranslationProvider = translationProvider;
         SiteContentService = siteContent;
         ErrorReports = errorReports;
+        Events = events;
+        Projects = projects;
     }
 
     // The optional feed seams (internal so the tests can assert the
@@ -103,6 +115,8 @@ public class HomeController : Controller
     internal ITranslationProvider? TranslationProvider { get; }
     internal ISiteContentService? SiteContentService { get; }
     internal IErrorReportService? ErrorReports { get; }
+    internal Kumunita.Core.Events.IEventService? Events { get; }
+    internal Kumunita.Core.Projects.IProjectService? Projects { get; }
 
     public async Task<IActionResult> Index()
     {
@@ -116,16 +130,25 @@ public class HomeController : Controller
         // degrades to the floor, and the page always renders. This is a
         // *display* read only — it never gates anything.
         bool hideIntro = false;
+        bool showUpcoming = false;
         var subjectId = KumunitaPrincipal.SubjectId(User);
         if (subjectId is not null && UserInfo is not null)
         {
             try
             {
-                hideIntro = (await UserInfo.GetProfileAsync(subjectId).ConfigureAwait(false))?.HideHomeIntro ?? false;
+                var profile = await UserInfo.GetProfileAsync(subjectId).ConfigureAwait(false);
+                hideIntro = profile?.HideHomeIntro ?? false;
+                // The home "upcoming" display preference (Profile.HomeShowUpcoming)
+                // — a pure display read (a read, not a decision): when the
+                // resident has opted in, the /home page shows the next events +
+                // to-dos above the feed; the floor (false) keeps the page exactly
+                // as before. The one profile read serves both flags.
+                showUpcoming = profile?.HomeShowUpcoming ?? false;
             }
             catch
             {
                 hideIntro = false; // floor: show the intro (never an error page)
+                showUpcoming = false; // floor: no upcoming section (never an error page)
             }
         }
 
@@ -150,7 +173,42 @@ public class HomeController : Controller
             }
         }
 
-        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed, hideIntro, site));
+        // The home "upcoming" section (the resident's Profile.HomeShowUpcoming
+        // preference). Built only when the resident has opted in and is
+        // signed-in (an anonymous visitor never sees their own feed — the
+        // BuildFeedAsync posture); each column is best-effort (a missing seam
+        // or a read failure degrades that column to empty, never the page).
+        // Null ⇒ the view omits the section entirely (the ADR 0004 §B.1
+        // additive shape — a fresh account that never opted in sees exactly
+        // the pre-feature home page).
+        HomeUpcoming? upcoming = null;
+        if (showUpcoming && subjectId is not null)
+        {
+            // One per-request language read for the whole section (the
+            // BuildFeedAsync ADR 0051 idiom); null ⇒ show authored-in.
+            string? upLang = null;
+            if (TranslationProvider is not null && Localization is not null)
+            {
+                try
+                {
+                    upLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, Localization, TranslationProvider).ConfigureAwait(false);
+                }
+                catch { upLang = null; } // display fallback, not an error
+            }
+
+            var upcomingEvents = await BuildUpcomingEventRowsAsync(subjectId, upLang).ConfigureAwait(false);
+            var upcomingTodos = await BuildUpcomingTodoRowsAsync(subjectId, upLang).ConfigureAwait(false);
+
+            // Both columns empty ⇒ collapse the section to null (the view omits
+            // it entirely) so an opted-in resident with nothing upcoming sees
+            // exactly the pre-feature home page — the feed's IsEmpty → hide
+            // idiom (no empty "Coming up" header stranded on the page).
+            upcoming = (upcomingEvents.Count == 0 && upcomingTodos.Count == 0)
+                ? null
+                : new HomeUpcoming(upcomingEvents, upcomingTodos);
+        }
+
+        return View(new HomeViewModel(_community.Name, _community.SupportEmail, feed, hideIntro, site, upcoming));
     }
 
     // NOTE (ML-UI U7): GET /about moved to StaticPagesController.About — one
@@ -487,6 +545,125 @@ public class HomeController : Controller
         catch
         {
             return [];
+        }
+    }
+
+    // ── the signed-in "upcoming" section (events + to-dos, the resident's
+    // Profile.HomeShowUpcoming preference) ─────────────────────────────────
+
+    /// <summary>
+    /// The next upcoming events the viewer can see — the same read + single
+    /// <c>CanSeeAsync</c> decision the /events feed uses
+    /// (<see cref="Kumunita.Core.Events.IEventService.ListUpcomingAsync"/>),
+    /// best-effort: a missing seam or a read failure yields an empty column,
+    /// never an error page. The full visible list is returned (not truncated)
+    /// so the view can render the first <see cref="HomeUpcoming.Columns"/>
+    /// and "show more" the rest client-side (the <c>mine-more</c> idiom).
+    /// </summary>
+    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingEventRowsAsync(string subjectId, string? effLang)
+    {
+        if (Events is null)
+            return [];
+        try
+        {
+            // page 1 of the feed (the community's upcoming events, most-
+            // imminent first — the seam's own Start-ascending order). The
+            // pageSize is generous (the home section is a quick-scan, not a
+            // feed page): one page of 20 covers the "next 5 + show more"
+            // without a second round trip; a community with >20 upcoming
+            // events still gets the first 20 (the view's show-more reveals
+            // what the page returned).
+            var page = await Events.ListUpcomingAsync(null, subjectId, page: 1, pageSize: 20).ConfigureAwait(false);
+
+            var rows = new List<HomeUpcomingRow>(page.Items.Count);
+            foreach (var ev in page.Items)
+            {
+                var title = ev.Title;
+                var body = ev.Body;
+                if (effLang is not null)
+                {
+                    try
+                    {
+                        var translations = await Events.GetEventTranslationsAsync(ev.Id).ConfigureAwait(false);
+                        var match = translations.FirstOrDefault(t =>
+                            string.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+                        if (match is not null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(match.Title)) title = match.Title;
+                            body = match.Body;
+                        }
+                    }
+                    catch { /* best-effort: the translation read degrades, the row does not */ }
+                }
+
+                rows.Add(new HomeUpcomingRow(
+                    title,
+                    MarkdownRenderer.PlainTextPreview(body, 140),
+                    ev.Start,
+                    $"/events/{ev.Id}",
+                    string.IsNullOrWhiteSpace(ev.Location) ? null : ev.Location));
+            }
+            return rows;
+        }
+        catch
+        {
+            return []; // best-effort: the column degrades, the page does not
+        }
+    }
+
+    /// <summary>
+    /// The top to-dos the viewer can see — the same read + single
+    /// <c>CanSeeAsync</c> decision the /projects/todos feed uses
+    /// (<see cref="Kumunita.Core.Projects.IProjectService.ListTodosAsync"/>),
+    /// best-effort: a missing seam or a read failure yields an empty column,
+    /// never an error page. The full visible list is returned (not truncated)
+    /// so the view can render the first <see cref="HomeUpcoming.Columns"/>
+    /// and "show more" the rest client-side (the <c>mine-more</c> idiom).
+    /// </summary>
+    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingTodoRowsAsync(string subjectId, string? effLang)
+    {
+        if (Projects is null)
+            return [];
+        try
+        {
+            // page 1 of the to-do feed (the community's to-dos, newest first —
+            // the seam's own Created-descending order). One page of 20 (the
+            // same generous home quick-scan window as the events column).
+            var page = await Projects.ListTodosAsync(null, null, subjectId, page: 1, pageSize: 20).ConfigureAwait(false);
+
+            var rows = new List<HomeUpcomingRow>(page.Items.Count);
+            foreach (var t in page.Items)
+            {
+                var title = t.Title;
+                var body = t.Body;
+                if (effLang is not null)
+                {
+                    try
+                    {
+                        var translations = await Projects.GetTodoTranslationsAsync(t.Id).ConfigureAwait(false);
+                        var match = translations.FirstOrDefault(tr =>
+                            string.Equals(tr.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+                        if (match is not null)
+                        {
+                            if (!string.IsNullOrWhiteSpace(match.Title)) title = match.Title;
+                            if (match.Body is not null) body = match.Body;
+                        }
+                    }
+                    catch { /* best-effort: the translation read degrades, the row does not */ }
+                }
+
+                rows.Add(new HomeUpcomingRow(
+                    title,
+                    MarkdownRenderer.PlainTextPreview(body, 140),
+                    t.DueAt,
+                    $"/projects/todos/{t.Id}",
+                    string.IsNullOrWhiteSpace(t.Status) ? null : t.Status));
+            }
+            return rows;
+        }
+        catch
+        {
+            return []; // best-effort: the column degrades, the page does not
         }
     }
 }

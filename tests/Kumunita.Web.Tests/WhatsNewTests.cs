@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.55.0 entry (ADR 0162) — 0.54.0 (ADR 0161) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.56.0 entry (ADR 0163) — 0.55.0 (ADR 0162) slides one row back")]
     public void The_Improve_Lane_Reduction_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,29 +69,36 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The M34 (analytics history) milestone (ADR 0162, this
-        // close flip) is the newest shipped (the 0.55.0 entry), so it is now
-        // the head; the ADR 0161 page-translation-standing lane (the editor
-        // can translate their own page + the /admin/platform translation
-        // surface) 0.54.0 entry slides one row back; the NESTED
+        // slides down. The home upcoming events & to-dos lane (ADR 0163, this
+        // close flip) is the newest shipped (the 0.56.0 entry), so it is now
+        // the head; the M34 (analytics history) milestone (ADR 0162) 0.55.0
+        // entry slides one row back; the ADR 0161 page-translation-standing
+        // lane (the editor can translate their own page + the /admin/platform
+        // translation surface) 0.54.0 entry two rows back; the NESTED
         // nested-help-guides lane (ADR 0160, the UG guide tree's second level)
-        // 0.53.0 entry two rows back; the ESC escalation-authorization lane
-        // (ADR 0159) 0.52.0 entry three rows back; the LBL-2
-        // surface-label-translation lane (ADR 0158) 0.51.0 entry four rows
-        // back; the SITE-2 hero-translation lane (ADR 0157) 0.50.0 entry five
-        // rows back; the M33 (storage metrics history) 0.49.0 entry six rows
-        // back; the M32 (issue submission & escalation) 0.48.0 entry seven
-        // rows back.
+        // 0.53.0 entry three rows back; the ESC escalation-authorization lane
+        // (ADR 0159) 0.52.0 entry four rows back; the LBL-2
+        // surface-label-translation lane (ADR 0158) 0.51.0 entry five rows
+        // back; the SITE-2 hero-translation lane (ADR 0157) 0.50.0 entry six
+        // rows back; the M33 (storage metrics history) 0.49.0 entry seven rows
+        // back; the M32 (issue submission & escalation) 0.48.0 entry eight rows
+        // back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.55.0" && head.Date == "2026-10-11",
-            "The M34 ADR 0162 0.55.0 (2026-10-11) entry must be the head of the registry; got "
+            head.Version == "0.56.0" && head.Date == "2026-10-12",
+            "The home upcoming lane ADR 0163 0.56.0 (2026-10-12) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("analytics history", StringComparison.OrdinalIgnoreCase)),
-            "The 0.55.0 head entry must name M34's analytics history capability.");
+            head.Changes.Any(c => c.Contains("upcoming", StringComparison.OrdinalIgnoreCase)),
+            "The 0.56.0 head entry must name the home upcoming events & to-dos capability.");
 
-        // The ADR 0161 page-translation-standing entry slides one row back.
+        // The M34 (analytics history) entry slides one row back.
+        var analytics = WhatsNew.All.Single(v => v.Version == "0.55.0");
+        Assert.True(
+            analytics.Changes.Any(c => c.Contains("analytics history", StringComparison.OrdinalIgnoreCase)),
+            "The 0.55.0 entry must name M34's analytics history capability.");
+
+        // The ADR 0161 page-translation-standing entry slides two rows back.
         var page = WhatsNew.All.Single(v => v.Version == "0.54.0");
         Assert.True(
             page.Changes.Any(c => c.Contains("page translations", StringComparison.OrdinalIgnoreCase)),

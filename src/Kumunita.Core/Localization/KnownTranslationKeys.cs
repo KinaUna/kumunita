@@ -723,6 +723,18 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Save",
             ["settings.home_flash_hide"]   = "Home page updated — the intro sections are now hidden and the feed shows first.",
             ["settings.home_flash_show"]   = "Home page updated — the intro sections will show again.",
+            // The home "upcoming" display preference (show the next events +
+            // to-dos above the "What's new" feed on /) — the HideHomeIntro
+            // checkbox's sibling (ADR 0004 §B.1 additive Profile field).
+            ["settings.home_upcoming_label"] =
+                "Show upcoming events and to-dos on the home page",
+            ["settings.home_upcoming_note"]  =
+                "When on, the next events and to-dos appear on your home page, above the feed. When off, the home page stays as it was.",
+            // The single "saved" confirmation the two-checkbox home form
+            // reports (both toggles save together in one POST, so one message
+            // covers every combination — the SavePageSize single-flash shape).
+            ["settings.home_flash_saved"]  =
+                "Home page updated — your choices are saved.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -825,6 +837,14 @@ public static class KnownTranslationKeys
             ["home.feed_empty"] =
                 "Nothing posted yet — be the first to start the conversation in the feed.",
             ["home.feed_badge_pinned"]   = "Pinned",
+
+            // ── home "upcoming" section (the next events + to-dos, above the
+            // "What's new" feed) — the resident's home.home_show_upcoming
+            // preference (ADR 0004 §B.1 additive Profile field) ────────────
+            ["home.upcoming_title"]        = "Coming up",
+            ["home.upcoming_events"]       = "Events",
+            ["home.upcoming_todos"]        = "To-dos",
+            ["home.upcoming_show_more"]    = "Show the {n} more",
 
             // ── home roadmap (the plan, after the intro) ────────────────────
             ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
@@ -3428,6 +3448,11 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Speichern",
             ["settings.home_flash_hide"]   = "Startseite aktualisiert — die Intro-Abschnitte werden ausgeblendet, der Feed kommt zuerst.",
             ["settings.home_flash_show"]   = "Startseite aktualisiert — die Intro-Abschnitte werden wieder gezeigt.",
+            ["settings.home_upcoming_label"] =
+                "Kommende Veranstaltungen und To-dos auf der Startseite anzeigen",
+            ["settings.home_upcoming_note"]  =
+                "Wenn an, erscheinen die nächsten Veranstaltungen und To-dos auf deiner Startseite, über dem Feed. Wenn aus, bleibt die Startseite wie bisher.",
+            ["settings.home_flash_saved"]  = "Startseite aktualisiert — deine Auswahl ist gespeichert.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -3525,6 +3550,12 @@ public static class KnownTranslationKeys
             ["home.feed_empty"] =
                 "Noch nichts gepostet — sei die erste Person, die die Unterhaltung im Feed anstößt.",
             ["home.feed_badge_pinned"]   = "Angepinnt",
+
+            // ── home „Demnächst“-Abschnitt (nächste Veranstaltungen + To-dos) ──
+            ["home.upcoming_title"]      = "Demnächst",
+            ["home.upcoming_events"]     = "Veranstaltungen",
+            ["home.upcoming_todos"]      = "To-dos",
+            ["home.upcoming_show_more"]  = "Die {n} weiteren anzeigen",
 
             // ── home Roadmap (der Plan, nach der Intro) ────────────────────
             ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
@@ -5913,6 +5944,11 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Enregistrer",
             ["settings.home_flash_hide"]   = "Page d'accueil mise à jour — les sections d'introduction sont masquées, le fil apparaît en premier.",
             ["settings.home_flash_show"]   = "Page d'accueil mise à jour — les sections d'introduction réapparaîtront.",
+            ["settings.home_upcoming_label"] =
+                "Afficher les événements et tâches à venir sur la page d'accueil",
+            ["settings.home_upcoming_note"]  =
+                "Quand activé, les prochains événements et tâches apparaissent sur votre page d'accueil, au-dessus du fil. Quand désactivé, la page d'accueil reste telle quelle.",
+            ["settings.home_flash_saved"]  = "Page d'accueil mise à jour — vos choix sont enregistrés.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -6010,6 +6046,12 @@ public static class KnownTranslationKeys
             ["home.feed_empty"] =
                 "Rien de posté pour l'instant — soyez le premier à lancer la conversation dans le flux.",
             ["home.feed_badge_pinned"]   = "Épinglé",
+
+            // ── home « À venir » (prochains événements + tâches) ────────────
+            ["home.upcoming_title"]      = "À venir",
+            ["home.upcoming_events"]     = "Événements",
+            ["home.upcoming_todos"]      = "Tâches",
+            ["home.upcoming_show_more"]  = "Afficher les {n} autres",
 
             // ── home feuille de route (le plan, après l'intro) ─────────────
             ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
@@ -8404,6 +8446,11 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Gem",
             ["settings.home_flash_hide"]   = "Forside opdateret — introduktionssektionerne skjules, strømmen vises først.",
             ["settings.home_flash_show"]   = "Forside opdateret — introduktionssektionerne vises igen.",
+            ["settings.home_upcoming_label"] =
+                "Vis kommende begivenheder og to-dos på forsiden",
+            ["settings.home_upcoming_note"]  =
+                "Når tændt, vises de næste begivenheder og to-dos på din forside, over strømmen. Når slukket, forbliver forsiden som før.",
+            ["settings.home_flash_saved"]  = "Forside opdateret — dine valg er gemt.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -8500,6 +8547,12 @@ public static class KnownTranslationKeys
             ["home.feed_empty"] =
                 "Ingenting er indlagt endnu — vær den første, der starter samtalen i fæden.",
             ["home.feed_badge_pinned"]   = "Fastgjort",
+
+            // ── home « Kommende » (næste begivenheder + to-dos) ─────────────
+            ["home.upcoming_title"]      = "Kommende",
+            ["home.upcoming_events"]     = "Begivenheder",
+            ["home.upcoming_todos"]      = "To-dos",
+            ["home.upcoming_show_more"]  = "Vis de {n} flere",
 
             // ── home milepæler (planen, efter introen) ─────────────────────
             ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",

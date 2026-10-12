@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.56.0", "2026-10-12", new List<string>
+        {
+            "Home upcoming events & to-dos — a resident can now opt in (Settings → Home page) to seeing the next upcoming events and to-dos on the home page, just above the \"What's new\" feed: a new per-resident display preference (Profile.HomeShowUpcoming, ADR 0004 §B.1 additive — the HideHomeIntro / PageSize single-write-lane shape, off by default so a fresh account is unchanged) + a /home \"Upcoming\" section that reuses the existing /events + /projects/todos read seams (so a row only shows when the viewer could already see it there) + a per-column \"show more\" that reveals rows beyond the first five (the mine-more / roadmap-more disclosure idiom) + the closed settings.home.* + home.upcoming.* kw-l key set × en/de/fr/da (ADR 0163).",
+        }),
         new("0.55.0", "2026-10-11", new List<string>
         {
             "Analytics history — the M13 /admin/analytics surface gains a trend view over time (a derived read over the existing UsageEvent rows — one UsageDailyTotal per UTC day over a pinned window — + a per-day table + an inline sparkline over a pinned 7/30/90/180/365-day window) so an operator can see usage patterns evolve: the M13 Usage surface extended additively (the UsageDailyTotal + UsageHistoryResult DTOs + the GetHistoryAsync read seam + the closed analytics.trend.* kw-l key set × en/de/fr/da) (ADR 0162).",
