@@ -222,3 +222,58 @@ order (U00, U01, … U10). Never rewrite a prior section. -->
   the source of truth** and pins the upsert; U02 should pin the exact
   `KioskService` impl shape (upsert vs. no-op) in Part 2 §2.2 and note the
   `SiteContent` divergence there. Not a Part 1 surface drift.
+
+## U02 — design doc Part 2 + ADR 0164 Draft
+
+- **Appended** `## Seams & contracts (Part 2, written by U02)` to
+  `docs/design/m35-kiosk-mode-design.md` (§2.1 frozen seam list, §2.2 new
+  Core types, §2.3 display + settings surface, §2.4 closed `kiosk.*` key set,
+  §2.5 the 12 pinned test names, §2.6 the three-test acceptance gate, §2.7 the
+  drift-guard). **Drafted** `docs/adr/0164-kiosk-mode.md` (Status: **Draft** —
+  U10 flips it to Accepted). **No code, no build.**
+- **(a) Reused frozen seams (verbatim, §2.1):** M5
+  `IProjectService.GetBoardAsync(boardId, actorId, ct)` (board slide) +
+  `ListTodosAsync(componentId, assigneeId, actorId, page, …, ct, sort, pageSize)`
+  (todos slide) + `ListBoardsAsync(componentId, actorId, page, projectId, ct, sort, pageSize)`
+  (settings board picker); M4
+  `IEventService.ListInRangeAsync(windowStartUtc, windowEndUtc, componentId, actorId, ct)`
+  (calendar slide). All **reused verbatim** — M35 adds no seam to them
+  (M35·3 / M35·9).
+- **(b) New `IKioskService` 2-method seam (§2.1):**
+  `Task<KioskPlaylist?> GetPlaylistAsync(CancellationToken ct = default);`
+  (read — zero audit rows, null on missing) + `Task<KioskPlaylist>
+  SavePlaylistAsync(IReadOnlyList<KioskView> views, int viewIntervalSeconds, int
+  refreshIntervalSeconds, string actorId, IDocumentSession session, CancellationToken
+  ct = default);` (write — one `kiosk.save` row, in the caller's session).
+- **(c) Ceilings + upsert-vs-no-op resolution (§2.2):** `KioskPlaylist`
+  **4 members** (`Id` sentinel `"kiosk"`, `Views`, `ViewIntervalSeconds`=30,
+  `RefreshIntervalSeconds`=10) + `KioskView` **5 members** (`Kind`, `BoardId?`,
+  `CalendarView?`="week", `ComponentId?`, `Label?`) + `KioskViewKind` **3
+  members** (`Board`/`Calendar`/`Todos`) + `KioskDocTypes` **one**
+  `.Schema.For`. **Chose the upsert** (create-on-missing) — the register is the
+  source of truth; the `SiteContentService.SaveAsync` template is a no-op on a
+  missing row (SITE·6), so M35 **intentionally departs** (U08 test
+  `M35_2_SavePlaylist_NoRow_CreatesSingleton` pins it). Also pinned the
+  **caller's-session** shape (vs. the template's own session) + the **nullable
+  read** (vs. the template's never-null fallback) as intentional divergences.
+- **(d) 12 test names (§2.5):** Core `KioskServiceTests` —
+  `M35_2_GetPlaylist_NoRow_ReturnsNull` · `M35_2_GetPlaylist_Configured_ReturnsRow`
+  · `M35_5_GetPlaylist_WritesNoAuditRow` · `M35_5_SavePlaylist_OneKioskSaveAuditRow`
+  · `M35_2_SavePlaylist_NoRow_CreatesSingleton` · `M35_SavePlaylist_AtomicInCallerSession`;
+  Web `KioskControllerTests` — `M35_3_SignedIn_Sees_ChromeHidden_FirstSlide` ·
+  `M35_3_Anonymous_RedirectedToSignIn` · `M35_5_SlideDenied_SignsInViewer_SeesDeniedShape`
+  · `M35_7_NonGlobalAdmin_AdminKiosk_403` · `M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists`
+  · `M35_6_ExistingSurfaces_RenderUnchanged`.
+- **(e) Three-test gate (§2.6):** **Closed loop** (GlobalAdmin sets playlist →
+  `/kiosk` renders the first slide) · **Handoff** (a slide resolves via the
+  frozen seam — same `Read` decision as the surface's own feed) · **Part-vs-whole**
+  (the 12-test list is the whole; all must pass together). U09 records it.
+- **(f) ADR 0164 Draft:** `docs/adr/0164-kiosk-mode.md` — the **"new context +
+  reused read seams"** framing (M35·1 / M35·3) that inverts M34's "derived, not
+  captured"; 10 decisions (D1–D10); Status **Draft**.
+- **(g) Closed `kiosk.*` key set (§2.4):** **8 keys** — `kiosk.title` /
+  `kiosk.empty` / `kiosk.slide_denied` / `kiosk.next_slide` / `kiosk.refreshed` /
+  `kiosk.settings.title` / `kiosk.settings.view_interval` /
+  `kiosk.settings.refresh_interval` — four-language (en values are the source
+  text; de/fr/da are U06's to author). Board / calendar / todos `kw-l` sets
+  **untouched** (M35·6).

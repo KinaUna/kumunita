@@ -439,3 +439,438 @@ the drift-guard (U02 + U10) re-pins them.
 ---
 
 *Part 1 — Context, Scope, Invariants, FACES. Authored by U01, 2026-10-12.*
+
+## Seams & contracts (Part 2, written by U02)
+
+This part freezes the **exact shapes** U03–U08 must match, the closed `kiosk.*`
+`kw-l` key set, the **12 pinned test names**, the **three-test acceptance
+gate**, and the **drift-guard**. U03 (Core context + service), U04 (the
+`/kiosk` display), U05 (the GlobalAdmin settings surface), U06 (the `kiosk.*`
+`kw-l` keys), and U08 (the test pins) each read **their** sub-section of this
+part as the primary source; the register
+(`docs/plans-milestones/plan-m35-kiosk-mode.md`) wins for *which files exist*
+and *what each unit does*. **No code, no build** in U02.
+
+### 2.1 frozen seam list (exact C#)
+
+**The M35 *reused* frozen seams** (verbatim — M35 adds **no** seam to them,
+M35·3 / M35·9 "reused, not re-shape"):
+
+```csharp
+// src/Kumunita.Core/Projects/IProjectService.cs (M5, FROZEN — reused verbatim)
+// board-detail seam (the kiosk's Board slide rides this):
+Task<BoardDetailResult> GetBoardAsync(string boardId, string actorId,
+    CancellationToken ct = default);
+// todos-list seam (the kiosk's Todos slide rides this):
+Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId,
+    int page, bool unassignedOnly = false, string? projectId = null,
+    bool blockedOnly = false, CancellationToken ct = default,
+    SortSpec? sort = null, int? pageSize = null);
+// board-list seam (seeds the /admin/kiosk settings board picker, U05):
+Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page,
+    string? projectId = null, CancellationToken ct = default,
+    SortSpec? sort = null, int? pageSize = null);
+
+// src/Kumunita.Core/Events/IEventService.cs (M4, FROZEN — reused verbatim)
+// calendar-range seam (the kiosk's Calendar slide rides this):
+Task<IReadOnlyList<Event>> ListInRangeAsync(
+    DateTimeOffset windowStartUtc,
+    DateTimeOffset windowEndUtc,
+    string? componentId,
+    string actorId,
+    CancellationToken ct = default);
+```
+
+- Each of these already resolves the **signed-in viewer's** `Read` decision
+  (the same `CanSeeAsync` / `CanAsync` pass that surface's own feed runs) and
+  emits its **own** surface's `AccessAudit` row. M35 rides that decision —
+  **re-run on every fetch** (M35·3, the M12 iCal "authorization rides the
+  cookie" precedent) — and adds **zero** `kiosk.*` `AccessAudit` rows on those
+  reads (M35·5). M35 adds **no** `AccessAction` / `AccessVia` / `Decide()`
+  branch / `IAuditableResource` adapter over any of them (M35·1 / M35·3).
+
+**The M35 *new* seam** — a **2-method** surface on the new `Kiosk` context
+(the M35·1 / M35·5 pin):
+
+```csharp
+// src/Kumunita.Core/Kiosk/IKioskService.cs (new — M35·1 additive seam)
+public interface IKioskService
+{
+    /// The singleton read (M35·5 — zero AccessAudit rows). Returns the row,
+    /// or **null** when no `KioskPlaylist` row is configured (the M35-8
+    /// floor: the display renders `kiosk.empty`).
+    Task<KioskPlaylist?> GetPlaylistAsync(CancellationToken ct = default);
+
+    /// The GlobalAdmin write (M35·5 — exactly one `kiosk.save` AccessAudit
+    /// row, `TargetKind = "kiosk"`, `Via = Admin`). **Within the caller's
+    /// session** so the write is in-transaction with any surrounding work (the
+    /// M3 `CreatePostAsync` same-transaction precedent). **Upsert**: a missing
+    /// row is created (the register's M35·2 pin — see §2.2 divergence note).
+    /// Returns the saved row.
+    Task<KioskPlaylist> SavePlaylistAsync(
+        IReadOnlyList<KioskView> views,
+        int viewIntervalSeconds,
+        int refreshIntervalSeconds,
+        string actorId,
+        IDocumentSession session,
+        CancellationToken ct = default);
+}
+```
+
+### 2.2 new M35-owned Core types (exact C#)
+
+**The closed enum** (the M35·2 pin):
+
+```csharp
+// src/Kumunita.Core/Kiosk/KioskViewKind.cs (new) — the closed 3-member set
+public enum KioskViewKind
+{
+    Board,
+    Calendar,
+    Todos,
+}
+```
+
+**The `KioskView` entry** — the **5-member M35·2 ceiling** (no field outside
+the set may appear):
+
+```csharp
+// src/Kumunita.Core/Kiosk/KioskView.cs (new)
+public sealed class KioskView
+{
+    /// <summary>Which surface this slide shows (the closed 3-member set).</summary>
+    public KioskViewKind Kind { get; set; }
+    /// <summary>The board id — **only when** <see cref="Kind"/> is <see cref="KioskViewKind.Board"/>.</summary>
+    public string?   BoardId      { get; set; }
+    /// <summary>`"day"` | `"week"` | `"month"` — **only when** <see cref="Kind"/> is <see cref="KioskViewKind.Calendar"/>; default `week`.</summary>
+    public string?   CalendarView { get; set; } = "week";
+    /// <summary>The community filter — **only when** <see cref="Kind"/> is <see cref="KioskViewKind.Todos"/>; `null` = all the viewer's visible todos.</summary>
+    public string?   ComponentId  { get; set; }
+    /// <summary>An optional per-slide display label; `null` = the surface's own header.</summary>
+    public string?   Label        { get; set; }
+}
+```
+
+**The `KioskPlaylist` singleton** — the **4-member M35·2 ceiling** (no field
+outside the set may appear):
+
+```csharp
+// src/Kumunita.Core/Kiosk/KioskPlaylist.cs (new) — the M10 LocaleSettings /
+// ADR 0004 §B.1 singleton idiom (the SiteContent.SingletonId shape).
+public sealed class KioskPlaylist
+{
+    /// <summary>The singleton sentinel id (the SiteContent "singleton" /
+    /// LocaleSettings idiom). One row per instance, keyed on this id.</summary>
+    public const string SingletonId = "kiosk";
+
+    public string Id { get; set; } = SingletonId;
+
+    /// <summary>The **ordered** slide list (list position = the slide order,
+    /// not a stored field).</summary>
+    public IReadOnlyList<KioskView> Views { get; set; } = [];
+
+    /// <summary>The slide-advance cadence (seconds). **Display-only, never an
+    /// access input** (M35·4). `>= 5`; default 30.</summary>
+    public int ViewIntervalSeconds    { get; set; } = 30;
+
+    /// <summary>The content-refresh cadence (seconds), **faster** than the
+    /// view cadence. **Display-only, never an access input** (M35·4).
+    /// `>= 2` and `< ViewIntervalSeconds`; default 10.</summary>
+    public int RefreshIntervalSeconds { get; set; } = 10;
+}
+```
+
+**The `KioskDocTypes` registration surface** (the ADR 0004 §B.1 shape — one
+`.Schema.For`, the M35·1 / M35·9 pin):
+
+```csharp
+// src/Kumunita.Core/Kiosk/KioskDocTypes.cs (new)
+public static class KioskDocTypes
+{
+    public static void Configure(StoreOptions opts)
+    {
+        // The singleton has a conventional string Id (fixed to "kiosk"), so no
+        // non-default convention or business-key index is needed — only the
+        // explicit Schema.For makes the doc visible to Marten (the
+        // SiteContentDocTypes / LocaleSettings *DocTypes precedent).
+        opts.Schema.For<KioskPlaylist>();
+    }
+}
+```
+
+**The `KioskService` impl shape** (the `SiteContentService` structural
+template, with **two** divergences pinned against the register below):
+
+```csharp
+// src/Kumunita.Core/Kiosk/KioskService.cs (new)
+public sealed class KioskService : IKioskService
+{
+    private readonly IDocumentStore _store;
+    public KioskService(IDocumentStore store, IAuthorizationService authz)
+    {
+        _store = store;
+        // authz is carried for composition-root symmetry (the M23
+        // ProfileFindService / M5 PostService precedent) but is **not** invoked
+        // for standing — M35·1 pins "no Decide() branch"; the controller
+        // ([Authorize(Roles = GlobalAdmin)]) enforces the standing (the
+        // admin-surface precedent).
+        _authz = authz;
+    }
+
+    // (1) GetPlaylistAsync — one QuerySession + LoadAsync<KioskPlaylist>("kiosk").
+    //     Returns the row, or **null** when absent (the M35-8 floor). ZERO
+    //     AccessAudit rows (M35·5).
+
+    // (2) SavePlaylistAsync — **within the caller's `session`**:
+    //     var row = await session.LoadAsync<KioskPlaylist>("kiosk", ct)
+    //                   ?? new KioskPlaylist { Id = KioskPlaylist.SingletonId };
+    //     row.Views                  = views;
+    //     row.ViewIntervalSeconds    = viewIntervalSeconds;
+    //     row.RefreshIntervalSeconds = refreshIntervalSeconds;
+    //     session.Store(row);
+    //     session.Store(new AccessAudit { ... Action = "kiosk.save",
+    //                                    TargetKind = "kiosk",
+    //                                    TargetId   = "kiosk",
+    //                                    Via = AccessVia.Admin,
+    //                                    Outcome = AccessOutcome.Allow });
+    //     await session.SaveChangesAsync(ct);
+    //     return row;
+    //     Exactly ONE kiosk.save AccessAudit row (M35·5).
+}
+```
+
+**Divergence notes (register is the source of truth — pinned here):**
+
+- **Upsert vs. no-op.** The register's M35·2 assumption pins
+  `SavePlaylistAsync` as an **upsert** — a missing `KioskPlaylist` row is
+  **created**. The `SiteContentService.SaveAsync` structural template it
+  mirrors is instead a **no-op on a missing row** (it "never load-or-creates",
+  SITE·6 — the `SiteContent` seeder is the only writer that creates the row).
+  **M35 pins the upsert** (the register wins): `SavePlaylistAsync` load-or-
+  creates the singleton so a GlobalAdmin can configure the playlist on a
+  fresh instance **without** a seeder. This is the one intentional departure
+  from the `SiteContent` template. (Consequence: the U08 test
+  `M35_2_SavePlaylist_NoRow_CreatesSingleton` asserts the create-on-missing
+  behavior — the `SiteContent` template has no such test.)
+- **Caller's session vs. own session.** `SavePlaylistAsync` takes the
+  **caller's** `IDocumentSession session` (in-transaction with surrounding
+  work — the M3 `CreatePostAsync` same-transaction precedent), whereas
+  `SiteContentService.SaveAsync` opens its **own** session. **M35 pins the
+  caller's-session shape** (the register's `IKioskService` signature).
+- **Nullable read vs. never-null read.** `GetPlaylistAsync` returns
+  `KioskPlaylist?` — **null** on a missing row (the M35-8 floor renders
+  `kiosk.empty`), whereas `SiteContentService.GetAsync` returns a never-null
+  in-code fallback. **M35 pins the nullable read** (the register's seam
+  signature; the kiosk has no in-code fallback content — an empty playlist is
+  a legitimate state, not a degraded one).
+
+**No** new `AccessAction` / `AccessVia` / `Decide()` branch /
+`IAuditableResource` adapter (the M35·1 / M35·3 pin). **No** `HttpClient` in
+Core (the M35·8 pin, ADR 0006-D). The M5 `Projects` + M4 `Events` contexts
+are **untouched** (M35·9).
+
+### 2.3 the `/kiosk` display + settings surface (exact Web shapes)
+
+**The `KioskController`** (namespace `Kumunita.Web`, `src/Kumunita.Web/
+Controllers/KioskController.cs`) — four actions:
+
+| Action | Route | Gate | Behavior |
+| --- | --- | --- | --- |
+| `Index` | `GET /kiosk` | `[Authorize]` | Read the `KioskPlaylist` via `GetPlaylistAsync`; resolve the **first** slide's content through the **frozen** read seam for the **signed-in viewer** (a denied slide → the `kiosk.slide_denied` shape, M35-5); render `Views/Kiosk/Index.cshtml` (the chrome-hidden stage + the first slide). |
+| `Slide` | `GET /kiosk/slide?slide=N&t=<ts>` | `[Authorize]` | The single-slide refresh fetch (the `t` timestamp busts any cache; a CSRF-free GET — the M12 iCal "the cookie is the authorization" precedent). Return the **Nth** slide's content via the **frozen** read seam; a slide the viewer cannot see returns the **denied-shape** view model (the `kiosk.slide_denied` message — not a 404). |
+| `SettingsGet` | `GET /admin/kiosk` | `[Authorize(Roles = GlobalAdmin)]` | Render `Views/Kiosk/Settings.cshtml` (the playlist editor + the two interval pickers; a non-GlobalAdmin → **403**, M35-7). |
+| `SettingsPost` | `POST /admin/kiosk` | `[Authorize(Roles = GlobalAdmin)]` | Bind `KioskSettingsViewModel`; on valid, commit `SavePlaylistAsync` (**one** `kiosk.save` audit row, M35·5) + redirect; on invalid, re-render with the error. |
+
+**The `KioskDisplayViewModel`** (`src/Kumunita.Web/Models/
+KioskDisplayViewModel.cs`):
+
+```csharp
+public sealed class KioskDisplayViewModel
+{
+    public IReadOnlyList<KioskView> Views { get; init; } = [];
+    public int  ViewIntervalSeconds    { get; init; } = 30;
+    public int  RefreshIntervalSeconds { get; init; } = 10;
+    /// True when at least one slide is configured (false → render kiosk.empty, M35-8).
+    public bool HasSlides  { get; init; }
+    /// The first slide's resolved content (the board / calendar / todos view
+    /// model the slide renders), or the kiosk.slide_denied shape (M35-5).
+    public object? FirstSlideContent { get; init; }
+    /// The kiosk.slide_denied label (present when a slide is denied, M35-5).
+    public string? DeniedLabel { get; init; }
+    /// The `#kiosk-stage` data-* attributes the client/lib/kiosk.ts reads
+    /// (U07): the two intervals + the slide count.
+    public int SlideCount { get; init; }
+}
+```
+
+**The `KioskSettingsViewModel`** (`src/Kumunita.Web/Models/
+KioskSettingsViewModel.cs`): the playlist editor binding + the interval
+pickers + the board-picker seed:
+
+```csharp
+public sealed class KioskSettingsViewModel
+{
+    public IReadOnlyList<KioskView> Views { get; set; } = [];
+    public int  ViewIntervalSeconds    { get; set; } = 30;
+    public int  RefreshIntervalSeconds { get; set; } = 10;
+    /// The board picker's options — seeded from the **frozen** M5
+    /// IProjectService.ListBoardsAsync (M35·3 / M35·9 — reused, not re-shape).
+    public IReadOnlyList<(string Id, string Title)> Boards { get; set; } = [];
+    public bool IsValid { get; set; }
+}
+```
+
+**The `Views/Kiosk/Index.cshtml` chrome-hidden layout** (the M35·6 pin): the
+`body.kmb-page-expanded` class (the ADR 0104 chrome-hide idiom — the navbar /
+footer / flash / pinned-announcement hidden, the slide fills the viewport) +
+a `#kiosk-stage` element carrying the `data-*` attributes the `kiosk.ts`
+reads (`data-view-interval`, `data-refresh-interval`, `data-slide-count`). The
+board / calendar / todos **Razor partials are `@await Html.PartialAsync`'d
+verbatim** (the M35·6 pin — the kiosk does **not** re-author them):
+`Views/Projects/BoardDetail.cshtml` + `Views/Projects/TodosIndex.cshtml` +
+`Views/Event/Calendar.cshtml` (note: the calendar partial's folder is
+singular `Event`, U00 verified).
+
+**The `client/lib/kiosk.ts` state machine** (the M35·7 pin — a plain-tsc,
+no-dep, no-`any` IIFE, the `expand-page.ts` / `calendar-fullscreen.ts`
+precedent): two `setInterval`s — (1) **advance** the visible slide to the
+next (wrapping to the first) every `ViewIntervalSeconds`; (2) **re-fetch** the
+current slide's content from `GET /kiosk/slide?slide=N&t=<ts>` every
+`RefreshIntervalSeconds` (a same-origin `fetch` + innerHTML swap over the
+server-rendered slide HTML). **Zero** new npm package, **zero** build step.
+
+**The `site.css` kiosk rules** (the M35·6 / M35·7 pin): the `#kiosk-stage`
+chrome-hide (reusing the `body.kmb-page-expanded` rules) + the slide-advance
+transition (a CSS opacity/transform transition — no JS animation lib).
+
+### 2.4 the closed `kiosk.*` `kw-l` key set
+
+**8 keys**, each present, **non-empty, in all four** languages (en/de/fr/da),
+pinned by `KwLRegistryConsistencyTests` (Web.Tests) +
+`KnownTranslationKeys_ParityTests` (Core.Tests) (the M35·10 pin, the M34·11
+closed-set precedent). The `en` values below are the **source text** (the
+ADR 0015 D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da` values
+are U06's to author (the M35·10 four-language pin). The board / calendar /
+todos `kw-l` key sets are **untouched** (the M35·6 additive-only pin — M35
+**adds** this set, it does not re-author the M5 / M4 set):
+
+| Key | en value (source text) | Consumed by |
+| --- | --- | --- |
+| `kiosk.title` | Neighbourhood board | the display heading (U04) |
+| `kiosk.empty` | The kiosk has no slides configured yet. | the empty playlist (U04, M35-8) |
+| `kiosk.slide_denied` | You don't have access to this view. | a denied slide (U04, M35-5) |
+| `kiosk.next_slide` | Next view | the advance control (U04 / U07) |
+| `kiosk.refreshed` | Updated just now | the refresh stamp (U07) |
+| `kiosk.settings.title` | Kiosk display | the settings heading (U05) |
+| `kiosk.settings.view_interval` | Change view every (seconds) | the view-interval picker (U05) |
+| `kiosk.settings.refresh_interval` | Refresh content every (seconds) | the refresh-interval picker (U05) |
+
+### 2.5 pinned seam tests (exact names)
+
+**12 pinned tests** — no unit may introduce a test whose exact name is not in
+this list (unit-series rule §3). **6 Core** in
+`tests/Kumunita.Core.Tests/Kiosk/KioskServiceTests.cs` (the M33
+`StorageMetricsHistoryTests` `PostgresFixture` seed-and-assert shape), **6
+Web** in `tests/Kumunita.Web.Tests/KioskControllerTests.cs` (the M33
+`AdminStorageMetricsHistoryTests` NSubstitute + minimal-`WebApplication`
+shape):
+
+`tests/Kumunita.Core.Tests/Kiosk/KioskServiceTests.cs`:
+
+1. `M35_2_GetPlaylist_NoRow_ReturnsNull` — `GetPlaylistAsync` over a **no
+   row** store returns `null` (the M35·2 / M35-8 floor).
+2. `M35_2_GetPlaylist_Configured_ReturnsRow` — `GetPlaylistAsync` over a
+   **configured** singleton returns the row (the M35·2 pin).
+3. `M35_5_GetPlaylist_WritesNoAuditRow` — `GetPlaylistAsync` writes **zero**
+   `AccessAudit` rows (the M35·5 pin).
+4. `M35_5_SavePlaylist_OneKioskSaveAuditRow` — `SavePlaylistAsync` commits
+   **exactly one** `kiosk.save` `AccessAudit` row (`TargetKind = "kiosk"`,
+   `Via = Admin`) (the M35·5 pin).
+5. `M35_2_SavePlaylist_NoRow_CreatesSingleton` — `SavePlaylistAsync` over a
+   **no row** store **creates** the singleton (the upsert — the M35·2 pin;
+   the §2.2 divergence from the `SiteContent` no-op template).
+6. `M35_SavePlaylist_AtomicInCallerSession` — `SavePlaylistAsync`
+   **within the caller's session** commits atomically (the M3
+   same-transaction pin).
+
+`tests/Kumunita.Web.Tests/KioskControllerTests.cs`:
+
+7. `M35_3_SignedIn_Sees_ChromeHidden_FirstSlide` — a **signed-in** viewer
+   visits `/kiosk` → the chrome-hidden layout + the first slide render (the
+   M35·3 / M35·6 pin).
+8. `M35_3_Anonymous_RedirectedToSignIn` — an **anonymous** visitor visits
+   `/kiosk` → redirected to sign-in (the M35·3 / M35-6 pin).
+9. `M35_5_SlideDenied_SignsInViewer_SeesDeniedShape` — `GET
+   /kiosk/slide?slide=N` over a slide the viewer **cannot see** → the
+   `kiosk.slide_denied` shape (no content, no 404 — the M35·5 / M35-5 pin).
+10. `M35_7_NonGlobalAdmin_AdminKiosk_403` — a **non-GlobalAdmin** visits
+    `/admin/kiosk` → 403 (the M35·2 / M35-7 pin).
+11. `M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists` — a
+    **GlobalAdmin** POSTs `/admin/kiosk` → one `kiosk.save` audit row + the
+    playlist persists (the M35·5 / M35-1 pin).
+12. `M35_6_ExistingSurfaces_RenderUnchanged` — the **existing** board /
+    calendar / todos surfaces render **unchanged** (a board detail / calendar
+    / todos index visit is byte-identical — the M35·6 additive-only pin).
+
+### 2.6 acceptance gate (U09 records)
+
+The **three-test shape** (U09 executes and records it in §"Run result";
+*using* the 12 §2.5 tests as the part-vs-whole evidence):
+
+- **Closed loop** — a `GlobalAdmin` sets the playlist (a board + a calendar
+  week + todos, with view + refresh intervals) → `/kiosk` renders the first
+  slide for a signed-in viewer (the full request → read → render loop
+  end-to-end, M35-1 / M35-2).
+- **Handoff** — a signed-in viewer's `/kiosk` slide resolves via the
+  **frozen** board / calendar / todos read seam — the **same `Read` decision**
+  as that surface's own feed — so the slide is a "handoff" from the
+  underlying surface to the display (the frozen-seam → slide contract, M35·3).
+- **Part-vs-whole** — the **12-test pin list is the whole**; the closed-loop
+  + handoff are the parts; **all must pass together** (a green 12-test run
+  *is* the gate evidence).
+
+### 2.7 drift-guard (frozen once written)
+
+The following are **frozen pins**. Any unit that finds a mismatch between
+these and the register, the handoff note, or the code is in drift and must
+record a `## U<m> — Drift pause` in the handoff note and stop (unit-series
+rule §13):
+
+- **The 11-invariant set (U01's table, Part 1)** — **M35·1 through M35·11**
+  (contiguous; no deliberate gaps, unlike M34). Any text that renames, skips,
+  or re-splits an id is a drift.
+- **The 10 FACES (U01's list)** — M35-1 through M35-10, verbatim, each bound
+  to the invariant ids stated in Part 1.
+- **The frozen seam list (§2.1)** — the M5 `GetBoardAsync` /
+  `ListTodosAsync` / `ListBoardsAsync` + the M4 `ListInRangeAsync`
+  **reused verbatim** (no re-shape); the **new** `IKioskService` **2-method**
+  surface (`GetPlaylistAsync` + `SavePlaylistAsync`).
+- **The new Core types (§2.2)** — `KioskPlaylist` **4 members** (`Id`
+  sentinel `"kiosk"`, `Views`, `ViewIntervalSeconds` default 30,
+  `RefreshIntervalSeconds` default 10) + `KioskView` **5 members**
+  (`Kind`, `BoardId?`, `CalendarView?` default `"week"`, `ComponentId?`,
+  `Label?`) + `KioskViewKind` **3 members** (`Board` / `Calendar` / `Todos`)
+  + `KioskDocTypes` **one** `.Schema.For`; no field outside any of these sets.
+  The **upsert** (create-on-missing) + **caller's-session** + **nullable
+  read** divergences are pinned and are **not** drift — they are the
+  intentional departures from the `SiteContent` template.
+- **The `/kiosk` display + settings surface (§2.3)** — the 4
+  `KioskController` actions (`Index` / `Slide` / `SettingsGet` /
+  `SettingsPost`), the `KioskDisplayViewModel` + `KioskSettingsViewModel`
+  member sets, the `body.kmb-page-expanded` chrome-hide, the board / calendar
+  / todos partials `@await`'d **verbatim**, the `kiosk.ts` two-`setInterval`
+  state machine, and the `site.css` kiosk rules.
+- **The closed `kiosk.*` key set (§2.4)** — exactly **8 keys**, four-language,
+  the board / calendar / todos `kw-l` sets **untouched**.
+- **The 12 test names (§2.5)** — verbatim, in the two named files/classes;
+  no test name outside the list.
+
+---
+
+*Part 2 — Seams & contracts (the reused frozen seams, the new `IKioskService`
+2-method seam, the `KioskPlaylist` / `KioskView` / `KioskViewKind` shapes +
+the `KioskDocTypes` surface + the `KioskService` impl shape [upsert /
+caller's-session / nullable-read divergence notes], the `/kiosk` display +
+settings surface, the closed `kiosk.*` `kw-l` key set, the 12 pinned test
+names, the three-test acceptance gate, the drift-guard). Authored by U02,
+2026-10-12. Companion ADR: `docs/adr/0164-kiosk-mode.md` (Draft).*
