@@ -248,6 +248,25 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
     Task SetProfileHomeShowUpcomingAsync(string subjectId, bool showUpcoming, string actorBy);
 
+    /// <summary>
+    /// Set the resident's <see cref="Profile.HomeUpcomingMineOnly"/> flag —
+    /// the home-page "upcoming" scope: whether the home page's Upcoming
+    /// section shows the resident's own events + to-dos (<c>true</c>) or the
+    /// community-wide lists (<c>false</c>, the floor). Mirrors
+    /// <see cref="SetProfileHomeShowUpcomingAsync"/> exactly (the C-MED·8
+    /// single write-lane shape): the self-scope check happens at the Web
+    /// boundary (the owner is the actor); this lane writes
+    /// <c>Profile.HomeUpcomingMineOnly</c> only. One session, one
+    /// <c>SaveChangesAsync</c>; no <see cref="Authorization.AccessAudit"/>
+    /// row (a profile field write). Strong consistency (invariant C4): the
+    /// new value is live on the very next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).
+    /// </exception>
+    Task SetProfileHomeUpcomingMineOnlyAsync(string subjectId, bool mineOnly, string actorBy);
+
     // ── Date format addition (ADR 0020; the *single* user-override write
     // lane for the resident's personal date-time format — the exact shape of
     // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──

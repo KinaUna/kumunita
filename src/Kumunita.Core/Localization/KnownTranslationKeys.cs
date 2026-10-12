@@ -730,6 +730,10 @@ public static class KnownTranslationKeys
                 "Show upcoming events and to-dos on the home page",
             ["settings.home_upcoming_note"]  =
                 "When on, the next events and to-dos appear on your home page, above the feed. When off, the home page stays as it was.",
+            ["settings.home_upcoming_mine_label"] =
+                "Show only my own events and to-dos",
+            ["settings.home_upcoming_mine_note"]  =
+                "When on, the section lists only the events you RSVP'd to or created and the to-dos assigned to you. When off, it shows the community's events and to-dos.",
             // The single "saved" confirmation the two-checkbox home form
             // reports (both toggles save together in one POST, so one message
             // covers every combination — the SavePageSize single-flash shape).
@@ -3452,6 +3456,10 @@ public static class KnownTranslationKeys
                 "Kommende Veranstaltungen und To-dos auf der Startseite anzeigen",
             ["settings.home_upcoming_note"]  =
                 "Wenn an, erscheinen die nächsten Veranstaltungen und To-dos auf deiner Startseite, über dem Feed. Wenn aus, bleibt die Startseite wie bisher.",
+            ["settings.home_upcoming_mine_label"] =
+                "Nur meine eigenen Veranstaltungen und To-dos anzeigen",
+            ["settings.home_upcoming_mine_note"]  =
+                "Wenn an, listet der Abschnitt nur die Veranstaltungen, für die du dich angemeldet hast oder die du erstellt hast, und die To-dos, die dir zugewiesen sind. Wenn aus, werden die Veranstaltungen und To-dos der Gemeinschaft angezeigt.",
             ["settings.home_flash_saved"]  = "Startseite aktualisiert — deine Auswahl ist gespeichert.",
 
             // ── admin — the platform-default timezone ───────────────────────
@@ -5948,6 +5956,10 @@ public static class KnownTranslationKeys
                 "Afficher les événements et tâches à venir sur la page d'accueil",
             ["settings.home_upcoming_note"]  =
                 "Quand activé, les prochains événements et tâches apparaissent sur votre page d'accueil, au-dessus du fil. Quand désactivé, la page d'accueil reste telle quelle.",
+            ["settings.home_upcoming_mine_label"] =
+                "N'afficher que mes propres événements et tâches",
+            ["settings.home_upcoming_mine_note"]  =
+                "Quand activé, la section ne liste que les événements auxquels vous êtes inscrit ou que vous avez créés, et les tâches qui vous sont assignées. Quand désactivé, elle affiche les événements et tâches de la communauté.",
             ["settings.home_flash_saved"]  = "Page d'accueil mise à jour — vos choix sont enregistrés.",
 
             // ── admin — the platform-default timezone ───────────────────────
@@ -8450,6 +8462,10 @@ public static class KnownTranslationKeys
                 "Vis kommende begivenheder og to-dos på forsiden",
             ["settings.home_upcoming_note"]  =
                 "Når tændt, vises de næste begivenheder og to-dos på din forside, over strømmen. Når slukket, forbliver forsiden som før.",
+            ["settings.home_upcoming_mine_label"] =
+                "Vis kun mine egne begivenheder og to-dos",
+            ["settings.home_upcoming_mine_note"]  =
+                "Når tændt, viser afsnittet kun de begivenheder, du har RSVP'd til eller oprettet, og de to-dos, der er tildelt dig. Når slukket, vises fællesskabets begivenheder og to-dos.",
             ["settings.home_flash_saved"]  = "Forside opdateret — dine valg er gemt.",
 
             // ── admin — the platform-default timezone ───────────────────────

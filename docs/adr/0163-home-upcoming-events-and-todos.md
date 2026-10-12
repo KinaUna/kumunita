@@ -44,10 +44,12 @@ additive surface — the 14th additive `Profile` field after
 `AvatarId` / `TimeZone` / `DateFormat` / `EmailLanguage` / `Bio` / `TagIds`
 / `OnboardingCompletedAt` / `MessagingOptIn` / `MessagingRestricted` /
 `BlockedCommunityIds` / `EventRsvpMode` / `PageSize` / `HideHomeIntro`) and
-**adds** one new additive `Profile` field
-(`HomeShowUpcoming` — a `bool`, default `false`), one new single-write-lane
-seam on `IUserInfoService` (`SetProfileHomeShowUpcomingAsync`, the
-`SetProfileHideHomeIntroAsync` ADD precedent), the `LocaleController
+**adds** two new additive `Profile` fields
+(`HomeShowUpcoming` — a `bool`, default `false` — and
+`HomeUpcomingMineOnly` — a `bool`, default `false`, the D1a "only mine"
+scope), two new single-write-lane seams on `IUserInfoService`
+(`SetProfileHomeShowUpcomingAsync` + `SetProfileHomeUpcomingMineOnlyAsync`,
+both the `SetProfileHideHomeIntroAsync` ADD precedent), the `LocaleController
 BuildModel` / `SaveHome` settings pair, the `HomeViewModel` `Upcoming`
 shape (the `HomeFeed` / `HomeFeedRow` projection precedent), the `Home
 Index` "Upcoming" section (the `mine-more` / `roadmap-more` disclosure
@@ -70,6 +72,25 @@ JS library, **no** EF migration, and **no** re-seed.
   pre-feature home page (the section is not in the DOM at all — the
   `@if (Model.Upcoming is { } upcoming)` wrap is the DOM-level pin, the
   ADR 0150 SITE·9 idiom).
+- **D1a — An optional "only mine" scope, off by default (a companion to
+  D1, shipped alongside).** `Profile.HomeUpcomingMineOnly` (a `bool`,
+  default `false`) — the ADR 0149 `HideHomeIntro` precedent, a 15th additive
+  `Profile` field. When on *and* the section is shown, the home page lists
+  the resident's **own** events (RSVP'd or authored — the EV-MINE read,
+  ADR 0065 `IEventService.ListMineAsync`) and **their own** to-dos (assigned
+  to them — the `assigneeId = subject` "assigned to me" idiom, the
+  `ProjectsController.TodosIndex` filter) instead of the community-wide
+  lists (the D3 floor, the shape the section shipped in). Same display-read
+  posture — it changes *what is listed*, never *whether a row is
+  authorized* (both scopes use the same authorization-aware read seams; the
+  mine-scoped reads apply their own `CanSeeAsync`, as the community-wide
+  ones do). It is a checkbox on the settings page (indented under the
+  "show upcoming" toggle it scopes; the controller reads it alongside the
+  others, the ADR 0149 "un-checked is the floor" idiom) and a single write
+  lane (`SetProfileHomeUpcomingMineOnlyAsync`, the D2 shape verbatim). The
+  closed `kw-l` key set gains `settings.home_upcoming_mine_label` /
+  `settings.home_upcoming_mine_note` × en/de/fr/da (the ADR 0015 / ADR 0119
+  D9 "no English-only key" rule).
 - **D2 — The write lane is the C-MED·8 single-write-lane shape.** One new
   method on `IUserInfoService`
   (`SetProfileHomeShowUpcomingAsync(subjectId, showUpcoming, actorBy)`) —
@@ -131,10 +152,11 @@ required sixth close-flip member per AGENTS.md).
 
 ## Consequences
 
-- **The `Profile` doc gains a 14th additive field** (the ADR 0004 §B.1
+- **The `Profile` doc gains two additive fields** (the ADR 0004 §B.1
   shape — delta-detected, idempotent, no re-seed, no EF migration; a
-  fresh `Profile` has `HomeShowUpcoming = false` — the ADR 0149 /
-  ADR 0019 "store, resolve on read" posture).
+  fresh `Profile` has `HomeShowUpcoming = false` **and**
+  `HomeUpcomingMineOnly = false` — the ADR 0149 / ADR 0019 "store,
+  resolve on read" posture).
 - **The `IUserInfoService` seam gains one method** (the
   `SetProfileHomeShowUpcomingAsync` ADD — the `SetProfileHideHomeIntroAsync`
   ADD precedent; the existing methods are untouched).
@@ -155,14 +177,17 @@ required sixth close-flip member per AGENTS.md).
 
 ## Tests
 
-- `ProfileHomeShowUpcomingLaneTests` (4 tests, `Kumunita.Core.Tests`) —
-  the new write lane's invariants (default-off, set-true-live,
-  false-clears-and-persists, missing-profile-fails-closed), the
+- `ProfileHomeShowUpcomingLaneTests` (8 tests, `Kumunita.Core.Tests`) —
+  the new write lanes' invariants (default-off, set-true-live,
+  false-clears-and-persists, missing-profile-fails-closed — for both
+  `HomeShowUpcoming` and `HomeUpcomingMineOnly`), the
   `ProfileTimezoneLaneTests` / `ProfileAvatarLaneTests` idiom.
-- `HomeControllerUpcomingTests` (3 tests, `Kumunita.Web.Tests`) — the
+- `HomeControllerUpcomingTests` (4 tests, `Kumunita.Web.Tests`) — the
   home "Upcoming" section's view-model shape (a fresh profile ⇒ `Upcoming`
   is `null`, `HomeShowUpcoming = true` ⇒ `Upcoming` present with both
-  columns, anonymous ⇒ `Upcoming` is `null`), the
+  columns, `HomeUpcomingMineOnly = true` ⇒ the mine-scoped reads —
+  `ListMineAsync` for events + `assigneeId = subject` for to-dos, the
+  community feed read not used, anonymous ⇒ `Upcoming` is `null`), the
   `HomeControllerSiteContentTests` shape.
 - `WhatsNewTests` (7 tests, `Kumunita.Web.Tests`) — the version-registry
   head (the required sixth close-flip member, ADR 0110 / AGENTS.md) pins

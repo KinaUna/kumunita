@@ -2108,6 +2108,30 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetProfileHomeUpcomingMineOnlyAsync(string subjectId, bool mineOnly, string actorBy)
+    {
+        // The home "upcoming" scope write lane. Mirrors
+        // SetProfileHomeShowUpcomingAsync exactly (the C-MED·8 single
+        // write-lane shape): the self-scope check happens at the Web
+        // boundary (the owner is the actor); this lane writes
+        // Profile.HomeUpcomingMineOnly only. One session, one SaveChangesAsync
+        // (C3); no audit row (a Profile field write — the UpsertProfileAsync
+        // shape, "not an access decision"). Fail closed on a missing profile
+        // (never load-or-create, the SetProfileTimezoneAsync pin). Strong
+        // consistency (C4): the new value is live on the very next
+        // GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.HomeUpcomingMineOnly = mineOnly;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)
     {
         // ADR 0020 — the user's date-format override write lane. Mirrors

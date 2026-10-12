@@ -3,6 +3,7 @@ using Kumunita.Core;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.ErrorReports;
+using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
@@ -131,6 +132,7 @@ public class HomeController : Controller
         // *display* read only — it never gates anything.
         bool hideIntro = false;
         bool showUpcoming = false;
+        bool mineOnly = false;
         var subjectId = KumunitaPrincipal.SubjectId(User);
         if (subjectId is not null && UserInfo is not null)
         {
@@ -144,11 +146,20 @@ public class HomeController : Controller
                 // to-dos above the feed; the floor (false) keeps the page exactly
                 // as before. The one profile read serves both flags.
                 showUpcoming = profile?.HomeShowUpcoming ?? false;
+                // The home "upcoming" scope (Profile.HomeUpcomingMineOnly, ADR
+                // 0163 D1a): when on, the section lists the resident's *own*
+                // events + to-dos rather than the community-wide lists (the
+                // floor, false, is the community-wide shape the section shipped
+                // in). Same display-read posture — it changes what is listed,
+                // never whether a row is authorized (the mine-scoped reads
+                // apply their own CanSeeAsync, as the community-wide ones do).
+                mineOnly = profile?.HomeUpcomingMineOnly ?? false;
             }
             catch
             {
                 hideIntro = false; // floor: show the intro (never an error page)
                 showUpcoming = false; // floor: no upcoming section (never an error page)
+                mineOnly = false; // floor: community-wide lists (never an error page)
             }
         }
 
@@ -196,8 +207,8 @@ public class HomeController : Controller
                 catch { upLang = null; } // display fallback, not an error
             }
 
-            var upcomingEvents = await BuildUpcomingEventRowsAsync(subjectId, upLang).ConfigureAwait(false);
-            var upcomingTodos = await BuildUpcomingTodoRowsAsync(subjectId, upLang).ConfigureAwait(false);
+            var upcomingEvents = await BuildUpcomingEventRowsAsync(subjectId, upLang, mineOnly).ConfigureAwait(false);
+            var upcomingTodos = await BuildUpcomingTodoRowsAsync(subjectId, upLang, mineOnly).ConfigureAwait(false);
 
             // Both columns empty ⇒ collapse the section to null (the view omits
             // it entirely) so an opted-in resident with nothing upcoming sees
@@ -560,23 +571,28 @@ public class HomeController : Controller
     /// so the view can render the first <see cref="HomeUpcoming.Columns"/>
     /// and "show more" the rest client-side (the <c>mine-more</c> idiom).
     /// </summary>
-    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingEventRowsAsync(string subjectId, string? effLang)
+    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingEventRowsAsync(string subjectId, string? effLang, bool mineOnly)
     {
         if (Events is null)
             return [];
         try
         {
-            // page 1 of the feed (the community's upcoming events, most-
-            // imminent first — the seam's own Start-ascending order). The
-            // pageSize is generous (the home section is a quick-scan, not a
-            // feed page): one page of 20 covers the "next 5 + show more"
-            // without a second round trip; a community with >20 upcoming
-            // events still gets the first 20 (the view's show-more reveals
-            // what the page returned).
-            var page = await Events.ListUpcomingAsync(null, subjectId, page: 1, pageSize: 20).ConfigureAwait(false);
+            // Two scopes, both the resident's own CanSeeAsync reads:
+            //  - mineOnly (ADR 0163 D1a): the resident's *own* upcoming events —
+            //    their RSVP'd or authored events (EV-MINE, ADR 0065), via
+            //    ListMineAsync (Start-ascending, live, author-drafts included).
+            //  - otherwise (the floor): the community's upcoming events, page 1
+            //    of the feed — ListUpcomingAsync(null, subjectId, ...). The
+            //    pageSize is generous (a quick-scan, not a feed page): one page
+            //    of 20 covers "next 5 + show more" without a second round trip.
+            IReadOnlyList<Event> visible;
+            if (mineOnly)
+                visible = await Events.ListMineAsync(subjectId).ConfigureAwait(false);
+            else
+                visible = (await Events.ListUpcomingAsync(null, subjectId, page: 1, pageSize: 20).ConfigureAwait(false)).Items;
 
-            var rows = new List<HomeUpcomingRow>(page.Items.Count);
-            foreach (var ev in page.Items)
+            var rows = new List<HomeUpcomingRow>(visible.Count);
+            foreach (var ev in visible)
             {
                 var title = ev.Title;
                 var body = ev.Body;
@@ -620,16 +636,27 @@ public class HomeController : Controller
     /// so the view can render the first <see cref="HomeUpcoming.Columns"/>
     /// and "show more" the rest client-side (the <c>mine-more</c> idiom).
     /// </summary>
-    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingTodoRowsAsync(string subjectId, string? effLang)
+    private async Task<IReadOnlyList<HomeUpcomingRow>> BuildUpcomingTodoRowsAsync(string subjectId, string? effLang, bool mineOnly)
     {
         if (Projects is null)
             return [];
         try
         {
-            // page 1 of the to-do feed (the community's to-dos, newest first —
-            // the seam's own Created-descending order). One page of 20 (the
-            // same generous home quick-scan window as the events column).
-            var page = await Projects.ListTodosAsync(null, null, subjectId, page: 1, pageSize: 20).ConfigureAwait(false);
+            // Two scopes, both the resident's own CanSeeAsync read (the same
+            // ListTodosAsync the /projects/todos feed uses — a filter, never a
+            // gate):
+            //  - mineOnly (ADR 0163 D1a): the to-dos *assigned to the
+            //    resident* (assigneeId = the subject), the "assigned to me"
+            //    idiom (ProjectsController.TodosIndex: effectiveAssigneeId).
+            //  - otherwise (the floor): the community's to-dos (assigneeId
+            //    null). One page of 20 (the same generous quick-scan window as
+            //    the events column).
+            var page = await Projects.ListTodosAsync(
+                    null,
+                    mineOnly ? subjectId : null,
+                    subjectId,
+                    page: 1,
+                    pageSize: 20).ConfigureAwait(false);
 
             var rows = new List<HomeUpcomingRow>(page.Items.Count);
             foreach (var t in page.Items)

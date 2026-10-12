@@ -33,7 +33,9 @@ public class HomeControllerUpcomingTests
 {
     private static (HomeController controller, IUserInfoService userInfo, IEventService events, IProjectService projects) Build(
         bool homeShowUpcoming,
+        bool homeUpcomingMineOnly = false,
         IReadOnlyList<Event> events = default,
+        IReadOnlyList<Event> mineEvents = default,
         IReadOnlyList<TodoItem> todos = default)
     {
         var userInfo = Substitute.For<IUserInfoService>();
@@ -42,12 +44,17 @@ public class HomeControllerUpcomingTests
             {
                 SubjectId = "u08-hsu-01",
                 HomeShowUpcoming = homeShowUpcoming,
+                HomeUpcomingMineOnly = homeUpcomingMineOnly,
             }));
 
         var eventsService = Substitute.For<IEventService>();
         eventsService.ListUpcomingAsync(Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
             Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>())
             .Returns(Task.FromResult(new EventPage(events, HasMore: false)));
+        // EV-MINE (ADR 0065): the resident's own upcoming events — the
+        // mine-scoped read (ADR 0163 D1a).
+        eventsService.ListMineAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(mineEvents));
         eventsService.GetEventTranslationsAsync(Arg.Any<string>())
             .Returns(Task.FromResult<IReadOnlyList<EventTranslation>>([]));
 
@@ -157,6 +164,70 @@ public class HomeControllerUpcomingTests
             Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
             Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<bool>(),
             Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
+    }
+
+    // ── 2b — HomeUpcomingMineOnly = true ⇒ mine-scoped reads ─────────────
+    // The events column comes from ListMineAsync (the resident's own RSVP'd /
+    // authored events — EV-MINE, ADR 0065), NOT ListUpcomingAsync (the
+    // community feed); the to-dos column filters to the resident's
+    // assigneeId (the "assigned to me" idiom). The section still renders from
+    // the mine-scoped rows.
+
+    [Fact(DisplayName = "HomeUpcomingMineOnlyTrue_MineScopedReads")]
+    public async Task HomeUpcomingMineOnlyTrue_MineScopedReads()
+    {
+        var now = DateTimeOffset.UtcNow;
+        const string subjectId = "u08-hsu-01";
+        var communityEvents = new List<Event>
+        {
+            new Event { Id = "ev-comm", Title = "Community cleanup", Start = now.AddHours(2) },
+        };
+        var mineEvents = new List<Event>
+        {
+            new Event { Id = "ev-mine", Title = "My event", Start = now.AddHours(2), Location = "My place" },
+        };
+        var todos = new List<TodoItem>
+        {
+            new TodoItem { Id = "td-mine", Title = "My to-do", DueAt = now.AddDays(1) },
+        };
+
+        var (controller, _, evSvc, prSvc) = Build(
+            homeShowUpcoming: true,
+            homeUpcomingMineOnly: true,
+            events: communityEvents, // should NOT be used
+            mineEvents: mineEvents,   // the mine-scoped read
+            todos: todos);
+
+        var result = await controller.Index();
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<HomeViewModel>(view.ViewData.Model);
+
+        // The events column reflects the MINE row, not the community row.
+        Assert.NotNull(vm.Upcoming);
+        Assert.Single(vm.Upcoming!.Events);
+        Assert.Equal("My event", vm.Upcoming.Events[0].Title);
+        Assert.Equal("/events/ev-mine", vm.Upcoming.Events[0].Href);
+
+        // The mine-scoped events read ran; the community feed read did not.
+        await evSvc.Received(1).ListMineAsync(subjectId, Arg.Any<CancellationToken>());
+        await evSvc.DidNotReceive().ListUpcomingAsync(
+            Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(),
+            Arg.Any<CancellationToken>(), Arg.Any<SortSpec?>(), Arg.Any<int?>());
+
+        // The to-dos read is scoped to the resident's assigneeId (subjectId).
+        // Assert the exact call arguments from the captured call (NSubstitute
+        // refuses to match a concrete value against an Arg.Any over the same
+        // type — ListTodosAsync has four String params — so the captured-args
+        // form is the unambiguous pin). ICall exposes GetMethodInfo() +
+        // GetArguments().
+        var todoCall = prSvc.ReceivedCalls()
+            .FirstOrDefault(c => c.GetMethodInfo().Name == nameof(IProjectService.ListTodosAsync));
+        Assert.NotNull(todoCall);
+        var args = todoCall!.GetArguments();
+        Assert.Null(args[0]);                    // componentId
+        Assert.Equal(subjectId, args[1]);        // assigneeId = the subject
+        Assert.Equal(subjectId, args[2]);        // actorId
+        Assert.Null(args[5]);                    // projectId
     }
 
     // ── 3 — anonymous (no subject) ⇒ Upcoming is null ────────────────────

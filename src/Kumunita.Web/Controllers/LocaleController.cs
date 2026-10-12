@@ -317,6 +317,12 @@ public sealed class LocaleController(
             // false = hide the section, so a fresh account sees the
             // pre-feature home page). No subject → the floor.
             HomeShowUpcoming = profile?.HomeShowUpcoming ?? false,
+
+            // The home "upcoming" scope (ADR 0163 D1a): whether the section
+            // lists the resident's own events + to-dos (true) or the
+            // community-wide lists (false, the floor the section shipped in).
+            // No subject → the floor.
+            HomeUpcomingMineOnly = profile?.HomeUpcomingMineOnly ?? false,
         };
     }
 
@@ -596,14 +602,18 @@ public sealed class LocaleController(
     ///     <see cref="IUserInfoService.SetProfileHomeShowUpcomingAsync"/>
     ///     (<c>"true"</c> = show the "Upcoming" events + to-dos section on
     ///     the home page; absent = hide it — the pre-feature default).</item>
+    ///   <item><c>homeUpcomingMineOnly</c> (ADR 0163 D1a) →
+    ///     <see cref="IUserInfoService.SetProfileHomeUpcomingMineOnlyAsync"/>
+    ///     (<c>"true"</c> = scope the section to the resident's own events +
+    ///     to-dos; absent = the community-wide lists — the floor).</item>
     /// </list>
     /// Each unchecked checkbox simply does not post its value, so
     /// <c>"true"</c> is the only affirmative state (the <c>SavePageSize</c>
-    /// "un-checked is the floor" idiom, no <c>clear=1</c> needed). Both
+    /// "un-checked is the floor" idiom, no <c>clear=1</c> needed). All three
     /// writes run in the same action; a missing profile (a pre-bootstrap
     /// edge) fails closed on the first lane — the lane throws
     /// <c>KeyNotFoundException</c> and we surface the error + redirect
-    /// (the <c>SetProfileTimezoneAsync</c> pin), so neither flag is half-
+    /// (the <c>SetProfileTimezoneAsync</c> pin), so no flag is half-
     /// written. A single <c>settings.home_flash_saved</c> confirmation
     /// covers every toggle combination (the form is one save button). The
     /// change is live on the very next home page visit (data, not config —
@@ -611,7 +621,7 @@ public sealed class LocaleController(
     /// </summary>
     [HttpPost("/settings/home")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveHome(string? hideHomeIntro, string? homeShowUpcoming)
+    public async Task<IActionResult> SaveHome(string? hideHomeIntro, string? homeShowUpcoming, string? homeUpcomingMineOnly)
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
@@ -621,6 +631,7 @@ public sealed class LocaleController(
         {
             await userInfo.SetProfileHideHomeIntroAsync(subject, hideHomeIntro == "true", subject);
             await userInfo.SetProfileHomeShowUpcomingAsync(subject, homeShowUpcoming == "true", subject);
+            await userInfo.SetProfileHomeUpcomingMineOnlyAsync(subject, homeUpcomingMineOnly == "true", subject);
             TempData["info"] = await FlashAsync("settings.home_flash_saved");
         }
         catch (KeyNotFoundException)
@@ -789,6 +800,15 @@ public sealed class LocaleController(
         /// The floor is <c>false</c> (hide the section — a fresh account
         /// sees exactly the pre-feature home page).</summary>
         public bool HomeShowUpcoming { get; init; }
+
+        /// <summary>The home "upcoming" scope (ADR 0163 D1a) — whether the
+        /// Upcoming section lists the resident's own events + to-dos
+        /// (<c>true</c>) or the community-wide lists (<c>false</c>, the floor
+        /// the section shipped in). Mirrors the flat
+        /// <see cref="Kumunita.Core.UserInfo.Profile.HomeUpcomingMineOnly"/>
+        /// flag (a simple on/off, like <see cref="HomeShowUpcoming"/>). The
+        /// floor is <c>false</c> (community-wide).</summary>
+        public bool HomeUpcomingMineOnly { get; init; }
 
         // ── M20 (ADR 0121, D7) — the quiet-hours section (the 5th resident
         // section). Flat fields (the ADR 0019 time-zone section's shape,

@@ -366,6 +366,26 @@ public sealed class Profile
     /// delta-detected, idempotent, no re-seed, no EF migration.
     /// </summary>
     public bool HomeShowUpcoming { get; set; } = false;
+
+    // ADD (the home "upcoming" scope; ADR 0004 §B.1 additive —
+    // the 15th additive Profile field, the HideHomeIntro / PageSize
+    // single-write-lane shape, ADR 0149 / ADR 0019 precedent):
+    /// <summary>
+    /// The resident's **home "upcoming" scope** — whether the home page's
+    /// "Upcoming" section lists the resident's <em>own</em> events
+    /// (RSVP'd or authored — EV-MINE, ADR 0065) and <em>their own</em>
+    /// to-dos (assigned to them), as opposed to the community-wide lists
+    /// (the floor). Only meaningful when <see cref="HomeShowUpcoming"/> is
+    /// on; <c>false</c> (the default) keeps the community-wide lists, the
+    /// shape the section shipped in (ADR 0163 D1a). A pure display
+    /// preference; written only by the owner-scope
+    /// <see cref="IUserInfoService.SetProfileHomeUpcomingMineOnlyAsync"/>
+    /// lane (the same single-write-lane shape as
+    /// <see cref="SetProfileHomeShowUpcomingAsync"/>). An *additive* field
+    /// (ADR 0004 §B.1): delta-detected, idempotent, no re-seed, no EF
+    /// migration.
+    /// </summary>
+    public bool HomeUpcomingMineOnly { get; set; } = false;
 }
 
 /// <summary>

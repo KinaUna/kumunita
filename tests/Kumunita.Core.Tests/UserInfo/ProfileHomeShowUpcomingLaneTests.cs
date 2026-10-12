@@ -87,6 +87,77 @@ public sealed class ProfileHomeShowUpcomingLaneTests(PostgresFixture fixture)
         Assert.Null(await svc.GetProfileAsync("u-hsu-missing"));
     }
 
+    // ── 5 — scope: a fresh profile defaults to the community-wide floor ──
+    [Fact]
+    public async Task FreshProfile_HomeUpcomingMineOnly_Defaults_False()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string subject = "u-huo-default";
+        await SeedProfileAsync(svc, subject);
+
+        var read = await svc.GetProfileAsync(subject);
+        Assert.NotNull(read);
+        Assert.False(read!.HomeUpcomingMineOnly); // the floor: community-wide
+    }
+
+    // ── 6 — set true: the scope flag is live on the very next read ───────
+    [Fact]
+    public async Task SetProfileHomeUpcomingMineOnly_True_LiveOnNextRead()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string subject = "u-huo-true";
+        await SeedProfileAsync(svc, subject);
+        Assert.False((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
+
+        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+
+        var read = await svc.GetProfileAsync(subject);
+        Assert.True(read!.HomeUpcomingMineOnly);
+
+        // The write touched no other field of the profile.
+        Assert.Equal("Resident " + subject, read.DisplayName);
+        Assert.False(read.HomeShowUpcoming); // the sibling flag is untouched
+    }
+
+    // ── 7 — set false over a true value: the clear persists ───────────────
+    [Fact]
+    public async Task SetProfileHomeUpcomingMineOnly_False_ClearsAndPersists()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string subject = "u-huo-clear";
+        await SeedProfileAsync(svc, subject);
+
+        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+        Assert.True((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
+
+        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, false, subject);
+        Assert.False((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
+
+        // Re-settable (the lane is a plain field write, not a tombstone).
+        await svc.SetProfileHomeUpcomingMineOnlyAsync(subject, true, subject);
+        Assert.True((await svc.GetProfileAsync(subject))!.HomeUpcomingMineOnly);
+    }
+
+    // ── 8 — missing profile fails closed (throw, never create) ───────────
+    [Fact]
+    public async Task SetProfileHomeUpcomingMineOnly_MissingProfile_ThrowsKeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.SetProfileHomeUpcomingMineOnlyAsync("u-huo-missing", true, "u-huo-any"));
+
+        // Fail closed = no profile row created.
+        Assert.Null(await svc.GetProfileAsync("u-huo-missing"));
+    }
+
     // ── Shared helpers ────────────────────────────────────────────────────
 
     private static async Task SeedProfileAsync(IUserInfoService svc, string subject)
