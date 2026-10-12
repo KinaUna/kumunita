@@ -330,3 +330,108 @@ order (U00, U01, … U10). Never rewrite a prior section. -->
   file I did **not** touch (pre-existing, M4/M13 related). The 6 new Kiosk
   files + the 2 wire-in edits produced **zero** warnings. Build green
   (27.6 s, 4 projects, 3 pre-existing warnings in `Kumunita.Web.Tests`).
+
+## U04 — Drift pause (the "partials" the register assumes are actually full MVC views)
+
+> **U04 did not ship.** Per **unit-series rule §13** I verified the frozen
+> base before writing code, found a mismatch between what the register /
+> design doc §2.3 / my unit plan assume and what is actually on disk, and am
+> **stopping** rather than improvising. **No code was written, no files
+> created/modified, the plan was NOT `git mv`'d to `done/`, and nothing was
+> committed.** The working tree is clean (only this handoff-note append is
+> new). The decision below is for the lane owner / the next fresh agent with
+> a mandate to amend the register + design doc.
+
+**What U04 is specified to build.** `KioskController` (`GET /kiosk` +
+`GET /kiosk/slide`), `Models/KioskDisplayViewModel.cs`, and
+`Views/Kiosk/Index.cshtml` (chrome-hidden stage) — where each slide
+`@await Html.PartialAsync`s the **same** board / calendar / todos **partial**
+the surface's own view uses, and the controller builds the three slide view
+models via the frozen read seams (M35·6 "reuse, not re-author"; the design
+doc §2.3 shows `object? FirstSlideContent`; Deliverables ≤ 4 files).
+
+**What the frozen base actually is (verified on disk, U04):**
+
+- `src/Kumunita.Web/Views/Projects/BoardDetail.cshtml` is a **full MVC view**,
+  not a partial: `@model BoardDetailViewModel` (line 1),
+  `ViewData["Title"] = …` (line 10), `@section Scripts` (line 828 — a
+  **layout-only** construct that **cannot render standalone**), and
+  `@inject IDocumentStore Store` (line 6) whose body runs an **unscoped**
+  `Store.QuerySession().Query<KanbanBoard>()` (all non-deleted boards — an
+  actor-unscoped read, not the frozen actor-scoped `IProjectService` seam).
+- `src/Kumunita.Web/Views/Projects/TodosIndex.cshtml` is a **full MVC view**:
+  `@model TodoIndexViewModel` (line 1), `ViewData["Title"]` (line 10), and
+  reads four **controller-seeded** bag entries —
+  `ViewData["Audience_Users"]` (line 400), `ViewData["Assign_Users"]` /
+  `ViewData["Audience_Groups"]` / `ViewData["Assign_Communities"]` (lines
+  442–444) — populated only by `ProjectsController.TodosIndex`'s
+  `SeedGrantPickerOptionsAsync()` + community seed (lines 672–683).
+- `src/Kumunita.Web/Views/Event/Calendar.cshtml` is a **full MVC view**:
+  `@model EventCalendarViewModel` (line 1), `ViewData["Title"]` (line 13),
+  `@section Scripts` (line 456), and depends on `events-calendar.js` +
+  `events-calendar-time.js` + `rich-editor.js` (loaded via that `@section`).
+- **Their view models are built by ~200–400 lines of
+  `ProjectsController` / `EventController` private-helper logic** —
+  `BoardDetail` (`ProjectsController.cs:2009–2208`) + `TodosIndex`
+  (`:539–705`): `ResolveDisplayNameAsync`, `ResolveComponentNamesAsync`,
+  `ResolveGroupNamesAsync`, `SeedComponentPickerAsync`, `SeedProjectPickerAsync`,
+  `SeedLanguagePickerAsync`, `SeedGrantPickerOptionsAsync`,
+  `ActorMembershipAsync`, `ApplyTodoTranslationAsync`, `ProjectRow`,
+  `LanguageOptionsFrom`, `FeedPaging.PageSizeAsync`,
+  `SortViewModel.ForRoute`, plus the `ViewData` seeds above; `Calendar`
+  (`EventController.cs:485–…`): its own ~150-line anchor/window +
+  `EventCalendarViewModel` ctor (line 691).
+- **No `@await Html.PartialAsync` of any of these three views exists
+  anywhere in the codebase** (grep-verified); there are no board/calendar/
+  todos "partial" files to `@await` (the only `_`-prefixed partials under
+  `Views/` are `_ProjectsTabs`, `_EventsTabs`, `_GrantPickers`, `_Pager`,
+  `_BoardCard`, etc. — none is a board/calendar/todos *detail* surface).
+
+**Why "U04 as specified" cannot be implemented without violating a frozen pin:**
+
+- **M35·6 (reuse, don't re-author) is broken by construction.** The three
+  surfaces are full views whose models require the controller-private helper
+  fan-out above. There is no `@await`-able partial to reuse. The only ways to
+  render a slide are (a) **rebuild each `*ViewModel` in `KioskController`**
+  (re-authoring the surface + a **second display/decision path**, which also
+  touches the **M35·1 / M35·3 / ADR 0006-D** "single decision path" spine), or
+  (b) **refactor the three surface views into real partials** — which
+  **modifies** the frozen M5/M4 surface files (violates M35·6 / M35·9 and
+  **Deliverables ≤ 4 files** — that path needs ≥ 8 files including the two
+  existing controllers) — or (c) **client-side `fetch` + iframe the existing
+  routes** (`/projects/boards/{id}`, `/events/calendar?view=…`,
+  `/projects/todos`) which **re-renders each surface's full layout + chrome**
+  (contradicts the chrome-hidden single-stage design) and needs a JS change
+  the register forbids (M35·7).
+- **The §2.3 `object? FirstSlideContent` shape is incoherent as written**: a
+  board slide is a `BoardDetailViewModel`, a calendar slide an
+  `EventCalendarViewModel`, a todos slide a `TodoIndexViewModel` — three
+  unrelated types, so the `KioskDisplayViewModel` cannot carry one content
+  member per slide without the same re-authoring.
+
+**Two candidate forward paths (decision needed before any code):**
+
+1. **Kiosk renders each slide by *embedding the live surface route*
+   (iframe/`fetch` of the existing full pages), chrome hidden by CSS only.**
+   Faithful to "the same `Read` decision, re-run on every fetch" (M35·3) and
+   to M35·6 (zero re-authoring) and M35·9 (surfaces untouched), but it
+   re-renders each surface's own `_Layout` (navbar/footer), which conflicts
+   with the single chrome-hidden `#kiosk-stage` model and the `kiosk.ts`
+   innerHTML-swap design. Needs a design-doc + register amendment on the
+   "chrome-hide a full rendered page inside a stage" mechanic.
+2. **Introduce true read-only partials for the three surfaces (a small M5/M4
+   refactor) and have `KioskController` build the three VMs** (delegating to
+   the existing controller actions rather than duplicating the helpers, to
+   avoid a second decision path). This matches the §2.3 mental model best but
+   is **> 4 files, touches frozen surface files (M35·6 / M35·9), and re-opens
+   the ADR 0006-D single-decision-path question** — it is a larger unit than
+   U04 was scoped to and arguably belongs to its own lane.
+
+**What I did NOT do:** no `KioskController` / `KioskDisplayViewModel` /
+`Views/Kiosk/Index.cshtml`; no `KioskSettingsViewModel` (that is U05's, and it
+inherits the same surface assumption); no `site.css` / `_Layout` /
+`kiosk.ts` edits (U07's); no `git mv` of `m35-u04.md`; **no commit**.
+The register (plan-m35-kiosk-mode.md §U04 / §U05 / §2.3), the design doc
+(§2.3 + §2.7 drift-guard), and the handoff note now agree that the frozen
+base is **three full MVC views, not three partials** — that is the fact the
+decision must turn on.
