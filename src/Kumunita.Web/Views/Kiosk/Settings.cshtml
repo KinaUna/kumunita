@@ -1,0 +1,174 @@
+@model Kumunita.Web.Models.KioskSettingsViewModel
+@using Kumunita.Core.Kiosk
+@{
+    ViewData["Title"] = "Kiosk settings";
+
+    // M35 (ADR 0164) — the kiosk playlist is a **fixed** set of slide slots
+    // (the register's example is exactly 5: board, calendar week, board,
+    // calendar today, todos). A fixed-slot editor is the "boring where it can
+    // be" pin (M35·7): no JS, no add/remove buttons, no drag-and-drop lib, no
+    // new npm package. Each slot is an independent row the admin fills in
+    // (a "— / none" kind leaves the slot empty) or clears; the slots' top-to-
+    // bottom order is the cycle order. "Remove a slide" = set its kind to
+    // "—", "reorder" = move the slide to a different slot.
+    //
+    // The view renders **all** of a row's kind-conditional fields (BoardId /
+    // CalendarView / ComponentId) on every row so that changing a row's Kind
+    // in the <select> still submits that row's other fields (a JS-free form:
+    // a <select> change does not re-render the row, so the other fields must
+    // be present in the DOM to round-trip). The controller (SettingsPost)
+    // applies the kind-conditional semantics — it reads only the field for
+    // the row's chosen kind and ignores the rest — so the always-present
+    // fields are harmless. This mirrors the KioskView 5-member ceiling
+    // (M35·2); no Enabled/blank discriminator field is added.
+    const int MaxSlides = 5;
+}
+@*
+  M35 (ADR 0164) — the /admin/kiosk GlobalAdmin settings surface (U05).
+  Two interval pickers (ViewIntervalSeconds >= 5, RefreshIntervalSeconds >= 2
+  and < ViewIntervalSeconds) + a fixed-slot playlist editor (each slot: a Kind
+  select Board/Calendar/Todos + the kind-conditional detail field + an
+  optional Label) + the kiosk.settings.* kw-l keys (U04 co-shipped all four
+  languages — M35·10). The board picker is seeded from the FROZEN M5
+  IProjectService.ListBoardsAsync seam (M35·3 / M35·9 — reused, not re-shape)
+  in the SettingsGet action. The form POSTs to /admin/kiosk; the controller
+  parses the Views[i].* indexed form fields + the two interval floors, then
+  calls IKioskService.SavePlaylistAsync (the one kiosk.save audit row, M35·5).
+  No new AccessAction / AccessVia / Decide() branch (M35·1 / M35·3). No new JS.
+*@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1>
+    <kw-l key="kiosk.settings.title">Kiosk display</kw-l>
+</h1>
+<p class="text-muted">
+    Configure the shared wall display: the ordered list of views it cycles
+    through (top to bottom), and the two auto-cycle / auto-refresh cadences.
+    To add a slide, pick a view in an empty slot. To remove one, set its view
+    to <em>&mdash;</em> and save. To reorder, move a slide to a different slot.
+    Then open <a href="/kiosk" target="_blank" rel="noopener">/kiosk</a> on the
+    TV (signed in) to see it run.
+</p>
+
+<form method="post" action="/admin/kiosk">
+    @Html.AntiForgeryToken()
+
+    @* ── The two interval pickers (M35·4 — display-only, never an access input) ── *@
+    <h2 class="h5">Intervals</h2>
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-4">
+            <label for="ViewIntervalSeconds" class="form-label">
+                <kw-l key="kiosk.settings.view_interval">Change view every (seconds)</kw-l>
+            </label>
+            <input type="number" min="5" step="1" class="form-control"
+                   id="ViewIntervalSeconds" name="ViewIntervalSeconds"
+                   value="@Model.ViewIntervalSeconds" />
+            <div class="form-text">The slide-advance cadence (seconds, &ge; 5). Default 30.</div>
+        </div>
+        <div class="col-sm-6 col-md-4">
+            <label for="RefreshIntervalSeconds" class="form-label">
+                <kw-l key="kiosk.settings.refresh_interval">Refresh content every (seconds)</kw-l>
+            </label>
+            <input type="number" min="2" step="1" class="form-control"
+                   id="RefreshIntervalSeconds" name="RefreshIntervalSeconds"
+                   value="@Model.RefreshIntervalSeconds" />
+            <div class="form-text">The content-refresh cadence (seconds, &ge; 2, and less than the view interval). Default 10.</div>
+        </div>
+    </div>
+
+    @* ── The playlist editor (a fixed set of MaxSlides slots, top to bottom) ── *@
+    <h2 class="h5">Playlist (top to bottom)</h2>
+    @* A slot is "configured" when its index is within Model.Views.Count (the
+       stored slides, in order). Each row renders all three kind-conditional
+       fields (named Views[<i>].BoardId / .CalendarView / .ComponentId) so a
+       JS-free form round-trips them when the kind changes; the controller
+       applies the kind-conditional semantics (M35·2). The board picker is the
+       only seeded picker (M35·3 / M35·9); the Todos community filter is a
+       free-text component id (blank = all todos); the Label is optional. *@
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col" class="w-1">#</th>
+                    <th scope="col">View</th>
+                    <th scope="col">Board</th>
+                    <th scope="col">Calendar</th>
+                    <th scope="col">Community</th>
+                    <th scope="col">Label (optional)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < MaxSlides; i++)
+                {
+                    var v = i < Model.Views.Count ? Model.Views[i] : null;
+                    var kind = v?.Kind ?? KioskViewKind.Board;
+                    <tr>
+                        <th scope="row" class="text-muted">@((i + 1))</th>
+
+                        @* Kind (the slot's identity — the controller skips a
+                           slot whose kind is blank / "—"). *@
+                        <td>
+                            <select class="form-select" name="Views[@i].Kind"
+                                    data-kiosk-kind="@(i)" aria-label="Slide @((i + 1)) view">
+                                <option value="" selected="@(v is null ? "selected" : null)" disabled>
+                                    &mdash; (none)
+                                </option>
+                                <option value="Board" selected="@(kind == KioskViewKind.Board && v is not null ? "selected" : null)">Board</option>
+                                <option value="Calendar" selected="@(kind == KioskViewKind.Calendar ? "selected" : null)">Calendar</option>
+                                <option value="Todos" selected="@(kind == KioskViewKind.Todos ? "selected" : null)">To-dos</option>
+                            </select>
+                        </td>
+
+                        @* Board id (Board rows; blank = no board chosen). *@
+                        <td>
+                            <select class="form-select" name="Views[@i].BoardId"
+                                    data-kiosk-board="@(i)" aria-label="Slide @((i + 1)) board">
+                                <option value="" selected="@(v is null or { BoardId: null } ? "selected" : null)">&mdash;</option>
+                                @foreach (var (id, title) in Model.Boards)
+                                {
+                                    <option value="@id" selected="@(id == v?.BoardId ? "selected" : null)">@title</option>
+                                }
+                            </select>
+                        </td>
+
+                        @* Calendar view (Calendar rows; default week). *@
+                        <td>
+                            <select class="form-select" name="Views[@i].CalendarView"
+                                    data-kiosk-cal="@(i)" aria-label="Slide @((i + 1)) calendar view">
+                                <option value="day" selected="@(v is { CalendarView: "day" } ? "selected" : null)">Day</option>
+                                <option value="week" selected="@(v is null or { CalendarView: "week" or null } ? "selected" : null)">Week</option>
+                                <option value="month" selected="@(v is { CalendarView: "month" } ? "selected" : null)">Month</option>
+                            </select>
+                        </td>
+
+                        @* Community filter (Todos rows; blank = all todos). *@
+                        <td>
+                            <input type="text" class="form-control" name="Views[@i].ComponentId"
+                                   value="@(v?.ComponentId ?? "")"
+                                   placeholder="(blank = all)"
+                                   data-kiosk-comp="@(i)" aria-label="Slide @((i + 1)) community" />
+                        </td>
+
+                        @* The optional per-slide label. *@
+                        <td>
+                            <input type="text" class="form-control" name="Views[@i].Label"
+                                   value="@(v?.Label ?? "")"
+                                   data-kiosk-label="@(i)" aria-label="Slide @((i + 1)) label" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-muted small">
+        Tip: only the <em>View</em> column decides which of the other columns a
+        slide uses — the rest are ignored for that slide. A row set to
+        <em>&mdash;</em> is left out of the cycle.
+    </p>
+
+    <div class="mt-3">
+        <button type="submit" class="btn btn-primary">Save playlist</button>
+        <a class="btn btn-link ms-2" href="/kiosk" target="_blank" rel="noopener">Preview the kiosk</a>
+    </div>
+</form>

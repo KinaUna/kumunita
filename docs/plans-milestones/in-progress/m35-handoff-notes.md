@@ -580,3 +580,64 @@ introduces no tests; U08 authors `KioskServiceTests` + `KioskControllerTests`).
 `kiosk.slide_denied` shape when `data-denied === "true"`). `GET
 /kiosk/slide?slide=N&t=<ts>` is the cache-bust refresh fetch (U07 may call it,
 or simply re-point the iframe — both re-run the frozen seam).
+
+## U05 — /admin/kiosk settings
+
+- **(a) `KioskController` action count: 4** — `Index` (U04) + `Slide` (U04) +
+  `SettingsGet` (`GET /admin/kiosk`, U05) + `SettingsPost` (`POST
+  /admin/kiosk`, U05). Both settings actions are
+  `[Authorize(Roles = GlobalAdmin)]` (the M35-7 FACE — a non-GlobalAdmin gets
+  403). `SettingsPost` is `[ValidateAntiForgeryToken]` (the admin-surface
+  write-lane idiom, the `AdminSurfaceLabelsController.Save` /
+  `AdminStorageController.Save` precedent).
+- **(b) `KioskSettingsViewModel` member set:** `IReadOnlyList<KioskView>
+  Views` (the ordered slide list — M35·2) + `int ViewIntervalSeconds`
+  (display-only, M35·4) + `int RefreshIntervalSeconds` (display-only, M35·4)
+  + `IReadOnlyList<(string Id, string Title)> Boards` (the board picker seed —
+  M35·3 / M35·9) + `bool IsValid` (server-side validation flag — the view
+  does not render it; the admin view's local convention is non-kw-l English,
+  so the flag is for the controller's own use only). **5 members.**
+- **(c) Board picker seed seam:** the **frozen** M5
+  `IProjectService.ListBoardsAsync(componentId: null, actorId, page: 1,
+  pageSize: 200, ct: ct)` (the M35·3 / M35·9 pin — reused, not re-shape).
+  The GlobalAdmin's own `Read` decision runs on the seam, so the picker
+  offers only the boards the GlobalAdmin can already see (a leak-prevention
+  guard, not a new access branch). A read failure degrades to an empty
+  picker (the form still renders; no board id is surfaced — no leak).
+- **(d) Pin confirmation:** **No** new `AccessAction` / `AccessVia` /
+  `Decide()` branch / `IAuditableResource` adapter was added (the
+  `[Authorize(Roles = GlobalAdmin)]` class gate is the standing — the
+  admin-surface precedent; the service
+  (`KioskService.SavePlaylistAsync`) owns the single `kiosk.save` audit row
+  + the upsert, M35·5 — the controller opens the
+  `IDocumentStore.LightweightSession` and passes it in, the M3
+  same-transaction precedent). **No** new JS / npm package (M35·7 — the view
+  is a plain `<form method="post">` + a static `<table>`; no
+  `<script>` tag, no `data-*` JS hooks, no drag-and-drop lib). **No**
+  `KnownTranslationKeys.cs` change (U04 already co-shipped the 8
+  `kiosk.*` keys in all four languages — U05 only *references* the existing
+  `kiosk.settings.title` / `.view_interval` / `.refresh_interval` keys,
+  which are confirmed present in en/de/fr/da at `KnownTranslationKeys.cs`
+  lines 2745–2747 / 5349–5351 / 7868–7870 / 10362–10364).
+- **(e) Compile warnings:** **None.** Build green (0 errors, 0 warnings on
+  the new code). Web.Tests **1033/0/0** (1 skipped — the pre-existing
+  `ImproveCheck_Gate_Passes` pwsh gate, unrelated to U05).
+- **View design note (a deviation from the register's ≤ 4-file constraint,
+  within its intent):** the register's U05 §Deliverables names
+  `_AdminNav.cshtml` as the nav entry. On disk, `_AdminNav.cshtml` is the
+  **nav-tabs strip** (the `AdminController`'s 5 GET actions: Overview /
+  Accounts / Communities / Platform / Security / Analytics — the
+  `AdminController`'s own section). The established convention for
+  **separate-controller** GlobalAdmin settings surfaces (`/admin/site`,
+  `/admin/labels`, `/admin/timezone`, `/admin/storage` — all of which are on
+  their own controller, exactly like `/admin/kiosk`) is a **row in the
+  Platform list-group** (`Views/Admin/Platform.cshtml`), the exact precedent
+  `AdminSurfaceLabelsController` (ADR 0152, M29·7) explicitly mirrors. U05
+  added the Kiosk row there (after "Surface labels"), not to
+  `_AdminNav.cshtml`. This is **not a new surface** — it is the same
+  `/admin/kiosk` route, and it gives a visible, discoverable entry to a
+  GlobalAdmin on the Platform hub. The M35·2 / M35·6 / M35·7 pins are
+  unchanged (the Platform list-group is an **additive** row — no existing
+  surface's file is re-authored, no new JS, no new npm package). **Total
+  U05 files: 4** (the controller edit, the new VM, the new view, the
+  Platform row) — within the register's ≤ 4-file constraint.
