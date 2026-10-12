@@ -641,3 +641,34 @@ or simply re-point the iframe — both re-run the frozen seam).
   surface's file is re-authored, no new JS, no new npm package). **Total
   U05 files: 4** (the controller edit, the new VM, the new view, the
   Platform row) — within the register's ≤ 4-file constraint.
+
+## U06 — kiosk.* kw-l key set (verification)
+
+> **U06 is a verification unit — it authored nothing** (the set was co-shipped
+> by U04, per the U04-resume drift note: the parity tests make the set
+> inseparably four-language, so there was no valid en-only intermediate state).
+
+- **(a) Key count: 8** — `kiosk.title` / `kiosk.empty` / `kiosk.slide_denied`
+  / `kiosk.next_slide` / `kiosk.refreshed` / `kiosk.settings.title` /
+  `kiosk.settings.view_interval` / `kiosk.settings.refresh_interval` — the
+  closed `kiosk.*` set, matching design doc §2.4 + the register §U06.
+- **(b) Four-language present + non-empty: CONFIRMED.** All 8 keys are present
+  and non-empty in **all four** dicts: `en` (`KnownTranslationKeys.cs`
+  ~2740), `de` (~5344), `fr` (~7863), `da` (~10357). `en` values are the
+  source text (ADR 0015 D1); `de`/`fr`/`da` are U04's authored translations
+  (the `du`/`tu`/`dig` familiar registers, sentence case — consistent with the
+  ADR 0042 idiom blocks adjacent to each block).
+- **(c) board / calendar / todos `kw-l` key sets: UNTOUCHED (M35·6 additive-only).**
+  The U04 commit (`b967bc58`) `KnownTranslationKeys.cs` diff is
+  `kiosk.*`-only: the only non-`kiosk` added lines are section-header comments
+  + blank lines (the M35·10 closed-set comment + a `fr` surface banner); **no**
+  M5 board / M4 calendar / todos key line was added, removed, or re-authored.
+- **(d) Two closure tests GREEN:**
+  - `KwLRegistryConsistencyTests` (Web.Tests) — **1/1** passed, 0 failed
+    (the `kiosk.*` keys referenced in `Views/Kiosk/*` are registered).
+  - `KnownTranslationKeys_ParityTests` (Core.Tests, namespace
+    `Kumunita.Core.Tests`) — **7/7** passed, 0 failed (en/de/fr/da
+    key-for-key set-equality holds).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (0 warnings,
+  0 errors). **No `KnownTranslationKeys.cs` change** (no key missing/empty —
+  no drift pause). **Total U06 code files touched: 0** (verification only).
