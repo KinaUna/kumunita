@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 using NSubstitute;
@@ -347,5 +348,75 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         var ct = TestContext.Current.CancellationToken;
         await using var q = store.QuerySession();
         return await q.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    /// <summary>A <see cref="ITranslationProvider"/> stand-in that returns the
+    /// key as a floor for any key it does not specifically resolve.</summary>
+    private static ITranslationProvider RecordingTranslator()
+    {
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci => Task.FromResult((string)ci[0]));
+        return translator;
+    }
+
+    /// <summary>Reads a planted <see cref="Profile"/> from the live store by
+    /// subject id (the <see cref="IUserInfoService.GetProfileAsync"/> read
+    /// lane the <see cref="NotificationService"/> resolves per recipient).</summary>
+    private static async Task<Profile?> LoadProfileAsync(IDocumentStore store, string subjectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Profile>(subjectId, ct);
+    }
+
+    // ── Link-path pin ─────────────────────────────────────────────────────────
+    //
+    // The event-reminder inbox row (the M6 F4 durable record) must carry the
+    // event detail page as its LinkPath so the inbox renders a clickable
+    // link to the event — not just the event's title. The email is M4's;
+    // this pin covers the inbox-side complement.
+
+    [Fact]
+    public async Task M4_ReminderInboxRowLinksToEvent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var conn = await fixture.NewDatabaseAsync(ct);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            M1DocTypes.Configure(opts);
+            M3DocTypes.Configure(opts);
+            M4DocTypes.Configure(opts);
+            M6DocTypes.Configure(opts);   // the Notification table
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        var now = DateTimeOffset.UtcNow;
+        const string recipient = "u-reminder-link";
+        const string eventId   = "ev-link";
+
+        await PlantProfile(store, recipient, "link@kumunita");
+        await PlantEvent(store, eventId, recipient, now.AddHours(23)); // in-window
+
+        var (mailer, _) = RecordingMailer();
+        var translator   = RecordingTranslator();
+        var userInfo     = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci => LoadProfileAsync(store, (string)ci[0]));
+        var svc = new NotificationService(store, userInfo, translator, mailer);
+
+        await EventReminderService.SendRemindersAsync(
+            store, new EventReminderOptions(), now, mailer, Localization(),
+            notifications: svc, ct: ct);
+
+        await using var q = store.QuerySession();
+        var row = (await q.Query<Notification>().ToListAsync(ct)).Single();
+        Assert.Equal(recipient, row.RecipientId);
+        Assert.Equal(NotificationKinds.EventReminder, row.Kind);
+        Assert.Equal($"/events/{eventId}", row.LinkPath);
     }
 }
