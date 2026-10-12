@@ -812,6 +812,30 @@ records `## U<m> — Drift pause` in the handoff note.
 
 ### U04 — Web: the `KioskController` + `KioskDisplayViewModel` + `Views/Kiosk/Index.cshtml` chrome-hidden display
 
+> **U04-resume (2026-10-12) — Path 1 supersedes the partial-rendering below.**
+> The U04 drift pause verified that the three slide surfaces are **full MVC
+> views**, not partials (`BoardDetail.cshtml` / `TodosIndex.cshtml` /
+> `Event/Calendar.cshtml`) — there are **no** board/calendar/todos partials to
+> `@await`. The lane owner chose **Path 1: iframe the live surface routes**.
+> Each slide therefore resolves to the surface's **own route**
+> (`/projects/boards/{id}` / `/events/calendar?view=…` / `/projects/todos`)
+> and is rendered as an `<iframe>` inside the chrome-hidden stage
+> (`frame-ancestors 'self'`, `Program.cs:721`). The §2.3
+> `object? FirstSlideContent` shape is **superseded** by
+> `IReadOnlyList<KioskSlideViewModel> Slides` (each slide carrying `Href` +
+> `Denied` + `Label`). The M35·6 "reuse, not re-author" pin is honored
+> **more strongly** (the kiosk adds no slide view at all) and M35·9 (surfaces
+> untouched) **holds** (no M5/M4 file edited) — so the "≤ 4 files" + "no
+> surface-file edits" constraints are **preserved, not waived**. The
+> `@await Html.PartialAsync` language in this unit and in §2.3 is superseded
+> accordingly. The `SettingsGet` / `SettingsPost` + `KioskSettingsViewModel`
+> (this §U04's settings rows / §U05) are **unaffected**. **Also superseded:**
+> the `kiosk.*` kw-l set was U06's (see §U06's note) — the Core.Tests
+> four-language parity tests + the Web.Tests view-scan test make the set
+> **inseparably four-language**, so **U04 co-shipped the 8 keys in en/de/fr/da**
+> and **U06 is re-scoped to a verification unit**. **Shipped: build green +
+> Web.Tests 1033/0/0 + Core.Tests 1459/0/0.**
+
 - **Goal:** implement the `/kiosk` signed-in display — the
   `KioskController` (`GET /kiosk` + `GET /kiosk/slide`), the
   `KioskDisplayViewModel`, and the `Views/Kiosk/Index.cshtml` chrome-hidden
@@ -958,6 +982,26 @@ records `## U<m> — Drift pause` in the handoff note.
   compile warnings.
 
 ### U06 — The closed `kiosk.*` `kw-l` key set × en/de/fr/da
+
+> **U04-resume (2026-10-12) — re-scoped to a verification unit.** U04
+> **co-shipped** the closed 8-key `kiosk.*` set in **all four** languages
+> (en/de/fr/da) in `KnownTranslationKeys.cs` (en: `kiosk.title` /
+> `kiosk.empty` / `kiosk.slide_denied` / `kiosk.next_slide` /
+> `kiosk.refreshed` / `kiosk.settings.title` / `kiosk.settings.view_interval`
+> / `kiosk.settings.refresh_interval`), because the **Core.Tests parity tests**
+> (`De/Fr/DaValues_Keys_Match_AllKeys_Exactly_NoEmptyValues` in
+> `KnownTranslationKeys_ParityTests`) enforce **key-for-key set equality**
+> between en/de/fr/da, and the **Web.Tests view-scan test**
+> (`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered`)
+> requires every static `kw-l` key in a view to be in `EnValues` — so there
+> is **no valid en-only intermediate state** (the register's assumption that
+> "de/fr/da are U06's to author" / "en-only floor until U06" is **superseded**:
+> the set is inseparably four-language). **U06's goal is now:** *verify* the
+> 8 keys are present, non-empty, and in all four dicts; confirm the board /
+> calendar / todos `kw-l` key sets are **untouched** (M35·6 additive-only);
+> confirm `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`
+> are green; then exit. **No new keys are authored** (U04 did that). The
+> original authoring text below is retained for the record.
 
 - **Goal:** author the closed `kiosk.*` `kw-l` key set (~8 keys) in **all
   four** languages (en/de/fr/da) in the `KnownTranslationKeys` registry —

@@ -435,3 +435,148 @@ The register (plan-m35-kiosk-mode.md §U04 / §U05 / §2.3), the design doc
 (§2.3 + §2.7 drift-guard), and the handoff note now agree that the frozen
 base is **three full MVC views, not three partials** — that is the fact the
 decision must turn on.
+
+## U04 — /kiosk display (resumed)
+
+> **U04-resume resolved the pause and shipped.** The lane owner (reachable)
+> was asked the Path 1 vs. Path 2 decision and chose **Path 1 — iframe the
+> live surface routes**. U04 then implemented the `/kiosk` display per Path 1
+> and exited with **build green**. **No M5/M4 surface file was touched**
+> (M35·6 / M35·9 held); **no** new `AccessAction` / `AccessVia` / `Decide()`
+> branch / `IAuditableResource` adapter was added (M35·1 / M35·3 held); **no**
+> new npm package / build step (M35·7 held); Core stays HTTP-free /
+> Wolverine-free (M35·8 — the `KioskController` is a Web-layer class, the
+> `KioskService` seam is untouched).
+
+**Decision — Path 1 (iframe the live surface routes), rationale:**
+
+- The frozen base is **three full MVC views** (`BoardDetail.cshtml` /
+  `TodosIndex.cshtml` / `Event/Calendar.cshtml`), not partials — the U04
+  drift pause. `@await`-ing them is impossible (`@section Scripts` is
+  layout-only; `@inject` / `ViewData` bags are controller-seeded; the VMs
+  need ~200–400 lines of controller helper fan-out). Path 2 (extract partials
+  + KioskController builds the VMs) would **touch the frozen M5/M4 surface
+  files** (violates M35·6 / M35·9 + the ≤ 4-file constraint) and re-open the
+  ADR 0006-D single-decision-path question — the drift note's own verdict is
+  that it "arguably belongs to its own lane." **Path 1 honors M35·3 most
+  strongly** (the iframe's navigation **re-runs the surface's own `Read`
+  decision** — the frozen board / calendar / todos read seam — on every load,
+  the M12 iCal precedent), **honors M35·6 more strongly** (the kiosk adds no
+  slide view at all — it frames the surface's own view), **holds M35·9** (no
+  M5/M4 file edited), and **stays ≤ 4 files**.
+- Verified enabling facts on disk: the app's own CSP sets
+  `frame-ancestors 'self'` (`src/Kumunita.Web/Program.cs:721`) — same-origin
+  iframing is explicitly permitted; `script-src 'self'` (no inline
+  `<script>` — U04 uses none; U07's `kiosk.ts` must be a module file);
+  `style-src 'self' 'unsafe-inline'` (the view's inline `<style>` chrome-hide
+  is permitted).
+- **How the M35·6 / M35·3 pins are still held:** the kiosk renders **no**
+  board / calendar / todos view of its own (it iframes the surface's own
+  route, so `@section Scripts` / `@inject` / `ViewData` all work and the
+  surface's own `Read` decision re-runs on the iframe's navigation); the
+  board / calendar / todos Razor views + their `kw-l` key sets are
+  **untouched** (M35·6 additive-only). The §2.3 `object? FirstSlideContent`
+  shape is **superseded** (recorded in the design doc §2.3 drift note + the
+  register §U04) because the three unrelated surface VMs cannot share one
+  content member — replaced by `IReadOnlyList<KioskSlideViewModel> Slides`
+  (each slide carrying `Href` + `Denied` + `Label`).
+
+**Secondary drift (mine, discovered in this unit) — the `kiosk.*` kw-l set
+is inseparably four-language:** the register / design doc §2.4 assigned the
+`kiosk.*` key set to **U06** ("en values are the source text; de/fr/da are
+U06's to author"), and U04's brief assumed the keys "exist as en-only floor
+until U06." On disk the **`kiosk.*` keys are absent from the registry** (not
+an en-only floor — the `kw-l` TagHelper would render the raw key), **and**
+the Core.Tests parity tests
+(`DeValues_Keys_Match_AllKeys_Exactly_NoEmptyValues`, Fr, Da in
+`KnownTranslationKeys_ParityTests`) enforce **key-for-key set equality**
+between en/de/fr/da — so there is **no valid en-only intermediate state**: the
+moment a `kiosk.*` key is added to `EnValues`, all three go red until de/fr/da
+match. Combined with the Web.Tests view-scan test
+(`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered`, which
+requires every static `kw-l key="…"` in a view to be in `EnValues`), U04's
+view **cannot** reference `kiosk.*` keys unless all four languages are
+present. **Resolution:** U04 co-ships the closed 8-key `kiosk.*` set in all
+four languages (en/de/fr/da), **absorbing U06's deliverable**; **U06 is
+re-scoped to a verification unit** (confirm the set is present + non-empty in
+all four + the board/calendar/todos sets are untouched, then exit). The
+register §U06 + design doc §2.4 are amended to record this supersession.
+
+**Deliverables (U04's, 4 code files + 1 registry + 1 design-doc amendment):**
+
+- **`KioskController`** (`src/Kumunita.Web/Controllers/KioskController.cs`) —
+  **2 actions** (`Index` + `Slide`). `Index` = `GET /kiosk` `[Authorize]`
+  (reads the playlist via `IKioskService.GetPlaylistAsync`, classifies each
+  slide via the frozen read seam for the signed-in viewer, renders
+  `Views/Kiosk/Index.cshtml`; a null/empty playlist → the `kiosk.empty`
+  message, M35-8 FACE). `Slide` = `GET /kiosk/slide?slide=N&t=<ts>`
+  `[Authorize]` (the single-slide refresh fetch — CSRF-free GET, the M12 iCal
+  precedent; returns a JSON `KioskSlideRefreshViewModel`). The classification
+  **catches the frozen seams' deny signals** (`GetBoardAsync`'s
+  `KeyNotFoundException` / `UnauthorizedAccessException`;
+  `ListTodosAsync` / `ListInRangeAsync`'s `UnauthorizedAccessException`) and
+  renders the `kiosk.slide_denied` shape (M35-5 FACE: no content leak, no
+  404). **No** new `AccessAction` / `AccessVia` / `Decide()` branch (M35·1 /
+  M35·3); the per-view decision is the frozen seam's, re-run by the surface's
+  own controller on the iframe's navigation.
+- **`KioskDisplayViewModel`** (`src/Kumunita.Web/Models/KioskDisplayViewModel.cs`)
+  — `IReadOnlyList<KioskSlideViewModel> Slides` + `int ViewIntervalSeconds`
+  (=30) + `int RefreshIntervalSeconds` (=10) + `bool HasSlides` +
+  `KioskSlideViewModel? FirstSlide`. The **`KioskSlideViewModel`** record
+  (per slide): `int Index` + `KioskViewKind Kind` + `string? Label` +
+  `string? Href` (the surface's own route) + `bool Denied` (the
+  `kiosk.slide_denied` shape). The **`KioskSlideRefreshViewModel`** (the
+  `/kiosk/slide` JSON): `int Index` + `bool Denied` + `string? Href` +
+  `string? DeniedKey`. These match U03's Core types exactly (`KioskPlaylist`
+  4 members, `KioskView` 5 members, `KioskViewKind` 3 — `Board`/`Calendar`/
+  `Todos`, via `IKioskService.GetPlaylistAsync` → `KioskPlaylist?`).
+- **`Views/Kiosk/Index.cshtml`** — the chrome-hidden display. The
+  `#kiosk-stage` element carries the **`data-*` attributes U07's
+  `client/lib/kiosk.ts` reads**: `data-view-interval`,
+  `data-refresh-interval`, `data-slide-count`; plus one hidden
+  `.kmb-kiosk-slide-meta` div per slide with `data-index` / `data-href` /
+  `data-denied` / `data-label` (simple values — no JSON-in-attribute, so
+  Razor's attribute encoding is a no-op for URLs/labels — sidestepping the
+  Razor attribute-value trap in `AGENTS.md`). The first slide renders an
+  `<iframe src="…">` (the surface's own route) or the `kiosk.slide_denied`
+  shape. The chrome-hide (navbar / footer / flash / pinned-announcement) is
+  applied via the view's inline `<style>` reusing the ADR 0104
+  `body.kmb-page-expanded` selector set (the M35·6 chrome-hide idiom **reused,
+  not re-authored** — no `_Layout.cshtml` touch, so the ≤ 4-file footprint
+  holds). A `kmb-kiosk-exit` link (→ `/`) is the ADR 0104 `.page-expand-close`
+  exit affordance. **No inline `<script>`** (CSP `script-src 'self'`), **no**
+  new JS / npm package (M35·7 — `kiosk.ts` + `site.css` are U07's).
+- **`KnownTranslationKeys.cs`** — the **8 `kiosk.*` keys added to all four
+  dicts** (en/de/fr/da): `kiosk.title` / `kiosk.empty` /
+  `kiosk.slide_denied` / `kiosk.next_slide` / `kiosk.refreshed` /
+  `kiosk.settings.title` / `kiosk.settings.view_interval` /
+  `kiosk.settings.refresh_interval`. The board / calendar / todos `kw-l` key
+  sets are **untouched** (M35·6 additive-only). (U06's deliverable, absorbed
+  per the secondary drift above.)
+- **`m35-kiosk-mode-design.md` §2.3** — the **Path-1 supersession note**
+  appended (the `object? FirstSlideContent` → `Slides` / `Href` / `Denied`
+  change, the `/kiosk/slide` JSON refresh, the inline-`<style>` chrome-hide,
+  the deny-signal catch, the `kiosk.ts` iframe-advance model). The
+  `SettingsGet` / `SettingsPost` + `KioskSettingsViewModel` rows (U05) are
+  **unaffected**.
+
+**Exit:** `dotnet build Kumunita.slnx -c Debug` **green** (0 errors, 0
+warnings on the new code — the 3 build warnings are the pre-existing
+`HomeControllerUpcomingTests.cs` CS8625 ones noted in U03, in a file I did not
+touch). `KwLRegistryConsistencyTests` (Web.Tests) **green** (1/1 — the
+`kiosk.*` keys in the view are registered). `KnownTranslationKeys_ParityTests`
+(Core.Tests) **green** (7/7 — en/de/fr/da set-equality holds). **Full
+Web.Tests green** (1033 total, 0 errors, 0 failed, 1 skipped — the
+`ImproveCheck_Gate_Passes` pwsh test, unrelated). **No test name outside
+§pinned-test-names was introduced** (the 12 U08 pins are untouched — U04
+introduces no tests; U08 authors `KioskServiceTests` + `KioskControllerTests`).
+**U07's `kiosk.ts` contract (the `#kiosk-stage` data-* names it reads):**
+`data-view-interval` / `data-refresh-interval` / `data-slide-count` on
+`#kiosk-stage`, and per-slide `data-index` / `data-href` / `data-denied` /
+`data-label` on `.kmb-kiosk-slide-meta`. The two `setInterval`s U07 drives:
+(1) advance the visible slide every `data-view-interval` (wrap to first),
+(2) re-point the iframe every `data-refresh-interval` (re-read the next
+`.kmb-kiosk-slide-meta`, set the iframe `src`, or swap the
+`kiosk.slide_denied` shape when `data-denied === "true"`). `GET
+/kiosk/slide?slide=N&t=<ts>` is the cache-bust refresh fetch (U07 may call it,
+or simply re-point the iframe — both re-run the frozen seam).

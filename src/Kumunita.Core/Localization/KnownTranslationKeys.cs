@@ -2731,6 +2731,20 @@ public static class KnownTranslationKeys
             ["admin.help.reset_all"]   =
                 "Reset ALL {0} seeded help pages to their seeded text? This overwrites any hand-edited " +
                 "copy on every page.",
+
+            // ── M35 (ADR 0164) — the kiosk-mode display surface: the /kiosk
+            // chrome-hidden stage (U04) + the /admin/kiosk settings surface (U05).
+            // The 8-key closed set (M35·10); U04 co-ships it because the
+            // Core.Tests parity tests (De/Fr/Da Values_Keys_Match_AllKeys_Exactly)
+            // enforce set-equality, so the set is inseparably four-language.
+            ["kiosk.title"]                  = "Neighbourhood board",
+            ["kiosk.empty"]                  = "The kiosk has no slides configured yet.",
+            ["kiosk.slide_denied"]           = "You don't have access to this view.",
+            ["kiosk.next_slide"]             = "Next view",
+            ["kiosk.refreshed"]              = "Updated just now",
+            ["kiosk.settings.title"]         = "Kiosk display",
+            ["kiosk.settings.view_interval"] = "Change view every (seconds)",
+            ["kiosk.settings.refresh_interval"] = "Refresh content every (seconds)",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -5324,6 +5338,17 @@ public static class KnownTranslationKeys
             ["storage.trend.empty"]     =
                 "Noch kein Speichertrend — die tägliche Erfassung hat für dieses Fenster " +
                 "noch keine Aufnahmen gespeichert.",
+
+            // ── M35 (ADR 0164) — die Kiosk-Anzeige-Oberfläche (U04) + die
+            // /admin/kiosk-Einstellungen (U05). Der 8-Schlüssel-Satz (M35·10).
+            ["kiosk.title"]                  = "Gemeinschaftstafel",
+            ["kiosk.empty"]                  = "Es sind noch keine Kiosk-Ansichten konfiguriert.",
+            ["kiosk.slide_denied"]           = "Du hast keinen Zugriff auf diese Ansicht.",
+            ["kiosk.next_slide"]             = "Nächste Ansicht",
+            ["kiosk.refreshed"]              = "Gerade aktualisiert",
+            ["kiosk.settings.title"]         = "Kiosk-Anzeige",
+            ["kiosk.settings.view_interval"] = "Ansicht wechseln alle (Sekunden)",
+            ["kiosk.settings.refresh_interval"] = "Inhalt aktualisieren alle (Sekunden)",
         };
 
     /// <summary>
@@ -7832,6 +7857,17 @@ public static class KnownTranslationKeys
             ["storage.trend.empty"]     =
                 "Pas encore de tendance de stockage — la capture quotidienne n'a pas " +
                 "enregistré d'échantillons pour cette fenêtre.",
+
+            // ── M35 (ADR 0164) — la surface d'affichage du kiosque (U04) +
+            // les réglages /admin/kiosk (U05). Le jeu de 8 clés (M35·10).
+            ["kiosk.title"]                  = "Tableau du quartier",
+            ["kiosk.empty"]                  = "Aucune vue du kiosque n'est encore configurée.",
+            ["kiosk.slide_denied"]           = "Tu n'as pas accès à cette vue.",
+            ["kiosk.next_slide"]             = "Vue suivante",
+            ["kiosk.refreshed"]              = "Mis à jour à l'instant",
+            ["kiosk.settings.title"]         = "Affichage du kiosque",
+            ["kiosk.settings.view_interval"] = "Changer de vue toutes les (secondes)",
+            ["kiosk.settings.refresh_interval"] = "Actualiser le contenu toutes les (secondes)",
         };
 
     /// <summary>
@@ -10315,6 +10351,17 @@ public static class KnownTranslationKeys
             ["storage.trend.empty"]     =
                 "Ingen lagringstrend endnu — den daglige optagelse har ikke gemt " +
                 "noen prøver for dette vindue.",
+
+            // ── M35 (ADR 0164) — kiosk-display-overfladen (U04) +
+            // /admin/kiosk-indstillingerne (U05). Det 8-nøglesæt (M35·10).
+            ["kiosk.title"]                  = "Nabolgsbræt",
+            ["kiosk.empty"]                  = "Der er endnu ikke konfigureret kiosk-visninger.",
+            ["kiosk.slide_denied"]           = "Du har ikke adgang til denne visning.",
+            ["kiosk.next_slide"]             = "Næste visning",
+            ["kiosk.refreshed"]              = "Opdateret lige nu",
+            ["kiosk.settings.title"]         = "Kiosk-display",
+            ["kiosk.settings.view_interval"] = "Skift visning hver (sekunder)",
+            ["kiosk.settings.refresh_interval"] = "Opdater indhold hver (sekunder)",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

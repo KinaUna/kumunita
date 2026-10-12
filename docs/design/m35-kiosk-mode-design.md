@@ -671,6 +671,44 @@ are **untouched** (M35·9).
 
 ### 2.3 the `/kiosk` display + settings surface (exact Web shapes)
 
+> **U04-resume drift resolution (2026-10-12) — path 1 supersedes the partial
+> rendering below.** The register's U04/U05 and this §2.3 assume the kiosk
+> `@await Html.PartialAsync`s the board / calendar / todos **partials**. On
+> disk those three surfaces are **full MVC views** (`BoardDetail.cshtml` /
+> `TodosIndex.cshtml` / `Event/Calendar.cshtml` — each with `@model`,
+> `ViewData["Title"]`, `@section Scripts`, `@inject`, and controller-seeded
+> `ViewData` bags), and there are **no** board/calendar/todos partials to
+> `@await` (the U04 drift pause). The lane owner chose **path 1**: each slide
+> iframes the surface's **own route** (`/projects/boards/{id}` /
+> `/events/calendar?view=…` / `/projects/todos`) inside the chrome-hidden
+> stage. The iframe's navigation **re-runs the surface's own `Read` decision**
+> (the frozen board / calendar / todos read seam — M35·3), so the M35·6
+> "reuse, not re-author" pin is honored **more strongly** (the kiosk adds no
+> slide view at all) and M35·9 (surfaces untouched) holds (no M5/M4 file
+> edited). Consequences that supersede the text below:
+> - The `object? FirstSlideContent` member of `KioskDisplayViewModel` is
+>   **replaced** by `IReadOnlyList<KioskSlideViewModel> Slides` (each slide
+>   carrying `Href` + `Denied` + `Label`) + a `FirstSlide` convenience — the
+>   three unrelated surface view models cannot share one content member.
+> - The `/kiosk/slide` refresh fetch returns a small JSON
+>   `KioskSlideRefreshViewModel` (`Index` / `Denied` / `Href` / `DeniedKey`)
+>   that `client/lib/kiosk.ts` (U07) uses to **re-point the iframe**, not to
+>   swap innerHTML.
+> - The `body.kmb-page-expanded` chrome-hide is applied via the view's inline
+>   `<style>` (the ADR 0104 selector set, `style-src 'self' 'unsafe-inline'`;
+>   no `_Layout.cshtml` touch, so the footprint stays ≤ 4 files — the "no
+>   surface-file edits" constraint is **preserved**, not waived).
+> - The M35-5 denied shape is honored by the controller **catching the frozen
+>   seam's deny signals** (`GetBoardAsync`'s `KeyNotFoundException` /
+>   `UnauthorizedAccessException`; `ListTodosAsync` / `ListInRangeAsync`'s
+>   `UnauthorizedAccessException`) and rendering the `kiosk.slide_denied`
+>   shape (no 404, no leak).
+>
+> The `SettingsGet` / `SettingsPost` rows and the `KioskSettingsViewModel`
+> below are **unaffected** (U05's surface is unchanged). The two
+> `setInterval`s in `kiosk.ts` (U07) now drive **iframe advance** + **iframe
+> re-point**, not innerHTML swaps.
+
 **The `KioskController`** (namespace `Kumunita.Web`, `src/Kumunita.Web/
 Controllers/KioskController.cs`) — four actions:
 
@@ -745,12 +783,29 @@ transition (a CSS opacity/transform transition — no JS animation lib).
 
 ### 2.4 the closed `kiosk.*` `kw-l` key set
 
+> **U04-resume (2026-10-12) — the set is inseparably four-language.** The
+> register's assumption that "the `de` / `fr` / `da` values are U06's to
+> author" (i.e. an en-only floor exists until U06) is **superseded**: on disk
+> the `kiosk.*` keys were **absent** (not an en-only floor — the `kw-l`
+> TagHelper would render the raw key), **and** the Core.Tests parity tests
+> (`De/Fr/DaValues_Keys_Match_AllKeys_Exactly_NoEmptyValues`) enforce
+> **key-for-key set equality** between en/de/fr/da, so there is **no valid
+> en-only intermediate state**. Combined with the Web.Tests view-scan test
+> (`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered`), U04's
+> view **cannot** reference `kiosk.*` keys unless all four languages are
+> present. **U04 therefore co-shipped the 8 keys in en/de/fr/da** (absorbing
+> U06's deliverable), and **U06 is re-scoped to a verification unit**. The
+> `en` values below remain the **source text** (the ADR 0015 D1
+> provider-floor discipline); the `de` / `fr` / `da` values are now authored
+> (by U04), present and non-empty in all four (verified green). The board /
+> calendar / todos `kw-l` key sets are **untouched** (the M35·6 additive-only
+> pin — M35 **adds** this set, it does not re-author the M5 / M4 set).
+
 **8 keys**, each present, **non-empty, in all four** languages (en/de/fr/da),
 pinned by `KwLRegistryConsistencyTests` (Web.Tests) +
 `KnownTranslationKeys_ParityTests` (Core.Tests) (the M35·10 pin, the M34·11
 closed-set precedent). The `en` values below are the **source text** (the
-ADR 0015 D1 `kw-l` provider-floor discipline); the `de` / `fr` / `da` values
-are U06's to author (the M35·10 four-language pin). The board / calendar /
+ADR 0015 D1 `kw-l` provider-floor discipline). The board / calendar /
 todos `kw-l` key sets are **untouched** (the M35·6 additive-only pin — M35
 **adds** this set, it does not re-author the M5 / M4 set):
 
