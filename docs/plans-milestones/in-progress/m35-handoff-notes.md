@@ -795,3 +795,30 @@ or simply re-point the iframe — both re-run the frozen seam).
   `string`). This is a test-harness requirement, not a production defect.
   **Builds:** `dotnet build Kumunita.slnx -c Debug` **green** (0 errors; 8
   pre-existing nullability warnings on the Web stub are benign).
+
+## U09 — gate recorded
+
+> **Docs-only gate unit — no code, no build.** Executed + recorded the
+> three-test acceptance gate (design doc §2.6) *using* U08's 12 §2.5 tests as
+> the part-vs-whole evidence, recorded in the design doc as
+> `### Run result (M35 acceptance gate — 2026-10-12)`.
+
+- **(a) Three-test gate — all PASS (2026-10-12):** **Closed loop** PASS (a
+  `GlobalAdmin` sets the playlist → a signed-in viewer's `/kiosk` renders the
+  first slide) · **Handoff** PASS (a slide resolves via the **frozen** board /
+  calendar / todos read seam — the same `Read` decision as that surface's own
+  feed; a denied slide is the `kiosk.slide_denied` shape, no leak, no 404) ·
+  **Part-vs-whole** PASS (the 12-test pin list is the whole; all 12 green).
+- **(b) 12-test count (from U08):** **12 / 12 GREEN** — Core `KioskServiceTests`
+  **6 / 6** (`Kumunita.Core.Tests` suite 1465 total, 0 failed, 0 errors,
+  `RUN_EXIT=0`) + Web `KioskControllerTests` **6 / 6** (`Kumunita.Web.Tests`
+  suite 1039 total, 0 failed, 0 errors, 1 pre-existing skip, `RUN_EXIT=0`).
+- **(c) Still-open drift:** the **U04 drift pause** is **RESOLVED** (the
+  **U04-resume** chose **path 1 — iframe the live surface routes**; §2.3
+  `FirstSlideContent` superseded by `IReadOnlyList<KioskSlideViewModel>
+  Slides`; no red pin remains). No other `## U<m> — Drift pause` section is
+  recorded (U00–U03, U05–U08 shipped clean).
+- **(d) Discipline:** **no code, no build** (the gate consumes U08's
+  already-recorded run results; the runtime was present). **U09 does not flip
+  the milestone and does not tag ADR 0164** — that is U10. `git status` clean
+  except the design doc + this handoff note + the `m35-u09.md` plan move.

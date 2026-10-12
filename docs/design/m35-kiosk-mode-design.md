@@ -929,3 +929,58 @@ caller's-session / nullable-read divergence notes], the `/kiosk` display +
 settings surface, the closed `kiosk.*` `kw-l` key set, the 12 pinned test
 names, the three-test acceptance gate, the drift-guard). Authored by U02,
 2026-10-12. Companion ADR: `docs/adr/0164-kiosk-mode.md` (Draft).*
+
+### Run result (M35 acceptance gate — 2026-10-12)
+
+**(a) Three-test gate (§2.6)** — **Closed loop PASS** · **Handoff PASS** ·
+**Part-vs-whole PASS** (the 12-test list is the whole; all 12 green).
+Evidence: `M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists` (a
+`GlobalAdmin` POSTs the playlist to `/admin/kiosk` → one `kiosk.save` audit
+row + the playlist persists) → `M35_3_SignedIn_Sees_ChromeHidden_FirstSlide`
+(a signed-in viewer's `GET /kiosk` renders the chrome-hidden stage + the first
+slide — the full request → read → render loop, M35-1 / M35-2) · the
+frozen-seam → slide contract (M35·3): `M35_5_SlideDenied_SignsInViewer_SeesDeniedShape`
+(a slide the viewer cannot see resolves via the **frozen** board / calendar /
+todos read seam into the `kiosk.slide_denied` shape — no content leak, no 404)
++ `M35_6_ExistingSurfaces_RenderUnchanged` (the board / calendar / todos
+surfaces render **unchanged** — the kiosk frames them, it does not re-author
+them) · the 12-test run green together.
+
+**(b) 12-test part-vs-whole (verbatim §2.5)** — **12 / 12 GREEN**:
+- **Core (6), `Kumunita.Core.Tests.KioskServiceTests`:**
+  `M35_2_GetPlaylist_NoRow_ReturnsNull` ·
+  `M35_2_GetPlaylist_Configured_ReturnsRow` ·
+  `M35_5_GetPlaylist_WritesNoAuditRow` ·
+  `M35_5_SavePlaylist_OneKioskSaveAuditRow` ·
+  `M35_2_SavePlaylist_NoRow_CreatesSingleton` ·
+  `M35_SavePlaylist_AtomicInCallerSession`.
+  Run: `dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll`
+  → **6 / 6 green** (suite **1465 total, 0 failed, 0 errors**, `RUN_EXIT=0`;
+  Testcontainers `postgres:18`).
+- **Web (6), `Kumunita.Web.Tests.KioskControllerTests`:**
+  `M35_3_SignedIn_Sees_ChromeHidden_FirstSlide` ·
+  `M35_3_Anonymous_RedirectedToSignIn` ·
+  `M35_5_SlideDenied_SignsInViewer_SeesDeniedShape` ·
+  `M35_7_NonGlobalAdmin_AdminKiosk_403` ·
+  `M35_5_GlobalAdmin_SavePlaylist_OneAuditRow_Persists` ·
+  `M35_6_ExistingSurfaces_RenderUnchanged`.
+  Run: `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll`
+  → **6 / 6 green** (suite **1039 total, 0 failed, 0 errors**, the 1 skip
+  is pre-existing, `RUN_EXIT=0`).
+
+**(c) Still-open drift (per the handoff note)** —
+- **U04 drift pause — RESOLVED.** U04's kickoff verification found the three
+  slide surfaces are **full MVC views**, not partials
+  (`BoardDetail.cshtml` / `TodosIndex.cshtml` / `Event/Calendar.cshtml`), so
+  the register's `@await Html.PartialAsync` premise could not hold. The
+  **U04-resume** resolved it via **path 1: iframe the live surface routes** —
+  each slide resolves to the surface's **own route** (`/projects/boards/{id}`
+  / `/events/calendar?view=…` / `/projects/todos`) inside the chrome-hidden
+  stage (`frame-ancestors 'self'`). This **supersedes** the §2.3
+  `object? FirstSlideContent` shape with `IReadOnlyList<KioskSlideViewModel>
+  Slides`, honors the M35·6 "reuse, not re-author" pin **more strongly** (no
+  slide view authored), and keeps M35·9 **held** (no M5/M4 file edited).
+  Recorded in the design doc §2.3 drift note + the register's `§U04-resume`.
+  No red pin remains — all 12 §2.5 tests green.
+- No other `## U<m> — Drift pause` section is recorded (U00 / U01 / U02 / U03
+  / U05 / U06 / U07 / U08 shipped without a drift pause).
