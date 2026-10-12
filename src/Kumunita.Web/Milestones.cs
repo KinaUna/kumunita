@@ -78,6 +78,7 @@ public static class Milestones
         new("ESC", "Escalation authorization + receiving inbox — a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token; when they escalate, the receiving platform validates the token and only then accepts the issue as an 'escalated' row in the same admin list (the M32 ErrorReports surface extended additively — the EscalationToken + EscalationOutboundConfig docs + the IEscalationTokenService seam + the AcceptInboundAsync seam + the POST /escalations/inbound endpoint + the EscalationForwarder Bearer-token change + the closed escalation.* kw-l key set × en/de/fr/da)", StatusDone),
         new("M33", "Storage metrics history — the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future", StatusDone),
         new("M34", "Analytics history — the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve", StatusDone),
+        new("M35", "Kiosk mode — a full-page / full-screen display that automatically cycles a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval", StatusNext),
     };
 
     public static string BadgeClass(string status) => status switch
