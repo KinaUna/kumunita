@@ -196,9 +196,21 @@ public sealed class PageController(
         var systemRoots = visible.Where(p => p.Kind == PageKind.System && IsRoot(p)).ToList();
         var userRoots = visible.Where(p => p.Kind != PageKind.System && IsRoot(p)).ToList();
 
+        // NOTE: the roots must be projected with an explicit lambda
+        // (`Select(p => ToNode(p))`), NOT a method group (`Select(ToNode)`).
+        // `ToNode` has a default parameter (`int depth = 0`). Binding it as a
+        // method group does not reliably apply that `0` default: each successive
+        // root comes out at depth 1, 2, 3… and its children one step further
+        // still, so the /pages tree renders every top-level item indented
+        // further than the first (the "staircase" the browse showed). The
+        // lambda pins `depth` to `0` for each root, so all top-level items line
+        // up and only true nesting steps in. (Kept as a lambda on purpose — do
+        // NOT "tidy" this back to `Select(ToNode)`. Verified against the served
+        // page: every top-level item at depth 0, and a minimal repro of the
+        // method-group-vs-lambda binding, 2026-10-12.)
         return View(new PageTreeViewModel(
-            userRoots.Select(ToNode).ToList(),
-            systemRoots.Select(ToNode).ToList()));
+            userRoots.Select(p => ToNode(p)).ToList(),
+            systemRoots.Select(p => ToNode(p)).ToList()));
     }
 
     // ── GET /pages/{**path} — the post view (404 absent / 403 denied) ───────
