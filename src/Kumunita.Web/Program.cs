@@ -274,6 +274,16 @@ var marten = builder.Services.AddMarten(opts =>
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
     EscalationDocTypes.Configure(opts);
+    // M35 (ADR 0164, U03): the Kiosk bounded context's singleton doc
+    // (KioskPlaylist, ADR 0004 §B.1 additive — one row per instance,
+    // Id = "kiosk", the SiteContent / LocaleSettings shape, ADR 0005 B /
+    // ADR 0150). The KioskView entry is a value object nested in the
+    // singleton (not a standalone doc — M35·9). Without this call the doc
+    // is invisible to Marten and a pristine boot never creates the
+    // mt_doc_kioskplaylist table (the SITE / M29 / M30 / ESC precedent).
+    // KioskDocTypes lives in Kumunita.Core (like the other *DocTypes), so
+    // the unqualified name resolves here unchanged.
+    KioskDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

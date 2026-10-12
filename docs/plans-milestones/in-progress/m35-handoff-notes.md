@@ -277,3 +277,56 @@ order (U00, U01, … U10). Never rewrite a prior section. -->
   `kiosk.settings.refresh_interval` — four-language (en values are the source
   text; de/fr/da are U06's to author). Board / calendar / todos `kw-l` sets
   **untouched** (M35·6).
+
+## U03 — Kiosk context + IKioskService
+
+- **(a) `IKioskService` public-method count: 2** — `GetPlaylistAsync` (the
+  nullable singleton read — zero audit rows, M35·5) + `SavePlaylistAsync`
+  (the GlobalAdmin write — one `kiosk.save` audit row, `TargetKind="kiosk"`,
+  `Via=Admin`, within the caller's session, M35·5). The design doc §2.1
+  pinned signatures matched exactly.
+- **(b) Ceilings:** `KioskPlaylist` **4 members** (`Id` sentinel `"kiosk"`,
+  `Views` `IReadOnlyList<KioskView>`, `ViewIntervalSeconds` int=30,
+  `RefreshIntervalSeconds` int=10) + `KioskView` **5 members** (`Kind`,
+  `BoardId?`, `CalendarView?`="week", `ComponentId?`, `Label?`) +
+  `KioskViewKind` **3 members** (`Board`/`Calendar`/`Todos`). All three
+  pinned ceilings from the design doc §2.2 matched exactly.
+- **(c) `KioskDocTypes` line count: 1 `.Schema.For`** —
+  `opts.Schema.For<KioskPlaylist>()`. The `KioskView` entry is a value
+  object nested in the singleton (not a standalone doc — M35·9: the kiosk
+  adds no new doc type beyond `KioskPlaylist`). The `SiteContent` /
+  `LocaleSettings` singleton shape mirrored (the structural template).
+- **(d) Boot-path line added (1 location — `Program.cs` only):**
+  `src/Kumunita.Web/Program.cs` line 287 — `KioskDocTypes.Configure(opts);`
+  (added next to the existing `EscalationDocTypes.Configure(opts);` at
+  line 276, in the `AddMarten` lambda). **Note:** `SchemaBootstrap.cs`
+  contains **zero** `*DocTypes.Configure` calls (verified by grep — all 20
+  existing registrations live in `Program.cs`'s `AddMarten` lambda); the
+  plan's mention of `SchemaBootstrap.cs` is a minor inaccuracy. The
+  `KioskDocTypes.Configure` call in `Program.cs` is the sole boot wiring
+  (the M31 `ErrorReportDocTypes` / M13 `UsageDocTypes` / SITE / M29 / M30
+  / ESC precedent — all registered in `Program.cs` only).
+- **(e) DI registration:** `src/Kumunita.Core/DependencyInjection.cs` —
+  `services.AddTransient<Kiosk.IKioskService>(sp => new Kiosk.KioskService(
+  sp.GetRequiredService<Marten.IDocumentStore>(),
+  sp.GetRequiredService<IAuthorizationService>()));` — the M31/M13
+  `AddTransient` shape. The `KioskService` ctor is
+  `(IDocumentStore store, IAuthorizationService authz)` — the
+  `IAuthorizationService` is carried for composition-root symmetry (the M23
+  `ProfileFindService` / M5 `PostService` precedent) but is **not invoked**
+  (M35·1 pins "no `Decide()` branch"; the controller
+  `[Authorize(Roles = GlobalAdmin)]` enforces the standing). The unused-
+  field is avoided via `_ = authz ?? throw` validation in the ctor.
+- **(f) Confirmation of the M35·1 / M35·3 / M35·8 pins:** **No** new
+  `AccessAction` / `AccessVia` / `Decide()` branch / `IAuditableResource`
+  adapter was added (the kiosk adds no authorization surface of its own —
+  the per-view content rides the **frozen** board / calendar / todos read
+  seams). **No** `HttpClient` in Core (the `KioskService` is a plain
+  store-composing service, ADR 0006-D). The M5 `Projects` + M4 `Events`
+  contexts are **untouched** (M35·9).
+- **(g) Compile warnings on the new types:** **None.** The 3 warnings in
+  the build output are in `HomeControllerUpcomingTests.cs` (lines 37–39,
+  CS8625 `Cannot convert null literal to non-nullable reference type`) — a
+  file I did **not** touch (pre-existing, M4/M13 related). The 6 new Kiosk
+  files + the 2 wire-in edits produced **zero** warnings. Build green
+  (27.6 s, 4 projects, 3 pre-existing warnings in `Kumunita.Web.Tests`).

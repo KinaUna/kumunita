@@ -161,6 +161,24 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ErrorReports.IEscalationTokenService>(sp => new ErrorReports.EscalationTokenService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M35 (ADR 0164, U03): the kiosk-mode seam — the KioskPlaylist
+        // singleton's read + audited-write lanes (the ADR 0150
+        // single-write-lane shape, the LocaleSettings-parallel bounded
+        // context Kumunita.Core.Kiosk). The same "AddTransient with the
+        // store injected" shape as ISiteContentService / ISurfaceLabelsService
+        // above: composes the host-registered Marten IDocumentStore (reads
+        // open a QuerySession, the audited write commits in the caller's
+        // session — invariant C3) + the IAuthorizationService (carried for
+        // composition-root symmetry but **not invoked** — M35·1 pins "no
+        // Decide() branch"; the Web gate enforces the GlobalAdmin standing).
+        // Core stays HTTP-free (ADR 0006-D, M35·8): the Web gate (U04/U05) is
+        // the only place the GlobalAdmin authorization is produced. Fully
+        // qualified Kiosk.IKioskService for the type/namespace idiom (like
+        // SiteContent.ISiteContentService).
+        services.AddTransient<Kiosk.IKioskService>(sp => new Kiosk.KioskService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
