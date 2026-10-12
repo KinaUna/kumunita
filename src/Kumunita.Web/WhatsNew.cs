@@ -19,6 +19,10 @@ public static class WhatsNew
 
     public static IReadOnlyList<Release> All { get; } = new List<Release>
     {
+        new("0.57.0", "2026-10-12", new List<string>
+        {
+            "Kiosk mode — a full-page / full-screen display at /kiosk that automatically cycles a GlobalAdmin-set preset list of views (boards, calendar, todos) on a set interval and refreshes each view's content on a separate, faster interval: a new bounded context Kumunita.Core.Kiosk (the KioskPlaylist singleton doc + the KioskDocTypes surface + the IKioskService seam + the KioskService impl — one kiosk.save audit row per GlobalAdmin write) + the /kiosk signed-in display (the chrome-hidden layout + the first slide) + the GET /kiosk/slide refresh fetch + the /admin/kiosk settings surface (the playlist editor + the interval pickers) + the client/lib/kiosk.ts auto-cycle/auto-refresh state machine (tsc-only) + the closed kiosk.* kw-l key set × en/de/fr/da; the frozen board / calendar / todos read seams + render partials are reused, not re-shape (ADR 0164).",
+        }),
         new("0.56.0", "2026-10-12", new List<string>
         {
             "Home upcoming events & to-dos — a resident can now opt in (Settings → Home page) to seeing the next upcoming events and to-dos on the home page, just above the \"What's new\" feed: a new per-resident display preference (Profile.HomeShowUpcoming, ADR 0004 §B.1 additive — the HideHomeIntro / PageSize single-write-lane shape, off by default so a fresh account is unchanged) + a /home \"Upcoming\" section that reuses the existing /events + /projects/todos read seams (so a row only shows when the viewer could already see it there) + an optional \"only mine\" scope (Profile.HomeUpcomingMineOnly, off by default) that lists the resident's own events (RSVP'd or authored, EV-MINE) and to-dos (assigned to them) instead of the community-wide lists + a per-column \"show more\" that reveals rows beyond the first five (the mine-more / roadmap-more disclosure idiom) + the closed settings.home.* + home.upcoming.* kw-l key set × en/de/fr/da (ADR 0163).",

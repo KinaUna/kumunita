@@ -294,7 +294,7 @@ stays trivial and the authorization rules can grow freely.
 - **ESC** — Escalation authorization + receiving inbox: a receiving GlobalAdmin generates labeled, individually-revocable tokens (shown once, hashed at rest) and hands them to origin platforms; an origin GlobalAdmin sets their endpoint + token; when they escalate, the receiving platform validates the token and only then accepts the issue as an 'escalated' row in the same admin list (the M32 ErrorReports surface extended additively). **Done.** (ADR 0159)
 - **M33** — Storage metrics history: the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future. **Done.** (ADR 0156)
 - **M34** — Analytics history: the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve. **Done.** (ADR 0162)
-- **M35** — Kiosk mode: a full-page / full-screen display that automatically navigates between a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval. **Next.**
+- **M35** — Kiosk mode: a full-page / full-screen display that automatically navigates between a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval. **Done.** (ADR 0164)
 
 ## Deferred (future, by design)
 

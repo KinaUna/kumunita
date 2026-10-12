@@ -822,3 +822,49 @@ or simply re-point the iframe — both re-run the frozen seam).
   already-recorded run results; the runtime was present). **U09 does not flip
   the milestone and does not tag ADR 0164** — that is U10. `git status` clean
   except the design doc + this handoff note + the `m35-u09.md` plan move.
+
+## U10 — close (M35 is the **last** milestone — the six-member close flip)
+
+> **Docs-only close unit — no production code change.** Executed the
+> six-member close flip for **M35** (the last milestone on the roadmap —
+> M35·11: **no** successor to promote). The only code touched is the
+> `MilestonesTests` / `WhatsNewTests` milestone-status pins.
+
+- **(a) `Milestones.cs` flip:** the `M35` row — `StatusNext` →
+  `StatusDone`. **No** successor row added (the order is unchanged,
+  `…"M33","M34","M35"` — `M35` is now the final row, and the final
+  `StatusDone`). The roadmap has **no** in-progress entry.
+- **(b) `MilestonesTests` re-pin:** removed
+  `Single_InProgress_Milestone_Is_M35`; added `No_Milestone_Is_InProgress`
+  (asserts `Milestones.All.Where(m => m.Status == Milestones.StatusNext)` is
+  **empty**); appended `"M35"` to the
+  `Shipped_Milestones_Are_Marked_Done` shipped-set list (the shipped set is now
+  **every** id). The `Roadmap_Covers_M0_Through_M35_Plus_Named_Lanes_In_Order`
+  pin is **untouched** (M35 is already in the pinned order — only its status
+  flipped).
+- **(c) `WhatsNew.cs` `0.57.0` entry** (newest-first, naming M35 + ADR 0164 —
+  the kiosk: the `/kiosk` chrome-hidden display that auto-cycles a
+  GlobalAdmin-set playlist of the resident's own surfaces and auto-refreshes
+  each slide; the new `Kiosk` context — the board / calendar / todos read
+  seams + render partials are reused, not re-shape); the
+  `WhatsNewTests` head-pin re-pinned to `0.57.0 (2026-10-12, ADR 0164)` with
+  the ADR 0163 `0.56.0` entry sliding one row back.
+- **(d) Doc parity (the three line appends):** `README.md` — the `M35`
+  Roadmap line tail `**Next.**` → `**Done.** (ADR 0164)` (the M34
+  `**Done.** (ADR 0162)` shape); `docs/STATUS.md` — `**M35 is next**` →
+  `**M35 is done**` (the M34 shape); `docs/ARCHITECTURE.md` — the `M35 kiosk
+  mode is shipped` sentence appended after the M34 `…discipline held).`
+  sentence (the M31 `ErrorReports` / M34 `Usage` shipped-sentence shape).
+- **(e) ADR 0164:** `Status: Draft` → `Status: Accepted`; the
+  `docs/adr/README.md` index gained the `0164` row tagged
+  `Accepted — **Done** (M35)` (the `0162` row shape).
+- **(f) `done/m35/` move:** `plan-m35-kiosk-mode.md` + `m35-u10.md` +
+  `m35-handoff-notes.md` → `docs/plans-milestones/done/m35/` (via
+  `git mv`; the `U00–U09` unit plans were already in `done/m35/`); the
+  `in-progress/` folder is now empty of M35 artifacts.
+- **Discipline:** `dotnet build Kumunita.slnx -c Debug` green +
+  `dotnet exec tests/Kumunita.Web.Tests/…/Kumunita.Web.Tests.dll` green (the
+  `MilestonesTests` — incl. the new `No_Milestone_Is_InProgress` — + the
+  `WhatsNewTests` pins green; the `0.57.0` entry present, newest-first).
+  **This is the last milestone** — after this flip the roadmap has no
+  in-progress entry; there is no next unit.

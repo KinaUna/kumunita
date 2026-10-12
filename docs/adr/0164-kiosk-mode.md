@@ -1,6 +1,6 @@
 # ADR 0164 — Kiosk mode (M35) — a full-page / full-screen display that automatically cycles a GlobalAdmin-set playlist of the community's own surfaces (boards, calendar, to-dos), changing view on a set interval and refreshing each view's content on a separate, faster interval
 
-Status: Draft
+Status: Accepted
 Date: 2026-10-12
 
 The README roadmap names M35 exactly: "**Kiosk mode** — a full-page /
