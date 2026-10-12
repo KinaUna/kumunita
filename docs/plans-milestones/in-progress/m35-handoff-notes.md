@@ -672,3 +672,82 @@ or simply re-point the iframe — both re-run the frozen seam).
 - **Build:** `dotnet build Kumunita.slnx -c Debug` **green** (0 warnings,
   0 errors). **No `KnownTranslationKeys.cs` change** (no key missing/empty —
   no drift pause). **Total U06 code files touched: 0** (verification only).
+
+## U07 — kiosk.ts + site.css
+
+> **Path-1 model (U04-resume), NOT the register's stale innerHTML-swap.**
+> U07 drives the **iframe `src`**, it does not swap innerHTML over fetched
+> slide HTML. The register §U07 "re-fetches from `GET /kiosk/slide` + innerHTML
+> swap" language is **superseded**: each slide iframes the surface's OWN route
+> and `renderSlide` re-points `iframe.src` (re-navigating re-runs the surface's
+> own `Read` decision on the frozen seam — M35·3). No `document.write`, no
+> inline `<script>`, no fetch/JSON — the iframe IS the content (M35·7).
+
+- **(a) `kiosk.ts` — 123 lines, two `setInterval`s.**
+  `src/Kumunita.Web/client/lib/kiosk.ts` (new) — a plain-tsc, no-dep, no-`any`
+  IIFE (the `expand-page.ts` shape, ADR 0031). Self-guards: a clean no-op when
+  there is no `#kiosk-stage` (so loading globally from `_Layout.cshtml` is
+  safe) and a no-op when `slideCount === 0` (the `kiosk.empty` page shows;
+  nothing to cycle). Reads the two intervals from `#kiosk-stage`'s
+  `data-view-interval` / `data-refresh-interval` and the ordered slides from
+  the `.kmb-kiosk-slide-meta` divs (`data-index` / `data-href` / `data-denied`
+  / `data-label`, the U04 contract). **Two independent `setInterval`s
+  (display-only, M35·4):** (1) **ADVANCE** — every `viewIntervalSec`, move
+  `current = (current + 1) % slideCount` and render it; (2) **REFRESH** — every
+  `refreshIntervalSec`, re-render the current slide. Both call `renderSlide(i)`,
+  which reads the meta, removes any existing `:scope > .kmb-kiosk-iframe` /
+  `:scope > .kmb-kiosk-denied` (so the server-rendered first slide is cleanly
+  replaced on the first tick, no duplication), and appends either an
+  `<iframe class="kmb-kiosk-iframe" src=…>` (re-pointing `src` re-runs the
+  surface's own `Read` on the frozen seam — M35·3) or the localized
+  `kiosk.slide_denied` shape when `data-denied === "true"` (M35-5 FACE: no
+  leak, no 404). The denied text is read from the **P0-6 `#kumunita-strings`
+  bundle** via the `L(key, fallback)` idiom the other client modules
+  (notifications-bell / rich-editor) already use, so it is localized in the
+  effective language; the en floor is the kw-l view text. A quiet cross-fade is
+  applied by toggling the `.kmb-kiosk-fading` class around the swap (built on
+  the `.3s opacity` transition the view's inline `<style>` already declares —
+  M35·6 idiom reused, M35·7 no animation lib). **No `AccessAction` / `AccessVia`
+  / `Decide()` branch** added (M35·1 / M35·3 — the JS is display-only); **no**
+  board / calendar / todos view or `kw-l` key touched (M35·6 additive-only).
+  One tsc quirk resolved: TS does not carry the `stage` guard-narrowing into
+  the `renderSlide` function expression (TS18047), so a definite
+  `const stageEl: HTMLElement = stage` is bound after the guard and used in the
+  closure.
+- **(b) `site.css` rules added — 2 blocks (24 lines appended).**
+  `src/Kumunita.Web/wwwroot/css/site.css` (append, after the
+  `.notifications-dropdown .dropdown-item` block). **Does NOT re-declare the
+  chrome-hide** (that + the stage/title/iframe/empty/denied base sizing already
+  live in `Views/Kiosk/Index.cshtml`'s inline `<style>` — the ADR 0104
+  `body.kmb-page-expanded` idiom, view-scoped). It adds only: (1)
+  `#kiosk-stage .kmb-kiosk-iframe { width:100%; height:100%; border:0; }` —
+  a robust fill for the JS-built iframe (belt-and-suspenders for the inline
+  flex rule), and (2) `#kiosk-stage .kmb-kiosk-fading { opacity:0; transition:
+  opacity .3s ease; }` — the fade state `kiosk.ts` toggles around each slide
+  swap (M35·6 chrome-hide idiom reused; M35·7 — plain CSS, no animation lib).
+- **(c) `_Layout.cshtml` script-tag append.**
+  `src/Kumunita.Web/Views/Shared/_Layout.cshtml` (2 additive edits, 11 lines).
+  Appended `<script type="module" src="~/js/lib/kiosk.js"></script>` immediately
+  after the `expand-page.js` tag (the global script-tag idiom — self-guarding,
+  no-op on non-kiosk pages, M35·7). **Also** added `"kiosk.slide_denied"` to the
+  closed `ClientJsStringKeys` array (line 60) so the P0-6 `#kumunita-strings`
+  bundle carries it — this is what lets `kiosk.ts` render a localized denied
+  shape via the `L(key, fallback)` idiom instead of hard-coding the string.
+  No test pins the bundle's exact key set (grep-verified `tests/**` clean), so
+  the additive key is safe.
+- **(d) `package.json` unchanged — CONFIRMED (M35·7).** `git status` shows only
+  `_Layout.cshtml` + `site.css` (modified) + `kiosk.ts` (new); `package.json`
+  is **not** in the diff. The tsc build (`npm run build` → `tsc`,
+  `outDir: wwwroot/js`) emitted `wwwroot/js/lib/kiosk.js` (5989 bytes), which is
+  gitignored (`.gitignore:31` `src/Kumunita.Web/wwwroot/js/`) so it is not
+  committed — the tsc-only build path (ADR 0031) is preserved.
+- **(e) `tsc` warnings:** **None** (one TS18047 "possibly null" on the
+  closure-captured `stage` resolved by binding a definite `const stageEl` after
+  the guard; the final `tsc` run is clean, 0 warnings).
+- **Builds:** `npm run build` (tsc) **green**; `dotnet build Kumunita.slnx -c
+  Debug` **green** (0 warnings, 0 errors). **No `AccessAction` / `AccessVia` /
+  `Decide()` branch added** (M35·1 / M35·3); **no** board / calendar / todos
+  view or `kw-l` key touched (M35·6 additive-only); **no** new npm package /
+  build step (M35·7). **Total U07 code files touched: 3** (the `kiosk.ts` new
+  + the `site.css` + `_Layout.cshtml` additive edits) — within the ≤ 3-file
+  constraint.

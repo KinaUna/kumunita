@@ -3518,3 +3518,27 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
   overflow-wrap: anywhere;
 }
 
+/* ── M35 (ADR 0164) — Kiosk mode: the #kiosk-stage slide fill + advance
+   transition. The chrome-hide (navbar / footer / flash / pinned-announcement)
+   and the stage/title/iframe base sizing already live in
+   Views/Kiosk/Index.cshtml's inline <style> (the ADR 0104
+   body.kmb-page-expanded idiom, view-scoped) — this block does NOT re-declare
+   that chrome-hide. It adds only: (a) a robust fill for the iframe so a
+   slide owns 100% of the stage (belt-and-suspenders for the inline
+   .kmb-kiosk-iframe flex rule), and (b) the .kmb-kiosk-fading state the
+   client/lib/kiosk.ts module toggles around each slide swap — a quiet
+   opacity fade built on the .kmb-kiosk-iframe transition the view declares
+   (M35·6 chrome-hide idiom reused; M35·7 — no animation library, plain CSS).
+   The denied-shape / empty-shape centering also already live in the view
+   inline <style>; the .kmb-kiosk-fading rule applies to whichever slide
+   element is fading (iframe or denied shape). */
+#kiosk-stage .kmb-kiosk-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+#kiosk-stage .kmb-kiosk-fading {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
