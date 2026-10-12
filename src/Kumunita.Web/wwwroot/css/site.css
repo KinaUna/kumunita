@@ -507,6 +507,17 @@ html[data-kmb-theme='dark'] {
   html:not([data-kmb-theme='light']) .badge.text-dark {
     color: #17251d !important;
   }
+  /* .badge.text-bg-light.text-dark (the home milestone-status chip and the
+     notification-type chips): the token flip makes the text-bg-light fill
+     dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
+     specificity, declared after the .badge.text-bg-light color fix) would
+     then leave dark ink on a dark fill — unreadable. Restore the readable
+     light ink the plain .badge.text-bg-light patch uses (higher specificity
+     than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
+     are untouched — they don't carry .text-bg-light). */
+  html:not([data-kmb-theme='light']) .badge.text-bg-light.text-dark {
+    color: var(--kmb-ink) !important;
+  }
   /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
      Community / Private): the token flip re-points --bs-light to a dark
      fill, so the .badge.text-dark dark ink above would sit on a dark
@@ -721,6 +732,17 @@ html[data-kmb-theme='dark'] .badge.text-bg-light {
    would render on the amber fill — unreadable. Restore the real dark ink. */
 html[data-kmb-theme='dark'] .badge.text-dark {
   color: #17251d !important;
+}
+/* .badge.text-bg-light.text-dark (the home milestone-status chip and the
+   notification-type chips): the token flip makes the text-bg-light fill
+   dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
+   specificity, declared after the .badge.text-bg-light color fix) would
+   then leave dark ink on a dark fill — unreadable. Restore the readable
+   light ink the plain .badge.text-bg-light patch uses (higher specificity
+   than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
+   are untouched — they don't carry .text-bg-light). */
+html[data-kmb-theme='dark'] .badge.text-bg-light.text-dark {
+  color: var(--kmb-ink) !important;
 }
 /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
    Community / Private): the token flip re-points --bs-light to a dark
