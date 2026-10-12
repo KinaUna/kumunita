@@ -99,10 +99,11 @@
             else
             {
                 <ul class="list-group">
-                    @foreach (var checkout in Model.History)
+                    @foreach (var row in Model.History)
                     {
+                        var checkout = row.Checkout;
                         <li class="list-group-item">
-                            <span class="fw-semibold">@checkout.BorrowerId</span>
+                            <span class="fw-semibold">@row.BorrowerName</span>
                             <span class="text-muted small ms-2">
                                 · <kw-l key="inv.detail.checkOut">Check out</kw-l> <kw-dt dt="@checkout.CheckedOutAt" format="g"></kw-dt>
                                 @if (checkout.CheckedInAt is not null)

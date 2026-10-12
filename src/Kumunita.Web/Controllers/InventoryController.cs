@@ -232,11 +232,28 @@ public sealed class InventoryController : Controller
         if (item.CurrentHolderId is not null && item.CurrentHolderId.Length > 0)
             holderName = await ResolveDisplayNameAsync(item.CurrentHolderId);
 
+        // F3 — the usage history rows: the append-only checkout records +
+        // each borrower's *display name* (a *read* lookup, never an access
+        // decision — the same idiom as the list page's holder names; the
+        // raw SubjectId is never rendered, it falls back when the profile
+        // row is missing).
+        var borrowerNames = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var checkout in history)
+        {
+            var borrowerId = checkout.BorrowerId;
+            if (borrowerId.Length == 0 || borrowerNames.ContainsKey(borrowerId))
+                continue;
+            borrowerNames[borrowerId] = await ResolveDisplayNameAsync(borrowerId);
+        }
+        var historyRows = history
+            .Select(c => new InventoryCheckoutRow(c, borrowerNames[c.BorrowerId]))
+            .ToList();
+
         var isActor = actorId.Length > 0 && string.Equals(item.AuthorId, actorId, StringComparison.Ordinal);
 
         var vm = new InventoryDetailViewModel(
             Item: item,
-            History: history,
+            History: historyRows,
             AuthorName: authorName,
             CurrentHolderName: holderName,
             CreatorIsActor: isActor,
