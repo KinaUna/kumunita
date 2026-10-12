@@ -183,3 +183,42 @@ order (U00, U01, … U10). Never rewrite a prior section. -->
     `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`) ·
     0006-D (Core HTTP-free — the `KioskService` is a plain store-composing
     service, no `HttpClient` in Core).
+
+## U01 — design doc Part 1
+
+- **Authored** `docs/design/m35-kiosk-mode-design.md` **Part 1** (Context,
+  Scope in/out + named deferrals, Invariants, FACES). **No code, no build.**
+- **11 invariants pinned** (contiguous, M35·1–M35·11 — U02 pin these by id):
+  M35·1 new bounded context `Kumunita.Core.Kiosk`, not a re-shape · M35·2 the
+  playlist is a GlobalAdmin-set singleton (the `KioskPlaylist` 4-member +
+  `KioskView` 5-member ceilings) · M35·3 the display is signed-in and rides
+  the frozen read seams (a denied slide renders `kiosk.slide_denied`, never a
+  404, never a content leak) · M35·4 the two intervals are display-only, never
+  an access input · M35·5 one `kiosk.save` audit row per write; the display
+  reads emit zero `kiosk.*` rows · M35·6 the existing render surface is
+  reused, not re-authored · M35·7 zero new dependency / npm package / build
+  step (`kiosk.ts` tsc-only, ADR 0031) · M35·8 Core stays HTTP-free +
+  Wolverine-free (ADR 0006-D) · M35·9 no new bounded context beyond `Kiosk`
+  (the M5 / M4 contexts are reused, not re-added) · M35·10 the closed
+  `kiosk.*` `kw-l` key set is four-language (en/de/fr/da) · M35·11 the
+  six-member close flip is U10's (M35 is the **last** milestone — no
+  successor to promote).
+- **10 FACES pinned** (M35-1–M35-10 — U02 pin these by id): M35-1 GlobalAdmin
+  sets playlist → saves (one `kiosk.save`) + `/kiosk` renders slide 1 (M35·2,
+  M35·5) · M35-2 signed-in resident opens `/kiosk` → slide 1 renders (M35·3,
+  M35·6) · M35-3 auto-advance after `ViewIntervalSeconds` (M35·4, M35·7) ·
+  M35-4 content auto-refresh after `RefreshIntervalSeconds` (M35·4, M35·3) ·
+  M35-5 a denied slide → `kiosk.slide_denied` (M35·3) · M35-6 anonymous →
+  sign-in redirect (M35·3) · M35-7 non-GlobalAdmin settings → 403 (M35·2) ·
+  M35-8 empty playlist → `kiosk.empty` (M35·10) · M35-9 read + display reads
+  emit zero `kiosk.*` audit rows (M35·5) · M35-10 board / calendar / todos
+  surfaces unchanged (M35·6).
+- **Note for U02 (impl-shape to reconcile in Part 2):** the register's M35·2
+  assumption has `SavePlaylistAsync` **upsert** the `KioskPlaylist` singleton
+  (a missing row is created). The `SiteContentService.SaveAsync` structural
+  template it mirrors is actually a **no-op on a missing row** (it "never
+  load-or-creates", SITE·6 — see
+  `src/Kumunita.Core/SiteContent/SiteContentService.cs`). The **register is
+  the source of truth** and pins the upsert; U02 should pin the exact
+  `KioskService` impl shape (upsert vs. no-op) in Part 2 §2.2 and note the
+  `SiteContent` divergence there. Not a Part 1 surface drift.
