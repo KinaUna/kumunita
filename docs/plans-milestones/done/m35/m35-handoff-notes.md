@@ -1,5 +1,17 @@
 # M35 — Kiosk mode — rolling handoff note
 
+> **TL;DR:** M35 ships the kiosk display (`/kiosk`) — a full-page chrome-hidden
+> display that auto-cycles a GlobalAdmin-set playlist of boards, calendar, and
+> todos, with a faster content-refresh interval (ADR 0164, 1039 Web.Tests +
+> 1465 Core.Tests green). The one seam it created is the
+> `Kumunita.Core.Kiosk` bounded context (the `KioskPlaylist` singleton +
+> `KioskDocTypes` surface + `IKioskService` 2-method seam — one `kiosk.save`
+> audit row per GlobalAdmin write). The one thing a future reader must not
+> re-litigate: the three slide surfaces are **full MVC views, not partials**
+> (the U04 drift pause) — Path 1 (iframe the surface's own route) is the
+> locked mechanism, and re-extracting partials to render slides inline is a
+> separate lane, not a fix.
+
 > **Milestone open (U00).** This is the **scratch tier** (rolling handoff
 > note) of M35's three-tier contract. One `##` section per unit, appended
 > (never rewritten), in order (U00, U01, … U10). Each unit writes exactly one
