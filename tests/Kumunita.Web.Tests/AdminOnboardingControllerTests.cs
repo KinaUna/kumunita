@@ -101,7 +101,7 @@ public class AdminOnboardingControllerTests
 
         // The closed seven-step set (M30·7) — in the README / Milestones.cs
         // order, each linking into the existing admin surface by route.
-        Assert.Equal("/admin/languages", vmCompleted.Steps[0].Route);          // community name
+        Assert.Equal("/admin/communities", vmCompleted.Steps[0].Route);       // community name & description (the base name/description surface; was /admin/languages, which only owns the language catalog + UI-string translations)
         Assert.Equal("/admin/languages", vmCompleted.Steps[1].Route);          // languages
         Assert.Equal("/admin/announcements/comments", vmCompleted.Steps[2].Route); // moderation
         Assert.Equal("/admin/quiet", vmCompleted.Steps[3].Route);              // notifications

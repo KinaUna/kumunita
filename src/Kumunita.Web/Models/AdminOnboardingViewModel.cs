@@ -25,7 +25,9 @@ namespace Kumunita.Web.Models;
 /// **The <see cref="Step"/> record is the closed seven-step set** (M30·7):
 /// the seven <c>(Key, LabelKey, Route, DescriptionKey)</c> tuples in the
 /// README / <c>Milestones.cs</c> order — community name →
-/// <c>/admin/languages</c>, languages → <c>/admin/languages</c>, moderation
+/// <c>/admin/communities</c> (the community's base name + description,
+/// ADR 0062; distinct from step 2's translations surface), languages →
+/// <c>/admin/languages</c>, moderation
 /// → <c>/admin/announcements/comments</c>, notifications →
 /// <c>/admin/quiet</c>, storage limits → <c>/admin/storage/settings</c>,
 /// site content → <c>/admin/site</c>, issue escalation →
@@ -69,7 +71,7 @@ public sealed class AdminOnboardingViewModel
     /// The closed seven-step set (M30·7, the design doc §2.3 table, the
     /// register's §"closed <c>kw-l</c> key set" table) — the seven
     /// <see cref="Step"/> records in the README / <c>Milestones.cs</c> order:
-    /// community name → <c>/admin/languages</c>, languages →
+    /// community name → <c>/admin/communities</c>, languages →
     /// <c>/admin/languages</c>, moderation → <c>/admin/announcements/comments</c>,
     /// notifications → <c>/admin/quiet</c>, storage limits →
     /// <c>/admin/storage/settings</c>, site content → <c>/admin/site</c>,
@@ -86,13 +88,18 @@ public sealed class AdminOnboardingViewModel
     /// </summary>
     public static IReadOnlyList<Step> ClosedSteps { get; } =
     [
-        // 1. Community name → the community's display name + description,
-        //    edited within the languages surface (ADR 0026 / ADR 0053
-        //    community-translation surface — the register's step 1).
+        // 1. Community name → the community's base name + description, edited
+        //    on the /admin/communities surface (the AddCommunity / UpdateCommunity
+        //    form, ADR 0062 — the register's step 1). Distinct from step 2,
+        //    the languages surface (ADR 0026 community *translations*):
+        //    the M30 route pointed at /admin/languages by mistake — that
+        //    surface only owns the language catalog + UI-string translations,
+        //    not the community's name/description, so the link was re-pointed
+        //    to the surface that actually owns it.
         new Step(
             Key:            "communityname",
             LabelKey:       "adminonboarding.step_communityname",
-            Route:          "/admin/languages",
+            Route:          "/admin/communities",
             DescriptionKey: "adminonboarding.desc_communityname"),
         // 2. Languages → the language catalog + the translated UI strings +
         //    the static pages (the ADR 0005 B / ADR 0044 surface — the

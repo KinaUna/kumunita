@@ -30,8 +30,9 @@ namespace Kumunita.Web.Controllers;
 /// **Rides frozen lanes (M30·1, M30·7):** the walk-through's *only* write
 /// is <see cref="IAdminOnboardingService.CompleteAsync"/>; every step the
 /// view surfaces links into the existing admin surface that already owns
-/// the setting (community name + languages → <c>/admin/languages</c>,
-/// moderation → <c>/admin/announcements/comments</c>, notifications →
+/// the setting (community name → <c>/admin/communities</c>, languages →
+/// <c>/admin/languages</c>, moderation →
+/// <c>/admin/announcements/comments</c>, notifications →
 /// <c>/admin/quiet</c>, storage limits → <c>/admin/storage/settings</c>,
 /// site content → <c>/admin/site</c>, issue escalation →
 /// <c>/admin/error-reports</c> — the M32 surface; the M30
