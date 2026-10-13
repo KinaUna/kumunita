@@ -263,3 +263,70 @@ Errors**).
   kind going live — the M6 `CreateReplyAsync` `EmitAsync` call site is the
   template; the per-recipient key
   `notification:post.mention:{contentId}:{recipientId}` — M36·4).
+
+## U04 — Post + reply emitters
+
+**Status:** done — build green. The reserved `post.mention` kind (ADR 0076 D2
+"follow-on lane") is now **wired** on the community post + reply surfaces
+(the M36·3 / M36·4 pins). The mention-emitter step is *inside* each frozen
+lane — the method signatures + audit rows are **untouched** (M36·4 additive).
+
+- **`src/Kumunita.Core/Posts/PostService.cs` (modified, additive):**
+  - **Constructor** — one new **optional** parameter
+    `Mentions.IMentionService? mentions = null` (the CS1736 shape of
+    `_tags` / `_notifications`; stored in the new
+    `private readonly Mentions.IMentionService? _mentions` field). The
+    existing positional call sites (the `PostServiceTests` harness + the DI
+    registration's first five args) keep compiling unchanged.
+  - **`CreatePostAsync`** — after the ADR 0084 community-post emitter block
+    and **before** the single `SaveChangesAsync`, an additive mention-emitter
+    step gated on `_mentions is not null && _notifications is not null &&
+    !(draft.IsDraft ?? false)` (the M36·8 draft gate — a draft save runs no
+    mention emitter; the M36-5 self pin is honored inside the resolver). The
+    step: (1) `MentionTokens.ExtractTokens(post.Body)`, (2)
+    `_mentions.ResolveAsync(tokens, actorId)`, (3) `foreach` over resolved
+    recipients → `EmitAsync(session, recipientId, kind:
+    NotificationKinds.PostMention, idempotencyKey:
+    $"notification:post.mention:{post.Id}:{recipientId}", body:
+    UgcSnippets.Truncate(post.Body), targetId: null, linkPath:
+    $"/posts/{post.Id}", ct: default)`. `EmitAsync` does not commit; the lane's
+    `SaveChangesAsync` is the single commit (C3). **Zero** `AccessAudit` row
+    emitted by the mention (M36·5 — a personal read).
+  - **`CreateReplyAsync`** — the same additive step after the M6 F1
+    post-reply emitter block and before `SaveChangesAsync`, with `body` =
+    `reply.Body`, `contentId` = `reply.Id` (per-recipient key
+    `notification:post.mention:{reply.Id}:{recipientId}`), and `linkPath:
+    $"/posts/{postId}#reply-{reply.Id}"` (the Part 2.5 table, lane 2). No
+    draft gate (a reply has no draft mode — the M6 lane is unconditional).
+- **`src/Kumunita.Core/DependencyInjection.cs` (modified, additive):** the
+  `PostService` registration gains one argument —
+  `sp.GetRequiredService<Mentions.IMentionService>()` — passing the live
+  U03-registered instance so the post + reply mention emitters fire in
+  production (the CS1736 optional-param idiom, mirroring the M6
+  `NotificationService` line).
+- **Frozen surfaces untouched (unit-series rules 4–7):** the M6
+  `NotificationKinds` vocabulary is **unmodified** in this unit — the
+  `PostMention` constant already existed (reserved) and is now simply
+  **consumed**; the six sibling kinds arrive with U05. The `EmitAsync`
+  signature, the `OptInKinds` table, the `IDirectoryService` read seam, and
+  the `PostService` method signatures + audit rows are all **byte-for-byte
+  untouched**. No new `AccessAction` / `AccessVia` / `Decide()` branch /
+  `IAuditableResource` adapter, no `AccessAudit` row from the mention
+  emission (M36·5). No new doc / doc-type / index / EF migration (M36·1 — a
+  mention is derived, not captured). No `HttpClient`, no Wolverine handler
+  (M36·9, ADR 0006-D).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 0
+  errors.
+- **No drift pause.** U04 honored the design doc Part 2.3 shared call shape
+  (the `MentionTokens.ExtractTokens` → `IMentionService.ResolveAsync` →
+  `EmitAsync` triad, the per-recipient key, the `UgcSnippets.Truncate` reuse,
+  the `targetId: null` opt-OUT pin, the surface-specific `linkPath`)
+  verbatim.
+- **Next unit (U05):** wire the **six remaining surfaces'** mention emitters —
+  `PageService` / `EventService` / `ProjectService.CreateTodoCommentAsync` /
+  `AnnouncementService` / `MessagingService` + the group post + group post
+  reply lanes — and add the **six new kinds**
+  (`group.post.mention` / `page.mention` / `event.mention` / `todo.mention` /
+  `announcement.mention` / `message.mention`) to `NotificationKinds.Known`
+  (M36·3). The `OptInKinds` table stays **untouched** (all seven mention
+  kinds are opt-OUT).

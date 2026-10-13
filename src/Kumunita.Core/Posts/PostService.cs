@@ -60,15 +60,25 @@ public sealed class PostService
     // the frozen service's `EmitAsync` surface is untouched (unit-series rule 4).
     private readonly NotificationService? _notifications;
 
+    // M36 (ADR 0165, U04) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_tags` / `_notifications`)
+    // so the existing test call sites that construct `PostService` positionally
+    // keep compiling unchanged. The DI registration passes the live
+    // `Mentions.MentionService` (composing the frozen `DirectoryService` read).
+    private readonly Mentions.IMentionService? _mentions;
+
     public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
         ITagService? tags = null,
-        NotificationService? notifications = null)
+        NotificationService? notifications = null,
+        Mentions.IMentionService? mentions = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
         _notifications = notifications;
+        _mentions = mentions;
     }
 
     /// <summary>
@@ -452,6 +462,42 @@ public sealed class PostService
             }
         }
 
+        // M36 (ADR 0165, U04) — the mention emitter (the reserved
+        // `post.mention` kind going live, M36·3 / M36·4). Additive, *inside*
+        // the lane (the frozen method signature + audit rows untouched):
+        // extract candidate `@`-tokens from the post body, resolve them
+        // against the frozen directory read (the author is never a
+        // recipient — M36-5 self pin), and emit one `post.mention`
+        // notification per resolved recipient on the caller's session. The
+        // per-recipient idempotency key (M36·4) keeps a re-emission of the
+        // same (post, recipient) pair a no-op (ADR 0076 D4 / F10). The draft
+        // gate (M36·8, ADR 0037) — a draft save runs no mention emitter; the
+        // mention fires only when the post is published (the `IsDraft` pin).
+        // `EmitAsync` does not commit; the `SaveChangesAsync` below is the
+        // single commit (C3). No new authorization surface, no `AccessAudit`
+        // row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null && !(draft.IsDraft ?? false))
+        {
+            var mentionTokens = Mentions.MentionTokens.ExtractTokens(post.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.PostMention,
+                        idempotencyKey: $"notification:post.mention:{post.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(post.Body),
+                        targetId: null,
+                        linkPath: $"/posts/{post.Id}",
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
@@ -738,6 +784,41 @@ public sealed class PostService
                     targetId: null,
                     linkPath: $"/posts/{postId}#reply-{reply.Id}",
                     ct: default).ConfigureAwait(false);
+            }
+        }
+
+        // M36 (ADR 0165, U04) — the mention emitter (the reserved
+        // `post.mention` kind going live on the reply surface, M36·3 /
+        // M36·4). Additive, *inside* the lane (the frozen method signature +
+        // audit rows untouched): extract candidate `@`-tokens from the reply
+        // body, resolve them against the frozen directory read (the author is
+        // never a recipient — M36-5 self pin), and emit one `post.mention`
+        // notification per resolved recipient on the caller's session. The
+        // per-recipient idempotency key (M36·4) keeps a re-emission of the
+        // same (reply, recipient) pair a no-op (ADR 0076 D4 / F10). The
+        // `linkPath` anchors to the reply (M36·4 — the Part 2.5 table, lane 2).
+        // `EmitAsync` does not commit; the `SaveChangesAsync` below is the
+        // single commit (C3). No new authorization surface, no `AccessAudit`
+        // row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Mentions.MentionTokens.ExtractTokens(reply.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.PostMention,
+                        idempotencyKey: $"notification:post.mention:{reply.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(reply.Body),
+                        targetId: null,
+                        linkPath: $"/posts/{postId}#reply-{reply.Id}",
+                        ct: default).ConfigureAwait(false);
+                }
             }
         }
 

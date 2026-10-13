@@ -241,7 +241,12 @@ public static class ServiceCollectionExtensions
             // ctor param is optional (CS1736); production wiring passes the
             // DI-registered instance so the post-reply / group-post emitters
             // fire in production (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // M36 (ADR 0165, U04) — the mention-resolution read seam (U03).
+            // The PostService ctor param is optional (CS1736); production
+            // wiring passes the DI-registered instance so the post + reply
+            // mention emitters fire in production (the M36·4 lane).
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M21 (ADR 0122, U02): the documents-side composition root — a concrete
         // class pairing the two frozen seams with the host-registered Marten
