@@ -63,7 +63,7 @@ machinery they compose.
 1. `docs/design/m11-portability-design.md` — §manifest (the locked field
    set), §inventory (the locked `Type` / file / order / reference-fields
    list), §layout (the D2 archive layout).
-2. `src/Kumunita.Core/M1DocTypes.cs` + `M3DocTypes.cs` — the document types
+2. `src/Kumunita.Core/CoreDocTypes.cs` + `PostDocTypes.cs` — the document types
    the registry enumerates (U00 pinned the list; the `M*DocTypes` surfaces
    confirm each type's namespace + the business-key fields the reference
    map needs).

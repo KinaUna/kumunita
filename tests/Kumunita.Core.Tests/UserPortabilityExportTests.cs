@@ -67,17 +67,17 @@ public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClass
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
-            M9DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);
-            M17DocTypes.Configure(opts);
+            BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -181,12 +181,12 @@ public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClass
                 Audience = new Audience(),
                 Created = DateTimeOffset.UtcNow,
             });
-            await session.SaveChangesAsync();
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         // Export as resident A.
-        using var stream = await boot.service.ExportAsync(residentA);
-        var data = await KumunitaArchive.ReadAsync(stream);
+        using var stream = await boot.service.ExportAsync(residentA, TestContext.Current.CancellationToken);
+        var data = await KumunitaArchive.ReadAsync(stream, TestContext.Current.CancellationToken);
 
         // Deserialize the Post array — exactly one (A's), not B's.
         var posts = KumunitaArchive.FromJson<List<Post>>(data.Docs["Post"])!;
@@ -207,8 +207,8 @@ public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClass
         const string resident = "m27-nosecret";
         await CreateResidentAsync(boot, resident, "no-secret", "ns@x.com", CancellationToken.None);
 
-        using var stream = await boot.service.ExportAsync(resident);
-        var data = await KumunitaArchive.ReadAsync(stream);
+        using var stream = await boot.service.ExportAsync(resident, TestContext.Current.CancellationToken);
+        var data = await KumunitaArchive.ReadAsync(stream, TestContext.Current.CancellationToken);
 
         // The PortabilityPrincipal POCO has no credential field
         // (the C-M27·2 type boundary — the field-shape pin).
@@ -248,8 +248,8 @@ public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClass
         const string resident = "m27-d2marker";
         await CreateResidentAsync(boot, resident, "d2-marker", "d2@x.com", CancellationToken.None);
 
-        using var stream = await boot.service.ExportAsync(resident);
-        var data = await KumunitaArchive.ReadAsync(stream);
+        using var stream = await boot.service.ExportAsync(resident, TestContext.Current.CancellationToken);
+        var data = await KumunitaArchive.ReadAsync(stream, TestContext.Current.CancellationToken);
 
         Assert.Equal("resident", data.Manifest!.Scope);
         Assert.Equal(resident, data.Manifest.ResidentSubjectId);
@@ -280,10 +280,11 @@ public sealed class UserPortabilityExportTests(PostgresFixture fixture) : IClass
         var writeStream = new MemoryStream();
         await KumunitaArchive.WriteAsync(
             writeStream, manifest, emptyDocs, emptyMedia,
-            Array.Empty<byte>(), Array.Empty<byte>());
+            Array.Empty<byte>(), Array.Empty<byte>(),
+                TestContext.Current.CancellationToken);
         writeStream.Position = 0;
 
-        var data = await KumunitaArchive.ReadAsync(writeStream);
+        var data = await KumunitaArchive.ReadAsync(writeStream, TestContext.Current.CancellationToken);
         Assert.NotNull(data.Manifest);
         Assert.Equal(PortabilityManifest.FormatVersion, data.Manifest.Format);
         Assert.Null(data.Manifest.Scope);

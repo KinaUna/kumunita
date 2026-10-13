@@ -26,6 +26,14 @@
     {
         "common.close",
         "common.cancel",
+        // Onboarding walk-through modal (M22/M30 rework): the "Step X of Y"
+        // counter template (the common.step_of {0}/{1} placeholders, resolved
+        // in the effective language) + the iframe title fallback. Read by
+        // client/lib/onboarding-modal.ts from this bundle (the L(key, fallback)
+        // idiom). The Previous / Next button labels are server-rendered
+        // <kw-l> in the partial, so they are not needed here.
+        "common.step_of",
+        "common.title",
         "rc.editor.error_generic",
         "rc.editor.link.title",
         "rc.editor.link.url",
@@ -57,6 +65,7 @@
         "img.edit.err_export",
         "tag.suggest.remove_prefix",
         "notif.fallback",
+        "kiosk.slide_denied",
     };
     string clientStringsJson = "{}";
     if (Translation is not null)
@@ -183,9 +192,31 @@
     // 0001-B: a preference, never a claim). Default B (compact top row);
     // variant C (icon rail) is the explicit opt-in.
     var navVariant = NavLayoutCookie.Read(Context.Request);
+
+    // Onboarding walk-through modal (M22/M30 rework) — this page is being
+    // iframed by the shared _OnboardingModal (the M35 kiosk "frame the
+    // surface's own route" idiom): the Sec-Fetch-Dest: iframe fetch-metadata
+    // signal (browser-driven, CSP-legal, no route change needed) is true only
+    // when a same-origin <iframe> loads the page. When set, the body carries
+    // the kmb-embed class and site.css hides the page chrome (navbar / footer
+    // / banners / toasts) so the framed page reads as a focused panel inside
+    // the modal — the ADR 0104 / M35 chrome-hide idiom. A direct navigation
+    // (Sec-Fetch-Dest: document) never sets it, so the page is unchanged when
+    // visited normally. A header-reading failure degrades to "not embedded"
+    // (the safe floor — the full page renders).
+    bool kmbEmbed = false;
+    try
+    {
+        if (Context.Request.Headers.TryGetValue("Sec-Fetch-Dest", out var dest))
+            kmbEmbed = string.Equals(dest.ToString(), "iframe", System.StringComparison.OrdinalIgnoreCase);
+    }
+    catch
+    {
+        // Non-HTTP render / missing context — not embedded (the floor).
+    }
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null)">
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
        controller left a flash value on the last redirect. Replaces the
@@ -304,7 +335,9 @@
                         </ul>
 
                         @* M8 (ADR 0091 D1) — the one /search entry in the navbar. *@
-                        @{ var _kwLNav = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation); var _navPlaceholder = await Translation.GetAsync("search.placeholder", _kwLNav); var _navAriaLabel = await Translation.GetAsync("search.nav", _kwLNav); }
+                        @{ var _kwLNav = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+                           var _navPlaceholder = Translation is null ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["search.placeholder"] : await Translation.GetAsync("search.placeholder", _kwLNav);
+                           var _navAriaLabel = Translation is null ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["search.nav"] : await Translation.GetAsync("search.nav", _kwLNav); }
                         <form class="navbar-form me-2 my-2 my-sm-0" action="/search" method="get" role="search">
                             <input class="form-control" type="search" name="q" placeholder="@_navPlaceholder" aria-label="@_navAriaLabel" required />
                         </form>
@@ -421,7 +454,9 @@
                         </button>
                         <div class="kmb-topbar-collapse collapse d-sm-inline-flex flex-grow-1 align-items-center gap-2">
                             @* M8 (ADR 0091 D1) — the search box. *@
-                            @{ var _kwLNavC = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation); var _navPlaceholderC = await Translation.GetAsync("search.placeholder", _kwLNavC); var _navAriaLabelC = await Translation.GetAsync("search.nav", _kwLNavC); }
+                            @{ var _kwLNavC = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+                               var _navPlaceholderC = Translation is null ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["search.placeholder"] : await Translation.GetAsync("search.placeholder", _kwLNavC);
+                               var _navAriaLabelC = Translation is null ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["search.nav"] : await Translation.GetAsync("search.nav", _kwLNavC); }
                             <form class="navbar-form kmb-topbar-search" action="/search" method="get" role="search">
                                 <input class="form-control" type="search" name="q" placeholder="@_navPlaceholderC" aria-label="@_navAriaLabelC" required />
                             </form>
@@ -484,6 +519,16 @@
                         <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
                         <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
                         <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
+                        @* M32 (ADR 0155) — the public "Report an issue" affordance
+                           (the issue.nav key, key 9 of the U06 closed set): links the
+                           M32 /issues/new general issue-submission surface. Linked
+                           unconditionally for every visitor (floor-honesty, the SP U03
+                           shape above) because M32·4 is public/anonymous-safe — the
+                           M31·2 500-form precedent. The design doc §2.3 named it "the
+                           nav entry (issue.nav)"; the footer Platform column is the
+                           public, platform-level seam that matches that intent — the
+                           signed-in-only More menu would gate a public surface. *@
+                        <li><a href="/issues/new"><kw-l key="issue.nav">Report an issue</kw-l></a></li>
                     </ul>
                 </div>
                 <div class="col-6 col-md-4 col-lg-3">
@@ -566,12 +611,28 @@
          beyond the first five in batches of 5 on click. Self-guards: no-op
          on pages without #events-mine-more-wrap (≤5 own events → no button). -->
     <script type="module" src="~/js/lib/mine-more.js"></script>
+    <!-- Home "upcoming" load-more (the Upcoming section on /, the resident's
+         Profile.HomeShowUpcoming preference): reveals the hidden event +
+         to-do rows beyond the first five of each column in batches of 5 on
+         click. Self-guards: no-op on pages without the Upcoming section
+         (signed-out / not opted in) and per-column where ≤5 rows → no button. -->
+    <script type="module" src="~/js/lib/home-upcoming-more.js"></script>
     <!-- Full-page expand mode (client/lib/expand-page.ts — shared by the
          Kanban board + the events calendar): wires the .page-expand-toggle /
          .page-expand-close buttons to the body.kmb-page-expanded class
          (site.css does the filling/hiding). Self-guards on pages without
          either button, so loading it globally is safe. -->
     <script type="module" src="~/js/lib/expand-page.js"></script>
+    <!-- M35 (ADR 0164) — the kiosk-mode auto-cycle / auto-refresh state
+         machine (client/lib/kiosk.ts, tsc-built). Drives the /kiosk display's
+         #kiosk-stage iframe: advances the visible slide to the next (wrapping
+         to the first) every data-view-interval, and re-points the iframe src
+         (re-running the surface's own Read decision on the frozen seam) every
+         data-refresh-interval; a slide the viewer cannot see shows the
+         localized kiosk.slide_denied shape (no leak, no 404). Self-guards on
+         pages without #kiosk-stage, so loading it globally is safe (the
+         expand-page.js idiom). No new npm package / build step (M35·7). -->
+    <script type="module" src="~/js/lib/kiosk.js"></script>
     <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
          service-worker registration (client/lib/pwa-install.ts, tsc-built).
          Registers /sw.js (U02's passive SW) and reveals the #pwa-install

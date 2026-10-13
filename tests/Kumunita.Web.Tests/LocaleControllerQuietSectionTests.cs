@@ -76,7 +76,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
     /// scratch Postgres database (the <see cref="NotificationsControllerTests"
     /// .BootStoreAsync"/> shape) with the M6 surface so the
     /// <see cref="NotificationQuietSchedule"/> table exists (its identity is
-    /// pinned to <c>RecipientId</c> in <see cref="M6DocTypes"/>).</summary>
+    /// pinned to <c>RecipientId</c> in <see cref="NotificationDocTypes"/>).</summary>
     private async Task<IDocumentStore> BootStoreAsync()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -86,7 +86,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
-            M6DocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;
@@ -165,7 +165,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
         var controller = Build(store, signedIn: true);
 
         // Floor: no schedule for this subject yet (never quiet, C-M20·3).
-        Assert.Null(await reader.GetQuietScheduleAsync(Subject));
+        Assert.Null(await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken));
 
         var result = await controller.SaveQuiet(
             enabled: true,
@@ -179,7 +179,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
 
         // The seam stored a schedule for the signed-in subject: RecipientId
         // pinned to the subject, mode Blocked, hours/days passed through.
-        var loaded = await reader.GetQuietScheduleAsync(Subject);
+        var loaded = await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken);
         Assert.NotNull(loaded);
         Assert.Equal(Subject, loaded!.RecipientId);
         Assert.True(loaded.Enabled);
@@ -216,8 +216,8 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
             Mode = QuietScheduleMode.Blocked,
             Hours = new[] { 22, 23 },
             DaysOfWeek = new[] { 0, 6 },
-        });
-        Assert.NotNull(await reader.GetQuietScheduleAsync(Subject));
+        }, TestContext.Current.CancellationToken);
+        Assert.NotNull(await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken));
 
         var result = await controller.SaveQuiet(
             enabled: true,
@@ -231,7 +231,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
 
         // The seam deleted the subject's schedule — the read lane returns null
         // (the floor, C-M20·3).
-        Assert.Null(await reader.GetQuietScheduleAsync(Subject));
+        Assert.Null(await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken));
 
         Assert.Equal(KnownTranslationKeys.EnValues["settings.quiet.flash_cleared"],
             controller.TempData["info"]);
@@ -251,7 +251,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
         var controller = Build(store, signedIn: false);
 
         // Floor: no schedule for this subject.
-        Assert.Null(await reader.GetQuietScheduleAsync(Subject));
+        Assert.Null(await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken));
 
         var result = await controller.SaveQuiet(
             enabled: true,
@@ -265,7 +265,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
 
         // Signed out → no subject → the seam was never invoked (nothing
         // written; the subject's schedule is still the floor).
-        Assert.Null(await reader.GetQuietScheduleAsync(Subject));
+        Assert.Null(await reader.GetQuietScheduleAsync(Subject, TestContext.Current.CancellationToken));
     }
 
     // ── Pin 2 — no caller-supplied recipient (C-M20·7) ────────────────────

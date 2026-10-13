@@ -208,7 +208,7 @@ public class AdminGuestsControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(action);
         Assert.Equal(nameof(AdminGuestsController.Index), redirect.ActionName);
-        Assert.Equal(GuestSubject, redirect.RouteValues["subjectId"]);
+        Assert.Equal(GuestSubject, redirect.RouteValues!["subjectId"]);
 
         // The single audited write lane, called exactly once (C-M19·5). The
         // second argument is the actor's SubjectId (the admin who settled the

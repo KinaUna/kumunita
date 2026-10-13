@@ -3,7 +3,7 @@
 > **Abstract:** *What it settles:* the **outcome arrow** — assignable,
 > hierarchical **to-dos** and **Kanban boards** with statused, limitable lanes.
 > A new bounded context `Kumunita.Core.Projects`: four documents, one new
-> document surface (`M5DocTypes`), one new service seam (`IProjectService`),
+> document surface (`ProjectDocTypes`), one new service seam (`IProjectService`),
 > two new authorization adapters, one new Web controller + views, and one new
 > plain-TS module for the board's reorder / move / copy / assign / delete
 > actions. *The one contract:* **a to-do is the work item; a placement is where
@@ -48,7 +48,7 @@ hierarchical **to-dos** and **Kanban boards** with statused, limitable
 lanes. It is a **new bounded context** `Kumunita.Core.Projects` (the `Projects/`
 folder already sketched in `docs/ARCHITECTURE.md` §3, marked "not yet
 created"), with **four documents**, **one new document surface**
-(`M5DocTypes`), **one new service seam** (`IProjectService`), **two new
+(`ProjectDocTypes`), **one new service seam** (`IProjectService`), **two new
 authorization adapters** (`TodoItemToAuditableResource`,
 `KanbanBoardToAuditableResource`), **one new Web controller**
 (`ProjectsController` + views + the nav entry), and **one new plain-TS
@@ -114,13 +114,13 @@ builds on without re-inventing:
    path. The optional to-do `Body` is rendered by the one `MarkdownRenderer`
    and edited by the one `bindRichEditor` — no new editor, no new TS editor
    module.
-5. **`Event` + `EventRsvp` + `EventService` + `M4DocTypes`**
+5. **`Event` + `EventRsvp` + `EventService` + `EventDocTypes`**
    (`Kumunita.Core.Events`, M4) — the **immediate template**: the
    field-by-field provenance table (each field reuses an existing idiom),
    the `EventRsvp` second-document shape with a **business-key unique index**
    (the model for `BoardItemPlacement`'s `(TodoItemId, BoardId)` identity),
    the standing matrix (author ∪ GlobalAdmin), the adapter, and the
-   `M4DocTypes` surface — the pattern `M5DocTypes` mirrors verbatim.
+   `EventDocTypes` surface — the pattern `ProjectDocTypes` mirrors verbatim.
 6. **`kw-dt` TagHelper** (ADR 0019 / 0020) — the one timestamp renderer:
    per-request resolver (resident override → platform default → `UTC` floor)
    + format (resident override → platform default → Long floor). Every M5
@@ -141,7 +141,7 @@ builds on without re-inventing:
    host for the new UI strings; the four seeded languages (en/de/fr/da, the
    ADR 0042 / 0045 set).
 10. **`Program.cs` + `SchemaBootstrap.cs`** (`Kumunita.Web`) — the **two
-    boot paths** the `M5DocTypes` surface and the `IProjectService`
+    boot paths** the `ProjectDocTypes` surface and the `IProjectService`
     registration are wired into (U02). The per-feature registration shape in
     `Kumunita.Core/DependencyInjection.cs` ("add transient with the store
     injected") is what the `IProjectService` registration follows.
@@ -160,7 +160,7 @@ Each is **[PROPOSED]** in this unit (U00); **U01** locks them into **ADR
 
 `Kumunita.Core.Projects` with four documents — `TodoItem`, `KanbanBoard`,
 `KanbanLane`, `BoardItemPlacement` — and **one new document surface**
-`M5DocTypes` (the `M4DocTypes` pattern verbatim: the `M3DocTypes` / `M4DocTypes`
+`ProjectDocTypes` (the `EventDocTypes` pattern verbatim: the `PostDocTypes` / `EventDocTypes`
 precedent). The four are Marten-native POCOs with conventional `string` `Id`,
 delta-detected + idempotent, no seeding, no EF. **Zero migrations for
 existing surfaces** — the four docs are new, the surface is additive (ADR
@@ -325,7 +325,7 @@ dependency**. *(C-M5·11.)*
 
 - **C-M5·1 — One bounded context, four documents, one surface, additive.**
   `Kumunita.Core.Projects` with `TodoItem`, `KanbanBoard`, `KanbanLane`,
-  `BoardItemPlacement`; one new surface `M5DocTypes` (the `M4DocTypes`
+  `BoardItemPlacement`; one new surface `ProjectDocTypes` (the `EventDocTypes`
   pattern verbatim); Marten-native POCOs, conventional `string` `Id`,
   delta-detected + idempotent, no seeding, no EF, zero migrations for
   existing surfaces (ADR 0004 §B.1).
@@ -420,8 +420,8 @@ dependency**. *(C-M5·11.)*
   folder in the ARCHITECTURE.md §3 tree, flipped from "not yet created").
   Four POCOs: `TodoItem`, `KanbanBoard`, `KanbanLane`,
   `BoardItemPlacement`.
-- **`M5DocTypes`** — the new document surface (a new file next to
-  `M4DocTypes`; the `M3DocTypes` / `M4DocTypes` pattern verbatim).
+- **`ProjectDocTypes`** — the new document surface (a new file next to
+  `EventDocTypes`; the `PostDocTypes` / `EventDocTypes` pattern verbatim).
 - **The two adapters** — `TodoItemToAuditableResource` +
   `KanbanBoardToAuditableResource` (new files in `Projects/`).
 - **`IProjectService` + `ProjectService`** — the new service seam (new files
@@ -501,7 +501,7 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 > **Part 2 status.** **Locked** — ADR 0067 (Accepted, 2026-09-23) is the
 > decisions source; this section is the **frozen reference tier** U02–U12
 > code against. The four POCOs + two adapters (§2.2), the **full
-> `IProjectService` surface** (§2.3), the `M5DocTypes` surface (§2.4), the
+> `IProjectService` surface** (§2.3), the `ProjectDocTypes` surface (§2.4), the
 > standing matrix (§2.5), the `kw-l` keys (§2.6), the **16 Core** +
 > **8 Web** pinned test names (§2.7 / §2.8), the three-test acceptance gate
 > (§2.9), and the drift-guard (§2.10) are **frozen pins** — a mismatch is a
@@ -991,19 +991,19 @@ public sealed record LaneDetail
 }
 ```
 
-## 2.4 The `M5DocTypes` surface (exact C#)
+## 2.4 The `ProjectDocTypes` surface (exact C#)
 
 ```csharp
-// Kumunita.Core (the M4DocTypes shape, verbatim — a new file `M5DocTypes.cs`
-// next to `M4DocTypes.cs`, wired into **both boot paths** — `Program.cs`
-// (next to the `M4DocTypes.Configure(opts)` call) + `SchemaBootstrap.cs` —
+// Kumunita.Core (the EventDocTypes shape, verbatim — a new file `ProjectDocTypes.cs`
+// next to `EventDocTypes.cs`, wired into **both boot paths** — `Program.cs`
+// (next to the `EventDocTypes.Configure(opts)` call) + `SchemaBootstrap.cs` —
 // U02).
 using Kumunita.Core.Projects;
 using Marten;
 
 namespace Kumunita.Core;
 
-public static class M5DocTypes
+public static class ProjectDocTypes
 {
     public static void Configure(StoreOptions opts)
     {
@@ -1042,7 +1042,7 @@ public static class M5DocTypes
 ```
 
 **Zero migrations for existing surfaces** — the four docs are new, the
-surface is additive (ADR 0004 §B.1; the `M4DocTypes` precedent).
+surface is additive (ADR 0004 §B.1; the `EventDocTypes` precedent).
 
 ## 2.5 The standing matrix (pinned)
 
@@ -1189,7 +1189,7 @@ The following are **frozen pins**; any mismatch with the implementation is a
 - **The DTOs** (this file §2.3) — `CreateTodoRequest` / `UpdateTodoRequest`
   / `CreateBoardRequest` / `CreateLaneRequest` / `UpdateLaneRequest` /
   `TodoDetailResult` / `BoardDetailResult` / `LaneDetail`.
-- **The `M5DocTypes` surface** (this file §2.4) — the four documents + the
+- **The `ProjectDocTypes` surface** (this file §2.4) — the four documents + the
   business-key unique indexes.
 - **The standing matrix** (this file §2.5) — creator ∪ assignee ∪ GlobalAdmin
   for to-do mutations; creator ∪ GlobalAdmin for board / lane mutations; the

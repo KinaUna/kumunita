@@ -73,7 +73,7 @@
   Kumunita.Web.Tests.dll` green — **Total 669, Failed 0** (the re-pinned
   `M20_Is_The_Single_InProgress_Milestone` plus the full pre-existing suite).
 - **Next unit entry point:** **U02** (`in-progress/m20-u02.md`) — Core: the
-  `NotificationQuietSchedule` doc + the `M6DocTypes` registration + the pure
+  `NotificationQuietSchedule` doc + the `NotificationDocTypes` registration + the pure
   `QuietScheduleEvaluator.IsQuietNow` + the two owner-scope `NotificationService`
   seams (`GetQuietScheduleAsync` / `SetQuietScheduleAsync`). Reads the design
   doc's §4 (the doc shape) + §6 (the evaluator) + the ADR 0121; exits on
@@ -93,7 +93,7 @@
      then read hour + day); empty axis = all; `Blocked` = quiet during the
      window, `Allowed` = the inverse; `null` / `Enabled == false` → `false`
      (the C-M20·3 floor).
-  3. `src/Kumunita.Core/M6DocTypes.cs` — additive `.Identity(s => s.RecipientId)`
+  3. `src/Kumunita.Core/NotificationDocTypes.cs` — additive `.Identity(s => s.RecipientId)`
      pin for `NotificationQuietSchedule` (the `NotificationPreference` shape —
      a bare `Schema.For<>()` would fail Marten identity resolution).
   4. `src/Kumunita.Core/Notifications/NotificationService.cs` — the two
@@ -284,7 +284,7 @@
 - **Tests (GATE-4 + GATE-6, 3 new pins):**
   - `tests/Kumunita.Core.Tests/NotificationFlushServiceTests.cs` (new file,
     `EventReminderServiceTests` idiom — real `PostgresFixture` `IDocumentStore`
-    booting `M1DocTypes`+`M3DocTypes`+`M6DocTypes`, NSubstitute
+    booting `CoreDocTypes`+`PostDocTypes`+`NotificationDocTypes`, NSubstitute
     `IMailerStage` recording staged keys, NSubstitute `IUserInfoService` stubbing
     the planted `Profile`, NSubstitute `ILocalizationService` returning
     `GetDefaultTimezoneAsync().Returns("UTC")`):

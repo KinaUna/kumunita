@@ -55,7 +55,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s1-b", member, t3, "b"));
         await Plant(store, Todo(author, "s1-c", member, t2, "c"));
 
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: null);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: null, ct: TestContext.Current.CancellationToken);
 
         // Created-desc: t3 (s1-b) > t2 (s1-c) > t1 (s1-a)
         Assert.Equal(new[] { "s1-b", "s1-c", "s1-a" }, feed.Items.Select(t => t.Id).ToList());
@@ -90,7 +90,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s2-c", member, now, "c", due: dueSoon));
 
         var spec = new SortSpec("due", false); // asc
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Postgres asc: dated first (dueSoon s2-c < dueLater s2-b), null last (s2-a)
         Assert.Equal(new[] { "s2-c", "s2-b", "s2-a" }, feed.Items.Select(t => t.Id).ToList());
@@ -124,7 +124,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s3-c", member, now, "c", due: dueSoon));
 
         var spec = new SortSpec("due", true); // desc
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Postgres desc: null first (s3-a), then most-recent→oldest (s3-b > s3-c)
         Assert.Equal(new[] { "s3-a", "s3-b", "s3-c" }, feed.Items.Select(t => t.Id).ToList());
@@ -156,7 +156,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s4-c", member, now, "c", status: "Open"));
 
         var spec = new SortSpec("status", false); // asc, OrdinalIgnoreCase
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // OrdinalIgnoreCase asc: "blocked" (s4-b) < "open" (s4-c); null last (s4-a)
         Assert.Equal(new[] { "s4-b", "s4-c", "s4-a" }, feed.Items.Select(t => t.Id).ToList());
@@ -183,7 +183,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s5-c", member, now, "avocado"));
 
         var spec = new SortSpec("title", false); // asc, OrdinalIgnoreCase
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // OrdinalIgnoreCase asc: "apple" (s5-a) < "avocado" (s5-c) < "banana" (s5-b)
         Assert.Equal(new[] { "s5-a", "s5-c", "s5-b" }, feed.Items.Select(t => t.Id).ToList());
@@ -212,7 +212,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Board(author, "s6-c", member, t2, "c"));
 
         var spec = new SortSpec("created", false); // asc
-        var feed = await svc.ListBoardsAsync(null, member, 1, sort: spec);
+        var feed = await svc.ListBoardsAsync(null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created-asc: t1 (s6-a) < t2 (s6-c) < t3 (s6-b)
         Assert.Equal(new[] { "s6-a", "s6-c", "s6-b" }, feed.Items.Select(b => b.Id).ToList());
@@ -238,7 +238,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Board(author, "s7-c", member, now, "avocado"));
 
         var spec = new SortSpec("title", false); // asc, OrdinalIgnoreCase
-        var feed = await svc.ListBoardsAsync(null, member, 1, sort: spec);
+        var feed = await svc.ListBoardsAsync(null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // OrdinalIgnoreCase asc: "apple" (s7-a) < "avocado" (s7-c) < "banana" (s7-b)
         Assert.Equal(new[] { "s7-a", "s7-c", "s7-b" }, feed.Items.Select(b => b.Id).ToList());
@@ -267,7 +267,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Project(author, "s8-c", member, t2, "c"));
 
         var spec = new SortSpec("created", true); // desc
-        var feed = await svc.ListProjectsAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListProjectsAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created-desc: t3 (s8-b) > t2 (s8-c) > t1 (s8-a)
         Assert.Equal(new[] { "s8-b", "s8-c", "s8-a" }, feed.Items.Select(p => p.Id).ToList());
@@ -302,7 +302,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Project(author, "s9-c", member, now, "c", modified: mNew));
 
         var spec = new SortSpec("modified", false); // asc
-        var feed = await svc.ListProjectsAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListProjectsAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Postgres asc: oldest→newest (s9-b mOld < s9-c mNew), null last (s9-a)
         Assert.Equal(new[] { "s9-b", "s9-c", "s9-a" }, feed.Items.Select(p => p.Id).ToList());
@@ -331,7 +331,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Goal(author, "s10-c", member, t2, "c"));
 
         var spec = new SortSpec("created", false); // asc
-        var feed = await svc.ListGoalsAsync(null, member, 1, sort: spec);
+        var feed = await svc.ListGoalsAsync(null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created-asc: t1 (s10-a) < t2 (s10-c) < t3 (s10-b)
         Assert.Equal(new[] { "s10-a", "s10-c", "s10-b" }, feed.Items.Select(g => g.Id).ToList());
@@ -359,7 +359,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "s11-b", member, t2, "b"));
 
         var spec = new SortSpec("bogus", true); // not in allowlist → _ branch
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Default = Created-desc: t2 (s11-b) > t1 (s11-a)
         Assert.Equal(new[] { "s11-b", "s11-a" }, feed.Items.Select(t => t.Id).ToList());
@@ -387,7 +387,7 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Plant(store, Todo(author, "tie-a", member, sharedTime, "a"));
 
         var spec = new SortSpec("created", false); // created asc — the tie is what matters
-        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec);
+        var feed = await svc.ListTodosAsync(null, null, member, 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, feed.Items.Select(t => t.Id).ToList());
@@ -452,10 +452,10 @@ public class ProjectSortTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

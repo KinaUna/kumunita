@@ -27,7 +27,7 @@ namespace Kumunita.Core.Tests;
 /// The harness follows the M3 <c>PostServiceTests</c> shape: a shared
 /// <see cref="PostgresFixture"/> (Testcontainers <c>postgres:18</c>), a
 /// fresh scratch database per test method, the full DDL applied
-/// (<c>M1DocTypes</c> + <c>M3DocTypes</c> + <c>M17DocTypes</c>), and the
+/// (<c>CoreDocTypes</c> + <c>PostDocTypes</c> + <c>BookmarkDocTypes</c>), and the
 /// seven-seam <see cref="BookmarkService"/> composition over the scratch
 /// store. No NSubstitute — the frozen seams are real (the M2
 /// <c>DirectoryServiceTests</c> / M3 <c>PostServiceTests</c> precedent).
@@ -64,7 +64,7 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         var second = await RunInSession(store, s => bm.ToggleAsync(owner, "post", postId, s));
         Assert.Equal(BookmarkToggleStatus.AlreadyBookmarked, second.Status);
 
-        // The M17DocTypes unique index is the witness: exactly ONE row.
+        // The BookmarkDocTypes unique index is the witness: exactly ONE row.
         var rows = await Bookmarks(store, owner);
         Assert.Single(rows, b => b.TargetKind == "post" && b.TargetId == postId);
     }
@@ -410,9 +410,9 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M17DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

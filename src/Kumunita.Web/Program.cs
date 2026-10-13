@@ -104,13 +104,13 @@ var marten = builder.Services.AddMarten(opts =>
 
     // M1's Marten-native documents + their non-default conventions (Profile identity,
     // GroupMembership business-key index). ADR 0004 §B.1.
-    M1DocTypes.Configure(opts);
+    CoreDocTypes.Configure(opts);
 
     // M3's + M3b's Marten-native documents (Post, PostReply, Report — report
     // table-in-M3 / flow-in-M3b; and Announcement — the M3b "platform
     // announcements" lane). All use the conventional string Id, so no non-default
     // convention needed. ADR 0004 §B.1.
-    M3DocTypes.Configure(opts);
+    PostDocTypes.Configure(opts);
 
     // Media (plan U2): the media catalog doc (MediaObject) — its Id *is* the
     // content hash (C-MED·4), so Marten's default Id-unique mapping is the dedup;
@@ -164,7 +164,7 @@ var marten = builder.Services.AddMarten(opts =>
     // concurrency exception, the ADR 0054 §3.2 pin). Without this call the docs are
     // invisible to Marten (the M3/Media/Page/Tag precedent). The Event/EventRsvp
     // POCOs are new; the existing Post/Announcement/Page surfaces are untouched.
-    M4DocTypes.Configure(opts);
+    EventDocTypes.Configure(opts);
 
     // M5 (ADR 0067, plan U02): the Projects bounded context's documents
     // (TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement, ADR 0004 §B.1
@@ -173,7 +173,7 @@ var marten = builder.Services.AddMarten(opts =>
     // Without this call the docs are invisible to Marten (the M3/Media/Page/Tag/M4
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
-    M5DocTypes.Configure(opts);
+    ProjectDocTypes.Configure(opts);
 
     // M6 (ADR 0076 D1, plan U02): the Notifications bounded context's documents
     // (Notification + NotificationPreference, ADR 0004 §B.1 — the (RecipientId,
@@ -182,7 +182,7 @@ var marten = builder.Services.AddMarten(opts =>
     // to Marten (the M3/Media/Page/Tag/M4/M5 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M6DocTypes.Configure(opts);
+    NotificationDocTypes.Configure(opts);
 
     // M9 (ADR 0105 D1, plan U01): the Messaging bounded context's documents
     // (Conversation + Message, ADR 0004 §B.1 — the (ParticipantA,
@@ -192,7 +192,7 @@ var marten = builder.Services.AddMarten(opts =>
     // (the M3/Media/Page/Tag/M4/M5/M6 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M9DocTypes.Configure(opts);
+    MessagingDocTypes.Configure(opts);
 
     // M16 (ADR 0117 D1, plan U01): the Inventory bounded context's documents
     // (InventoryItem + InventoryCheckout, ADR 0004 §B.1 — the (ComponentId,
@@ -204,7 +204,7 @@ var marten = builder.Services.AddMarten(opts =>
     // to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M16DocTypes.Configure(opts);
+    InventoryDocTypes.Configure(opts);
 
     // M17 (ADR 0118 D1, plan U01): the Bookmarks bounded context's document
     // (Bookmark, ADR 0004 §B.1 — the (OwnerId, TargetKind, TargetId) unique
@@ -214,10 +214,10 @@ var marten = builder.Services.AddMarten(opts =>
     // M3/Media/Page/Tag/M4/M5/M6/M9/M16 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M17DocTypes.Configure(opts);
+    BookmarkDocTypes.Configure(opts);
 
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
-    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
+    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to PostDocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
     // the conventional string Id, so no non-default convention or
     // business-key index is pinned). Without this call the UsageEvent doc
@@ -225,7 +225,7 @@ var marten = builder.Services.AddMarten(opts =>
     UsageDocTypes.Configure(opts);
 
     // M21 (ADR 0122 D1, plan U01): the Document bounded context's document
-    // (Document, ADR 0004 §B.1 — a parallel surface to M17DocTypes /
+    // (Document, ADR 0004 §B.1 — a parallel surface to BookmarkDocTypes /
     // MediaDocTypes / UsageDocTypes, not additive on an existing one:
     // Document uses the conventional string Id, so no non-default convention
     // or business-key index is pinned). Without this call the Document doc is
@@ -241,6 +241,49 @@ var marten = builder.Services.AddMarten(opts =>
     // business-key index is pinned). Without this call the doc is invisible
     // to Marten (the M3/Media/Usage/Document precedent).
     StorageSettingsDocTypes.Configure(opts);
+
+    // M33 (ADR 0156, U03): the storage-history doc (StorageMetricsSample,
+    // ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
+    // StorageSettingsDocTypes, not additive on an existing one: it uses the
+    // conventional string Id, so no non-default convention or business-key
+    // index is pinned). Without this call the doc is invisible to Marten (the
+    // M3/Media/Usage/Document precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    StorageHistoryDocTypes.Configure(opts);
+
+    // M31 (ADR 0154 D1, U03): the error-report bounded context's document
+    // (ErrorReport, ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
+    // BookmarkDocTypes / DocumentDocTypes, not additive on an existing one:
+    // ErrorReport uses the conventional string Id identity, so only the
+    // (TriageStatus, Created) admin-list-ordering index is pinned). Without
+    // this call the ErrorReport doc is invisible to Marten (the
+    // M3/Media/Usage/Document precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    ErrorReportDocTypes.Configure(opts);
+
+    // ESC (ADR 0159, ESC·1): the escalation-authorization bounded context's
+    // **two new** docs (EscalationToken + EscalationOutboundConfig) on a
+    // **new** parallel surface (the ErrorReportDocTypes / UsageDocTypes
+    // parallel-surface precedent — ADR 0004 §B.1). Without this call the two
+    // new docs are invisible to Marten (the M3/Media/Usage/Document
+    // precedent). The M32 ErrorReportDocTypes surface is **untouched** (ESC·1)
+    // — the four additive ErrorReport fields (ESC·2) ride its existing
+    // .Schema.For<ErrorReport>() (the idempotent delta at boot). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    EscalationDocTypes.Configure(opts);
+    // M35 (ADR 0164, U03): the Kiosk bounded context's singleton doc
+    // (KioskPlaylist, ADR 0004 §B.1 additive — one row per instance,
+    // Id = "kiosk", the SiteContent / LocaleSettings shape, ADR 0005 B /
+    // ADR 0150). The KioskView entry is a value object nested in the
+    // singleton (not a standalone doc — M35·9). Without this call the doc
+    // is invisible to Marten and a pristine boot never creates the
+    // mt_doc_kioskplaylist table (the SITE / M29 / M30 / ESC precedent).
+    // KioskDocTypes lives in Kumunita.Core (like the other *DocTypes), so
+    // the unqualified name resolves here unchanged.
+    KioskDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -276,6 +319,18 @@ builder.Services.AddScoped<Kumunita.Web.Security.IUploadGate>(sp =>
         sp.GetRequiredService<Kumunita.Core.Usage.IStorageMetricsService>()));
 
 builder.Services.AddScoped<Kumunita.Web.Security.IUploadLimitHint, Kumunita.Web.Security.UploadLimitHint>();
+
+// M32 (ADR 0155, M32·5) — the escalation forwarding lane: the Web-layer
+// IEscalationForwarder is the **first outbound HTTP** in the codebase (Core
+// stays HTTP-free, ADR 0006-D). AddHttpClient() registers the
+// IHttpClientFactory (a singleton); the EscalationForwarder is a singleton
+// (it holds no per-request state — its dependencies are a singleton
+// IHttpClientFactory + the IErrorReportService read seam, both resolved
+// safely). The KUMUNITA_ESCALATION_ENDPOINT env var is read from
+// configuration at forward time (M32·6 — never persisted, never a DB
+// column, never a per-row field).
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<Kumunita.Web.Services.IEscalationForwarder, Kumunita.Web.Services.EscalationForwarder>();
 
 // M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
 // (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
@@ -593,6 +648,29 @@ builder.UseWolverine(opts =>
     opts.OnException<MailKit.Net.Smtp.SmtpCommandException>().RetryWithCooldown(backoff);
     opts.OnException<MailKit.Net.Smtp.SmtpProtocolException>().RetryWithCooldown(backoff);
     opts.OnException<MailKit.ProtocolException>().RetryWithCooldown(backoff);
+    // Per-type service-location opt-ins (Wolverine 6.x default is
+    // ServiceLocationPolicy.NotAllowed; 5.x was AllowedButWarn — see
+    // WolverineOptions.ServiceLocationPolicy XML doc + wolverine#2584). The
+    // three services below are registered in Kumunita.Core/DependencyInjection.cs
+    // as opaque lambda factories (or, for IUserInfoService, the impl's ctor
+    // takes IServiceProvider? as a circular-dependency escape hatch — see
+    // UserInfoService.cs lines 57-71), so the generated handler code cannot
+    // inline-construct them via ctor injection. Opting them in here — per the
+    // XML doc's "opt specific types in with AlwaysUseServiceLocationFor only
+    // when you have to" — is the surgical alternative to a global
+    // ServiceLocationPolicy change: the strict default stays in force for every
+    // future opaque service (which will still fail fast at first dispatch), but
+    // these three known-good services are allowed to be service-located.
+    //
+    // The failing handlers (EventReminderTick, NotificationFlushTick) are the
+    // only two §6.4 jobs whose handler signatures cross into opaque-land — the
+    // other three (AuditPurgeTick / UsagePurgeTick / StorageMetricsCaptureTick)
+    // take only IDocumentStore + IOptions<T>, both transparent. See the app
+    // log: "InvalidServiceLocationException … ServiceLocationPolicy.NotAllowed
+    // is in effect" on the first dispatch of each.
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Identity.IMailerStage>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.Notifications.NotificationService>();
+    opts.CodeGeneration.AlwaysUseServiceLocationFor<Kumunita.Core.UserInfo.IUserInfoService>();
 });
 
 var app = builder.Build();
@@ -821,6 +899,13 @@ await bus.PublishAsync(new EventReminderTick());
 // UsageEvent rows accumulate forever — the D5 "no-tier, no-summary" lane
 // would silently stop honoring the 365-day constant).
 await bus.PublishAsync(new UsagePurgeTick());
+// M33 (ADR 0156) — the StorageMetricsSample 365-day capture + retention tick
+// (the StorageMetricsCaptureHandler self-reschedules after each run; this
+// seed is the first-boot scheduling. Without this line the handler never
+// fires and no StorageMetricsSample rows are ever stored, so the
+// /admin/storage Trend section is permanently empty — the M13
+// UsagePurgeTick seed precedent, M33·3).
+await bus.PublishAsync(new StorageMetricsCaptureTick());
 // M20 (ADR 0121) — the deferred-notification email flush tick (the
 // NotificationFlushHandler self-reschedules at the resolved admin cadence
 // QuietCheckMinutes after each run; this seed is the first-boot scheduling).

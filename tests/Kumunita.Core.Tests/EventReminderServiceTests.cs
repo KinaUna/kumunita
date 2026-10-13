@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 using NSubstitute;
@@ -60,7 +61,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "w-in", authorInside, now.AddHours(23));
         await PlantEvent(store, "w-out", authorOutside, now.AddHours(25));
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // 23 h out (inside the window) → the author is reminded.
         Assert.Contains(staged, s => s.Key == $"remind:w-in:{authorInside}");
@@ -95,7 +96,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantRsvp(store, "g-ev", maybe, RsvpStatus.Maybe);
         await PlantRsvp(store, "g-ev", no, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{goer}");          // Going → reminded
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{author}");        // author always (T21)
@@ -123,7 +124,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         // The author RSVPed "No" — but the author is still a reminder recipient.
         await PlantRsvp(store, "a-ev", author, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         Assert.Contains(staged, s => s.Key == $"remind:a-ev:{author}");
         // Exactly one row for the author (no double-send via the Going path).
@@ -151,7 +152,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "k-ev", author, now.AddHours(5));
         await PlantRsvp(store, "k-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // Exactly one staged email per (event, recipient); the key is the
         // §6.2 per-email shape remind:{eventId}:{userId}.
@@ -183,7 +184,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "n-ev", author, now.AddHours(8));
         await PlantRsvp(store, "n-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // The reminder actually staged emails (the test is not vacuous).
         Assert.Equal(2, staged.Count);
@@ -218,7 +219,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "pz-ev", paris, start);
         await PlantRsvp(store, "pz-ev", plain, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization(), ct: TestContext.Current.CancellationToken);
 
         // The UTC wall time of the event instant = the plain recipient's view
         // (the platform default here is the UTC zone); the Paris recipient's
@@ -255,9 +256,9 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -347,5 +348,75 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         var ct = TestContext.Current.CancellationToken;
         await using var q = store.QuerySession();
         return await q.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    /// <summary>A <see cref="ITranslationProvider"/> stand-in that returns the
+    /// key as a floor for any key it does not specifically resolve.</summary>
+    private static ITranslationProvider RecordingTranslator()
+    {
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci => Task.FromResult((string)ci[0]));
+        return translator;
+    }
+
+    /// <summary>Reads a planted <see cref="Profile"/> from the live store by
+    /// subject id (the <see cref="IUserInfoService.GetProfileAsync"/> read
+    /// lane the <see cref="NotificationService"/> resolves per recipient).</summary>
+    private static async Task<Profile?> LoadProfileAsync(IDocumentStore store, string subjectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Profile>(subjectId, ct);
+    }
+
+    // ── Link-path pin ─────────────────────────────────────────────────────────
+    //
+    // The event-reminder inbox row (the M6 F4 durable record) must carry the
+    // event detail page as its LinkPath so the inbox renders a clickable
+    // link to the event — not just the event's title. The email is M4's;
+    // this pin covers the inbox-side complement.
+
+    [Fact]
+    public async Task M4_ReminderInboxRowLinksToEvent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var conn = await fixture.NewDatabaseAsync(ct);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);   // the Notification table
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+
+        var now = DateTimeOffset.UtcNow;
+        const string recipient = "u-reminder-link";
+        const string eventId   = "ev-link";
+
+        await PlantProfile(store, recipient, "link@kumunita");
+        await PlantEvent(store, eventId, recipient, now.AddHours(23)); // in-window
+
+        var (mailer, _) = RecordingMailer();
+        var translator   = RecordingTranslator();
+        var userInfo     = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci => LoadProfileAsync(store, (string)ci[0]));
+        var svc = new NotificationService(store, userInfo, translator, mailer);
+
+        await EventReminderService.SendRemindersAsync(
+            store, new EventReminderOptions(), now, mailer, Localization(),
+            notifications: svc, ct: ct);
+
+        await using var q = store.QuerySession();
+        var row = (await q.Query<Notification>().ToListAsync(ct)).Single();
+        Assert.Equal(recipient, row.RecipientId);
+        Assert.Equal(NotificationKinds.EventReminder, row.Kind);
+        Assert.Equal($"/events/{eventId}", row.LinkPath);
     }
 }

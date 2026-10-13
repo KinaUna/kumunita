@@ -61,19 +61,41 @@ public sealed class TagController(
     IPageService pages,
     ILocalizationService localization,
     IDocumentStore store,
+    // The per-request effective-language seam (ADR 0049) — resolves the viewer's
+    // reading language for the tag display-name resolution. Optional (default
+    // null) so test-construction sites that build this controller without it
+    // keep compiling; a missing seam means the read falls to the instance-
+    // default → en floor (the legacy behavior). DI always supplies it in the app.
+    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
     // The items-per-page preference seam (FeedPaging). Optional (default
     // null) so test-construction sites that build this controller without it
     // keep compiling (a missing seam falls back to the platform page-size
     // default); DI always supplies it in the app.
     Kumunita.Core.UserInfo.IUserInfoService? userInfo = null) : Controller
-{
-    private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
-        KumunitaPrincipal.SubjectId(user);
+    {
+        private static string? ActorId(System.Security.Claims.ClaimsPrincipal user) =>
+            KumunitaPrincipal.SubjectId(user);
 
-    private static IReadOnlySet<string> ActorRoles(System.Security.Claims.ClaimsPrincipal user) =>
-        KumunitaPrincipal.RoleSet(user);
+        private static IReadOnlySet<string> ActorRoles(System.Security.Claims.ClaimsPrincipal user) =>
+            KumunitaPrincipal.RoleSet(user);
 
-    // ── GET /tags — the tag list (F12: empty on a fresh instance) ─────────
+        /// <summary>
+        /// The viewer's per-request effective language code (ADR 0005 /
+        /// ADR 0049 — the exact <see cref="EffectiveLanguageCode.ResolveAsync"/>
+        /// chain the <c>&lt;kw-l&gt;</c> TagHelper uses: the <c>kumunita.locale</c>
+        /// cookie → the first enabled <c>Accept-Language</c> match → the instance
+        /// default → <c>en</c> floor), passed to the read seam as the top of the
+        /// ADR 0005 preference order so a tag's <see cref="TagTranslation"/> in
+        /// that language resolves — the exact idiom the <see
+        /// cref="GroupsController"/> group-name and <see cref="PostsController
+        /// "/> post-translation surfaces use. **Null** when the
+        /// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> seam is
+        /// absent (a test-construction site) — the read then falls to the
+        /// instance-default → <c>en</c> floor (the legacy behavior), so the
+        /// existing mock call sites keep matching their stubs.
+        /// </summary>
+        private Task<string?> ResolvePreferredLanguageAsync()
+            => EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
 
     /// <summary>
     /// <c>GET /tags</c> — the tag list: the distinct tags used on ≥ 1 post
@@ -87,7 +109,8 @@ public sealed class TagController(
     public async Task<IActionResult> Index()
     {
         var actor = ActorId(User) ?? string.Empty;
-        var items = await tags.ListForActorAsync(actor);
+        var preferred = await ResolvePreferredLanguageAsync();
+        var items = await tags.ListForActorAsync(actor, preferred);
         return View(new TagListViewModel { Tags = items });
     }
 
@@ -150,7 +173,8 @@ public sealed class TagController(
         // viewer's language): find the tag in the accessor's readable tag
         // set (one extra base-query call — N+1 acceptable for a neighborhood
         // scale, the M2 GroupsController display-name precedent).
-        var tagItems = await tags.ListForActorAsync(actor);
+        var preferred = await ResolvePreferredLanguageAsync();
+        var tagItems = await tags.ListForActorAsync(actor, preferred);
         var displayName = tagItems
             .FirstOrDefault(t => t.Tag.Slug == slug)?.DisplayedName
             ?? slug;
@@ -327,7 +351,7 @@ public sealed class TagController(
         // tag-specific gate, C-TG·1). A missing or unreadable tag is a 404
         // (the C-TG·1 floor — the two are indistinguishable to the viewer,
         // both map to 404, not 403 — a 403 would confirm the tag exists).
-        var items = await tags.ListForActorAsync(actor);
+        var items = await tags.ListForActorAsync(actor, await ResolvePreferredLanguageAsync());
         var tag = items.FirstOrDefault(t => t.Tag.Slug == slug)?.Tag;
         if (tag is null)
             return NotFound();
@@ -441,7 +465,8 @@ public sealed class TagController(
     public async Task<IActionResult> Suggest([FromBody] SuggestRequest request)
     {
         var actor = ActorId(User) ?? string.Empty;
-        var suggestions = await tags.SuggestAsync(request?.Prefix ?? string.Empty, actor);
+        var preferred = await ResolvePreferredLanguageAsync();
+        var suggestions = await tags.SuggestAsync(request?.Prefix ?? string.Empty, actor, preferred);
         return Json(new TagSuggestViewModel { Suggestions = suggestions });
     }
 }

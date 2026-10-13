@@ -25,7 +25,7 @@ on `IEventService` (`ListMineAsync` — the actor's own rows, non-leaky by
 construction), one additive view-model field (`EventIndexViewModel.MyEvents`,
 default-empty so every existing call site is untouched), one view section
 (rendered **only when non-empty**, above the feed), and 2 `kw-l` keys × 4
-languages — and **nothing else**: no new documents, no `M4DocTypes` change, no
+languages — and **nothing else**: no new documents, no `EventDocTypes` change, no
 `FeatureSchemaBase` migration, no write lane, **no new `AccessAudit` row
 shape** (the `GetMyRsvpAsync` posture — the per-row write lanes already
 committed their decisions; this read re-decides nothing), no new bounded

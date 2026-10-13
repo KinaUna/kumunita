@@ -29,14 +29,14 @@ no multi-tenant data model.
 - **`Kumunita.Core`** — domain + services. Bounded contexts live in
   `Identity/`, `UserInfo/`, `Authorization/`, `Posts/`, `Moderation/`,
   `Localization/`, `Bootstrap/`. The M3b "platform announcements" lane
-  (`Announcements/`, registered in `M3DocTypes` alongside `M1DocTypes`) is a
+  (`Announcements/`, registered in `PostDocTypes` alongside `CoreDocTypes`) is a
   feature module within that surface, not a top-level bounded context.
   `DependencyInjection.cs` registers each feature.
 - **`Kumunita.Web`** — Razor Pages / MVC (server-rendered), `Program.cs`
   bootstrap, `Milestones.cs` (home-page roadmap — keep in sync with `README.md`),
   `Models/` + `Security/` (view-models and claim shaping, both server-rendered).
 - **Persistence** (ADR 0004 §B): **Marten** owns the domain documents and
-  versioned schema (the `M1DocTypes` / `M3DocTypes` registration
+  versioned schema (the `CoreDocTypes` / `PostDocTypes` registration
   surfaces). **EF Core is used only for ASP.NET Identity tables** — do not put
   domain data in EF.
 
@@ -278,6 +278,28 @@ process with no memory of any earlier command:
   line-continuation marker, meaning an unterminated quote or backslash),
   stop and cancel rather than trying to "finish" the statement, and don't
   retry the same multi-line form.
+
+### When the sync terminal channel wedges (no output at all)
+
+A separate, Copilot-agent-specific failure mode (not a bash/WSL2 one): a
+`mode=sync` terminal call can return **"Command produced no output"** — even
+for a trivial `echo` — because the agent's *output-capture* layer wedges.
+This is the known Copilot agent terminal bug cited above (microsoft/vscode#
+286106 / #265881 / #265863); it is not caused by anything in the repo and no
+`.vscode/settings.json` key disables it. Treat it as a **channel** failure,
+not a command failure, and do not keep retrying the same sync call. The
+reliable workarounds, best first:
+
+- **Prefer `mode=async` + `get_terminal_output`** for anything non-trivial
+  (builds, test runs, servers). This has been observed to work even while the
+  sync channel is dead: the `Kumunita.Core.Tests` suite (1440 tests) completed
+  and reported its full `TEST EXECUTION SUMMARY` through the async channel in
+  exactly that situation.
+- **Redirect to a file as a belt-and-suspenders** so the result survives on
+  disk regardless of inline capture: `… 2>&1 > .tmp/result.log`, then read it
+  with the file tools.
+- **Keep each command self-contained** (single process, no cross-call
+  `$vars` — the doctrine above) so a wedged call has a small blast radius.
 
 Secondary causes worth ruling out if a command still hangs: `git`/`gh` commands
 that page output (`git log`, `git diff`, `gh pr view`) can block waiting for a

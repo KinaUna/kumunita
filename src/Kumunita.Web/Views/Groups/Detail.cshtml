@@ -28,7 +28,9 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
-    var filterNamePlaceholder = await Translation.GetAsync("common.filter_name", _kwL);
+    var filterNamePlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["common.filter_name"]
+        : await Translation.GetAsync("common.filter_name", _kwL);
 
     // The add / remove member routes each carry the same [FromForm] subjectId —
     // the route distinguishes the two (the plan's U10 line 152 pin). The

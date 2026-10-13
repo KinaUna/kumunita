@@ -19,7 +19,7 @@ rule — every new seam is an *additive* method on
 `IUserInfoService` / `IEventService`; no new bounded context, no new
 `AccessAction`, no branch in the frozen `IAuthorizationService`); 0004 (the
 persistence rule — one new `GuardianEventRequest` document on the
-`M4DocTypes` surface, one unique `(EventId, ChildId)` index, no EF); 0003
+`EventDocTypes` surface, one unique `(EventId, ChildId)` index, no EF); 0003
 (audit-by-default — the three guardian resolve lanes each write one
 `AccessAudit` row with `Via: Guardian`; the child's own self-lane writes
 **no** audit row, preserving the M4 pin)
@@ -73,7 +73,7 @@ in the frozen `IAuthorizationService`.
 
 ### A. The new document: `GuardianEventRequest`
 
-One new document on the **`M4DocTypes`** surface (it is an event-attendance
+One new document on the **`EventDocTypes`** surface (it is an event-attendance
 artifact, not an identity or profile artifact — the ADR 0004 §B
 persistence rule):
 
@@ -93,7 +93,7 @@ public sealed class GuardianEventRequest
 public enum GuardianEventRequestStatus { Pending, Approved, Denied }
 ```
 
-The **unique `(EventId, ChildId)` index** (the `M4DocTypes.Configure`
+The **unique `(EventId, ChildId)` index** (the `EventDocTypes.Configure`
 surface) enforces exactly **one** pending request per child per event at
 the DB layer — the `EventRsvp` `(EventId, UserId)` / `GroupInvitation`
 `(GroupId, UserId)` business-key precedent. A resolved (Approved / Denied)
@@ -287,7 +287,7 @@ inbox).
   lanes; the active-link existence check for the gate itself); the frozen
   `IAuthorizationService` surface is untouched (ADR 0006 §A).
 - **No EF Core involvement** — the `GuardianEventRequest` document is on
-  the `M4DocTypes` Marten surface (ADR 0004 §B); EF Core remains
+  the `EventDocTypes` Marten surface (ADR 0004 §B); EF Core remains
   Identity-only.
 
 ## Consequences
@@ -320,7 +320,7 @@ inbox).
 - **Testable without a new fixture.** The Core tests reuse the
   `GuardianApprovalLaneTests` harness (the `NotificationService` wiring,
   the `CreateGuardianLinkAsync` GU formation, the `NotificationsFor` /
-  `AuditsFor` query helpers) with the `M4DocTypes` surface added for the
+  `AuditsFor` query helpers) with the `EventDocTypes` surface added for the
   event documents — the 15 new Core tests + 8 new Web tests run in the
   same ~15-second window as the existing GU lane tests.
 

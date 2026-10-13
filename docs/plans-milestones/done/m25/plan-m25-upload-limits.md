@@ -156,7 +156,7 @@ M26 → `StatusNext` and updates the two `MilestonesTests.cs` tests to match.
 - **Versioned storage (ADR 0004 §B.1):** `CommunityStorageSettings` is
   **Marten-native** (POCO, a stable string `Id` = `"community"`), registered on
   a new parallel doc surface `Usage.StorageSettingsDocTypes.Configure(StoreOptions)`
-  (mirroring `M1DocTypes`/`M3DocTypes`), delta-detected + idempotent,
+  (mirroring `CoreDocTypes`/`PostDocTypes`), delta-detected + idempotent,
   **create-if-missing on read** (no hand-rolled seed; the read lane is the
   create-if-missing seam, mirroring the M9/M20 community-setting precedent).
 - **Test model (unchanged).** The invariant-anchored seam-test list pinned in
@@ -332,7 +332,7 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
   (the `Kumunita.Core.Usage` context home — the namespace M25's new types live in;
   mirror its registration in `Kumunita.Core/DependencyInjection.cs`);
   `src/Kumunita.Core/DependencyInjection.cs` (the `AddTransient` + factory
-  registration shape); `src/Kumunita.Core/M3DocTypes.cs` + `Bootstrap/SchemaBootstrap.cs`
+  registration shape); `src/Kumunita.Core/PostDocTypes.cs` + `Bootstrap/SchemaBootstrap.cs`
   + `src/Kumunita.Web/Program.cs` (the doc-surface + two boot-path shape U3 mirrors);
   `src/Kumunita.Web/Controllers/AttachmentController.cs` +
   `ContentImageController.cs` + `DocumentController.cs` +
@@ -451,9 +451,9 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
 - **Goal:** create the `CommunityStorageSettings` POCO (ns
   `Kumunita.Core.Usage`) + a new `StorageSettingsDocTypes.Configure(StoreOptions)`
   registration surface + wire it into both boot paths (the dev loop in
-  `Program.cs` and the all-env `SchemaBootstrap`). Mirrors the `M3DocTypes`
+  `Program.cs` and the all-env `SchemaBootstrap`). Mirrors the `PostDocTypes`
   pattern exactly. **Build green.**
-- **Entry reads:** `src/Kumunita.Core/M3DocTypes.cs` (the shape to mirror);
+- **Entry reads:** `src/Kumunita.Core/PostDocTypes.cs` (the shape to mirror);
   `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (where the existing
   `*.Configure(opts)` calls live — add `StorageSettingsDocTypes.Configure(opts)`
   next to them); `src/Kumunita.Web/Program.cs` (the dev-loop `Configure` call —

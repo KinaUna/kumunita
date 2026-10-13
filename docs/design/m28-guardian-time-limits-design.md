@@ -19,7 +19,7 @@
 > context, zero new `IAuthorizationService` surface, zero new `AccessAction`,
 > zero new `AccessVia`, zero new adapter, zero new `Decide()` branch
 > (C-M28·5, D5). The **only** schema change is **one new document**
-> (`GuardianTimeLimitSchedule`, D2 — registered on the **existing `M1DocTypes`**
+> (`GuardianTimeLimitSchedule`, D2 — registered on the **existing `CoreDocTypes`**
 > GU surface, next to `GuardianLink`) **+ one new enum** (`TimeLimitMode`, D2)
 > **+ three additive seams on `IUserInfoService`** (D4, ADR 0006-E compatible
 > ADDs) **+ one new middleware** (`TimeLimitMiddleware`, D5 — the
@@ -51,7 +51,7 @@
 > the frozen `IUserInfoService` GU standing read, the frozen
 > `BlockedAccountMiddleware` sign-out shape, and the frozen ADR 0019 zone
 > resolution are the **only** seams touched (three *additive* seams on
-> `IUserInfoService` + one *additive* doc on `M1DocTypes` + one *additive*
+> `IUserInfoService` + one *additive* doc on `CoreDocTypes` + one *additive*
 > middleware + one `?error=time-limit` login landing). It does **not** add a
 > branch to `Decide()`, a new `IAuthorizationService` signature, a new
 > `AccessAction`, a new `AccessVia`, a new adapter, or a relational time-limit
@@ -292,7 +292,7 @@ public enum TimeLimitMode
 /// document per child (id = the child's <see cref="ChildId"/> — the
 /// <see cref="NotificationQuietSchedule"/> "one row per subject" shape, ADR
 /// 0121 D2, with <c>ChildId</c> in place of <c>RecipientId</c>; identity
-/// pinned to <c>ChildId</c> in <c>M1DocTypes</c>, next to
+/// pinned to <c>ChildId</c> in <c>CoreDocTypes</c>, next to
 /// <see cref="GuardianLink"/>). A child with two guardians shares **one**
 /// schedule (the <see cref="GuardianLink"/> multi-guardian shape).
 /// <see cref="Enabled"/> is the master on/off: <c>false</c> = "never
@@ -346,17 +346,17 @@ public sealed class GuardianTimeLimitSchedule
 }
 ```
 
-**The `M1DocTypes` registration** (U01 — the `GuardianTimeLimitSchedule`
+**The `CoreDocTypes` registration** (U01 — the `GuardianTimeLimitSchedule`
 document is Marten-native with a conventional `ChildId` identity; the additive-
 surface delta is applied idempotently at boot — ADR 0004 §B.1, zero migration,
 **no** new `*DocTypes` surface, **no** EF):
 
 ```csharp
-// In M1DocTypes.Configure(StoreOptions opts), alongside Schema.For<GuardianLink>():
+// In CoreDocTypes.Configure(StoreOptions opts), alongside Schema.For<GuardianLink>():
 opts.Schema.For<UserInfo.GuardianTimeLimitSchedule>().Identity(s => s.ChildId);
 ```
 
-**Why `M1DocTypes` and not a new `M28DocTypes` (D2):** it is **part of the GU
+**Why `CoreDocTypes` and not a new `M28DocTypes` (D2):** it is **part of the GU
 guardian-lane surface** (the "lane on the M1 surface, not a new bounded
 context" shape, the M27 D7 / SITE "one new doc type" precedent) — the cheapest
 + most consistent choice. The seeder does **not** seed a schedule for any

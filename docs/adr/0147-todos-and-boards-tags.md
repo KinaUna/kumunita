@@ -63,7 +63,7 @@ delta-detected by `ApplyAllConfiguredChangesToDatabaseAsync`, idempotent,
 no re-seed, no EF migration. It registers in `PortabilityDocTypes` as
 `A("TagIds", "Tag")` (an array-valued tag reference, the `TodoItem`
 `TagIds` entry's shape) so a board export carries its tags. **No new
-document** is added to the `M5DocTypes` / `PortabilityDocTypes` surface —
+document** is added to the `ProjectDocTypes` / `PortabilityDocTypes` surface —
 only a field on an existing doc type.
 
 ### D2 — The write path reuses the `TagService` attach lanes; standing is the board's / to-do's own edit lane

@@ -34,6 +34,26 @@ public sealed class SiteContent
     public string HomeHeroLead { get; set; } =
         "One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.";
 
+    // ── /home hero sub-copy (editable text — the exact en source text) ──
+    // The two supporting lines under the home hero's lead (the <c>kmb-hero-sub</c>
+    // paragraphs in Views/Home/Index.cshtml). Admin-editable + translatable like
+    // the hero eyebrow + lead (SITE lane extension, ADR 0150 §D5 / ADR 0157).
+    // The defaults are the <b>exact</b> <c>en</c> source text from
+    // <c>KnownTranslationKeys.cs</c> (the <c>platform.scope_home</c> /
+    // <c>platform.fig_home</c> keys), byte-identical (SITE·3).
+
+    /// <summary>The home hero's first sub line — the "scope" line (default =
+    /// the <c>platform.scope_home</c> English text, byte-identical to the shipped
+    /// <c>kw-l</c> string).</summary>
+    public string HomeHeroSub1 { get; set; } =
+        "Kumunita started out as a home for one neighbourhood — but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.";
+
+    /// <summary>The home hero's second sub line — the "FIG" line (default = the
+    /// <c>platform.fig_home</c> English text, byte-identical to the shipped
+    /// <c>kw-l</c> string).</summary>
+    public string HomeHeroSub2 { get; set; } =
+        "It is built on the Fractal Integration Guidelines (FIG): the idea that a group's real value lives in the links between its people and parts, not in the parts themselves. Kumunita is the software that builds and holds those links.";
+
     // ── /home section toggles (server-side show/hide, SITE·9) ──
 
     /// <summary>The home hero's "What it is &amp; how it works" CTA button is shown.</summary>

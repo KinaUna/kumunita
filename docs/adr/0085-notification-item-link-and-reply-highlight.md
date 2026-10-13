@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-26
 Amends: **0076** (the M6 notifications context — this ADR **adds one optional
-field** to the `Notification` doc (`LinkPath`, additive on the `M6DocTypes`
+field** to the `Notification` doc (`LinkPath`, additive on the `NotificationDocTypes`
 surface, the ADR 0084 `NotificationSubscription`-doc precedent) and **adds one
 optional parameter** to the frozen `EmitAsync` writer (`linkPath`, default
 `null`) — the same frozen-surface-amendment precedent ADR 0084 set for its
@@ -89,7 +89,7 @@ append, the post-detail anchor + scroll/highlight, and the one new `kw-l` key.
 
 **D1 — One additive field on the `Notification` doc: `LinkPath` (a
 same-origin relative path, or `null`).** A new `public string? LinkPath { get;
-set; }` on the `Notification` doc (the `M6DocTypes` surface, additive on the
+set; }` on the `Notification` doc (the `NotificationDocTypes` surface, additive on the
 ADR 0084 doc). It holds the **same-origin relative** path of the item the
 notification is about — e.g. `/posts/{postId}#reply-{replyId}` for a reply,
 `/posts/{postId}` for a community post, `/groups/{groupId}/posts/{postId}`

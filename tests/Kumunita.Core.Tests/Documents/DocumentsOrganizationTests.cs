@@ -76,8 +76,8 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
         // business-key shape: lowercase + trimmed).
         await using (var q = store.QuerySession())
         {
-            var bylaws = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "bylaws");
-            var gov = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "governance");
+            var bylaws = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "bylaws", TestContext.Current.CancellationToken);
+            var gov = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "governance", TestContext.Current.CancellationToken);
             Assert.NotNull(bylaws);
             Assert.NotNull(gov);
             Assert.Equal(actor, bylaws!.CreatedBy);   // the actor is the tag's CreatedBy (the creator)
@@ -401,6 +401,7 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
             // here" convention — the PostService.CreatePostAsync idiom); re-store
             // + save here to persist the mutation.
             var d = await s.LoadAsync<Document>(doc.Id);
+            if (d is null) throw new InvalidOperationException("Document not found");
             d.TagIds = r.Select(t => t.Id).ToList();
             s.Store(d);
             await s.SaveChangesAsync();
@@ -429,8 +430,8 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);   // the Document + DocumentFolder surfaces
             TagDocTypes.Configure(opts);        // the Tag + TagTranslation surfaces (the TG attach lane)
         });

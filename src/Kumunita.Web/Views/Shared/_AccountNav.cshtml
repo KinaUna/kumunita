@@ -189,8 +189,35 @@
                 }
                 @if (isGlobalAdmin)
                 {
+                    <li><hr class="dropdown-divider" /></li>
+                    <li class="px-3 pt-2 pb-1 small text-secondary">
+                        <kw-l key="nav.management">Management</kw-l>
+                    </li>
                     <li class="nav-item">
                         <a class="dropdown-item text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
+                    </li>
+                    @* The two admin-side issue surfaces, both GlobalAdmin-gated at
+                       the controller: the platform error-report triage surface
+                       (/admin/error-reports, M31/M32) + the resident report
+                       queue (/moderation, M3b). *@
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/admin/error-reports"><kw-l key="nav.error_reports">Error reports</kw-l></a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/moderation"><kw-l key="nav.moderation">Moderation</kw-l></a>
+                    </li>
+                }
+                else if (KumunitaPrincipal.IsModerator(User))
+                {
+                    <li><hr class="dropdown-divider" /></li>
+                    <li class="px-3 pt-2 pb-1 small text-secondary">
+                        <kw-l key="nav.management">Management</kw-l>
+                    </li>
+                    @* A standing community moderator (not a GlobalAdmin) sees only
+                       the /moderation queue — scoped to their assigned components
+                       at the read lane; no error-report surface. *@
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/moderation"><kw-l key="nav.moderation">Moderation</kw-l></a>
                     </li>
                 }
                 @* ADR 0021 — the Translator's home: the language catalog + translation editors.

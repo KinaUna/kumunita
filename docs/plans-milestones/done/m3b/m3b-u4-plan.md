@@ -352,7 +352,7 @@ Create `src/Kumunita.Core/Moderation/ModerationService.cs` as a new
      (`docs/design/m3b-moderation.md` §2.2/§2.3,
      `src/Kumunita.Core/Posts/Report.cs`,
      `src/Kumunita.Core/Posts/PostToAuditableResource.cs`,
-     `src/Kumunita.Core/M3DocTypes.cs`) — each confirmed against the
+     `src/Kumunita.Core/PostDocTypes.cs`) — each confirmed against the
      actual file contents.
    - **What U4 implemented (verbatim):** the full method signature +
      a short summary of the body's shape (one `KeyNotFoundException`

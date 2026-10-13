@@ -1,0 +1,240 @@
+@*
+    Index.cshtml — the M31 /admin/error-reports GlobalAdmin triage surface
+    (ADR 0154, M31·4 / M31·6 / M31·7).
+
+    The GlobalAdmin's read-only listing of the platform-error reports
+    (newest first, the IErrorReportService.ListAsync read, M31·4 — no
+    per-row IAuthorizationService call, no AccessAudit row) + the idempotent
+    mark-as-triaged action (M31·6 — one AccessAudit row per effective
+    triage; a second POST on an already-triaged report is a no-op). The
+    [Authorize(Roles = GlobalAdmin)] gate is the standard admin surface (the
+    AdminOnboardingController shape, ADR 0001-B thin-token rule); no new
+    AccessAction / Decide() branch / IAuthorizationService surface (M31·9).
+
+    The copy is the closed errorreport.list.* kw-l key set (keys 9–20,
+    M31·7 — the U05 closed set, parity-pinned in four languages, the
+    KwLRegistryConsistencyTests + KnownTranslationKeys_ParityTests
+    closure). Every label goes through <kw-l> by key (the kw-l TagHelper
+    floor, ADR 0015 D1).
+
+    Razor traps honored (AGENTS.md):
+      - No <kw-l> inside a quoted attribute value (the status chip uses a
+        conditional @if/@else with two separate <kw-l> elements, each with a
+        static key, so the KwLRegistryConsistencyTests static scan finds
+        both keys).
+      - No un-awaited Task<string> in markup (the flash string is
+        server-resolved by the controller's FlashAsync, the
+        AdminOnboardingController.FlashAsync idiom — the view only renders
+        the resolved string).
+      - No style=/data-* attributes built by interpolating quoted strings
+        via @(...) (the Bootstrap classes are static strings).
+*@
+@using Kumunita.Core.ErrorReports
+@model Kumunita.Web.Models.AdminErrorReportViewModel
+@{
+    ViewData["Title"] = "Admin — Error reports";
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the
+   page — the strip sits just under the navbar (the kmb-tab-under-navbar
+   treatment, site.css). *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1><kw-l key="errorreport.list.title">Error reports</kw-l></h1>
+
+@* The ESC·8 received-issues filter (ADR 0159) — a GET form over
+   /admin/error-reports bound to the ?filter= selector (the
+   AdminErrorReportViewModel.Filter value, the controller's Index
+   [FromQuery] param). The closed set is {"all","received","local"} (the
+   controller normalizes an unknown value to "all", the M31·4 unfiltered
+   listing shape, ESC·1). The three options use the U07
+   escalation.list.filter.* kw-l keys (ESC·11 — the values are U07's to
+   author; the en source text in the <kw-l> is the floor, ADR 0015 D1). The
+   Inventory/List.cshtml filter-form idiom (a <form method="get"> + a
+   <select name="filter"> with a selected= conditional + a submit button) is
+   mirrored here. The existing M31/M32 list shape is **unchanged** (ESC·1 —
+   the filter is additive). *@
+<form method="get" action="/admin/error-reports" class="mb-4">
+    <div class="d-flex gap-2 align-items-end flex-wrap">
+        <div>
+            <label class="form-label" for="error-report-filter" style="font-weight:600;">
+                <kw-l key="escalation.list.filter.all">All</kw-l>
+            </label>
+            <select class="form-select" id="error-report-filter" name="filter">
+                <option value="all" selected="@(Model.Filter == "all" ? "selected" : null)"><kw-l key="escalation.list.filter.all">All</kw-l></option>
+                <option value="received" selected="@(Model.Filter == "received" ? "selected" : null)"><kw-l key="escalation.list.filter.received">Received</kw-l></option>
+                <option value="local" selected="@(Model.Filter == "local" ? "selected" : null)"><kw-l key="escalation.list.filter.local">Local</kw-l></option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+    </div>
+</form>
+
+@* The flash toast (the errorreport.list.flash_triaged key, the U05 closed
+   set, M31·7) — rendered when the just-processed MarkTriaged action was
+   effective (a "new" → "triaged" transition). The AdminSite/Index.cshtml
+   shape: TempData["info"] is a server-resolved string (the controller's
+   FlashAsync, the AdminOnboardingController.FlashAsync idiom). A no-op
+   (an already-triaged report, M31·6) sets no flash → no alert. *@
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+
+@if (Model.Reports.Count == 0)
+{
+    <p class="text-muted">
+        <kw-l key="errorreport.list.empty">No error reports yet.</kw-l>
+    </p>
+}
+else
+{
+    <div class="list-group kmb-error-reports-list">
+        @foreach (var r in Model.Reports)
+        {
+            @* The description truncated to 80 chars (the register's U05 pin;
+               full text in the title= attribute for hover). The exception
+               type truncated to 60 chars (monospace, full text in title=). *@
+            var desc      = r.Description ?? "";
+            var descShort = desc.Length > 80 ? desc[..80] + "…" : desc;
+            var exc       = r.ExceptionType ?? "—";
+            var excShort  = exc.Length > 60 ? exc[..60] + "…" : exc;
+            <div class="list-group-item">
+                <div class="d-flex align-items-start gap-3">
+                    @* The status chip (new = text-bg-warning, triaged =
+                       text-bg-success, resolved = text-bg-primary — the M31
+                       new / triaged precedent + the M32 additive resolved
+                       chip, the M32·1 pin). A conditional @if/@else/@else
+                       with three separate <kw-l> elements (each with a static
+                       key) so the KwLRegistryConsistencyTests static scan
+                       finds all three keys (errorreport.list.status.new +
+                       errorreport.list.status.triaged +
+                       errorreport.list.status.resolved). The existing new /
+                       triaged chips are **unchanged** (M32·1 — additive-
+                       only). *@
+                    @if (r.TriageStatus == "new")
+                    {
+                        <span class="badge text-bg-warning fw-semibold">
+                            <kw-l key="errorreport.list.status.new">New</kw-l>
+                        </span>
+                    }
+                    else if (r.TriageStatus == "triaged")
+                    {
+                        <span class="badge text-bg-success fw-semibold">
+                            <kw-l key="errorreport.list.status.triaged">Triaged</kw-l>
+                        </span>
+                    }
+                    else
+                    {
+                        @* The M32 additive resolved chip (the M32·1 pin — the
+                           errorreport.list.status.resolved kw-l key, the
+                           M32·9 closed set key 10; the text-bg-primary
+                           Bootstrap class — the M31 chip precedent). *@
+                        <span class="badge text-bg-primary fw-semibold">
+                            <kw-l key="errorreport.list.status.resolved">Resolved</kw-l>
+                        </span>
+                    }
+                    @* The ESC·8 additive "escalated" chip (ADR 0159) — rendered
+                       only for a received row (Origin == "escalated"), next to
+                       the triage status chip (a received row can be any triage
+                       state, so the two chips coexist). The
+                       escalation.list.status.escalated kw-l key is the U07
+                       closed set (ESC·11 — the value is U07's to author; the
+                       en source text here is the floor, ADR 0015 D1). The
+                       text-bg-info Bootstrap class (the register's U06 pin —
+                       the M32 new / triaged / resolved chip precedent). The
+                       existing new / triaged / resolved chips are **unchanged**
+                       (ESC·1 — additive-only; the KwLRegistryConsistencyTests
+                       static scan finds the new key via its static <kw-l>). *@
+                    @if (r.Origin == "escalated")
+                    {
+                        <span class="badge text-bg-info fw-semibold">
+                            <kw-l key="escalation.list.status.escalated">Escalated</kw-l>
+                        </span>
+                    }
+                    <div class="flex-grow-1">
+                        @* The exception type (monospace, truncated to 60
+                           chars; full text in the title= attribute). *@
+                        <div class="small">
+                            <span class="text-muted">
+                                <kw-l key="errorreport.list.exception">Exception</kw-l>
+                            </span>
+                            <code title="@exc">@excShort</code>
+                        </div>
+                        @* The description (truncated to 80 chars; full text
+                           in the title= attribute for hover). *@
+                        <div class="small mt-1">
+                            <span class="text-muted">
+                                <kw-l key="errorreport.list.description">Description</kw-l>
+                            </span>
+                            <span title="@desc">@descShort</span>
+                        </div>
+                        @* The reporter (the SubjectId, or the
+                           errorreport.list.anonymous kw-l key for blank —
+                           the register's U05 pin, the §2.3 key 19 note:
+                           "the errorreport.list.anonymous key (19) is the
+                           display value for a blank SubjectId in the admin
+                           list's reporter column"). *@
+                        <div class="small mt-1">
+                            <span class="text-muted">
+                                <kw-l key="errorreport.list.reporter">Reporter</kw-l>
+                            </span>
+                            @if (string.IsNullOrEmpty(r.SubjectId))
+                            {
+                                <kw-l key="errorreport.list.anonymous">Anonymous</kw-l>
+                            }
+                            else
+                            {
+                                <span>@r.SubjectId</span>
+                            }
+                        </div>
+                        @* The created timestamp (the kw-dt TagHelper — the
+                           house date format, the ADR 0019/0020 surface). *@
+                        <div class="small mt-1">
+                            <span class="text-muted">
+                                <kw-l key="errorreport.list.created">Reported</kw-l>
+                            </span>
+                            <kw-dt dt="@r.Created" format="g"></kw-dt>
+                        </div>
+                        @* The request ID (monospace, small — the log
+                           correlation handle, the resident's correlation
+                           handle on the error page). *@
+                        <div class="small mt-1">
+                            <span class="text-muted">
+                                <kw-l key="errorreport.list.request_id">Request ID</kw-l>
+                            </span>
+                            <code class="small">@r.RequestId</code>
+                        </div>
+                    </div>
+                    @* The "View" detail link (the M32·10 pin — links to the
+                       /admin/error-reports/{id} detail view). Always visible
+                       (the M31 list's mark-as-triaged button is the only
+                       conditional affordance; the View link is additive,
+                       the M32·1 pin). The errorreport.list.view kw-l key is
+                       a plain link label (a value, not a platform-key in the
+                       M32·9 closed set — the en source text is the floor,
+                       ADR 0015 D1). *@
+                    <a href="/admin/error-reports/@r.Id" class="btn btn-sm btn-outline-secondary text-nowrap ms-2 me-0">
+                        View
+                    </a>
+                    @* The "Mark as triaged" button (visible only when
+                       TriageStatus == "new" — the register's U05 pin,
+                       M31·6 idempotency: a second POST on an already-
+                       triaged report is a no-op, no second audit row). A
+                       [ValidateAntiForgeryToken] POST to
+                       /admin/error-reports/{id}/triage (the
+                       AdminOnboardingController.Complete shape). *@
+                    @if (r.TriageStatus == "new")
+                    {
+                        <form method="post" action="/admin/error-reports/@r.Id/triage" class="ms-2 me-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-primary text-nowrap">
+                                <kw-l key="errorreport.list.mark_triaged">Mark as triaged</kw-l>
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}

@@ -167,4 +167,31 @@ public sealed class StorageMetricsService : IStorageMetricsService
             LimitBytes: platformLimitBytes,
             IsFull: limitReached || belowFloor);
     }
+
+    /// <inheritdoc/>
+    public async Task<StorageHistoryResult> GetHistoryAsync(int days,
+        CancellationToken ct = default)
+    {
+        // The M33·8 pinned-window guard (the M13 windowDays precedent — an
+        // unknown value throws, not a 0-row query).
+        if (days is not (30 or 90 or 180 or 365))
+            throw new ArgumentOutOfRangeException(nameof(days),
+                days, $"Window must be one of 30, 90, 180, 365 days (M33·8).");
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+
+        // One QuerySession (M33·4 — read-only, zero writes, zero AccessAudit
+        // rows): the StorageMetricsSample rows in the trailing window, ascending.
+        // The Linq-to-objects fallback over a ToListAsync row set (the
+        // GetSnapshotAsync precedent) — one server-side ToListAsync, then
+        // client-side OrderBy; the deterministic result is identical to a
+        // server-side ORDER BY.
+        await using var session = _store.QuerySession();
+        var points = (await session.Query<StorageMetricsSample>()
+                                    .Where(s => s.SampleDate >= cutoff)
+                                    .ToListAsync(ct))
+                     .OrderBy(s => s.SampleDate)
+                     .ToList();
+        return new StorageHistoryResult(days, points);
+    }
 }

@@ -668,7 +668,8 @@ public sealed class TagService : ITagService
     // write-lane transaction).
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId)
+    public async Task<IReadOnlyList<TagItem>> ListForActorAsync(
+        string actorId, string? preferredLanguageCode = null)
     {
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
@@ -679,7 +680,7 @@ public sealed class TagService : ITagService
         var tagIds = CollectReadableTagIds(readablePosts, readablePages);
         if (tagIds.Count == 0) return Array.Empty<TagItem>();
 
-        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages);
+        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages, preferredLanguageCode);
         return items
             .OrderBy(i => i.DisplayedName, StringComparer.Ordinal)
             .ThenBy(i => i.Tag.Slug, StringComparer.Ordinal)
@@ -810,7 +811,8 @@ public sealed class TagService : ITagService
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId)
+    public async Task<IReadOnlyList<TagItem>> SuggestAsync(
+        string prefix, string actorId, string? preferredLanguageCode = null)
     {
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
@@ -822,7 +824,7 @@ public sealed class TagService : ITagService
         if (tagIds.Count == 0) return Array.Empty<TagItem>();
 
         var pfx = (prefix ?? string.Empty).Trim().ToLowerInvariant();
-        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages);
+        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages, preferredLanguageCode);
         return items
             .Where(i => MatchesPrefix(i, pfx))
             .OrderBy(i => i.DisplayedName, StringComparer.Ordinal)
@@ -896,14 +898,29 @@ public sealed class TagService : ITagService
     /// (the ADR 0005 preference order: the viewer's effective language → the
     /// <see cref="TagTranslation"/> for it → the base <see cref="Tag.Name"/>)
     /// into <see cref="TagItem"/> rows.
+    /// <para>
+    /// <paramref name="preferredLanguageCode"/> is the actor's **per-request
+    /// effective** language (the Web's <c>EffectiveLanguageCode</c> chain) — the
+    /// top of the ADR 0005 preference order. When it resolves to a concrete
+    /// enabled code (the usual Web call path), that code is the effective
+    /// language for the tag-name lookup. When it is null or blank (a Core-only
+    /// call with no per-request signal), the provider falls through to the
+    /// instance default → <c>en</c> floor — the exact behavior the seam's own
+    /// tests pin (the "Core collapses to the instance default" idiom).
+    /// </para>
     /// </summary>
     private async Task<List<TagItem>> BuildTagItemsAsync(
         IQuerySession session, HashSet<string> tagIds,
-        IReadOnlyList<Post> readablePosts, IReadOnlyList<Page> readablePages)
+        IReadOnlyList<Post> readablePosts, IReadOnlyList<Page> readablePages,
+        string? preferredLanguageCode = null)
     {
         var tags = await session.Query<Tag>().Where(t => tagIds.Contains(t.Id)).ToListAsync();
         var translations = await session.Query<TagTranslation>().Where(t => tagIds.Contains(t.TagId)).ToListAsync();
-        var effective = await _translations.ResolveEffectiveLanguageAsync((string?)null);
+
+        // The viewer's effective language (the ADR 0005 preference order —
+        // the per-request preference when the Web threaded one in, else the
+        // instance default → en floor).
+        var effective = await _translations.ResolveEffectiveLanguageAsync(preferredLanguageCode);
 
         var nameByTag = translations
             .Where(t => string.Equals(t.LanguageCode, effective, StringComparison.Ordinal))

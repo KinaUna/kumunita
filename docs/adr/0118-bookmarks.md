@@ -10,7 +10,7 @@ Projects bounded-context precedent** (a standalone core surface on its
 own context + `*DocTypes` surface, always available, **no**
 off-by-default toggle — the D6 inverse of the ADR 0101/0105
 `LocaleSettings` shape), the **ADR 0004 §B.1 delta-detected, idempotent,
-zero-migration document-surface shape** (the new `M17DocTypes` surface),
+zero-migration document-surface shape** (the new `BookmarkDocTypes` surface),
 the **M9 `convo_uidx_pair` unique-index-as-witness idiom** (the
 `bm_uidx_owner_target` index on `(OwnerId, TargetKind, TargetId)`), the
 **frozen `IAuthorizationService` seam** (the 4-method surface + the
@@ -47,7 +47,7 @@ comparison**, never an audience decision — the owner's own read is a
 **personal read** that **never audits** ("reads never audit"), and a
 non-participant — an operator included — gets a **non-leaky 404** that
 commits **no** `AccessAudit` row. The M9 `convo_uidx_pair` precedent
-adds the **unique-index-as-witness** idiom the `M17DocTypes` unique
+adds the **unique-index-as-witness** idiom the `BookmarkDocTypes` unique
 index on `(OwnerId, TargetKind, TargetId)` copies (F1 — a second
 bookmark of the same target is a no-op **at the DB layer**).
 
@@ -70,7 +70,7 @@ toggle shape **inverted**: there is **no toggle at all**).
 **D1 — One document, one new surface, one new bounded context.** M17
 adds a new bounded context `Kumunita.Core.Bookmarks` with **one
 document**: `Bookmark` (`OwnerId`, `TargetKind`, `TargetId`,
-`Created`), registered on a **new `M17DocTypes`** surface (the M9/M5
+`Created`), registered on a **new `BookmarkDocTypes`** surface (the M9/M5
 `*DocTypes` precedent — a parallel additive surface, delta-detected and
 applied idempotently at boot, **zero migrations** for existing surfaces;
 the **unique** index on `(OwnerId, TargetKind, TargetId)` — the F1
@@ -187,10 +187,10 @@ others.
   not the owner cannot read a resident's list (a non-leaky 404, no
   `AccessAudit` row — the ADR 0105 "operator has no read standing"
   precedent, C-M17·2).
-- **Zero migrations for existing surfaces** (D1): the `M17DocTypes`
+- **Zero migrations for existing surfaces** (D1): the `BookmarkDocTypes`
   surface is **parallel** (the ADR 0004 §B.1 shape — delta-detected and
   applied idempotently at boot) — the one new table + the two indexes
-  are additive; the `M1DocTypes` … `M16DocTypes` surfaces are
+  are additive; the `CoreDocTypes` … `InventoryDocTypes` surfaces are
   **byte-identical** after M17 (§drift-guard).
 - **The leak surface of a dangling row is exactly one static string**
   (the named trade, C-M17·5): the degraded label is the closed

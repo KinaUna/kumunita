@@ -22,7 +22,7 @@ touches the disk (C-MED·6).
 - `Kumunita.Core` stays **HTTP-free**: `Put` takes `byte[]` + `filename` +
   `contentType` + `actorId`, **not** `IFormFile`/`Stream` (C-MED·6).
 - `MediaDocTypes` is a **new doc-type surface** (ADR 0004 §B.1), mirroring
-  `M1DocTypes` / `M3DocTypes` — its own `Configure(StoreOptions)` extension.
+  `CoreDocTypes` / `PostDocTypes` — its own `Configure(StoreOptions)` extension.
 
 ## Approach
 
@@ -32,7 +32,7 @@ dedup-by-id, `Put` = compute hash → load → return-or-store), and
 `MediaDocTypes.Configure(StoreOptions opts) => opts.Schema.For<MediaObject>()`.
 Register `IMediaStore` in `AddKumunitaCore()` and call
 `MediaDocTypes.Configure(opts)` in `Program.cs` next to the existing
-`M1DocTypes` / `M3DocTypes` lines, binding `Media__*` (mirror the
+`CoreDocTypes` / `PostDocTypes` lines, binding `Media__*` (mirror the
 `CommunityOptions` binding).
 
 ## Key files (entry reads — no more)
@@ -41,7 +41,7 @@ Register `IMediaStore` in `AddKumunitaCore()` and call
   `IMediaStore`, `LocalVolumeMediaStore`, `MediaDocTypes`) + §2.7 rules 5/6.
 - `docs/plans-milestones/done/media-u1-plan.md` + the **U1** handoff
   (the `IMediaFileStore` + `MediaOptions` to compose).
-- `src/Kumunita.Core/M3DocTypes.cs` — the `MediaDocTypes.Configure(StoreOptions)`
+- `src/Kumunita.Core/PostDocTypes.cs` — the `MediaDocTypes.Configure(StoreOptions)`
   shape to mirror.
 - `src/Kumunita.Core/DependencyInjection.cs` — where to add `IMediaStore`.
 - `src/Kumunita.Web/Program.cs` (L52–93) — where `MediaDocTypes.Configure(opts)`
@@ -56,7 +56,7 @@ Register `IMediaStore` in `AddKumunitaCore()` and call
 - edit `src/Kumunita.Core/DependencyInjection.cs` —
   `services.AddTransient<IMediaStore, LocalVolumeMediaStore>()`.
 - edit `src/Kumunita.Web/Program.cs` — `MediaDocTypes.Configure(opts)` next to
-  `M1DocTypes.Configure(opts)`, and confirm
+  `CoreDocTypes.Configure(opts)`, and confirm
   `Services.Configure<MediaOptions>(configuration.GetSection("Media"))`.
 
 ## Risks & open questions
@@ -80,7 +80,7 @@ Register `IMediaStore` in `AddKumunitaCore()` and call
 4. Add `MediaDocTypes.cs` (`opts.Schema.For<MediaObject>()`).
 5. Register `IMediaStore` in `DependencyInjection.cs`.
 6. In `Program.cs`, call `MediaDocTypes.Configure(opts)` next to the existing
-   `M1DocTypes` / `M3DocTypes` lines; confirm the `Media__*` options binding.
+   `CoreDocTypes` / `PostDocTypes` lines; confirm the `Media__*` options binding.
 7. `run_build` → green on **both** `Kumunita.Core` and `Kumunita.Web`.
 8. Append **`## U2`** to the handoff notes: the `MediaDocTypes` call-site line,
    the DI registrations, and the `Media__*` binding confirmed.

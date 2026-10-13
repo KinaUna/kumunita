@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tests;
 /// The <c>PL</c> U01 doc-shape pin (ADR 0086 D2 / D3 / D4, the design doc
 /// §9.1 / §9.2 / §9.5): the two new documents
 /// <see cref="ProjectGoal"/> + <see cref="Project"/> boot through
-/// <see cref="M5DocTypes.Configure"/> and round-trip against a fresh
+/// <see cref="ProjectDocTypes.Configure"/> and round-trip against a fresh
 /// scratch Postgres (the schema + the registration surface are live); the
 /// two new adapters implement the frozen 6-member
 /// <see cref="IAuditableResource"/> surface with the **exact**
@@ -27,7 +27,7 @@ namespace Kumunita.Core.Tests;
 public class ProjectDocShapeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     /// <summary>
-    /// The two PL documents boot through <see cref="M5DocTypes.Configure"/>
+    /// The two PL documents boot through <see cref="ProjectDocTypes.Configure"/>
     /// without error and round-trip (the delta-detected schema is live); the
     /// two PL adapters present the frozen 6-member
     /// <see cref="IAuditableResource"/> projection with the exact
@@ -166,10 +166,10 @@ public class ProjectDocShapeTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

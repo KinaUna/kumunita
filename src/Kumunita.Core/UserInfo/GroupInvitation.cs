@@ -22,7 +22,7 @@ public enum InvitationStatus
 /// One row per (group, user) invitation pair (m2b — <see cref="InvitationStatus"/>
 /// is the single state field; the business key (<c>GroupId</c>, <c>UserId</c>) is the
 /// same pair shape as <see cref="GroupMembership"/>, enforced by the unique index in
-/// <see cref="M1DocTypes"/>'s <c>Configure</c> — <see cref="Id"/> is the surrogate
+/// <see cref="CoreDocTypes"/>'s <c>Configure</c> — <see cref="Id"/> is the surrogate
 /// PK for clean Marten identity, mirroring <see cref="GroupMembership"/>'s pin).
 /// <para>
 /// No TTL / expiry (m2b decision): a pending invitation stays pending until the

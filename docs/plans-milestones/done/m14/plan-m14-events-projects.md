@@ -53,8 +53,8 @@
 > `BlockerChip` dangling-safe display idiom**
 > (`Kumunita.Core/Projects/ProjectRequests.cs` — the to-do→event and
 > event→to-do links copy its access-scoped / omitted-when-unreadable rule),
-> the **`M5DocTypes` registration surface**
-> (`Kumunita.Core/M5DocTypes.cs` — the additive `(EventId)` feed index joins
+> the **`ProjectDocTypes` registration surface**
+> (`Kumunita.Core/ProjectDocTypes.cs` — the additive `(EventId)` feed index joins
 > the existing `(ProjectId)` / `(ComponentId, Created)` indexes), the
 > **`IcsWriter` BCL-only closed-subset emitter**
 > (`Kumunita.Core/Events/IcsWriter.cs` — the `VTODO` emitter copies its
@@ -150,7 +150,7 @@ Consequences, own lanes / own milestones):
   `TodoItem.cs` already carries `ProjectId` / `ComponentId` in exactly this
   shape). **1:1** — one event per to-do, "a to-do is *for* one event" (the
   `ProjectId` "a to-do is *in* one project" precedent). An optional
-  `(EventId)` feed index joins `M5DocTypes` (the `(ProjectId)` index
+  `(EventId)` feed index joins `ProjectDocTypes` (the `(ProjectId)` index
   precedent — additive, delta-detected, zero migration for existing rows,
   C-M14·7). **[Veto: a separate many-to-many `EventTodoLink` doc — then
   `ListTodosForEventAsync` reads the link table instead of the field; the
@@ -379,7 +379,7 @@ the design doc is the only authority.**
    D2 composes against + the emitter discipline D4 copies.
 7. `src/Kumunita.Web/Controllers/EventController.cs` (the two `.ics`
    routes ≈ L822 / L898) — the serve idiom D4's routes copy.
-8. `src/Kumunita.Core/M5DocTypes.cs` — the additive-index shape the
+8. `src/Kumunita.Core/ProjectDocTypes.cs` — the additive-index shape the
    `(EventId)` index joins.
 
 **Deliverables (3).**
@@ -423,7 +423,7 @@ seam** `ListTodosForEventAsync` (the `ListTodosAsync` candidate-filter +
    `ListTodosForEventAsync` signature + candidate-filter rule, verbatim.
 2. `src/Kumunita.Core/Projects/TodoItem.cs` — the `ProjectId` /
    `ComponentId` field shapes + doc-comments the new `EventId?` mirrors.
-3. `src/Kumunita.Core/M5DocTypes.cs` — the `(ProjectId)` / `(ComponentId,
+3. `src/Kumunita.Core/ProjectDocTypes.cs` — the `(ProjectId)` / `(ComponentId,
    Created)` index blocks the `(EventId)` index joins (the naming note at
    the top of `Configure`).
 4. `src/Kumunita.Core/Projects/IProjectService.cs` (`ListTodosAsync` +
@@ -440,7 +440,7 @@ seam** `ListTodosForEventAsync` (the `ListTodosAsync` candidate-filter +
 - `src/Kumunita.Core/Projects/TodoItem.cs` — one additive `public string?
   EventId { get; set; }` (the `ProjectId` shape, doc-comment: the M14
   interlock, C-M14·1 filter-never-gate, ADR 0115).
-- `src/Kumunita.Core/M5DocTypes.cs` — one additive `(EventId)` feed index
+- `src/Kumunita.Core/ProjectDocTypes.cs` — one additive `(EventId)` feed index
   on `TodoItem` (the `(ProjectId)` index precedent; the unnamed-form note
   if the computed-index naming constraint applies).
 - `src/Kumunita.Core/Projects/IProjectService.cs` — the

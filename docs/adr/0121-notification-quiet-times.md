@@ -84,7 +84,7 @@ during quiet.
 **D2 — The quiet schedule is a per-resident document, floor = never quiet.**
 A new document `Kumunita.Core.Notifications.NotificationQuietSchedule` (id =
 the recipient's `SubjectId`, the `NotificationPreference` "one row per
-recipient" shape — identity pinned to `RecipientId` in `M6DocTypes`, the ADR
+recipient" shape — identity pinned to `RecipientId` in `NotificationDocTypes`, the ADR
 0004 §B.1 additive-surface precedent): a `bool Enabled` master (a disabled
 schedule is "never quiet"), a `QuietScheduleMode` (`Blocked` lean default vs
 `Allowed` allow-list), and two independent axes (`int[] Hours`, `int[]
@@ -278,7 +278,7 @@ sender-zone / shared-household quiet (D9·4); delivery-time prediction UX (D9·5
   the `QuietNowForAsync` helper + the `EmitAsync` quiet gate (D4).
 - `src/Kumunita.Core/Notifications/NotificationFlushService.cs` — new (the
   §6.4 flush business logic) (D5).
-- `src/Kumunita.Core/M6DocTypes.cs` — the
+- `src/Kumunita.Core/NotificationDocTypes.cs` — the
   `Notifications.NotificationQuietSchedule` registration (pinned to
   `RecipientId`) (D2).
 - `src/Kumunita.Core/Localization/LocaleSettings.cs` — the additive

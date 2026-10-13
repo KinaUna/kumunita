@@ -60,9 +60,27 @@ public sealed class AdminAnalyticsController(
     /// as a 400.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Index([FromQuery] int window = 30)
+    public async Task<IActionResult> Index(
+        [FromQuery] int window = 30,
+        [FromQuery] int trendWindow = 30)
     {
         var result = await analytics.GetWindowAsync(window);
+
+        // M34 additive (M34·8, ADR 0162) — the second read: the over-time
+        // history. **Option-B seam (the M34 close resolution, ADR 0162):**
+        // the Trend section reads its **own** window param
+        // <c>?trendwindow=</c> (pinned {7, 30, 90, 180, 365}, M34·7) rather
+        // than sharing the frozen M13 <c>?window=</c> param (pinned
+        // {7, 30, 90}). The two reads are therefore **independent**: the M13
+        // read above is **unchanged** (M34·1 additive-only), and
+        // <c>?trendwindow=180</c> / <c>?trendwindow=365</c> render the Trend
+        // end-to-end without tripping the M13 <c>GetWindowAsync</c> window
+        // guard (the 180/365 red pin the U06/U07 gate recorded is resolved by
+        // this decoupling). <c>GetHistoryAsync</c> enforces its own pinned
+        // set (M34·7 — an unknown value throws ArgumentOutOfRangeException,
+        // the M13/M33 error posture). A read — zero AccessAudit rows (M34·4).
+        var history = await analytics.GetHistoryAsync(trendWindow);
+
         return View(new AnalyticsViewModel
         {
             WindowDays         = result.WindowDays,
@@ -70,7 +88,14 @@ public sealed class AdminAnalyticsController(
             AuthenticatedTotal = result.AuthenticatedTotal,
             AnonymousTotal     = result.AnonymousTotal,
             DistinctActors     = result.DistinctActors,
-            SurfaceRanking     = result.SurfaceRanking
+            SurfaceRanking     = result.SurfaceRanking,
+            // M34 additive (M34·8): the Trend section projection. The Trend
+            // section's window label is its **own** <c>TrendWindowDays</c>
+            // (the Option-B <c>?trendwindow=</c> seam) — independent of the
+            // M13 <c>WindowDays</c> member above (the <c>?window=</c> seam),
+            // so the two windows no longer collide over one shared param.
+            TrendWindowDays    = history.WindowDays,
+            History            = history.Points
         });
     }
 

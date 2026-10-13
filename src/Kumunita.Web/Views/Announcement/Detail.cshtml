@@ -1,6 +1,7 @@
 @model Kumunita.Web.Models.AnnouncementDetailViewModel
 @using Kumunita.Core.Announcements
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
@@ -333,7 +334,7 @@
                         @* The full body (the /announcements list shows the
                            first 250 characters and links here). Rendered
                            through the one MarkdownRenderer (R·1). *@
-                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                        <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(Model.Body, Model.AuthorSubjectId)" /></div>
                     </div>
 
                     @* One variant per user-added translation — hidden by
@@ -349,7 +350,7 @@
                             {
                                 <h1 class="mb-1">@t.Title</h1>
                             }
-                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                            <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" /></div>
                         </div>
                     }
 
@@ -513,9 +514,12 @@
                                     <kw-l key="posts.reply_language_note">The language you're commenting in — a tag, not a translation.</kw-l>
                                 </div>
                             </div>
-                            <div class="text-muted small mb-3">
-                                <kw-l key="announcements.comment_audience_note">Comments are visible to signed-in residents only, even on a public announcement, and under this announcement's own audience (a community-targeted one is visible to that community's residents).</kw-l>
-                            </div>
+                            <details class="kw-audience-disclosure mb-3">
+                                <summary><kw-l key="announcements.comment_audience_note_label">Who can see comments?</kw-l></summary>
+                                <div class="text-muted small">
+                                    <kw-l key="announcements.comment_audience_note">Comments are visible to signed-in residents only, even on a public announcement, and under this announcement's own audience (a community-targeted one is visible to that community's residents).</kw-l>
+                                </div>
+                            </details>
                             <button type="submit" class="btn btn-primary"><kw-l key="announcements.comment_submit">Comment</kw-l></button>
                         </form>
                     </div>

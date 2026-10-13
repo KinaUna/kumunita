@@ -30,7 +30,7 @@
 > zero new `Decide()` branch (C-M20·5, D1/D4). The **only** schema changes are
 > **one additive `bool` on the existing `Notification` POCO** (`EmailDeferred`,
 > D1 — the ADR 0004 §B.1 additive-field precedent) **+ one new document**
-> (`NotificationQuietSchedule`, D2 — registered on `M6DocTypes`) **+ one new
+> (`NotificationQuietSchedule`, D2 — registered on `NotificationDocTypes`) **+ one new
 > enum** (`QuietScheduleMode`, D2) **+ one additive `int` on the existing
 > `LocaleSettings` singleton** (`QuietCheckMinutes`, D6 — the ADR 0050/0077/0105
 > admin-set-runtime-field precedent). The closed `kw-l` key set (15 keys ×
@@ -163,7 +163,7 @@ during quiet.
 **D2 — The quiet schedule is a per-resident document, floor = never quiet.**
 A new document `Kumunita.Core.Notifications.NotificationQuietSchedule` (id =
 the recipient's `SubjectId`, the `NotificationPreference` "one row per
-recipient" shape — identity pinned to `RecipientId` in `M6DocTypes`, the ADR
+recipient" shape — identity pinned to `RecipientId` in `NotificationDocTypes`, the ADR
 0004 §B.1 additive-surface precedent). Shape (locked by U00's design doc §4):
 
 ```csharp
@@ -478,7 +478,7 @@ public enum QuietScheduleMode
 /// M20 (ADR 0121, D2) — the per-resident notification-quiet schedule. One
 /// document per recipient (id = the recipient's <see cref="RecipientId"/> —
 /// the <see cref="NotificationPreference"/> "one row per recipient" shape;
-/// identity pinned to <c>RecipientId</c> in <c>M6DocTypes</c>).
+/// identity pinned to <c>RecipientId</c> in <c>NotificationDocTypes</c>).
 /// <see cref="Enabled"/> is the master on/off: <c>false</c> = "never quiet"
 /// (the floor — every notification's email flows, exactly as pre-M20,
 /// C-M20·3). When <see cref="Enabled"/> is <c>true</c>, the quiet verdict is
@@ -530,13 +530,13 @@ public sealed class NotificationQuietSchedule
 }
 ```
 
-**The `M6DocTypes` registration** (U02 — the `NotificationQuietSchedule`
+**The `NotificationDocTypes` registration** (U02 — the `NotificationQuietSchedule`
 document is Marten-native with a conventional `RecipientId` identity, like
 `NotificationPreference`; the additive-surface delta is applied idempotently at
 boot — ADR 0004 §B.1, zero migration):
 
 ```csharp
-// In M6DocTypes.Configure(StoreOptions opts), alongside NotificationPreference:
+// In NotificationDocTypes.Configure(StoreOptions opts), alongside NotificationPreference:
 opts.Schema.For<Notifications.NotificationQuietSchedule>().Identity(s => s.RecipientId);
 ```
 
@@ -1050,7 +1050,7 @@ prose sections above are the explanation).
 See §4 (the exact C# is verbatim above — the `QuietScheduleMode` enum
 (`Blocked = 0`, `Allowed = 1`), the `NotificationQuietSchedule` document
 (`RecipientId`, `Enabled`, `Mode`, `Hours`, `DaysOfWeek`, `Updated`), and the
-`M6DocTypes` `Notifications.NotificationQuietSchedule` registration pinned to
+`NotificationDocTypes` `Notifications.NotificationQuietSchedule` registration pinned to
 `RecipientId`).
 
 ### 9.2 The pure `QuietScheduleEvaluator` + the owner-scope seams (U02)

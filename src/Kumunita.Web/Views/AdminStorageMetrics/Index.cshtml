@@ -13,6 +13,38 @@
         while (n >= 1024 && i < u.Length - 1) { n /= 1024; i++; }
         return i == 0 ? $"{n:0} {u[i]}" : $"{n:0.##} {u[i]}";
     }
+
+    @* M33 Trend sparkline (M33·10 — server-rendered, no JS / chart lib).
+       Maps the window's TotalUsedBytes points (ascending) to a <polyline>
+       points string in a 100×40 viewBox, normalised to the window's
+       min/max (a flat window renders a flat mid line). One point per day
+       present — gaps are simply not plotted (the M33-9 FACE). *@
+    static string TrendPoints(IReadOnlyList<Kumunita.Core.Usage.StorageMetricsSample> pts)
+    {
+        if (pts.Count == 0) return "";
+        if (pts.Count == 1) return "0,20 100,20";
+        double[] vals = new double[pts.Count];
+        double max = double.MinValue, min = double.MaxValue;
+        for (int i = 0; i < pts.Count; i++)
+        {
+            double d = pts[i].TotalUsedBytes;
+            vals[i] = d;
+            if (d > max) max = d;
+            if (d < min) min = d;
+        }
+        const double W = 100, H = 40, pad = 2;
+        double range = max - min;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < vals.Length; i++)
+        {
+            double x = W * i / (vals.Length - 1);
+            double norm = range > 0 ? (vals[i] - min) / range : 0.5;
+            double y = H - pad - norm * (H - 2 * pad);
+            if (i > 0) sb.Append(' ');
+            sb.Append($"{x:0.##} {y:0.##}");
+        }
+        return sb.ToString();
+    }
 }
 
 @* The /admin section sub-nav (the ADR 0062 nav-tabs idiom). This view sits in
@@ -142,3 +174,74 @@
         <a class="btn btn-outline-primary btn-sm" href="/admin/storage?page=@(Model.Page + 1)">Next &rarr;</a>
     }
 </nav>
+
+@* ── M33 storage-metrics-history Trend section (M33·9 additive-only, M33·10) ──
+   The over-time half the M24 point-in-time surface defers (ADR 0134 item 3).
+   A per-day table (date · total used · free, ascending) + an inline <svg>
+   sparkline (TotalUsedBytes over the window) + a window selector (30/90/180/
+   365, the active one marked). No JS, no chart library — server-rendered
+   (M33·10). The labels are the closed storage.trend.* kw-l set (U06 authors
+   the values; this view references them, the kw-l TagHelper resolves them per
+   request, the inner English text is the ADR 0015 D1 provider floor). *@
+<h2 class="h5 mt-5"><kw-l key="storage.trend.title">Storage trend</kw-l></h2>
+
+@* The window selector — four links, the active one (Model.WindowDays) marked
+   via the btn-primary style rather than btn-outline (a plain class toggle, no
+   kw-l dependency on the state). *@
+<div class="d-flex align-items-center gap-2 mb-3">
+    @{ int wd = Model.WindowDays; }
+    @for (int w = 0; w < 4; w++)
+    {
+        int win = new[] { 30, 90, 180, 365 }[w];
+        string key = "storage.trend.window." + win;
+        string cls = (win == wd) ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
+        <a class="@cls" href="/admin/storage?window=@win"><kw-l key="@key">@win days</kw-l></a>
+    }
+</div>
+
+@if (Model.History.Count == 0)
+{
+    @* M33-3 FACE — an empty history (a fresh instance, no samples captured
+       yet) renders the empty message, not a blank and not an error. *@
+    <p class="text-muted"><kw-l key="storage.trend.empty">No storage trend yet — the daily capture has not stored any samples for this window.</kw-l></p>
+}
+else
+{
+    @* The sparkline — an inline <svg> <polyline> over the window's
+       TotalUsedBytes points (TrendPoints normalises to a 100×40 viewBox).
+       preserveAspectRatio="none" lets it stretch to its container width. *@
+    <div class="mb-3">
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none"
+             class="d-block" style="width:100%;height:80px;background:#f8f9fa;">
+            <polyline points="@TrendPoints(Model.History)"
+                      fill="none" stroke="#0d6efd" stroke-width="1"
+                      vector-effect="non-scaling-stroke" />
+        </svg>
+        <div class="text-muted small mt-1"><kw-l key="storage.trend.legend.used">Total used over window</kw-l></div>
+    </div>
+
+    @* The per-day table — one row per sample, ascending (the seam orders it);
+       SampleDate via the kw-dt TagHelper (the request's locale); the bytes
+       columns reuse the Bytes() helper above. *@
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th><kw-l key="storage.trend.col.date">Date</kw-l></th>
+                    <th class="text-end"><kw-l key="storage.trend.col.used">Total used</kw-l></th>
+                    <th class="text-end"><kw-l key="storage.trend.col.free">Free</kw-l></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.History)
+                {
+                    <tr>
+                        <td><kw-dt dt="@s.SampleDate" format="d"></kw-dt></td>
+                        <td class="text-end">@Bytes(s.TotalUsedBytes)</td>
+                        <td class="text-end">@Bytes(s.FreeVolumeBytes)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>PG</c> (Pages) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PostDocTypes"/> /
 /// <see cref="MediaDocTypes"/> for the new
 /// <c>Kumunita.Core.Pages</c> context (ADR 0039). Both documents are POCOs
 /// with the conventional <c>string</c> <c>Id</c> identity (the M3
@@ -56,7 +56,7 @@ public static class PageDocTypes
         // ~48 chars) is under Postgres's 64-char NAMEDATALEN limit, so the
         // explicit name is not strictly required here (unlike
         // AnnouncementTranslation's `ann_tr_uidx_ann_lang`, which is right at
-        // the edge — see M3DocTypes). It is used anyway for convention
+        // the edge — see PostDocTypes). It is used anyway for convention
         // consistency across the `<Parent>Translation` doc family, so a
         // future reader sees the same short-name idiom on every translation
         // row: `pg_tr_uidx_page_lang`.

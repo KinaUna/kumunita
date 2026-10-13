@@ -5,7 +5,7 @@ namespace Kumunita.Core;
 
 /// <summary>
 /// The M13 usage bounded context's Marten-native document registration
-/// surface (ADR 0004 §B.1, the <c>M3DocTypes</c> / <c>M5DocTypes</c>
+/// surface (ADR 0004 §B.1, the <c>PostDocTypes</c> / <c>ProjectDocTypes</c>
 /// parallel-surface shape). <see cref="UsageEvent"/> uses the
 /// conventional <c>string Id</c> identity (the M3 "string Id"
 /// convention), so no non-default convention (identity, business-key

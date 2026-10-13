@@ -88,13 +88,13 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
-            M9DocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
@@ -164,12 +164,14 @@ public sealed class SampleDataCorpusBackfillTests(PostgresFixture fixture) : ICl
 
     // ── Query helpers ────────────────────────────────────────────────────────
     private static async Task<int> Count<T>(IDocumentStore store, CancellationToken ct)
+        where T : notnull
     {
         await using var q = store.OpenSession(new Marten.Services.SessionOptions());
         return await Marten.QueryableExtensions.CountAsync(q.Query<T>(), ct);
     }
 
     private static async Task<bool> Exists<T>(IDocumentStore store, System.Linq.Expressions.Expression<System.Func<T, bool>> filter, CancellationToken ct)
+        where T : notnull
     {
         await using var q = store.OpenSession(new Marten.Services.SessionOptions());
         return await Marten.QueryableExtensions.AnyAsync(q.Query<T>(), filter, ct);

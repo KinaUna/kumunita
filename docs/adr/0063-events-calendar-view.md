@@ -53,7 +53,7 @@ row, calls no seam, and is never an access decision.
 
 ### D1 — Zero document changes
 
-No field is added to `Event`, `EventRsvp`, or `EventTranslation`; `M4DocTypes`
+No field is added to `Event`, `EventRsvp`, or `EventTranslation`; `EventDocTypes`
 is untouched; no `FeatureSchemaBase` migration; the boot paths are untouched;
 no EF. The calendar is a **view** — it reads the existing `Start` / `End`
 instants and nothing new. The only additive C# in the whole lane is: one seam

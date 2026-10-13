@@ -8,7 +8,7 @@ namespace Kumunita.Core.Posts;
 /// <para>
 /// One row per (post, language) pair — the
 /// <c>(PostId, LanguageCode)</c> unique index
-/// (<see cref="M3DocTypes.Configure"/>) enforces that at the database layer
+/// (<see cref="PostDocTypes.Configure"/>) enforces that at the database layer
 /// (Marten's document identity is the surrogate <c>Id</c>, the same
 /// <see cref="ComponentMembership"/> business-key convention as M1). The
 /// translation carries its own <see cref="Title"/> (optional — the base post's

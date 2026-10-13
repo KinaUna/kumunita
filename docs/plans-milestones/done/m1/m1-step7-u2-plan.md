@@ -20,7 +20,7 @@ mirrors it and does not supersede it.
   not exist in 6.33.0 — CS1061; not `IMessageBus.PublishAsync`, which asserts host-started).
 - `docs/plans-milestones/done/m1-step-7-handoff-notes.md` — the `## U1 — pinned API` section
   (U1's Exit, R1 escalation check: NOT triggered, and the exact call U2 should use).
-- `src/Kumunita.Core/M1DocTypes.cs` (`OutboxEmail` shape, `M1DocTypes.Configure`) — read
+- `src/Kumunita.Core/CoreDocTypes.cs` (`OutboxEmail` shape, `CoreDocTypes.Configure`) — read
   only, not changed (U2 must not alter the document shape — R5).
 
 ## Deliverable (closed set — only these 2 files were edited)
@@ -50,7 +50,7 @@ Not touched, deliberately, per the unit-series rules ("a unit never edits a file
 its own Deliverables list"): `U1PinnedApiProbe.cs` (left for U5's sweep — U1's note
 explicitly defers the keep-vs-delete call to U5; still compiles clean and remains accurate
 documentation of the pinned surface), `OutboxEmailHandler.cs`, `Program.cs`, the three
-pinned test files, `M1DocTypes.cs`/`M3DocTypes.cs`/any `FeatureSchemaBase` subclass (R5).
+pinned test files, `CoreDocTypes.cs`/`PostDocTypes.cs`/any `FeatureSchemaBase` subclass (R5).
 
 ## Exit (all hit)
 

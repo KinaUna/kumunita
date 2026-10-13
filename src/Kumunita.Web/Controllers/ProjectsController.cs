@@ -511,7 +511,7 @@ public sealed class ProjectsController : Controller
     // M7 community filter + the sort/dir pairs only when the request carried
     // them (the U10/U11 pager-carry rule, U11's SortFilterParams helper —
     // reused, not re-derived).
-    private static IReadOnlyDictionary<string, string> BuildBoardFilterParams(
+    private static IReadOnlyDictionary<string, string>? BuildBoardFilterParams(
         string? componentId, string? sort, string? dir)
     {
         var p = new Dictionary<string, string>();
@@ -525,7 +525,7 @@ public sealed class ProjectsController : Controller
     // FilterParams: the same frozen M7 community filter + the sort/dir pairs
     // (each section's own pager carries its own copy — both sections read
     // the request's single ?sort=/?dir= pair, so both pagers carry it).
-    private static IReadOnlyDictionary<string, string> BuildLandingFilterParams(
+    private static IReadOnlyDictionary<string, string>? BuildLandingFilterParams(
         string? componentId, string? sort, string? dir)
     {
         var p = new Dictionary<string, string>();
@@ -892,7 +892,11 @@ public sealed class ProjectsController : Controller
         if (tags is not null && result.Todo.TagIds.Count > 0)
         {
             var todoTagIds = result.Todo.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actorId);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049)
+            // so a tag's <c>TagTranslation</c> in that language resolves; null
+            // (test-construction site) falls to the instance-default → en floor.
+            var tagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actorId, tagPreferred);
             tagRows = readable
                 .Where(t => todoTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
@@ -900,6 +904,22 @@ public sealed class ProjectsController : Controller
                 .ThenBy(x => x.Slug, StringComparer.Ordinal)
                 .ToList();
         }
+
+        // ADR 0115 D3 (M14 interlock) — the **"create a new event" modal's**
+        // default Start/End: the actor's *current* wall-clock date and time in
+        // their effective time zone (the <see cref="EventController"/>
+        // CreateGet idiom), rounded to the whole minute — End is +1 h.
+        // Wall-clock only (the ADR 0019 contract): the form POSTs the strings
+        // verbatim and the server (the create-event lane below) converts to
+        // UTC at write time using the actor's zone. Carried onto the picker
+        // (the <see cref="TodoEventPicker.Start"/> / <see
+        // cref="TodoEventPicker.End"/> fields) so the modal's two
+        // <c>datetime-local</c> inputs open pre-filled — the actor can edit
+        // either before submitting. Display defaults, never a gate (C-M14·4).
+        var _seedZone    = await ResolveZoneAsync();
+        var _seedNow     = DateTimeOffset.UtcNow.ToOffset(_seedZone.GetUtcOffset(DateTimeOffset.UtcNow));
+        var _seedStart   = new DateTime(_seedNow.Year, _seedNow.Month, _seedNow.Day, _seedNow.Hour, _seedNow.Minute, 0);
+        var _seedEnd     = _seedStart.AddHours(1);
 
         var vm = new TodoDetailViewModel(
             Todo: row,
@@ -925,9 +945,12 @@ public sealed class ProjectsController : Controller
             // display surface, never a gate, C-M14·4). <see
             // cref="TodoEventPicker.CurrentEventId"/> is the to-do's stored
             // <c>EventId</c> (the <c>&lt;select&gt;</c> prefill).
+            // Start / End are the modal's defaults (the declarations above).
             EventPicker: new TodoEventPicker(
                 Options: await SeedEventPickerAsync(),
-                CurrentEventId: result.Todo.EventId),
+                CurrentEventId: result.Todo.EventId,
+                Start: _seedStart,
+                End: _seedEnd),
             Tags: tagRows);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
@@ -1526,6 +1549,193 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// <c>POST /projects/todos/{id}/create-event</c> — the **"create a new
+    /// event"** affordance on the to-do detail's event picker (the modal's
+    /// submit button). Composes the existing frozen seams in the correct
+    /// order for this surface: (1) create the event through the frozen
+    /// <see cref="IEventService.CreateAsync"/> (the **any signed-in
+    /// resident** standing floor — the service's
+    /// <see cref="Kumunita.Core.Events.EventService"/>
+    /// <see cref="Kumunita.Core.Events.EventService.CheckCreateStanding"/>
+    /// is the enforcement, C-M14·4 — no new authorization surface in the
+    /// controller); (2) link it to the to-do through the frozen <see
+    /// cref="IProjectService.SetTodoEventAsync"/> (the **creator ∪ assignee
+    /// ∪ GlobalAdmin** standing re-check + the event guard over the newly
+    /// created event — the same seam the existing
+    /// <see cref="TodoSetEvent"/> uses, so the event is guaranteed
+    /// readable by the actor — the author's own draft, the
+    /// <see cref="Kumunita.Core.Events.EventService.GetAsync"/>
+    /// author-only draft-gate pin).
+    /// <para>
+    /// **Order matters.** Create first, then set. If the set fails (e.g. the
+    /// actor has no standing on the to-do), the failure surfaces as the
+    /// set-event's 403 / 404 (the seam's decision, verbatim) and the
+    /// freshly-created event stays in the store as a draft — the author can
+    /// review + publish it from <c>/events/{id}</c> or link it to a
+    /// different to-do. This is the correct failure mode for "I created an
+    /// event but couldn't link it" — rather than the worse "I couldn't
+    /// create the event at all" (which would require a transactional seam
+    /// that does not exist and would couple two services' write paths).
+    /// </para>
+    /// <para>
+    /// **Shape validation** (the <see cref="EventEditorModel.IsValid"/>
+    /// subset the modal actually posts — Title required, Start/End present
+    /// and Start ≤ End, audience is the community-visible default the ADR
+    /// 0036 floor seeds): a shape failure redirects back to the to-do
+    /// detail with <c>TempData["error"]</c> (the
+    /// <see cref="_FlashToast"/> partial renders the toast; the form
+    /// re-renders with the same default values the modal had — no server
+    /// round-trip state needed for the simple modal shape).
+    /// </para>
+    /// <para>
+    /// **Timezone** (ADR 0019): the form POSTs wall-clock
+    /// <c>datetime-local</c> strings in the actor's effective zone;
+    /// this action converts them to UTC instants using the actor's zone
+    /// (the same <see cref="ResolveZoneAsync"/> the EventController
+    /// <see cref="EventController.CreatePost"/> uses).
+    /// </para>
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/create-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TodoCreateAndLinkEvent(
+        string id,
+        [FromForm] string? Title,
+        [FromForm] DateTime Start,
+        [FromForm] DateTime End,
+        [FromForm] string? Location)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+        {
+            TempData["error"] = "You must sign in to create an event.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        // Shape gate (the <see cref="EventEditorModel.IsValid"/> subset the
+        // modal actually posts): Title required, Start ≤ End. A shape
+        // failure re-redirects to the to-do detail with a flash — the form
+        // re-renders with the same defaults (no server state for the
+        // simple modal shape, C-M14·4 posture).
+        if (string.IsNullOrWhiteSpace(Title) || End < Start)
+        {
+            TempData["error"] = "A title is required and the end time must be after the start time.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        if (events is null)
+        {
+            TempData["error"] = "Event creation is unavailable on this deployment.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        // ADR 0019 — the form's Start/End are wall-clock (no offset) in the
+        // actor's effective zone. Convert to a UTC instant using the zone's
+        // DST-aware offset at that wall-clock moment (the
+        // <see cref="EventController.CreatePost"/> idiom, verbatim).
+        var authorZone = await ResolveZoneAsync();
+        var startUtc = new DateTimeOffset(Start, authorZone.GetUtcOffset(Start)).UtcDateTime;
+        var endUtc   = new DateTimeOffset(End,   authorZone.GetUtcOffset(End)).UtcDateTime;
+
+        // The authored-in language (ADR 0018) — the actor's effective
+        // language (the <see cref="ResolveComposeDefaultLanguageAsync"/>
+        // chain; a null translation provider — a test-construction site —
+        // degrades to the instance default, never a gate).
+        var languageCode = await ResolveComposeDefaultLanguageAsync();
+
+        // ADR 0036 — the audience default: community-visible (the
+        // <see cref="EventController.CreatePost"/> quick-create
+        // modal's hidden fields, verbatim — the modal does not carry a
+        // restricted audience picker, so the community branch is the sole
+        // decision branch: any signed-in actor sees the event via the
+        // Community branch's "all communities" shape). The Grants list is
+        // empty (the empty-audience-denies invariant C1 does not apply to
+        // the Community branch — a distinct grant, ADR 0036).
+        var audience = new Audience
+        {
+            Mode = AudienceMode.Any,
+            Grants = new List<AudienceGrant>(),
+            Community = true,
+        };
+
+        var request = new CreateEventRequest
+        {
+            Title = Title.Trim(),
+            Body = Title.Trim(), // quick-create shape (the ADR 0081 idiom —
+                                 // body seeds from the title; the modal is
+                                 // a title + times + location surface).
+            Start = new DateTimeOffset(startUtc, TimeSpan.Zero),
+            End   = new DateTimeOffset(endUtc,   TimeSpan.Zero),
+            Location = string.IsNullOrWhiteSpace(Location) ? null : Location.Trim(),
+            Audience = audience,
+            ReminderEnabled = true,
+            IsDraft = true, // ADR 0037 — a newly created event is a draft
+                             // until the author publishes it.
+            LanguageCode = languageCode,
+            TagIds = [],
+            ImageIds = [],
+            AttachmentIds = [],
+            Recurrence = null, // single, non-recurring (the modal has no
+                               // recurrence picker — the zero-change branch).
+        };
+
+        // (1) Create the event (the frozen seam; the service's
+        // CheckCreateStanding is the standing floor — any signed-in
+        // resident, C-M14·4 no new surface).
+        Kumunita.Core.Events.Event ev;
+        try
+        {
+            ev = await events.CreateAsync(actorId, request, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You do not have permission to create an event.";
+            return Redirect($"/projects/todos/{id}");
+        }
+        catch (ArgumentException)
+        {
+            // A bad shape the service rejected (the service's own guard —
+            // e.g. a malformed audience) — surfaced as a flash (the modal
+            // re-renders with the same defaults).
+            TempData["error"] = "The event could not be created.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        // (2) Link the newly created event to the to-do (the frozen seam —
+        // the same SetTodoEventAsync the existing TodoSetEvent action
+        // uses; the event guard over the new event is guaranteed to pass
+        // because the actor is its author — the author-only draft-gate
+        // pin in EventService.GetAsync).
+        try
+        {
+            await projects.SetTodoEventAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                ev.Id,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            // The to-do disappeared (concurrent delete) — the event was
+            // created and stays (the draft, the author can review it);
+            // the link is just not set.
+            TempData["error"] = "The event was created, but the to-do could not be updated to link it (it may have been deleted).";
+            return Redirect($"/projects/todos/{id}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The actor has no standing on the to-do (creator ∪ assignee ∪
+            // GlobalAdmin) — the event was created and stays (the draft);
+            // the link is just not set.
+            TempData["error"] = "The event was created, but you do not have permission to link it to this to-do.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        TempData["info"] = "Event created and linked to this to-do (saved as a draft).";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
     /// <c>GET /projects/todos/{id}.ics</c> — the M14 per-to-do calendar file
     /// (ADR 0115 D4 / design doc §routes lane-1, locked): the frozen
     /// <see cref="IProjectService.GetTodoAsync"/> (one <c>CanAsync(Read)</c>
@@ -1894,7 +2104,11 @@ public sealed class ProjectsController : Controller
             Modified: board.Modified,
             // ADR 0086 D9 — the stored association (may dangle — display
             // only); the "Add to Project…" modal preselects it.
-            ProjectId: board.ProjectId);
+            ProjectId: board.ProjectId,
+            // ADR 0115 (M14 interlock carried to the board surface) — the
+            // stored event association (may dangle — display only); the
+            // "Link to event…" picker preselects it.
+            EventId: board.EventId);
     }
 
     /// <summary>
@@ -2129,6 +2343,39 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+        // **event link**: resolve the board's `EventId` to a readable,
+        // non-deleted event title for the detail view, through the **frozen**
+        // <see cref="Kumunita.Core.Events.IEventService.GetAsync"/> (a
+        // single <c>CanAsync(Read)</c> decision). The D2 dangling-safe rule:
+        // a soft-deleted target (404) or an unreadable one (403) leaves all
+        // three fields `null`, and the chip is omitted entirely — **not** a
+        // 404/403 for the board itself (C-M14·2 — a read convenience, never an
+        // error; the target's title / id are not leaked). Only when `EventId`
+        // is non-empty is <c>GetAsync</c> called (a `null` association is the
+        // common case — no extra read).
+        string? eventLinkId = null;
+        string? eventLinkTitle = null;
+        if (events is not null && result.Board.EventId is { Length: > 0 })
+        {
+            try
+            {
+                var linked = await events.GetAsync(result.Board.EventId, actorId, HttpContext.RequestAborted);
+                eventLinkId = linked.Id;
+                eventLinkTitle = linked.Title;
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted event — the association dangles; the chip is
+                // hidden (C-M14·2), the board itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // An event the actor may not read — a hidden chip, not a 403
+                // for the board (C-M14·2).
+            }
+        }
+
         // ADR 0088 — the board's user-added translations (the ADR 0027
         // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
         // shape). A "a read, not a decision" surface; the parent board's
@@ -2146,7 +2393,11 @@ public sealed class ProjectsController : Controller
         if (tags is not null && result.Board.TagIds.Count > 0)
         {
             var boardTagIds = result.Board.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actorId);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049)
+            // so a tag's <c>TagTranslation</c> in that language resolves; null
+            // (test-construction site) falls to the instance-default → en floor.
+            var boardTagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actorId, boardTagPreferred);
             boardTagRows = readable
                 .Where(t => boardTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
@@ -2168,6 +2419,19 @@ public sealed class ProjectsController : Controller
             // ADR 0086 D9 — the project link (the D6 dangling rule above).
             ProjectId: projectLinkId,
             ProjectTitle: projectLinkTitle,
+            // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+            // event link (the D2 dangling rule above).
+            EventId: eventLinkId,
+            EventTitle: eventLinkTitle,
+            EventLinkPath: eventLinkId is not null ? $"/events/{eventLinkId}" : null,
+            // ADR 0115 D3 (M14 interlock carried to the board surface) — the
+            // "Link to event…" picker (a display surface, never a gate —
+            // C-M14·4; empty ⇒ the card hides, the ADR 0086 D9 F10 rule). The
+            // <see cref="SeedEventPickerAsync"/> seed offers the actor's own
+            // events; the board's stored <c>EventId</c> prefills it.
+            EventPicker: new BoardEventPicker(
+                Options: await SeedEventPickerAsync(),
+                CurrentEventId: result.Board.EventId),
             // ADR 0086 D9 — the ⋮ menu's "Add to Project…" modal picker
             // (a display surface, never a gate — C-PL·3; empty ⇒ the item
             // + modal hide, the BoardEdit F10 rule).
@@ -2412,6 +2676,53 @@ public sealed class ProjectsController : Controller
         TempData["info"] = string.IsNullOrWhiteSpace(projectId)
             ? "Project cleared."
             : "Project set.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/set-event</c> — the **event
+    /// association** write lane (ADR 0115 D3 / C-M14·3, the M14 interlock
+    /// carried to the board surface — the <c>TodoSetEvent</c> shape verbatim,
+    /// the <c>BoardSetProject</c> board-standing sibling). A **standalone**
+    /// form POST (its own small form on the board detail — **not** the main
+    /// board update form, whose frozen <see
+    /// cref="Kumunita.Core.Projects.UpdateBoardRequest"/> is untouched).
+    /// Sets the board's <see cref="Kumunita.Core.Projects.KanbanBoard
+    /// .EventId"/> through the <see
+    /// cref="IProjectService.SetBoardEventAsync"/> seam; a blank / <c>null</c>
+    /// choice posts <c>null</c> = **clear** the association. **Creator ∪
+    /// GlobalAdmin** over the board — the service's server-side standing
+    /// re-check + event guard (C-M14·3) is the enforcement; the controller
+    /// does no standing math (the ADR 0006-D split). A missing board is 404,
+    /// a denied actor 403, a missing / unreadable event 404 (the seam's
+    /// decision as truth, C-M14·3).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/set-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardSetEvent(string id, [FromForm] string? eventId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetBoardEventAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(eventId) ? null : eventId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(eventId)
+            ? "Event link cleared."
+            : "Event linked.";
         return Redirect($"/projects/boards/{id}");
     }
 

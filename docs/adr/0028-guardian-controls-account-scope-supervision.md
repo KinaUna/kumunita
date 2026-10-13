@@ -57,7 +57,7 @@ exists (the multi-group membership shape, not a single owner).
 - `GuardianId`, `ChildId`, `Status` (`Active` → `Dissolved`), `CreatedAt`,
   `DissolvedAt?`, `DissolvedBy?` — the `DelegationGrant.RevokedBy` and the
   `GroupInvitation` state-machine precedent.
-- **Additive (ADR 0004 §B.1):** registered on the **existing `M1DocTypes`**
+- **Additive (ADR 0004 §B.1):** registered on the **existing `CoreDocTypes`**
   surface (a neighbor of `Schema.For<DelegationGrant>()`) — delta-detected by
   Marten, idempotent, no re-seed, no new `*DocTypes`, no DDL change under
   Marten 9's JSONB `data` column (the ADR 0010 `IsPrivate` upgrade-path

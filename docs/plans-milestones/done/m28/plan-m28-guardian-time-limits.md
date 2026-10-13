@@ -18,7 +18,7 @@
 > the index runs 0001–0150; U00 verifies 0151 is free against
 > `docs/adr/README.md` and on disk). **U01** adds the
 > `GuardianTimeLimitSchedule` doc + `TimeLimitMode` enum on the existing
-> `M1DocTypes` GU surface. **U02** authors the pure
+> `CoreDocTypes` GU surface. **U02** authors the pure
 > `GuardianTimeLimitEvaluator.IsAllowedNow`. **U03** adds the three
 > `IUserInfoService` seams (guardian read / guardian write / enforcement
 > read) + their implementation + the standing/audit pins. **U04** ships the
@@ -44,7 +44,7 @@
 > precedent). **One new middleware** (`TimeLimitMiddleware`, the
 > `BlockedAccountMiddleware` shape). **No EF migration** (a new Marten doc
 > type is additive per ADR 0004 §B.1; the delta is applied idempotently at
-> boot on the existing `M1DocTypes` surface — the `GuardianLink` neighbor).
+> boot on the existing `CoreDocTypes` surface — the `GuardianLink` neighbor).
 > **One new route** for the write (a section on the existing
 > `/me/children/{childId}` Detail surface — no new controller, no new route
 > for the read; the enforcement is a middleware, not a route). **No roadmap
@@ -200,13 +200,13 @@ their own time limits — that is the whole point of the control); a
   early + too wide) whereas a dedicated read seam is read fresh per request
   (the ADR 0050 `IsSignupOpen` strong-consistency shape, C-M28·4).
 - **D2 · The doc is per-child (id = `ChildId`), registered on the existing
-  `M1DocTypes` GU surface (the `GuardianLink` neighbor).** One row per child
+  `CoreDocTypes` GU surface (the `GuardianLink` neighbor).** One row per child
   — the exact `NotificationQuietSchedule` "one row per subject" shape (ADR
   0121 D2), with `ChildId` in place of `RecipientId`. Registered **next to
-  `GuardianLink`** on `M1DocTypes` (the GU lane's surface, ADR 0028 §B; the
+  `GuardianLink`** on `CoreDocTypes` (the GU lane's surface, ADR 0028 §B; the
   ADR 0004 §B.1 additive-doc-type precedent — delta-detected, idempotent, no
   new `*DocTypes` surface, no new boot-path wiring, no EF migration).
-  **Why `M1DocTypes` and not a new `M28DocTypes`:** it is **part of the GU
+  **Why `CoreDocTypes` and not a new `M28DocTypes`:** it is **part of the GU
   guardian-lane surface** (the "lane on the M1 surface, not a new bounded
   context" shape, the M27 D7 / SITE "one new doc type" precedent); the
   cheapest + most consistent choice. The seeder does **not** seed a
@@ -337,7 +337,7 @@ their own time limits — that is the whole point of the control); a
   per-subject doc: `Enabled` master, `Mode` enum, `Hours` int[], `DaysOfWeek`
   int[], `Updated?`), `src/Kumunita.Core/Notifications/NotificationService.cs`
   (the `GetQuietScheduleAsync` / `SetQuietScheduleAsync` owner-scope read /
-  write shape U03 mirrors), `src/Kumunita.Core/M6DocTypes.cs` (the
+  write shape U03 mirrors), `src/Kumunita.Core/NotificationDocTypes.cs` (the
   `NotificationQuietSchedule` registration U01 mirrors),
   `tests/Kumunita.Core.Tests/NotificationServiceTests.cs` (the
   `IsQuietNow_Verdict_Differs_Between_UTC2_And_UTC` + the
@@ -351,7 +351,7 @@ their own time limits — that is the whole point of the control); a
   the gate + the audit shape), `src/Kumunita.Web/Controllers/GuardianController.cs`
   + `src/Kumunita.Web/Models/GuardianViewModels.cs` (the GU Index / Detail
   surface + the `ChildAccountItem` 3-field pin U06 re-pins),
-  `src/Kumunita.Core/M1DocTypes.cs` (the `GuardianLink` registration U01
+  `src/Kumunita.Core/CoreDocTypes.cs` (the `GuardianLink` registration U01
   mirrors — the doc's new surface).
 - **The blocked-account enforcement (the middleware + landing pattern to
   mirror).** `src/Kumunita.Web/Security/BlockedAccountMiddleware.cs` (the
@@ -553,10 +553,10 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
   consistent (the [PROPOSED] set locked, or refined + recorded). **No
   build.** Handoff note: 6–8 lines.
 
-### U01 — `GuardianTimeLimitSchedule` doc + `TimeLimitMode` enum + `M1DocTypes` registration
+### U01 — `GuardianTimeLimitSchedule` doc + `TimeLimitMode` enum + `CoreDocTypes` registration
 - **Goal:** create the `GuardianTimeLimitSchedule` POCO + the
   `TimeLimitMode` enum (namespace `Kumunita.Core.UserInfo`) and register
-  the doc on the existing `M1DocTypes` GU surface (next to
+  the doc on the existing `CoreDocTypes` GU surface (next to
   `GuardianLink`). Mirrors the `NotificationQuietSchedule` doc shape
   (per-subject, the `Enabled`/`Mode`/`Hours`/`DaysOfWeek`/`Updated?`
   fields, identity pinned to `ChildId`). **No service, no test, no
@@ -565,9 +565,9 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
   `src/Kumunita.Core/Notifications/NotificationQuietSchedule.cs` (the doc
   shape to mirror — the `Enabled` master, the `Mode` enum, the `Hours`
   int[], the `DaysOfWeek` int[], the `Updated?`),
-  `src/Kumunita.Core/M6DocTypes.cs` (the `NotificationQuietSchedule`
+  `src/Kumunita.Core/NotificationDocTypes.cs` (the `NotificationQuietSchedule`
   registration U01 mirrors — the identity pin + the `Schema.For` shape),
-  `src/Kumunita.Core/M1DocTypes.cs` (the GU surface — the
+  `src/Kumunita.Core/CoreDocTypes.cs` (the GU surface — the
   `opts.Schema.For<GuardianLink>()` line U01 adds the new doc next to),
   `docs/adr/0121-notification-quiet-times.md` §D2 (the doc's invariants —
   the `Enabled` floor, the empty-array = "all" reading).
@@ -581,14 +581,14 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
      the lean default), `Allowed = 1` (restricted EXCEPT the window, the
      allow-list). (One file, the doc + enum — the `NotificationQuietSchedule`
      + `QuietScheduleMode` same-file shape.)
-  2. `src/Kumunita.Core/M1DocTypes.cs` (modify) — add
+  2. `src/Kumunita.Core/CoreDocTypes.cs` (modify) — add
      `opts.Schema.For<GuardianTimeLimitSchedule>()` (identity pinned to
-     `ChildId`, mirroring the M6DocTypes `NotificationQuietSchedule`
+     `ChildId`, mirroring the NotificationDocTypes `NotificationQuietSchedule`
      registration) **next to** the `GuardianLink` line.
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` green. The doc + enum
-  compile; the `M1DocTypes` line added. **No test** (U02's evaluator tests
+  compile; the `CoreDocTypes` line added. **No test** (U02's evaluator tests
   are the first M28 tests). Handoff note: 4 lines (the doc field list, the
-  enum values, the `M1DocTypes` line number, any compile warnings).
+  enum values, the `CoreDocTypes` line number, any compile warnings).
 
 ### U02 — The pure `GuardianTimeLimitEvaluator` + the pure-evaluator tests
 - **Goal:** author the `static` pure `GuardianTimeLimitEvaluator`

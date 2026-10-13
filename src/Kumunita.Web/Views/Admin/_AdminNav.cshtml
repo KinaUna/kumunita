@@ -34,8 +34,16 @@
    AdminOnboardingController + /admin/onboarding view call — M30·5).
    Non-blocking (M30·5): it never gates sign-in; the close button is a
    client-side dismiss (onboarding-banner.js), and the only way to clear it
-   for real is the explicit "mark as complete" POST (M30·4). *@
-@await Html.PartialAsync("~/Views/Shared/_AdminOnboardingBanner")
+   for real is the explicit "mark as complete" POST (M30·4).
+
+   The reference MUST keep the `.cshtml` extension: under a published
+   precompiled-assembly deployment (Docker) the view lookup is by exact
+   registered name, and the extension is part of it — the `~/.../X` form
+   (no extension) only resolves via the file-based provider that `dotnet run`
+   uses, so it 500s in the container. Matches every other `~/`-absolute
+   reference here (e.g. `~/Views/Locale/_SettingsTabs.cshtml`,
+   `~/Views/Admin/_AdminNav.cshtml`). *@
+@await Html.PartialAsync("~/Views/Shared/_AdminOnboardingBanner.cshtml")
 <ul class="nav nav-tabs kmb-tab-under-navbar mb-4" role="tablist">
     @foreach (var tab in tabs)
     {

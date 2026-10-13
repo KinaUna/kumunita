@@ -51,8 +51,12 @@
 
     // The toast's accessible names are server-resolved (the kw-l TagHelper
     // can't wrap an attribute); the a11y.* floor is the closed set.
-    string ariaWhatsNewRegion = await Translation.GetAsync("a11y.whatsnew_region", effLang);
-    string ariaClose          = await Translation.GetAsync("a11y.close", effLang);
+    string ariaWhatsNewRegion = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["a11y.whatsnew_region"]
+        : await Translation.GetAsync("a11y.whatsnew_region", effLang);
+    string ariaClose          = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["a11y.close"]
+        : await Translation.GetAsync("a11y.close", effLang);
 }
 <div class="toast-container position-fixed top-0 end-0 p-3 kmb-whatsnew-toast"
      id="whatsnew-toast-container" aria-label="@ariaWhatsNewRegion"

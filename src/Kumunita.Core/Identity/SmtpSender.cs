@@ -276,8 +276,8 @@ public sealed class SmtpSender(
         // after the fact. The body is Markdown (§6.2: "rendered Markdown");
         // relays don't re-render it, so a plain-text MIME part is the honest
         // shape.
-        IEnumerable<InternetAddress>? fromList = string.IsNullOrWhiteSpace(_cfg.From)
-            ? null
+        IEnumerable<InternetAddress> fromList = string.IsNullOrWhiteSpace(_cfg.From)
+            ? Array.Empty<InternetAddress>()
             : new InternetAddress[] { new MailboxAddress(null, _cfg.From) };
         var toList = new InternetAddress[] { new MailboxAddress(null, email.Recipient) };
         var msg = new MimeMessage(fromList, toList, email.Subject, new TextPart("plain") { Text = email.Body });

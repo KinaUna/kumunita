@@ -15,7 +15,7 @@ namespace Kumunita.Core.Tests;
 /// seams (<see cref="TranslationProvider"/> / <see cref="LocalizationService"/>)
 /// over a fresh scratch Postgres database (the <see cref="PostgresFixture"/>
 /// harness — the same template <see cref="PostServiceTests"/> uses, extended
-/// with <c>M3DocTypes.Configure</c> for M6's <see cref="Post"/> plant).
+/// with <c>PostDocTypes.Configure</c> for M6's <see cref="Post"/> plant).
 /// <para>
 /// No new Core or Web code; no new seams. The 19 names are the **whole**;
 /// the three-test acceptance gate (U8) runs them together with the inherited
@@ -793,8 +793,8 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

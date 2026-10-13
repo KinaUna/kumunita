@@ -30,7 +30,7 @@ design doc's 19 names are the **whole** and the **part-vs-whole** gate is U8's.
    `dotnet test`). *(Authoritative.)*
 2. `tests/Kumunita.Core.Tests/UserInfoServiceTests.cs` — the `BootStoreAsync`
    harness (fresh scratch DB, `KumunitaFeature` + `AuthorizationFeature` +
-   `M1DocTypes.Configure`, `ApplyAllConfiguredChangesToDatabaseAsync`) and
+   `CoreDocTypes.Configure`, `ApplyAllConfiguredChangesToDatabaseAsync`) and
    the audit-row-assertion idiom (`session.Query<AccessAudit>()` + the pinned
    `Via`/`Outcome`/`TargetKind`/`Action`/`TargetId` shape).
 3. `src/Kumunita.Core/Localization/ITranslationProvider.cs` +
@@ -53,7 +53,7 @@ design doc's 19 names are the **whole** and the **part-vs-whole** gate is U8's.
 
 | # | File | What ships |
 |---|------|-----------|
-| 1 | **New** `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` | The **19 pinned `[Fact]` names** verbatim. Class `public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>`. A **private** `BootStoreAsync()` (the `PostServiceTests` template: fresh scratch DB → `DocumentStore.For` with `KumunitaFeature` + `AuthorizationFeature` + `M1DocTypes.Configure` **+ `M3DocTypes.Configure`** — M6's `Post` plant needs the M3 surface — → `ApplyAllConfiguredChangesToDatabaseAsync`). A **private** `Plant(store, document)` helper (the `PostServiceTests` idiom — a plain write-session store, for test-fixture seeding that is not a service write seam). A **private** `SeedM1RowAsync(store)` helper — mirrors `FirstBootSeeder.SeedLanguageCatalogAsync` exactly (upserts the `en` catalog row + the `LocaleSettings` singleton) so every test that needs the M·9 floor has it without re-running the full host seeder. **19 `[Fact]`s** — the 13 FACES tests (one per M1–M13) + the 6 audit-row-shape tests, named exactly per the design doc table. Each test asserts the pinned outcome (the FACES row) and, where applicable, the audit-row shape (`Via = Admin`, `Outcome = Allow`, `Action`, `TargetKind`, `TargetId` per method). No new Core or Web code; no new seams; the file is the **whole** (part-vs-whole gate — U8 runs it together with the inherited M1/M2/M3/M3b/media/group-posts anchors). |
+| 1 | **New** `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` | The **19 pinned `[Fact]` names** verbatim. Class `public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>`. A **private** `BootStoreAsync()` (the `PostServiceTests` template: fresh scratch DB → `DocumentStore.For` with `KumunitaFeature` + `AuthorizationFeature` + `CoreDocTypes.Configure` **+ `PostDocTypes.Configure`** — M6's `Post` plant needs the M3 surface — → `ApplyAllConfiguredChangesToDatabaseAsync`). A **private** `Plant(store, document)` helper (the `PostServiceTests` idiom — a plain write-session store, for test-fixture seeding that is not a service write seam). A **private** `SeedM1RowAsync(store)` helper — mirrors `FirstBootSeeder.SeedLanguageCatalogAsync` exactly (upserts the `en` catalog row + the `LocaleSettings` singleton) so every test that needs the M·9 floor has it without re-running the full host seeder. **19 `[Fact]`s** — the 13 FACES tests (one per M1–M13) + the 6 audit-row-shape tests, named exactly per the design doc table. Each test asserts the pinned outcome (the FACES row) and, where applicable, the audit-row shape (`Via = Admin`, `Outcome = Allow`, `Action`, `TargetKind`, `TargetId` per method). No new Core or Web code; no new seams; the file is the **whole** (part-vs-whole gate — U8 runs it together with the inherited M1/M2/M3/M3b/media/group-posts anchors). |
 
 ### The 19 names (verbatim — a rename is a drift event)
 
@@ -160,7 +160,7 @@ table):
 
 - **Fresh scratch DB per test** (`PostgresFixture.NewDatabaseAsync`), boot via
   the `DocumentStore.For` template: `KumunitaFeature` + `AuthorizationFeature`
-  + `M1DocTypes.Configure` **+ `M3DocTypes.Configure`** (M6's `Post` plant
+  + `CoreDocTypes.Configure` **+ `PostDocTypes.Configure`** (M6's `Post` plant
   needs the M3 surface) + `ApplyAllConfiguredChangesToDatabaseAsync`.
 - **M1 seed via helper** — a private `SeedM1RowAsync(store)` that upserts
   exactly the two rows `FirstBootSeeder.SeedLanguageCatalogAsync` writes (the
@@ -173,7 +173,7 @@ table):
 - **No new seams, no new documents, no new packages.** The test file is the
   **only** new file in this unit. The `Post` / `PostReply` / `Group` documents
   used in M6 are seeded via a plain write session (they are already in
-  `M3DocTypes`, registered by U1's `M1DocTypes` surface — no schema change).
+  `PostDocTypes`, registered by U1's `CoreDocTypes` surface — no schema change).
 - **CancellationToken** — `TestContext.Current.CancellationToken` (the
   `UserInfoServiceTests` idiom).
 

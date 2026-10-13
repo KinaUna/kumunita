@@ -69,13 +69,52 @@ public static class EffectiveLanguageCode
     /// <c>en</c> floor — M·1/M·9).</param>
     public static async Task<string> ResolveAsync(
         HttpRequest? request,
-        ILocalizationService localization,
-        ITranslationProvider provider)
+        ILocalizationService? localization,
+        ITranslationProvider? provider)
     {
+        if (localization is null || provider is null)
+            return "en";
+
         // Mirror the <c>&lt;kw-l&gt;</c> TagHelper's three-branch chain exactly
         // (TagHelpers/LocalizeTagHelper.cs), but return the resolved **code**
         // rather than a string, so a content surface can pick which of an item's
         // pre-rendered variants (ADR 0027) is default-visible.
+        var pref = request is null ? null : LocaleCookie.Read(request);
+        if (!string.IsNullOrWhiteSpace(pref))
+            return await provider.ResolveEffectiveLanguageAsync(pref).ConfigureAwait(false);
+
+        if (request is not null)
+        {
+            var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+            var candidates = RequestLanguage.BrowserCandidates(request, catalog);
+            if (candidates.Count > 0)
+                return await provider.ResolveEffectiveLanguageAsync(candidates).ConfigureAwait(false);
+        }
+
+        return await provider.ResolveEffectiveLanguageAsync((string?)null).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The same per-request chain as <see cref="ResolveAsync"/>, but returning
+    /// <b>null when the localization / provider seam is absent</b> (a
+    /// test-construction site) rather than the hard <c>"en"</c> floor. A read
+    /// seam that accepts an optional <c>preferredLanguageCode</c> (the
+    /// <c>ITagService</c> tag-display-name resolution) can pass this value
+    /// straight through: when null the provider falls to its instance-default →
+    /// <c>en</c> floor (the legacy behavior), so single-argument mock stubs
+    /// keep matching. This is the "thread the per-request language into the
+    /// Core read" idiom the tag lane was missing — the group-name and
+    /// post-translation surfaces resolve the same chain but pass a concrete
+    /// code; this overload lets a Core seam keep its null-fallback contract.
+    /// </summary>
+    public static async Task<string?> ResolvePreferredAsync(
+        HttpRequest? request,
+        ILocalizationService? localization,
+        ITranslationProvider? provider)
+    {
+        if (localization is null || provider is null)
+            return null;
+
         var pref = request is null ? null : LocaleCookie.Read(request);
         if (!string.IsNullOrWhiteSpace(pref))
             return await provider.ResolveEffectiveLanguageAsync(pref).ConfigureAwait(false);

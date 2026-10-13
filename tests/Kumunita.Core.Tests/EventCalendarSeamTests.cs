@@ -90,7 +90,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident, TestContext.Current.CancellationToken);
         Assert.Contains("in-window", result.Select(e => e.Id));
         Assert.DoesNotContain("before-window", result.Select(e => e.Id));
         Assert.DoesNotContain("after-window", result.Select(e => e.Id));
@@ -128,7 +128,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident, TestContext.Current.CancellationToken);
         Assert.Contains("on-start", result.Select(e => e.Id));
         Assert.DoesNotContain("just-before", result.Select(e => e.Id));
     }
@@ -165,7 +165,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, resident, TestContext.Current.CancellationToken);
         Assert.Contains("just-before-end", result.Select(e => e.Id));
         Assert.DoesNotContain("on-end", result.Select(e => e.Id));
     }
@@ -194,7 +194,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = true, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger, TestContext.Current.CancellationToken);
         Assert.Empty(result);
     }
 
@@ -236,7 +236,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         // for everyone, including the author. The author accesses their draft
         // via the detail view (GetAsync, the ADR 0037 draft gate), not the
         // list surface.
-        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, author));
+        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, author, TestContext.Current.CancellationToken));
     }
 
     // ── 6 — EV_Range_DeletedExcludedForEveryone (ADR 0024; §5.3 #6) ────────
@@ -262,8 +262,8 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
-        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, author));
-        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger));
+        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, author, TestContext.Current.CancellationToken));
+        Assert.Empty(await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger, TestContext.Current.CancellationToken));
     }
 
     // ── 7 — EV_Range_AudienceMemberSeesEvent (C6 branch 6; §5.3 #7) ────────
@@ -290,7 +290,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, grantee);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, grantee, TestContext.Current.CancellationToken);
         Assert.Contains("granted", result.Select(e => e.Id));
     }
 
@@ -319,7 +319,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, stranger, TestContext.Current.CancellationToken);
         Assert.Empty(result);
     }
 
@@ -361,7 +361,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             Audience = Audience(GrantKind.User, otherGrantee),
         });
 
-        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, actor);
+        var result = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, actor, TestContext.Current.CancellationToken);
         Assert.Contains("public-ev", result.Select(e => e.Id));
         Assert.DoesNotContain("restricted-ev", result.Select(e => e.Id));
 
@@ -422,20 +422,20 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         // The filter narrows the candidate set: unfiltered, the member sees
         // both (their restricted one + the public one); filtered to compA,
         // only compA's event is listed.
-        var unfiltered = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, member);
+        var unfiltered = await svc.ListInRangeAsync(WindowStart, WindowEnd, null, member, TestContext.Current.CancellationToken);
         Assert.Contains("ev-a", unfiltered.Select(e => e.Id));
         Assert.Contains("ev-b", unfiltered.Select(e => e.Id));
 
-        var filtered = await svc.ListInRangeAsync(WindowStart, WindowEnd, compA, member);
+        var filtered = await svc.ListInRangeAsync(WindowStart, WindowEnd, compA, member, TestContext.Current.CancellationToken);
         Assert.Contains("ev-a", filtered.Select(e => e.Id));
         Assert.DoesNotContain("ev-b", filtered.Select(e => e.Id));
 
         // The filter is never a gate: the non-member is denied the restricted
         // event with <em>and</em> without the filter (no leak either way).
         Assert.DoesNotContain(
-            "ev-a", (await svc.ListInRangeAsync(WindowStart, WindowEnd, null, nonMember)).Select(e => e.Id));
+            "ev-a", (await svc.ListInRangeAsync(WindowStart, WindowEnd, null, nonMember, TestContext.Current.CancellationToken)).Select(e => e.Id));
         Assert.DoesNotContain(
-            "ev-a", (await svc.ListInRangeAsync(WindowStart, WindowEnd, compA, nonMember)).Select(e => e.Id));
+            "ev-a", (await svc.ListInRangeAsync(WindowStart, WindowEnd, compA, nonMember, TestContext.Current.CancellationToken)).Select(e => e.Id));
     }
 
     // ── EV-DWM — additive window pins (C-DWM·1; design §6.3) ───────────────
@@ -490,7 +490,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(dayStartUtc, dayEndUtc, null, resident);
+        var result = await svc.ListInRangeAsync(dayStartUtc, dayEndUtc, null, resident, TestContext.Current.CancellationToken);
         var ids = result.Select(e => e.Id).ToList();
         Assert.Contains("on-anchor-day", ids);
         Assert.DoesNotContain("day-before", ids);
@@ -550,7 +550,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var result = await svc.ListInRangeAsync(weekStartUtc, weekEndUtc, null, resident);
+        var result = await svc.ListInRangeAsync(weekStartUtc, weekEndUtc, null, resident, TestContext.Current.CancellationToken);
         var ids = result.Select(e => e.Id).ToList();
         Assert.Contains("in-week-1", ids);
         Assert.Contains("in-week-2", ids);
@@ -584,9 +584,9 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

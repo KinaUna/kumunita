@@ -72,17 +72,17 @@ public sealed class UserPortabilityResolveTests(PostgresFixture fixture) : IClas
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
-            M9DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);
-            M17DocTypes.Configure(opts);
+            BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -284,7 +284,7 @@ public sealed class UserPortabilityResolveTests(PostgresFixture fixture) : IClas
         var postsBefore = await CountPostsAsync(boot, CancellationToken.None);
         Assert.Equal(0, postsBefore);
 
-        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive);
+        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive, TestContext.Current.CancellationToken);
 
         Assert.True(result.Ok);
         Assert.Empty(result.Failures);
@@ -348,7 +348,7 @@ public sealed class UserPortabilityResolveTests(PostgresFixture fixture) : IClas
         var postsBefore = await CountPostsAsync(boot, CancellationToken.None);
         Assert.Equal(0, postsBefore);
 
-        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive);
+        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive, TestContext.Current.CancellationToken);
 
         Assert.True(result.Ok);
         Assert.Empty(result.Failures);
@@ -392,7 +392,7 @@ public sealed class UserPortabilityResolveTests(PostgresFixture fixture) : IClas
         // on it) — the C-M27·4 no-auto-merge pin: it is not applied.
         var resolutions = new List<UserPortabilityEntityResolution>();
 
-        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive);
+        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive, TestContext.Current.CancellationToken);
 
         Assert.True(result.Ok);
         Assert.Equal(0, result.AppliedCount);
@@ -451,7 +451,7 @@ public sealed class UserPortabilityResolveTests(PostgresFixture fixture) : IClas
         Assert.Equal(0, postsBefore);
         Assert.Equal(0, auditsBefore);
 
-        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive);
+        var result = await boot.service.ResolveAsync(resident, plan, resolutions, archive, TestContext.Current.CancellationToken);
 
         Assert.False(result.Ok);
         Assert.Equal(0, result.AppliedCount);

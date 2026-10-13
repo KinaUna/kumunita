@@ -99,12 +99,12 @@ public sealed class PortabilityRoundTripTests(PostgresFixture fixture) : IClassF
             // Every doc-type surface the §inventory's 44 content docs span
             // (the M1 / M3 / M4 / M5 / M6 / M9 + Media + Tag + Page + the
             // Localization docs — the exact set Program.cs registers).
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
-            M9DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);

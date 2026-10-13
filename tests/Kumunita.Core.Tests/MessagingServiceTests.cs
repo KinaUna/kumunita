@@ -504,13 +504,13 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers LocaleSettings (the toggle's home) and
+            // CoreDocTypes registers LocaleSettings (the toggle's home) and
             // AccessAudit (the audit-row pin needs it in the schema).
-            M1DocTypes.Configure(opts);
-            // M9DocTypes registers Conversation / Message (the M9 surface
+            CoreDocTypes.Configure(opts);
+            // MessagingDocTypes registers Conversation / Message (the M9 surface
             // the service writes to; the U02 toggle pins only touch
             // LocaleSettings, but the schema is the full lane's).
-            M9DocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -526,7 +526,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
     }
 
     /// <summary>
-    /// The U03 harness: a scratch store with <c>M6DocTypes</c> registered
+    /// The U03 harness: a scratch store with <c>NotificationDocTypes</c> registered
     /// (so the <see cref="Notification"/> table exists for the nudge pin),
     /// a <see cref="MessagingService"/> constructed with a
     /// <see cref="NotificationService"/> (the ADR 0077 optional-nudge-param
@@ -545,9 +545,9 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);   // LocaleSettings + AccessAudit
-            M6DocTypes.Configure(opts);   // Notification (the D6 nudge table)
-            M9DocTypes.Configure(opts);   // Conversation + Message
+            CoreDocTypes.Configure(opts);   // LocaleSettings + AccessAudit
+            NotificationDocTypes.Configure(opts);   // Notification (the D6 nudge table)
+            MessagingDocTypes.Configure(opts);   // Conversation + Message
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -601,5 +601,48 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
         return await s.Query<Notification>().ToListAsync(ct);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 9 (message): a resolved `@`-token stores ONE `message.mention`
+    // row for the recipient (the per-recipient key + the `/messages/{convoId}`
+    // linkPath, M36·4) + a staged email; an unknown token (M36-5) stores
+    // none. Messaging has **no** draft concept (M36·8 — the send **is** the
+    // publishing lane), so no draft case applies.
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Message_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, MessagingDocTypes.Configure);
+        var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await svc.SetMessagingEnabledAsync(true, "u-admin");
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+
+        var convo = await svc.OpenConversationAsync("alice", "bob");
+        await svc.SendAsync(convo.Id, "alice", "@Ada hi");
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.MessageMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.StartsWith($"notification:{Notifications.NotificationKinds.MessageMention}:", row.IdempotencyKey);
+        Assert.EndsWith(":ada", row.IdempotencyKey);
+        Assert.Equal($"/messages/{convo.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key.EndsWith(":ada") && e.Recipient == "ada@ex.net");
+    }
+
+    [Fact]
+    public async Task M36_Message_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, MessagingDocTypes.Configure);
+        var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await svc.SetMessagingEnabledAsync(true, "u-admin");
+
+        var convo = await svc.OpenConversationAsync("alice", "bob");
+        await svc.SendAsync(convo.Id, "alice", "@Ghost hi");
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.MessageMention));
     }
 }

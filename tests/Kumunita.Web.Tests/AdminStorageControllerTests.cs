@@ -93,7 +93,7 @@ public class AdminStorageControllerTests
         store.Received(1).LightweightSession();
 
         // The read seam (U5's GET) is untouched by the set-lane.
-        await settings.DidNotReceiveWithAnyArgs().GetOrCreateAsync(default);
+        await settings.DidNotReceiveWithAnyArgs().GetOrCreateAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -51,7 +51,7 @@ translation of an event:
 | `AuthorId` | the last actor to add / edit the row. |
 | `Created` | the last add / edit stamp. |
 
-Registered on the **`M4DocTypes`** document surface (the ADR 0054 M4 doc-type
+Registered on the **`EventDocTypes`** document surface (the ADR 0054 M4 doc-type
 registration — the events docs already register there) with a
 **`(EventId, LanguageCode)` unique index**, mirroring the
 `PostTranslation` / `AnnouncementTranslation` / `GroupTranslation` /

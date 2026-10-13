@@ -422,10 +422,13 @@ public class UserPortabilityControllerTests
     [InlineData("myportability.resolve.add_elsewhere")]
     [InlineData("myportability.resolve.discard")]
     [InlineData("myportability.status")]
+    [InlineData("nav.my_data")]
     public void Web_KwL_KeysResolve(string key)
     {
-        // The seven myportability.* keys the controller emits / renders are
-        // present with non-empty values in all four languages (en/de/fr/da) —
+        // The seven myportability.* keys the controller emits / renders, plus
+        // the nav.my_data settings-tab key (the settings sub-nav link to this
+        // surface, added 2026-10-11 so the page is reachable from Settings),
+        // are present with non-empty values in all four languages (en/de/fr/da) —
         // the C-M27·6/7 parity (the D9 closed-key registry, the
         // KnownTranslationKeys_ParityTests enforces the × 4). Deliberately a
         // DISTINCT myportability.* namespace from M11's admin portability.*

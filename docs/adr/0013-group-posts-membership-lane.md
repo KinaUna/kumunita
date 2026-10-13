@@ -70,7 +70,7 @@ authority on *why these shapes, and why nothing else*.
 - **The data is one additive, not a new doc.** `Post.GroupId` (`string`,
   default `string.Empty`) is the **single** change to the `Post` POCO —
   the ADR 0004 §B.1 additive lane, the M3b `Status` ADD precedent
-  (delta-detected, idempotent, no re-seed, no `M3DocTypes` change). It is
+  (delta-detected, idempotent, no re-seed, no `PostDocTypes` change). It is
   written **only** by `PostService.CreateGroupPostAsync`, which pins the
   write shape: `ComponentId = string.Empty` and `Audience = new
   Audience()` (G·2, G·8). `PostReply` is **unchanged** — replies are

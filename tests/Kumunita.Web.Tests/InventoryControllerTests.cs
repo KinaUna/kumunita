@@ -217,8 +217,9 @@ public sealed class InventoryControllerTests
         Assert.Equal(itemId, vm.Item.Id);
         Assert.Equal("Projector", vm.Item.Name);
         Assert.Single(vm.History);
-        Assert.Equal("chk-1", vm.History[0].Id);
-        Assert.Equal("subj-borrower", vm.History[0].BorrowerId);
+        Assert.Equal("chk-1", vm.History[0].Checkout.Id);
+        Assert.Equal("subj-borrower", vm.History[0].Checkout.BorrowerId);
+        Assert.Equal("subj-borrower", vm.History[0].BorrowerName); // no profile → raw id
         Assert.Equal("subj-author", vm.AuthorName); // no profile → raw id
         Assert.False(vm.CreatorIsActor);
         Assert.True(vm.CanCheckOut); // community + no current holder + not creator → any member who can see it

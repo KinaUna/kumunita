@@ -97,12 +97,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The grantee sees the event in the feed (branch 6 MatchGroups).
-        var granteeFeed = (await svc.ListUpcomingAsync(null, grantee, 1)).Items;
+        var granteeFeed = (await svc.ListUpcomingAsync(null, grantee, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f1-ev", granteeFeed.Select(e => e.Id));
 
         // A stranger is denied the event (branch 7 Deny — the audience does
         // not match the stranger, and the stranger is not the owner).
-        var strangerFeed = (await svc.ListUpcomingAsync(null, stranger, 1)).Items;
+        var strangerFeed = (await svc.ListUpcomingAsync(null, stranger, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("f1-ev", strangerFeed.Select(e => e.Id));
     }
 
@@ -131,12 +131,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = null, // public — branch 5
         });
 
-        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f2-ev", feed.Select(e => e.Id));
 
         // Detail: the resident reads the public event via a single CanAsync
         // decision (branch 5) — no denial, no 403.
-        var ev = await svc.GetAsync("f2-ev", resident);
+        var ev = await svc.GetAsync("f2-ev", resident, TestContext.Current.CancellationToken);
         Assert.Equal("Town hall", ev.Title);
     }
 
@@ -173,19 +173,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // The community member sees the event (branch 4 — the live
         // communityIds contain the event's ComponentId).
-        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1)).Items;
+        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f3-ev", memberFeed.Select(e => e.Id));
 
         // A non-member resident is denied (branch 7 — the Community flag is
         // set but the actor's communityIds do not contain the component).
-        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1)).Items;
+        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("f3-ev", nonMemberFeed.Select(e => e.Id));
 
         // Detail 404-vs-403 split: the member reads it (Allow); the
         // non-member is denied with a 403 (an audience the actor is not in).
-        await svc.GetAsync("f3-ev", member);
+        await svc.GetAsync("f3-ev", member, TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.GetAsync("f3-ev", nonMember));
+            () => svc.GetAsync("f3-ev", nonMember, TestContext.Current.CancellationToken));
     }
 
     // ── 4 — M4_GrantAudienceOnlyGranteeSees (MatchGroups branch) ─────────────
@@ -224,10 +224,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = Audience(GrantKind.Group, group),
         });
 
-        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
+        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f4-ev", memberFeed.Select(e => e.Id));
 
-        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1)).Items;
+        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("f4-ev", outsiderFeed.Select(e => e.Id));
     }
 
@@ -258,27 +258,27 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The author sees their own draft (the draft gate's Allow).
-        var ev = await svc.GetAsync("f5-ev", author);
+        var ev = await svc.GetAsync("f5-ev", author, TestContext.Current.CancellationToken);
         Assert.Equal("Unpublished", ev.Title);
 
         // A non-author is denied with a 404 (KeyNotFoundException) — the
         // non-leaky pin, NOT a 403 (no "denied" signal that the event
         // exists).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetAsync("f5-ev", stranger));
+            () => svc.GetAsync("f5-ev", stranger, TestContext.Current.CancellationToken));
 
         // The draft is excluded from the feed unconditionally (the candidate
         // set filters !IsDraft) — neither the author nor the stranger sees it
         // in the feed.
-        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
-        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, stranger, 1)).Items.Select(e => e.Id));
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, author, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, stranger, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
     }
 
     // ── 6 — M4_FeedOrderedStartAscending (feed ordering) ─────────────────────
     //
     // The feed is ordered by <see cref="Event.Start"/> ascending (the
     // upcoming-events shape, the <c>(ComponentId, Start)</c> index) — the
-    // <see cref="M4DocTypes.Configure"/> ordering pin.
+    // <see cref="EventDocTypes.Configure"/> ordering pin.
 
     [Fact]
     public async Task M4_FeedOrderedStartAscending()
@@ -296,7 +296,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event { Id = "late", AuthorId = author, Title = "late", Body = "l", Start = t.AddDays(1), End = t.AddDays(1), IsDraft = false, Audience = null });
         await Plant(store, new Event { Id = "early", AuthorId = author, Title = "early", Body = "e", Start = t.AddDays(-1), End = t.AddDays(-1), IsDraft = false, Audience = null });
 
-        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items;
         // All three are public + published + non-deleted ⇒ all visible.
         Assert.Equal(3, feed.Count);
         // Start ascending: early → mid → late.
@@ -333,19 +333,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
-        var feed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
+        var feed = (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f7-live", feed.Select(e => e.Id));
         Assert.DoesNotContain("f7-deleted", feed.Select(e => e.Id));
 
         // Detail: the live event is readable; the deleted event is a 404
         // (the non-leaky pin — same "not found" as a missing id).
-        await svc.GetAsync("f7-live", resident);
+        await svc.GetAsync("f7-live", resident, TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetAsync("f7-deleted", resident));
+            () => svc.GetAsync("f7-deleted", resident, TestContext.Current.CancellationToken));
 
         // A missing id is also a 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetAsync("no-such-event", resident));
+            () => svc.GetAsync("no-such-event", resident, TestContext.Current.CancellationToken));
     }
 
     // ── 8 — M4_GetRsvps_ReturnsRsvps (owner list read) ───────────────────────
@@ -383,14 +383,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Status = RsvpStatus.Maybe, At = new DateTimeOffset(2099, 3, 1, 11, 0, 0, TimeSpan.Zero),
         });
 
-        var rsvps = await svc.GetRsvpsAsync("f8-ev");
+        var rsvps = await svc.GetRsvpsAsync("f8-ev", TestContext.Current.CancellationToken);
         Assert.Equal(2, rsvps.Count);
         Assert.Contains(rsvps, r => r.UserId == rsvp1 && r.Status == RsvpStatus.Going);
         Assert.Contains(rsvps, r => r.UserId == rsvp2 && r.Status == RsvpStatus.Maybe);
 
         // A missing event is a 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetRsvpsAsync("no-such-event"));
+            () => svc.GetRsvpsAsync("no-such-event", TestContext.Current.CancellationToken));
     }
 
     // ── 9 — M4_GetMyRsvp_ReturnsOwn (last-write-wins read) ───────────────────
@@ -429,18 +429,18 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The actor's own RSVP is returned (not the other resident's).
-        var mine = await svc.GetMyRsvpAsync("f9-ev", me);
+        var mine = await svc.GetMyRsvpAsync("f9-ev", me, TestContext.Current.CancellationToken);
         Assert.NotNull(mine);
         Assert.Equal(me, mine!.UserId);
         Assert.Equal(RsvpStatus.Going, mine.Status);
 
         // A resident who has not RSVPed gets null (not an error).
-        var otherMine = await svc.GetMyRsvpAsync("f9-ev", other);
+        var otherMine = await svc.GetMyRsvpAsync("f9-ev", other, TestContext.Current.CancellationToken);
         Assert.NotNull(otherMine);
         Assert.Equal(RsvpStatus.No, otherMine!.Status);
 
         // A resident with no RSVP row gets null.
-        var nobody = await svc.GetMyRsvpAsync("f9-ev", "u-u03-f9-nobody");
+        var nobody = await svc.GetMyRsvpAsync("f9-ev", "u-u03-f9-nobody", TestContext.Current.CancellationToken);
         Assert.Null(nobody);
     }
 
@@ -473,7 +473,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // The non-author's own RSVP of a draft event is a 404 (denied).
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetMyRsvpAsync("f10-ev", stranger));
+            () => svc.GetMyRsvpAsync("f10-ev", stranger, TestContext.Current.CancellationToken));
 
         // The author may read their own draft event's RSVP (the author lane).
         await Plant(store, new EventRsvp
@@ -481,7 +481,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Id = "f10-r-author", EventId = "f10-ev", UserId = author,
             Status = RsvpStatus.Going, At = new DateTimeOffset(2099, 3, 3, 9, 1, 0, TimeSpan.Zero),
         });
-        var authorRsvp = await svc.GetMyRsvpAsync("f10-ev", author);
+        var authorRsvp = await svc.GetMyRsvpAsync("f10-ev", author, TestContext.Current.CancellationToken);
         Assert.NotNull(authorRsvp);
         Assert.Equal(author, authorRsvp!.UserId);
     }
@@ -623,7 +623,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 1, 12, 0, 0, TimeSpan.Zero),
             Audience = null,            // public (branch 5)
             IsDraft = true,             // ADR 0037 — a new event is a draft
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.False(string.IsNullOrEmpty(ev.Id));
         Assert.Equal(author, ev.AuthorId);            // the author becomes the standing owner.
@@ -665,7 +666,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 2, 11, 0, 0, TimeSpan.Zero),
             Audience = Audience(GrantKind.User, grantee),
             IsDraft = false,                            // published so the feed/decision path runs.
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The stored row carries the audience verbatim (bit-identical to the input).
         Assert.NotNull(ev.Audience);
@@ -674,8 +676,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(grantee, ev.Audience.Grants[0].Id);
 
         // The grantee sees it; the stranger is denied the detail (403).
-        await svc.GetAsync(ev.Id, grantee);
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.GetAsync(ev.Id, stranger));
+        await svc.GetAsync(ev.Id, grantee, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.GetAsync(ev.Id, stranger, TestContext.Current.CancellationToken));
     }
 
     // ── U04·3 — M4_CreateNoActor_Denies ─────────────────────────────────────
@@ -690,7 +692,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         // An empty actor is a 403 — thrown before any store access (the
         // CheckCreateStanding denial). No event row and no audit row land.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.CreateAsync("", new CreateEventRequest { Title = "t" }));
+            () => svc.CreateAsync("", new CreateEventRequest { Title = "t" }, TestContext.Current.CancellationToken));
         var rows = await EventAuditRows(store);
         Assert.Empty(rows);
     }
@@ -712,14 +714,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "old title", Body = "old body",
             Start = created, End = created, IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
         var createdBefore = ev.Created;
 
         var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "new title", Body = "new body",
             Start = created, End = created,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("new title", updated.Title);
         Assert.Equal("new body", updated.Body);
@@ -747,7 +751,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "unchanged", Body = "body",
             Start = created, End = created, IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
         Assert.Null(ev.Modified);   // a fresh create does not stamp Modified.
 
         // Re-save the exact same values — a no-op.
@@ -755,7 +760,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "unchanged", Body = "body",
             Start = created, End = created,
-        });
+        },
+            TestContext.Current.CancellationToken);
         Assert.Null(updated.Modified);   // no real change ⇒ the stamp stays untouched.
     }
 
@@ -783,7 +789,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Start = created, End = created,
             ImageIds = new[] { "aa11" },
             AttachmentIds = new[] { "bb22" },
-        });
+        },
+            TestContext.Current.CancellationToken);
         Assert.Equal(new[] { "aa11" }, ev.ImageIds);
         Assert.Equal(new[] { "bb22" }, ev.AttachmentIds);
 
@@ -794,7 +801,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Start = created, End = created,
             ImageIds = new[] { "cc33" },
             AttachmentIds = new[] { "dd44" },
-        });
+        },
+            TestContext.Current.CancellationToken);
         Assert.Equal(new[] { "cc33" }, updated.ImageIds);
         Assert.Equal(new[] { "dd44" }, updated.AttachmentIds);
     }
@@ -816,10 +824,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned", Body = "b", Start = created, End = created, IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.UpdateAsync(ev.Id, stranger, EmptyRoles, new UpdateEventRequest { Title = "hijack", Start = created, End = created }));
+            () => svc.UpdateAsync(ev.Id, stranger, EmptyRoles, new UpdateEventRequest { Title = "hijack", Start = created, End = created }, TestContext.Current.CancellationToken));
     }
 
     // ── U04·8 — M4_UpdateMissingEvent_404 ───────────────────────────────────
@@ -832,7 +841,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.UpdateAsync("no-such-event", "u-u04-u5", EmptyRoles, new UpdateEventRequest { Title = "t" }));
+            () => svc.UpdateAsync("no-such-event", "u-u04-u5", EmptyRoles, new UpdateEventRequest { Title = "t" }, TestContext.Current.CancellationToken));
     }
 
     // ── U04·9 — M4_PublishAuthorOnly (ADR 0037) ─────────────────────────────
@@ -853,18 +862,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "draft", Body = "b", Start = created, End = created,
             IsDraft = true, Audience = null,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // A draft is excluded from the feed and invisible to a non-author.
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken));
 
-        var published = await svc.PublishAsync(ev.Id, author);
+        var published = await svc.PublishAsync(ev.Id, author, TestContext.Current.CancellationToken);
         Assert.False(published.IsDraft);
 
         // Now the feed shows it and a public reader can open it.
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await svc.GetAsync(ev.Id, resident);
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken);
 
         var rows = await EventAuditRows(store);
         Assert.Contains(rows, r => r.Action == "event.publish" && r.TargetId == ev.Id);
@@ -887,12 +897,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "draft", Body = "b", Start = created, End = created, IsDraft = true,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.PublishAsync(ev.Id, stranger));
+            () => svc.PublishAsync(ev.Id, stranger, TestContext.Current.CancellationToken));
         // The event is still a draft.
-        var still = await svc.GetAsync(ev.Id, author);
+        var still = await svc.GetAsync(ev.Id, author, TestContext.Current.CancellationToken);
         Assert.True(still.IsDraft);
     }
 
@@ -911,12 +922,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "d", Body = "b", Start = created, End = created, IsDraft = true,
-        });
-        var first = await svc.PublishAsync(ev.Id, author);
+        },
+            TestContext.Current.CancellationToken);
+        var first = await svc.PublishAsync(ev.Id, author, TestContext.Current.CancellationToken);
         var modifiedAfterFirst = first.Modified;
         Assert.NotNull(modifiedAfterFirst);
 
-        var second = await svc.PublishAsync(ev.Id, author);
+        var second = await svc.PublishAsync(ev.Id, author, TestContext.Current.CancellationToken);
         Assert.False(second.IsDraft);
         Assert.Equal(modifiedAfterFirst, second.Modified);   // no re-stamp on the no-op.
     }
@@ -939,15 +951,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         {
             Title = "live", Body = "b", Start = created, End = created,
             IsDraft = false, Audience = null,
-        });
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await svc.GetAsync(ev.Id, resident);
+        },
+            TestContext.Current.CancellationToken);
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken);
 
-        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles, TestContext.Current.CancellationToken);
 
         // Gone from the feed; the detail is a 404 (non-leaky pin).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken));
 
         var rows = await EventAuditRows(store);
         Assert.Contains(rows, r => r.Action == "event.delete" && r.TargetId == ev.Id);
@@ -969,12 +982,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "owned", Body = "b", Start = created, End = created, IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.DeleteAsync(ev.Id, stranger, EmptyRoles));
+            () => svc.DeleteAsync(ev.Id, stranger, EmptyRoles, TestContext.Current.CancellationToken));
         // The event is still live (not deleted).
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
     }
 
     // ── U04·14 — M4_RsvpLastWriteWins (ADR 0054 §3.2) ───────────────────────
@@ -994,18 +1008,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
-        var going = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
+        var going = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.Going, going.Status);
 
-        var no = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.No);
+        var no = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.No, TestContext.Current.CancellationToken);
         Assert.Equal(RsvpStatus.No, no.Status);          // last write wins.
         Assert.True(no.At >= going.At);                  // the At stamp advanced (or held).
         Assert.Equal(going.Id, no.Id);                   // the same row (the unique business key).
 
         // Exactly one RSVP row for this resident on this event.
-        var all = await svc.GetRsvpsAsync(ev.Id);
+        var all = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Single(all, r => r.UserId == rsvp1);
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == rsvp1).Status);
     }
@@ -1028,12 +1043,13 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
-        await svc.RsvpAsync(ev.Id, u1, RsvpStatus.Going);
-        await svc.RsvpAsync(ev.Id, u2, RsvpStatus.Maybe);
+        await svc.RsvpAsync(ev.Id, u1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await svc.RsvpAsync(ev.Id, u2, RsvpStatus.Maybe, TestContext.Current.CancellationToken);
 
-        var all = await svc.GetRsvpsAsync(ev.Id);
+        var all = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Equal(2, all.Count);
         Assert.Contains(all, r => r.UserId == u1 && r.Status == RsvpStatus.Going);
         Assert.Contains(all, r => r.UserId == u2 && r.Status == RsvpStatus.Maybe);
@@ -1049,7 +1065,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.RsvpAsync("no-such-event", "u-u04-r3", RsvpStatus.Going));
+            () => svc.RsvpAsync("no-such-event", "u-u04-r3", RsvpStatus.Going, TestContext.Current.CancellationToken));
     }
 
     // ── U04·17 — M4_RsvpWritesNoAccessAuditRow (ADR 0054 §3.2) ──────────────
@@ -1069,14 +1085,15 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var ev = await svc.CreateAsync(author, new CreateEventRequest
         {
             Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
-        });
+        },
+            TestContext.Current.CancellationToken);
         // The create lane wrote exactly one row (event.create).
         var before = await EventAuditRows(store);
         Assert.Single(before);
         Assert.Equal("event.create", before.Single().Action);
 
         // The RSVP lane must add **no** audit row.
-        await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
+        await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         var after = await EventAuditRows(store);
         Assert.Single(after);                                  // still exactly one (the create).
@@ -1118,15 +1135,15 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         // The frozen CanAsync decision for the anonymous actor is Allow
         // (branch 5 — the §3.7 "unauthenticated sees it" pin).
         await using var q = store.QuerySession();
-        var ev = await q.LoadAsync<Event>("t02-ev");
+        var ev = await q.LoadAsync<Event>("t02-ev", TestContext.Current.CancellationToken);
         var decision = await authz.CanAsync(string.Empty, AccessAction.Read,
             new EventToAuditableResource(ev!));
         Assert.True(decision.Allowed);
 
         // A signed-in resident (the "member" in the §3.7 name) also sees it.
-        var residentFeed = (await svc.ListUpcomingAsync(null, resident, 1)).Items;
+        var residentFeed = (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("t02-ev", residentFeed.Select(e => e.Id));
-        var ev2 = await svc.GetAsync("t02-ev", resident);
+        var ev2 = await svc.GetAsync("t02-ev", resident, TestContext.Current.CancellationToken);
         Assert.Equal("Open to all", ev2.Title);
     }
 
@@ -1149,7 +1166,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 21, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(resident, ev.AuthorId);    // the resident becomes the standing owner.
         Assert.Equal("Plain member event", ev.Title);
@@ -1177,14 +1195,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 22, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
         var createdStamp = ev.Created;
 
         var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "edited", Body = "new body",
             Start = ev.Start, End = ev.End,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("edited", updated.Title);
         Assert.Equal("new body", updated.Body);
@@ -1216,17 +1236,19 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 23, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => svc.UpdateAsync(ev.Id, stranger, EmptyRoles, new UpdateEventRequest
             {
                 Title = "hijack", Body = "body t08",
                 Start = ev.Start, End = ev.End,
-            }));
+            },
+                TestContext.Current.CancellationToken));
 
         // The event is unchanged (the denied write did not apply).
-        var still = await svc.GetAsync(ev.Id, author);
+        var still = await svc.GetAsync(ev.Id, author, TestContext.Current.CancellationToken);
         Assert.Equal("owned", still.Title);
     }
 
@@ -1284,14 +1306,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 25, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The non-author GlobalAdmin edits it (the ADR 0017 override branch).
         var updated = await svc.UpdateAsync(ev.Id, admin, GlobalAdminRoles, new UpdateEventRequest
         {
             Title = "admin-edited", Body = "body t15",
             Start = ev.Start, End = ev.End,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("admin-edited", updated.Title);
         Assert.Equal(author, updated.AuthorId);        // author of record preserved.
@@ -1328,15 +1352,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 26, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
+        },
+            TestContext.Current.CancellationToken);
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
 
         // The non-author GlobalAdmin soft-deletes it (the ADR 0017 override).
-        await svc.DeleteAsync(ev.Id, admin, GlobalAdminRoles);
+        await svc.DeleteAsync(ev.Id, admin, GlobalAdminRoles, TestContext.Current.CancellationToken);
 
         // Gone from the feed; the detail is a 404 (the non-leaky pin).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken));
 
         // The audit row is stored and tagged Admin (the override branch,
         // ADR 0054 §3.4).
@@ -1366,15 +1391,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 25, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // r1 RSVPs twice (Going then No) — last write wins, one row.
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going);
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.No);
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.No, TestContext.Current.CancellationToken);
         // r2 RSVPs once (Going) — their own row.
-        await svc.RsvpAsync(ev.Id, r2, RsvpStatus.Going);
+        await svc.RsvpAsync(ev.Id, r2, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
-        var all = await svc.GetRsvpsAsync(ev.Id);
+        var all = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Equal(2, all.Count);                                            // exactly 2 rows.
         Assert.Single(all, r => r.UserId == r1);                               // r1: one row.
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == r1).Status);  // last write won.
@@ -1405,19 +1431,20 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 26, 11, 0, 0, TimeSpan.Zero),
             Audience = Audience(GrantKind.User, author),  // grantee = author only
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // A resident RSVPs (the RSVP list will hold their row).
-        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going);
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         // The author (owner) reads the RSVP list successfully.
-        var rsvps = await svc.GetRsvpsAsync(ev.Id);
+        var rsvps = await svc.GetRsvpsAsync(ev.Id, TestContext.Current.CancellationToken);
         Assert.Contains(rsvps, r => r.UserId == r1 && r.Status == RsvpStatus.Going);
 
         // A non-author (not in the audience) is denied the event detail (403)
         // — the owner-only gate's Core-layer expression.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.GetAsync(ev.Id, stranger));
+            () => svc.GetAsync(ev.Id, stranger, TestContext.Current.CancellationToken));
     }
 
     // ── T17 — M4_AuditRowShape_Create (§3.4 — the row shape) ───────────────
@@ -1438,7 +1465,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 4, 27, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         var rows = await EventAuditRows(store);
         var row = Assert.Single(rows);              // exactly one row (the create).
@@ -1540,11 +1568,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The member (grantee) sees the event in the feed.
-        var feed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
+        var feed = (await svc.ListUpcomingAsync(null, member, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("t01-ev", feed.Select(e => e.Id));
 
         // A stranger (not in the audience) does not see it.
-        var strangerFeed = (await svc.ListUpcomingAsync(null, "u-u09-t01-stranger", 1)).Items;
+        var strangerFeed = (await svc.ListUpcomingAsync(null, "u-u09-t01-stranger", 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("t01-ev", strangerFeed.Select(e => e.Id));
     }
 
@@ -1576,11 +1604,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The community member sees the event (branch 4).
-        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1)).Items;
+        var memberFeed = (await svc.ListUpcomingAsync(comp, member, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("t03-ev", memberFeed.Select(e => e.Id));
 
         // A non-member does not (branch 7 Deny).
-        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1)).Items;
+        var nonMemberFeed = (await svc.ListUpcomingAsync(comp, nonMember, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("t03-ev", nonMemberFeed.Select(e => e.Id));
     }
 
@@ -1616,11 +1644,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The group member sees the event (branch 6 MatchGroups).
-        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1)).Items;
+        var memberFeed = (await svc.ListUpcomingAsync(null, member, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("t04-ev", memberFeed.Select(e => e.Id));
 
         // An un-granted resident does not (branch 7 Deny).
-        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1)).Items;
+        var outsiderFeed = (await svc.ListUpcomingAsync(null, outsider, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("t04-ev", outsiderFeed.Select(e => e.Id));
     }
 
@@ -1643,19 +1671,20 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 5, 2, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // Before delete: the event is in the feed and readable.
-        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await svc.GetAsync(ev.Id, resident);
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken);
 
         // The author soft-deletes (ADR 0024 — IsDeleted = true).
-        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles, TestContext.Current.CancellationToken);
 
         // After delete: the event is filtered from the feed and the detail
         // is a 404 (the non-leaky pin — same as a missing id).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id));
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident, TestContext.Current.CancellationToken));
 
         // The delete lane's audit row is stored (C3, TargetKind "event").
         var rows = await EventAuditRows(store);
@@ -1682,16 +1711,17 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 5, 3, 11, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
 
         // The author (the standing owner) soft-deletes their own event.
-        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles, TestContext.Current.CancellationToken);
 
         // The event is now filtered from the feed (the read lanes filter it).
-        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
 
         // The detail is a 404 (the non-leaky pin).
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, author));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, author, TestContext.Current.CancellationToken));
 
         // A non-author (stranger) is denied the delete (403 — the C3 pin).
         var ev2 = await svc.CreateAsync(author, new CreateEventRequest
@@ -1701,11 +1731,12 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 5, 3, 13, 0, 0, TimeSpan.Zero),
             Audience = null,
             IsDraft = false,
-        });
+        },
+            TestContext.Current.CancellationToken);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.DeleteAsync(ev2.Id, stranger, EmptyRoles));
+            () => svc.DeleteAsync(ev2.Id, stranger, EmptyRoles, TestContext.Current.CancellationToken));
         // The second event is still live (the denied write did not apply).
-        Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1)).Items.Select(e => e.Id));
+        Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id));
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1775,7 +1806,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         var row = await svc.AddEventTranslationAsync(evId, "de",
-            "Aufräumtag", "Kommunikationstest", author, EmptyRoles);
+            "Aufräumtag", "Kommunikationstest", author, EmptyRoles,
+                TestContext.Current.CancellationToken);
 
         Assert.Equal(evId, row.EventId);
         Assert.Equal("de", row.LanguageCode);
@@ -1827,7 +1859,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await svc.AddEventTranslationAsync(evId, "fr",
-            "Potluck", "Un pot commun", translator, TranslatorRoles);
+            "Potluck", "Un pot commun", translator, TranslatorRoles,
+                TestContext.Current.CancellationToken);
 
         var rows = await EventAuditRows(store);
         var add = Assert.Single(rows);
@@ -1862,7 +1895,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await svc.AddEventTranslationAsync(evId, "da",
-            "Møde", "Et møde", admin, GlobalAdminRoles);
+            "Møde", "Et møde", admin, GlobalAdminRoles,
+                TestContext.Current.CancellationToken);
 
         var rows = await EventAuditRows(store);
         var add = Assert.Single(rows);
@@ -1896,7 +1930,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.AddEventTranslationAsync(evId, "de", "t", "b", stranger, MemberRoles));
+            () => svc.AddEventTranslationAsync(evId, "de", "t", "b", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         // The denial wrote nothing — no translation row, no audit row.
         Assert.Empty(await svc.GetEventTranslationsAsync(evId));
@@ -1916,7 +1950,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => svc.AddEventTranslationAsync("no-such-event", "de", "t", "b",
-                "u-a059-a5", EmptyRoles));
+                "u-a059-a5", EmptyRoles,
+                    TestContext.Current.CancellationToken));
     }
 
     // ── ADR 0059·7 — M4_TranslationAddBlankTitle_NullNormalized ────────────
@@ -1941,7 +1976,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, Audience = null,
         });
 
-        var blank = await svc.AddEventTranslationAsync(evId, "de", "   ", "Körper", author, EmptyRoles);
+        var blank = await svc.AddEventTranslationAsync(evId, "de", "   ", "Körper", author, EmptyRoles, TestContext.Current.CancellationToken);
         Assert.Null(blank.Title);                    // blank → null.
         Assert.Equal("Körper", blank.Body);
     }
@@ -1968,10 +2003,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 6, 6, 12, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
-        await svc.AddEventTranslationAsync(evId, "de", "alt titel", "alt body", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evId, "de", "alt titel", "alt body", author, EmptyRoles, TestContext.Current.CancellationToken);
 
         var updated = await svc.UpdateEventTranslationAsync(evId, "de",
-            "neuer titel", "neuer body", author, EmptyRoles);
+            "neuer titel", "neuer body", author, EmptyRoles,
+                TestContext.Current.CancellationToken);
 
         Assert.Equal("neuer titel", updated.Title);
         Assert.Equal("neuer body", updated.Body);
@@ -2008,10 +2044,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 6, 7, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
-        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.UpdateEventTranslationAsync(evId, "de", "x", "y", stranger, MemberRoles));
+            () => svc.UpdateEventTranslationAsync(evId, "de", "x", "y", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         // The row is unchanged (the denied write did not apply).
         var read = await svc.GetEventTranslationsAsync(evId);
@@ -2042,7 +2078,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // No "fr" row exists on this event.
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.UpdateEventTranslationAsync(evId, "fr", "t", "b", author, EmptyRoles));
+            () => svc.UpdateEventTranslationAsync(evId, "fr", "t", "b", author, EmptyRoles, TestContext.Current.CancellationToken));
     }
 
     // ── ADR 0059·11 — M4_TranslationAuthorRemoves_AuditRemove ──────────────
@@ -2066,9 +2102,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 6, 9, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
-        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles, TestContext.Current.CancellationToken);
 
-        await svc.RemoveEventTranslationAsync(evId, "de", author, EmptyRoles);
+        await svc.RemoveEventTranslationAsync(evId, "de", author, EmptyRoles, TestContext.Current.CancellationToken);
 
         Assert.Empty(await svc.GetEventTranslationsAsync(evId));
         var rows = await EventAuditRows(store);
@@ -2101,10 +2137,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             End = new DateTimeOffset(2099, 6, 10, 11, 0, 0, TimeSpan.Zero),
             IsDraft = false, Audience = null,
         });
-        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.RemoveEventTranslationAsync(evId, "de", stranger, MemberRoles));
+            () => svc.RemoveEventTranslationAsync(evId, "de", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         Assert.Single(await svc.GetEventTranslationsAsync(evId));   // the row survived.
     }
@@ -2130,7 +2166,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.RemoveEventTranslationAsync(evId, "fr", author, EmptyRoles));
+            () => svc.RemoveEventTranslationAsync(evId, "fr", author, EmptyRoles, TestContext.Current.CancellationToken));
     }
 
     // ── ADR 0059·14 — M4_TranslationGetOrderedByLanguageCode ───────────────
@@ -2163,9 +2199,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // Seed evA with two rows (inserted out of order) and evB with one.
-        await svc.AddEventTranslationAsync(evA, "fr", "t", "b", author, EmptyRoles);
-        await svc.AddEventTranslationAsync(evA, "da", "t", "b", author, EmptyRoles);
-        await svc.AddEventTranslationAsync(evB, "de", "t", "b", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evA, "fr", "t", "b", author, EmptyRoles, TestContext.Current.CancellationToken);
+        await svc.AddEventTranslationAsync(evA, "da", "t", "b", author, EmptyRoles, TestContext.Current.CancellationToken);
+        await svc.AddEventTranslationAsync(evB, "de", "t", "b", author, EmptyRoles, TestContext.Current.CancellationToken);
 
         // evA's rows come back in LanguageCode order (da < fr); evB's single row
         // is isolated to its own event.
@@ -2247,7 +2283,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = true, IsDeleted = false, Audience = null,
         });
 
-        var mine = await svc.ListMineAsync(me);
+        var mine = await svc.ListMineAsync(me, TestContext.Current.CancellationToken);
 
         var ids = mine.Select(e => e.Id).ToArray();
         Assert.Contains("a065-1-maybe", ids);
@@ -2264,7 +2300,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Id = "a065-1-r3", EventId = "a065-1-mine", UserId = otherAuthor,
             Status = RsvpStatus.Going, At = past,
         });
-        var again = await svc.ListMineAsync(me);
+        var again = await svc.ListMineAsync(me, TestContext.Current.CancellationToken);
         Assert.Equal(ids, again.Select(e => e.Id).ToArray());
     }
 
@@ -2311,7 +2347,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var mine = await svc.ListMineAsync(me);
+        var mine = await svc.ListMineAsync(me, TestContext.Current.CancellationToken);
         var ids = mine.Select(e => e.Id).ToArray();
         Assert.DoesNotContain("a065-2-past", ids);
         Assert.DoesNotContain("a065-2-deleted", ids);
@@ -2338,7 +2374,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var mine = await svc.ListMineAsync("u-a065-3-me");
+        var mine = await svc.ListMineAsync("u-a065-3-me", TestContext.Current.CancellationToken);
         Assert.Empty(mine);
     }
 
@@ -2354,11 +2390,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(""));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync("", TestContext.Current.CancellationToken));
         // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
         // these; the Core layer re-checks). `null!` documents the intentional null
         // instead of tripping CS8625 (null → non-nullable `string actorId`).
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(null!));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(null!, TestContext.Current.CancellationToken));
 
         // No audit row from the denied read (the GetMyRsvpAsync posture).
         Assert.Empty(await EventAuditRows(store));
@@ -2397,14 +2433,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var past = (await svc.ListPastAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        var past = (await svc.ListPastAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p1-past", past);
         Assert.DoesNotContain("p1-future", past);
 
         // The upcoming lane (Start >= nowUtc) shows the future event but NOT
         // the past one — the two lanes are exact mirrors (the bug fix that
         // added Start >= nowUtc to ListUpcomingAsync).
-        var upcoming = (await svc.ListUpcomingAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        var upcoming = (await svc.ListUpcomingAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p1-future", upcoming);
         Assert.DoesNotContain("p1-past", upcoming);
     }
@@ -2431,7 +2467,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, new Event { Id = "oldest", AuthorId = author, Title = "oldest", Body = "o", Start = t.AddDays(-2), End = t.AddDays(-2), IsDraft = false, IsDeleted = false, Audience = null });
         await Plant(store, new Event { Id = "middle", AuthorId = author, Title = "middle", Body = "m", Start = t.AddDays(-1), End = t.AddDays(-1), IsDraft = false, IsDeleted = false, Audience = null });
 
-        var feed = (await svc.ListPastAsync(null, resident, 1)).Items;
+        var feed = (await svc.ListPastAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Equal(3, feed.Count);
         // Start descending: recent (t) → middle (t-1d) → oldest (t-2d).
         Assert.Equal(new[] { "recent", "middle", "oldest" }, feed.Select(e => e.Id).ToArray());
@@ -2462,11 +2498,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The grantee sees the past event (branch 6 MatchGroups).
-        var granteePast = (await svc.ListPastAsync(null, grantee, 1)).Items.Select(e => e.Id).ToArray();
+        var granteePast = (await svc.ListPastAsync(null, grantee, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p3-ev", granteePast);
 
         // The stranger is denied (branch 7 Deny) and the deny lands an audit row.
-        var strangerPast = (await svc.ListPastAsync(null, stranger, 1)).Items.Select(e => e.Id).ToArray();
+        var strangerPast = (await svc.ListPastAsync(null, stranger, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.DoesNotContain("p3-ev", strangerPast);
     }
 
@@ -2504,7 +2540,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = true, Audience = null,
         });
 
-        var ids = (await svc.ListPastAsync(null, resident, 1)).Items.Select(e => e.Id).ToArray();
+        var ids = (await svc.ListPastAsync(null, resident, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p4-live", ids);
         Assert.DoesNotContain("p4-draft", ids);
         Assert.DoesNotContain("p4-deleted", ids);
@@ -2531,7 +2567,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false, IsDeleted = false, Audience = null,
         });
 
-        var page = await svc.ListPastAsync(null, resident, 1);
+        var page = await svc.ListPastAsync(null, resident, 1, TestContext.Current.CancellationToken);
         Assert.Empty(page.Items);
         Assert.False(page.HasMore);
 
@@ -2575,11 +2611,11 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             Audience = new Audience { Community = true },
         });
 
-        var aFeed = (await svc.ListPastAsync(compA, member, 1)).Items.Select(e => e.Id).ToArray();
+        var aFeed = (await svc.ListPastAsync(compA, member, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p6-a", aFeed);
         Assert.DoesNotContain("p6-b", aFeed);
 
-        var bFeed = (await svc.ListPastAsync(compB, member, 1)).Items.Select(e => e.Id).ToArray();
+        var bFeed = (await svc.ListPastAsync(compB, member, 1, TestContext.Current.CancellationToken)).Items.Select(e => e.Id).ToArray();
         Assert.Contains("p6-b", bFeed);
         Assert.DoesNotContain("p6-a", bFeed);
     }
@@ -2634,9 +2670,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -2668,5 +2704,60 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await using var w = store.OpenSession(new Marten.Services.SessionOptions());
         w.Store(document);
         await w.SaveChangesAsync(ct);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 6 (event): a resolved `@`-token stores ONE `event.mention` row for
+    // the recipient (the per-recipient key + the `/events/{id}` linkPath,
+    // M36·4) + a staged email; an unknown token (M36-5) stores none. The
+    // event create lane is the publishing lane (M36·8 — no separate publish
+    // step; the mention emitter is not draft-gated, unlike post/group post/
+    // announcement).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Event_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, EventDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-ev-author";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "Town hall", Body = "@Ada can you bring the projector?",
+            Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+        });
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.EventMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.EventMention}:{ev.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/events/{ev.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.EventMention}:{ev.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_Event_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, EventDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
+        const string author = "u-m36-ev-inert-author";
+
+        await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "T", Body = "@Ghost ping",
+            Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+        });
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.EventMention));
     }
 }

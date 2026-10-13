@@ -15,7 +15,7 @@
   this lane is; the 10 verified existing surfaces; the D1–D9 decisions;
   the C-TBD·1…6 invariants; the F1–F8 FACES; the 8-part parts-affected
   list; the 3-test gate; the drift-guard; the 5 risks. Part 2: the exact
-  C# shapes for the `TodoItem` field, the `M5DocTypes` index, the
+  C# shapes for the `TodoItem` field, the `ProjectDocTypes` index, the
   `ListTodosAsync` / `GetTodoAsync` / `CreateTodoAsync` /
   `UpdateTodoAsync` / `ListPickerTodosAsync` seams, the `BlockerChip`
   record, the Web controller + view shapes, the 11 Core pins + 6 Web pins,
@@ -32,15 +32,15 @@
 - **Next unit's entry reads:** the plan's `Entry reads` list (the 10
   files above) + the design doc's §7 (Part 2) for the exact C# shapes.
 
-## U01 — `TodoItem.BlockedByTodoId?` field + the `M5DocTypes` index
+## U01 — `TodoItem.BlockedByTodoId?` field + the `ProjectDocTypes` index
 
 **Two additive edits (both under `src/Kumunita.Core/Projects/`) + no test
-addition** — the design doc §7.1 (the field shape) + §7.5 (the `M5DocTypes`
+addition** — the design doc §7.1 (the field shape) + §7.5 (the `ProjectDocTypes`
 index) landed **verbatim**. **`TodoItem.cs`:** one new field, `string?
 BlockedByTodoId { get; set; }` (the "waiting on" pointer; XML-doc prose
 names ADR 0087 + the C-TBD·2 "a hint, never a gate" pin + the C-TBD·3
 cycle-guard note; placed after `ParentId`, the additive `ProjectId` field
-is **not** touched). **`M5DocTypes.cs`:** the existing `TodoItem` block
+is **not** touched). **`ProjectDocTypes.cs`:** the existing `TodoItem` block
 gains one additive `.Index(t => t.BlockedByTodoId)` (unnamed — the
 Marten 9.31.2 / Weasel 9.29.0 no-`Name`-on-`ComputedIndex` constraint
 already noted in the file); the `Configure` XML doc gains the TBD additive
@@ -176,7 +176,7 @@ xunit.v3; Core via Testcontainers `postgres:18`).
   gains, **additively** after the existing `PL` block: the TBD note —
   `TodoItem.BlockedByTodoId?` (the "waiting on" chip + picker + `blockedOnly`
   feed filter; ADR 0087; a hint, never a gate; the cycle guard is the lane's
-  only refusal; the standing matrix re-checked server-side; the `M5DocTypes`
+  only refusal; the standing matrix re-checked server-side; the `ProjectDocTypes`
   `BlockedByTodoId` index). The **§3 tree** is **untouched** (the lane adds
   no new context). **No existing M5 / PL line renamed / reordered / removed.**
 - **`README.md`** — the **Roadmap** section gains one **`TBD`** lane entry

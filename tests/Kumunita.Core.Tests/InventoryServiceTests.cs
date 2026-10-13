@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests;
 /// The shape follows <see cref="PostServiceTests"/> /
 /// <see cref="ProjectServiceTests"/> verbatim — same
 /// <see cref="PostgresFixture"/>, same <c>BootStoreAsync</c> (+ the
-/// <see cref="M16DocTypes"/> registration surface), same <c>Plant</c> helper,
+/// <see cref="InventoryDocTypes"/> registration surface), same <c>Plant</c> helper,
 /// same <c>Services</c> composition (the <c>UserInfoService</c> +
 /// <c>AuthorizationService</c> + <c>InventoryService</c> trio U02's
 /// <c>AddTransient</c> registration mirrors), fresh scratch Postgres per test
@@ -78,7 +78,7 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             Created = new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
         });
 
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, TestContext.Current.CancellationToken);
         Assert.Contains("u02-a-public", page.Items.Select(i => i.Id));
         Assert.DoesNotContain("u02-a-restricted", page.Items.Select(i => i.Id));
 
@@ -128,7 +128,7 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // A non-visible item is a 404 (KeyNotFoundException), NOT a 403
         // (UnauthorizedAccessException) — C-M3·4 non-leaky shape.
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.GetItemAsync("u02-b-restricted", stranger));
+            () => svc.GetItemAsync("u02-b-restricted", stranger, TestContext.Current.CancellationToken));
 
         var rows = await InventoryAudits(store, actor: stranger, targetId: "u02-b-restricted");
         var deny = Assert.Single(rows, a => a.Outcome == AccessOutcome.Deny);
@@ -188,7 +188,7 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             CheckedInAt = null, // open
         });
 
-        var history = await svc.GetHistoryAsync("u02-c-item", owner);
+        var history = await svc.GetHistoryAsync("u02-c-item", owner, TestContext.Current.CancellationToken);
         Assert.Equal(
             new[] { "u02-c-co-newest", "u02-c-co-mid", "u02-c-co-oldest" },
             history.Select(c => c.Id).ToArray());
@@ -231,8 +231,8 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // commits an open record — the <c>inv_uidx_item_open</c> unique index
         // guarantees exactly **one** can win, the other's commit fails (23505)
         // and rolls back (the loser sees "already checked out").
-        var t1 = svc.CheckOutAsync("u03-a-item", borrower1, MemberRoles);
-        var t2 = svc.CheckOutAsync("u03-a-item", borrower2, MemberRoles);
+        var t1 = svc.CheckOutAsync("u03-a-item", borrower1, MemberRoles, ct: TestContext.Current.CancellationToken);
+        var t2 = svc.CheckOutAsync("u03-a-item", borrower2, MemberRoles, ct: TestContext.Current.CancellationToken);
 
         var exceptions = new List<Exception?>();
         foreach (var t in new[] { t1, t2 })
@@ -301,7 +301,7 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // is the read lanes' job, standing is the write lanes' job). The Deny
         // row commits (C-M16·2 — Allow **and** Deny).
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.CheckOutAsync("u03-b-item", stranger, MemberRoles));
+            svc.CheckOutAsync("u03-b-item", stranger, MemberRoles, ct: TestContext.Current.CancellationToken));
 
         var denies = (await InventoryAudits(store, actor: stranger, targetId: "u03-b-item"))
             .Where(a => a.Action == "inventory.checkout" && a.Outcome == AccessOutcome.Deny).ToList();
@@ -316,8 +316,8 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // then checks in. Exactly **one** checkout record, with both
         // CheckedOutAt and CheckedInAt set (the record is closed, not
         // duplicated or deleted).
-        var checkout = await svc.CheckOutAsync("u03-b-item", owner, MemberRoles);
-        var checkin = await svc.CheckInAsync("u03-b-item", owner, MemberRoles);
+        var checkout = await svc.CheckOutAsync("u03-b-item", owner, MemberRoles, ct: TestContext.Current.CancellationToken);
+        var checkin = await svc.CheckInAsync("u03-b-item", owner, MemberRoles, TestContext.Current.CancellationToken);
 
         // CheckInAsync closes the **same** open record (a re-load, hence a new
         // C# instance, but the same <c>Id</c> — not a second record).
@@ -330,7 +330,7 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         Assert.Single(all);
         Assert.Equal(checkout.Id, all[0].Id);
         Assert.True(all[0].CheckedInAt is not null);
-        var item = (await store.QuerySession().LoadAsync<InventoryItem>("u03-b-item"))!;
+        var item = (await store.QuerySession().LoadAsync<InventoryItem>("u03-b-item", TestContext.Current.CancellationToken))!;
         Assert.Null(item.CurrentHolderId);       // cleared on check-in (D4)
     }
 
@@ -353,7 +353,8 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
         var created = await svc.CreateItemAsync(
             author, MemberRoles,
-            new CreateItemRequest { Name = "Garden hose", OwnerKind = "shared" });
+            new CreateItemRequest { Name = "Garden hose", OwnerKind = "shared" },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal(author, created.AuthorId);   // the actor IS the creator (D5)
         Assert.False(created.IsDeleted);
@@ -393,16 +394,18 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.EditItemAsync("u03-d-item", stranger, MemberRoles,
-                new EditItemRequest { Name = "Hijacked" }));
+                new EditItemRequest { Name = "Hijacked" },
+                    TestContext.Current.CancellationToken));
         var editDeny = (await InventoryAudits(store, actor: stranger, targetId: "u03-d-item"))
             .Where(a => a.Action == "inventory.update" && a.Outcome == AccessOutcome.Deny).ToList();
         Assert.Single(editDeny);
-        var afterDeny = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item"))!;
+        var afterDeny = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item", TestContext.Current.CancellationToken))!;
         Assert.Equal("Shared drill", afterDeny.Name); // unchanged — the deny wrote no domain change
 
         // (b·edit-allow) The **creator** edits successfully (one Allow row).
         var edited = await svc.EditItemAsync("u03-d-item", creator, MemberRoles,
-            new EditItemRequest { Name = "Shared drill (updated)", OwnerKind = "community" });
+            new EditItemRequest { Name = "Shared drill (updated)", OwnerKind = "community" },
+                TestContext.Current.CancellationToken);
         Assert.Equal("Shared drill (updated)", edited.Name);
         var editAllow = (await InventoryAudits(store, actor: creator, targetId: "u03-d-item"))
             .Where(a => a.Action == "inventory.update" && a.Outcome == AccessOutcome.Allow).ToList();
@@ -412,17 +415,17 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         // creator ∪ GlobalAdmin); the **Deny** audit row commits; the item is
         // NOT soft-deleted (the ADR 0024 flag is untouched).
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.DeleteItemAsync("u03-d-item", stranger, MemberRoles));
+            svc.DeleteItemAsync("u03-d-item", stranger, MemberRoles, TestContext.Current.CancellationToken));
         var deleteDeny = (await InventoryAudits(store, actor: stranger, targetId: "u03-d-item"))
             .Where(a => a.Action == "inventory.delete" && a.Outcome == AccessOutcome.Deny).ToList();
         Assert.Single(deleteDeny);
-        var afterDeleteDeny = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item"))!;
+        var afterDeleteDeny = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item", TestContext.Current.CancellationToken))!;
         Assert.False(afterDeleteDeny.IsDeleted); // unchanged — the deny wrote no domain change
 
         // (b·delete-allow) The **creator** deletes (soft-delete flag, one
         // Allow row; the append-only history survives the flag).
-        await svc.DeleteItemAsync("u03-d-item", creator, MemberRoles);
-        var afterDelete = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item"))!;
+        await svc.DeleteItemAsync("u03-d-item", creator, MemberRoles, TestContext.Current.CancellationToken);
+        var afterDelete = (await store.QuerySession().LoadAsync<InventoryItem>("u03-d-item", TestContext.Current.CancellationToken))!;
         Assert.True(afterDelete.IsDeleted);              // ADR 0024 — the soft-delete flag
         var deleteAllow = (await InventoryAudits(store, actor: creator, targetId: "u03-d-item"))
             .Where(a => a.Action == "inventory.delete" && a.Outcome == AccessOutcome.Allow).ToList();
@@ -440,14 +443,14 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers Profile — the AuthorizationService decision
+            // CoreDocTypes registers Profile — the AuthorizationService decision
             // (ResolveActorAsync) reads the actor's Profile for the guardian's
             // per-community block (GetEffectiveCommunityIdsAsync) on every
             // community-scoped read, so this surface needs Profile registered,
             // the same as the PostServiceTests / ProjectServiceTests harness
-            // (the M16DocTypes + M1DocTypes composition).
-            M1DocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            // (the InventoryDocTypes + CoreDocTypes composition).
+            CoreDocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

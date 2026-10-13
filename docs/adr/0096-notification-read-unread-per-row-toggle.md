@@ -126,7 +126,7 @@ the foreign-recipient `KeyNotFoundException` shape.
 
 - **No schema change.** The existing `Notification.ReadAt` nullable field is
   the whole state story — `null` = unread, set = read. No new field, no new
-  index, no `M6DocTypes` delta (Marten's delta-detection is unaffected).
+  index, no `NotificationDocTypes` delta (Marten's delta-detection is unaffected).
 - **The frozen surface grows by two methods** (the ADR 0084/0085 additive
   precedent — the existing `EmitAsync` / `ListInboxAsync` /
   `CountUnreadAsync` / `MarkAllReadAsync` / preference lanes are untouched and

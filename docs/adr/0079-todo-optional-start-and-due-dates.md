@@ -111,7 +111,7 @@ for `End < Start`.
 
 `StartAt` / `DueAt` are nullable field additions on an existing document.
 Per ADR 0004 §B (Marten delta-detection), adding a nullable column to a
-document is a no-op against the existing schema — the `M5DocTypes`
+document is a no-op against the existing schema — the `ProjectDocTypes`
 registration is unchanged and no explicit migration is required.
 
 ### The standing matrix is untouched

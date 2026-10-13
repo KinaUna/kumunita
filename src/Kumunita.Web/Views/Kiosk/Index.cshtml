@@ -1,0 +1,91 @@
+@model Kumunita.Web.Models.KioskDisplayViewModel
+@{
+    ViewData["Title"] = "Kiosk";
+}
+@*
+  M35 (ADR 0164) — the /kiosk chrome-hidden display (U04).
+  Path-1 drift resolution (U04-resume, 2026-10-12): each slide iframes the
+  surface's OWN route (the surface's full view, with @section Scripts / @inject /
+  ViewData all working) — the kiosk adds no new slide view (M35·6 reuse, not
+  re-author). The iframe's navigation re-runs the surface's own Read decision
+  (the frozen board / calendar / todos read seam — M35·3). A slide the viewer
+  cannot see renders the kiosk.slide_denied shape (M35-5 FACE: no leak, no 404);
+  an empty playlist renders the kiosk.empty message (M35-8 FACE).
+  The top-level chrome (navbar / footer / flash / pinned-announcement) is hidden
+  via the ADR 0104 body.kmb-page-expanded selector set, applied here through an
+  inline <style> (style-src 'self' 'unsafe-inline'; the view-scoped rules are
+  only present on this page). The per-slide chrome (inside the iframe) is
+  U07's kiosk.ts concern (same-origin frame access + the same idiom). No inline
+  <script> (script-src 'self'); no new npm package (M35·7).
+*@
+<style>
+  /* M35 — the kiosk chrome-hide + stage (the ADR 0104 body.kmb-page-expanded
+     idiom, applied to the kiosk's own top-level document). */
+  body { margin-bottom: 0; }
+  .navbar,
+  .kmb-footer,
+  .kumunita-pinned-announcement,
+  .kmb-flash-toast { display: none !important; }
+  main { height: 100vh; padding: 0; }
+  #kiosk-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .kmb-kiosk-title { margin: 0 0 .25rem; padding: .5rem 3.5rem .5rem 1rem; font-size: 1rem; font-weight: 600; }
+  .kmb-kiosk-iframe { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; transition: opacity .3s ease; }
+  .kmb-kiosk-empty,
+  .kmb-kiosk-denied { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; text-align: center; padding: 2rem; }
+  .kmb-kiosk-exit { position: absolute; top: .75rem; right: .75rem; z-index: 10; }
+  .kmb-kiosk-slide-meta { display: none; } /* U07's kiosk.ts reads these in order */
+</style>
+
+<div id="kiosk-stage"
+     data-view-interval="@Model.ViewIntervalSeconds"
+     data-refresh-interval="@Model.RefreshIntervalSeconds"
+     data-slide-count="@Model.Slides.Count">
+    <a class="kmb-kiosk-exit" href="/" aria-label="Exit kiosk">&#10005;</a>
+
+    @if (!Model.HasSlides)
+    {
+        <div class="kmb-kiosk-empty">
+            <kw-l key="kiosk.empty">The kiosk has no slides configured yet.</kw-l>
+        </div>
+    }
+    else
+    {
+        <h1 class="kmb-kiosk-title">
+            <kw-l key="kiosk.title">Neighbourhood board</kw-l>
+        </h1>
+
+        @* The per-slide meta (simple data-* values — no JSON-in-attribute, so
+           Razor's attribute encoding is a no-op for URLs/labels). U07's
+           client/lib/kiosk.ts reads these in order to advance + refresh. *@
+        @foreach (var slide in Model.Slides)
+        {
+            <div class="kmb-kiosk-slide-meta"
+                 data-index="@slide.Index"
+                 data-href="@(slide.Href ?? string.Empty)"
+                 data-denied="@slide.Denied.ToString().ToLowerInvariant()"
+                 data-label="@(slide.Label ?? string.Empty)"></div>
+        }
+
+        @* The initial (first) slide: the iframe (the surface's own route), or
+           the kiosk.slide_denied shape when the viewer cannot see it. *@
+        @if (Model.FirstSlide is { Denied: true })
+        {
+            <div class="kmb-kiosk-denied">
+                <kw-l key="kiosk.slide_denied">You don't have access to this view.</kw-l>
+            </div>
+        }
+        else
+        {
+            <iframe class="kmb-kiosk-iframe"
+                    src="@Model.FirstSlide!.Href"
+                    title="@(Model.FirstSlide!.Label ?? "Kiosk slide")"></iframe>
+        }
+    }
+</div>

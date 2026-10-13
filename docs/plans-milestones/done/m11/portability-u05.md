@@ -62,7 +62,7 @@ re-creation + the config apply are U06's.
    the apply + the integrity loop consume).
 3. `src/Kumunita.Core/Media/IMediaFileStore.cs` — the `PutAsync` + the
    content-addressed layout the media apply writes to.
-4. `src/Kumunita.Core/M1DocTypes.cs` — the `Profile.SubjectId` identity + the
+4. `src/Kumunita.Core/CoreDocTypes.cs` — the `Profile.SubjectId` identity + the
    `GroupMembership` business key (the referential relationships the
    integrity loop checks *against*, confirming the D7 reference map matches
    the source).

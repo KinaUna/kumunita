@@ -162,7 +162,7 @@ top-level keys — `goals` and `projects` — and two new POCO types
   association intact (the ADR 0086 `Project.GoalId` / ADR 0067
   `TodoItem.ProjectId` shape). No new DocTypes surface is needed — the
   `ProjectGoal` / `Project` / `TodoItem` / `ProjectTranslation` documents are
-  already registered by `M5DocTypes.Configure` (ADR 0086 / ADR 0088) and the
+  already registered by `ProjectDocTypes.Configure` (ADR 0086 / ADR 0088) and the
   tables already exist.
 - **Constraint (D3)** — the embedded resource and a valid `accounts[].role` are
   load preconditions; a broken file fails the (Development-only) seed loudly rather

@@ -101,7 +101,7 @@ localization registry are all *reused, not re-invented*. This is the EV-CAL
   `src/Kumunita.Core/Events/IEventService.cs` L48 and `EventService.cs`
   L113–145), so day/week/month windows are **caller policy in the controller**,
   not a new seam. **No** field is added to `Event` / `EventRsvp` /
-  `EventTranslation`; `M4DocTypes` is untouched; the boot paths are untouched;
+  `EventTranslation`; `EventDocTypes` is untouched; the boot paths are untouched;
   no EF. The **only** additive C# in the whole lane is **2 additive view-model
   fields** (+ the `MonthLabel`→`Label` generalization) on
   `EventCalendarViewModel`, **one `?view=` param** on the existing `Calendar`
@@ -223,7 +223,7 @@ action; the unit file moved `in-progress/` → `done/`).
 `Deliverables`; (2) never rewrites the design doc outside the §drift-guard
 unit; (3) never introduces a test whose exact name is not in the design doc's
 pinned list; (4) **never touches `IEventService` / `EventService` / any Core
-document / `M4DocTypes` / a boot path (zero Core change — D1)**; (5) never
+document / `EventDocTypes` / a boot path (zero Core change — D1)**; (5) never
 opens a seam on `IAuthorizationService` / `IUserInfoService` / `IIdentityService`
 or adds any seam on `IEventService` (there is *no* ADD in this lane); (6) never
 introduces a calendar library or a bundler (plain `client/lib` TS, tsc-only —
@@ -238,7 +238,7 @@ in the handoff note.
 ## The invariants (pinned for `EV-DWM`)
 
 - **C-DWM·1 — Zero Core change.** No seam added, no `Event` / `EventRsvp` /
-  `EventTranslation` field, no `M4DocTypes` / boot-path change, no EF, no new
+  `EventTranslation` field, no `EventDocTypes` / boot-path change, no EF, no new
   audit row shape. The lane's only additive C# is the 2 additive view-model
   fields (+ `MonthLabel`→`Label`) and the `?view=` param on the existing
   `Calendar` action. The `ListInRangeAsync` seam is **reused, unchanged** — it

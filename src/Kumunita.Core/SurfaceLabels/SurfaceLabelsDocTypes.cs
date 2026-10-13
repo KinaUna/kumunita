@@ -37,5 +37,16 @@ public static class SurfaceLabelsDocTypes
         // share the name `SurfaceLabels`) — the exact SiteContent.SiteContent
         // idiom.
         opts.Schema.For<SurfaceLabels.SurfaceLabels>();
+
+        // ADR 0158 — the LBL-2 translation lane (the "future LBL-2 lane" ADR
+        // 0152 §D8 named). One row per language of the singleton's 13 surface
+        // labels — the (LanguageCode) unique index enforces that at the DB
+        // layer (the PostTranslation (PostId, LanguageCode) convention, minus
+        // the parent key: the surface-labels singleton is a singleton, so its
+        // single identity is implicit and the row is keyed only on its target
+        // language). Additive per ADR 0004 §B.1; the SurfaceLabels singleton
+        // above is untouched (the exact SiteContentDocTypes ADR 0157 idiom).
+        opts.Schema.For<SurfaceLabelTranslation>()
+               .UniqueIndex(t => t.LanguageCode);
     }
 }

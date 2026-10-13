@@ -18,7 +18,7 @@ namespace Kumunita.Core.Events;
 /// standing matrix's standing owner.</item>
 /// <item><see cref="Start"/> / <see cref="End"/> — *new, this milestone*: the time,
 /// rendered by the one <c>kw-dt</c> TagHelper; <see cref="Start"/> drives feed ordering
-/// (the <c>(ComponentId, Start)</c> index, <see cref="M4DocTypes.Configure"/>) and the
+/// (the <c>(ComponentId, Start)</c> index, <see cref="EventDocTypes.Configure"/>) and the
 /// reminder window (§3.6).</item>
 /// <item><see cref="Location"/> / <see cref="Capacity"/> — *new, this milestone*:
 /// display metadata — <see cref="Capacity"/> is **not** a gate (no admission queue in
@@ -188,7 +188,7 @@ public sealed class Event
     /// existing POCO (the ADR 0004 §B "additive surface" shape — the
     /// <see cref="ComponentId"/> / <see cref="TagIds"/> / <see cref="ImageIds"/>
     /// / <see cref="AttachmentIds"/> precedent); no new doc type, no new index,
-    /// no <c>M4DocTypes</c> change.
+    /// no <c>EventDocTypes</c> change.
     /// <para>
     /// <b>U01 note (handoff):</b> the register / ADR 0119 / design doc annotate
     /// this as <c>Guid?</c>, but <see cref="Id"/> is a Marten <b>string</b>

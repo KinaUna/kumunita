@@ -45,7 +45,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(owner, "GE1 family", null);
         await Plant(store, GroupEvent("ge1-ev", group.Id, owner));
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, owner, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, owner, page: 1, TestContext.Current.CancellationToken);
         var ev = Assert.Single(feed.Visible);
         Assert.Equal("ge1-ev", ev.Id);
         Assert.Equal(0, feed.HiddenCount);
@@ -76,7 +76,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(owner, "GE2 family", null);
         await Plant(store, GroupEvent("ge2-ev", group.Id, owner));
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, stranger, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, stranger, page: 1, TestContext.Current.CancellationToken);
         Assert.Empty(feed.Visible);
         Assert.Equal(1, feed.HiddenCount);
         Assert.Equal(0, feed.Total);
@@ -104,11 +104,11 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(owner, "GE3 family", null);
         await Plant(store, GroupEvent("ge3-ev", group.Id, owner));
 
-        var before = await svc.ListGroupEventsAsync(group.Id, newcomer, page: 1);
+        var before = await svc.ListGroupEventsAsync(group.Id, newcomer, page: 1, TestContext.Current.CancellationToken);
         Assert.Empty(before.Visible);
 
         await userInfo.AddGroupMemberAsync(group.Id, newcomer, addedBy: owner);
-        var after = await svc.ListGroupEventsAsync(group.Id, newcomer, page: 1);
+        var after = await svc.ListGroupEventsAsync(group.Id, newcomer, page: 1, TestContext.Current.CancellationToken);
         var ev = Assert.Single(after.Visible);
         Assert.Equal("ge3-ev", ev.Id);
         Assert.Equal(0, after.HiddenCount);
@@ -130,11 +130,11 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(author, "GE4 family", null);
         await Plant(store, GroupEvent("ge4-ev", group.Id, author));
 
-        var whileMember = await svc.GetGroupEventAsync(group.Id, "ge4-ev", author);
+        var whileMember = await svc.GetGroupEventAsync(group.Id, "ge4-ev", author, TestContext.Current.CancellationToken);
         Assert.NotNull(whileMember);
 
         await userInfo.RemoveGroupMemberAsync(group.Id, author, removedBy: "u-ge-g4-admin");
-        var afterRemove = await svc.GetGroupEventAsync(group.Id, "ge4-ev", author);
+        var afterRemove = await svc.GetGroupEventAsync(group.Id, "ge4-ev", author, TestContext.Current.CancellationToken);
         Assert.Null(afterRemove);
 
         var denyRow = Assert.Single(await GroupAudits(store, actor: author),
@@ -165,7 +165,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.Equal(group.Id, created.GroupId);
         Assert.True(created.IsDraft); // ADR 0037 — a group event is a draft at create.
 
-        var authorDetail = await svc.GetGroupEventAsync(group.Id, created.Id, owner);
+        var authorDetail = await svc.GetGroupEventAsync(group.Id, created.Id, owner, TestContext.Current.CancellationToken);
         Assert.NotNull(authorDetail); // the author's draft gate (ADR 0037) returns it.
 
         var gateRow = Assert.Single(await GroupAudits(store, actor: owner),
@@ -250,11 +250,11 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             GrantedBy = "u-ge-g7-admin", At = DateTimeOffset.UtcNow
         });
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, moderator, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, moderator, page: 1, TestContext.Current.CancellationToken);
         Assert.Empty(feed.Visible);
         Assert.Equal(1, feed.HiddenCount);
 
-        Assert.Null(await svc.GetGroupEventAsync(group.Id, "ge7-ev", moderator));
+        Assert.Null(await svc.GetGroupEventAsync(group.Id, "ge7-ev", moderator, TestContext.Current.CancellationToken));
 
         var rows = await GroupAudits(store, actor: moderator);
         Assert.All(rows, r =>
@@ -287,11 +287,11 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             grantedAt: now.AddHours(-2), expiresAt: now.AddHours(+2),
             consumedAt: now.AddHours(-1));
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, admin, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, admin, page: 1, TestContext.Current.CancellationToken);
         Assert.Empty(feed.Visible);
         Assert.Equal(1, feed.HiddenCount);
 
-        Assert.Null(await svc.GetGroupEventAsync(group.Id, "ge8-ev", admin));
+        Assert.Null(await svc.GetGroupEventAsync(group.Id, "ge8-ev", admin, TestContext.Current.CancellationToken));
 
         var rows = await GroupAudits(store, actor: admin);
         Assert.All(rows, r =>
@@ -319,7 +319,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         await Plant(store, GroupEvent("ge9-ev", group.Id, owner));
         await Plant(store, ReadGrant(owner, delegate_, "ge9-grant"));
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, delegate_, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, delegate_, page: 1, TestContext.Current.CancellationToken);
         var ev = Assert.Single(feed.Visible);
         Assert.Equal("ge9-ev", ev.Id);
 
@@ -354,7 +354,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             From = DateTimeOffset.UtcNow.AddDays(-1)
         });
 
-        var feed = await svc.ListGroupEventsAsync(group.Id, delegate_, page: 1);
+        var feed = await svc.ListGroupEventsAsync(group.Id, delegate_, page: 1, TestContext.Current.CancellationToken);
         Assert.Empty(feed.Visible);
         Assert.Equal(1, feed.HiddenCount);
 
@@ -421,7 +421,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // The community feed never contains the group event (the author is the
         // strongest possible claimant, so if even they can't see it the lane
         // is exclusive by construction).
-        var upcoming = (await svc.ListUpcomingAsync(null, owner, page: 1)).Items;
+        var upcoming = (await svc.ListUpcomingAsync(null, owner, page: 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain(upcoming, e => e.Id == "ge12-group");
     }
 
@@ -451,7 +451,8 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var window = await svc.ListInRangeAsync(
             new DateTimeOffset(2099, 3, 1, 0, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2099, 3, 2, 0, 0, 0, TimeSpan.Zero),
-            null, owner);
+            null, owner,
+                TestContext.Current.CancellationToken);
         Assert.DoesNotContain(window, e => e.Id == "ge13-group");
     }
 
@@ -471,7 +472,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(owner, "GEfeed family", null);
         await Plant(store, GroupEvent("feedshape-ev", group.Id, owner));
 
-        await svc.ListGroupEventsAsync(group.Id, owner, page: 1);
+        await svc.ListGroupEventsAsync(group.Id, owner, page: 1, TestContext.Current.CancellationToken);
 
         var row = Assert.Single(await GroupAudits(store, actor: owner), a => a.TargetId is null);
         Assert.Equal("grouppost", row.TargetKind);
@@ -497,7 +498,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var group = await userInfo.CreateGroupAsync(owner, "GEdetail family", null);
         await Plant(store, GroupEvent("dshape-ev", group.Id, owner));
 
-        var ev = await svc.GetGroupEventAsync(group.Id, "dshape-ev", owner);
+        var ev = await svc.GetGroupEventAsync(group.Id, "dshape-ev", owner, TestContext.Current.CancellationToken);
         Assert.NotNull(ev);
 
         var row = Assert.Single(await GroupAudits(store, actor: owner), a => a.TargetId == "dshape-ev");
@@ -524,7 +525,7 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         await Plant(store, GroupEvent("ddel-ev", group.Id, owner));
         await Plant(store, ReadGrant(owner, delegate_, "ddel-grant"));
 
-        var ev = await svc.GetGroupEventAsync(group.Id, "ddel-ev", delegate_);
+        var ev = await svc.GetGroupEventAsync(group.Id, "ddel-ev", delegate_, TestContext.Current.CancellationToken);
         Assert.NotNull(ev);
 
         var row = Assert.Single(await GroupAudits(store, actor: delegate_), a => a.TargetId == "ddel-ev");
@@ -564,10 +565,10 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: author);
 
         // A member (not the author) sees nothing.
-        Assert.Null(await svc.GetGroupEventAsync(group.Id, "draft-ev", member));
+        Assert.Null(await svc.GetGroupEventAsync(group.Id, "draft-ev", member, TestContext.Current.CancellationToken));
 
         // The author (via the draft gate, before membership) sees it.
-        Assert.NotNull(await svc.GetGroupEventAsync(group.Id, "draft-ev", author));
+        Assert.NotNull(await svc.GetGroupEventAsync(group.Id, "draft-ev", author, TestContext.Current.CancellationToken));
 
         // The draft gate writes **no** decision row for the member (the ADR
         // 0037 ordinal check is decision-free); the only row is the author's
@@ -599,8 +600,8 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
 
         // The whole group surface: read (feed + detail), write allow, write
         // deny (caught — the gate's row must still persist).
-        await spy.ListGroupEventsAsync(group.Id, owner, page: 1);
-        await spy.GetGroupEventAsync(group.Id, "spy-ev", owner);
+        await spy.ListGroupEventsAsync(group.Id, owner, page: 1, TestContext.Current.CancellationToken);
+        await spy.GetGroupEventAsync(group.Id, "spy-ev", owner, TestContext.Current.CancellationToken);
         await RunInSession(store, s => spy.CreateGroupEventAsync(
             new GroupEventDraft(group.Id, "t", "body spy",
                 DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1)), owner, s));
@@ -625,9 +626,9 @@ public class GroupEventServiceTests(PostgresFixture fixture) : IClassFixture<Pos
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

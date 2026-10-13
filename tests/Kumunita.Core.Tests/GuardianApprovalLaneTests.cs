@@ -25,7 +25,7 @@
 // · AcceptGroupInvitationAsync on a supervised child → refused (the
 //   pre-existing GU gate: the guardian must resolve instead).
 //
-// Harness: the single-store shape (M1DocTypes + M6DocTypes), the real
+// Harness: the single-store shape (CoreDocTypes + NotificationDocTypes), the real
 // NotificationService over a recording mailer + a Substitute
 // ITranslationProvider (the UserInfoServiceGroupNotificationTests
 // precedent), and a UserInfoService wired with an IServiceProvider that
@@ -357,8 +357,8 @@ public sealed class GuardianApprovalLaneTests(PostgresFixture fixture)
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

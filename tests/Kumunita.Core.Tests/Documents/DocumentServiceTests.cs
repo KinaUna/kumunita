@@ -428,8 +428,8 @@ public class DocumentServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);   // M21 (ADR 0122 D1)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

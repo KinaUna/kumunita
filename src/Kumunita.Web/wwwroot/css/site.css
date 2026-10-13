@@ -215,6 +215,10 @@
      width: the pull-up merely fills the navbar's own mb-3 gap, it never
      overlaps the bar. */
   --kmb-navbar-tab-offset: 1rem;
+  /* M36 (ADR 0165 D6/D7) — the @mention link color (the warm attention tone,
+     distinct from the green body-link so a resident reads "a person" not a URL).
+     The .mention rule is defined below in the rich-content section. */
+  --kw-mention: #8a5a12;
 }
 
 /* ==========================================================================
@@ -322,6 +326,7 @@
     --kmb-surface: #16241c;    /* the "white card" fill in dark */
     --kmb-surface-2: #1b2d24;  /* nested / raised panels */
     --kmb-band: #0c1510;       /* the features band (lighter than canvas) */
+    --kw-mention: #d8b36a;     /* M36 (ADR 0165 D7) — dark-theme mention link */
   }
 }
 html[data-kmb-theme='dark'] {
@@ -378,6 +383,7 @@ html[data-kmb-theme='dark'] {
   --kmb-ink: #e6ece7;
   --kmb-ink-soft: #c3cec6;
   --kmb-muted: #8fa196;
+  --kw-mention: #d8b36a;       /* M36 (ADR 0165 D7) — dark-theme mention link */
   --kmb-eyebrow: #d8b36a;
   --kmb-cream: #f2f6f2;
   --kmb-amber-soft: #f0c97e;
@@ -506,6 +512,17 @@ html[data-kmb-theme='dark'] {
      would render on the amber fill — unreadable. Restore the real dark ink. */
   html:not([data-kmb-theme='light']) .badge.text-dark {
     color: #17251d !important;
+  }
+  /* .badge.text-bg-light.text-dark (the home milestone-status chip and the
+     notification-type chips): the token flip makes the text-bg-light fill
+     dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
+     specificity, declared after the .badge.text-bg-light color fix) would
+     then leave dark ink on a dark fill — unreadable. Restore the readable
+     light ink the plain .badge.text-bg-light patch uses (higher specificity
+     than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
+     are untouched — they don't carry .text-bg-light). */
+  html:not([data-kmb-theme='light']) .badge.text-bg-light.text-dark {
+    color: var(--kmb-ink) !important;
   }
   /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
      Community / Private): the token flip re-points --bs-light to a dark
@@ -721,6 +738,17 @@ html[data-kmb-theme='dark'] .badge.text-bg-light {
    would render on the amber fill — unreadable. Restore the real dark ink. */
 html[data-kmb-theme='dark'] .badge.text-dark {
   color: #17251d !important;
+}
+/* .badge.text-bg-light.text-dark (the home milestone-status chip and the
+   notification-type chips): the token flip makes the text-bg-light fill
+   dark, and the .badge.text-dark dark-ink patch above (higher-or-equal
+   specificity, declared after the .badge.text-bg-light color fix) would
+   then leave dark ink on a dark fill — unreadable. Restore the readable
+   light ink the plain .badge.text-bg-light patch uses (higher specificity
+   than .badge.text-dark, so it wins; bg-warning/bg-light text-dark chips
+   are untouched — they don't carry .text-bg-light). */
+html[data-kmb-theme='dark'] .badge.text-bg-light.text-dark {
+  color: var(--kmb-ink) !important;
 }
 /* .badge.bg-light.text-dark (the Inventory ownerKind chips, Shared /
    Community / Private): the token flip re-points --bs-light to a dark
@@ -947,6 +975,46 @@ body.kmb-page-expanded .page-expand-close {
   right: 0.75rem;
   z-index: 100;
   background: #fff;
+}
+
+/* ── Onboarding walk-through modal (M22/M30 rework) — the framed page ──────
+   When a settings page is loaded inside the shared _OnboardingModal's iframe
+   (the M35 kiosk "frame the surface's own route" idiom), _Layout.cshtml sets
+   body.kmb-embed (the Sec-Fetch-Dest: iframe signal). Hide the page chrome
+   (navbar / footer / banners / toasts) so the framed page reads as a focused
+   panel inside the modal — the ADR 0104 / M35 chrome-hide idiom. The flash
+   toast stays VISIBLE inside the frame: it is the save-success feedback the
+   resident/admin sees after saving the setting in the modal. The settings
+   sub-nav (.kmb-tab-under-navbar) is neutralized (its negative margin-top
+   assumes the navbar it hangs under; in the embed there is no navbar) and
+   given a little top padding so the first control isn't flush at the top.
+   A direct navigation (Sec-Fetch-Dest: document) never sets the class, so
+   the page is unchanged when visited normally. */
+body.kmb-embed {
+  margin-bottom: 0;
+}
+body.kmb-embed .navbar,
+body.kmb-embed .kmb-footer,
+body.kmb-embed .kumunita-pinned-announcement,
+body.kmb-embed .kumunita-onboarding-banner,
+body.kmb-embed .kmb-whatsnew-toast {
+  display: none;
+}
+/* Neutralize the settings sub-nav's negative margin (it hangs under the
+   navbar, which is hidden here) so the first heading isn't clipped. */
+body.kmb-embed .kmb-tab-under-navbar {
+  margin-top: 0;
+  border-top: 0;
+  border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+}
+/* The framed page's iframe inside the modal needs an explicit size — an
+   <iframe> defaults to a ~150px tall, full-width box; give it a tall, full-
+   width, borderless panel that fills the modal body (the M35 kiosk iframe
+   sizing idiom). */
+.kmb-onboarding-iframe {
+  width: 100%;
+  height: 70vh;
+  border: 0;
 }
 
 .lead {
@@ -2128,6 +2196,20 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   text-underline-offset: 2px;
 }
 
+/* M36 (ADR 0165 D6/D7) — the @mention link: a resolved @<DisplayName>
+   linkified by the MentionRenderer render pass into <a class="mention"
+   href="/directory/{id}">. The warm --kw-mention tone (the eyebrow / attention
+   color) distinguishes it from the green body-link, so a resident reads "a
+   person being addressed" rather than a URL. No underline by default; hover
+   reveals the underline (the .mention style hook — the M36·7 pin). */
+.mention {
+  color: var(--kw-mention);
+  text-decoration: none;
+}
+.mention:hover {
+  text-decoration: underline;
+}
+
 /* RC image (the U02 emission <img … class="rc-image" loading="lazy" /> carries
    no width/height — CSS owns sizing). Register-pinned values. */
 .rc-image {
@@ -2523,26 +2605,43 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 .airy-page-list a:hover { color: var(--bs-primary); }
 
 /* Collapsible branches (native <details>/<summary>, no JS — _PageTreeItem).
-   Children render in a nested <ul>, so the leaf-row padding above still owns
-   the indentation at every depth; the branch rows themselves are flush, with
-   the row separator provided by the <li> they live in (and, for nested
-   branches, the nested <ul>'s own rows). */
+   A branch row is a wrapper <li> (same geometry as any leaf row: padding +
+   separator from the base .airy-page-list li rules) with a transparent
+   flex <summary> inside. The chevron sits in a fixed 1.5rem gutter, so the
+   branch's TITLE lines up with its sibling leaf rows' titles at the same
+   depth (the chevron occupies the gutter, not extra padding) and stays
+   stable when the branch opens. The <summary> carries no padding or border
+   of its own — the wrapper <li> owns the row geometry and the separator,
+   so a branch row looks exactly like a leaf row at the same level. The
+   row separator lives on the <summary> (not the wrapper <li>, which is
+   zeroed) so a branch row carries a single line, like its leaf siblings. */
 .airy-page-list .kmb-page-branch { display: block; }
+/* A branch row's wrapper <li> drops its own bottom border (the separator is
+   carried by the <summary> below — one line, like a leaf sibling) and shifts
+   its left padding in by the chevron+gap width (1rem + 0.25rem = 1.25rem),
+   so the branch's TITLE lands at the same x as its leaf siblings' titles
+   (the chevron occupies the gutter to the left of the title). This is the
+   standard file-tree pattern: siblings align, the chevron is the branch cue. */
+.airy-page-list li:has(> .kmb-page-branch) {
+  border-bottom: 0;
+  padding-left: calc(0.25rem + var(--kmb-page-depth, 0) * 1.5rem);
+}
 .airy-page-list .kmb-page-branch > summary {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 1.5rem;
+  gap: 0.25rem;
   cursor: pointer;
-  list-style: none;               /* hide the default marker; we draw our own chevron */
+  list-style: none;
   user-select: none;
+  border-bottom: 1px solid var(--kmb-border-soft);
 }
 .airy-page-list .kmb-page-branch > summary::-webkit-details-marker { display: none; }
 .airy-page-list .kmb-page-branch > summary::before {
   content: "\203a";              /* single guillemet ≈ right chevron, like Bootstrap's caret */
-  flex: 0 0 auto;
+  flex: 0 0 1rem;               /* fixed gutter (1rem + 0.25rem gap = 1.25rem push) */
+  text-align: center;
   font-family: var(--bs-body-font-family);
-  font-size: 1.125rem;
+  font-size: 1rem;              /* slightly smaller chevron */
   line-height: 1;
   color: var(--kmb-muted);
   transition: transform 0.15s ease-in-out;
@@ -2558,28 +2657,22 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   border-radius: 999px;
   padding: 0.125rem 0.5rem;
 }
-/* Children list: keeps the row separators without double borders (the
-   parent row's <li> border already closes the gap above it), and the
-   borderless nested <ul> keeps the bordered-ledger silhouette intact. */
+/* Children list: a borderless nested <ul> (no extra margin/padding, so the
+   bordered-ledger silhouette stays one continuous card). */
 .airy-page-list .kmb-page-branch > ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 2.75rem; }
-/* A branch's own row (summary) stays flush at every depth — the
-   chevron/title never shift when the branch opens. The separator line
-   moves from the wrapper <li> (zero padding/border) onto the summary
-   itself, so a closed branch shows no blank bordered strip and the
-   separator sits exactly at the child-row boundary when open. */
-.airy-page-list li:has(> .kmb-page-branch) { padding: 0; border-bottom: 0; }
-.airy-page-list .kmb-page-branch > summary { border-bottom: 1px solid var(--kmb-border-soft); }
-/* Depth cue: the old flat list encoded tree depth as 1.25rem of extra
-   padding-left per level — keep that visual language, now carried by the
-   child rows (2.75rem = the 1.5rem row padding + 1.25rem per level).
-   An inner branch's own summary stays flush; its children indent
-   relative to the parent's 2.75rem, so a nested branch reads slightly
-   further in — a consistent, if non-cumulative, depth signal. */
+/* Depth cue — a single calc() rule handles any depth (no :has() chains,
+   no per-level rules, no flat indent). The --kmb-page-depth custom property
+   is 0 for top-level rows, 1 for one level in, 2 for two levels in, etc.
+   Each level adds 1.25rem of left padding, so the tree reads as a real
+   gradient: a branch and its sub-pages each sit one step further in than
+   their parent. A branch's TITLE aligns with its leaf siblings at the same
+   depth (the chevron occupies the 1.5rem gutter, not extra padding). The
+   rule comes after the base li shorthand so it wins the cascade. */
+.airy-page-list li { padding-left: calc(1.5rem + var(--kmb-page-depth, 0) * 1.5rem); }
 
 /* C: directory — the cards grid (the "bigger avatars" overview). */
 .dir-cards {
@@ -2618,10 +2711,7 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
   .airy-side-list { flex-direction: row; flex-wrap: wrap; gap: 0.375rem; }
   .airy-side-note { display: none; } /* the mandatory badge reappears in the head */
   .airy-group-grid { grid-template-columns: 1fr; }
-  .airy-page-list li { padding: 0.75rem 1rem; }
-  .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
-  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 2.25rem; }
-  .airy-page-list li:has(> .kmb-page-branch) { padding: 0; }
+  .airy-page-list li { padding: 0.75rem 1rem; padding-left: calc(1rem + var(--kmb-page-depth, 0) * 1.25rem); }
   /* U05 · post/reply card — M10 (ADR 0107) §Responsive U05 row:
      the .rc-body rendered body's long code spans / unbroken URLs
      overflow the card → truncate (overflow-wrap: anywhere). The
@@ -3486,5 +3576,63 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
   font-size: 0.875rem;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* ── M35 (ADR 0164) — Kiosk mode: the #kiosk-stage slide fill + advance
+   transition. The chrome-hide (navbar / footer / flash / pinned-announcement)
+   and the stage/title/iframe base sizing already live in
+   Views/Kiosk/Index.cshtml's inline <style> (the ADR 0104
+   body.kmb-page-expanded idiom, view-scoped) — this block does NOT re-declare
+   that chrome-hide. It adds only: (a) a robust fill for the iframe so a
+   slide owns 100% of the stage (belt-and-suspenders for the inline
+   .kmb-kiosk-iframe flex rule), and (b) the .kmb-kiosk-fading state the
+   client/lib/kiosk.ts module toggles around each slide swap — a quiet
+   opacity fade built on the .kmb-kiosk-iframe transition the view declares
+   (M35·6 chrome-hide idiom reused; M35·7 — no animation library, plain CSS).
+   The denied-shape / empty-shape centering also already live in the view
+   inline <style>; the .kmb-kiosk-fading rule applies to whichever slide
+   element is fading (iframe or denied shape). */
+#kiosk-stage .kmb-kiosk-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+#kiosk-stage .kmb-kiosk-fading {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Disclosure: the audience / visibility explanation notes on the
+   post / group-post / announcement / to-do detail pages. These are
+   informational (they explain *who can see* the post, a reply, or a
+   comment) and were previously always visible as muted prose, which
+   distracted from the primary actions. They are now collapsed by
+   default in a native <details> — the same affordance the pages tree
+   (_PageTreeItem.cshtml) and the translation chips use — so the label
+   is the only thing shown until the resident opts into the detail.
+   No JS: <details> is native. The summary is the visible affordance
+   (a muted, small, clickable label); the note text is the collapsed
+   content below it. The Bootstrap `small` class already gives the
+   0.875rem size; `text-muted` the muted color. */
+.kw-audience-disclosure > summary {
+  cursor: pointer;
+  list-style-position: inside;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color, #6c757d);
+}
+.kw-audience-disclosure > summary:hover {
+  text-decoration: underline;
+}
+.kw-audience-disclosure > summary::-webkit-details-marker {
+  cursor: pointer;
+}
+.kw-audience-disclosure[open] > summary {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.kw-audience-disclosure > .text-muted {
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+  margin-top: 0.25rem;
 }
 

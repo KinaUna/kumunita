@@ -250,6 +250,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "This comment has been deleted by its author.",
             ["projects.todo.comment_delete"] = "Delete",
             ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision. You are commenting only where the to-do itself is visible.",
+            ["projects.todo.comment_audience_note_label"] = "Who can see comments?",
             ["projects.todo.back"]           = "← Back to to-dos",
             ["projects.todo.untitled"]       = "Untitled to-do",
             ["projects.todo.edit"]           = "Edit",
@@ -386,6 +387,9 @@ public static class KnownTranslationKeys
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
             ["nav.admin"]         = "Admin",
+            ["nav.management"]    = "Management",
+            ["nav.error_reports"] = "Error reports",
+            ["nav.moderation"]    = "Moderation",
             ["nav.translations"]  = "Translations",
             ["nav.sign_out"]      = "Sign out",
             ["nav.children"]      = "Children",
@@ -720,6 +724,22 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Save",
             ["settings.home_flash_hide"]   = "Home page updated — the intro sections are now hidden and the feed shows first.",
             ["settings.home_flash_show"]   = "Home page updated — the intro sections will show again.",
+            // The home "upcoming" display preference (show the next events +
+            // to-dos above the "What's new" feed on /) — the HideHomeIntro
+            // checkbox's sibling (ADR 0004 §B.1 additive Profile field).
+            ["settings.home_upcoming_label"] =
+                "Show upcoming events and to-dos on the home page",
+            ["settings.home_upcoming_note"]  =
+                "When on, the next events and to-dos appear on your home page, above the feed. When off, the home page stays as it was.",
+            ["settings.home_upcoming_mine_label"] =
+                "Show only my own events and to-dos",
+            ["settings.home_upcoming_mine_note"]  =
+                "When on, the section lists only the events you RSVP'd to or created and the to-dos assigned to you. When off, it shows the community's events and to-dos.",
+            // The single "saved" confirmation the two-checkbox home form
+            // reports (both toggles save together in one POST, so one message
+            // covers every combination — the SavePageSize single-flash shape).
+            ["settings.home_flash_saved"]  =
+                "Home page updated — your choices are saved.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -823,6 +843,14 @@ public static class KnownTranslationKeys
                 "Nothing posted yet — be the first to start the conversation in the feed.",
             ["home.feed_badge_pinned"]   = "Pinned",
 
+            // ── home "upcoming" section (the next events + to-dos, above the
+            // "What's new" feed) — the resident's home.home_show_upcoming
+            // preference (ADR 0004 §B.1 additive Profile field) ────────────
+            ["home.upcoming_title"]        = "Coming up",
+            ["home.upcoming_events"]       = "Events",
+            ["home.upcoming_todos"]        = "To-dos",
+            ["home.upcoming_show_more"]    = "Show the {n} more",
+
             // ── home roadmap (the plan, after the intro) ────────────────────
             ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
             ["home.roadmap.show_more_earlier"] = "Show the {n} earlier milestones",
@@ -837,6 +865,14 @@ public static class KnownTranslationKeys
             //    #kumunita-strings JSON block in _Layout.cshtml) ──────────
             ["common.close"]  = "Close",
             ["common.cancel"] = "Cancel",
+            // Onboarding walk-through (M22/M30 modal rework) — the previous /
+            // next / done buttons in the shared _OnboardingModal partial + the
+            // "Step X of Y" counter the client/lib/onboarding-modal.ts formats
+            // from the #kumunita-strings bundle ({0}/{1} placeholders).
+            ["common.previous"] = "Previous",
+            ["common.next"]     = "Next",
+            ["common.done"]     = "Done",
+            ["common.step_of"]  = "Step {0} of {1}",
             ["rc.editor.error_generic"] = "Something went wrong.",
             ["rc.editor.link.title"]    = "Insert link",
             ["rc.editor.link.url"]      = "URL",
@@ -924,6 +960,10 @@ public static class KnownTranslationKeys
                 "The self-serve delete-account lane is only available to a " +
                 "GlobalAdmin. A non-GlobalAdmin resident cannot delete their " +
                 "own account — contact an administrator to remove the account.",
+
+            // M27 (ADR 0148) — the settings-tab link to the resident's own
+            // backup/restore surface (/account/portability, the "My data" page).
+            ["nav.my_data"]          = "My data",
 
             ["nav.delete_account"] = "Delete account",
 
@@ -1222,6 +1262,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "You can see this post because you were allowed to view it — " +
                 "either you're the author, or it was shared with you or your groups.",
+            ["posts.detail_why_label"] = "Why can I see this?",
             ["posts.report_button"] = "Report this post",
             ["posts.reply_report_button"] = "Report this reply",
             ["posts.report_reason_label"] = "What's wrong?",
@@ -1244,6 +1285,7 @@ public static class KnownTranslationKeys
                 "Replies have no own audience — they are visible under " +
                 "this post's single audience decision. You are replying " +
                 "only where the post itself is visible.",
+            ["posts.reply_audience_note_label"] = "Who can see replies?",
             ["posts.reply_submit"] = "Reply",
             ["posts.reply_edit"] = "Edit",
             ["posts.reply_save"] = "Save",
@@ -1500,6 +1542,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Count",
             ["admin.analytics_export"] = "Export CSV",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Trend",
+            ["analytics.trend.window.7"] = "7 days",
+            ["analytics.trend.window.30"] = "30 days",
+            ["analytics.trend.window.90"] = "90 days",
+            ["analytics.trend.window.180"] = "180 days",
+            ["analytics.trend.window.365"] = "365 days",
+            ["analytics.trend.col.date"] = "Date",
+            ["analytics.trend.col.total"] = "Total requests",
+            ["analytics.trend.legend.total"] = "Total requests per day",
+            ["analytics.trend.empty"] = "No usage recorded in this window yet.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Granted at (UTC)",
@@ -1631,6 +1685,7 @@ public static class KnownTranslationKeys
                 "public announcement, and follow this announcement's own " +
                 "audience (a community-targeted one is visible to that " +
                 "community's residents).",
+            ["announcements.comment_audience_note_label"] = "Who can see comments?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Last updated:",
@@ -1842,12 +1897,40 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Linked event",
             ["events.linked_todos"] = "Linked to-dos",
 
+            // ── M14 (ADR 0115 D2/D3, the interlock carried to the board
+            //    surface) — the board's event chip + the event detail's linked
+            //    boards section + the board detail's "Link to event…" picker
+            //    labels (the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["board.event_link"] = "Linked event",
+            ["board.link_to_event"] = "Link to event…",
+            ["board.event_hint"] = "An event link is a display surface — it groups this board under the event, it never limits who can see it.",
+            ["events.linked_boards"] = "Linked boards",
+
+            // ── M14 (ADR 0115 D3) — the inline "Add a to-do to this event"
+            //    composer (the POST /events/{id}/todos lane's affordance on
+            //    the event detail page; the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["events.add_todo.title"] = "Add a to-do to this event",
+            ["events.add_todo.hint"] = "A quick way to add a checklist item or prep task that belongs to this event.",
+            ["events.add_todo.submit"] = "Add to-do",
+
             // ── M14 (ADR 0115 D3) — the U04 set-event picker labels (the
             //    to-do detail's "Link to event" form label + the
             //    <select>'s placeholder / clear option; the closed-key
             //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
             ["todo.set_event.label"] = "Link to event",
             ["todo.set_event.pick"] = "Choose an event",
+            // The "create a new event" modal (the to-do detail's
+            // set-event picker's second affordance): the <select>'s
+            // special option, the modal's title + hint, and the submit
+            // button. The en floor is the server fallback (a null
+            // provider — a non-HTTP render — degrades to en). The
+            // closed-key registry + KnownTranslationKeys_ParityTests
+            // enforce the × 4.
+            ["todo.set_event.create_new"] = "Create a new event…",
+            ["todo.set_event.create_hint"] = "Create a new event to link to this to-do. It is saved as a draft — you can publish it from the event's detail page.",
+            ["todo.set_event.create_submit"] = "Create and link",
 
             // ── M14 (ADR 0115 D4) — the two U06 VTODO affordances (the to-do
             //    detail's "Add to calendar" link + the to-do index's feed
@@ -2029,6 +2112,41 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages from other residents",
             ["notification.message.new.subject"] = "A new message",
             ["notification.message.new.body"] = "A resident sent you a message: ",
+
+            // ── M36 (ADR 0165, M36·7) — the cross-surface @mention kw-l key set ──
+            // 7 kinds × 4 keys = 28 keys. post.mention badge + preference label
+            // already exist (M6 reserved set); only its subject/body are new.
+            // The six sibling kinds (group.post / page / event / todo /
+            // announcement / message .mention) contribute all four keys each.
+            // Subject ends in a sentence break; body ends in a trailing space
+            // (the M6 post.reply shape — the UGC snippet is appended after one
+            // space at emit time, `template + " " + snippet`).
+            ["notification.post.mention.subject"] = "You were mentioned",
+            ["notification.post.mention.body"] = "You were mentioned: ",
+            ["notifications.kind.group.post.mention"] = "Group post mention",
+            ["notifications.preference.group.post.mention.label"] = "Mentions in group posts",
+            ["notification.group.post.mention.subject"] = "You were mentioned in a group post",
+            ["notification.group.post.mention.body"] = "You were mentioned in a group post: ",
+            ["notifications.kind.page.mention"] = "Page mention",
+            ["notifications.preference.page.mention.label"] = "Mentions on pages",
+            ["notification.page.mention.subject"] = "You were mentioned on a page",
+            ["notification.page.mention.body"] = "You were mentioned on a page: ",
+            ["notifications.kind.event.mention"] = "Event mention",
+            ["notifications.preference.event.mention.label"] = "Mentions on events",
+            ["notification.event.mention.subject"] = "You were mentioned in an event",
+            ["notification.event.mention.body"] = "You were mentioned in an event: ",
+            ["notifications.kind.todo.mention"] = "To-do mention",
+            ["notifications.preference.todo.mention.label"] = "Mentions on to-dos",
+            ["notification.todo.mention.subject"] = "You were mentioned in a to-do",
+            ["notification.todo.mention.body"] = "You were mentioned in a to-do comment: ",
+            ["notifications.kind.announcement.mention"] = "Announcement mention",
+            ["notifications.preference.announcement.mention.label"] = "Mentions in announcements",
+            ["notification.announcement.mention.subject"] = "You were mentioned in an announcement",
+            ["notification.announcement.mention.body"] = "You were mentioned in an announcement: ",
+            ["notifications.kind.message.mention"] = "Message mention",
+            ["notifications.preference.message.mention.label"] = "Mentions in messages",
+            ["notification.message.mention.subject"] = "You were mentioned in a message",
+            ["notification.message.mention.body"] = "You were mentioned in a message: ",
 
             // ── GU community-approval lane (ADR 0141) — the guardian-facing
             // kind + nudge templates (the template ends with ": " — the
@@ -2352,7 +2470,7 @@ public static class KnownTranslationKeys
             ["adminonboarding.step_storage"]       = "Storage limits",
             ["adminonboarding.step_sitecontent"]   = "Site content",
             ["adminonboarding.step_escalation"]    = "Issue escalation",
-            ["adminonboarding.desc_communityname"] = "What this community is called and how it describes itself — edited within the languages surface.",
+            ["adminonboarding.desc_communityname"] = "What this community is called and how it describes itself — the community's base name and description.",
             ["adminonboarding.desc_languages"]     = "The languages residents can use, the translated interface strings, and the static pages.",
             ["adminonboarding.desc_moderation"]    = "How announcement comments are moderated on this instance.",
             ["adminonboarding.desc_notifications"] = "How often held notification emails are flushed to residents.",
@@ -2364,6 +2482,98 @@ public static class KnownTranslationKeys
             ["adminonboarding.flash_done"]         = "Admin setup complete — the walk-through is done.",
             ["adminonboarding.banner.text"]        = "Finish setting up this community?",
             ["adminonboarding.banner.action"]      = "Start setup",
+
+            // ── M31 (ADR 0154) — production error handling: the 500-page
+            // report-an-issue affordance (M31·2) + the /admin/error-reports
+            // GlobalAdmin triage surface (M31·4 / M31·6). U05 authors the
+            // COMPLETE closed 20-key set (keys 1–8 consumed by the error
+            // page, keys 9–20 consumed by the admin list view). The parity
+            // pin (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M31·7). ──
+            ["errorreport.title"]                    = "Tell us what went wrong",
+            ["errorreport.intro"]                    = "If something went wrong, let us know what you were trying to do so we can look into it.",
+            ["errorreport.description.label"]        = "What were you trying to do?",
+            ["errorreport.description.placeholder"]  = "e.g. I was trying to sign up for the Saturday event and the page went blank",
+            ["errorreport.email.label"]              = "Your email (optional)",
+            ["errorreport.email.placeholder"]        = "you@example.com",
+            ["errorreport.submit"]                   = "Send report",
+            ["errorreport.thanks"]                   = "Thanks — your report has been filed.",
+            ["errorreport.list.title"]               = "Error reports",
+            ["errorreport.list.empty"]               = "No error reports yet.",
+            ["errorreport.list.status.new"]          = "New",
+            ["errorreport.list.status.triaged"]      = "Triaged",
+            ["errorreport.list.mark_triaged"]        = "Mark as triaged",
+            ["errorreport.list.request_id"]          = "Request ID",
+            ["errorreport.list.exception"]           = "Exception",
+            ["errorreport.list.description"]         = "Description",
+            ["errorreport.list.reporter"]            = "Reporter",
+            ["errorreport.list.created"]             = "Reported",
+            ["errorreport.list.anonymous"]           = "Anonymous",
+            ["errorreport.list.flash_triaged"]       = "Report marked as triaged.",
+
+            // ── M32 (ADR 0155) — issue submission & escalation: the public
+            // /issues/new general-issue lane (keys 1–9, M32·4) + the
+            // /admin/error-reports/{id} detail view's Resolve section
+            // (keys 11–15, M32·8) + Escalate section (keys 16–19, M32·5/·6/·7)
+            // + the new `resolved` list chip (key 10, M32·2). U06 authors the
+            // COMPLETE closed 19-key set; the parity pin
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) requires every key present,
+            // non-empty, in all four languages (M32·9). The M31 `errorreport.*`
+            // 20-key set above is the floor, unchanged (M32·1 — additive-only).
+            ["issue.title"]                          = "Report an issue",
+            ["issue.intro"]                          = "Something not working, or a problem we should know about? Tell us what happened — even if there's no error page in front of you.",
+            ["issue.description.label"]              = "What's the issue?",
+            ["issue.description.placeholder"]        = "e.g. The group calendar page is down, or I can't log in",
+            ["issue.email.label"]                    = "Your email (optional)",
+            ["issue.email.placeholder"]              = "you@example.com",
+            ["issue.submit"]                         = "Send issue report",
+            ["issue.thanks"]                         = "Thanks — your issue has been filed.",
+            ["issue.nav"]                            = "Report an issue",
+            ["errorreport.list.status.resolved"]     = "Resolved",
+            ["errorreport.resolve.title"]            = "Resolve this report",
+            ["errorreport.resolve.note.label"]       = "Resolution note",
+            ["errorreport.resolve.note.placeholder"] = "e.g. Fixed the broken calendar link; nothing to forward.",
+            ["errorreport.resolve.button"]           = "Mark as resolved",
+            ["errorreport.resolve.flash"]            = "Report marked as resolved.",
+            ["errorreport.escalate.button"]          = "Escalate to operator endpoint",
+            ["errorreport.escalate.flash_success"]   = "Report escalated and marked as resolved.",
+            ["errorreport.escalate.flash_failure"]   = "Escalation failed — the report is unchanged. You can retry.",
+            ["errorreport.escalate.not_configured"]  = "Escalation is not configured on this instance (KUMUNITA_ESCALATION_ENDPOINT is not set).",
+
+            // ── ESC — the closed escalation.* kw-l key set (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Escalation",
+            ["escalation.intro"] = "Escalation moves an issue from one Kumunita instance to another. This page sets up sending — where this instance forwards escalated issues and the token that authorizes it. The other direction, receiving, is managed on the Receiving access tokens page.",
+            ["escalation.how.heading"] = "How escalation works",
+            ["escalation.how.outbound"] = "This page is for sending: when an admin escalates a report from the Error reports page, it is forwarded to another instance's queue. Fill in the receiving instance's inbound endpoint and the access token its admin shared with you, then turn escalation on. While it is off, escalating a report does nothing.",
+            ["escalation.how.inbound"] = "The other direction is receiving: to let other instances escalate issues to this one, generate an access token for each of them and share it with their admin, who enters it on their own copy of this page.",
+            ["escalation.outbound.endpoint.help"] = "The receiving instance's inbound URL — they give it to you. It is the address your escalated issues are delivered to (it ends in /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "The access token the receiving instance's admin generated for you and shared out-of-band. It is sent as a Bearer credential so the receiving instance knows you are authorized to send.",
+            ["escalation.outbound.enabled.help"] = "Turn this on once both fields above are filled in. While it is off, escalating a report does nothing.",
+            ["escalation.outbound.endpoint.label"] = "Receiving platform endpoint",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Access token (issued by the receiving admin)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Enable escalation",
+            ["escalation.outbound.save"] = "Save escalation settings",
+            ["escalation.outbound.saved"] = "Escalation settings saved.",
+            ["escalation.tokens.title"] = "Receiving access tokens",
+            ["escalation.tokens.generate.button"] = "Generate a new token",
+            ["escalation.tokens.label.label"] = "Label (e.g. the origin platform's name)",
+            ["escalation.tokens.show_once"] = "Copy this token now — it is shown only once and never stored in plain text.",
+            ["escalation.tokens.copy"] = "Copy",
+            ["escalation.tokens.revoke.button"] = "Revoke",
+            ["escalation.tokens.revoked"] = "Token revoked. It can no longer be used to escalate.",
+            ["escalation.tokens.none"] = "No access tokens yet. Generate one to authorize an origin platform.",
+            ["escalation.tokens.last_used"] = "Last used",
+            ["escalation.list.status.escalated"] = "Escalated",
+            ["escalation.list.filter.all"] = "All",
+            ["escalation.list.filter.received"] = "Received",
+            ["escalation.list.filter.local"] = "Local",
+            ["escalation.detail.from_instance"] = "Received from",
+            ["escalation.inbound.invalid_token"] = "Invalid access token.",
+            ["escalation.inbound.received"] = "Escalation received.",
 
             // ── M9 amendment — the per-resident messaging control (the
             // /settings/messaging surface) + the guardian's ceiling (the
@@ -2571,11 +2781,45 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Start date",
             ["sort.due"]              = "Due date",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — the closed storage.trend.* set
+            // for the M24 /admin/storage Trend section (U05's additive view —
+            // Views/AdminStorageMetrics/Index.cshtml): the section heading,
+            // the four window-selector labels (30/90/180/365), the per-day
+            // table headers, the sparkline legend, and the empty message.
+            // The en values are the view's inner English reference text (the
+            // ADR 0015 D1 provider floor). M33·1 additive-only: the M24
+            // storage.* surface is unchanged.
+            ["storage.trend.title"]     = "Storage trend",
+            ["storage.trend.window.30"] = "30 days",
+            ["storage.trend.window.90"] = "90 days",
+            ["storage.trend.window.180"] = "180 days",
+            ["storage.trend.window.365"] = "365 days",
+            ["storage.trend.col.date"]  = "Date",
+            ["storage.trend.col.used"]  = "Total used",
+            ["storage.trend.col.free"]  = "Free",
+            ["storage.trend.legend.used"] = "Total used over window",
+            ["storage.trend.empty"]     =
+                "No storage trend yet — the daily capture has not stored any samples for this window.",
             ["admin.help.reset_one"]   =
                 "Reset \"{0}\" to its seeded text? This overwrites any hand-edited copy.",
             ["admin.help.reset_all"]   =
                 "Reset ALL {0} seeded help pages to their seeded text? This overwrites any hand-edited " +
                 "copy on every page.",
+
+            // ── M35 (ADR 0164) — the kiosk-mode display surface: the /kiosk
+            // chrome-hidden stage (U04) + the /admin/kiosk settings surface (U05).
+            // The 8-key closed set (M35·10); U04 co-ships it because the
+            // Core.Tests parity tests (De/Fr/Da Values_Keys_Match_AllKeys_Exactly)
+            // enforce set-equality, so the set is inseparably four-language.
+            ["kiosk.title"]                  = "Neighbourhood board",
+            ["kiosk.empty"]                  = "The kiosk has no slides configured yet.",
+            ["kiosk.slide_denied"]           = "You don't have access to this view.",
+            ["kiosk.next_slide"]             = "Next view",
+            ["kiosk.refreshed"]              = "Updated just now",
+            ["kiosk.settings.title"]         = "Kiosk display",
+            ["kiosk.settings.view_interval"] = "Change view every (seconds)",
+            ["kiosk.settings.refresh_interval"] = "Refresh content every (seconds)",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -2848,6 +3092,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Dieser Kommentar wurde von seinem Autor gelöscht.",
             ["projects.todo.comment_delete"] = "Löschen",
             ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar. Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
+            ["projects.todo.comment_audience_note_label"] = "Wer sieht Kommentare?",
             ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
             ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
             ["projects.todo.edit"]           = "Bearbeiten",
@@ -2978,6 +3223,9 @@ public static class KnownTranslationKeys
             ["nav.sign_up"]       = "Registrieren",
             ["nav.profile"]       = "Profil",
             ["nav.admin"]         = "Verwaltung",
+            ["nav.management"]    = "Betreuung",
+            ["nav.error_reports"] = "Fehlerberichte",
+            ["nav.moderation"]    = "Moderation",
             ["nav.translations"]  = "Übersetzungen",
             ["nav.sign_out"]      = "Abmelden",
             ["nav.children"]      = "Kinder",
@@ -3294,6 +3542,15 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Speichern",
             ["settings.home_flash_hide"]   = "Startseite aktualisiert — die Intro-Abschnitte werden ausgeblendet, der Feed kommt zuerst.",
             ["settings.home_flash_show"]   = "Startseite aktualisiert — die Intro-Abschnitte werden wieder gezeigt.",
+            ["settings.home_upcoming_label"] =
+                "Kommende Veranstaltungen und To-dos auf der Startseite anzeigen",
+            ["settings.home_upcoming_note"]  =
+                "Wenn an, erscheinen die nächsten Veranstaltungen und To-dos auf deiner Startseite, über dem Feed. Wenn aus, bleibt die Startseite wie bisher.",
+            ["settings.home_upcoming_mine_label"] =
+                "Nur meine eigenen Veranstaltungen und To-dos anzeigen",
+            ["settings.home_upcoming_mine_note"]  =
+                "Wenn an, listet der Abschnitt nur die Veranstaltungen, für die du dich angemeldet hast oder die du erstellt hast, und die To-dos, die dir zugewiesen sind. Wenn aus, werden die Veranstaltungen und To-dos der Gemeinschaft angezeigt.",
+            ["settings.home_flash_saved"]  = "Startseite aktualisiert — deine Auswahl ist gespeichert.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -3392,6 +3649,12 @@ public static class KnownTranslationKeys
                 "Noch nichts gepostet — sei die erste Person, die die Unterhaltung im Feed anstößt.",
             ["home.feed_badge_pinned"]   = "Angepinnt",
 
+            // ── home „Demnächst“-Abschnitt (nächste Veranstaltungen + To-dos) ──
+            ["home.upcoming_title"]      = "Demnächst",
+            ["home.upcoming_events"]     = "Veranstaltungen",
+            ["home.upcoming_todos"]      = "To-dos",
+            ["home.upcoming_show_more"]  = "Die {n} weiteren anzeigen",
+
             // ── home Roadmap (der Plan, nach der Intro) ────────────────────
             ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
             ["home.roadmap.show_more_earlier"] = "Die {n} früheren Meilensteine anzeigen",
@@ -3403,6 +3666,10 @@ public static class KnownTranslationKeys
             // ── Client-JS-Strings (P0-6: #kumunita-strings-Bundle) ────────
             ["common.close"]  = "Schließen",
             ["common.cancel"] = "Abbrechen",
+            ["common.previous"] = "Zurück",
+            ["common.next"]     = "Weiter",
+            ["common.done"]     = "Fertig",
+            ["common.step_of"]  = "Schritt {0} von {1}",
             ["rc.editor.error_generic"] = "Etwas ist schiefgelaufen.",
             ["rc.editor.link.title"]    = "Link einfügen",
             ["rc.editor.link.url"]      = "URL",
@@ -3486,6 +3753,10 @@ public static class KnownTranslationKeys
                 "zur Verfügung. Ein Bewohner ohne Global-Admin-Stellung kann " +
                 "sein eigenes Konto nicht löschen — wende dich an einen " +
                 "Administrator, um das Konto entfernen zu lassen.",
+
+            // M27 (ADR 0148) — der Einstellungen-Tab-Link zur eigenen
+            // Backup-/Restore-Oberfläche (/account/portability, "Meine Daten").
+            ["nav.my_data"]          = "Meine Daten",
 
             ["nav.delete_account"] = "Konto löschen",
 
@@ -3767,6 +4038,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Du kannst diesen Beitrag sehen, weil er dir freigegeben wurde — " +
                 "entweder du bist Autor:in, oder er wurde mit dir oder deinen Gruppen geteilt.",
+            ["posts.detail_why_label"] = "Warum sehe ich das?",
             ["posts.report_button"] = "Diesen Beitrag melden",
             ["posts.reply_report_button"] = "Diese Antwort melden",
             ["posts.report_reason_label"] = "Was ist schiefgelaufen?",
@@ -3789,6 +4061,7 @@ public static class KnownTranslationKeys
                 "Antworten haben kein eigenes Publikum — sie sind unter " +
                 "der einzelnen Publikumsentscheidung dieses Beitrags sichtbar. " +
                 "Du antwortest nur dort, wo der Beitrag selbst sichtbar ist.",
+            ["posts.reply_audience_note_label"] = "Wer sieht Antworten?",
             ["posts.reply_submit"] = "Antworten",
             ["posts.reply_edit"] = "Bearbeiten",
             ["posts.reply_save"] = "Speichern",
@@ -4028,6 +4301,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Anzahl",
             ["admin.analytics_export"] = "CSV exportieren",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Trend",
+            ["analytics.trend.window.7"] = "7 Tage",
+            ["analytics.trend.window.30"] = "30 Tage",
+            ["analytics.trend.window.90"] = "90 Tage",
+            ["analytics.trend.window.180"] = "180 Tage",
+            ["analytics.trend.window.365"] = "365 Tage",
+            ["analytics.trend.col.date"] = "Datum",
+            ["analytics.trend.col.total"] = "Gesamtanfragen",
+            ["analytics.trend.legend.total"] = "Gesamtanfragen pro Tag",
+            ["analytics.trend.empty"] = "In diesem Zeitfenster wurden noch keine Anfragen aufgezeichnet.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Gewährt am (UTC)",
@@ -4160,6 +4445,7 @@ public static class KnownTranslationKeys
                 "auch bei einer öffentlichen Ankündigung — und folgen dem " +
                 "eigenen Publikum dieser Ankündigung (eine an eine " +
                 "Community gerichtete ist deren Anwohner:innen sichtbar).",
+            ["announcements.comment_audience_note_label"] = "Wer sieht Kommentare?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Zuletzt aktualisiert:",
@@ -4345,10 +4631,32 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Verknüpfte Veranstaltung",
             ["events.linked_todos"] = "Verknüpfte To-dos",
 
+            // ── M14 (ADR 0115 D2/D3, die Verknüpfung auf die Board-Oberfläche
+            //    übertragen) — das Board-Veranstaltungs-Badge + die
+            //    „Verknüpfte Boards"-Sektion + das „Mit Veranstaltung
+            //    verknüpfen…"-Auswahl-Label (die Schlüssel-Registry + die
+            //    KnownTranslationKeys_ParityTests erzwingen die × 4) ──
+            ["board.event_link"] = "Verknüpfte Veranstaltung",
+            ["board.link_to_event"] = "Mit Veranstaltung verknüpfen…",
+            ["board.event_hint"] = "Eine Veranstaltungs-Verknüpfung ist eine Anzeige — sie gruppiert dieses Board unter der Veranstaltung, begrenzt aber nie, wer es sehen kann.",
+            ["events.linked_boards"] = "Verknüpfte Boards",
+
+            // ── M14 (ADR 0115 D3) — der Inline-„Aufgabe zu dieser
+            //    Veranstaltung hinzufügen"-Komponist (die POST
+            //    /events/{id}/todos-Lane auf der Veranstaltungsdetailseite;
+            //    die Schlüssel-Registry + KnownTranslationKeys_ParityTests
+            //    erzwingen die × 4) ──
+            ["events.add_todo.title"] = "Aufgabe zu dieser Veranstaltung hinzufügen",
+            ["events.add_todo.hint"] = "Ein schneller Weg, um eine Checklisten-Eintrag oder Vorbereitungs-Aufgabe zu dieser Veranstaltung hinzuzufügen.",
+            ["events.add_todo.submit"] = "Aufgabe hinzufügen",
+
             // ── M14 (ADR 0115 D3) — die U04 set-event-Picker-Beschriftungen
             //    (To-do-Details: Formularbeschriftung + Platzhalter/Clear-Option) ──
             ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
             ["todo.set_event.pick"] = "Veranstaltung wählen",
+            ["todo.set_event.create_new"] = "Neue Veranstaltung erstellen…",
+            ["todo.set_event.create_hint"] = "Erstellen Sie eine neue Veranstaltung, um sie mit dieser Aufgabe zu verknüpfen. Sie wird als Entwurf gespeichert — Sie können sie auf der Detailseite der Veranstaltung veröffentlichen.",
+            ["todo.set_event.create_submit"] = "Erstellen und verknüpfen",
 
             // ── M14 (ADR 0115 D4) — die zwei U06 VTODO-Oberflächen
             //    (To-do-Details: „Zum Kalender hinzufügen" + To-do-Index:
@@ -4511,6 +4819,40 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Nachrichten von anderen Bewohnern",
             ["notification.message.new.subject"] = "Neue Nachricht",
             ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
+
+            // ── M36 (ADR 0165, M36·7) — die Querflächenerwähnungs- kw-l-Schlüssel ──
+            // 7 Arten × 4 Schlüssel = 28 Schlüssel. post.mention-Badge +
+            // Präferenzlabel existieren bereits (M6-reserviert); nur deren
+            // Betreff/Text sind neu. Die sechs Schwesternarten liefern alle
+            // vier Schlüssel. Betreff endet mit Satzende; Text endet mit
+            // Leerzeichen (die M6 post.reply-Form — das UGC-Fragment wird
+            // beim Emission mit einem Leerzeichen angehängt).
+            ["notification.post.mention.subject"] = "Du wurdest erwähnt",
+            ["notification.post.mention.body"] = "Du wurdest erwähnt: ",
+            ["notifications.kind.group.post.mention"] = "Erwähnung im Gruppenbeitrag",
+            ["notifications.preference.group.post.mention.label"] = "Erwähnungen in Gruppenbeiträgen",
+            ["notification.group.post.mention.subject"] = "Du wurdest in einem Gruppenbeitrag erwähnt",
+            ["notification.group.post.mention.body"] = "Du wurdest in einem Gruppenbeitrag erwähnt: ",
+            ["notifications.kind.page.mention"] = "Erwähnung auf einer Seite",
+            ["notifications.preference.page.mention.label"] = "Erwähnungen auf Seiten",
+            ["notification.page.mention.subject"] = "Du wurdest auf einer Seite erwähnt",
+            ["notification.page.mention.body"] = "Du wurdest auf einer Seite erwähnt: ",
+            ["notifications.kind.event.mention"] = "Erwähnung bei einer Veranstaltung",
+            ["notifications.preference.event.mention.label"] = "Erwähnungen bei Veranstaltungen",
+            ["notification.event.mention.subject"] = "Du wurdest bei einer Veranstaltung erwähnt",
+            ["notification.event.mention.body"] = "Du wurdest bei einer Veranstaltung erwähnt: ",
+            ["notifications.kind.todo.mention"] = "Erwähnung in einer Aufgabe",
+            ["notifications.preference.todo.mention.label"] = "Erwähnungen in Aufgaben",
+            ["notification.todo.mention.subject"] = "Du wurdest in einer Aufgabe erwähnt",
+            ["notification.todo.mention.body"] = "Du wurdest in einem Aufgabenkommentar erwähnt: ",
+            ["notifications.kind.announcement.mention"] = "Erwähnung in einem Hinweis",
+            ["notifications.preference.announcement.mention.label"] = "Erwähnungen in Hinweisen",
+            ["notification.announcement.mention.subject"] = "Du wurdest in einem Hinweis erwähnt",
+            ["notification.announcement.mention.body"] = "Du wurdest in einem Hinweis erwähnt: ",
+            ["notifications.kind.message.mention"] = "Erwähnung in einer Nachricht",
+            ["notifications.preference.message.mention.label"] = "Erwähnungen in Nachrichten",
+            ["notification.message.mention.subject"] = "Du wurdest in einer Nachricht erwähnt",
+            ["notification.message.mention.body"] = "Du wurdest in einer Nachricht erwähnt: ",
 
             // ── GU community-approval lane (ADR 0141) — die Betreuer-Art ──
             ["notifications.kind.guardian.group_invite"] =
@@ -4812,7 +5154,7 @@ public static class KnownTranslationKeys
             ["adminonboarding.step_storage"]       = "Speichergrenzen",
             ["adminonboarding.step_sitecontent"]   = "Website-Inhalte",
             ["adminonboarding.step_escalation"]    = "Eskalation von Anliegen",
-            ["adminonboarding.desc_communityname"] = "Wie diese Gemeinschaft heißt und wie sie sich beschreibt — in der Sprachoberfläche bearbeitbar.",
+            ["adminonboarding.desc_communityname"] = "Wie diese Gemeinschaft heißt und wie sie sich beschreibt — der Basisname und die Beschreibung der Gemeinschaft.",
             ["adminonboarding.desc_languages"]     = "Die Sprachen, die Bewohner verwenden können, die übersetzten Interface-Zeichenketten und die statischen Seiten.",
             ["adminonboarding.desc_moderation"]    = "Wie Ankündigungskommentare auf dieser Instanz moderiert werden.",
             ["adminonboarding.desc_notifications"] = "Wie oft zurückgehaltene Benachrichtigungs-E-Mails an Bewohner zugestellt werden.",
@@ -4824,6 +5166,96 @@ public static class KnownTranslationKeys
             ["adminonboarding.flash_done"]         = "Admin-Einrichtung abgeschlossen — der Rundgang ist erledigt.",
             ["adminonboarding.banner.text"]        = "Diese Gemeinschaft fertig einrichten?",
             ["adminonboarding.banner.action"]      = "Einrichtung starten",
+
+            // ── M31 (ADR 0154) — Produktionsfehlerbehandlung: die 500-Seite
+            // (M31·2) + die /admin/error-reports Triagierungsfläche
+            // (M31·4 / M31·6). U05 verfasst den vollständigen geschlossenen
+            // 20-Schlüssel-Satz (Keys 1–8 für die Fehlerseite, Keys 9–20 für
+            // die Admin-Liste). Die Paritätssperre
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) verlangt, dass jeder
+            // Schlüssel in allen vier Sprachen vorhanden und nicht leer ist
+            // (M31·7). ──
+            ["errorreport.title"]                    = "Sagen Sie uns, was schiefgelaufen ist",
+            ["errorreport.intro"]                    = "Falls etwas schiefgelaufen ist, sagen Sie uns, was Sie gerade versucht haben, damit wir uns das ansehen können.",
+            ["errorreport.description.label"]        = "Was haben Sie versucht zu tun?",
+            ["errorreport.description.placeholder"]  = "z. B. Ich wollte mich für das Samstagsereignis anmelden, und die Seite wurde leer",
+            ["errorreport.email.label"]              = "Ihre E-Mail (optional)",
+            ["errorreport.email.placeholder"]        = "sie@beispiel.de",
+            ["errorreport.submit"]                   = "Melden Sie das Problem",
+            ["errorreport.thanks"]                   = "Danke — Ihr Bericht wurde eingereicht.",
+            ["errorreport.list.title"]               = "Fehlermeldungen",
+            ["errorreport.list.empty"]               = "Noch keine Fehlermeldungen.",
+            ["errorreport.list.status.new"]          = "Neu",
+            ["errorreport.list.status.triaged"]      = "Eingearbeitet",
+            ["errorreport.list.mark_triaged"]        = "Als eingearbeitet markieren",
+            ["errorreport.list.request_id"]          = "Anforderungs-ID",
+            ["errorreport.list.exception"]           = "Ausnahme",
+            ["errorreport.list.description"]         = "Beschreibung",
+            ["errorreport.list.reporter"]            = "Melder",
+            ["errorreport.list.created"]             = "Gemeldet",
+            ["errorreport.list.anonymous"]           = "Anonym",
+            ["errorreport.list.flash_triaged"]       = "Meldung als eingearbeitet markiert.",
+
+            // ── M32 (ADR 0155) — Problemübermittlung & Eskalation: die
+            // öffentliche /issues/new Allzweck-Problemlane (Schlüssel 1–9,
+            // M32·4) + die Resolve-Sektion der Detailansicht (Schlüssel 11–15,
+            // M32·8) + die Escalate-Sektion (Schlüssel 16–19, M32·5/·6/·7) +
+            // der neue `resolved`-Listenchip (Schlüssel 10, M32·2). Die M31
+            // `errorreport.*` 20-Schlüssel-Menge oben ist die Untergrenze,
+            // unverändert (M32·1 — nur additiv).
+            ["issue.title"]                          = "Problem melden",
+            ["issue.intro"]                          = "Etwas funktioniert nicht, oder es gibt ein Problem, über das wir Bescheid wissen sollten? Sagen Sie uns, was passiert ist — selbst wenn keine Fehlerseite vor Ihnen liegt.",
+            ["issue.description.label"]              = "Was ist das Problem?",
+            ["issue.description.placeholder"]        = "z. B. Die Gruppenkalender-Seite ist down, oder ich kann mich nicht anmelden",
+            ["issue.email.label"]                    = "Ihre E-Mail (optional)",
+            ["issue.email.placeholder"]              = "sie@beispiel.de",
+            ["issue.submit"]                         = "Problembericht senden",
+            ["issue.thanks"]                         = "Danke — Ihr Problembericht wurde eingereicht.",
+            ["issue.nav"]                            = "Problem melden",
+            ["errorreport.list.status.resolved"]     = "Erledigt",
+            ["errorreport.resolve.title"]            = "Diesen Bericht abschließen",
+            ["errorreport.resolve.note.label"]       = "Auflösungshinweis",
+            ["errorreport.resolve.note.placeholder"] = "z. B. Den defekten Kalendereintrag gefixt; nichts weiterzuleiten.",
+            ["errorreport.resolve.button"]           = "Als erledigt markieren",
+            ["errorreport.resolve.flash"]            = "Bericht als erledigt markiert.",
+            ["errorreport.escalate.button"]          = "An Betreiber-Endpunkt weiterleiten",
+            ["errorreport.escalate.flash_success"]   = "Bericht weitergeleitet und als erledigt markiert.",
+            ["errorreport.escalate.flash_failure"]   = "Weiterleitung fehlgeschlagen — der Bericht wurde nicht geändert. Sie können es erneut versuchen.",
+            ["errorreport.escalate.not_configured"]  = "Weiterleitung ist auf dieser Instanz nicht konfiguriert (KUMUNITA_ESCALATION_ENDPOINT ist nicht gesetzt).",
+
+            // ── ESC — das geschlossene escalation.* kw-l-Schlüsselsatz (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Eskalation",
+            ["escalation.intro"] = "Eskalation überträgt ein Problem von einer Kumunita-Instanz zu einer anderen. Diese Seite richtet das Senden ein – wohin diese Instanz eskalierte Probleme weiterleitet und das Token, das sie dazu berechtigt. Die andere Richtung, das Empfangen, wird auf der Seite der empfangenen Zugriffstokens verwaltet.",
+            ["escalation.how.heading"] = "So funktioniert Eskalation",
+            ["escalation.how.outbound"] = "Diese Seite dient zum Senden: Wenn ein Administrator einen Bericht von der Seite Fehlerberichte eskaliert, wird er an die Warteschlange einer anderen Instanz weitergeleitet. Tragen Sie den Eingangsendpunkt der empfangenden Instanz und das Zugriffstoken ein, das deren Administrator Ihnen mitgeteilt hat, und aktivieren Sie die Eskalation. Solange sie aus ist, ändert das Eskalieren eines Berichts nichts.",
+            ["escalation.how.inbound"] = "Die andere Richtung ist das Empfangen: Um anderen Instanzen zu gestatten, Probleme an diese Instanz zu eskalieren, erstellen Sie für jede ein Zugriffstoken und teilen Sie es deren Administrator mit, der es auf seiner eigenen Kopie dieser Seite einträgt.",
+            ["escalation.outbound.endpoint.help"] = "Der Eingangsendpunkt der empfangenden Instanz – sie teilt ihn Ihnen mit. Das ist die Adresse, an die Ihre eskalierten Probleme geliefert werden (endet auf /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Das Zugriffstoken, das der Administrator der empfangenden Instanz für Sie erstellt und Ihnen außerhalb des Systems mitgeteilt hat. Es wird als Bearer-Nachweis gesendet, damit die empfangende Instanz weiß, dass Sie zum Senden berechtigt sind.",
+            ["escalation.outbound.enabled.help"] = "Aktivieren Sie dies, sobald beide Felder oben ausgefüllt sind. Solange es aus ist, ändert das Eskalieren eines Berichts nichts.",
+            ["escalation.outbound.endpoint.label"] = "Endpunkt der empfangenden Plattform",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Zugriffstoken (ausgestellt vom empfangenden Administrator)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Eskalation aktivieren",
+            ["escalation.outbound.save"] = "Eskalationseinstellungen speichern",
+            ["escalation.outbound.saved"] = "Eskalationseinstellungen gespeichert.",
+            ["escalation.tokens.title"] = "Empfangene Zugriffstokens",
+            ["escalation.tokens.generate.button"] = "Neues Token erstellen",
+            ["escalation.tokens.label.label"] = "Bezeichnung (z. B. der Name der Ursprungsplattform)",
+            ["escalation.tokens.show_once"] = "Kopiere dieses Token jetzt — es wird nur einmal angezeigt und nie im Klartext gespeichert.",
+            ["escalation.tokens.copy"] = "Kopieren",
+            ["escalation.tokens.revoke.button"] = "Widerrufen",
+            ["escalation.tokens.revoked"] = "Token widerrufen. Es kann nicht mehr zur Eskalation verwendet werden.",
+            ["escalation.tokens.none"] = "Noch keine Zugriffstokens. Erstelle eines, um eine Ursprungsplattform zu autorisieren.",
+            ["escalation.tokens.last_used"] = "Zuletzt verwendet",
+            ["escalation.list.status.escalated"] = "Eskaliert",
+            ["escalation.list.filter.all"] = "Alle",
+            ["escalation.list.filter.received"] = "Empfangen",
+            ["escalation.list.filter.local"] = "Lokal",
+            ["escalation.detail.from_instance"] = "Empfangen von",
+            ["escalation.inbound.invalid_token"] = "Ungültiges Zugriffstoken.",
+            ["escalation.inbound.received"] = "Eskalation empfangen.",
 
             // ── M9 amendment — die pro-Bewohner-Messaging-Steuerung + die
             // Betreuer-Obergrenze (initial English values, pending de
@@ -5027,6 +5459,35 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Beginn",
             ["sort.due"]              = "Fällig",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — das geschlossene storage.trend.*-
+            // Set der M24-Fläche /admin/storage (Trend-Abschnitt): Überschrift,
+            // die vier Fensteraufkleber, die Tabellenköpfe, die
+            // Sparkline-Legende und die Leerzustandsmeldung. M33·1
+            // additive-only: die M24 storage.*-Oberfläche bleibt unverändert.
+            ["storage.trend.title"]     = "Speichertrend",
+            ["storage.trend.window.30"] = "30 Tage",
+            ["storage.trend.window.90"] = "90 Tage",
+            ["storage.trend.window.180"] = "180 Tage",
+            ["storage.trend.window.365"] = "365 Tage",
+            ["storage.trend.col.date"]  = "Datum",
+            ["storage.trend.col.used"]  = "Gesamt belegt",
+            ["storage.trend.col.free"]  = "Frei",
+            ["storage.trend.legend.used"] = "Gesamt belegt über das Fenster",
+            ["storage.trend.empty"]     =
+                "Noch kein Speichertrend — die tägliche Erfassung hat für dieses Fenster " +
+                "noch keine Aufnahmen gespeichert.",
+
+            // ── M35 (ADR 0164) — die Kiosk-Anzeige-Oberfläche (U04) + die
+            // /admin/kiosk-Einstellungen (U05). Der 8-Schlüssel-Satz (M35·10).
+            ["kiosk.title"]                  = "Gemeinschaftstafel",
+            ["kiosk.empty"]                  = "Es sind noch keine Kiosk-Ansichten konfiguriert.",
+            ["kiosk.slide_denied"]           = "Du hast keinen Zugriff auf diese Ansicht.",
+            ["kiosk.next_slide"]             = "Nächste Ansicht",
+            ["kiosk.refreshed"]              = "Gerade aktualisiert",
+            ["kiosk.settings.title"]         = "Kiosk-Anzeige",
+            ["kiosk.settings.view_interval"] = "Ansicht wechseln alle (Sekunden)",
+            ["kiosk.settings.refresh_interval"] = "Inhalt aktualisieren alle (Sekunden)",
         };
 
     /// <summary>
@@ -5193,6 +5654,9 @@ public static class KnownTranslationKeys
             ["nav.sign_up"]       = "S'inscrire",
             ["nav.profile"]       = "Profil",
             ["nav.admin"]         = "Administration",
+            ["nav.management"]    = "Gestion",
+            ["nav.error_reports"] = "Signalements d'erreurs",
+            ["nav.moderation"]    = "Modération",
             ["nav.translations"]  = "Traductions",
             ["nav.sign_out"]      = "Se déconnecter",
             ["nav.children"]      = "Enfants",
@@ -5281,6 +5745,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
             ["projects.todo.comment_delete"] = "Supprimer",
             ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche. Tu ne commentes que là où la tâche elle-même est visible.",
+            ["projects.todo.comment_audience_note_label"] = "Qui peut voir les commentaires ?",
             ["projects.todo.back"]           = "← Retour aux tâches",
             ["projects.todo.untitled"]       = "Tâche sans titre",
             ["projects.todo.edit"]           = "Modifier",
@@ -5652,6 +6117,15 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Enregistrer",
             ["settings.home_flash_hide"]   = "Page d'accueil mise à jour — les sections d'introduction sont masquées, le fil apparaît en premier.",
             ["settings.home_flash_show"]   = "Page d'accueil mise à jour — les sections d'introduction réapparaîtront.",
+            ["settings.home_upcoming_label"] =
+                "Afficher les événements et tâches à venir sur la page d'accueil",
+            ["settings.home_upcoming_note"]  =
+                "Quand activé, les prochains événements et tâches apparaissent sur votre page d'accueil, au-dessus du fil. Quand désactivé, la page d'accueil reste telle quelle.",
+            ["settings.home_upcoming_mine_label"] =
+                "N'afficher que mes propres événements et tâches",
+            ["settings.home_upcoming_mine_note"]  =
+                "Quand activé, la section ne liste que les événements auxquels vous êtes inscrit ou que vous avez créés, et les tâches qui vous sont assignées. Quand désactivé, elle affiche les événements et tâches de la communauté.",
+            ["settings.home_flash_saved"]  = "Page d'accueil mise à jour — vos choix sont enregistrés.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -5750,6 +6224,12 @@ public static class KnownTranslationKeys
                 "Rien de posté pour l'instant — soyez le premier à lancer la conversation dans le flux.",
             ["home.feed_badge_pinned"]   = "Épinglé",
 
+            // ── home « À venir » (prochains événements + tâches) ────────────
+            ["home.upcoming_title"]      = "À venir",
+            ["home.upcoming_events"]     = "Événements",
+            ["home.upcoming_todos"]      = "Tâches",
+            ["home.upcoming_show_more"]  = "Afficher les {n} autres",
+
             // ── home feuille de route (le plan, après l'intro) ─────────────
             ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
             ["home.roadmap.show_more_earlier"] = "Afficher les {n} jalons précédents",
@@ -5761,6 +6241,10 @@ public static class KnownTranslationKeys
             // ── chaînes du JS client (P0-6 : le bundle #kumunita-strings) ─
             ["common.close"]  = "Fermer",
             ["common.cancel"] = "Annuler",
+            ["common.previous"] = "Précédent",
+            ["common.next"]     = "Suivant",
+            ["common.done"]     = "Terminé",
+            ["common.step_of"]  = "Étape {0} sur {1}",
             ["rc.editor.error_generic"] = "Quelque chose s'est mal passé.",
             ["rc.editor.link.title"]    = "Insérer un lien",
             ["rc.editor.link.url"]      = "URL",
@@ -5843,6 +6327,11 @@ public static class KnownTranslationKeys
                 "administrateurs globaux. Un résident non-administrateur " +
                 "ne peut pas supprimer son propre compte — contacte un " +
                 "administrateur pour supprimer le compte.",
+
+            // M27 (ADR 0148) — le lien d'onglet vers la surface de
+            // sauvegarde/restauration du résident (/account/portability,
+            // "Mes données").
+            ["nav.my_data"]          = "Mes données",
 
             ["nav.delete_account"] = "Supprimer le compte",
 
@@ -6125,6 +6614,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Tu peux voir cette publication parce qu'elle t'a été accordée — " +
                 "soit tu en es l'auteur, soit elle a été partagée avec toi ou tes groupes.",
+            ["posts.detail_why_label"] = "Pourquoi est-ce que je vois ça ?",
             ["posts.report_button"] = "Signaler cette publication",
             ["posts.reply_report_button"] = "Signaler cette réponse",
             ["posts.report_reason_label"] = "Quel est le problème ?",
@@ -6147,6 +6637,7 @@ public static class KnownTranslationKeys
                 "Les réponses n'ont pas d'audience propre — elles sont visibles " +
                 "selon la décision d'audience unique de cette publication. " +
                 "Tu réponds uniquement là où la publication elle-même est visible.",
+            ["posts.reply_audience_note_label"] = "Qui peut voir les réponses ?",
             ["posts.reply_submit"] = "Répondre",
             ["posts.reply_edit"] = "Modifier",
             ["posts.reply_save"] = "Enregistrer",
@@ -6386,6 +6877,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Nombre",
             ["admin.analytics_export"] = "Exporter CSV",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Tendance",
+            ["analytics.trend.window.7"] = "7 jours",
+            ["analytics.trend.window.30"] = "30 jours",
+            ["analytics.trend.window.90"] = "90 jours",
+            ["analytics.trend.window.180"] = "180 jours",
+            ["analytics.trend.window.365"] = "365 jours",
+            ["analytics.trend.col.date"] = "Date",
+            ["analytics.trend.col.total"] = "Requêtes totales",
+            ["analytics.trend.legend.total"] = "Requêtes totales par jour",
+            ["analytics.trend.empty"] = "Aucune utilisation enregistrée dans cette fenêtre pour le moment.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Accordé à (UTC)",
@@ -6520,6 +7023,7 @@ public static class KnownTranslationKeys
                 "connectés — même sur une annonce publique — et suivent le " +
                 "public de cette annonce (une annonce destinée à une " +
                 "communauté est visible par les habitants de celle-ci).",
+            ["announcements.comment_audience_note_label"] = "Qui peut voir les commentaires ?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Dernière mise à jour :",
@@ -6705,11 +7209,32 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Événement lié",
             ["events.linked_todos"] = "To-dos liés",
 
+            // ── M14 (ADR 0115 D2/D3, l'interconnexion portée à la surface
+            //    board) — le badge événement du board + la section « Boards
+            //    liés » + le libellé du sélecteur « Lier à un événement… »
+            //    (la registry de clés + KnownTranslationKeys_ParityTests
+            //    imposent les × 4) ──
+            ["board.event_link"] = "Événement lié",
+            ["board.link_to_event"] = "Lier à un événement…",
+            ["board.event_hint"] = "Un lien d'événement est une surface d'affichage — il regroupe ce board sous l'événement, sans jamais limiter qui peut le voir.",
+            ["events.linked_boards"] = "Boards liés",
+
+            // ── M14 (ADR 0115 D3) — le composeur inline « Ajouter une to-do
+            //    à cet événement » (la lane POST /events/{id}/todos sur la
+            //    page de détail de l'événement ; la registry de clés +
+            //    KnownTranslationKeys_ParityTests imposent les × 4) ──
+            ["events.add_todo.title"] = "Ajouter une to-do à cet événement",
+            ["events.add_todo.hint"] = "Une façon rapide d'ajouter un élément de liste de vérification ou une tâche de préparation à cet événement.",
+            ["events.add_todo.submit"] = "Ajouter",
+
             // ── M14 (ADR 0115 D3) — les deux libellés du sélecteur U04 set-event
             //    (détail de la to-do : libellé du formulaire + option
             //    placeholder / effacement) ──
             ["todo.set_event.label"] = "Lier à un événement",
             ["todo.set_event.pick"] = "Choisir un événement",
+            ["todo.set_event.create_new"] = "Créer un nouvel événement…",
+            ["todo.set_event.create_hint"] = "Créez un nouvel événement à lier à cette to-do. Il est enregistré en brouillon — vous pouvez le publier depuis sa page de détail.",
+            ["todo.set_event.create_submit"] = "Créer et lier",
 
             // ── M14 (ADR 0115 D4) — les deux surfaces VTODO U06 (détail de la
             //    to-do : lien « Ajouter à l'agenda » + index des to-dos : lien
@@ -6886,6 +7411,40 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Messages d'autres résidents",
             ["notification.message.new.subject"] = "Nouveau message",
             ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
+
+            // ── M36 (ADR 0165, M36·7) — les clés kw-l de mention transversale ──
+            // 7 types × 4 clés = 28 clés. Le badge + le libellé de préférence
+            // post.mention existent déjà (réservé M6) ; seul son objet/corps
+            // est nouveau. Les six types frères fournissent les quatre clés.
+            // L'objet se termine par une fin de phrase ; le corps se termine
+            // par une espace (la forme post.reply M6 — l'extrait UGC est
+            // ajouté après une espace à l'émission).
+            ["notification.post.mention.subject"] = "Vous avez été mentionné",
+            ["notification.post.mention.body"] = "Vous avez été mentionné : ",
+            ["notifications.kind.group.post.mention"] = "Mention dans un message de groupe",
+            ["notifications.preference.group.post.mention.label"] = "Les mentions dans les messages de groupe",
+            ["notification.group.post.mention.subject"] = "Vous avez été mentionné dans un message de groupe",
+            ["notification.group.post.mention.body"] = "Vous avez été mentionné dans un message de groupe : ",
+            ["notifications.kind.page.mention"] = "Mention sur une page",
+            ["notifications.preference.page.mention.label"] = "Les mentions sur les pages",
+            ["notification.page.mention.subject"] = "Vous avez été mentionné sur une page",
+            ["notification.page.mention.body"] = "Vous avez été mentionné sur une page : ",
+            ["notifications.kind.event.mention"] = "Mention à un événement",
+            ["notifications.preference.event.mention.label"] = "Les mentions à des événements",
+            ["notification.event.mention.subject"] = "Vous avez été mentionné dans un événement",
+            ["notification.event.mention.body"] = "Vous avez été mentionné dans un événement : ",
+            ["notifications.kind.todo.mention"] = "Mention dans une tâche",
+            ["notifications.preference.todo.mention.label"] = "Les mentions dans les tâches",
+            ["notification.todo.mention.subject"] = "Vous avez été mentionné dans une tâche",
+            ["notification.todo.mention.body"] = "Vous avez été mentionné dans un commentaire de tâche : ",
+            ["notifications.kind.announcement.mention"] = "Mention dans une annonce",
+            ["notifications.preference.announcement.mention.label"] = "Les mentions dans les annonces",
+            ["notification.announcement.mention.subject"] = "Vous avez été mentionné dans une annonce",
+            ["notification.announcement.mention.body"] = "Vous avez été mentionné dans une annonce : ",
+            ["notifications.kind.message.mention"] = "Mention dans un message",
+            ["notifications.preference.message.mention.label"] = "Les mentions dans les messages",
+            ["notification.message.mention.subject"] = "Vous avez été mentionné dans un message",
+            ["notification.message.mention.body"] = "Vous avez été mentionné dans un message : ",
 
             // ── GU community-approval lane (ADR 0141) — l'art du tuteur ──
             ["notifications.kind.guardian.group_invite"] =
@@ -7175,7 +7734,7 @@ public static class KnownTranslationKeys
             ["adminonboarding.step_storage"]       = "Limites de stockage",
             ["adminonboarding.step_sitecontent"]   = "Contenu du site",
             ["adminonboarding.step_escalation"]    = "Escalade des problèmes",
-            ["adminonboarding.desc_communityname"] = "Comment cette communauté s'appelle et comment elle se présente — modifiable dans la surface langues.",
+            ["adminonboarding.desc_communityname"] = "Comment cette communauté s'appelle et comment elle se présente — le nom et la description de base de la communauté.",
             ["adminonboarding.desc_languages"]     = "Les langues que les résidents peuvent utiliser, les chaînes d'interface traduites et les pages statiques.",
             ["adminonboarding.desc_moderation"]    = "Comment les commentaires d'annonces sont modérés sur cette instance.",
             ["adminonboarding.desc_notifications"] = "À quelle fréquence les e-mails de notification retenus sont envoyés aux résidents.",
@@ -7187,6 +7746,95 @@ public static class KnownTranslationKeys
             ["adminonboarding.flash_done"]         = "Configuration admin terminée — la marche est achevée.",
             ["adminonboarding.banner.text"]        = "Terminer la configuration de cette communauté ?",
             ["adminonboarding.banner.action"]      = "Démarrer la configuration",
+
+            // ── M31 (ADR 0154) — gestion des erreurs en production :
+            // la page 500 (M31·2) + la surface de triage /admin/error-reports
+            // (M31·4 / M31·6). U05 rédige le jeu complet de 20 clés
+            // (clés 1–8 pour la page d'erreur, clés 9–20 pour la liste
+            // admin). La verrou de parité
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) exige que chaque clé soit
+            // présente et non vide dans les quatre langues (M31·7). ──
+            ["errorreport.title"]                    = "Dites-nous ce qui s'est mal passé",
+            ["errorreport.intro"]                    = "Si quelque chose s'est mal passé, dites-nous ce que vous essayiez de faire afin que nous puissions y regarder.",
+            ["errorreport.description.label"]        = "Qu'essayiez-vous de faire ?",
+            ["errorreport.description.placeholder"]  = "p. ex. J'essayais de m'inscrire à l'événement de samedi et la page est devenue blanche",
+            ["errorreport.email.label"]              = "Votre e-mail (facultatif)",
+            ["errorreport.email.placeholder"]        = "vous@exemple.fr",
+            ["errorreport.submit"]                   = "Envoyer le rapport",
+            ["errorreport.thanks"]                   = "Merci — votre rapport a été enregistré.",
+            ["errorreport.list.title"]               = "Rapports d'erreurs",
+            ["errorreport.list.empty"]               = "Aucun rapport d'erreur pour l'instant.",
+            ["errorreport.list.status.new"]          = "Nouveau",
+            ["errorreport.list.status.triaged"]      = "Trié",
+            ["errorreport.list.mark_triaged"]        = "Marquer comme trié",
+            ["errorreport.list.request_id"]          = "ID de la requête",
+            ["errorreport.list.exception"]           = "Exception",
+            ["errorreport.list.description"]         = "Description",
+            ["errorreport.list.reporter"]            = "Signaleur",
+            ["errorreport.list.created"]             = "Signalé",
+            ["errorreport.list.anonymous"]           = "Anonyme",
+            ["errorreport.list.flash_triaged"]       = "Rapport marqué comme trié.",
+
+            // ── M32 (ADR 0155) — dépôt de signalement & escalade : la voie
+            // publique /issues/new de signalement général (clés 1–9, M32·4) +
+            // la section Résoudre de la vue de détail (clés 11–15, M32·8) +
+            // la section Escalader (clés 16–19, M32·5/·6/·7) + le nouveau
+            // badge `resolved` de la liste (clé 10, M32·2). La plage de 20
+            // clés `errorreport.*` M31 ci-dessus est le plancher, inchangée
+            // (M32·1 — additif uniquement).
+            ["issue.title"]                          = "Signaler un problème",
+            ["issue.intro"]                          = "Quelque chose ne fonctionne pas, ou un problème que nous devrions connaître ? Dites-nous ce qui s'est passé — même s'il n'y a pas de page d'erreur devant vous.",
+            ["issue.description.label"]              = "Quel est le problème ?",
+            ["issue.description.placeholder"]        = "p. ex. La page du calendrier du groupe est down, ou je ne peux pas me connecter",
+            ["issue.email.label"]                    = "Votre e-mail (facultatif)",
+            ["issue.email.placeholder"]              = "vous@exemple.fr",
+            ["issue.submit"]                         = "Envoyer le signalement",
+            ["issue.thanks"]                         = "Merci — votre signalement a été enregistré.",
+            ["issue.nav"]                            = "Signaler un problème",
+            ["errorreport.list.status.resolved"]     = "Résolu",
+            ["errorreport.resolve.title"]            = "Résoudre ce signalement",
+            ["errorreport.resolve.note.label"]       = "Note de résolution",
+            ["errorreport.resolve.note.placeholder"] = "p. ex. Lien de calendrier corrigé ; rien à transmettre.",
+            ["errorreport.resolve.button"]           = "Marquer comme résolu",
+            ["errorreport.resolve.flash"]            = "Signalement marqué comme résolu.",
+            ["errorreport.escalate.button"]          = "Escalader vers le point de terminaison de l'opérateur",
+            ["errorreport.escalate.flash_success"]   = "Signalement transmis et marqué comme résolu.",
+            ["errorreport.escalate.flash_failure"]   = "Échec de l'escalade — le signalement est inchangé. Vous pouvez réessayer.",
+            ["errorreport.escalate.not_configured"]  = "L'escalade n'est pas configurée sur cette instance (KUMUNITA_ESCALATION_ENDPOINT n'est pas défini).",
+
+            // ── ESC — le jeu fermé de clés kw-l escalation.* (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Escalade",
+            ["escalation.intro"] = "L'escalade transmet un signalement d'une instance Kumunita à une autre. Cette page configure l'envoi — vers quelle instance cette instance transmet les signalements et le jeton qui y autorise. L'autre sens, la réception, se gère sur la page Jetons d'accès reçus.",
+            ["escalation.how.heading"] = "Comment fonctionne l'escalade",
+            ["escalation.how.outbound"] = "Cette page sert à l'envoi : lorsqu'un administrateur escalade un signalement depuis la page Signalements, il est transmis à la file d'attente d'une autre instance. Renseignez le point de terminaison d'entrée de l'instance réceptrice et le jeton d'accès que son administrateur vous a communiqué, puis activez l'escalade. Tant qu'elle est désactivée, l'escalade d'un signalement ne fait rien.",
+            ["escalation.how.inbound"] = "L'autre sens est la réception : pour autoriser d'autres instances à escalader des signalements vers celle-ci, générez un jeton d'accès pour chacune et communiquez-le à leur administrateur, qui le saisit sur sa propre copie de cette page.",
+            ["escalation.outbound.endpoint.help"] = "Le point de terminaison d'entrée de l'instance réceptrice — elle vous le communique. C'est l'adresse à laquelle vos signalements sont livrés (il se termine par /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Le jeton d'accès que l'administrateur de l'instance réceptrice a généré pour vous et vous a communiqué hors système. Il est envoyé comme preuve Bearer afin que l'instance réceptrice sache que vous êtes autorisé à envoyer.",
+            ["escalation.outbound.enabled.help"] = "Activez ceci une fois les deux champs ci-dessus renseignés. Tant qu'il est désactivé, l'escalade d'un signalement ne fait rien.",
+            ["escalation.outbound.endpoint.label"] = "Point de terminaison de la plateforme réceptrice",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Jeton d'accès (émis par l'administrateur récepteur)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Activer l'escalade",
+            ["escalation.outbound.save"] = "Enregistrer les paramètres d'escalade",
+            ["escalation.outbound.saved"] = "Paramètres d'escalade enregistrés.",
+            ["escalation.tokens.title"] = "Jetons d'accès reçus",
+            ["escalation.tokens.generate.button"] = "Générer un nouveau jeton",
+            ["escalation.tokens.label.label"] = "Étiquette (p. ex. le nom de la plateforme d'origine)",
+            ["escalation.tokens.show_once"] = "Copie ce jeton maintenant — il n'est affiché qu'une seule fois et n'est jamais stocké en texte brut.",
+            ["escalation.tokens.copy"] = "Copier",
+            ["escalation.tokens.revoke.button"] = "Révoquer",
+            ["escalation.tokens.revoked"] = "Jeton révoqué. Il ne peut plus être utilisé pour escalader.",
+            ["escalation.tokens.none"] = "Aucun jeton d'accès pour le moment. Générez-en un pour autoriser une plateforme d'origine.",
+            ["escalation.tokens.last_used"] = "Dernière utilisation",
+            ["escalation.list.status.escalated"] = "Escaladé",
+            ["escalation.list.filter.all"] = "Tous",
+            ["escalation.list.filter.received"] = "Reçus",
+            ["escalation.list.filter.local"] = "Local",
+            ["escalation.detail.from_instance"] = "Reçu de",
+            ["escalation.inbound.invalid_token"] = "Jeton d'accès invalide.",
+            ["escalation.inbound.received"] = "Escalade reçue.",
 
             // ── M9 amendment — le contrôle de messagerie par résident + le
             // plafond du tuteur (valeurs initiales, en fr, à réviser par un
@@ -7393,6 +8041,35 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Date de début",
             ["sort.due"]              = "Échéance",
             ["sort.status"]           = "Statut",
+
+            // ── M33 U06 (ADR 0156, M33·11) — le jeu fermé storage.trend.* de la
+            // surface /admin/storage (section Trend) : le titre, les quatre
+            // libellés de fenêtre, les en-têtes du tableau, la légende de la
+            // sparkline et le message vide. M33·1 additive-only : la surface
+            // storage.* de M24 reste inchangée.
+            ["storage.trend.title"]     = "Tendance de stockage",
+            ["storage.trend.window.30"] = "30 jours",
+            ["storage.trend.window.90"] = "90 jours",
+            ["storage.trend.window.180"] = "180 jours",
+            ["storage.trend.window.365"] = "365 jours",
+            ["storage.trend.col.date"]  = "Date",
+            ["storage.trend.col.used"]  = "Total utilisé",
+            ["storage.trend.col.free"]  = "Libre",
+            ["storage.trend.legend.used"] = "Total utilisé sur la fenêtre",
+            ["storage.trend.empty"]     =
+                "Pas encore de tendance de stockage — la capture quotidienne n'a pas " +
+                "enregistré d'échantillons pour cette fenêtre.",
+
+            // ── M35 (ADR 0164) — la surface d'affichage du kiosque (U04) +
+            // les réglages /admin/kiosk (U05). Le jeu de 8 clés (M35·10).
+            ["kiosk.title"]                  = "Tableau du quartier",
+            ["kiosk.empty"]                  = "Aucune vue du kiosque n'est encore configurée.",
+            ["kiosk.slide_denied"]           = "Tu n'as pas accès à cette vue.",
+            ["kiosk.next_slide"]             = "Vue suivante",
+            ["kiosk.refreshed"]              = "Mis à jour à l'instant",
+            ["kiosk.settings.title"]         = "Affichage du kiosque",
+            ["kiosk.settings.view_interval"] = "Changer de vue toutes les (secondes)",
+            ["kiosk.settings.refresh_interval"] = "Actualiser le contenu toutes les (secondes)",
         };
 
     /// <summary>
@@ -7559,6 +8236,9 @@ public static class KnownTranslationKeys
             ["nav.sign_up"]       = "Opret konto",
             ["nav.profile"]       = "Profil",
             ["nav.admin"]         = "Administration",
+            ["nav.management"]    = "Administration",
+            ["nav.error_reports"] = "Fejlrapporter",
+            ["nav.moderation"]    = "Moderation",
             ["nav.translations"]  = "Oversættelser",
             ["nav.sign_out"]      = "Log ud",
             ["nav.children"]      = "Børn",
@@ -7647,6 +8327,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Denne kommentar er slettet af dens forfatter.",
             ["projects.todo.comment_delete"] = "Slet",
             ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse. Du kommenterer kun hvor opgaven selv er synlig.",
+            ["projects.todo.comment_audience_note_label"] = "Hvem kan se kommentarerne?",
             ["projects.todo.back"]           = "← Tilbage til opgaverne",
             ["projects.todo.untitled"]       = "Opgave uden navn",
             ["projects.todo.edit"]           = "Rediger",
@@ -8016,6 +8697,15 @@ public static class KnownTranslationKeys
             ["settings.home_save"]         = "Gem",
             ["settings.home_flash_hide"]   = "Forside opdateret — introduktionssektionerne skjules, strømmen vises først.",
             ["settings.home_flash_show"]   = "Forside opdateret — introduktionssektionerne vises igen.",
+            ["settings.home_upcoming_label"] =
+                "Vis kommende begivenheder og to-dos på forsiden",
+            ["settings.home_upcoming_note"]  =
+                "Når tændt, vises de næste begivenheder og to-dos på din forside, over strømmen. Når slukket, forbliver forsiden som før.",
+            ["settings.home_upcoming_mine_label"] =
+                "Vis kun mine egne begivenheder og to-dos",
+            ["settings.home_upcoming_mine_note"]  =
+                "Når tændt, viser afsnittet kun de begivenheder, du har RSVP'd til eller oprettet, og de to-dos, der er tildelt dig. Når slukket, vises fællesskabets begivenheder og to-dos.",
+            ["settings.home_flash_saved"]  = "Forside opdateret — dine valg er gemt.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -8113,6 +8803,12 @@ public static class KnownTranslationKeys
                 "Ingenting er indlagt endnu — vær den første, der starter samtalen i fæden.",
             ["home.feed_badge_pinned"]   = "Fastgjort",
 
+            // ── home « Kommende » (næste begivenheder + to-dos) ─────────────
+            ["home.upcoming_title"]      = "Kommende",
+            ["home.upcoming_events"]     = "Begivenheder",
+            ["home.upcoming_todos"]      = "To-dos",
+            ["home.upcoming_show_more"]  = "Vis de {n} flere",
+
             // ── home milepæler (planen, efter introen) ─────────────────────
             ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",
             ["home.roadmap.show_more_earlier"] = "Vis de {n} tidligere milepæle",
@@ -8124,6 +8820,10 @@ public static class KnownTranslationKeys
             // ── klient-JS-strenge (P0-6: #kumunita-strings-bundlen) ───────
             ["common.close"]  = "Luk",
             ["common.cancel"] = "Annuller",
+            ["common.previous"] = "Forrige",
+            ["common.next"]     = "Næste",
+            ["common.done"]     = "Færdig",
+            ["common.step_of"]  = "Trin {0} af {1}",
             ["rc.editor.error_generic"] = "Noget gik galt.",
             ["rc.editor.link.title"]    = "Indsæt link",
             ["rc.editor.link.url"]      = "URL",
@@ -8206,6 +8906,10 @@ public static class KnownTranslationKeys
                 "GlobalAdmin. En beboer, der ikke er GlobalAdmin, kan ikke " +
                 "slette sin egen konto — kontakt en administrator for at " +
                 "fjerne kontoen.",
+
+            // M27 (ADR 0148) — indstillingsskabelinket til beboerens egen
+            // backup-/restore-overflade (/account/portability, "Mine data").
+            ["nav.my_data"]          = "Mine data",
 
             ["nav.delete_account"] = "Slet konto",
 
@@ -8485,6 +9189,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Du kan se dette indlæg, fordi det er blevet delt med dig — " +
                 "enten er du forfatteren, eller det er delagt med dig eller dine grupper.",
+            ["posts.detail_why_label"] = "Hvorfor kan jeg se det?",
             ["posts.report_button"] = "Rapportér dette indlæg",
             ["posts.reply_report_button"] = "Rapportér dette svar",
             ["posts.report_reason_label"] = "Hvad er der galt?",
@@ -8507,6 +9212,7 @@ public static class KnownTranslationKeys
                 "Svar har ingen egen modtagerkreds — de er synlige under " +
                 "dette indlægs ene modtagerkredsbeslutning. " +
                 "Du svarer kun der, hvor indlægget selv er synligt.",
+            ["posts.reply_audience_note_label"] = "Hvem kan se svarene?",
             ["posts.reply_submit"] = "Svar",
             ["posts.reply_edit"] = "Rediger",
             ["posts.reply_save"] = "Gem",
@@ -8744,6 +9450,18 @@ public static class KnownTranslationKeys
             ["admin.analytics_count"] = "Antal",
             ["admin.analytics_export"] = "Eksportér CSV",
 
+            // ── analytics trend (Analytics history — M34, ADR 0162) ──────────
+            ["analytics.trend.title"] = "Tendens",
+            ["analytics.trend.window.7"] = "7 dage",
+            ["analytics.trend.window.30"] = "30 dage",
+            ["analytics.trend.window.90"] = "90 dage",
+            ["analytics.trend.window.180"] = "180 dage",
+            ["analytics.trend.window.365"] = "365 dage",
+            ["analytics.trend.col.date"] = "Dato",
+            ["analytics.trend.col.total"] = "Samtlige anmodninger",
+            ["analytics.trend.legend.total"] = "Samtlige anmodninger pr. dag",
+            ["analytics.trend.empty"] = "Ingen brug er registreret i dette vindue endnu.",
+
             // ── admin (Break-glass page) ─────────────────────────────────────
             ["admin.breakglass_title"] = "Break-glass",
             ["admin.breakglass_granted"] = "Givet (UTC)",
@@ -8874,6 +9592,7 @@ public static class KnownTranslationKeys
                 "officiel meddelelse — og følger denne meddelelses eget " +
                 "publikum (en meddelelse rettet til et fællesskab er synligt " +
                 "for dets indboere).",
+            ["announcements.comment_audience_note_label"] = "Hvem kan se kommentarerne?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Sidst opdateret:",
@@ -9059,10 +9778,30 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Knyttet arrangement",
             ["events.linked_todos"] = "Knyttede to-dos",
 
+            // ── M14 (ADR 0115 D2/D3, samspillet båret over på board-overfladen)
+            //    — boardets arrangement-badge + „Knyttede boards"-sektion +
+            //    „Knyt til arrangement…"-vælgermærkatet (nøgleregisteret +
+            //    KnownTranslationKeys_ParityTests pålægger × 4) ──
+            ["board.event_link"] = "Knyttet arrangement",
+            ["board.link_to_event"] = "Knyt til arrangement…",
+            ["board.event_hint"] = "En arrangementet-lænke er et displayoverflade — den grupperer dette board under arrangementet, men begrænser aldrig, hvem der kan se det.",
+            ["events.linked_boards"] = "Knyttede boards",
+
+            // ── M14 (ADR 0115 D3) — den inline „Tilføj en to-do til dette
+            //    arrangement"-komponist (POST /events/{id}/todos-lanen på
+            //    arrangementets detailside; nøgleregisteret +
+            //    KnownTranslationKeys_ParityTests pålægger × 4) ──
+            ["events.add_todo.title"] = "Tilføj en to-do til dette arrangement",
+            ["events.add_todo.hint"] = "En hurtig måde at tilføje et tjeklisten-punkt eller en forberedelsesopgave til dette arrangement.",
+            ["events.add_todo.submit"] = "Tilføj to-do",
+
             // ── M14 (ADR 0115 D3) — de to U04 set-event-vælgermærkater
             //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──
             ["todo.set_event.label"] = "Knyt til arrangement",
             ["todo.set_event.pick"] = "Vælg et arrangement",
+            ["todo.set_event.create_new"] = "Opret et nyt arrangement…",
+            ["todo.set_event.create_hint"] = "Opret et nyt arrangement, der skal knyttes til denne to-do. Det gemmes som udkast — du kan publicere det fra arrangementets detailside.",
+            ["todo.set_event.create_submit"] = "Opret og knyt",
 
             // ── M14 (ADR 0115 D4) — de to U06 VTODO-overflader (to-do-detail:
             //    "Tilføj til kalender"-link + to-do-index: feed-link; ADR 0112's
@@ -9238,6 +9977,40 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
             ["notification.message.new.subject"] = "Ny besked",
             ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
+
+            // ── M36 (ADR 0165, M36·7) — tværflade nævnelse kw-l-nøgler ──
+            // 7 typer × 4 nøgler = 28 nøgler. post.mention-badge +
+            // præference-label findes allerede (M6-reserveret); kun dens
+            // emne/krop er nye. De seks søskendetyper leverer alle fire
+            // nøgler. Emne ender med sætningsafslutning; krop ender med et
+            // mellemrum (M6 post.reply-formen — UGC-uddraget tilføjes efter
+            // et mellemrum ved emissionen).
+            ["notification.post.mention.subject"] = "Du blev nævnt",
+            ["notification.post.mention.body"] = "Du blev nævnt: ",
+            ["notifications.kind.group.post.mention"] = "Nævnelse i gruppeindlæg",
+            ["notifications.preference.group.post.mention.label"] = "Nævnelser i gruppeindlæg",
+            ["notification.group.post.mention.subject"] = "Du blev nævnt i et gruppeindlæg",
+            ["notification.group.post.mention.body"] = "Du blev nævnt i et gruppeindlæg: ",
+            ["notifications.kind.page.mention"] = "Nævnelse på en side",
+            ["notifications.preference.page.mention.label"] = "Nævnelser på sider",
+            ["notification.page.mention.subject"] = "Du blev nævnt på en side",
+            ["notification.page.mention.body"] = "Du blev nævnt på en side: ",
+            ["notifications.kind.event.mention"] = "Nævnelse ved et arrangement",
+            ["notifications.preference.event.mention.label"] = "Nævnelser ved arrangementer",
+            ["notification.event.mention.subject"] = "Du blev nævnt i et arrangement",
+            ["notification.event.mention.body"] = "Du blev nævnt i et arrangement: ",
+            ["notifications.kind.todo.mention"] = "Nævnelse i en opgave",
+            ["notifications.preference.todo.mention.label"] = "Nævnelser i opgaver",
+            ["notification.todo.mention.subject"] = "Du blev nævnt i en opgave",
+            ["notification.todo.mention.body"] = "Du blev nævnt i en opgavekommentar: ",
+            ["notifications.kind.announcement.mention"] = "Nævnelse i en meddelelse",
+            ["notifications.preference.announcement.mention.label"] = "Nævnelser i meddelelser",
+            ["notification.announcement.mention.subject"] = "Du blev nævnt i en meddelelse",
+            ["notification.announcement.mention.body"] = "Du blev nævnt i en meddelelse: ",
+            ["notifications.kind.message.mention"] = "Nævnelse i en besked",
+            ["notifications.preference.message.mention.label"] = "Nævnelser i beskeder",
+            ["notification.message.mention.subject"] = "Du blev nævnt i en besked",
+            ["notification.message.mention.body"] = "Du blev nævnt i en besked: ",
 
             // ── GU community-approval lane (ADR 0141) — den vagts type ──
             ["notifications.kind.guardian.group_invite"] =
@@ -9526,7 +10299,7 @@ public static class KnownTranslationKeys
             ["adminonboarding.step_storage"]       = "Lagringsgrænser",
             ["adminonboarding.step_sitecontent"]   = "Sideindhold",
             ["adminonboarding.step_escalation"]    = "Eskalering af henvendelser",
-            ["adminonboarding.desc_communityname"] = "Hvad dette fællesskab hedder og hvordan det beskriver sig selv — redigér det i sprogfladen.",
+            ["adminonboarding.desc_communityname"] = "Hvad dette fællesskab hedder og hvordan det beskriver sig selv — fællesskabets basenavn og beskrivelse.",
             ["adminonboarding.desc_languages"]     = "De sprog, beboerne kan bruge, de oversatte grænsefladesnore og de statiske sider.",
             ["adminonboarding.desc_moderation"]    = "Hvordan annoncerkommentarer modereres på denne instans.",
             ["adminonboarding.desc_notifications"] = "Hvor ofte tilbagelagte beskedelsesmails sendes til beboerne.",
@@ -9538,6 +10311,94 @@ public static class KnownTranslationKeys
             ["adminonboarding.flash_done"]         = "Admin-opsætning færdig — rundturen er sluttet.",
             ["adminonboarding.banner.text"]        = "Færdiggøre opsætningen af dette fællesskab?",
             ["adminonboarding.banner.action"]      = "Start opsætning",
+
+            // ── M31 (ADR 0154) — produktionsfejlhåndtering: 500-siden
+            // (M31·2) + /admin/error-reports triagefladen (M31·4 / M31·6).
+            // U05 udarbejder det komplette lukkede 20-nøgledæksel (nøgler
+            // 1–8 til fejliden, nøgler 9–20 til adminlisten). Paritetslåsen
+            // (KwLRegistryConsistencyTests +
+            // KnownTranslationKeys_ParityTests) kræver, at hver nøgle er
+            // til stede og ikke tom i alle fire sprog (M31·7). ──
+            ["errorreport.title"]                    = "Fortæl os, hvad der gik galt",
+            ["errorreport.intro"]                    = "Hvis noget gik galt, fortæl os, hvad du prøvede at gøre, så vi kan kigge på det.",
+            ["errorreport.description.label"]        = "Hvad prøvede du at gøre?",
+            ["errorreport.description.placeholder"]  = "f.eks. Jeg prøvede at tilmelde mig lørdagsbegivenheden, og siden blev hvid",
+            ["errorreport.email.label"]              = "Din e-mail (valgfri)",
+            ["errorreport.email.placeholder"]        = "dig@eksempel.dk",
+            ["errorreport.submit"]                   = "Send rapport",
+            ["errorreport.thanks"]                   = "Tak — din rapport er indsendt.",
+            ["errorreport.list.title"]               = "Fejlrapporter",
+            ["errorreport.list.empty"]               = "Ingen fejlrapporter endnu.",
+            ["errorreport.list.status.new"]          = "Ny",
+            ["errorreport.list.status.triaged"]      = "Behandlet",
+            ["errorreport.list.mark_triaged"]        = "Markér som behandlet",
+            ["errorreport.list.request_id"]          = "Anmodnings-ID",
+            ["errorreport.list.exception"]           = "Undtagelse",
+            ["errorreport.list.description"]         = "Beskrivelse",
+            ["errorreport.list.reporter"]            = "Melder",
+            ["errorreport.list.created"]             = "Rapporteret",
+            ["errorreport.list.anonymous"]           = "Anonym",
+            ["errorreport.list.flash_triaged"]       = "Rapport markeret som behandlet.",
+
+            // ── M32 (ADR 0155) — problemsignalering & eskalering: den
+            // offentlige /issues/new generelle problemsignaleringsbane (nøgler
+            // 1–9, M32·4) + Resolve-sektionen af detaljevisningen (nøgler
+            // 11–15, M32·8) + Eskaler-sektionen (nøgler 16–19, M32·5/·6/·7) +
+            // den nye `resolved` liste-badge (nøgle 10, M32·2). Den M31
+            // `errorreport.*` 20-nøgle-sæt ovenfor er gulvet, uændret (M32·1
+            // — kun additivt).
+            ["issue.title"]                          = "Signalér et problem",
+            ["issue.intro"]                          = "Noget virker ikke, eller er der et problem, vi bør vide om? Fortæl os, hvad der skete — selvom der ikke er en fejlside foran dig.",
+            ["issue.description.label"]              = "Hvad er problemet?",
+            ["issue.description.placeholder"]        = "f.eks. Gruppens kalender side er down, eller jeg kan ikke logge ind",
+            ["issue.email.label"]                    = "Din e-mail (valgfri)",
+            ["issue.email.placeholder"]              = "dig@eksempel.dk",
+            ["issue.submit"]                         = "Send problemrapport",
+            ["issue.thanks"]                         = "Tak — din problemrapport er indsendt.",
+            ["issue.nav"]                            = "Signalér et problem",
+            ["errorreport.list.status.resolved"]     = "Løst",
+            ["errorreport.resolve.title"]            = "Løs denne rapport",
+            ["errorreport.resolve.note.label"]       = "Løsningsnote",
+            ["errorreport.resolve.note.placeholder"] = "f.eks. Rettede det brudte kalenderlink; intet at videresende.",
+            ["errorreport.resolve.button"]           = "Marker som løst",
+            ["errorreport.resolve.flash"]            = "Rapport markeret som løst.",
+            ["errorreport.escalate.button"]          = "Eskalér til operatørendepunkt",
+            ["errorreport.escalate.flash_success"]   = "Rapport eskaleret og markeret som løst.",
+            ["errorreport.escalate.flash_failure"]   = "Eskalering fejlede — rapporten er uændret. Du kan prøve igen.",
+            ["errorreport.escalate.not_configured"]  = "Eskalering er ikke konfigureret på denne instans (KUMUNITA_ESCALATION_ENDPOINT er ikke sat).",
+
+            // ── ESC — det lukkede escalation.* kw-l-nøglesæt (ADR 0159 ESC·11) ──
+            ["escalation.title"] = "Eskalering",
+            ["escalation.intro"] = "Eskalering flytter en sag fra én Kumunita-instans til en anden. Denne side opsætter afsendelse – hvor denne instans videresender eskalerede sager og den token, der autoriserer det. Den anden retning, modtagelse, administreres på siden Modtagne adgangstokens.",
+            ["escalation.how.heading"] = "Sådan virker eskalering",
+            ["escalation.how.outbound"] = "Denne side er til afsendelse: Når en administrator eskalerer en rapport fra siden Fejlrapporter, videresendes den til en anden instans' kø. Udfyld den modtagende instans' indgangsendepunkt og den adgangstoken, deres administrator har delt med dig, og tænd for eskalering. Mens den er slukket, gør det ingenting at eskalere en rapport.",
+            ["escalation.how.inbound"] = "Den anden retning er modtagelse: For at lade andre instanser eskalere sager til denne instans, generér en adgangstoken for hver af dem og del den med deres administrator, der indtaster den på deres egen kopi af denne side.",
+            ["escalation.outbound.endpoint.help"] = "Den modtagende instans' indgangsendepunkt – de deler det med dig. Det er adressen, dine eskalerede sager leveres til (slutter med /escalations/inbound).",
+            ["escalation.outbound.token.help"] = "Den adgangstoken, den modtagende instans' administrator har genereret til dig og delt uden for systemet. Den sendes som Bearer-besked, så den modtagende instans ved, at du er autoriseret til at sende.",
+            ["escalation.outbound.enabled.help"] = "Tænd for dette, når begge felter ovenfor er udfyldt. Mens det er slukket, gør det ingenting at eskalere en rapport.",
+            ["escalation.outbound.endpoint.label"] = "Modtagende platformendepunkt",
+            ["escalation.outbound.endpoint.placeholder"] = "https://receiving.example/escalations/inbound",
+            ["escalation.outbound.token.label"] = "Adgangstoken (udstedt af den modtagende administrator)",
+            ["escalation.outbound.token.placeholder"] = "kesc_…",
+            ["escalation.outbound.enabled.label"] = "Aktivér eskalering",
+            ["escalation.outbound.save"] = "Gem eskaleringsindstillinger",
+            ["escalation.outbound.saved"] = "Eskaleringsindstillinger gemt.",
+            ["escalation.tokens.title"] = "Modtagne adgangstokens",
+            ["escalation.tokens.generate.button"] = "Generér en ny token",
+            ["escalation.tokens.label.label"] = "Etiket (f.eks. oprindelsesplatformens navn)",
+            ["escalation.tokens.show_once"] = "Kopiér denne token nu — den vises kun én gang og opbevares aldrig i ren tekst.",
+            ["escalation.tokens.copy"] = "Kopiér",
+            ["escalation.tokens.revoke.button"] = "Træk tilbage",
+            ["escalation.tokens.revoked"] = "Token trukket tilbage. Den kan ikke længere bruges til at eskalere.",
+            ["escalation.tokens.none"] = "Ingen adgangstokens endnu. Generér én for at autorisere en oprindelsesplatform.",
+            ["escalation.tokens.last_used"] = "Sidst brugt",
+            ["escalation.list.status.escalated"] = "Eskaleret",
+            ["escalation.list.filter.all"] = "Alle",
+            ["escalation.list.filter.received"] = "Modtaget",
+            ["escalation.list.filter.local"] = "Lokal",
+            ["escalation.detail.from_instance"] = "Modtaget fra",
+            ["escalation.inbound.invalid_token"] = "Ugyldig adgangstoken.",
+            ["escalation.inbound.received"] = "Eskalering modtaget.",
 
             // ── M9 amendment — den pro-borger-beskedkontrol + værgens
             // loft (startværdier på da, til revidering af en oversætter;
@@ -9736,6 +10597,35 @@ public static class KnownTranslationKeys
             ["sort.start"]            = "Startdato",
             ["sort.due"]              = "Frist",
             ["sort.status"]           = "Status",
+
+            // ── M33 U06 (ADR 0156, M33·11) — det lukkede storage.trend.*-sæt
+            // for M24-fladen /admin/storage (Trend-sektionen): overskriften,
+            // de fire vinduelabels, tabeloverskrifterne, sparkline-legenden
+            // og tommelfingerbeskeden. M33·1 additive-only: M24's
+            // storage.*-overflade er uændret.
+            ["storage.trend.title"]     = "Lagringstrend",
+            ["storage.trend.window.30"] = "30 dage",
+            ["storage.trend.window.90"] = "90 dage",
+            ["storage.trend.window.180"] = "180 dage",
+            ["storage.trend.window.365"] = "365 dage",
+            ["storage.trend.col.date"]  = "Dato",
+            ["storage.trend.col.used"]  = "I alt brugt",
+            ["storage.trend.col.free"]  = "Fri",
+            ["storage.trend.legend.used"] = "I alt brugt over vinduet",
+            ["storage.trend.empty"]     =
+                "Ingen lagringstrend endnu — den daglige optagelse har ikke gemt " +
+                "noen prøver for dette vindue.",
+
+            // ── M35 (ADR 0164) — kiosk-display-overfladen (U04) +
+            // /admin/kiosk-indstillingerne (U05). Det 8-nøglesæt (M35·10).
+            ["kiosk.title"]                  = "Nabolgsbræt",
+            ["kiosk.empty"]                  = "Der er endnu ikke konfigureret kiosk-visninger.",
+            ["kiosk.slide_denied"]           = "Du har ikke adgang til denne visning.",
+            ["kiosk.next_slide"]             = "Næste visning",
+            ["kiosk.refreshed"]              = "Opdateret lige nu",
+            ["kiosk.settings.title"]         = "Kiosk-display",
+            ["kiosk.settings.view_interval"] = "Skift visning hver (sekunder)",
+            ["kiosk.settings.refresh_interval"] = "Opdater indhold hver (sekunder)",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

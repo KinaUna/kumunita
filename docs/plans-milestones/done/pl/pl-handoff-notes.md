@@ -11,7 +11,7 @@ Part 1: 8 sections — what it is / the reused surface (verified) / the locked
 decisions / invariants / FACES / parts affected / feedback loops / risks;
 Part 2: `## Seams & contracts`, §9.1–§9.8 — the exact C# of the two new docs
 + the two adapters, the additive `IProjectService` seams, the four request
-DTOs, the `M5DocTypes` additive shape, the ~20 pinned test names, the
+DTOs, the `ProjectDocTypes` additive shape, the ~20 pinned test names, the
 three-test gate, the drift-guard); **ADR 0086 authored and Accepted**
 (`docs/adr/0086-goals-projects-lane.md`, 2026-09-25, Amends
 0067 / 0070 / 0079 / 0024 / 0006 / 0001-B / 0036 / 0025 / 0031 / 0018 /
@@ -33,10 +33,10 @@ U02–U04 / U09):** goal read — `ListGoalsAsync`, `GetGoalAsync`; goal write �
 `DeleteProjectAsync`. **Pinned test names (§9.6, ~20):** 11 Core
 (`ProjectServiceTests.cs` appends) + 10 Web
 (`ProjectsControllerTests.cs` appends). **No code, no build, no tests**
-(U00 exit criteria). U01 (the docs + `M5DocTypes` + `ProjectId` fields)
+(U00 exit criteria). U01 (the docs + `ProjectDocTypes` + `ProjectId` fields)
 reads only this section + its own entry-read list.
 
-## U01 — the four new Core types + the `M5DocTypes` extension + the `ProjectId` fields
+## U01 — the four new Core types + the `ProjectDocTypes` extension + the `ProjectId` fields
 
 **Four new files** (all **verbatim** from the design doc §9.1 / §9.2, ADR
 0086 D2 / D3, the `TodoItem` / `KanbanBoard` provenance-table XML-doc style,
@@ -53,7 +53,7 @@ optional-date C-PL·5 / ADR 0079, **no** `IsDraft`),
 `src/Kumunita.Core/Projects/TodoItem.cs` + `KanbanBoard.cs` each gain
 exactly one `string? ProjectId { get; set; }` field (the C-M3·2 feed-filter
 pin, the `ComponentId` line style, ADR 0086 D4); **nothing else moves.**
-**`M5DocTypes.cs` extension** (the design doc §9.5 shape): two new
+**`ProjectDocTypes.cs` extension** (the design doc §9.5 shape): two new
 registrations after the `BoardItemPlacement` block —
 `opts.Schema.For<ProjectGoal>().Index(g => new { g.ComponentId,
 g.Created })` +
@@ -68,7 +68,7 @@ note (ADR 0086 / §9.5 / C-PL·3 / C-PL·8 named, the zero-migration pin).
 `src/Kumunita.Core/` + the one new test). **Test** (new):
 `tests/Kumunita.Core.Tests/ProjectDocShapeTests.cs` — one test,
 `ProjectGoal_Project_ResolveAndRegister` (boots a fresh scratch Postgres
-through the `M5DocTypes` surface, round-trips one of each of the four docs
+through the `ProjectDocTypes` surface, round-trips one of each of the four docs
 exercising the two new `ProjectId` columns, asserts the two adapters'
 6-member projection + the **exact** `"goal"` / `"project"` `TargetKind`
 strings, and the two additive fields exist + are `string?`); **pass**
@@ -799,7 +799,7 @@ handoff sections + the code:**
 - **Part-vs-whole (the M5 surface is untouched; the additions are additive)
   — PASS.** Confirmed by reading: the **U01** section (the four new Core
   types + `TodoItem` / `KanbanBoard` each gaining **exactly one** `string?
-  ProjectId`; the `M5DocTypes` extension = two new doc registrations + the
+  ProjectId`; the `ProjectDocTypes` extension = two new doc registrations + the
   `ProjectId` indexes; `ProjectDocShapeTests.ProjectGoal_Project_ResolveAndRegister`
   green; "Total: 802" Core full-run green); the **U08** section (the create
   forms post `ProjectId` and apply it **post-create** via the frozen
@@ -811,7 +811,7 @@ handoff sections + the code:**
   `UpdateTodoRequest` / `CreateBoardRequest` / `UpdateBoardRequest` all
   unchanged (no `ProjectId` member); `TodoItem.cs` + `KanbanBoard.cs` each
   carry the single additive `string? ProjectId` (comment: "a feed filter,
-  never a gate (C-M3·2)"); `M5DocTypes.cs` — the `TodoItem` / `KanbanBoard`
+  never a gate (C-M3·2)"); `ProjectDocTypes.cs` — the `TodoItem` / `KanbanBoard`
   blocks unchanged apart from the additive `.Index(...ProjectId)`, plus the
   two new `For<ProjectGoal>()` / `For<Project>()` registrations;
   `Milestones.cs` — `M7` is still the **single** `StatusNext` (line 48);
@@ -834,12 +834,12 @@ handoff sections + the code:**
   two new adapters (`ProjectGoalToAuditableResource` /
   `ProjectToAuditableResource`), the `IProjectService` new seam groups
   (goal U02 / project U03 / association U04 / delete U09), and the
-  `M5DocTypes` two new doc registrations + `ProjectId` indexes. The **§5
+  `ProjectDocTypes` two new doc registrations + `ProjectId` indexes. The **§5
   data-model** `Projects` block gains, **additively** after the existing
   `BoardItemPlacement` comment: the `ProjectGoal` + `Project` canonical
   field sets, the `ProjectId?` feed-filter note on `TodoItem` /
   `KanbanBoard`, the **creator ∪ GlobalAdmin** standing (ADR 0070), the
-  two new adapters, and the `IProjectService` seam groups + `M5DocTypes`
+  two new adapters, and the `IProjectService` seam groups + `ProjectDocTypes`
   registration note. **No existing M5 / M6 / M7 line renamed / reordered /
   removed.**
 - **`docs/adr/README.md`** — **verified, not rewritten**: the **0086** row

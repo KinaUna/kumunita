@@ -4,7 +4,7 @@ Status: Accepted
 Date: 2026-09-11
 Amends: M3 (the "posts in components" lane — component membership gains the
 mandatory/optional axis and a moderator write surface); ADR 0004 §B (the new
-`Component.Mandatory` column rides the existing `M1DocTypes` migration
+`Component.Mandatory` column rides the existing `CoreDocTypes` migration
 surface, no new schema surface); ADR 0006-E (all four new seams are additive)
 
 ## Context
@@ -45,7 +45,7 @@ one flag, one definition of membership, one gate.
 
 ### Core (`Kumunita.Core.UserInfo`)
 
-- **`Component.Mandatory`** (added to `M1DocTypes`; default `false`).
+- **`Component.Mandatory`** (added to `CoreDocTypes`; default `false`).
   ADR 0004 §B unchanged otherwise.
 - **The single "who is a member" definition** — `GetCommunityIdsAsync(userId)`
   returns the explicit `ComponentMembership` rows **∪ (Enabled ∧ Mandatory)**
@@ -169,7 +169,7 @@ is view-only.
   verbs), all `targetKind: component`, all C3, all Allow; the self-leave
   reuses `community.remove-member` (actor = the member). No new `Via` state.
 - Existing deployments are untouched: `Mandatory` defaults to `false` under
-  the `M1DocTypes` migration, and no existing row changes meaning.
+  the `CoreDocTypes` migration, and no existing row changes meaning.
 - `SetCommunityEnabledAsync(false)` on a mandatory community still hides it
   from every reader (union = enabled∧mandatory) — a mandatory but *disabled*
   community grants nothing; re-enabling restores it implicitly.

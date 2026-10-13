@@ -262,8 +262,8 @@ public sealed class IdentityServiceDeleteAccountTests(PostgresFixture fixture) :
         {
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

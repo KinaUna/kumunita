@@ -54,7 +54,9 @@
                              // floor (en registry) is the backstop.
                              string effectiveStatusLabel = !string.IsNullOrWhiteSpace(card.Status)
                                  ? card.Status
-                                 : (await Translation.GetAsync(StatusLabelKey(lane.Status), _kwL));
+                                 : (Translation is null
+                                     ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues.GetValueOrDefault(StatusLabelKey(lane.Status)) ?? StatusLabelKey(lane.Status)
+                                     : await Translation.GetAsync(StatusLabelKey(lane.Status), _kwL));
                             
                              string assigneeInitial = !string.IsNullOrWhiteSpace(card.AssigneeDisplayName)
                                  ? char.ToUpperInvariant(card.AssigneeDisplayName.TrimStart()[0]).ToString()
@@ -506,9 +508,15 @@
                                                             // renders text nodes, not attributes, so the labels are
                                                             // resolved the ADR 0072 way: provider by the effective
                                                             // language, the en registry the floor).
-                                                            var assignPeopleLabel = await Translation.GetAsync("projects.todo.assign_people", _kwL);
-                                                            var assignGroupsLabel = await Translation.GetAsync("projects.todo.assign_groups", _kwL);
-                                                            var assignCommunitiesLabel = await Translation.GetAsync("projects.todo.assign_communities", _kwL);
+                                                            var assignPeopleLabel = Translation is null
+                                                                ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_people"]
+                                                                : await Translation.GetAsync("projects.todo.assign_people", _kwL);
+                                                            var assignGroupsLabel = Translation is null
+                                                                ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_groups"]
+                                                                : await Translation.GetAsync("projects.todo.assign_groups", _kwL);
+                                                            var assignCommunitiesLabel = Translation is null
+                                                                ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_communities"]
+                                                                : await Translation.GetAsync("projects.todo.assign_communities", _kwL);
                                                             bool IsCurrent(string? oId) =>
                                                                 !string.IsNullOrEmpty(card.AssigneeId) && card.AssigneeId == oId;
                                                         }

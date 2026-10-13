@@ -106,7 +106,7 @@
   - `src/Kumunita.Core/Media/LocalVolumeMediaStore.cs` — composes U1's
     `IMediaFileStore` + the host `IDocumentStore`; the dedup lane (C-MED·4).
   - `src/Kumunita.Core/MediaDocTypes.cs` — the new ADR 0004 §B.1 doc surface
-    (`opts.Schema.For<MediaObject>()`), parallel to `M1DocTypes`/`M3DocTypes`.
+    (`opts.Schema.For<MediaObject>()`), parallel to `CoreDocTypes`/`PostDocTypes`.
   - edit `src/Kumunita.Core/DependencyInjection.cs` — registration below.
   - edit `src/Kumunita.Web/Program.cs` — the doc-surface call-site + the
     `Media__*` binding (below).
@@ -117,7 +117,7 @@
   (plain `AddTransient` — DI resolves `IMediaFileStore` from U1 and the
   host-registered `IDocumentStore`; mirrors M3 U6's `PostService` shape.)
 - **`MediaDocTypes` call-site** (in the `builder.Services.AddMarten(opts => …)`
-  lambda, immediately after `M3DocTypes.Configure(opts);`):
+  lambda, immediately after `PostDocTypes.Configure(opts);`):
   ```csharp
   MediaDocTypes.Configure(opts);
   ```
@@ -174,7 +174,7 @@
 - **Wiring confirmed at the pinned lines:** `IMediaStore` registration at
   `DependencyInjection.cs` L128 (right after U1's block);
   `MediaDocTypes.Configure(opts)` at `Program.cs` L87 (immediately after
-  `M3DocTypes.Configure(opts);`); the `Media__*` binding at `Program.cs`
+  `PostDocTypes.Configure(opts);`); the `Media__*` binding at `Program.cs`
   L45–46 (`Configure<MediaOptions>(… GetSection(MediaOptions.SectionName))`,
   `SectionName = "Media"`).
 - **Drift scan:** no Web/HTTP type (`IFormFile` etc.) in the four new files
@@ -322,7 +322,7 @@
     `NewDatabaseAsync()` scratch DB per test +
     `DocumentStore.For(opts => { Connection; DatabaseSchemaName = "mt";
     opts.Storage.Add<KumunitaFeature>(); opts.Storage.Add<AuthorizationFeature>();
-    M1DocTypes.Configure(opts); })` +
+    CoreDocTypes.Configure(opts); })` +
     `ApplyAllConfiguredChangesToDatabaseAsync` — the
     `UserInfoServiceGroupDescriptionTests.BootStoreAsync` shape in this
     assembly, mirrored verbatim). `Profile` seeded through the service's own
@@ -1014,7 +1014,7 @@ Dispo: **Confirmed-drift-and-corrected** (ADR 0004 §B wins; OPS.md fixed).
 
 - **Code truth:** there is no `mt.migrations` ledger anywhere — not in
   `Program.cs` (boot is `Marten` feature-schema boot from the
-  `M1DocTypes`/`M3DocTypes` registration surfaces), not in `M1DocTypes`
+  `CoreDocTypes`/`PostDocTypes` registration surfaces), not in `CoreDocTypes`
   (its comment is explicit: "Marten owns the schema — no hand-written
   `migrations/` files"), and not on the live stack: `pg_tables` on the
   compose `kumunita` DB shows the `identity` schema (7 AspNet* tables),

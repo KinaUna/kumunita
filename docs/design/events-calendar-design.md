@@ -133,7 +133,7 @@ locked text.
 ### 3.1 Zero document changes (D1) **[DECIDED — ADR 0063]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
-`M4DocTypes` is untouched; no `FeatureSchemaBase` migration; the boot
+`EventDocTypes` is untouched; no `FeatureSchemaBase` migration; the boot
 paths are untouched; no EF. The calendar is a **view** — it reads the
 existing `Start` / `End` instants and nothing new. The only additive C#
 in the whole lane is: one seam (`ListInRangeAsync`) + its implementation,

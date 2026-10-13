@@ -124,7 +124,7 @@ local volume.
 - **ADR 0006-D / ADR 0004 are not touched** for this lane — the `MediaObject`
   doc and the `MediaDocTypes` surface are the ADR 0004 §B.1 shape (Marten
   registers the POCO; `MediaDocTypes.Configure(opts)` is called once in
-  `Program.cs`, the same call-site as `M3DocTypes`).
+  `Program.cs`, the same call-site as `PostDocTypes`).
 - **Rejected: per-resident volume partition** (one subfolder per subject)
   — the content hash *is* the partition; scoping the read gate is an
   authorization job (C-MED·1), not an FS job. Rejected: **signed URLs /

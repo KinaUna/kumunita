@@ -4,7 +4,7 @@ namespace Kumunita.Core.Messaging;
 /// One 1:1 conversation (D1). The pair is stored **sorted** (ParticipantA ≤
 /// ParticipantB, string compare) so the unordered pair has exactly one
 /// canonical form — the (ParticipantA, ParticipantB) unique index in
-/// <see cref="M9DocTypes"/> is the idempotency witness for F1.
+/// <see cref="MessagingDocTypes"/> is the idempotency witness for F1.
 /// </summary>
 public sealed class Conversation
 {

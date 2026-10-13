@@ -20,7 +20,7 @@
 
 <form method="post" action="/settings/home">
     @Html.AntiForgeryToken()
-    <div class="row g-2 align-items-end">
+    <div class="row g-3">
         <div class="col-sm-8">
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="hideHomeIntro" id="hideHomeIntroId"
@@ -30,6 +30,38 @@
                 </label>
                 <div class="form-text small">
                     <kw-l key="settings.home_note">When off, the home page shows its intro sections as usual.</kw-l>
+                </div>
+            </div>
+
+            @* The home "upcoming" display preference (the Profile.HomeShowUpcoming
+               additive field) — a second on/off checkbox on the same page, the
+               same idiom as the intro toggle above. Un-checked does not post a
+               value, so "true" is the only affirmative state (the SavePageSize
+               "un-checked is the floor" shape). *@
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="homeShowUpcoming" id="homeShowUpcomingId"
+                       value="true" @(Model.HomeShowUpcoming ? "checked" : null)>
+                <label class="form-check-label" for="homeShowUpcomingId">
+                    <kw-l key="settings.home_upcoming_label">Show upcoming events and to-dos on the home page</kw-l>
+                </label>
+                <div class="form-text small">
+                    <kw-l key="settings.home_upcoming_note">When on, the next events and to-dos appear on your home page, above the feed. When off, the home page stays as it was.</kw-l>
+                </div>
+
+                @* The home "upcoming" scope (Profile.HomeUpcomingMineOnly, ADR 0163
+                   D1a) — a third on/off checkbox, indented under the "show upcoming"
+                   toggle it scopes (it is only meaningful when that one is on; the
+                   controller reads it alongside the others). Same un-checked-is-floor
+                   idiom: "true" is the only affirmative state. *@
+                <div class="form-check ms-4 mt-2">
+                    <input class="form-check-input" type="checkbox" name="homeUpcomingMineOnly" id="homeUpcomingMineOnlyId"
+                           value="true" @(Model.HomeUpcomingMineOnly ? "checked" : null)>
+                    <label class="form-check-label" for="homeUpcomingMineOnlyId">
+                        <kw-l key="settings.home_upcoming_mine_label">Show only my own events and to-dos</kw-l>
+                    </label>
+                    <div class="form-text small">
+                        <kw-l key="settings.home_upcoming_mine_note">When on, the section lists only the events you RSVP'd to or created and the to-dos assigned to you. When off, it shows the community's events and to-dos.</kw-l>
+                    </div>
                 </div>
             </div>
         </div>

@@ -112,6 +112,11 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         var detailProjects = Substitute.For<IProjectService>();
         detailProjects.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem> { todo }, false));
+        // The M14 interlock's board sibling — no boards are linked to the
+        // event in this closed-loop test, so the reverse read seam returns an
+        // empty page (the section renders nothing — C-M14·2).
+        detailProjects.ListBoardsForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
+            .Returns(new BoardPage(Array.Empty<Kumunita.Core.Projects.KanbanBoard>(), false));
         var detailEvents = Substitute.For<IEventService>();
         detailEvents.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
         detailEvents.GetEventTranslationsAsync(eventId).Returns(new List<EventTranslation>());
@@ -293,6 +298,117 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         }
     }
 
+    /// <summary>
+    /// The **create-and-link** write lane (the to-do detail's
+    /// "Create a new event" modal's submit button): composes the frozen
+    /// <see cref="IEventService.CreateAsync"/> + <see
+    /// cref="IProjectService.SetTodoEventAsync"/> in the correct order
+    /// (create first, then link) and redirects to the to-do detail with a
+    /// flash. The event is created as a draft (the ADR 0037 floor) and the
+    /// audience is the community-visible default (the ADR 0036 floor).
+    /// </summary>
+    [Fact]
+    public async Task CreateAndLinkEvent_CreatesEventAndLinksToDo()
+    {
+        const string actor = "subj-m14-create";
+        const string todoId = "todo-m14";
+        const string newEventId = "event-m14-new";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.SetTodoEventAsync(todoId, actor, Arg.Any<IReadOnlySet<string>>(), newEventId, Arg.Any<CancellationToken>())
+            .Returns(new TodoItem { Id = todoId, Title = "Set up the bench", AuthorId = actor, EventId = newEventId });
+
+        CreateEventRequest? capturedCreate = null;
+        var events = Substitute.For<IEventService>();
+        var created = new Event
+        {
+            Id = newEventId,
+            Title = "Cleanup day",
+            Body = "Cleanup day",
+            AuthorId = actor,
+            IsDraft = true,
+            Created = DateTimeOffset.UtcNow,
+        };
+        events.CreateAsync(actor, Arg.Any<CreateEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => { capturedCreate = call.ArgAt<CreateEventRequest>(1); return created; });
+
+        var controller = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
+        var start = new DateTime(2026, 10, 13, 10, 0, 0);
+        var end   = new DateTime(2026, 10, 13, 11, 0, 0);
+
+        var result = await controller.TodoCreateAndLinkEvent(todoId, "Cleanup day", start, end, "Common shed");
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
+
+        // (1) The event was created through the frozen seam.
+        await events.Received(1).CreateAsync(actor, Arg.Any<CreateEventRequest>(), Arg.Any<CancellationToken>());
+        Assert.NotNull(capturedCreate);
+        var request = capturedCreate!;
+        Assert.Equal("Cleanup day", request.Title);
+        Assert.Equal("Cleanup day", request.Body); // quick-create: body = title
+        Assert.Equal("Common shed", request.Location);
+        Assert.True(request.IsDraft); // ADR 0037 floor
+        Assert.True(request.Audience!.Community); // ADR 0036 floor
+
+        // (2) The to-do was linked to the new event through the frozen seam.
+        await projects.Received(1).SetTodoEventAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(), newEventId, Arg.Any<CancellationToken>());
+
+        // (3) The flash message confirms success.
+        Assert.Equal("Event created and linked to this to-do (saved as a draft).",
+            controller.TempData["info"]);
+    }
+
+    /// <summary>
+    /// The **create-and-link** write lane's shape gate: a blank title is
+    /// refused with a flash (no event is created, no link is set).
+    /// </summary>
+    [Fact]
+    public async Task CreateAndLinkEvent_BlankTitleIsRefused()
+    {
+        const string actor = "subj-m14-create-blank";
+        const string todoId = "todo-m14";
+
+        var projects = Substitute.For<IProjectService>();
+        var events = Substitute.For<IEventService>();
+        var controller = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
+        var start = new DateTime(2026, 10, 13, 10, 0, 0);
+        var end   = new DateTime(2026, 10, 13, 11, 0, 0);
+
+        var result = await controller.TodoCreateAndLinkEvent(todoId, "", start, end, null);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
+        await events.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, default!);
+        await projects.DidNotReceiveWithAnyArgs().SetTodoEventAsync(default!, default!, default!, default!, default!);
+        Assert.NotNull(controller.TempData["error"]);
+    }
+
+    /// <summary>
+    /// The **create-and-link** write lane's End-before-Start shape gate:
+    /// refused with a flash (no event is created, no link is set).
+    /// </summary>
+    [Fact]
+    public async Task CreateAndLinkEvent_EndBeforeStartIsRefused()
+    {
+        const string actor = "subj-m14-create-end";
+        const string todoId = "todo-m14";
+
+        var projects = Substitute.For<IProjectService>();
+        var events = Substitute.For<IEventService>();
+        var controller = BuildProjects(projects, events, Substitute.For<IDocumentStore>(), actor);
+        var start = new DateTime(2026, 10, 13, 11, 0, 0);
+        var end   = new DateTime(2026, 10, 13, 10, 0, 0); // end before start
+
+        var result = await controller.TodoCreateAndLinkEvent(todoId, "Cleanup day", start, end, null);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
+        await events.DidNotReceiveWithAnyArgs().CreateAsync(default!, default!, default!);
+        Assert.NotNull(controller.TempData["error"]);
+    }
+
     // ── Scaffolding ──────────────────────────────────────────────────────────
 
     /// <summary>
@@ -336,10 +452,10 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

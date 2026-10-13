@@ -220,8 +220,8 @@ public sealed class IdentityServiceDeleteChildAccountTests(
         {
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

@@ -15,7 +15,7 @@
 >
 > **Status.** **Part 1 + Part 2 LOCKED.** The decisions D1–D9 are locked in
 > **ADR 0087 (Accepted, 2026-09-25)**; **Part 2** (the exact C# shapes, the
-> additive `IProjectService` seams, the request DTOs, the `M5DocTypes`
+> additive `IProjectService` seams, the request DTOs, the `ProjectDocTypes`
 > additive shape, the pinned test names, the three-test acceptance gate, and
 > the drift-guard) follows in the "Seams & contracts" section below.
 >
@@ -30,7 +30,7 @@
 > invariants (C-TBD·1…6); the FACES (F1–F8); the parts affected; the
 > feedback-loop shape; and the risks. **Part 2:** the exact C# shapes, the
 > additive `IProjectService` seams, the request DTO fields, the
-> `M5DocTypes` additive shape, the pinned test names, the three-test
+> `ProjectDocTypes` additive shape, the pinned test names, the three-test
 > acceptance gate, and the drift-guard.
 
 ## 1. What this lane is
@@ -73,7 +73,7 @@ reusing.** It reuses the frozen `IAuthorizationService.CanAsync(Read)` path
 a *read of another to-do*, not a new resource), the standing matrix
 **creator ∪ assignee ∪ GlobalAdmin** (the C-M5·6 to-do matrix — the
 `AssignTodoAsync` shape), the `kw-l` registry (ADR 0015) for the four new
-keys, and the `M5DocTypes` surface (the ADR 0004 §B.1 delta-detect — one new
+keys, and the `ProjectDocTypes` surface (the ADR 0004 §B.1 delta-detect — one new
 index, zero migration). **No new `AccessAction`**, **no new `AccessVia`**,
 **no new authorization branch**, **no new adapter**, **no new document** —
 `TBD` adds one *field + a chip*, not a *branch*. **No code in this unit —
@@ -130,7 +130,7 @@ builds on without re-inventing:
    are additive on; **no new routes** (the filter is a `?blockedOnly=true`
    query param on the existing `TodosIndex` route — the `unassignedOnly`
    precedent).
-8. **`M5DocTypes`** (`Kumunita.Core`) — the existing surface the new
+8. **`ProjectDocTypes`** (`Kumunita.Core`) — the existing surface the new
    `TodoItem.BlockedByTodoId` **index** registers on (the ADR 0004 §B.1
    delta-detect shape; the unnamed-computed-index constraint noted there
    applies).
@@ -152,7 +152,7 @@ the lane plan are retired by this lock.
 
 One `string? BlockedByTodoId` on **`TodoItem`** (the ADR 0004 §B.1 / ADR
 0086 `ProjectId` additive shape; existing rows simply have `null`);
-registered on `M5DocTypes` with one `Index` on `(BlockedByTodoId)`.
+registered on `ProjectDocTypes` with one `Index` on `(BlockedByTodoId)`.
 **The singular pointer is the design** — `ParentId?` / `GoalId?` /
 `ProjectId?` are all single-optional-FK idioms; a to-do waiting on *three*
 things uses the `ParentId` subtask structure or three to-dos, not a list.
@@ -255,7 +255,7 @@ proves its weight); and any **enforced** dependency (D2).
 
 - **C-TBD·1 — One optional pointer, additive, zero migration.** One
   `string? BlockedByTodoId` on `TodoItem` (the `ParentId?` / `GoalId?` /
-  `ProjectId?` single-optional-FK idiom); the `M5DocTypes` surface gains
+  `ProjectId?` single-optional-FK idiom); the `ProjectDocTypes` surface gains
   one `Index` on `(BlockedByTodoId)` (ADR 0004 §B.1 delta-detect; existing
   rows simply have `null`). **Not a list, not a new document.**
 - **C-TBD·2 — A hint, never a gate.** `BlockedByTodoId` never changes the
@@ -318,7 +318,7 @@ proves its weight); and any **enforced** dependency (D2).
 ## 6. Parts affected
 
 - **`Kumunita.Core.Projects`** — one additive field: `TodoItem.BlockedByTodoId?`
-  (U01); one additive index on `M5DocTypes` (U01).
+  (U01); one additive index on `ProjectDocTypes` (U01).
 - **`IProjectService` + `ProjectService`** — additive seams (U02):
   `ListTodosAsync` gains `blockedOnly`; `TodoDetailResult` gains `Blocker?`
   (+ `GetTodoAsync` resolves it); `CreateTodoRequest` / `UpdateTodoRequest`
@@ -354,17 +354,17 @@ public string? ParentId { get; set; }                       // the sole hierarch
 public string? BlockedByTodoId { get; set; }                // the "waiting on" pointer; a hint, never a gate (C-TBD·2 — ADR 0087)
 ```
 
-The `M5DocTypes` `Configure` gains **one index** (the ADR 0004 §B.1
+The `ProjectDocTypes` `Configure` gains **one index** (the ADR 0004 §B.1
 delta-detect shape; the unnamed-computed-index constraint noted there
 applies):
 
 ```csharp
-// the TBD "waiting on" index (ADR 0087 D1 — additive on M5DocTypes, zero
+// the TBD "waiting on" index (ADR 0087 D1 — additive on ProjectDocTypes, zero
 // migration for existing rows)
 db.Schema.For<TodoItem>(x => x.BlockedByTodoId).CreateIndex();
 ```
 
-(Exact registration syntax per the existing `M5DocTypes` file — the
+(Exact registration syntax per the existing `ProjectDocTypes` file — the
 `TodoItem.ProjectId` index is the immediate template; U01 settles the
 exact call.)
 
@@ -580,13 +580,13 @@ keys):
 </a>
 ```
 
-### 7.4 `M5DocTypes` additive shape (U01)
+### 7.4 `ProjectDocTypes` additive shape (U01)
 
-The `M5DocTypes.Configure` gains **one index** (the exact call per the
+The `ProjectDocTypes.Configure` gains **one index** (the exact call per the
 existing file — the `TodoItem.ProjectId` index is the immediate template):
 
 ```csharp
-// the TBD "waiting on" index (ADR 0087 D1 — additive on M5DocTypes, zero
+// the TBD "waiting on" index (ADR 0087 D1 — additive on ProjectDocTypes, zero
 // migration for existing rows; the ADR 0004 §B.1 delta-detect shape)
 db.Schema.For<TodoItem>(x => x.BlockedByTodoId).CreateIndex();
 ```
@@ -662,7 +662,7 @@ reading the named handoff sections + the code (the full record is in
 `docs/plans-milestones/done/tbd/tbd-handoff-notes.md`, `## U04`):
 
 - **Closed loop — PASS.** U01 adds `TodoItem.BlockedByTodoId?` + the
-  `M5DocTypes` index; U02 lands the seams + the cycle guard + the
+  `ProjectDocTypes` index; U02 lands the seams + the cycle guard + the
   `BlockerChip` (11 Core pins); U03 wires the chip on `TodoDetail.cshtml`,
   the picker on `Create.cshtml` / `Edit.cshtml`, the `?blockedOnly=true`
   toggle on `TodosIndex.cshtml`, the `None`→`ClearBlockedBy` clear, and the

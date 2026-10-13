@@ -1,0 +1,217 @@
+@*
+    Tokens.cshtml — the ESC /admin/escalation/tokens receiving-token surface
+    (ADR 0159, ESC·3 / ESC·9 / ESC·12).
+
+    The receiving GlobalAdmin's token lifecycle:
+      - A **generate** form (the Label input + the
+        escalation.tokens.generate.button button, the U07 closed set). A
+        [ValidateAntiForgeryToken] POST to …/generate (the
+        IEscalationTokenService.GenerateAsync single-write-lane, ESC·3 /
+        ESC·9). On success the plaintext is shown **once** (the
+        Model.NewTokenPlaintext one-shot, the
+        escalation.tokens.show_once warning, ESC·3) + a masked row in the
+        list (the TokenPrefix only, ESC·3). The plaintext is **never**
+        re-rendered on a subsequent GET (a fresh ListAsync projects to the
+        EscalationTokenSummary — no plaintext, no TokenHash, ESC·3).
+      - A **token list** (newest first, the IEscalationTokenService.ListAsync
+        read — a read, no audit row, the M31·4 precedent). Each row: the
+        Label + the masked TokenPrefix (the escalation.tokens.last_used label
+        for the LastUsedAt? field, the U07 closed set) + the Created + the
+        LastUsedAt? + a revoked chip (RevokedAt != null) + a Revoke button
+        (the [ValidateAntiForgeryToken] POST to …/{id}/revoke, the
+        IEscalationTokenService.RevokeAsync idempotent write lane, ESC·9).
+      - An **empty state** (the escalation.tokens.none kw-l key, the U07
+        closed set) when there are no tokens.
+
+    The [Authorize(Roles = GlobalAdmin)] gate is the standard admin surface
+    (the ErrorReportAdminController shape, the ADR 0001-B thin-token rule);
+    no new AccessAction / Decide() branch / IAuthorizationService surface
+    (ESC·12). The token validation stays in Core (the
+    IEscalationTokenService.ValidateAsync seam, used by the inbound endpoint,
+    U06) — this surface only generates / lists / revokes.
+
+    The copy is the closed escalation.tokens.* kw-l key set (the U07 closed
+    set, ESC·11 — the register's §2.3 keys 10–18). Every label goes through
+    <kw-l> by key (the kw-l TagHelper floor, ADR 0015 D1 — an unregistered
+    key falls back to the raw key, so the view renders the en reference text
+    until U07 authors the values).
+
+    Razor traps honored (AGENTS.md):
+      - No <kw-l> inside a quoted attribute value (the chip uses a
+        conditional @if/@else with separate <kw-l> elements).
+      - No un-awaited Task<string> in markup (the flash strings are
+        server-resolved by the controller's FlashAsync — the view only
+        renders the resolved string).
+      - No style=/data-* attributes built by interpolating quoted strings
+        via @(...) (the Bootstrap classes are static strings).
+      - The plaintext <code> block is a plain string (Model.NewTokenPlaintext
+        is a server-resolved value, not a Task — the kw-l provider floor,
+        ADR 0015 D1; the view renders it directly).
+*@
+@using Kumunita.Core.ErrorReports
+@model Kumunita.Web.Models.EscalationTokenViewModel
+@{
+    ViewData["Title"] = "Admin — Receiving tokens";
+}
+
+@* The /admin section sub-nav (the ADR 0062 nav-tabs idiom): top of the page.
+   This view sits in Views/Admin/Escalation/, so the shared partial — which
+   lives in Views/Admin/ (the AdminController's own section) — must be
+   referenced absolutely (the AdminStorage/Index.cshtml precedent). *@
+@await Html.PartialAsync("~/Views/Admin/_AdminNav.cshtml")
+
+<h1><kw-l key="escalation.tokens.title">Receiving access tokens</kw-l></h1>
+
+@* The generate / revoke flash (the escalation.tokens.revoked key, the U07
+   closed set, ESC·11) — rendered when the just-processed Revoke action was
+   effective (a successful revocation). The Model.Flash is a server-resolved
+   string (the controller's FlashAsync, the AdminOnboardingController.FlashAsync
+   idiom). A no-op (an already-revoked token, ESC·9) sets no flash → no alert
+   (the M32·8 idempotency precedent). *@
+@if (Model.Flash is string flash)
+{
+    <div class="alert alert-success">@flash</div>
+}
+
+@* The validation error flash (a blank Label on Generate, the M32·4 / M31·6
+   no-op shape). The Model.Error is a server-resolved string (the
+   controller's FlashAsync, the kw-l provider floor, ADR 0015 D1). *@
+@if (Model.Error is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@* The one-shot plaintext block (the ESC·3 pin — the plaintext is shown
+   **exactly once**, the escalation.tokens.show_once warning). Rendered only
+   when Model.NewTokenPlaintext is non-null (set on the re-render
+   immediately after a Generate action, **never** on a subsequent GET — a
+   fresh ListAsync projects to the EscalationTokenSummary read-model, which
+   carries no plaintext and no TokenHash, ESC·3). A <code> block + a copy
+   button (the escalation.tokens.copy kw-l key, the U07 closed set). *@
+@if (Model.NewTokenPlaintext is string token)
+{
+    <div class="alert alert-warning">
+        <p class="mb-2">
+            <kw-l key="escalation.tokens.show_once">Copy this token now — it is shown only once and never stored in plain text.</kw-l>
+        </p>
+        <div class="d-flex align-items-center gap-2">
+            <code class="flex-grow-1 break-all p-2 bg-white border rounded" id="new-token">@token</code>
+            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                    onclick="navigator.clipboard.writeText(document.getElementById('new-token').textContent)">
+                <kw-l key="escalation.tokens.copy">Copy</kw-l>
+            </button>
+        </div>
+    </div>
+}
+
+@* The generate form (the escalation.tokens.generate.button + the
+   escalation.tokens.label.label kw-l keys, the U07 closed set). A
+   [ValidateAntiForgeryToken] POST to /admin/escalation/tokens/generate (the
+   IEscalationTokenService.GenerateAsync single-write-lane, ESC·3 / ESC·9). *@
+<form method="post" action="/admin/escalation/tokens/generate" class="card card-body mb-4">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-md-8">
+            <label class="form-label" for="label">
+                <kw-l key="escalation.tokens.label.label">Label (e.g. the origin platform's name)</kw-l>
+            </label>
+            <input type="text" class="form-control" id="label" name="label" required />
+        </div>
+        <div class="col-md-4">
+            <button type="submit" class="btn btn-primary w-100">
+                <kw-l key="escalation.tokens.generate.button">Generate a new token</kw-l>
+            </button>
+        </div>
+    </div>
+</form>
+
+@* The token list (newest first, the IEscalationTokenService.ListAsync read,
+   ESC·3 / ESC·9 — a read, no audit row, the M31·4 precedent). Each row: the
+   Label + the masked TokenPrefix + the Created + the LastUsedAt? + a revoked
+   chip (RevokedAt != null) + a Revoke button (the POST …/{id}/revoke, the
+   IEscalationTokenService.RevokeAsync idempotent write lane, ESC·9). *@
+@if (Model.Tokens.Count == 0)
+{
+    @* The empty state (the escalation.tokens.none kw-l key, the U07 closed
+       set). *@
+    <p class="text-muted">
+        <kw-l key="escalation.tokens.none">No access tokens yet. Generate one to authorize an origin platform.</kw-l>
+    </p>
+}
+else
+{
+    <div class="list-group kmb-escalation-tokens-list">
+        @foreach (var t in Model.Tokens)
+        {
+            <div class="list-group-item d-flex align-items-start gap-3">
+                @* The status chip: revoked = text-bg-danger (the
+                   escalation.tokens.revoked kw-l key, the U07 closed set,
+                   ESC·11 — the ESC·9 pin, the token no longer validates,
+                   immediate). An active token shows a neutral success chip
+                   (no dedicated "active" key in the §2.3 set — a static
+                   Bootstrap badge, the M31 chip precedent). *@
+                @if (t.RevokedAt is not null)
+                {
+                    <span class="badge text-bg-danger fw-semibold text-nowrap">
+                        <kw-l key="escalation.tokens.revoked">Revoked</kw-l>
+                    </span>
+                }
+                else
+                {
+                    <span class="badge text-bg-success fw-semibold text-nowrap">
+                        Active
+                    </span>
+                }
+                <div class="flex-grow-1">
+                    @* The label (the admin's name for the origin platform —
+                       the ESC·3 pin, a plain string rendered as authored) +
+                       the masked token prefix (the TokenPrefix is the masked
+                       display form, e.g. "kesc_ab12…"; the plaintext + the
+                       TokenHash are **never** exposed, the
+                       EscalationTokenSummary read-model, ESC·3). *@
+                    <div class="font-weight-semibold">
+                        <span>@t.Label</span>
+                        <code class="ms-2 fw-normal">@t.TokenPrefix</code>
+                    </div>
+                    @* The created timestamp (the kw-dt TagHelper — the house
+                       date format, the ADR 0019/0020 surface). The
+                       escalation.tokens.last_used kw-l key (the U07 closed
+                       set) labels the last-used field below; the created
+                       timestamp is a plain date (no dedicated "created" key
+                       in the §2.3 set — the M31 list's created-date
+                       precedent, the errorreport.list.created shape). *@
+                    <div class="small mt-1 text-muted">
+                        <kw-dt dt="@t.Created" format="g"></kw-dt>
+                    </div>
+                    @* The last-used timestamp (the kw-dt TagHelper, rendered
+                       when non-null — the ESC·9 pin, the escalation.tokens.
+                       last_used kw-l key, the U07 closed set). *@
+                    @if (t.LastUsedAt is not null)
+                    {
+                        <div class="small mt-1">
+                            <span class="text-muted">
+                                <kw-l key="escalation.tokens.last_used">Last used</kw-l>
+                            </span>
+                            <kw-dt dt="@t.LastUsedAt.Value" format="g"></kw-dt>
+                        </div>
+                    }
+                </div>
+                @* The Revoke button (the [ValidateAntiForgeryToken] POST to
+                   /admin/escalation/tokens/{id}/revoke, the
+                   IEscalationTokenService.RevokeAsync idempotent write lane,
+                   ESC·9). Visible only when the token is **not** already
+                   revoked (a no-op — the M32·8 / M31·6 idempotency
+                   precedent). *@
+                @if (t.RevokedAt is null)
+                {
+                    <form method="post" action="/admin/escalation/tokens/@t.Id/revoke" class="ms-2 me-0">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">
+                            <kw-l key="escalation.tokens.revoke.button">Revoke</kw-l>
+                        </button>
+                    </form>
+                }
+            </div>
+        }
+    </div>
+}

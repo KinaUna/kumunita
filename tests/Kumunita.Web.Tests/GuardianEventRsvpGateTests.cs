@@ -97,7 +97,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         // The redirect goes back to the Detail page (the standard
         // "save + back to curation" shape, the SetChildMessaging idiom).
         Assert.Equal(nameof(GuardianController.Detail), redirect.ActionName);
-        Assert.Equal(Child, redirect.RouteValues["childId"]);
+        Assert.Equal(Child, redirect.RouteValues!["childId"]);
 
         // The mode is live on the very next read (C4).
         Assert.Equal(mode, (await userInfo.GetProfileAsync(Child))!.EventRsvpMode);
@@ -121,7 +121,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         // Pending request row + left no RSVP row).
         var events = EventsService(store);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going));
+            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         var result = await controller.ApproveEventRsvp(Child, EventId);
         Assert.IsType<RedirectToActionResult>(result);
@@ -131,7 +131,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         {
             var rsvp = await session.Query<EventRsvp>()
                 .Where(r => r.EventId == EventId && r.UserId == Child)
-                .SingleAsync();
+                .SingleAsync(TestContext.Current.CancellationToken);
             Assert.Equal(RsvpStatus.Going, rsvp.Status);
         }
 
@@ -140,7 +140,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         {
             var request = await session.Query<GuardianEventRequest>()
                 .Where(r => r.EventId == EventId && r.ChildId == Child)
-                .SingleAsync();
+                .SingleAsync(TestContext.Current.CancellationToken);
             Assert.Equal(GuardianEventRequestStatus.Approved, request.Status);
             Assert.Equal(Guardian, request.ResolvedBy);
         }
@@ -157,7 +157,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         var (controller, store) = await BuildAsync(actorSubjectId: NonGuardian);
         var events = EventsService(store);
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going));
+            () => events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken));
 
         var result = await controller.DenyEventRsvp(Child, EventId);
 
@@ -169,7 +169,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         {
             var request = await session.Query<GuardianEventRequest>()
                 .Where(r => r.EventId == EventId && r.ChildId == Child)
-                .SingleAsync();
+                .SingleAsync(TestContext.Current.CancellationToken);
             Assert.Equal(GuardianEventRequestStatus.Pending, request.Status);
         }
         Assert.Equal(0, await CountAuditAsync(store, "guardian.event_rsvp_deny", EventId));
@@ -184,7 +184,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         // The GuardianNotifies posture: the child RSVPs freely...
         await (new UserInfoService(store)).SetChildEventRsvpModeAsync(
             Child, EventRsvpMode.GuardianNotifies, Guardian);
-        await events.RsvpAsync(EventId, Child, RsvpStatus.Going);
+        await events.RsvpAsync(EventId, Child, RsvpStatus.Going, TestContext.Current.CancellationToken);
 
         // ...and the guardian vetoes (the window to undo).
         var result = await controller.VetoEventRsvp(Child, EventId);
@@ -194,7 +194,7 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
         {
             Assert.Equal(0, await session.Query<EventRsvp>()
                 .Where(r => r.EventId == EventId && r.UserId == Child)
-                .CountAsync());
+                .CountAsync(TestContext.Current.CancellationToken));
         }
 
         var row = await LastAuditAsync(store, "guardian.event_rsvp_veto", EventId);
@@ -231,8 +231,8 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture) : IClass
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

@@ -16,7 +16,10 @@
  *     TagHelper can't substitute {n}, so the count is computed here).
  *   - On each click, reveals the next batch (10 by default, the button's
  *     `data-rm-batch-size`) of that side's hidden entries and updates the
- *     label with the new remaining count.
+ *     label with the new remaining count. The disclosure direction always
+ *     grows the visible window: "upcoming" reveals from the window's edge
+ *     toward the latest, "earlier" reveals from the window's edge toward
+ *     the earliest (i.e. the latest hidden entries first, not the oldest).
  *   - When a side has nothing left to reveal, removes that button's wrapper
  *     (so the section ends on the list, not a dead control).
  *
@@ -64,7 +67,14 @@
 
     btn.addEventListener('click', () => {
       const hidden = remaining();
-      for (let i = 0; i < batch && i < hidden.length; i++) {
+      // The list renders oldest→newest, so "earlier" items sit at the front
+      // of the DOM. Reveal from the end of that run — the entries closest to
+      // the visible window — so each click extends the window backwards
+      // (latest→earliest) instead of surfacing the oldest entries first.
+      // "upcoming" items grow away from the window in DOM order, unchanged.
+      const count = Math.min(batch, hidden.length);
+      const start = dir === 'earlier' ? hidden.length - count : 0;
+      for (let i = start; i < start + count; i++) {
         hidden[i].hidden = false;
       }
       const left = remaining().length;

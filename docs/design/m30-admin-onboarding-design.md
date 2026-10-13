@@ -148,7 +148,7 @@ M30·7 is route-agnostic about where the discoverability affordance lives):
 
 | # | Setting (step) | Route (link target) | Owning surface |
 | --- | --- | --- | --- |
-| 1 | **Community name** | `/admin/languages` | the community's display name + description, edited within the languages surface (ADR 0026 / 0053 community-translation surface). |
+| 1 | **Community name** | `/admin/communities` | the community's base name + description (the AddCommunity / UpdateCommunity form, ADR 0062). The M30 route pointed at `/admin/languages` by mistake — that surface only owns the language catalog + UI-string translations, not the community's name/description, so the link was re-pointed to the surface that actually owns it. |
 | 2 | **Languages** | `/admin/languages` | the language catalog + the translated UI strings + the static pages. |
 | 3 | **Moderation** | `/admin/announcements/comments` | the announcement-comment moderation toggle (the ADR 0101 shape — the closest shipped admin surface for "moderation" on the current admin surface). |
 | 4 | **Notifications** | `/admin/quiet` | the notification-flush cadence the admin sets for held notification emails (residents set their own quiet window on `/settings/quiet`). |
@@ -680,7 +680,7 @@ scope) carries the `Completed` property (the `GetAsync` read's inverse —
 `CompletedAt != null`) + the closed seven-step list. The seven `Step` entries
 are the closed set (the register's §"closed `kw-l` key set" table, the seven
 `(key, labelKey, route, descriptionKey)` tuples in the README /
-`Milestones.cs` order: community name → `/admin/languages`, languages →
+`Milestones.cs` order: community name → `/admin/communities`, languages →
 `/admin/languages`, moderation → `/admin/announcements/comments`,
 notifications → `/admin/quiet`, storage limits → `/admin/storage/settings`,
 site content → `/admin/site`, issue escalation →

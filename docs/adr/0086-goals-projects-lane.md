@@ -36,7 +36,7 @@ One already-accepted decision constrains this lane:
 - **Two new documents, one existing context (D1).** `ProjectGoal` +
   `Project` (ns `Kumunita.Core.Projects` — the M5 context; a *new* context
   would be overkill for two docs that share the same standing / audience /
-  renderer surface), additive on **`M5DocTypes`** (the surface already
+  renderer surface), additive on **`ProjectDocTypes`** (the surface already
   delta-detects; zero new surface file, zero migration for existing docs).
 - **`ProjectGoal` (D2).** `Id`; `Title` (non-empty); `Description?`
   (Markdown — the ADR 0025 shape, optional); `ComponentId?` (a feed filter,
@@ -120,7 +120,7 @@ One already-accepted decision constrains this lane:
 
 ## Consequences
 
-- The `M5DocTypes` surface grows by two documents + four indexes (the
+- The `ProjectDocTypes` surface grows by two documents + four indexes (the
   `(ComponentId, Created)` feed indexes on `ProjectGoal` + `Project`, the
   `GoalId` index on `Project`, the `ProjectId` indexes on `TodoItem` +
   `KanbanBoard`) — delta-detected at boot (ADR 0004 §B.1), zero migration

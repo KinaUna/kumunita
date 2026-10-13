@@ -11,7 +11,7 @@
 > **What this is:** two **new documents** in the **existing**
 > `Kumunita.Core.Projects` context (a `ProjectGoal` — title + description, the
 > organizing container — and a `Project` — title + description + status +
-> start/due dates + optional goal), **additive on the `M5DocTypes` surface**
+> start/due dates + optional goal), **additive on the `ProjectDocTypes` surface**
 > (zero new surface, zero migrations for existing docs), **additive
 > `IProjectService` seams** (read / write for both docs + the
 > project-association write lanes for to-dos and boards), **one new
@@ -78,7 +78,7 @@ rendered.
 - **D1 — two new docs, one existing context.** `ProjectGoal` + `Project`
   (ns `Kumunita.Core.Projects`, the M5 context — a *new* context would be
   overkill for two docs that share the same standing / audience / renderer
-  surface). Additive on **`M5DocTypes`** (ADR 0004 §B.1 — the surface already
+  surface). Additive on **`ProjectDocTypes`** (ADR 0004 §B.1 — the surface already
   delta-detects; zero new surface file, zero migration for existing docs).
 - **D2 — `ProjectGoal` shape.** `Id`; `Title` (non-empty); `Description?`
   (Markdown — the ADR 0025 shape, optional); `ComponentId?` (a feed filter,
@@ -187,7 +187,7 @@ rendered.
 | Unit | Title | Deliverable shape |
 |------|-------|-------------------|
 | **U00** | Design doc + **ADR 0086** | `docs/design/pl-goals-projects-design.md` (the D1–D12 above, locked, the exact C# seam shapes, the pinned test names, the three-test gate, the drift-guard) + `docs/adr/0086-goals-projects-lane.md` (Accepted) + `docs/adr/README.md` index row. **No code, no build.** |
-| **U01** | `ProjectGoal` + `Project` docs + `M5DocTypes` surface + `ProjectId` on `TodoItem` / `KanbanBoard` | `src/Kumunita.Core/Projects/ProjectGoal.cs`, `Project.cs`, `ProjectGoalToAuditableResource.cs`, `ProjectToAuditableResource.cs`; `M5DocTypes.Configure` extended (the two new docs + the `TodoItem` / `KanbanBoard` `ProjectId` indexes); `dotnet build` clean; a `PL` unit test (the doc shapes compile + register). |
+| **U01** | `ProjectGoal` + `Project` docs + `ProjectDocTypes` surface + `ProjectId` on `TodoItem` / `KanbanBoard` | `src/Kumunita.Core/Projects/ProjectGoal.cs`, `Project.cs`, `ProjectGoalToAuditableResource.cs`, `ProjectToAuditableResource.cs`; `ProjectDocTypes.Configure` extended (the two new docs + the `TodoItem` / `KanbanBoard` `ProjectId` indexes); `dotnet build` clean; a `PL` unit test (the doc shapes compile + register). |
 | **U02** | `IProjectService` goal read + write lanes | `IProjectService` (additive: `ListGoalsAsync` / `GetGoalAsync` / `CreateGoalAsync` / `UpdateGoalAsync` — the full-interface-first pattern, the M4 `IEventService` precedent); `ProjectService` implements all four (the frozen `IAuthorizationService` path, the two adapters, the standing re-check, the `AccessAudit` rows); `ProjectServiceTests` pinned tests (the design doc §pin list). |
 | **U03** | `IProjectService` project read + write lanes | `IProjectService` (additive: `ListProjectsAsync` / `GetProjectAsync` / `CreateProjectAsync` / `UpdateProjectAsync` **+ `ListProjectsForGoalAsync`** — the goal detail's "projects in this goal" seam, the M5 `ListBoardsForTodoAsync` per-parent precedent); `ProjectService` implements (the `GoalId` guard — a `GoalId` pointing at a soft-deleted or unreadable goal is **refused** on create, the `KeyNotFoundException` 404 shape; the `Status` string + `StartAt` / `DueAt` optional-date shape, the ADR 0079 precedent); `ProjectServiceTests` pinned tests. |
 | **U04** | `IProjectService` association lanes (`SetTodoProjectAsync` / `SetBoardProjectAsync`) + `ProjectId` on the existing read lanes | `IProjectService` (additive: `SetTodoProjectAsync` / `SetBoardProjectAsync` + the **`projectId?`** optional param on the existing `ListTodosAsync` / `ListBoardsAsync` feed seams — a feed filter, never a gate, C-M3·2); `ProjectService` implements (the standing re-check, the `AccessAudit` rows, the `ProjectId` filter); `ProjectServiceTests` pinned tests. |
@@ -269,11 +269,11 @@ rendered.
   template this one builds on; the `TodoItem` / `KanbanBoard` /
   `KanbanLane` / `BoardItemPlacement` shapes, the `IProjectService` surface,
   the `TodoItemToAuditableResource` / `KanbanBoardToAuditableResource`
-  adapter shapes, the `M5DocTypes` surface, the standing matrix, the
+  adapter shapes, the `ProjectDocTypes` surface, the standing matrix, the
   `kw-l` key-registry shape).
 - `docs/adr/0067-m5-projects-todos-and-kanban.md` (the ADR this lane
   extends — the bounded context, the `IProjectService` surface, the two
-  adapters, the `M5DocTypes` surface, the standing matrix; confirm what is
+  adapters, the `ProjectDocTypes` surface, the standing matrix; confirm what is
   frozen).
 - `docs/adr/0070-board-edit-lane-title-and-description.md` (the
   **creator ∪ GlobalAdmin** standing precedent this lane reuses — the
@@ -300,7 +300,7 @@ rendered.
 - `src/Kumunita.Core/Projects/TodoItem.cs` + `KanbanBoard.cs` (the
   **existing** doc shapes — the `ProjectId?` field is **additive** on them,
   the C-M3·2 feed-filter pin).
-- `src/Kumunita.Core/M5DocTypes.cs` (the **existing** surface — the two new
+- `src/Kumunita.Core/ProjectDocTypes.cs` (the **existing** surface — the two new
   docs + the `TodoItem` / `KanbanBoard` `ProjectId` indexes are **additive**
   on it; the `UniqueIndex` / `Index` shape the new indexes mirror).
 - `src/Kumunita.Web/Controllers/ProjectsController.cs` (the **existing**

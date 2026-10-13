@@ -9,7 +9,7 @@ namespace Kumunita.Core.Events;
 /// <para>
 /// One row per (event, language) pair — the
 /// <c>(EventId, LanguageCode)</c> unique index
-/// (<see cref="M4DocTypes.Configure"/>) enforces that at the database layer
+/// (<see cref="EventDocTypes.Configure"/>) enforces that at the database layer
 /// (Marten's document identity is the surrogate <c>Id</c>, the same
 /// <see cref="PostTranslation"/> business-key convention as M1/M3). The
 /// translation carries its own <see cref="Title"/> (optional — the base event's

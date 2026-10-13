@@ -461,7 +461,6 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
 
         const string assigningGuardian = "ga-read-assigning";
         const string assignedGuardian = "ga-read-assigned";
-        const string otherGuardian  = "ga-read-other";
         const string child          = "ga-read-child";
 
         await SeedChildProfileAsync(store, child, ct);
@@ -519,7 +518,7 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

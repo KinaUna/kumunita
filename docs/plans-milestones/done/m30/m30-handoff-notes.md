@@ -825,8 +825,8 @@ the 13 that were not already present (U03 owns the 3 seeder tests); U06 did
 
 - `tests/Kumunita.Core.Tests/AdminOnboardingServiceTests.cs` (5) — direct
   construction of `AdminOnboarding.AdminOnboardingService` over a fresh
-  Testcontainers `postgres:18` store (`NewDatabaseAsync` + `M1DocTypes` /
-  `M3DocTypes` / `AdminOnboardingDocTypes` + `ApplyAllConfiguredChangesToDatabaseAsync`),
+  Testcontainers `postgres:18` store (`NewDatabaseAsync` + `CoreDocTypes` /
+  `PostDocTypes` / `AdminOnboardingDocTypes` + `ApplyAllConfiguredChangesToDatabaseAsync`),
   mirroring `AdminOnboardingSeederTests.BootStoreAsync`. Pins: `GetAsync`
   best-effort null (missing store / missing row), `CompleteAsync` writes
   exactly **one** `AccessAudit` row (`Via = Admin`, action

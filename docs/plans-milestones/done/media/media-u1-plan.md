@@ -44,7 +44,7 @@ Register both in `AddKumunitaCore()` (add `AddOptions<MediaOptions>()` +
   `IMediaFileStore`, `LocalVolumeFileStore`) + §2.7 rules 5/6.
 - `src/Kumunita.Core/CommunityOptions.cs` — options shape to mirror.
 - `src/Kumunita.Core/DependencyInjection.cs` — where to register.
-- `src/Kumunita.Core/M3DocTypes.cs` — the doc-type-surface shape (context only
+- `src/Kumunita.Core/PostDocTypes.cs` — the doc-type-surface shape (context only
   — U1 does **not** add a doc-type surface; U2 does).
 - `README.md` — "one database" + self-hosted principle (the volume fits here).
 

@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests;
 /// pinned ~25-test surface; the 16 Core names are the §2.7 table verbatim).
 /// The shape follows <see cref="EventServiceTests"/> verbatim — same
 /// <see cref="PostgresFixture"/>, same <c>BootStoreAsync</c> (+ the
-/// <see cref="M5DocTypes"/> registration surface), same <c>Plant</c> helper,
+/// <see cref="ProjectDocTypes"/> registration surface), same <c>Plant</c> helper,
 /// same <c>Services</c> composition — the <c>UserInfoService</c> +
 /// <c>AuthorizationService</c> + <c>ProjectService</c> trio the U01
 /// <c>AddTransient</c> registration mirrors — fresh scratch Postgres per test
@@ -66,7 +66,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1)).Items;
+        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f1-todo", granteeFeed.Select(t => t.Id));
     }
 
@@ -94,7 +94,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("f1-todo", strangerFeed.Select(t => t.Id));
     }
 
@@ -154,10 +154,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var board1 = await svc.GetBoardAsync("f2-b1", author);
+        var board1 = await svc.GetBoardAsync("f2-b1", author, TestContext.Current.CancellationToken);
         Assert.Contains("f2-todo", board1.Lanes[0].Cards.Select(t => t.Id));
 
-        var board2 = await svc.GetBoardAsync("f2-b2", author);
+        var board2 = await svc.GetBoardAsync("f2-b2", author, TestContext.Current.CancellationToken);
         Assert.Contains("f2-todo", board2.Lanes[0].Cards.Select(t => t.Id));
     }
 
@@ -206,7 +206,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.GetBoardAsync("f3-board", stranger));
+            () => svc.GetBoardAsync("f3-board", stranger, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -246,7 +246,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         // `other` is in the board's audience → gate passes; the card is shown.
-        var board = await svc.GetBoardAsync("f3-board", other);
+        var board = await svc.GetBoardAsync("f3-board", other, TestContext.Current.CancellationToken);
         Assert.Contains("f3-todo", board.Lanes[0].Cards.Select(t => t.Id));
     }
 
@@ -296,13 +296,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var moved = await svc.MoveTodoToAdjacentLaneAsync("f4-p1", "right", author, MemberRoles);
+        var moved = await svc.MoveTodoToAdjacentLaneAsync("f4-p1", "right", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal("f4-laneB", moved.LaneId);
 
         // The lane's status was imparted on the to-do.
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f4-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f4-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("done", reloaded.Status);
         }
 
@@ -353,13 +353,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var moved = await svc.MoveTodoToAdjacentLaneAsync("f5-p1", "right", author, MemberRoles);
+        var moved = await svc.MoveTodoToAdjacentLaneAsync("f5-p1", "right", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal("f5-laneB", moved.LaneId);
 
         // The target lane's null status imparts nothing — the to-do keeps "in-progress".
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f5-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f5-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("in-progress", reloaded.Status);
         }
     }
@@ -422,13 +422,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.MoveTodoToAdjacentLaneAsync("f6-p-moving", "right", author, MemberRoles));
+            () => svc.MoveTodoToAdjacentLaneAsync("f6-p-moving", "right", author, MemberRoles, TestContext.Current.CancellationToken));
         Assert.Contains("Full lane", ex.Message);
 
         // Nothing was written — the moving card is still in lane A.
         await using (var q = store.QuerySession())
         {
-            var placement = (await q.LoadAsync<BoardItemPlacement>("f6-p-moving"))!;
+            var placement = (await q.LoadAsync<BoardItemPlacement>("f6-p-moving", TestContext.Current.CancellationToken))!;
             Assert.Equal("f6-laneA", placement.LaneId);
         }
     }
@@ -485,7 +485,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var moved = await svc.MoveTodoToAdjacentLaneAsync("f6-p-moving", "right", author, MemberRoles);
+        var moved = await svc.MoveTodoToAdjacentLaneAsync("f6-p-moving", "right", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal("f6-laneB", moved.LaneId);
         // Order reset to the end of the target lane (max Order + 1 = 0 + 1).
         Assert.Equal(1, moved.Order);
@@ -517,7 +517,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateTodoAsync(
             "f7-todo", assignee, MemberRoles,
-            new UpdateTodoRequest { Title = "Renamed by assignee" });
+            new UpdateTodoRequest { Title = "Renamed by assignee" },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal("Renamed by assignee", updated.Title);
         Assert.Equal(assignee, updated.AssigneeId); // untouched by the update
@@ -549,12 +550,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.UpdateTodoAsync("f8-todo", stranger, MemberRoles,
-                new UpdateTodoRequest { Title = "Intrusion" }));
+                new UpdateTodoRequest { Title = "Intrusion" },
+                    TestContext.Current.CancellationToken));
 
         // The to-do is untouched by the refused write.
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f8-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f8-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("Author's to-do", reloaded.Title);
         }
     }
@@ -585,7 +587,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var subtask = await svc.AddSubtaskAsync(
             "f9-parent", author, MemberRoles,
-            new CreateTodoRequest { Title = "Child to-do", AssigneeId = assignee });
+            new CreateTodoRequest { Title = "Child to-do", AssigneeId = assignee },
+                TestContext.Current.CancellationToken);
 
         Assert.NotEqual("f9-parent", subtask.Id);
         Assert.Equal("f9-parent", subtask.ParentId);   // a full to-do under its parent
@@ -595,13 +598,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The parent is untouched: still top-level, still authored by the author.
         await using (var q = store.QuerySession())
         {
-            var parent = (await q.LoadAsync<TodoItem>("f9-parent"))!;
+            var parent = (await q.LoadAsync<TodoItem>("f9-parent", TestContext.Current.CancellationToken))!;
             Assert.Null(parent.ParentId);
             Assert.Equal("Parent to-do", parent.Title);
         }
 
         // The subtask shows up under the parent's detail (the F9 read lane).
-        var detail = await svc.GetTodoAsync("f9-parent", author);
+        var detail = await svc.GetTodoAsync("f9-parent", author, TestContext.Current.CancellationToken);
         Assert.Contains(subtask.Id, detail.Subtasks.Select(t => t.Id));
     }
 
@@ -637,13 +640,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        await svc.DeleteTodoAsync("f9-root", author, MemberRoles);
+        await svc.DeleteTodoAsync("f9-root", author, MemberRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
-            var root = (await q.LoadAsync<TodoItem>("f9-root"))!;
-            var child = (await q.LoadAsync<TodoItem>("f9-child"))!;
-            var grandchild = (await q.LoadAsync<TodoItem>("f9-grandchild"))!;
+            var root = (await q.LoadAsync<TodoItem>("f9-root", TestContext.Current.CancellationToken))!;
+            var child = (await q.LoadAsync<TodoItem>("f9-child", TestContext.Current.CancellationToken))!;
+            var grandchild = (await q.LoadAsync<TodoItem>("f9-grandchild", TestContext.Current.CancellationToken))!;
             Assert.True(root.IsDeleted);
             Assert.True(child.IsDeleted);   // cascade to the child
             Assert.True(grandchild.IsDeleted); // cascade to the grandchild
@@ -679,12 +682,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // Reparenting the parent onto its child closes the cycle.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.UpdateTodoAsync("f9-parent", author, MemberRoles,
-                new UpdateTodoRequest { ParentId = "f9-child" }));
+                new UpdateTodoRequest { ParentId = "f9-child" },
+                    TestContext.Current.CancellationToken));
 
         // Nothing was written — the parent is still top-level.
         await using (var q = store.QuerySession())
         {
-            var parent = (await q.LoadAsync<TodoItem>("f9-parent"))!;
+            var parent = (await q.LoadAsync<TodoItem>("f9-parent", TestContext.Current.CancellationToken))!;
             Assert.Null(parent.ParentId);
         }
     }
@@ -743,7 +747,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var copy = await svc.CopyTodoToBoardAsync("f10-orig", "f10-target", actor, MemberRoles);
+        var copy = await svc.CopyTodoToBoardAsync("f10-orig", "f10-target", actor, MemberRoles, TestContext.Current.CancellationToken);
 
         // The copy is a new to-do, authored by the actor, always top-level.
         Assert.NotEqual("f10-orig", copy.Id);
@@ -756,7 +760,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         {
             var copyPlacements = await q.Query<BoardItemPlacement>()
                 .Where(p => p.TodoItemId == copy.Id && p.BoardId == "f10-target")
-                .ToListAsync();
+                .ToListAsync(TestContext.Current.CancellationToken);
             Assert.Single(copyPlacements);
             Assert.Equal("f10-target-lane", copyPlacements[0].LaneId);
         }
@@ -764,10 +768,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The original is untouched: present, not deleted, its own placement intact.
         await using (var q = store.QuerySession())
         {
-            var original = (await q.LoadAsync<TodoItem>("f10-orig"))!;
+            var original = (await q.LoadAsync<TodoItem>("f10-orig", TestContext.Current.CancellationToken))!;
             Assert.False(original.IsDeleted);
             Assert.Equal("f10-orig", original.Id);
-            var origPlacement = (await q.LoadAsync<BoardItemPlacement>("f10-orig-p"))!;
+            var origPlacement = (await q.LoadAsync<BoardItemPlacement>("f10-orig-p", TestContext.Current.CancellationToken))!;
             Assert.Equal("f10-source", origPlacement.BoardId);
         }
     }
@@ -822,7 +826,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         });
 
-        var moved = await svc.MoveTodoToBoardAsync("f10-todo", "f10-target", author, MemberRoles);
+        var moved = await svc.MoveTodoToBoardAsync("f10-todo", "f10-target", author, MemberRoles, TestContext.Current.CancellationToken);
 
         // The placement now points at the target board's first lane.
         Assert.Equal("f10-target", moved.BoardId);
@@ -834,7 +838,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         {
             var all = await q.Query<BoardItemPlacement>()
                 .Where(p => p.TodoItemId == "f10-todo")
-                .ToListAsync();
+                .ToListAsync(TestContext.Current.CancellationToken);
             Assert.Single(all);
             Assert.Equal("f10-target", all[0].BoardId);
         }
@@ -842,7 +846,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The to-do itself is the same row — relocated, not duplicated.
         await using (var q = store.QuerySession())
         {
-            var todo = (await q.LoadAsync<TodoItem>("f10-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("f10-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal(author, todo.AuthorId);
             Assert.False(todo.IsDeleted);
         }
@@ -900,17 +904,17 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         // Move lane B one to the right: B (Order 1) and C (Order 2) swap.
-        var moved = await svc.MoveLaneAsync("f11-laneB", "right", author, MemberRoles);
+        var moved = await svc.MoveLaneAsync("f11-laneB", "right", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal(2, moved.Order);
 
         await using (var q = store.QuerySession())
         {
-            var laneB = (await q.LoadAsync<KanbanLane>("f11-laneB"))!;
-            var laneC = (await q.LoadAsync<KanbanLane>("f11-laneC"))!;
+            var laneB = (await q.LoadAsync<KanbanLane>("f11-laneB", TestContext.Current.CancellationToken))!;
+            var laneC = (await q.LoadAsync<KanbanLane>("f11-laneC", TestContext.Current.CancellationToken))!;
             Assert.Equal(2, laneB.Order);
             Assert.Equal(1, laneC.Order);   // the transposition, not a renumber
             // The card on B is untouched — still in lane B, same position.
-            var p = (await q.LoadAsync<BoardItemPlacement>("f11-p1"))!;
+            var p = (await q.LoadAsync<BoardItemPlacement>("f11-p1", TestContext.Current.CancellationToken))!;
             Assert.Equal("f11-laneB", p.LaneId);
             Assert.Equal(0, p.Order);
         }
@@ -948,13 +952,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         // Moving the first lane left is a no-op.
-        var moved = await svc.MoveLaneAsync("f11-first", "left", author, MemberRoles);
+        var moved = await svc.MoveLaneAsync("f11-first", "left", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal(0, moved.Order);
 
         await using (var q = store.QuerySession())
         {
-            var first = (await q.LoadAsync<KanbanLane>("f11-first"))!;
-            var second = (await q.LoadAsync<KanbanLane>("f11-second"))!;
+            var first = (await q.LoadAsync<KanbanLane>("f11-first", TestContext.Current.CancellationToken))!;
+            var second = (await q.LoadAsync<KanbanLane>("f11-second", TestContext.Current.CancellationToken))!;
             Assert.Equal(0, first.Order);   // unchanged
             Assert.Equal(1, second.Order);  // unchanged
         }
@@ -991,11 +995,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.MoveLaneAsync("f11-first", "right", stranger, MemberRoles));
+            svc.MoveLaneAsync("f11-first", "right", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var first = (await q.LoadAsync<KanbanLane>("f11-first"))!;
+            var first = (await q.LoadAsync<KanbanLane>("f11-first", TestContext.Current.CancellationToken))!;
             Assert.Equal(0, first.Order);   // untouched by the refused move
         }
     }
@@ -1041,7 +1045,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var todo = await svc.AddTodoToLaneAsync("f12-board", "f12-lane", "New card", author, MemberRoles);
+        var todo = await svc.AddTodoToLaneAsync("f12-board", "f12-lane", "New card", author, MemberRoles, TestContext.Current.CancellationToken);
 
         Assert.NotEqual("f12-existing", todo.Id);
         Assert.Equal("New card", todo.Title);
@@ -1054,7 +1058,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         {
             var placements = await q.Query<BoardItemPlacement>()
                 .Where(p => p.TodoItemId == todo.Id && p.BoardId == "f12-board")
-                .ToListAsync();
+                .ToListAsync(TestContext.Current.CancellationToken);
             Assert.Single(placements);
             Assert.Equal("f12-lane", placements[0].LaneId);
             Assert.Equal(1, placements[0].Order);
@@ -1093,7 +1097,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         });
 
-        var todo = await svc.AddTodoToLaneAsync("f12d-board", "f12d-lane", "Inherited card", author, MemberRoles);
+        var todo = await svc.AddTodoToLaneAsync("f12d-board", "f12d-lane", "Inherited card", author, MemberRoles, TestContext.Current.CancellationToken);
 
         // The card carries the board's audience verbatim (C-M5·3) — not null.
         Assert.NotNull(todo.Audience);
@@ -1103,10 +1107,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(grantee, grant.Id);
 
         // Behavioral: the standalone feed gates on the to-do's own audience.
-        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1)).Items;
+        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains(todo.Id, granteeFeed.Select(t => t.Id));
 
-        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain(todo.Id, strangerFeed.Select(t => t.Id));
     }
 
@@ -1137,11 +1141,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         });
 
-        var todo = await svc.AddTodoToLaneAsync("f12e-board", "f12e-lane", "Public card", author, MemberRoles);
+        var todo = await svc.AddTodoToLaneAsync("f12e-board", "f12e-lane", "Public card", author, MemberRoles, TestContext.Current.CancellationToken);
 
         Assert.Null(todo.Audience); // inherited null — public, unchanged
 
-        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains(todo.Id, strangerFeed.Select(t => t.Id));
     }
 
@@ -1183,7 +1187,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Rejected card", author, MemberRoles));
+            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Rejected card", author, MemberRoles, TestContext.Current.CancellationToken));
         Assert.Contains("Full lane", ex.Message);
 
         // Nothing was written — the lane has exactly one placement (the
@@ -1192,7 +1196,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         {
             var count = await q.Query<BoardItemPlacement>()
                 .Where(p => p.BoardId == "f12-board" && p.LaneId == "f12-lane")
-                .CountAsync();
+                .CountAsync(TestContext.Current.CancellationToken);
             Assert.Equal(1, count);
         }
     }
@@ -1223,13 +1227,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Intrusion", stranger, MemberRoles));
+            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Intrusion", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
             var count = await q.Query<BoardItemPlacement>()
                 .Where(p => p.BoardId == "f12-board")
-                .CountAsync();
+                .CountAsync(TestContext.Current.CancellationToken);
             Assert.Equal(0, count);   // nothing written by the refused add
         }
     }
@@ -1268,7 +1272,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         });
 
-        var lane = await svc.CreateLaneAsync("f13-board", "C", author, MemberRoles);
+        var lane = await svc.CreateLaneAsync("f13-board", "C", author, MemberRoles, TestContext.Current.CancellationToken);
 
         Assert.Equal("C", lane.Title);
         Assert.Equal("f13-board", lane.BoardId);
@@ -1302,11 +1306,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.CreateLaneAsync("f13-board", "Intrusion", stranger, MemberRoles));
+            svc.CreateLaneAsync("f13-board", "Intrusion", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var count = await q.Query<KanbanLane>().Where(l => l.BoardId == "f13-board").CountAsync();
+            var count = await q.Query<KanbanLane>().Where(l => l.BoardId == "f13-board").CountAsync(TestContext.Current.CancellationToken);
             Assert.Equal(0, count);        // nothing written by the refused add
         }
     }
@@ -1342,16 +1346,16 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new BoardItemPlacement { Id = "f14-p1", TodoItemId = "f14-todo", BoardId = "f14-board", LaneId = "f14-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
         // Move C (index 2) to the front (index 0): the new order is C, A, B.
-        var moved = await svc.MoveLaneToPositionAsync("f14-C", 0, author, MemberRoles);
+        var moved = await svc.MoveLaneToPositionAsync("f14-C", 0, author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal(0, moved.Order);
 
         await using (var q = store.QuerySession())
         {
-            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-C"))!.Order);
-            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);
-            Assert.Equal(2, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-C", TestContext.Current.CancellationToken))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A", TestContext.Current.CancellationToken))!.Order);
+            Assert.Equal(2, (await q.LoadAsync<KanbanLane>("f14-B", TestContext.Current.CancellationToken))!.Order);
             // The card on A is untouched — still in A, same slot.
-            var p = (await q.LoadAsync<BoardItemPlacement>("f14-p1"))!;
+            var p = (await q.LoadAsync<BoardItemPlacement>("f14-p1", TestContext.Current.CancellationToken))!;
             Assert.Equal("f14-A", p.LaneId);
             Assert.Equal(0, p.Order);
         }
@@ -1384,13 +1388,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // Move A (index 0) to index 99 — clamped to the last position (1):
         // the new order is B, A.
-        var moved = await svc.MoveLaneToPositionAsync("f14-A", 99, author, MemberRoles);
+        var moved = await svc.MoveLaneToPositionAsync("f14-A", 99, author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal(1, moved.Order);
 
         await using (var q = store.QuerySession())
         {
-            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);
-            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A", TestContext.Current.CancellationToken))!.Order);
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-B", TestContext.Current.CancellationToken))!.Order);
         }
     }
 
@@ -1416,13 +1420,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
 
         // Move A (already at index 0) to index 0 — a no-op.
-        var moved = await svc.MoveLaneToPositionAsync("f14-A", 0, author, MemberRoles);
+        var moved = await svc.MoveLaneToPositionAsync("f14-A", 0, author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal(0, moved.Order);
 
         await using (var q = store.QuerySession())
         {
-            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);   // unchanged
-            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);  // unchanged
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A", TestContext.Current.CancellationToken))!.Order);   // unchanged
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-B", TestContext.Current.CancellationToken))!.Order);  // unchanged
         }
     }
 
@@ -1449,11 +1453,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.MoveLaneToPositionAsync("f14-A", 1, stranger, MemberRoles));
+            svc.MoveLaneToPositionAsync("f14-A", 1, stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);   // untouched by the refused move
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A", TestContext.Current.CancellationToken))!.Order);   // untouched by the refused move
         }
     }
 
@@ -1493,24 +1497,24 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new BoardItemPlacement { Id = "f17-pB", TodoItemId = "f17-todoB", BoardId = "f17-board", LaneId = "f17-B", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
         await Plant(store, new BoardItemPlacement { Id = "f17-pA", TodoItemId = "f17-todoA", BoardId = "f17-board", LaneId = "f17-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
-        await svc.DeleteLaneAsync("f17-B", author, MemberRoles);
+        await svc.DeleteLaneAsync("f17-B", author, MemberRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
             // The lane and its placements are gone.
-            Assert.Null(await q.LoadAsync<KanbanLane>("f17-B"));
-            Assert.Null(await q.LoadAsync<BoardItemPlacement>("f17-pB"));
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17-B", TestContext.Current.CancellationToken));
+            Assert.Null(await q.LoadAsync<BoardItemPlacement>("f17-pB", TestContext.Current.CancellationToken));
 
             // The to-do itself is kept (C-M5·2) — standalone, not soft-deleted.
-            var todo = (await q.LoadAsync<TodoItem>("f17-todoB"))!;
+            var todo = (await q.LoadAsync<TodoItem>("f17-todoB", TestContext.Current.CancellationToken))!;
             Assert.Equal("On B", todo.Title);
             Assert.False(todo.IsDeleted);
 
             // The remaining lanes re-settle to a clean 0..n-1 sequence:
             // A (0), C (1) — the survivor on A keeps its placement + slot.
-            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f17-A"))!.Order);
-            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f17-C"))!.Order);
-            var pA = (await q.LoadAsync<BoardItemPlacement>("f17-pA"))!;
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f17-A", TestContext.Current.CancellationToken))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f17-C", TestContext.Current.CancellationToken))!.Order);
+            var pA = (await q.LoadAsync<BoardItemPlacement>("f17-pA", TestContext.Current.CancellationToken))!;
             Assert.Equal("f17-A", pA.LaneId);
             Assert.Equal(0, pA.Order);
         }
@@ -1548,17 +1552,17 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new TodoItem { Id = "f17b-todo", AuthorId = author, Title = "On the only lane", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
         await Plant(store, new BoardItemPlacement { Id = "f17b-p", TodoItemId = "f17b-todo", BoardId = "f17b-board", LaneId = "f17b-sole", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
-        await svc.DeleteLaneAsync("f17b-sole", author, MemberRoles);
+        await svc.DeleteLaneAsync("f17b-sole", author, MemberRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
-            Assert.Null(await q.LoadAsync<KanbanLane>("f17b-sole"));
-            Assert.Equal(0, await q.Query<KanbanLane>().Where(l => l.BoardId == "f17b-board").CountAsync());
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17b-sole", TestContext.Current.CancellationToken));
+            Assert.Equal(0, await q.Query<KanbanLane>().Where(l => l.BoardId == "f17b-board").CountAsync(TestContext.Current.CancellationToken));
             // The to-do survives its lane's deletion (C-M5·2).
-            Assert.NotNull(await q.LoadAsync<TodoItem>("f17b-todo"));
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17b-todo", TestContext.Current.CancellationToken));
             // The board itself is untouched (no soft-delete flag on a lane
             // delete — only the board-delete seam flips board.IsDeleted).
-            var board = (await q.LoadAsync<KanbanBoard>("f17b-board"))!;
+            var board = (await q.LoadAsync<KanbanBoard>("f17b-board", TestContext.Current.CancellationToken))!;
             Assert.False(board.IsDeleted);
         }
     }
@@ -1588,13 +1592,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new BoardItemPlacement { Id = "f17c-p", TodoItemId = "f17c-todo", BoardId = "f17c-board", LaneId = "f17c-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.DeleteLaneAsync("f17c-A", stranger, MemberRoles));
+            svc.DeleteLaneAsync("f17c-A", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            Assert.NotNull(await q.LoadAsync<KanbanLane>("f17c-A"));        // untouched
-            Assert.NotNull(await q.LoadAsync<BoardItemPlacement>("f17c-p"));
-            Assert.NotNull(await q.LoadAsync<TodoItem>("f17c-todo"));
+            Assert.NotNull(await q.LoadAsync<KanbanLane>("f17c-A", TestContext.Current.CancellationToken));        // untouched
+            Assert.NotNull(await q.LoadAsync<BoardItemPlacement>("f17c-p", TestContext.Current.CancellationToken));
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17c-todo", TestContext.Current.CancellationToken));
         }
 
         // No audit row for the refused delete.
@@ -1617,7 +1621,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // A missing lane id — the 404 side.
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.DeleteLaneAsync("no-such-lane", author, MemberRoles));
+            svc.DeleteLaneAsync("no-such-lane", author, MemberRoles, TestContext.Current.CancellationToken));
 
         // A lane on a soft-deleted board — the 404 side (checked before the
         // standing, so even the creator is refused).
@@ -1631,7 +1635,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new KanbanLane { Id = "f17d-A", BoardId = "f17d-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.DeleteLaneAsync("f17d-A", author, MemberRoles));
+            svc.DeleteLaneAsync("f17d-A", author, MemberRoles, TestContext.Current.CancellationToken));
     }
 
     // ── F15 — move a card to a lane + position (ADR 0069) ───────────────────
@@ -1668,18 +1672,18 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new BoardItemPlacement { Id = "f15-p-resident", TodoItemId = "f15-resident", BoardId = "f15-board", LaneId = "f15-dst", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
         // Move the card into the target lane at index 1 (after the resident).
-        var moved = await svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 1, author, MemberRoles);
+        var moved = await svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 1, author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal("f15-dst", moved.LaneId);
 
         await using (var q = store.QuerySession())
         {
             // The target lane's placements are re-settled to 0..n-1.
-            var dst = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving"))!;
-            var resident = (await q.LoadAsync<BoardItemPlacement>("f15-p-resident"))!;
+            var dst = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving", TestContext.Current.CancellationToken))!;
+            var resident = (await q.LoadAsync<BoardItemPlacement>("f15-p-resident", TestContext.Current.CancellationToken))!;
             Assert.Equal(0, resident.Order);   // the resident stays first
             Assert.Equal(1, dst.Order);        // the moved card lands at index 1
             // The target lane's status was imparted on the to-do (C-M5·4).
-            Assert.Equal("done", (await q.LoadAsync<TodoItem>("f15-moving"))!.Status);
+            Assert.Equal("done", (await q.LoadAsync<TodoItem>("f15-moving", TestContext.Current.CancellationToken))!.Status);
         }
 
         // The todo.move_to_lane audit row (C3) is written.
@@ -1715,17 +1719,17 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await Plant(store, new BoardItemPlacement { Id = "f15-p-resident", TodoItemId = "f15-resident", BoardId = "f15-board", LaneId = "f15-dst", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 0, author, MemberRoles));
+            svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 0, author, MemberRoles, TestContext.Current.CancellationToken));
         Assert.Contains("Full lane", ex.Message);
 
         // Nothing was written — the card is still on its source lane.
         await using (var q = store.QuerySession())
         {
-            var p = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving"))!;
+            var p = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving", TestContext.Current.CancellationToken))!;
             Assert.Equal("f15-src", p.LaneId);
             var dstCount = await q.Query<BoardItemPlacement>()
                 .Where(x => x.BoardId == "f15-board" && x.LaneId == "f15-dst")
-                .CountAsync();
+                .CountAsync(TestContext.Current.CancellationToken);
             Assert.Equal(1, dstCount);   // the resident only — the move was refused
         }
     }
@@ -1756,7 +1760,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateBoardAsync(
             "f16-board", author, MemberRoles,
-            new UpdateBoardRequest { Title = "New title", Description = "New description" });
+            new UpdateBoardRequest { Title = "New title", Description = "New description" },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal("New title", updated.Title);
         Assert.Equal("New description", updated.Description);
@@ -1764,7 +1769,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board", TestContext.Current.CancellationToken))!;
             Assert.Equal("New title", reloaded.Title);
             Assert.Equal("New description", reloaded.Description);
         }
@@ -1796,7 +1801,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateBoardAsync(
             "f16-board", admin, GlobalAdminRoles,
-            new UpdateBoardRequest { Title = "Board (admin edit)" });
+            new UpdateBoardRequest { Title = "Board (admin edit)" },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal("Board (admin edit)", updated.Title);
     }
@@ -1823,11 +1829,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.UpdateBoardAsync("f16-board", stranger, MemberRoles,
-                new UpdateBoardRequest { Title = "Intrusion" }));
+                new UpdateBoardRequest { Title = "Intrusion" },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board", TestContext.Current.CancellationToken))!;
             Assert.Equal("Author's board", reloaded.Title);
         }
     }
@@ -1852,11 +1859,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             svc.UpdateBoardAsync("f16-board", author, MemberRoles,
-                new UpdateBoardRequest { Title = "   " }));
+                new UpdateBoardRequest { Title = "   " },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board", TestContext.Current.CancellationToken))!;
             Assert.Equal("Author's board", reloaded.Title);
         }
     }
@@ -1885,7 +1893,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateBoardAsync(
             "f16-board", author, MemberRoles,
-            new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
+            new UpdateBoardRequest { Title = "Same title", Description = "Same description" },
+                TestContext.Current.CancellationToken);
 
         // A no-op re-save leaves the stamp untouched.
         Assert.Null(updated.Modified);
@@ -1919,7 +1928,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateBoardAsync(
             "f16-board", author, MemberRoles,
-            new UpdateBoardRequest { Title = "Board", Audience = audience });
+            new UpdateBoardRequest { Title = "Board", Audience = audience },
+                TestContext.Current.CancellationToken);
 
         Assert.NotNull(updated.Modified);
         Assert.NotNull(updated.Audience);
@@ -1931,7 +1941,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board", TestContext.Current.CancellationToken))!;
             Assert.NotNull(reloaded.Audience);
             Assert.Equal(AudienceMode.Any, reloaded.Audience!.Mode);
             Assert.Single(reloaded.Audience.Grants);
@@ -1966,7 +1976,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateBoardAsync(
             "f16-board", author, MemberRoles,
-            new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
+            new UpdateBoardRequest { Title = "Same title", Description = "Same description" },
+                TestContext.Current.CancellationToken);
 
         // A null audience on the request does not clear the stored one.
         Assert.NotNull(updated.Audience);
@@ -2007,10 +2018,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee),
         });
 
-        var granteeFeed = (await svc.ListGoalsAsync(null, grantee, 1)).Items;
+        var granteeFeed = (await svc.ListGoalsAsync(null, grantee, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f1-goal", granteeFeed.Select(g => g.Id));
 
-        var strangerFeed = (await svc.ListGoalsAsync(null, stranger, 1)).Items;
+        var strangerFeed = (await svc.ListGoalsAsync(null, stranger, 1, TestContext.Current.CancellationToken)).Items;
         Assert.DoesNotContain("f1-goal", strangerFeed.Select(g => g.Id));
     }
 
@@ -2032,7 +2043,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         const string stranger = "u-pl-f2-stranger";
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetGoalAsync("no-such-goal", author));
+            svc.GetGoalAsync("no-such-goal", author, TestContext.Current.CancellationToken));
 
         await Plant(store, new ProjectGoal
         {
@@ -2044,7 +2055,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.GetGoalAsync("f2-goal", stranger));
+            svc.GetGoalAsync("f2-goal", stranger, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -2066,7 +2077,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var created = await svc.CreateGoalAsync(
             author, MemberRoles,
-            new CreateGoalRequest { Title = "Neighborhood goal" });
+            new CreateGoalRequest { Title = "Neighborhood goal" },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal(author, created.AuthorId);
         Assert.False(created.IsDeleted);
@@ -2115,7 +2127,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // Modified is stamped — and the blank Description clears to null.
         var updated = await svc.UpdateGoalAsync(
             "f3b-goal", creator, MemberRoles,
-            new UpdateGoalRequest { Title = "Edited title", Description = "   " });
+            new UpdateGoalRequest { Title = "Edited title", Description = "   " },
+                TestContext.Current.CancellationToken);
         Assert.Equal("Edited title", updated.Title);
         Assert.Null(updated.Description);
         Assert.NotNull(updated.Modified);
@@ -2124,17 +2137,19 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The GlobalAdmin (not the creator) has standing (the ADR 0017 override).
         var adminUpdated = await svc.UpdateGoalAsync(
             "f3b-goal", admin, GlobalAdminRoles,
-            new UpdateGoalRequest { Title = "Admin edit" });
+            new UpdateGoalRequest { Title = "Admin edit" },
+                TestContext.Current.CancellationToken);
         Assert.Equal("Admin edit", adminUpdated.Title);
 
         // The stranger is refused (403); nothing is written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.UpdateGoalAsync("f3b-goal", stranger, MemberRoles,
-                new UpdateGoalRequest { Title = "Intrusion" }));
+                new UpdateGoalRequest { Title = "Intrusion" },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<ProjectGoal>("f3b-goal"))!;
+            var reloaded = (await q.LoadAsync<ProjectGoal>("f3b-goal", TestContext.Current.CancellationToken))!;
             Assert.Equal("Admin edit", reloaded.Title);
             Assert.Equal(creator, reloaded.AuthorId);
         }
@@ -2190,12 +2205,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         // The standalone feed (goalId == null — the /projects landing's projects section).
-        var standaloneFeed = (await svc.ListProjectsAsync(null, null, author, 1)).Items;
+        var standaloneFeed = (await svc.ListProjectsAsync(null, null, author, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f5-standalone", standaloneFeed.Select(p => p.Id));
         Assert.DoesNotContain("f5-under-goal", standaloneFeed.Select(p => p.Id));
 
         // The under-goal feed (goalId filter narrows to that goal's projects).
-        var underGoalFeed = (await svc.ListProjectsAsync(null, "f5-goal", author, 1)).Items;
+        var underGoalFeed = (await svc.ListProjectsAsync(null, "f5-goal", author, 1, TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f5-under-goal", underGoalFeed.Select(p => p.Id));
         Assert.DoesNotContain("f5-standalone", underGoalFeed.Select(p => p.Id));
     }
@@ -2218,7 +2233,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         const string stranger = "u-pl-f2-stranger";
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetProjectAsync("no-such-project", author));
+            svc.GetProjectAsync("no-such-project", author, TestContext.Current.CancellationToken));
 
         await Plant(store, new Project
         {
@@ -2230,7 +2245,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.GetProjectAsync("f2-project", stranger));
+            svc.GetProjectAsync("f2-project", stranger, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -2265,7 +2280,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var created = await svc.CreateProjectAsync(
             author, MemberRoles,
-            new CreateProjectRequest { Title = "Under a readable goal", GoalId = "f5-read-goal" });
+            new CreateProjectRequest { Title = "Under a readable goal", GoalId = "f5-read-goal" },
+                TestContext.Current.CancellationToken);
         Assert.Equal("f5-read-goal", created.GoalId);
         Assert.Equal("project.create", (await ProjectAuditRows(store, created.Id)).Single().Action);
 
@@ -2281,7 +2297,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateProjectAsync(author, MemberRoles,
-                new CreateProjectRequest { Title = "Refused (deleted goal)", GoalId = "f5-deleted-goal" }));
+                new CreateProjectRequest { Title = "Refused (deleted goal)", GoalId = "f5-deleted-goal" },
+                    TestContext.Current.CancellationToken));
 
         // An unreadable goal (audience-restricted; the author is a third
         // party so only the audience branch is exercised) — the 403 side.
@@ -2295,7 +2312,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.CreateProjectAsync(stranger, MemberRoles,
-                new CreateProjectRequest { Title = "Refused (unreadable goal)", GoalId = "f5-restricted-goal" }));
+                new CreateProjectRequest { Title = "Refused (unreadable goal)", GoalId = "f5-restricted-goal" },
+                    TestContext.Current.CancellationToken));
 
         // Nothing was written for either refusal: the total project count is
         // still exactly one, and no project.update / project.create row
@@ -2355,7 +2373,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         var dueAt = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero);
         var unGoaled = await svc.UpdateProjectAsync(
             "f4-project", creator, MemberRoles,
-            new UpdateProjectRequest { ClearGoal = true, StartAt = startAt, DueAt = dueAt });
+            new UpdateProjectRequest { ClearGoal = true, StartAt = startAt, DueAt = dueAt },
+                TestContext.Current.CancellationToken);
         Assert.Null(unGoaled.GoalId);
         Assert.Equal(startAt, unGoaled.StartAt);
         Assert.Equal(dueAt, unGoaled.DueAt);
@@ -2366,7 +2385,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // edit form's blank datetime-local → null shape).
         var cleared = await svc.UpdateProjectAsync(
             "f4-project", creator, MemberRoles,
-            new UpdateProjectRequest { StartAt = null, DueAt = null });
+            new UpdateProjectRequest { StartAt = null, DueAt = null },
+                TestContext.Current.CancellationToken);
         Assert.Null(cleared.StartAt);
         Assert.Null(cleared.DueAt);
 
@@ -2420,26 +2440,26 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // The stranger is refused (403); nothing is written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.DeleteGoalAsync("f8-goal", stranger, MemberRoles));
+            svc.DeleteGoalAsync("f8-goal", stranger, MemberRoles, TestContext.Current.CancellationToken));
         await using (var q0 = store.QuerySession())
         {
-            var untouched = (await q0.LoadAsync<ProjectGoal>("f8-goal"))!;
+            var untouched = (await q0.LoadAsync<ProjectGoal>("f8-goal", TestContext.Current.CancellationToken))!;
             Assert.False(untouched.IsDeleted);
         }
         Assert.Empty(await GoalAuditRows(store, "f8-goal"));
 
         // The GlobalAdmin (not the creator) has standing (the override branch).
-        await svc.DeleteGoalAsync("f8-goal", admin, GlobalAdminRoles);
+        await svc.DeleteGoalAsync("f8-goal", admin, GlobalAdminRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
-            var goal = (await q.LoadAsync<ProjectGoal>("f8-goal"))!;
+            var goal = (await q.LoadAsync<ProjectGoal>("f8-goal", TestContext.Current.CancellationToken))!;
             Assert.True(goal.IsDeleted);                 // ADR 0024 — the soft-delete flag.
             Assert.NotNull(goal.Modified);
 
             // **The D6 dangling-association rule (C-PL·6):** the project is
             // kept and its GoalId is **not** cleared.
-            var project = (await q.LoadAsync<Project>("f8-project"))!;
+            var project = (await q.LoadAsync<Project>("f8-project", TestContext.Current.CancellationToken))!;
             Assert.False(project.IsDeleted);
             Assert.Equal("f8-goal", project.GoalId);     // the link dangles.
         }
@@ -2447,7 +2467,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The read lane 404s on the now-soft-deleted goal (the read lane's
         // filter — the dangling project's goal link is not rendered).
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetGoalAsync("f8-goal", creator));
+            svc.GetGoalAsync("f8-goal", creator, TestContext.Current.CancellationToken));
 
         // One goal.delete row (C3), the creator's admin override.
         var audits = await GoalAuditRows(store, "f8-goal");
@@ -2509,30 +2529,30 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // The stranger is refused (403); nothing is written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.DeleteProjectAsync("f8-proj", stranger, MemberRoles));
+            svc.DeleteProjectAsync("f8-proj", stranger, MemberRoles, TestContext.Current.CancellationToken));
         await using (var q0 = store.QuerySession())
         {
-            var untouched = (await q0.LoadAsync<Project>("f8-proj"))!;
+            var untouched = (await q0.LoadAsync<Project>("f8-proj", TestContext.Current.CancellationToken))!;
             Assert.False(untouched.IsDeleted);
         }
         Assert.Empty(await ProjectAuditRows(store, "f8-proj"));
 
         // The creator has standing (the Owner branch).
-        await svc.DeleteProjectAsync("f8-proj", creator, MemberRoles);
+        await svc.DeleteProjectAsync("f8-proj", creator, MemberRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
-            var project = (await q.LoadAsync<Project>("f8-proj"))!;
+            var project = (await q.LoadAsync<Project>("f8-proj", TestContext.Current.CancellationToken))!;
             Assert.True(project.IsDeleted);              // ADR 0024 — the soft-delete flag.
             Assert.NotNull(project.Modified);
 
             // **The D6 dangling-association rule (C-PL·6):** the to-do + the
             // board are kept and their ProjectId is **not** cleared.
-            var todo = (await q.LoadAsync<TodoItem>("f8-proj-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("f8-proj-todo", TestContext.Current.CancellationToken))!;
             Assert.False(todo.IsDeleted);
             Assert.Equal("f8-proj", todo.ProjectId);     // the link dangles.
 
-            var board = (await q.LoadAsync<KanbanBoard>("f8-proj-board"))!;
+            var board = (await q.LoadAsync<KanbanBoard>("f8-proj-board", TestContext.Current.CancellationToken))!;
             Assert.False(board.IsDeleted);
             Assert.Equal("f8-proj", board.ProjectId);    // the link dangles.
         }
@@ -2540,7 +2560,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The read lane 404s on the now-soft-deleted project (the read lane's
         // filter — the dangling to-do/board's project link is not rendered).
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetProjectAsync("f8-proj", creator));
+            svc.GetProjectAsync("f8-proj", creator, TestContext.Current.CancellationToken));
 
         // One project.delete row (C3), the creator (the Owner branch).
         var audits = await ProjectAuditRows(store, "f8-proj");
@@ -2594,14 +2614,15 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The creator has standing (the Owner branch): the association
         // writes, Modified is stamped, AuthorId / Created preserved.
         var set = await svc.SetTodoProjectAsync(
-            "f7-todo", creator, MemberRoles, "f7-project");
+            "f7-todo", creator, MemberRoles, "f7-project",
+                TestContext.Current.CancellationToken);
         Assert.Equal("f7-project", set.ProjectId);
         Assert.NotNull(set.Modified);
         Assert.Equal(creator, set.AuthorId);
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("f7-project", reloaded.ProjectId);
         }
 
@@ -2614,7 +2635,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The stranger (no standing — not the creator, not the assignee,
         // not a GlobalAdmin) is refused (403); nothing is written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetTodoProjectAsync("f7-todo", stranger, MemberRoles, "f7-project"));
+            svc.SetTodoProjectAsync("f7-todo", stranger, MemberRoles, "f7-project", TestContext.Current.CancellationToken));
 
         // A soft-deleted project — the 404 side of the C3 split (the guard is
         // checked before the write, so the standing creator is still refused).
@@ -2628,12 +2649,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.SetTodoProjectAsync("f7-todo", creator, MemberRoles, "f7-deleted-project"));
+            svc.SetTodoProjectAsync("f7-todo", creator, MemberRoles, "f7-deleted-project", TestContext.Current.CancellationToken));
 
         // The refused attempts left the stored row's ProjectId untouched.
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("f7-project", reloaded.ProjectId);
         }
     }
@@ -2680,14 +2701,15 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // The creator has standing (the Owner branch): the association
         // writes, Modified is stamped, AuthorId / Created preserved.
         var set = await svc.SetBoardProjectAsync(
-            "f7b-board", creator, MemberRoles, "f7b-project");
+            "f7b-board", creator, MemberRoles, "f7b-project",
+                TestContext.Current.CancellationToken);
         Assert.Equal("f7b-project", set.ProjectId);
         Assert.NotNull(set.Modified);
         Assert.Equal(creator, set.AuthorId);
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board", TestContext.Current.CancellationToken))!;
             Assert.Equal("f7b-project", reloaded.ProjectId);
         }
 
@@ -2701,7 +2723,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // the assignee branch does not apply to a board) is refused (403);
         // nothing is written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetBoardProjectAsync("f7b-board", stranger, MemberRoles, "f7b-project"));
+            svc.SetBoardProjectAsync("f7b-board", stranger, MemberRoles, "f7b-project", TestContext.Current.CancellationToken));
 
         // A soft-deleted project — the 404 side of the C3 split (the guard is
         // checked before the write, so the standing creator is still refused).
@@ -2715,12 +2737,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.SetBoardProjectAsync("f7b-board", creator, MemberRoles, "f7b-deleted-project"));
+            svc.SetBoardProjectAsync("f7b-board", creator, MemberRoles, "f7b-deleted-project", TestContext.Current.CancellationToken));
 
         // The refused attempts left the stored row's ProjectId untouched.
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board", TestContext.Current.CancellationToken))!;
             Assert.Equal("f7b-project", reloaded.ProjectId);
         }
     }
@@ -2750,13 +2772,13 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var unset = await svc.SetTodoProjectAsync("f7c-todo", creator, MemberRoles, null);
+        var unset = await svc.SetTodoProjectAsync("f7c-todo", creator, MemberRoles, null, TestContext.Current.CancellationToken);
         Assert.Null(unset.ProjectId);
         Assert.NotNull(unset.Modified);
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f7c-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f7c-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(reloaded.ProjectId);
         }
 
@@ -2803,12 +2825,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetTodoProjectAsync("f7d-todo", creator, MemberRoles, "f7d-project"));
+            svc.SetTodoProjectAsync("f7d-todo", creator, MemberRoles, "f7d-project", TestContext.Current.CancellationToken));
 
         // Nothing was written.
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("f7d-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("f7d-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(reloaded.ProjectId);
         }
         Assert.Empty(await TodoAuditRows(store, "f7d-todo"));
@@ -2866,7 +2888,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // out-of-project to-do is excluded for everyone (the filter), and the
         // in-project + restricted to-dos are candidates — the audience
         // decision then admits each actor its own slice.
-        var authorFiltered = (await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project")).Items;
+        var authorFiltered = (await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project", ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f7e-in-project", authorFiltered.Select(t => t.Id));
         Assert.DoesNotContain("f7e-out-of-project", authorFiltered.Select(t => t.Id));
         Assert.Contains("f7e-restricted", authorFiltered.Select(t => t.Id)); // the author may read it.
@@ -2875,7 +2897,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // C-PL·3): the filter does **not** open the gate for the stranger —
         // the restricted to-do (which matches the filter) is still hidden,
         // while the public in-project to-do is visible to everyone.
-        var strangerFiltered = (await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project")).Items;
+        var strangerFiltered = (await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project", ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f7e-in-project", strangerFiltered.Select(t => t.Id));   // public — visible.
         Assert.DoesNotContain("f7e-out-of-project", strangerFiltered.Select(t => t.Id)); // the filter.
         Assert.DoesNotContain("f7e-restricted", strangerFiltered.Select(t => t.Id)); // the gate.
@@ -2914,7 +2936,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var filtered = (await svc.ListBoardsAsync(null, author, 1, "f7f-project")).Items;
+        var filtered = (await svc.ListBoardsAsync(null, author, 1, "f7f-project", TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f7f-in-project", filtered.Select(b => b.Id));
         Assert.DoesNotContain("f7f-out-of-project", filtered.Select(b => b.Id));
     }
@@ -2954,7 +2976,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // The existing 5-arg call shape (default projectId = null): both
         // to-dos are in the author's feed — the M5 behavior is intact.
-        var feed = (await svc.ListTodosAsync(null, null, author, 1)).Items;
+        var feed = (await svc.ListTodosAsync(null, null, author, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("f7g-in-project", feed.Select(t => t.Id));
         Assert.Contains("f7g-standalone", feed.Select(t => t.Id));
     }
@@ -2998,14 +3020,14 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.Group, group),
         });
 
-        var claimed = await svc.ClaimTodoAsync("c1-todo", claimer, MemberRoles);
+        var claimed = await svc.ClaimTodoAsync("c1-todo", claimer, MemberRoles, TestContext.Current.CancellationToken);
 
         Assert.Equal(claimer, claimed.AssigneeId);
         Assert.NotNull(claimed.Modified);
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("c1-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("c1-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal(claimer, reloaded.AssigneeId);
         }
 
@@ -3047,11 +3069,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.ClaimTodoAsync("c2-todo", claimer, MemberRoles));
+            svc.ClaimTodoAsync("c2-todo", claimer, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("c2-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("c2-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal(assignee, reloaded.AssigneeId); // untouched
         }
     }
@@ -3087,11 +3109,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.ClaimTodoAsync("c3-todo", stranger, MemberRoles));
+            svc.ClaimTodoAsync("c3-todo", stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("c3-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("c3-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(reloaded.AssigneeId);
         }
     }
@@ -3130,7 +3152,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null, // public — no group grants, so the standing is purely community
         });
 
-        var claimed = await svc.ClaimTodoAsync("c4-todo", claimer, MemberRoles);
+        var claimed = await svc.ClaimTodoAsync("c4-todo", claimer, MemberRoles, TestContext.Current.CancellationToken);
 
         Assert.Equal(claimer, claimed.AssigneeId);
         Assert.NotNull(claimed.Modified);
@@ -3177,11 +3199,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var unassigned = (await svc.ListTodosAsync(null, null, reader, 1, unassignedOnly: true)).Items;
+        var unassigned = (await svc.ListTodosAsync(null, null, reader, 1, unassignedOnly: true, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("c5-unassigned", unassigned.Select(t => t.Id));
         Assert.DoesNotContain("c5-assigned", unassigned.Select(t => t.Id));
 
-        var all = (await svc.ListTodosAsync(null, null, reader, 1)).Items;
+        var all = (await svc.ListTodosAsync(null, null, reader, 1, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("c5-unassigned", all.Select(t => t.Id));
         Assert.Contains("c5-assigned", all.Select(t => t.Id));
     }
@@ -3214,7 +3236,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
                 StartAt = startAt,
                 DueAt = dueAt,
                 Audience = null, // public
-            });
+            },
+                TestContext.Current.CancellationToken);
 
         Assert.Equal(startAt, created.StartAt);
         Assert.Equal(dueAt, created.DueAt);
@@ -3226,7 +3249,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             {
                 Title = "Undated to-do",
                 Audience = null,
-            });
+            },
+                TestContext.Current.CancellationToken);
 
         Assert.Null(undated.StartAt);
         Assert.Null(undated.DueAt);
@@ -3261,7 +3285,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // Setting both dates is a change → the dates are applied + Modified stamped.
         var set = await svc.UpdateTodoAsync(
             "f11-todo", author, MemberRoles,
-            new UpdateTodoRequest { StartAt = startAt, DueAt = dueAt });
+            new UpdateTodoRequest { StartAt = startAt, DueAt = dueAt },
+                TestContext.Current.CancellationToken);
         Assert.Equal(startAt, set.StartAt);
         Assert.Equal(dueAt, set.DueAt);
         Assert.NotNull(set.Modified);
@@ -3269,7 +3294,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // Blank (null) request clears both → back to no-date.
         var cleared = await svc.UpdateTodoAsync(
             "f11-todo", author, MemberRoles,
-            new UpdateTodoRequest { StartAt = null, DueAt = null });
+            new UpdateTodoRequest { StartAt = null, DueAt = null },
+                TestContext.Current.CancellationToken);
         Assert.Null(cleared.StartAt);
         Assert.Null(cleared.DueAt);
     }
@@ -3307,7 +3333,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var page = await svc.ListTodosForEventAsync("m14-eve-p1", author, page: 1);
+        var page = await svc.ListTodosForEventAsync("m14-eve-p1", author, page: 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(page.Items);
         Assert.False(page.HasMore);
@@ -3350,7 +3376,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = Audience(GrantKind.User, grantee), // the actor is neither author nor grantee
         });
 
-        var page = await svc.ListTodosForEventAsync("m14-eve-p2", actor, page: 1);
+        var page = await svc.ListTodosForEventAsync("m14-eve-p2", actor, page: 1, TestContext.Current.CancellationToken);
 
         Assert.Contains("p2-todo-public", page.Items.Select(t => t.Id));
         Assert.DoesNotContain("p2-todo-restricted", page.Items.Select(t => t.Id));
@@ -3385,7 +3411,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var page = await svc.ListTodosForEventAsync("m14-eve-p3", author, page: 1);
+        var page = await svc.ListTodosForEventAsync("m14-eve-p3", author, page: 1, TestContext.Current.CancellationToken);
 
         Assert.Contains("p3-todo-a", page.Items.Select(t => t.Id));
         Assert.DoesNotContain("p3-todo-b", page.Items.Select(t => t.Id));
@@ -3418,7 +3444,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             });
         }
 
-        var page = await svc.ListTodosForEventAsync(eventId, author, page: 1);
+        var page = await svc.ListTodosForEventAsync(eventId, author, page: 1, TestContext.Current.CancellationToken);
 
         Assert.Equal(30, page.Items.Count);
         Assert.True(page.HasMore);
@@ -3477,26 +3503,29 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // Creator (Owner branch) → allowed; EventId written.
         var byCreator = await svc.SetTodoEventAsync(
-            "u02p1-todo-creator", creator, MemberRoles, eventId);
+            "u02p1-todo-creator", creator, MemberRoles, eventId,
+                TestContext.Current.CancellationToken);
         Assert.Equal(eventId, byCreator.EventId);
 
         // Assignee (the ADR 0067 collaborator branch) → allowed.
         var byAssignee = await svc.SetTodoEventAsync(
-            "u02p1-todo-assignee", assignee, MemberRoles, eventId);
+            "u02p1-todo-assignee", assignee, MemberRoles, eventId,
+                TestContext.Current.CancellationToken);
         Assert.Equal(eventId, byAssignee.EventId);
 
         // GlobalAdmin (the ADR 0017 override branch) → allowed.
         var byAdmin = await svc.SetTodoEventAsync(
-            "u02p1-todo-admin", "u-m14-u02-p1-admin", GlobalAdminRoles, eventId);
+            "u02p1-todo-admin", "u-m14-u02-p1-admin", GlobalAdminRoles, eventId,
+                TestContext.Current.CancellationToken);
         Assert.Equal(eventId, byAdmin.EventId);
 
         // Outsider (a member, neither creator nor assignee) → refused (403),
         // nothing written on the to-do.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetTodoEventAsync("u02p1-todo-creator", outsider, MemberRoles, eventId));
+            svc.SetTodoEventAsync("u02p1-todo-creator", outsider, MemberRoles, eventId, TestContext.Current.CancellationToken));
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("u02p1-todo-creator"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p1-todo-creator", TestContext.Current.CancellationToken))!;
             // The allowed creator write above is still the stored value — the
             // refused outsider write left it untouched.
             Assert.Equal(eventId, reloaded.EventId);
@@ -3547,27 +3576,28 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // The creator (standing satisfied) may link to the readable event.
         var ok = await svc.SetTodoEventAsync(
-            "u02p2-todo", creator, MemberRoles, eventId);
+            "u02p2-todo", creator, MemberRoles, eventId,
+                TestContext.Current.CancellationToken);
         Assert.Equal(eventId, ok.EventId);
 
         // ...but is refused (the C3 split, the sibling's 403-for-unreadable)
         // when pointing at the restricted event — nothing written.
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, "m14-u02-p2-restricted"));
+            svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, "m14-u02-p2-restricted", TestContext.Current.CancellationToken));
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal(eventId, reloaded.EventId); // still the readable one
         }
 
         // A null eventId clears the link (the sibling's null-unassociate rule)
         // and stamps Modified.
-        var cleared = await svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, null);
+        var cleared = await svc.SetTodoEventAsync("u02p2-todo", creator, MemberRoles, null, TestContext.Current.CancellationToken);
         Assert.Null(cleared.EventId);
         Assert.NotNull(cleared.Modified);
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p2-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(reloaded.EventId);
         }
     }
@@ -3599,12 +3629,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        await svc.SetTodoEventAsync("u02p3-todo", creator, MemberRoles, eventId);
+        await svc.SetTodoEventAsync("u02p3-todo", creator, MemberRoles, eventId, TestContext.Current.CancellationToken);
 
         // The write landed ...
         await using (var q = store.QuerySession())
         {
-            var reloaded = (await q.LoadAsync<TodoItem>("u02p3-todo"))!;
+            var reloaded = (await q.LoadAsync<TodoItem>("u02p3-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal(eventId, reloaded.EventId);
         }
 
@@ -3679,7 +3709,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var blockedFeed = (await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true)).Items;
+        var blockedFeed = (await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true, ct: TestContext.Current.CancellationToken)).Items;
         Assert.Contains("tbd-f4-b", blockedFeed.Select(t => t.Id));
         Assert.DoesNotContain("tbd-f4-a", blockedFeed.Select(t => t.Id));
     }
@@ -3711,7 +3741,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var detail = await svc.GetTodoAsync("tbd-f1-todo", author);
+        var detail = await svc.GetTodoAsync("tbd-f1-todo", author, TestContext.Current.CancellationToken);
         Assert.NotNull(detail.Blocker);
         Assert.False(detail.Blocker!.Generic);
         Assert.Equal("tbd-f1-blocker", detail.Blocker.TodoId);
@@ -3749,7 +3779,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var detail = await svc.GetTodoAsync("tbd-f2-todo", author);
+        var detail = await svc.GetTodoAsync("tbd-f2-todo", author, TestContext.Current.CancellationToken);
         Assert.NotNull(detail.Blocker);
         Assert.True(detail.Blocker!.Generic);
         Assert.Equal("tbd-f2-blocker", detail.Blocker.TodoId);
@@ -3785,7 +3815,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        var detail = await svc.GetTodoAsync("tbd-f2c-todo", author);
+        var detail = await svc.GetTodoAsync("tbd-f2c-todo", author, TestContext.Current.CancellationToken);
         Assert.NotNull(detail.Blocker);
         Assert.True(detail.Blocker!.Generic);
         Assert.Null(detail.Blocker.Title);
@@ -3814,11 +3844,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.UpdateTodoAsync("tbd-f3-todo", author, MemberRoles,
-                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3-todo" }));
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3-todo" },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var todo = (await q.LoadAsync<TodoItem>("tbd-f3-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f3-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(todo.BlockedByTodoId);
         }
     }
@@ -3862,11 +3893,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         // Setting A's blocker to C closes A → C → B → A.
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.UpdateTodoAsync("tbd-f3c-a", author, MemberRoles,
-                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3c-c" }));
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3c-c" },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var a = (await q.LoadAsync<TodoItem>("tbd-f3c-a"))!;
+            var a = (await q.LoadAsync<TodoItem>("tbd-f3c-a", TestContext.Current.CancellationToken))!;
             Assert.Null(a.BlockedByTodoId);
         }
     }
@@ -3899,7 +3931,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         var updated = await svc.UpdateTodoAsync(
             "tbd-f5-todo", author, MemberRoles,
-            new UpdateTodoRequest { ClearBlockedBy = true });
+            new UpdateTodoRequest { ClearBlockedBy = true },
+                TestContext.Current.CancellationToken);
 
         Assert.Null(updated.BlockedByTodoId);
         Assert.NotNull(updated.Modified);
@@ -3928,11 +3961,12 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.UpdateTodoAsync("tbd-f6-todo", stranger, MemberRoles,
-                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6-todo" }));
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6-todo" },
+                    TestContext.Current.CancellationToken));
 
         await using (var q = store.QuerySession())
         {
-            var todo = (await q.LoadAsync<TodoItem>("tbd-f6-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f6-todo", TestContext.Current.CancellationToken))!;
             Assert.Null(todo.BlockedByTodoId);
         }
     }
@@ -3967,7 +4001,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.UpdateTodoAsync("tbd-f6c-todo", author, MemberRoles,
-                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6c-blocker" }));
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6c-blocker" },
+                    TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -4028,16 +4063,16 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
         });
 
-        var moved = await svc.MoveTodoToBoardAsync("tbd-f7-todo", "tbd-f7-target", author, MemberRoles);
+        var moved = await svc.MoveTodoToBoardAsync("tbd-f7-todo", "tbd-f7-target", author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.Equal("tbd-f7-target", moved.BoardId); // the placement relocated
 
         // The BlockedByTodoId persists — moving never clears the hint.
         await using (var q = store.QuerySession())
         {
-            var todo = (await q.LoadAsync<TodoItem>("tbd-f7-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7-todo", TestContext.Current.CancellationToken))!;
             Assert.Equal("tbd-f7-blocker", todo.BlockedByTodoId);
 
-            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7-blocker"))!;
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7-blocker", TestContext.Current.CancellationToken))!;
             Assert.False(blocker.IsDeleted); // the blocker is untouched
         }
     }
@@ -4069,15 +4104,15 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
 
-        await svc.DeleteTodoAsync("tbd-f7c-todo", author, MemberRoles);
+        await svc.DeleteTodoAsync("tbd-f7c-todo", author, MemberRoles, TestContext.Current.CancellationToken);
 
         await using (var q = store.QuerySession())
         {
-            var todo = (await q.LoadAsync<TodoItem>("tbd-f7c-todo"))!;
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7c-todo", TestContext.Current.CancellationToken))!;
             Assert.True(todo.IsDeleted);
             Assert.Equal("tbd-f7c-blocker", todo.BlockedByTodoId); // the hint persists
 
-            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7c-blocker"))!;
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7c-blocker", TestContext.Current.CancellationToken))!;
             Assert.False(blocker.IsDeleted); // the blocker is untouched
         }
     }
@@ -4129,7 +4164,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var board = await svc.GetBoardAsync("tbd-b1-board", author);
+        var board = await svc.GetBoardAsync("tbd-b1-board", author, TestContext.Current.CancellationToken);
         Assert.True(board.CardBlockers.ContainsKey("tbd-b1-card"));
         var chip = board.CardBlockers["tbd-b1-card"];
         Assert.False(chip.Generic);
@@ -4188,7 +4223,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
         });
 
-        var board = await svc.GetBoardAsync("tbd-b2-board", author);
+        var board = await svc.GetBoardAsync("tbd-b2-board", author, TestContext.Current.CancellationToken);
         Assert.True(board.CardBlockers.ContainsKey("tbd-b2-card"));
         var chip = board.CardBlockers["tbd-b2-card"];
         Assert.True(chip.Generic);
@@ -4224,7 +4259,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         var created = await svc.CreateTodoCommentAsync(
-            "cmt-1-todo", commenter, MemberRoles, "First thought", "en");
+            "cmt-1-todo", commenter, MemberRoles, "First thought", "en",
+                ct: TestContext.Current.CancellationToken);
 
         Assert.NotEmpty(created.Id);
         Assert.Equal("cmt-1-todo", created.TodoId);
@@ -4240,7 +4276,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(AccessVia.Owner, audit.Via);
 
         // The read lane returns the comment (the to-do's Read decision already ran).
-        var detail = await svc.GetTodoAsync("cmt-1-todo", author);
+        var detail = await svc.GetTodoAsync("cmt-1-todo", author, TestContext.Current.CancellationToken);
         Assert.Single(detail.Comments);
     }
 
@@ -4266,16 +4302,18 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         var topLevel = await svc.CreateTodoCommentAsync(
-            "cmt-2-todo", commenter, MemberRoles, "Question?", "en");
+            "cmt-2-todo", commenter, MemberRoles, "Question?", "en",
+                ct: TestContext.Current.CancellationToken);
 
         var reply = await svc.CreateTodoCommentAsync(
             "cmt-2-todo", author, MemberRoles, "Answer.", "en",
-            parentId: topLevel.Id);
+            parentId: topLevel.Id,
+                TestContext.Current.CancellationToken);
 
         Assert.Equal(topLevel.Id, reply.ParentId);
         Assert.Equal("cmt-2-todo", reply.TodoId);
 
-        var detail = await svc.GetTodoAsync("cmt-2-todo", author);
+        var detail = await svc.GetTodoAsync("cmt-2-todo", author, TestContext.Current.CancellationToken);
         Assert.Equal(2, detail.Comments.Count);
         Assert.Contains(detail.Comments, c => c.ParentId == topLevel.Id);
     }
@@ -4309,26 +4347,31 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         // A live top-level comment on the *other* to-do.
         var otherComment = await svc.CreateTodoCommentAsync(
-            "cmt-3-other", author, MemberRoles, "On the other to-do", "en");
+            "cmt-3-other", author, MemberRoles, "On the other to-do", "en",
+                ct: TestContext.Current.CancellationToken);
         // A soft-deleted top-level comment on *this* to-do.
         var deletedComment = await svc.CreateTodoCommentAsync(
-            "cmt-3-todo", author, MemberRoles, "To be deleted", "en");
-        await svc.DeleteTodoCommentAsync("cmt-3-todo", deletedComment.Id, author, MemberRoles);
+            "cmt-3-todo", author, MemberRoles, "To be deleted", "en",
+                ct: TestContext.Current.CancellationToken);
+        await svc.DeleteTodoCommentAsync("cmt-3-todo", deletedComment.Id, author, MemberRoles, TestContext.Current.CancellationToken);
 
         // Parent on a different to-do → 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
-                "Reply?", "en", parentId: otherComment.Id));
+                "Reply?", "en", parentId: otherComment.Id,
+                    TestContext.Current.CancellationToken));
 
         // Missing parent → 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
-                "Reply?", "en", parentId: "cmt-3-missing"));
+                "Reply?", "en", parentId: "cmt-3-missing",
+                    TestContext.Current.CancellationToken));
 
         // Soft-deleted parent → 404.
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateTodoCommentAsync("cmt-3-todo", author, MemberRoles,
-                "Reply?", "en", parentId: deletedComment.Id));
+                "Reply?", "en", parentId: deletedComment.Id,
+                    TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -4346,7 +4389,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateTodoCommentAsync("cmt-4-missing", author, MemberRoles,
-                "Ghost to-do", "en"));
+                "Ghost to-do", "en",
+                    ct: TestContext.Current.CancellationToken));
 
         await Plant(store, new TodoItem
         {
@@ -4358,7 +4402,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.CreateTodoCommentAsync("cmt-4-deleted", author, MemberRoles,
-                "On a deleted to-do", "en"));
+                "On a deleted to-do", "en",
+                    ct: TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -4386,7 +4431,8 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             svc.CreateTodoCommentAsync("cmt-5-todo", stranger, MemberRoles,
-                "Intrusion", "en"));
+                "Intrusion", "en",
+                    ct: TestContext.Current.CancellationToken));
 
         // The to-do's comment set is still empty.
         await using var q = store.QuerySession();
@@ -4418,13 +4464,14 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
         var comment = await svc.CreateTodoCommentAsync(
-            "cmt-6-todo", commenter, MemberRoles, "Mine", "en");
+            "cmt-6-todo", commenter, MemberRoles, "Mine", "en",
+                ct: TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            svc.DeleteTodoCommentAsync("cmt-6-todo", comment.Id, stranger, MemberRoles));
+            svc.DeleteTodoCommentAsync("cmt-6-todo", comment.Id, stranger, MemberRoles, TestContext.Current.CancellationToken));
 
         await using var q = store.QuerySession();
-        var reloaded = (await q.LoadAsync<TodoComment>(comment.Id))!;
+        var reloaded = (await q.LoadAsync<TodoComment>(comment.Id, TestContext.Current.CancellationToken))!;
         Assert.Null(reloaded.DeletedAt); // untouched by the refused write
     }
 
@@ -4449,10 +4496,11 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Audience = null,
         });
         var comment = await svc.CreateTodoCommentAsync(
-            "cmt-7-todo", author, MemberRoles, "To be deleted", "en");
+            "cmt-7-todo", author, MemberRoles, "To be deleted", "en",
+                ct: TestContext.Current.CancellationToken);
         Assert.Null(comment.DeletedAt);
 
-        var deleted = await svc.DeleteTodoCommentAsync("cmt-7-todo", comment.Id, author, MemberRoles);
+        var deleted = await svc.DeleteTodoCommentAsync("cmt-7-todo", comment.Id, author, MemberRoles, TestContext.Current.CancellationToken);
         Assert.NotNull(deleted.DeletedAt);
 
         // C3 audit row for the delete.
@@ -4460,7 +4508,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             a => a.Action == "todo.comment.delete");
 
         // The record is kept — the read lane still returns it (now deleted).
-        var detail = await svc.GetTodoAsync("cmt-7-todo", author);
+        var detail = await svc.GetTodoAsync("cmt-7-todo", author, TestContext.Current.CancellationToken);
         var row = Assert.Single(detail.Comments);
         Assert.NotNull(row.DeletedAt);
     }
@@ -4483,10 +4531,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
             Audience = null,
         });
-        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Older", "en");
-        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Newer", "en");
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Older", "en", ct: TestContext.Current.CancellationToken);
+        await svc.CreateTodoCommentAsync("cmt-8-todo", author, MemberRoles, "Newer", "en", ct: TestContext.Current.CancellationToken);
 
-        var detail = await svc.GetTodoAsync("cmt-8-todo", author);
+        var detail = await svc.GetTodoAsync("cmt-8-todo", author, TestContext.Current.CancellationToken);
         var bodies = detail.Comments.Select(c => c.Body).ToList();
         // Created ascending — the older comment precedes the newer one.
         Assert.Equal(["Older", "Newer"], bodies);
@@ -4512,7 +4560,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         });
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            svc.CreateTodoCommentAsync("cmt-9-todo", author, MemberRoles, "   ", "en"));
+            svc.CreateTodoCommentAsync("cmt-9-todo", author, MemberRoles, "   ", "en", ct: TestContext.Current.CancellationToken));
 
         await using var q = store.QuerySession();
         var ct = TestContext.Current.CancellationToken;
@@ -4551,10 +4599,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -4587,5 +4635,51 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await using var w = store.OpenSession(new Marten.Services.SessionOptions());
         w.Store(document);
         await w.SaveChangesAsync(ct);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 7 (to-do comment): a resolved `@`-token stores ONE `todo.mention`
+    // row for the recipient (the per-recipient key + the
+    // `/projects/todos/{todoId}#comment-{commentId}` linkPath, M36·4) + a
+    // staged email; an unknown token (M36-5) stores none. The comment lane
+    // is the publishing lane (M36·8 — no separate publish step).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_TodoComment_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-todo-author";
+        const string todoId = "m36-todo-1";
+        await Plant(boot.Store, new TodoItem { Id = todoId, Title = "Water the plants", AuthorId = author });
+
+        var comment = await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ada can you water them?", null);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.TodoMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.TodoMention}:{comment.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/projects/todos/{todoId}#comment-{comment.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.TodoMention}:{comment.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_TodoComment_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
+        const string author = "u-m36-todo-inert-author";
+        const string todoId = "m36-todo-inert";
+        await Plant(boot.Store, new TodoItem { Id = todoId, Title = "T", AuthorId = author });
+
+        await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ghost ping", null);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.TodoMention));
     }
 }

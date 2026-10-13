@@ -5,7 +5,7 @@
 // — a shared key would collapse the fan-out to the first admin).
 //
 // Harness: the GuardianAssignmentTests two-store boot (the `mt` document
-// schema — including M6DocTypes so the Notification rows have a table — plus
+// schema — including NotificationDocTypes so the Notification rows have a table — plus
 // the EF-migrated `identity` schema + the real EF UserStore/UserManager so
 // GetUsersInRoleAsync works), wired with a real NotificationService over the
 // M6-registered store (recording translator + mailer doubles, the
@@ -155,7 +155,7 @@ public sealed class IdentityServiceAccountNotificationTests(PostgresFixture fixt
 
     /// <summary>
     /// Boots the two-store shape (the `mt` document schema — including
-    /// <see cref="M6DocTypes"/> so the <see cref="Notification"/> rows have a
+    /// <see cref="NotificationDocTypes"/> so the <see cref="Notification"/> rows have a
     /// table — plus the EF-migrated `identity` schema and the real EF
     /// UserStore/UserManager so <c>GetUsersInRoleAsync</c> works), and wires
     /// the real <see cref="IdentityService"/> with a real
@@ -172,8 +172,8 @@ public sealed class IdentityServiceAccountNotificationTests(PostgresFixture fixt
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

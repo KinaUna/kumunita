@@ -66,7 +66,7 @@ Two already-accepted decisions constrain this lane:
   assignee value with the same standing semantics as a person id (the
   C-M5·3 pin, the ADR 0073 read-side semantics mirrored on the write side).
   No new `IProjectService` seam, no `Decide()` branch, no schema change
-  (`M5DocTypes` untouched — `AssigneeId` is already a single subject-id
+  (`ProjectDocTypes` untouched — `AssigneeId` is already a single subject-id
   string).
 - **The controller gains two small additive pieces** (thin HTTP layer,
   ADR 0006-D):

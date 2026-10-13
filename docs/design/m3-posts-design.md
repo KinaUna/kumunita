@@ -63,8 +63,8 @@ invariant list).
   M3 ADD** on a frozen interface (ADR 0006-E compatible-lane, precedent
   `GetProfilesAsync`; doc-comment says *candidate* set, no audit row, never
   a visible set).
-- `M3DocTypes.Configure(StoreOptions)` — the new parallel document surface
-  (analogous to `M1DocTypes`). U3 wires it into both boot paths
+- `PostDocTypes.Configure(StoreOptions)` — the new parallel document surface
+  (analogous to `CoreDocTypes`). U3 wires it into both boot paths
   (`Kumunita.Core/Bootstrap/SchemaBootstrap.cs` + `Kumunita.Web/Program.cs`).
 - `Kumunita.Web` surface:
   - `/community/{componentId}` — component feed (one aggregate
@@ -138,7 +138,7 @@ seam tests for M3 (pinned by Part 2 §2.5) will name each by id.
 | **C5** (ADR 0006) | Moderator default-OFF on audience-restricted content. | **M3's hold:** M3 exercises **no** `Moderate`-on-post call. A moderator (any scope) cannot peek at a post the author has not shared with them — `CanSeeAsync` denies the moderator exactly as it denies any other non-audience viewer, and the `AccessAudit` row records Deny. `Via = Report` stays dormant (M3b). M3 tests assert the absence (F3 / F8). |
 | **C6** (ADR 0006) | One matching pass (`MatchGroups`) shared by `CanAsync` and `CanSeeAsync`. | The feed (bulk), the detail (single), and the reply-visibility (inherited from the parent's single `Read` decision — C-M3·1) all reduce to the **same** `MatchGroups` core; they cannot drift. A post visible to a group member in the feed is visible on the detail page, and a reply under it is visible on the detail, in one pass. |
 | **ADR 0001-B** | Author's choice is absolute. | The composer writes the chosen `Audience` verbatim into `Post.Audience`. M3 does **not** auto-add group grants, does **not** second-guess a "Safety only" choice with a "but the author is friendly" branch, and does **not** inject a community-wide audience. The C1 owner branch is the only "extra" the author gets. |
-| **ADR 0004 §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, no seeding. | M3's three documents are registered in **`Kumunita.Core/Bootstrap/M3DocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to `M1DocTypes`. **No seeding** (the four components are already seeded by M1's `FirstBootSeeder`; M3 consumes them, does not re-seed). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan notes U1 may flip to a hand-rolled `FeatureSchemaBase` subclass before U2 pins §2.2 — this doc records the choice; U2's pin decides. |
+| **ADR 0004 §B.1** | Marten-native document registration (POCOs, conventional `string Id`), delta-detected, idempotent, no seeding. | M3's three documents are registered in **`Kumunita.Core/Bootstrap/PostDocTypes.Configure(StoreOptions)`** — a new parallel surface analogous to `CoreDocTypes`. **No seeding** (the four components are already seeded by M1's `FirstBootSeeder`; M3 consumes them, does not re-seed). Delta-detected + idempotent is inherited from `ApplyAllConfiguredChangesToDatabaseAsync`. *Open veto:* the plan notes U1 may flip to a hand-rolled `FeatureSchemaBase` subclass before U2 pins §2.2 — this doc records the choice; U2's pin decides. |
 
 **ADRs M3 must respect (not pinned as invariants, but the code must not
 violate):**
@@ -374,7 +374,7 @@ Namespace `Kumunita.Core.Posts`. All three documents are **Marten-native**
 POCOs with the conventional `string Id` identity (ADR 0004 §B.1; the carve-out
 for a hand-rolled `FeatureSchemaBase` is *not* used in M3 — that pin is
 reserved for operator-written tables like `AdminOverride`, mirroring
-`M1DocTypes`).
+`CoreDocTypes`).
 
 ```csharp
 namespace Kumunita.Core.Posts;
@@ -523,16 +523,16 @@ public sealed record PostDraft(string ComponentId, string? Title,
                                string Body, Authorization.Audience Audience);
 ```
 
-**M3 document registration surface** (U3 lands this, mirroring `M1DocTypes`):
+**M3 document registration surface** (U3 lands this, mirroring `CoreDocTypes`):
 
 ```csharp
 namespace Kumunita.Core;
 
 /// M3's Marten-native document registration surface (ADR 0004 §B.1). Mirrors
-/// `M1DocTypes` exactly: all three POCOs use the conventional `string Id`
+/// `CoreDocTypes` exactly: all three POCOs use the conventional `string Id`
 /// identity and need no `Identity(...)` or `UniqueIndex(...)` call — Marten's
 /// defaults apply.
-public static class M3DocTypes
+public static class PostDocTypes
 {
     public static void Configure(Marten.StoreOptions opts)
     {
@@ -546,7 +546,7 @@ public static class M3DocTypes
 Wired by U3 into both boot paths:
 `Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (called from
 `ApplyAllConfiguredChangesToDatabaseAsync`) and `Kumunita.Web/Program.cs`
-(the dev-loop + all-env paths, adjacent to `M1DocTypes.Configure`).
+(the dev-loop + all-env paths, adjacent to `CoreDocTypes.Configure`).
 
 ### 2.3 Candidate-filter + reply-inherits rule (M3-owned invariants)
 

@@ -119,7 +119,7 @@ reassembled from pages in the Web layer.
   **Never an access decision, never persisted, never a service concept** —
   pinning this in the ADR keeps it from accreting.
 - **No documents, no schema, no seeding.** `Event` / `EventRsvp` are
-  untouched (zero fields added); `M4DocTypes` is untouched; the
+  untouched (zero fields added); `EventDocTypes` is untouched; the
   boot paths are untouched; no `FeatureSchemaBase`, no EF.
 - **No new `AccessAction`, no new `AccessVia` value, no new standing
   matrix** — the calendar is a signed-in read surface (`[Authorize]`, the
@@ -245,7 +245,7 @@ handoff note.
   - `## 3. The design decisions` — each **[PROPOSED]** until U01 locks
     them:
     - `### 3.1 Zero document changes` — no field on `Event` / `EventRsvp`
-      / `EventTranslation`; no `M4DocTypes` change; no boot-path change.
+      / `EventTranslation`; no `EventDocTypes` change; no boot-path change.
       (D1)
     - `### 3.2 The one seam: `ListInRangeAsync`` — the exact signature +
       the candidate-filter / gate / audit rules (mirroring

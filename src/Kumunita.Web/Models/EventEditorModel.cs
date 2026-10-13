@@ -656,6 +656,11 @@ public sealed record EventDetailViewModel(
     // readable to-dos, the view renders nothing; the `events.linked_todos`
     // kw-l key labels the section).
     IReadOnlyList<LinkedTodoRow>? LinkedTodos = null,
+    // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+    // **linked boards** on the event detail (the reverse read seam's page,
+    // mapped to rows; `null` = no linked readable boards, the view renders
+    // nothing; the `events.linked_boards` kw-l key labels the section).
+    IReadOnlyList<LinkedBoardRow>? LinkedBoards = null,
     // M18 (ADR 0119, D7) — the detail-page series shape (U06). Set by the
     // controller from the <see cref="Kumunita.Core.Events.Event"/> row + the
     // actor's standing (C-M18·4). The detail page renders the series chip
@@ -710,4 +715,18 @@ public sealed record LinkedTodoRow(
     string Title,
     string? Status,
     DateTimeOffset? DueAt,
+    string LinkPath);
+
+/// <summary>
+/// ADR 0115 D2 (M14 interlock carried to the board surface) — one
+/// **linked board** row on the event detail (the <see cref="LinkedTodoRow"/>
+/// shape, carried to the board surface). <see cref="Title"/> is the board's
+/// label; <see cref="LinkPath"/> is <c>/projects/boards/{BoardId}</c>. The
+/// page's <c>Read</c> decision already ran on every row — the seam's
+/// <c>CanSeeAsync(Read)</c> pass is the gate (C-M14·1 / C-M14·4), so the row
+/// is a display convenience, never a gate.
+/// </summary>
+public sealed record LinkedBoardRow(
+    string BoardId,
+    string Title,
     string LinkPath);

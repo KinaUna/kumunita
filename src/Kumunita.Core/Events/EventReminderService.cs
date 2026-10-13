@@ -238,6 +238,10 @@ public static class EventReminderService
                     // email is already staged by the M4 path above (the email is the M4
                     // nudge, not the M6 inbox — the C-M6·5 split). A recipient without a
                     // profile / email is skipped (no delivery address — the M4 precedent).
+                    // `linkPath` is the event detail page (the same `/events/{id}` the
+                    // event.rsvp + guardian.event.rsvp emitters pass — the inbox renders
+                    // it as a clickable link, so the reminder row — not just its title —
+                    // jumps straight to the event).
                     if (notifications is not null)
                     {
                         await notifications.EmitAsync(
@@ -246,6 +250,7 @@ public static class EventReminderService
                             kind: NotificationKinds.EventReminder,
                             idempotencyKey: $"notification:event.reminder:{ev.Id}:{when}",
                             body: ev.Title,
+                            linkPath: $"/events/{ev.Id}",
                             ct: ct).ConfigureAwait(false);
                     }
                 }

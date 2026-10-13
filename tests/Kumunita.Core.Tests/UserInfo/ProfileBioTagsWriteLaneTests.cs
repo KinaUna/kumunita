@@ -276,7 +276,7 @@ public sealed class ProfileBioTagsWriteLaneTests(PostgresFixture fixture)
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);   // the two new Tag/TagTranslation docs (the create-or-get writes Tag)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

@@ -144,7 +144,7 @@ and the §deferred lanes (D8).
 fields, both **additive POCO fields** (the `Post.Status` / `Post.TagIds` /
 `Profile.AvatarId` / `Profile.TimeZone` history on a POCO — delta-detected,
 idempotent, **no re-seed**, **no EF migration**, **no new `*DocTypes`
-surface** — `Profile` already registers in `M1DocTypes`; adding two fields is
+surface** — `Profile` already registers in `CoreDocTypes`; adding two fields is
 the §B.1 additive lane):
 
 ```csharp

@@ -110,7 +110,7 @@ public sealed class NotificationService
     /// commit atomically). **Dedup (D4, F10):** if a <see cref="Notification"/>
     /// row with the same <paramref name="idempotencyKey"/> already exists
     /// (looked up on <paramref name="session"/>, the
-    /// <c>IdempotencyKey</c> index in <c>M6DocTypes</c>), the method returns
+    /// <c>IdempotencyKey</c> index in <c>NotificationDocTypes</c>), the method returns
     /// that existing row **without** storing a second row and **without**
     /// calling <c>StageAsync</c> — a re-emission of the same logical event is
     /// a no-op (no second inbox row, no second email). The key itself is the
@@ -203,7 +203,7 @@ public sealed class NotificationService
 
         // (1) Inbox-side dedup (D4 / F10): a same-key row already stored (on
         //     this session or in a prior commit — the <c>IdempotencyKey</c>
-        //     index in <c>M6DocTypes</c>) makes this emission a no-op: no
+        //     index in <c>NotificationDocTypes</c>) makes this emission a no-op: no
         //     second row, no <c>StageAsync</c> call.
         // (U09 fix: `FirstAsync` throws on an empty sequence — i.e. on every
         //  first emission, which is the normal path. The intent (and the null

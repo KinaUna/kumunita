@@ -53,7 +53,7 @@ public class GuestAccessSeamTests(PostgresFixture fixture) : IClassFixture<Postg
                 DisplayName = "A Consultant",
                 Verified = true
             });
-            await seed.SaveChangesAsync();
+            await seed.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         // One call to the single write lane (GATE-3) settles the standing.
@@ -172,8 +172,8 @@ public class GuestAccessSeamTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

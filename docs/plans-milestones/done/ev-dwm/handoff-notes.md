@@ -183,7 +183,7 @@ section + its own entry-read list.
   pins re-exercising the *existing* `ListInRangeAsync`) +
   `tests/Kumunita.Web.Tests/EventControllerTests.cs` (7 NSubstitute `?view=`
   engine pins). **No `IEventService` / `EventService` / Core document /
-  `M4DocTypes` / boot-path touched** (verified: the only C# diff is the two
+  `EventDocTypes` / boot-path touched** (verified: the only C# diff is the two
   test files; the design doc is untouched).
 - **9 names (verbatim, design §6.3):** `EV_Range_OneDayWindow_OnlyThatDay`,
   `EV_Range_SevenDayWindow_OnlyThoseDays`; `Calendar_DefaultViewIsMonth_BackwardCompat`,

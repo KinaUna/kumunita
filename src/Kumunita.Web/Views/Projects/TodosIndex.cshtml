@@ -442,9 +442,15 @@
                         var _assignPeople = (ViewData["Assign_Users"] as List<GrantOption>) ?? new List<GrantOption>();
                         var _assignGroups = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>();
                         var _assignCommunities = (ViewData["Assign_Communities"] as List<GrantOption>) ?? new List<GrantOption>();
-                        var _assignPeopleLabel = await Translation.GetAsync("projects.todo.assign_people", _kwL);
-                        var _assignGroupsLabel = await Translation.GetAsync("projects.todo.assign_groups", _kwL);
-                        var _assignCommunitiesLabel = await Translation.GetAsync("projects.todo.assign_communities", _kwL);
+                        var _assignPeopleLabel = Translation is null
+                            ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_people"]
+                            : await Translation.GetAsync("projects.todo.assign_people", _kwL);
+                        var _assignGroupsLabel = Translation is null
+                            ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_groups"]
+                            : await Translation.GetAsync("projects.todo.assign_groups", _kwL);
+                        var _assignCommunitiesLabel = Translation is null
+                            ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["projects.todo.assign_communities"]
+                            : await Translation.GetAsync("projects.todo.assign_communities", _kwL);
                         static bool _IsCurrent(string? currentId, string oId) =>
                             !string.IsNullOrEmpty(currentId) && currentId == oId;
                     }

@@ -65,12 +65,20 @@ public sealed class PageService : IPageService
     // The DI registration passes the live Notifications.NotificationService.
     private readonly NotificationService? _notifications;
 
+    // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_tags` / `_notifications`)
+    // so the existing test call sites keep compiling unchanged.
+    private readonly Mentions.IMentionService? _mentions;
+
     public PageService(IDocumentStore store, ITagService? tags = null,
-        NotificationService? notifications = null)
+        NotificationService? notifications = null,
+        Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
         _notifications = notifications;
+        _mentions = mentions;
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -287,12 +295,18 @@ public sealed class PageService : IPageService
 
     /// <summary>
     /// The **translation** standing (ADR 0040, amending ADR 0039 §3.7 /
-    /// ADR 0029 carried over): a <see cref="PageKind.System"/> page may be
-    /// translated by a <b>GlobalAdmin or a Translator only</b> (the ADR 0040
-    /// amendment; a platform page has no community to moderate); a
-    /// <see cref="PageKind.User"/> (blog) page is also GlobalAdmin ∪ Translator
-    /// — a community Moderator has <b>no</b> translation standing on either
-    /// kind (a blog is personal content, not community content).
+    /// ADR 0029 carried over, and further amended by ADR 0161 to close the
+    /// "an editor cannot translate their own page" gap): a
+    /// <see cref="PageKind.System"/> page may be translated by a
+    /// <b>GlobalAdmin or a Translator</b> (a platform page has no community to
+    /// moderate; its author is an audit identity, not a standing branch); a
+    /// <see cref="PageKind.User"/> (blog) page is <b>the page's author ∪
+    /// GlobalAdmin ∪ Translator</b> — the author branch is the ADR 0161
+    /// symmetry with the edit standing (a blog page's edit standing is the
+    /// author ∪ GlobalAdmin, ADR 0040), so a resident who can edit their own
+    /// page can also translate it. A community Moderator has <b>no</b>
+    /// translation standing on either kind (a blog is personal content, not
+    /// community content).
     /// </summary>
     public static void CheckTranslateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
     {
@@ -304,7 +318,7 @@ public sealed class PageService : IPageService
 
         if (!CanTranslatePage(actorId, actorRoles, page))
             throw new UnauthorizedAccessException(
-                "Only a GlobalAdmin or a Translator may add a translation.");
+                "Only the page's author, a GlobalAdmin, or a Translator may add a translation.");
     }
 
     /// <summary>
@@ -327,22 +341,40 @@ public sealed class PageService : IPageService
             return false;
         if (string.IsNullOrEmpty(actorId))
             return false;
-        return CanTranslatePageCore(actorRoles, page);
+        return CanTranslatePageCore(actorId, actorRoles, page);
     }
 
     /// <summary>
     /// The single shared translation-standing decision (ADR 0040, amending
-    /// ADR 0039 §3.7 / ADR 0029 carried over): a GlobalAdmin or a Translator
-    /// qualifies on **any** page (system or user). A community Moderator has
-    /// **no** translation standing on either kind (the ADR 0040 amendment:
-    /// a system page has no community to moderate; a blog page is personal
-    /// content, not community content). Called by both <see
-    /// cref="CanTranslatePage"/> (the display probe) and <see
+    /// ADR 0039 §3.7 / ADR 0029 carried over, and further amended by ADR 0161
+    /// to close the "an editor cannot translate their own page" gap): a
+    /// GlobalAdmin or a Translator qualifies on **any** page (system or user).
+    /// Additionally (ADR 0161) the **author** of a <see cref="PageKind.User"/>
+    /// (blog) page qualifies — the same branch the edit standing uses (a blog
+    /// page's edit standing is the author ∪ GlobalAdmin, ADR 0040), so a
+    /// resident who can edit their own page can also translate it. A system
+    /// page's author is an audit identity, not a standing branch (a system
+    /// page is GlobalAdmin-only), so the author branch is scoped to
+    /// <see cref="PageKind.User"/> only — mirroring <see
+    /// cref="CheckEditStanding"/>. A community Moderator has **no** translation
+    /// standing on either kind (the ADR 0040 amendment: a system page has no
+    /// community to moderate; a blog page is personal content). Called by both
+    /// <see cref="CanTranslatePage"/> (the display probe) and <see
     /// cref="CheckTranslateStanding"/> (the write-lane gate), so the two can
     /// never disagree.
     /// </summary>
-    private static bool CanTranslatePageCore(IReadOnlySet<string> actorRoles, Page page)
+    private static bool CanTranslatePageCore(string actorId, IReadOnlySet<string> actorRoles, Page page)
     {
+        // ADR 0161 — the author of a blog (User) page may translate it, the
+        // same branch CheckEditStanding grants for editing (author ∪
+        // GlobalAdmin on a User page). A System page's author is an audit
+        // identity, not a standing branch, so this is scoped to User kind —
+        // a resident cannot translate a system page by being its author (only
+        // GlobalAdmin / Translator may, as before).
+        if (page.Kind == PageKind.User
+            && string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            return true;
+
         if (actorRoles.Contains(Roles.GlobalAdmin))
             return true;
         if (actorRoles.Contains(Roles.Translator))
@@ -717,6 +749,39 @@ public sealed class PageService : IPageService
             }
         }
 
+        // M36 (ADR 0165, U05) — the page mention emitter (Part 2.3 lane 5,
+        // `page.mention`). Additive, *inside* the lane (the frozen method
+        // signature + audit rows untouched): extract candidate `@`-tokens
+        // from the page body, resolve them against the frozen directory read
+        // (the author is never a recipient — M36-5 self pin), and emit one
+        // `page.mention` notification per resolved recipient on the caller's
+        // session. The per-recipient idempotency key (M36·4) keeps a
+        // re-emission of the same (page, recipient) pair a no-op (ADR 0076
+        // D4 / F10). `EmitAsync` does not commit; the `SaveChangesAsync`
+        // below is the single commit (C3). No new authorization surface, no
+        // `AccessAudit` row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Mentions.MentionTokens.ExtractTokens(page.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.PageMention,
+                        idempotencyKey: $"notification:page.mention:{page.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(page.Body),
+                        targetId: null,
+                        linkPath: $"/pages/{page.Id}",
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
@@ -1041,11 +1106,14 @@ public sealed class PageService : IPageService
     /// <summary>
     /// Adds a **user-added translation** of a page in the **caller's**
     /// in-flight session (C3; the ADR 0029 standing carried over, design doc
-    /// §3.7). Standing (ADR 0040): a GlobalAdmin or a Translator on **either**
-    /// kind — a community Moderator has no translation standing on either kind
-    /// (a system page has no community to moderate; a blog page is personal
-    /// content). The <c>(PageId, LanguageCode)</c> unique index (U01) is the
-    /// add-only duplicate guard.
+    /// §3.7). Standing (ADR 0040, and ADR 0161): a GlobalAdmin or a Translator
+    /// on **either** kind, and — since ADR 0161 — the **author** of a
+    /// <see cref="PageKind.User"/> (blog) page (the same branch as the edit
+    /// standing, so an editor can translate their own page); a community
+    /// Moderator has no translation standing on either kind (a system page has
+    /// no community to moderate; a blog page is personal content). The
+    /// <c>(PageId, LanguageCode)</c> unique index (U01) is the add-only
+    /// duplicate guard.
     /// </summary>
     public async Task<PageTranslation> AddTranslationAsync(
         string pageId, string languageCode, string? title, string body,
@@ -1084,8 +1152,7 @@ public sealed class PageService : IPageService
             Created = now
         };
 
-        var via = ResolveTranslationStandingVia(
-            page.Kind, page.ComponentId, actorId, actorRoles);
+        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
 
         var audit = new AccessAudit
         {
@@ -1117,8 +1184,9 @@ public sealed class PageService : IPageService
     /// **Updates** the existing <see cref="PageTranslation"/> row for
     /// (<paramref name="pageId"/>, <paramref name="languageCode"/>) in the
     /// <b>caller's</b> in-flight session (C3). Standing (ADR 0048, same as
-    /// the add lane): a <see cref="Roles.GlobalAdmin"/> or a
-    /// <see cref="Roles.Translator"/> — a community Moderator has no
+    /// the add lane; ADR 0161): a <see cref="Roles.GlobalAdmin"/> or a
+    /// <see cref="Roles.Translator"/> on either kind, or the **author** of a
+    /// <see cref="PageKind.User"/> (blog) page — a community Moderator has no
     /// translation standing. A missing page or row is a
     /// <see cref="KeyNotFoundException"/>; a denied actor throws
     /// <see cref="UnauthorizedAccessException"/>. One <c>SaveChangesAsync</c>.
@@ -1156,7 +1224,7 @@ public sealed class PageService : IPageService
         row.Body = body;
 
         var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page.Kind, page.ComponentId, actorId, actorRoles);
+        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
         var audit = new AccessAudit
         {
             Id = Guid.NewGuid().ToString("N"),
@@ -1213,7 +1281,7 @@ public sealed class PageService : IPageService
         CheckTranslateStanding(actorId, actorRoles, page);
 
         var now = DateTimeOffset.UtcNow;
-        var via = ResolveTranslationStandingVia(page.Kind, page.ComponentId, actorId, actorRoles);
+        var via = ResolveTranslationStandingVia(page, actorId, actorRoles);
         var audit = new AccessAudit
         {
             Id = Guid.NewGuid().ToString("N"),
@@ -1557,23 +1625,37 @@ public sealed class PageService : IPageService
 
     /// <summary>
     /// The **translation** standing resolver (ADR 0040, amending ADR 0039
-    /// §3.7 / ADR 0029 carried over): a GlobalAdmin or a Translator
-    /// (<see cref="AccessVia.Admin"/>) on <b>either</b> kind. A community
-    /// Moderator has <b>no</b> translation standing on either kind (the ADR
-    /// 0040 amendment — a system page has no community to moderate; a blog
-    /// page is personal content, not community content), so the
-    /// component-moderator branch (<see cref="AccessVia.Moderator"/>) is
-    /// retired for both. Both qualifying roles map to
-    /// <see cref="AccessVia.Admin"/>.
+    /// §3.7 / ADR 0029 carried over, and further amended by ADR 0161): a
+    /// GlobalAdmin or a Translator (<see cref="AccessVia.Admin"/>) on
+    /// <b>either</b> kind, and — since ADR 0161 — the **author** of a
+    /// <see cref="PageKind.User"/> (blog) page (<see cref="AccessVia.Owner"/>),
+    /// the same branch the edit standing uses (the audit row records the
+    /// narrowest right that applied, so the author's translation is tagged
+    /// <c>Owner</c>, not <c>Admin</c>). A community Moderator has <b>no</b>
+    /// translation standing on either kind (the ADR 0040 amendment — a system
+    /// page has no community to moderate; a blog page is personal content, not
+    /// community content), so the component-moderator branch (<see
+    /// cref="AccessVia.Moderator"/>) is retired for both. The caller has
+    /// already verified the standing via <see cref="CheckTranslateStanding"/>
+    /// before calling this — it is a pure tag-resolution, not a gate.
     /// </summary>
     private static AccessVia ResolveTranslationStandingVia(
-        PageKind kind, string? componentId, string actorId, IReadOnlySet<string> actorRoles)
+        Page page, string actorId, IReadOnlySet<string> actorRoles)
     {
         ArgumentNullException.ThrowIfNull(actorRoles);
+        // ADR 0161 — the author of a blog (User) page translates under the
+        // Owner standing (the narrowest right — the same branch CheckEditStanding
+        // grants for editing). A system page's author is an audit identity, not
+        // a standing branch (a system page is GlobalAdmin-only), so the Owner
+        // branch is scoped to the User kind; a GlobalAdmin / Translator on a
+        // system page still maps to Admin.
+        if (page.Kind == PageKind.User
+            && string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
         // ADR 0040: a community Moderator has no translation standing on
         // either kind (a system page has no community to moderate; a blog
-        // page is personal content). Only GlobalAdmin / Translator qualify,
-        // both of which map to AccessVia.Admin.
+        // page is personal content). GlobalAdmin / Translator map to Admin.
         return AccessVia.Admin;
     }
 

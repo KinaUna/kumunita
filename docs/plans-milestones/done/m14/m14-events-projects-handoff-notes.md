@@ -1,6 +1,6 @@
 # M14 — Living handoff note (scratch tier)
 
-> **TL;DR:** Shipped M14 (integration of Events and Projects, ADR 0115): the additive `TodoItem.EventId?` association (a feed filter, never a gate — C-M14·1), the `(EventId)` index on `M5DocTypes` (ADR 0004 §B.1, zero migration), the `IProjectService.ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane, both-direction display links (the to-do → event chip + the event → to-do "linked to-dos" section, dangling-safe — C-M14·2), the `TodoIcsWriter` `VTODO` emitter + the two `.ics` routes, and the three acceptance tests (closed-loop / handoff / part-vs-whole) green end-to-end (Web 588/588, Core 1000/1000) — zero new authorization surface (C-M14·4).
+> **TL;DR:** Shipped M14 (integration of Events and Projects, ADR 0115): the additive `TodoItem.EventId?` association (a feed filter, never a gate — C-M14·1), the `(EventId)` index on `ProjectDocTypes` (ADR 0004 §B.1, zero migration), the `IProjectService.ListTodosForEventAsync` reverse read seam + the `SetTodoEventAsync` set-event write lane, both-direction display links (the to-do → event chip + the event → to-do "linked to-dos" section, dangling-safe — C-M14·2), the `TodoIcsWriter` `VTODO` emitter + the two `.ics` routes, and the three acceptance tests (closed-loop / handoff / part-vs-whole) green end-to-end (Web 588/588, Core 1000/1000) — zero new authorization surface (C-M14·4).
 > **Seam it created:** the interlock is **Web-composition over the frozen seams** — the to-do → event chip rides the frozen `IEventService.GetAsync` (the M4 seam, unchanged) and the event → to-do leg rides the **new** `IProjectService.ListTodosForEventAsync` (U01's reverse seam, the `ListTodosAsync` shape filtered to one event, one `CanSeeAsync(Read)` over the existing adapter, one `AccessAudit` row); there is **no** `Core.Events` → `Core.Projects` dependency, **no** new `AccessAction` / `AccessVia` / `Decide()` branch, and the `AccessAction` closed-set pin is `Read` + `Moderate` (M14 adds none).
 > **Do not re-litigate:** **no `RRULE` / recurrence anywhere in M14** (C-M14·6 — M18's home; the `VTODO` emitter carries no `RRULE` / `ORGANIZER` / `CREATED-BY` / `ATTENDEE` / `X-…` per the ADR 0028 posture) and the `VTODO` emitter carries **no identity / audience / grant material** (C-M14·5 — the never-emitted property-name sweep); the `EventId?` field is a feed filter / association, **never a gate** (C-M14·1 — a to-do's visibility is unchanged by its event linkage), and the two `.ics` routes are mutually unambiguous (the literal `/projects/todos.ics` wins over the parameterized `/projects/todos/{id}.ics` — the ADR 0112 §routes precedent, the M12 `EventController` shape).
 
@@ -41,7 +41,7 @@ scratch tier unit agents read before starting.
 - **D1** — one additive `EventId?` field on `TodoItem` (a 1:1
   association — the `ProjectId` shape; a feed filter / association,
   **never a gate**, C-M14·1) + one unnamed `(EventId)` index on
-  `M5DocTypes` (ADR 0004 §B.1 additive, zero migration — existing rows
+  `ProjectDocTypes` (ADR 0004 §B.1 additive, zero migration — existing rows
   read `EventId = null`).
 - **D2** — both display directions as **Web-layer composition** over the
   frozen read seams (no `Core.Events` → `Core.Projects` dependency):
@@ -173,7 +173,7 @@ Not added to `CreateTodoRequest` / `UpdateTodoRequest` (D3 — the
 `ProjectId` precedent: association is a dedicated lane, not the main
 form).
 
-**(b) The `(EventId)` index** — `src/Kumunita.Core/M5DocTypes.cs`, on
+**(b) The `(EventId)` index** — `src/Kumunita.Core/ProjectDocTypes.cs`, on
 the `TodoItem` block, **unnamed form** (the file's own note: Marten
 `ComputedIndex` exposes no `Name`, so single-field indexes use the
 auto-derived name — same as the `ProjectId` / `BlockedByTodoId`
@@ -776,8 +776,8 @@ read-shape pins** that Core's own pins do not cover (see (b)), and the
 **(a) The three acceptance tests — all green.** All three are
 `[Fact]` on `M14InterlockTests` (the `PostgresFixture` class-fixture
 harness — one shared `postgres:18` container; `BuildRealStoreAsync` boots
-a real Marten `DocumentStore` over `M1DocTypes` / `M3DocTypes` /
-`M4DocTypes` / `M5DocTypes`, since the to-do-detail chip resolves the
+a real Marten `DocumentStore` over `CoreDocTypes` / `PostDocTypes` /
+`EventDocTypes` / `ProjectDocTypes`, since the to-do-detail chip resolves the
 event over a **real store session** in `ProjectsController.TodoDetail`);
 NSubstitute stands in for the frozen service seams
 (`IProjectService` / `IEventService` / `IUserInfoService` /
@@ -960,7 +960,7 @@ lines are unchanged).
 | Unit | Shipped |
 |---|---|
 | U00 | the design doc (primary authority) + ADR 0115 (the decision record) + the three acceptance test names + the D7/D8 close shape locked |
-| U01 | the additive `TodoItem.EventId?` (a feed filter, never a gate — C-M14·1) + the `(EventId)` index on `M5DocTypes` (ADR 0004 §B.1, zero migration) + the `IProjectService.ListTodosForEventAsync` reverse read seam (the `ListTodosAsync` shape, the `ListBoardsForTodoAsync` precedent, one `CanSeeAsync(Read)` over the existing adapter, one `AccessAudit` row) + 4 pins |
+| U01 | the additive `TodoItem.EventId?` (a feed filter, never a gate — C-M14·1) + the `(EventId)` index on `ProjectDocTypes` (ADR 0004 §B.1, zero migration) + the `IProjectService.ListTodosForEventAsync` reverse read seam (the `ListTodosAsync` shape, the `ListBoardsForTodoAsync` precedent, one `CanSeeAsync(Read)` over the existing adapter, one `AccessAudit` row) + 4 pins |
 | U02 | the `IProjectService.SetTodoEventAsync(todoItemId, actorId, actorRoles, eventId, ct)` set-event write lane (standing creator ∪ assignee ∪ GlobalAdmin — C-M5·6; a non-visible `eventId` refused 404; `null` clears; one atomic `todo.set_event` audit row) + 3 pins |
 | U03 | both-direction display links (the to-do → event chip over the frozen `GetAsync` + the event → to-do "linked to-dos" section over U01's seam) + the `TodoDetailViewModel.EventId/EventTitle/EventLinkPath` + the `EventDetailViewModel.LinkedTodos` (`LinkedTodoRow` shape) + the `todo.event_link` / `events.linked_todos` `kw-l` keys × en/de/fr/da — dangling-safe (C-M14·2) |
 | U04 | the event picker (seeded by the frozen `IEventService.ListMineAsync`, ADR 0065) + the `TodoSetEvent` `POST /projects/todos/{id}/set-event` action (CSRF) + the `todo.set_event.label` / `todo.set_event.pick` `kw-l` keys |

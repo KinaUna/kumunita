@@ -92,7 +92,7 @@ warm, never both).
   that `(Key, LanguageCode)` already exists**. The created row is
   byte-identical to what a fresh seed would have produced (same
   baseline dictionaries, same `(Key, LanguageCode)` business key,
-  surrogate `Id` — the pair idiom, M1DocTypes' unique index enforces one
+  surrogate `Id` — the pair idiom, CoreDocTypes' unique index enforces one
   text per key per language).
 - **The `en` row is never read or written.** It is the floor, owned by
   code (the code-wins upsert lives on the pristine-boot path, ADR 0042

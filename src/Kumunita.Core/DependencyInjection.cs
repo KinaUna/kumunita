@@ -131,6 +131,54 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AdminOnboarding.IAdminOnboardingService>(sp => new AdminOnboarding.AdminOnboardingService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // M31 (ADR 0154, U03): the production-error-handling seam — the
+        // ErrorReport doc's read + two audited-write lanes (the ADR 0153
+        // single-write-lane shape, the LocaleSettings-parallel bounded context
+        // Kumunita.Core.ErrorReports). The same "AddTransient with the store
+        // injected" shape as IAdminOnboardingService above: composes the
+        // host-registered Marten IDocumentStore (reads open a QuerySession,
+        // the audited write opens a write session — invariant C3). Core stays
+        // HTTP-free (ADR 0006-D): the Web gate (U04/U05) is the only place the
+        // subject / request context are produced + the GlobalAdmin
+        // authorization is checked. Fully qualified
+        // ErrorReports.IErrorReportService for the type/namespace-collision
+        // idiom (like SiteContent.ISiteContentService).
+        services.AddTransient<ErrorReports.IErrorReportService>(sp => new ErrorReports.ErrorReportService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<ErrorReports.IEscalationTokenService>()));
+
+        // ESC (ADR 0159, U03): the escalation-authorization seam — the
+        // receiving-side EscalationToken doc's read + two audited-write lanes
+        // (the ADR 0154 single-write-lane shape, the LocaleSettings-parallel
+        // bounded context Kumunita.Core.ErrorReports). The same
+        // "AddTransient with the store injected" shape as IErrorReportService
+        // above: composes the host-registered Marten IDocumentStore (reads
+        // open a QuerySession, the audited write opens a write session —
+        // invariant C3). Core stays HTTP-free (ADR 0006-D / ESC·6): the Web
+        // inbound endpoint (U06) is the only place the Bearer token is parsed
+        // from the request. Fully qualified ErrorReports.IEscalationTokenService
+        // for the type/namespace-collision idiom (like IErrorReportService).
+        services.AddTransient<ErrorReports.IEscalationTokenService>(sp => new ErrorReports.EscalationTokenService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
+        // M35 (ADR 0164, U03): the kiosk-mode seam — the KioskPlaylist
+        // singleton's read + audited-write lanes (the ADR 0150
+        // single-write-lane shape, the LocaleSettings-parallel bounded
+        // context Kumunita.Core.Kiosk). The same "AddTransient with the
+        // store injected" shape as ISiteContentService / ISurfaceLabelsService
+        // above: composes the host-registered Marten IDocumentStore (reads
+        // open a QuerySession, the audited write commits in the caller's
+        // session — invariant C3) + the IAuthorizationService (carried for
+        // composition-root symmetry but **not invoked** — M35·1 pins "no
+        // Decide() branch"; the Web gate enforces the GlobalAdmin standing).
+        // Core stays HTTP-free (ADR 0006-D, M35·8): the Web gate (U04/U05) is
+        // the only place the GlobalAdmin authorization is produced. Fully
+        // qualified Kiosk.IKioskService for the type/namespace idiom (like
+        // SiteContent.ISiteContentService).
+        services.AddTransient<Kiosk.IKioskService>(sp => new Kiosk.KioskService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>()));
+
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
         // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
         // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
@@ -146,6 +194,18 @@ public static class ServiceCollectionExtensions
             new DirectoryService(
                 sp.GetRequiredService<IUserInfoService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
+
+        // M36 (ADR 0165, U03): the @mentions shared module — the one new Core
+        // read seam (M36·1). A plain store-composing read over the frozen M2
+        // DirectoryService catalog seam (M36·2 — reused, not re-shaped): it
+        // composes ListAsync, does no IAuthorizationService call, writes zero
+        // AccessAudit rows (M36·5), and carries no HttpClient / Wolverine
+        // handler (M36·9, ADR 0006-D). Fully qualified Mentions.IMentionService
+        // for the type/namespace idiom (like SiteContent.ISiteContentService).
+        // Resolves the concrete DirectoryService (Part 2.0 — no IDirectoryService
+        // interface is invented).
+        services.AddTransient<Mentions.IMentionService>(sp => new Mentions.MentionService(
+            sp.GetRequiredService<DirectoryService>()));
 
         // M23 (ADR 0123 D4): the find-people composition root — the
         // DirectoryService shape above, extended with the host-registered Marten
@@ -181,7 +241,12 @@ public static class ServiceCollectionExtensions
             // ctor param is optional (CS1736); production wiring passes the
             // DI-registered instance so the post-reply / group-post emitters
             // fire in production (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // M36 (ADR 0165, U04) — the mention-resolution read seam (U03).
+            // The PostService ctor param is optional (CS1736); production
+            // wiring passes the DI-registered instance so the post + reply
+            // mention emitters fire in production (the M36·4 lane).
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M21 (ADR 0122, U02): the documents-side composition root — a concrete
         // class pairing the two frozen seams with the host-registered Marten
@@ -222,7 +287,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<UserInfo.IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M9 (ADR 0105, plan U02/U03): the messaging-side service seam (bounded
         // context Kumunita.Core.Messaging — direct 1:1 signed-in resident
@@ -236,7 +302,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Messaging.IMessagingService>(sp => new Messaging.MessagingService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
@@ -249,7 +316,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Tags.ITagService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
@@ -345,7 +413,11 @@ public static class ServiceCollectionExtensions
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
             // is optional (CS1736), production wiring passes the registered
             // instance so the event.rsvp emitter fires (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // M36 (ADR 0165, U05) — the mention-resolution read seam; the
+            // ctor param is optional (CS1736), production wiring passes the
+            // registered instance so the event.mention emitter fires.
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M5 (ADR 0067, plan U04): the Projects bounded context's service seam
         // (bounded context Kumunita.Core.Projects — the "outcome" arrow: the
@@ -375,12 +447,16 @@ public static class ServiceCollectionExtensions
             // <c>AttachToBoardAsync</c>, then persist the resolved ids onto the
             // doc — the <c>PostService._tags</c> shape). Optional (CS1736); the
             // production wiring passes the registered instance so tags attach.
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            // M36 (ADR 0165, U05) — the mention-resolution read seam; the
+            // ctor param is optional (CS1736), production wiring passes the
+            // registered instance so the todo.mention emitter fires.
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M16 (ADR 0117, plan U02): the Inventory bounded context's service
         // seam (bounded context Kumunita.Core.Inventory — the "track where
         // items are, and optionally how much they are used by whom" surface:
-        // the InventoryItem + InventoryCheckout documents, the M16DocTypes
+        // the InventoryItem + InventoryCheckout documents, the InventoryDocTypes
         // surface, the InventoryItemToAuditableResource adapter). Same
         // "AddTransient with the store injected" shape as IProjectService
         // above; U02 lands the read lanes (ListItemsAsync / GetItemAsync /

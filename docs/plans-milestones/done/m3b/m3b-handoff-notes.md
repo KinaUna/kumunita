@@ -293,7 +293,7 @@ and cross-reference fixes, not literal re-pins;
    M1-frozen, but no such type exists in `src/Kumunita.Core` (no
    grep hit in `*.cs`). The real M1 POCO is `ModeratorAssignment`
    (confirmed at `src/Kumunita.Core/UserInfo/Component.cs:43`,
-   registered in `M1DocTypes.cs:57`). Fixed to cite
+   registered in `CoreDocTypes.cs:57`). Fixed to cite
    `ModeratorAssignment` (and added `AccessAudit`, which Part 2's
    doc-comments reference throughout) to the §2.0 bullet.
 2. **§2.1 CreateReplyAsync signature wrong.** M3's actual U6 seam
@@ -621,7 +621,7 @@ self-contained plan for this unit per the sealed-unit convention).
     It IS relevant to U5's `CanReadWithReportAsync` (the read branch,
     where the adapter IS the target of the `CanAsync` call) —
     U5's deliverable, not U4's.
-  - `src/Kumunita.Core/M3DocTypes.cs` — **confirmed**: `opts.
+  - `src/Kumunita.Core/PostDocTypes.cs` — **confirmed**: `opts.
     Schema.For<Report>();` is **already registered** (M3 U3's
     "table-in-M3 / flow-in-M3b" split — the table is registered,
     the workflow is M3b's; U4 is the first M3b unit to write to it).

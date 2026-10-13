@@ -108,11 +108,17 @@ admin can now **name the platform's own surface**.
   pattern).
 - **Single-string labels, not per-language** (D8). Each label is **one**
   admin-set string (a literal override), shown in **all** languages when
-  set. The per-language label is a **named deferral** (a future `LBL-2`
+  set. The per-language label was a **named deferral** (a future `LBL-2`
   lane would add a `SurfaceLabelTranslation` row shape — the
   `PageTranslation` / `PostTranslation` precedent — + a `/admin/labels`
   translation editor) — the exact SITE lane D1 "single string, translation
-  deferred" shape.
+  deferred" shape. **Shipped as [ADR 0158](0158-surface-label-translations.md)
+  (2026-10-10)**: the `SurfaceLabelTranslation` row shape (one row per
+  language on the `SurfaceLabelsDocTypes` surface) + the `/admin/labels`
+  translation editor (the ADR 0157 SITE-2 shape carried onto the surface
+  labels). This D8 remains the *shape of the singleton* — the single-string
+  override is still the authored-in layer; ADR 0158 adds the per-language
+  row **above** it (the translation → singleton → `kw-l` floor resolution).
 - **The `Milestones.cs` / README / `MilestonesTests` trio is untouched
   until the milestone *ships*** (D9). The `MilestonesTests` pin that the
   single in-progress milestone is unchanged stays intact through U00–U09.
@@ -139,9 +145,10 @@ admin can now **name the platform's own surface**.
   page gains one list-group row linking to it.
 - The `kw-l` registry entries (`nav.*` / `inv.nav` / `bm.nav` /
   `documents.title` keys in `KnownTranslationKeys.cs`) are **untouched** —
-  they remain the canonical `en` source text the fallback resolves to, and a
-  future `LBL-2` translation lane (out of scope) would add a
-  `SurfaceLabelTranslation` row shape keyed on the same strings.
+  they remain the canonical `en` source text the fallback resolves to. (The
+  named `LBL-2` translation lane shipped as
+  [ADR 0158](0158-surface-label-translations.md) — the
+  `SurfaceLabelTranslation` row shape keyed on the same 13 surface keys.)
 - The `SiteContent` + `LocaleSettings` docs are **untouched** — this lane
   adds a *new* doc in a *new* context, not a new field on an existing one
   (the ADR 0006 module-boundary contract keeps the contexts independent).

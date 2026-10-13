@@ -317,7 +317,7 @@ public sealed class BookmarksControllerTests
         // The caller owned the session (the C3 commit — the U02
         // RunInSession shape: the service stores/deletes into the
         // caller's session, the caller commits).
-        await session.Received(1).SaveChangesAsync();
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     // ── 5 — BmKeys_AreTheClosedTwelveKeySet ───────────────────────────────

@@ -45,7 +45,7 @@
 > the retention-job shape the usage purge copies verbatim), the
 > **`AuditPurgeService`** (the Core-side "Wolverine-free static class + the
 > Web host's thin adapter" convention), the **document-surface registration
-> pattern** (`M3DocTypes` / `M5DocTypes` in `Program.cs` — one
+> pattern** (`PostDocTypes` / `ProjectDocTypes` in `Program.cs` — one
 > `*DocTypes.Configure(opts)` call per bounded context), the
 > **GlobalAdmin-gated admin surface** (`AdminController` — the
 > `[Authorize(Roles = Roles.GlobalAdmin)]` shape, the
@@ -716,11 +716,11 @@ D1 shape: `Id` / `At` / `ActorId` / `RouteTemplate`, the
 `ActorId` empty-for-anonymous rule, the `RouteTemplate`
 template-not-concrete rule, the "no status code / no email / no body /
 no UA / no IP" C-M13·2 pin), the `UsageDocTypes.Configure(StoreOptions)`
-registration surface (the `M3DocTypes` / `M5DocTypes` shape verbatim —
+registration surface (the `PostDocTypes` / `ProjectDocTypes` shape verbatim —
 one `opts.Schema.For<UsageEvent>();` call, the conventional string
 `Id`, no business-key index — the M3 "string Id" convention), the
 boot wiring (`Program.cs`'s `*DocTypes.Configure(opts)` block — one
-`UsageDocTypes.Configure(opts);` line added next to the `M3DocTypes`
+`UsageDocTypes.Configure(opts);` line added next to the `PostDocTypes`
 call; `SchemaBootstrap.cs` — one line added), the **pure**
 `UsageCapturePolicy` static class (the D1 `Decide(UsageCaptureInput)
 → UsageCaptureDecision` method — the `UsageCaptureInput` POCO:
@@ -747,11 +747,11 @@ reflection test, also BCL-only): `Policy_Skips_No_Endpoint`,
 §D2 (the exact `SurfaceKey` closed list — the top-level-segment →
 surface-key map, verbatim, the `"other"` fallback rule); §D7 (the six
 Core pinned test names for this unit, verbatim);
-`src/Kumunita.Core/M3DocTypes.cs` (the `*DocTypes.Configure` shape to
+`src/Kumunita.Core/PostDocTypes.cs` (the `*DocTypes.Configure` shape to
 mirror verbatim — the `opts.Schema.For<…>()` call, the namespace, the
 "no business-key index" M3 convention); `src/Kumunita.Web/Program.cs`
 (the `*DocTypes.Configure(opts)` block — the exact line to add the
-`UsageDocTypes.Configure(opts);` next to; the `M3DocTypes` call as
+`UsageDocTypes.Configure(opts);` next to; the `PostDocTypes` call as
 the immediate neighbor); `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs`
 (the all-env boot path — the same one-line addition);
 `src/Kumunita.Core/Authorization/AccessAudit.cs` (the POCO house
@@ -767,7 +767,7 @@ convention, the pure-input/pure-output shape).
   the `sealed class` + `string.Empty` default house style, the
   C-M13·2 doc-comment pin).
 - `src/Kumunita.Core/Usage/UsageDocTypes.cs` — the registration
-  surface (the `M3DocTypes` shape verbatim — one
+  surface (the `PostDocTypes` shape verbatim — one
   `opts.Schema.For<UsageEvent>();` call).
 - `src/Kumunita.Core/Usage/UsageCapturePolicy.cs` — the pure static
   class (the `Decide` method, the `UsageCaptureInput` +
@@ -789,10 +789,10 @@ convention, the pure-input/pure-output shape).
   reflection pin over the POCO's public properties, BCL-only).
 - `src/Kumunita.Web/Program.cs` — the
   `UsageDocTypes.Configure(opts);` line (one line, next to the
-  `M3DocTypes.Configure(opts);` call).
+  `PostDocTypes.Configure(opts);` call).
 - `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — the
   `UsageDocTypes.Configure(opts);` line (one line, next to the
-  `M3DocTypes` call in the all-env boot path).
+  `PostDocTypes` call in the all-env boot path).
 
 **Exit.** `run_build` on `Kumunita.Core` + `Kumunita.Web` green.
 `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`

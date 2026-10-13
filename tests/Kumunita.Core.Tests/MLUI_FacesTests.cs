@@ -41,7 +41,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// No new Core or Web code; no new seams. The private helper set at the bottom
 /// is a copy of the inherited idiom (same template as
-/// <see cref="LocalizationServiceTests"/> + <c>M3DocTypes.Configure</c> for
+/// <see cref="LocalizationServiceTests"/> + <c>PostDocTypes.Configure</c> for
 /// L8's <see cref="Post"/> plant).
 /// </para>
 /// </summary>
@@ -425,8 +425,8 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

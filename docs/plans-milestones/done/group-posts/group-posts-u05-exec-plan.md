@@ -33,7 +33,7 @@
      transaction (C3).
 - **Out:** everything else — no `Post.cs` change (U4, done), no
   `PostService` / `GroupPostDraft` (U6), no Web (U7/U8), **no tests** (U9),
-  no `M3DocTypes.cs` change, no ADR edit, no doc file touched. The touched
+  no `PostDocTypes.cs` change, no ADR edit, no doc file touched. The touched
   project is `Kumunita.Core` only.
 
 ## Constraints I keep pinned while I write

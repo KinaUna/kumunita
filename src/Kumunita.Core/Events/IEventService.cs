@@ -462,7 +462,7 @@ public interface IEventService
     /// <summary>
     /// Add a **user-added translation** of an event into a language other than the
     /// one it was authored in (ADR 0059). One row per <c>(eventId, languageCode)</c>
-    /// pair (the <see cref="M4DocTypes.Configure"/>'s <c>(EventId, LanguageCode)</c>
+    /// pair (the <see cref="EventDocTypes.Configure"/>'s <c>(EventId, LanguageCode)</c>
     /// unique index).
     /// <para>
     /// <b>Standing (ADR 0059, the approved default):</b> the event's

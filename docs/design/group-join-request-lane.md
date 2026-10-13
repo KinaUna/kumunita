@@ -55,7 +55,7 @@ lane**:
 1. One new Core document, `GroupJoinRequest` (+ the `JoinRequestStatus` enum
    `Pending/Approved/Declined/Withdrawn`) — the request row with its state
    machine.
-2. The `M1DocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
+2. The `CoreDocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
    one-row-per-(group, user) business-key convention of `GroupMembership` /
    `GroupInvitation`).
 3. Six new named seams on `IUserInfoService` (ADR 0006-E compatible lane — no
@@ -182,7 +182,7 @@ sealed class GroupJoinRequest
 }
 ```
 
-`M1DocTypes.Configure` registers the row:
+`CoreDocTypes.Configure` registers the row:
 
 ```csharp
 opts.Schema.For<GroupJoinRequest>()

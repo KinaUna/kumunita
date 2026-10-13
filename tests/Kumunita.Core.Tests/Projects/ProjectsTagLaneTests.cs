@@ -71,8 +71,8 @@ public class ProjectsTagLaneTests(PostgresFixture fixture) : IClassFixture<Postg
         // create-or-reuse lane: both slugs are new, so both are created).
         await using (var q = store.QuerySession())
         {
-            var sanitation = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "sanitation");
-            var budget = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "budget");
+            var sanitation = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "sanitation", TestContext.Current.CancellationToken);
+            var budget = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "budget", TestContext.Current.CancellationToken);
             Assert.NotNull(sanitation);
             Assert.NotNull(budget);
             Assert.Equal(author, sanitation!.CreatedBy);
@@ -186,8 +186,8 @@ public class ProjectsTagLaneTests(PostgresFixture fixture) : IClassFixture<Postg
 
         await using (var q = store.QuerySession())
         {
-            var sanitation = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "sanitation");
-            var garden = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "garden");
+            var sanitation = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "sanitation", TestContext.Current.CancellationToken);
+            var garden = await q.Query<Tag>().FirstOrDefaultAsync(t => t.Slug == "garden", TestContext.Current.CancellationToken);
             Assert.NotNull(sanitation);
             Assert.NotNull(garden);
             Assert.Equal(author, sanitation!.CreatedBy);
@@ -382,10 +382,10 @@ public class ProjectsTagLaneTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);        // the Projects surfaces (todo + board)
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);        // the Projects surfaces (todo + board)
             TagDocTypes.Configure(opts);       // the Tag + TagTranslation surfaces (the TG attach lane)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

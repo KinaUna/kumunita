@@ -49,7 +49,7 @@ This is a **named lane on the already-shipped M5 surface** (like ADR 0086–0099
 
 ## Decision
 
-A new document type `Projects.TodoComment` (registered on the `M5DocTypes`
+A new document type `Projects.TodoComment` (registered on the `ProjectDocTypes`
 surface — the additive-schema shape, ADR 0004 §B.1) carries:
 
 ```csharp
@@ -165,7 +165,7 @@ include (`~/js/lib/rich-editor.js`).
   as a placeholder, so the discussion history is preserved (a deleted comment
   still shows "this comment has been deleted by its author").
 - The schema is purely additive (a new `TodoComment` table + two indexes on the
-  `M5DocTypes` surface); no existing table, index, or seam changes. The
+  `ProjectDocTypes` surface); no existing table, index, or seam changes. The
   `Milestones.cs` / README Roadmap / `MilestonesTests.cs` triple is untouched
   (a named lane on the shipped M5 surface, not a milestone — the ADR
   0086–0099 precedent).

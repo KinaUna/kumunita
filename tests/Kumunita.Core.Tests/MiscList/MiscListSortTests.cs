@@ -50,7 +50,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Ann("s1-b", now.AddDays(-1)));
         await Plant(store, Ann("s1-c", now.AddDays(-2)));
 
-        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: null);
+        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: null, ct: TestContext.Current.CancellationToken);
 
         // Created-desc: s1-b > s1-c > s1-a
         Assert.Equal(new[] { "s1-b", "s1-c", "s1-a" }, page.Items.Select(a => a.Id).ToList());
@@ -74,7 +74,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Ann("s2-c", now, modified: now.AddDays(-1)));
 
         var spec = new SortSpec("modified", true); // desc
-        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec);
+        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Postgres desc: null first (s2-a), then most-recent→oldest (s2-c > s2-b)
         Assert.Equal(new[] { "s2-a", "s2-c", "s2-b" }, page.Items.Select(a => a.Id).ToList());
@@ -97,7 +97,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Ann("s3-c", now, title: "cherry"));
 
         var spec = new SortSpec("title", false); // asc
-        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec);
+        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         Assert.Equal(new[] { "s3-b", "s3-a", "s3-c" }, page.Items.Select(a => a.Id).ToList());
     }
@@ -120,7 +120,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Ann("s4-c", now.AddDays(-2)));
 
         var spec = new SortSpec("rating", true); // not in the allowlist
-        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec);
+        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Default: created-desc — s4-b > s4-c > s4-a
         Assert.Equal(new[] { "s4-b", "s4-c", "s4-a" }, page.Items.Select(a => a.Id).ToList());
@@ -142,7 +142,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Ann("tie-a", now));
 
         var spec = new SortSpec("created", false); // asc — equal values
-        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec);
+        var page = await svc.ListVisiblePagedAsync(null, new HashSet<string>(), page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, page.Items.Select(a => a.Id).ToList());
@@ -281,7 +281,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Item("s1-b", now.AddDays(-1)));
         await Plant(store, Item("s1-c", now.AddDays(-2)));
 
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: null);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: null, ct: TestContext.Current.CancellationToken);
 
         // Created-desc: s1-b > s1-c > s1-a
         Assert.Equal(new[] { "s1-b", "s1-c", "s1-a" }, page.Items.Select(i => i.Id).ToList());
@@ -306,7 +306,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Item("s2-c", now, name: "Bolt"));
 
         var spec = new SortSpec("name", false); // asc
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Name asc (OrdinalIgnoreCase): Alpha < Bolt < Ladder
         Assert.Equal(new[] { "s2-b", "s2-c", "s2-a" }, page.Items.Select(i => i.Id).ToList());
@@ -331,7 +331,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Item("s3-c", now, modified: now.AddDays(-2)));
 
         var spec = new SortSpec("modified", true); // desc
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Postgres desc: null first (s3-a), then most-recent→oldest (s3-b > s3-c)
         Assert.Equal(new[] { "s3-a", "s3-b", "s3-c" }, page.Items.Select(i => i.Id).ToList());
@@ -356,7 +356,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Item("s4-c", now.AddDays(-2)));
 
         var spec = new SortSpec("size", true); // not in the allowlist
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Default: created-desc — s4-b > s4-c > s4-a
         Assert.Equal(new[] { "s4-b", "s4-c", "s4-a" }, page.Items.Select(i => i.Id).ToList());
@@ -376,7 +376,7 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
         await Plant(store, Item("tie-a", now));
 
         var spec = new SortSpec("created", false); // asc — equal values
-        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec);
+        var page = await svc.ListItemsAsync(null, null, actor, page: 1, sort: spec, ct: TestContext.Current.CancellationToken);
 
         // Created ties → ThenBy(Id) asc: "tie-a" < "tie-b"
         Assert.Equal(new[] { "tie-a", "tie-b" }, page.Items.Select(i => i.Id).ToList());
@@ -435,11 +435,11 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);   // M21 (ADR 0122 D1)
-            M16DocTypes.Configure(opts);        // M16 (ADR 0117) — the inventory documents
+            InventoryDocTypes.Configure(opts);        // M16 (ADR 0117) — the inventory documents
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

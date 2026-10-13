@@ -100,8 +100,8 @@ What M14 builds on, all frozen and verified against source at U00:
    `ProjectId?` / `ProjectTitle?` pair (ADR 0086 D9) — both `null` when the
    target is soft-deleted / unreadable, the link omitted entirely (C-M14·2
    is this idiom carried to the event link).
-5. **The `M5DocTypes` registration surface**
-   (`Kumunita.Core/M5DocTypes.cs`): the additive index precedent — the
+5. **The `ProjectDocTypes` registration surface**
+   (`Kumunita.Core/ProjectDocTypes.cs`): the additive index precedent — the
    `(ComponentId, Created)` feed-ordering index, the `ProjectId` /
    `BlockedByTodoId` single-field indexes — **unnamed** (the computed-index
    naming constraint recorded in the file's own note: Marten
@@ -130,7 +130,7 @@ What M14 builds on, all frozen and verified against source at U00:
 
 - **D1** — one additive `public string? EventId { get; set; }` on
   `TodoItem` (the `ProjectId` shape, §D1) + one optional `(EventId)` feed
-  index on `M5DocTypes` (the unnamed-index precedent) — **a field, not a
+  index on `ProjectDocTypes` (the unnamed-index precedent) — **a field, not a
   link doc** (1:1).
 - **D2** — both display directions as **Web-layer composition** over the
   frozen read seams: the **to-do → event** chip resolves through the
@@ -198,7 +198,7 @@ pins, which is the point).
   cross-surface read-shape pins (U07); the Web parity pins (U03 / U04 /
   U06 — the `kw-l` key parity moves together).
 - **Touched:** `src/Kumunita.Core/Projects/TodoItem.cs` (the one additive
-  `EventId?` field — D1); `src/Kumunita.Core/M5DocTypes.cs` (the one
+  `EventId?` field — D1); `src/Kumunita.Core/ProjectDocTypes.cs` (the one
   additive `(EventId)` index — D1); `src/Kumunita.Core/Projects/
   IProjectService.cs` (the two additive seams — D2 / D3) +
   `src/Kumunita.Core/Projects/ProjectService.cs` (their implementations —
@@ -491,7 +491,7 @@ unlinked / dangling target omits its chip — the interlock never leaks
 ## Rollout & rollback
 
 **Additive-only, delta-detected** (C-M14·7 — ADR 0004 §B.1): the `EventId?`
-field + the `(EventId)` index land on `M5DocTypes`'s existing `TodoItem`
+field + the `(EventId)` index land on `ProjectDocTypes`'s existing `TodoItem`
 block; `ApplyAllConfiguredChangesToDatabaseAsync()` delta-detects the new
 column + index and applies them **idempotently at boot** — **zero
 migration for existing rows** (existing `TodoItem` rows simply read
@@ -586,7 +586,7 @@ delivery channel).
 public string? EventId { get; set; }                    // a feed filter / association, NEVER a gate (C-M14·1) — the Event association (ADR 0115, the ProjectId shape, ADR 0086 D4)
 ```
 
-**The index** (locked, on the `TodoItem` block in `M5DocTypes.Configure`,
+**The index** (locked, on the `TodoItem` block in `ProjectDocTypes.Configure`,
 joining the `ProjectId` / `BlockedByTodoId` single-field indexes):
 
 ```csharp

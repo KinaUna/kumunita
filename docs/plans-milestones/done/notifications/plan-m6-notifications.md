@@ -14,7 +14,7 @@
 >
 > **What this is:** a **new bounded context** `Kumunita.Core.Notifications`
 > (the `Notification` and `NotificationPreference` documents), **one new
-> document surface** (`M6DocTypes`, the `M5DocTypes` pattern verbatim),
+> document surface** (`NotificationDocTypes`, the `ProjectDocTypes` pattern verbatim),
 > **one new service** (`NotificationService`, no `INotificationService`
 > interface — the `EventService` / `ProjectService` precedent), **no new
 > `AccessAction`**, **no new `AccessVia`**, **no new
@@ -54,7 +54,7 @@
 > roadmap trio is confirmed by **U01** (M5 `StatusDone`, M6 `StatusNext`,
 > M7 `StatusPlanned` — already the case on `Milestones.cs` + README);
 > every later unit codes against the *locked* text. **Sequencing
-> invariant:** the two documents + `M6DocTypes` (U02) land before the
+> invariant:** the two documents + `NotificationDocTypes` (U02) land before the
 > service (U03–U04); the service (U03–U04) lands before the Web
 > controller (U05) and the settings (U07); the bell + poller (U06, U08)
 > land after the controller they call; the pinned tests (U09) run before
@@ -110,7 +110,7 @@ sender has no standing to override it).
 
 - **Scope (per user, settled by ADR 0076):** the **two documents**
   (`Notification`, `NotificationPreference`), the **one surface**
-  (`M6DocTypes`), the **one service** (`NotificationService` — the
+  (`NotificationDocTypes`), the **one service** (`NotificationService` — the
   `EmitAsync` writer, the `ListInboxAsync` / `CountUnreadAsync` /
   `MarkAllReadAsync` read + state lanes, the
   `GetPreferencesAsync` / `SetPreferencesAsync` preference lanes), the
@@ -258,7 +258,7 @@ sender has no standing to override it).
 ## Approach
 
 Four tracks, sequenced — exactly like M5. **Track A (Core model, U02):**
-the two POCOs in `Kumunita.Core.Notifications`, the `M6DocTypes`
+the two POCOs in `Kumunita.Core.Notifications`, the `NotificationDocTypes`
 registration + boot wiring, and the `NotificationKinds` static class.
 **Track B (Core service, U03–U04):** U03 declares the
 **`NotificationService`** (the `EmitAsync` writer + the
@@ -362,8 +362,8 @@ the handoff note.
 
 - **C-M6·1 — One bounded context, two documents, one surface, additive.**
   `Kumunita.Core.Notifications` with `Notification`,
-  `NotificationPreference`; one new surface `M6DocTypes` (the
-  `M5DocTypes` pattern verbatim); Marten-native POCOs, conventional
+  `NotificationPreference`; one new surface `NotificationDocTypes` (the
+  `ProjectDocTypes` pattern verbatim); Marten-native POCOs, conventional
   `string` `Id`, delta-detected + idempotent, no seeding, no EF, zero
   migrations for existing surfaces (ADR 0004 §B.1).
   *(ADR 0076 D1.)*
@@ -509,7 +509,7 @@ convention). The lane register (this file) stays at
 - **U01** — Design doc Part 2 (seams, contracts, test list, gate,
   drift-guard) + ADR 0076 sign-off + the roadmap trio confirmation —
   `U01.md`
-- **U02** — The two documents + `M6DocTypes` registration + boot wiring
+- **U02** — The two documents + `NotificationDocTypes` registration + boot wiring
   + the `NotificationKinds` static class — `U02.md`
 - **U03** — The `NotificationService` (the `EmitAsync` writer + the
   read / state / preference lanes) — `U03.md`

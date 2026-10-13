@@ -74,10 +74,10 @@ occurrences, links back to the head row; `null` on the head itself and
 on all non-recurring events) and `RecurrenceRule: EventRecurrenceRule?`
 (non-null **only on the head row**, carrying the author's rule so a
 later edit can re-expand). No new doc type, no new index, no
-`M4DocTypes` change — both fields are additive on the existing `Event`
+`EventDocTypes` change — both fields are additive on the existing `Event`
 POCO (the ADR 0004 §B "additive surface" shape — the `ComponentId` /
 `TagIds` / `ImageIds` / `AttachmentIds` precedent). *Forbids:* a unit
-reaching for a new `RecurrenceSeries` doc, a new `M4DocTypes` surface,
+reaching for a new `RecurrenceSeries` doc, a new `EventDocTypes` surface,
 a versioned migration, or a read-time expansion path.
 
 **D2 — Closed rule shape.** `EventRecurrenceRule` is a **closed**

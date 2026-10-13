@@ -78,11 +78,23 @@ public sealed record InventoryItemRow(
 /// </summary>
 public sealed record InventoryDetailViewModel(
     InventoryItem Item,
-    IReadOnlyList<InventoryCheckout> History,
+    IReadOnlyList<InventoryCheckoutRow> History,
     string AuthorName,
     string? CurrentHolderName,
     bool CreatorIsActor,
     bool CanCheckOut);
+
+/// <summary>
+/// One usage-history row (F3): the append-only <see
+/// cref="InventoryCheckout"/> record + the borrower's **display name**
+/// (a *read* lookup — the raw <c>BorrowerId</c> is never rendered; the
+/// list page's <see cref="InventoryItemRow"/> holder-name idiom, resolved
+/// server-side in the controller; falls back to the raw id when the
+/// profile row is missing).
+/// </summary>
+public sealed record InventoryCheckoutRow(
+    InventoryCheckout Checkout,
+    string BorrowerName);
 
 /// <summary>
 /// The create-an-item form (the <see cref="CreateItemRequest"/> field set,

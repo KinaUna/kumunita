@@ -229,6 +229,44 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
     Task SetProfileHideHomeIntroAsync(string subjectId, bool hideHomeIntro, string actorBy);
 
+    /// <summary>
+    /// Set the resident's <see cref="Profile.HomeShowUpcoming"/> flag — the
+    /// home-page "upcoming" display preference: whether the home page shows
+    /// the "Upcoming" section (the next upcoming events + the top to-dos,
+    /// rendered just above the "What's new" feed). Mirrors
+    /// <see cref="SetProfileHideHomeIntroAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary
+    /// (the owner is the actor); this lane writes
+    /// <c>Profile.HomeShowUpcoming</c> only. One session, one
+    /// <c>SaveChangesAsync</c>; no <see cref="Authorization.AccessAudit"/> row
+    /// (a profile field write — the <see cref="UpsertProfileAsync"/> shape,
+    /// "not an access decision"). Strong consistency (invariant C4): the new
+    /// value is live on the very next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task SetProfileHomeShowUpcomingAsync(string subjectId, bool showUpcoming, string actorBy);
+
+    /// <summary>
+    /// Set the resident's <see cref="Profile.HomeUpcomingMineOnly"/> flag —
+    /// the home-page "upcoming" scope: whether the home page's Upcoming
+    /// section shows the resident's own events + to-dos (<c>true</c>) or the
+    /// community-wide lists (<c>false</c>, the floor). Mirrors
+    /// <see cref="SetProfileHomeShowUpcomingAsync"/> exactly (the C-MED·8
+    /// single write-lane shape): the self-scope check happens at the Web
+    /// boundary (the owner is the actor); this lane writes
+    /// <c>Profile.HomeUpcomingMineOnly</c> only. One session, one
+    /// <c>SaveChangesAsync</c>; no <see cref="Authorization.AccessAudit"/>
+    /// row (a profile field write). Strong consistency (invariant C4): the
+    /// new value is live on the very next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).
+    /// </exception>
+    Task SetProfileHomeUpcomingMineOnlyAsync(string subjectId, bool mineOnly, string actorBy);
+
     // ── Date format addition (ADR 0020; the *single* user-override write
     // lane for the resident's personal date-time format — the exact shape of
     // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──
@@ -691,7 +729,7 @@ public interface IUserInfoService
     /// Idempotent on the <c>(componentId, userId)</c> pair: an existing row is
     /// re-stamped with <paramref name="actorId"/> and the new timestamp rather
     /// than duplicated (the business key is unique — the index in
-    /// <see cref="M1DocTypes"/> enforces it). Appends an
+    /// <see cref="CoreDocTypes"/> enforces it). Appends an
     /// <see cref="Authorization.AccessAudit"/> row (action
     /// "community.add-member", targetKind "component", via Admin, outcome
     /// Allow) in the same transaction as the row (invariant C3).
@@ -830,7 +868,7 @@ public interface IUserInfoService
     // ── ADR 0026 — group & community name/description translations ─────────
     // The "separate feature" ADR 0021's scope boundary deferred (and ADR 0022
     // shipped for posts/replies). Two documents in this context
-    // (GroupTranslation / CommunityTranslation, registered in M1DocTypes), an
+    // (GroupTranslation / CommunityTranslation, registered in CoreDocTypes), an
     // add-only write lane each (a hand-written AccessAudit row, C3), a plain
     // read seam each (no decision, no audit — inherits the parent's reach),
     // and a public standing probe each the Web uses to decide whether to show

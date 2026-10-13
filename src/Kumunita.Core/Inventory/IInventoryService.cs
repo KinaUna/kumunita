@@ -152,7 +152,7 @@ public interface IInventoryService
     /// (the M5 <c>ClaimTodoAsync</c> broad-standing precedent — the
     /// frozen <c>IAuthorizationService</c> "can see it" pass); the **owner ∪
     /// GlobalAdmin** over a <c>private</c> item. The <see
-    /// cref="M16DocTypes"/> unique partial index on
+    /// cref="InventoryDocTypes"/> unique partial index on
     /// <c>(ItemId) where CheckedInAt IS NULL</c> is the **F1 idempotency
     /// witness** — a concurrent double-check-out's second commit fails at
     /// the DB layer (the loser sees "already checked out"), making the DB

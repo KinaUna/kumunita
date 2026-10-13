@@ -82,6 +82,17 @@ public class AdminAnalyticsControllerTests
                 SurfaceRanking     = new[] { new SurfaceRow { Surface = "posts", Total = 5 } }
             });
 
+        // M34 additive (ADR 0162, M34·8): Index now also reads the Trend
+        // history over its own ?trendwindow= param (default 30) — the D7 pin
+        // stubs only the M13 read above, so stub the additive Trend read too
+        // (the U08 close note's open item, resolved here) so the action does
+        // not NRE on history.Points. The M13 read + the D4 audit pin below
+        // are unchanged; GetHistoryAsync is a read (no store) so
+        // store.DidNotReceive().LightweightSession() still holds.
+        analytics
+            .GetHistoryAsync(30, Arg.Any<CancellationToken>())
+            .Returns(new UsageHistoryResult(30, Array.Empty<UsageDailyTotal>()));
+
         var action = await controller.Index(window: 30);
         var view = Assert.IsType<ViewResult>(action);
         var model = Assert.IsType<AnalyticsViewModel>(view.Model);

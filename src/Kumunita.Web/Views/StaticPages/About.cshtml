@@ -2,6 +2,7 @@
 @using Kumunita.Web.Security
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.SiteContent.ISiteContentService SiteContentService
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @model Kumunita.Web.Models.HomeViewModel
 @{
@@ -27,6 +28,28 @@
     string ariaProject    = await Translation.GetAsync("a11y.about_project", effLang);
     string ariaWhatsNew   = await Translation.GetAsync("whatsnew.heading", effLang);
     string ariaContact    = await Translation.GetAsync("a11y.about_contact", effLang);
+
+    // ADR 0157 — the SITE-2 hero-translation overlay (the ADR 0150 §D5 "future
+    // SITE-2 translation lane"). When the effective language has a
+    // SiteContentTranslation row, its About-hero field renders in place of the
+    // singleton's value; a null / blank hero field falls back to the singleton
+    // value, then to the in-code floor (SITE·3 / SITE·1: never a blank page).
+    // Best-effort read: a missing seam or a read failure yields the singleton
+    // value (the page always renders). A public landing-surface read (ADR 0150
+    // D2) — never a decision, audited at the write only.
+    Kumunita.Core.SiteContent.SiteContentTranslation? heroTrans = null;
+    try {
+        var siteTranslations = await SiteContentService.GetTranslationsAsync().ConfigureAwait(false);
+        heroTrans = siteTranslations.FirstOrDefault(x =>
+            System.String.Equals(x.LanguageCode, effLang, System.StringComparison.OrdinalIgnoreCase));
+    }
+    catch { heroTrans = null; }
+    string AboutHeroEyebrow =
+        !string.IsNullOrWhiteSpace(heroTrans?.AboutHeroEyebrow) ? heroTrans!.AboutHeroEyebrow!
+        : Model.Site?.AboutHeroEyebrow ?? "Private by default";
+    string AboutHeroLead =
+        !string.IsNullOrWhiteSpace(heroTrans?.AboutHeroLead) ? heroTrans!.AboutHeroLead!
+        : Model.Site?.AboutHeroLead ?? "One home for everything your neighborhood does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.";
 }
 
 <!-- ══════════ 1. Hero ══════════ -->
@@ -34,10 +57,10 @@
     <div class="container">
         <div class="row justify-content-center text-center">
             <div class="col-12 col-lg-9">
-                <div class="eyebrow">@(Model.Site?.AboutHeroEyebrow ?? "Private by default")</div>
+                <div class="eyebrow">@AboutHeroEyebrow</div>
                 <h1 class="display-5 mb-4">@Model.CommunityName</h1>
                 <p class="kmb-hero-lead mx-auto mb-4" style="max-width: 42rem;">
-                    @(Model.Site?.AboutHeroLead ?? "One home for everything your neighborhood does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.")
+                    @AboutHeroLead
                 </p>
                 <div class="d-flex flex-wrap justify-content-center gap-3 kmb-hero-actions">
                     <a asp-controller="Posts" asp-action="AllSections" class="btn btn-pill btn-primary">

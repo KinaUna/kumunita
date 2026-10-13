@@ -225,7 +225,18 @@ public sealed record TodoDetailViewModel(
 /// </summary>
 public sealed record TodoEventPicker(
     IReadOnlyList<(string Id, string Name)> Options,
-    string? CurrentEventId = null);
+    string? CurrentEventId = null,
+    // The default start / end wall-clock instant (in the actor's effective
+    // zone — ADR 0019) for the "create a new event" modal's two
+    // <input type="datetime-local"> fields. The controller seeds both
+    // (Start = now rounded to the whole minute, End = Start + 1 h — the
+    // <see cref="EventController"/> CreateGet idiom); the form POSTs the
+    // values verbatim as wall-clock strings and the server converts to UTC
+    // at write time (the ADR 0019 wall-clock contract). Both are
+    // **display defaults**, never a gate (C-M14·4) — the actor can edit
+    // them in the modal before submitting.
+    DateTime Start = default,
+    DateTime End = default);
 
 /// <summary>
 /// One <see cref="Kumunita.Core.Projects.TodoComment"/> as a **detail row**

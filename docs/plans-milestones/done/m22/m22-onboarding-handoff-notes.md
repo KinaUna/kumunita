@@ -24,7 +24,7 @@
 - **D1 — `Profile` member confirmed** as `OnboardingCompletedAt: DateTimeOffset?`
   (nullable, `null` = not completed). Verified against
   `src/Kumunita.Core/UserInfo/Profile.cs` (already carries ten additive fields
-  incl. the M23 `Bio`/`TagIds` precedent; registered in `M1DocTypes`). Locked as
+  incl. the M23 `Bio`/`TagIds` precedent; registered in `CoreDocTypes`). Locked as
   one nullable `DateTimeOffset?` (not a `bool + DateTime` pair) in §1.a-C1.
 - **D4 — skip-vs-finish confirmed** at the register's single-required-`finish` +
   **optional-`skip`** shape (both → the same `CompleteOnboardingAsync`); neither

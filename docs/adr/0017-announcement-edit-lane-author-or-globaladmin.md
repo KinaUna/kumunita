@@ -99,7 +99,7 @@ moderator originated them.
   `TempData`).
 - No schema change, no new document type, no new bounded context. `AuthorId`
   already exists on `Announcement` and is the immutable author-of-record; the
-  edit gate simply starts reading it. The `M3DocTypes` registration surface is
+  edit gate simply starts reading it. The `PostDocTypes` registration surface is
   unchanged.
 - This lane is intentionally **not** author-only (contrast ADR 0014/0016): the
   GlobalAdmin branch is retained for platform curation. If a future

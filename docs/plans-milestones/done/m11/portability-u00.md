@@ -106,8 +106,8 @@ import-merge, backup-automation, the iCal / other world-seam exports).
   failure** (fail-closed, C-M11·3).
 - **D7 · The closed document inventory + import order is pinned in the
   design doc from source.** U00 reads **every** `*DocTypes` surface
-  (`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
-  `M9DocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`) and locks
+  (`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes` /
+  `MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`) and locks
   the **exact** closed inventory — each entry: the document `Type`, its
   archive file (`docs/{Type}.json`), its **import order** (parents before
   children), and its **reference fields** (which of its fields point at
@@ -169,8 +169,8 @@ pins below witness them.
    — the ADR shape to mirror (the operator-plane shape, the "a milestone"
    close, the deferred-lane language, and the ADR 0105 no-break-glass /
    floor precedent that D3/D4 build on).
-4. `src/Kumunita.Core/M1DocTypes.cs` + `M3DocTypes.cs` + `M4DocTypes.cs` +
-   `M5DocTypes.cs` — the D7 inventory source (the registered document types
+4. `src/Kumunita.Core/CoreDocTypes.cs` + `PostDocTypes.cs` + `EventDocTypes.cs` +
+   `ProjectDocTypes.cs` — the D7 inventory source (the registered document types
    + their business-key / feed indexes reveal the referential
    relationships).
 5. `src/Kumunita.Core/Media/IMediaFileStore.cs` + `IMediaStore.cs` +

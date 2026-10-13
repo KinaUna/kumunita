@@ -257,7 +257,7 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         // child's RSVP was routed to the guardian) / guardian.event_rsvp
         // (the child's own attendance stands, the guardian's veto window)).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(22, vm.AllKinds.Count);
+        Assert.Equal(28, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }
@@ -462,9 +462,9 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

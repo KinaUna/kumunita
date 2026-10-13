@@ -140,7 +140,7 @@ public class HomeControllerSiteContentTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(subjectId)
-            .Returns(Task.FromResult(new Profile { SubjectId = subjectId, HideHomeIntro = true }));
+            .Returns(Task.FromResult<Profile?>(new Profile { SubjectId = subjectId, HideHomeIntro = true }));
 
         // The admin has HomeShowFeatures = true (the platform flag says "show").
         var saved = new Kumunita.Core.SiteContent.SiteContent
@@ -205,7 +205,7 @@ public class HomeControllerSiteContentTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(subjectId)
-            .Returns(Task.FromResult(new Profile { SubjectId = subjectId, HideHomeIntro = false }));
+            .Returns(Task.FromResult<Profile?>(new Profile { SubjectId = subjectId, HideHomeIntro = false }));
 
         // The admin has HomeShowFeatures = false (the platform flag says "hide").
         var saved = new Kumunita.Core.SiteContent.SiteContent

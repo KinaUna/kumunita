@@ -388,7 +388,7 @@ copies this same map (the D3 §aggregation `SurfaceRanking`
 
 - `src/Kumunita.Web/Program.cs` **line 175** — the
   `UsageDocTypes.Configure(opts);` call, immediately after the
-  `M9DocTypes.Configure(opts);` call (the last existing `*DocTypes`
+  `MessagingDocTypes.Configure(opts);` call (the last existing `*DocTypes`
   line, the house per-milestone "comment + one-line `Configure(opts)`"
   pattern). Inside the `builder.Services.AddMarten(opts => { … })`
   lambda (the single `*DocTypes.Configure(opts)` registration surface in
@@ -436,9 +436,9 @@ has no `StoreOptions` surface; the source is the authority):**
    (line 55). The single `*DocTypes.Configure(opts)` registration
    surface in this repo is the `builder.Services.AddMarten(opts => { … })`
    lambda in `Program.cs` (lines 90–176), where every one of the
-   `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` /
-   `TagDocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
-   `M9DocTypes` calls lives. The `SchemaBootstrap` versioned boot picks
+   `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` / `PageDocTypes` /
+   `TagDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes` /
+   `MessagingDocTypes` calls lives. The `SchemaBootstrap` versioned boot picks
    the new surface up automatically through the host-registered
    `StoreOptions` (the M4/M5/M6/M9 precedent comments all say exactly
    this: "the SchemaBootstrap versioned boot both pick the surface up
@@ -500,7 +500,7 @@ against the live tree before inserting**), and the 3 D1 middleware pins
 `UsageCaptureMiddleware_Skips_True_404`,
 `UsageCaptureMiddleware_Skips_When_Store_Throws`). The `Usage` context
 surface is complete — the `UsageEvent` doc is registered on the
-`UsageDocTypes` parallel surface (the `M3DocTypes` precedent), the
+`UsageDocTypes` parallel surface (the `PostDocTypes` precedent), the
 capture policy is pure and pinned, and the `SurfaceKey` closed list is
 pinned verbatim (the U04 aggregation's `GroupBy` copies this same map).
 

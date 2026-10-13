@@ -16,7 +16,7 @@
 
 The first **content-with-time** milestone: a new bounded context
 `Kumunita.Core.Events` with two documents (`Event` + `EventRsvp`), one new
-document surface (`M4DocTypes`), one new service seam (`IEventService`), one
+document surface (`EventDocTypes`), one new service seam (`IEventService`), one
 new adapter (`EventToAuditableResource`), one new Web surface
 (`EventController` + views + the nav entry), and **one new §6.4 scheduled
 job** (`EventReminders` — the second of the three jobs named in
@@ -176,7 +176,7 @@ public sealed class EventRsvp
 - **Last-write-wins concurrency** — the ARCHITECTURE.md §5 exception, keyed
   per `(EventId, UserId)`: a conflicting RSVP write is a no-op or
   self-converging; the resident's latest status is simply the truth. The
-  `M4DocTypes` surface registers a **unique** `(EventId, UserId)` index
+  `EventDocTypes` surface registers a **unique** `(EventId, UserId)` index
   (upsert semantics).
 - **No `AccessAudit` row on an RSVP** — a routine resident action, not an
   access decision (the same posture as a profile edit).
@@ -415,7 +415,7 @@ public static class EventReminderHandler
 public sealed record EventReminderTick() : Wolverine.TimeoutMessage(TimeSpan.FromDays(1));
 ```
 
-**The `M4DocTypes` surface** (U01, the `M3DocTypes` pattern verbatim):
+**The `EventDocTypes` surface** (U01, the `PostDocTypes` pattern verbatim):
 `Event` (conventional `Id`) + a `(ComponentId, Start)` index (the feed
 ordering shape) + `EventRsvp` with a **unique** `(EventId, UserId)` index
 (the §3.2 last-write-wins exception). Zero migrations for existing

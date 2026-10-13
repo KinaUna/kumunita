@@ -41,7 +41,14 @@ public sealed class AdminController(
     IDocumentStore store,
     IIdentityService identity,
     IUserInfoService userInfo,
-    IPageService pages) : Controller
+    IPageService pages,
+    // ADR 0161 — the language-catalog seam for the /admin/platform
+    // platform-pages translation surface (the enabled-language candidate
+    // list). Optional so the existing 5-arg test-construction sites keep
+    // compiling (the CS1736 idiom); DI always supplies the live
+    // ILocalizationService in the app, and the translation surface degrades
+    // to "no candidate list" when it is absent (a test harness).
+    Kumunita.Core.Localization.ILocalizationService? localization = null) : Controller
 {
     // SP U03 (ADR 0043 D4) — the five shipped platform surfaces, in the
     // footer-column order (about view first, then the four Page docs). The
@@ -240,6 +247,16 @@ public sealed class AdminController(
     public async Task<IActionResult> Platform()
     {
         var platformPages = await BuildPlatformPagesAsync(pages);
+        // ADR 0161 — the per-page translation surface: for each of the four
+        // Page-backed platform pages (about is preview-only, no Page doc), the
+        // stored translations + the enabled-language candidate list (the
+        // shared _PageTranslationModals partial's data). Standing is the
+        // GlobalAdmin gate on this controller (the controller's
+        // [Authorize(Roles = GlobalAdmin)]); the PageController write lanes
+        // re-check standing server-side (C3). Degrades to an empty list when
+        // the localization seam is absent (a test harness — the candidate
+        // list is simply empty, the stored-translation rows still render).
+        var platformPageTranslations = await BuildPlatformPageTranslationsAsync(pages, localization);
         // ADR 0138 — surface the sample-data link (the /admin/sample
         // change-password lock) only on a SampleData__Enabled instance (the
         // "unreachable by construction" shape, ADR 0056 — a real deployment
@@ -250,8 +267,92 @@ public sealed class AdminController(
         return View(new AdminPlatformViewModel
         {
             PlatformPages  = platformPages,
+            PlatformPageTranslations = platformPageTranslations,
             ShowSampleData = sampleDataEnabled
         });
+    }
+
+    /// <summary>
+    /// ADR 0161 — composes the per-page translation surface for the
+    /// <c>/admin/platform</c> platform pages table: for each of the four
+    /// <c>Page</c>-backed platform surfaces (the <c>about</c> view is
+    /// preview-only, no <c>Page</c> doc, and is skipped), one
+    /// <see cref="AdminPlatformViewModel.PlatformPage"/> row carrying the
+    /// page's authored-in title, its stored
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows, the enabled-
+    /// language candidate list (the enabled catalog languages with no stored
+    /// translation row — the ADR 0027 "candidate list excludes the item's
+    /// already-translated languages" rule), and the code → native-name map.
+    /// The <c>Slug</c> is the id-prefix the shared
+    /// <c>Views/Shared/_PageTranslationModals</c> partial uses to disambiguate
+    /// element ids across the multiple rows on one document. Each platform
+    /// page is resolved once (the same <c>system/{slug}</c> → bare-slug
+    /// fallback the edit-link resolution uses) — the <c>PageId</c> and the
+    /// title come from that single read. Pure: no EF Core round-trip,
+    /// callable from the test harness.
+    /// </summary>
+    public static async Task<IReadOnlyList<AdminPlatformViewModel.PlatformPage>>
+        BuildPlatformPageTranslationsAsync(
+            IPageService pages,
+            Kumunita.Core.Localization.ILocalizationService? localization = null)
+    {
+        // The enabled catalog (the candidate list + the code → name map).
+        // When the localization seam is absent (a test harness), the enabled
+        // set is empty — the candidate list is simply empty (no "add" modals),
+        // and the stored-translation rows still render (graceful degradation).
+        IReadOnlyList<Kumunita.Core.Localization.LanguageCatalog> enabledCatalog = [];
+        if (localization is not null)
+        {
+            var catalog = await localization.ListLanguagesAsync();
+            enabledCatalog = catalog.Where(l => l.Enabled).OrderBy(l => l.SortOrder).ToList();
+        }
+
+        var result = new List<AdminPlatformViewModel.PlatformPage>();
+        foreach (var (slug, _route) in PlatformSurfaceRows)
+        {
+            // Resolve the page once (system/{slug} → bare-slug → absent) —
+            // the same fallback the edit-link resolution (ResolvePageIdAsync)
+            // uses. about is a view, not a Page doc (ADR 0043 D1), so it is
+            // absent and skipped (preview-only).
+            Kumunita.Core.Pages.Page? page = null;
+            try { page = await pages.GetByPathAsync($"system/{slug}"); }
+            catch (KeyNotFoundException) { /* try the bare-slug legacy fallback below */ }
+            if (page is null)
+            {
+                try { page = await pages.GetByPathAsync(slug); }
+                catch (KeyNotFoundException) { continue; /* absent — preview-only */ }
+            }
+
+            var translations = await pages.GetTranslationsAsync(page.Id);
+            var translatedCodes = translations
+                .Select(t => t.LanguageCode)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // The candidate list mirrors the page detail's rule (Views/Page/
+            // Show.cshtml missingLanguages): enabled catalog languages with no
+            // stored PageTranslation row AND not the page's authored-in
+            // language (the ADR 0027 "candidate list excludes the item's own
+            // language" rule — the authored-in body is the default, not a
+            // translation to add).
+            var missingLanguages = enabledCatalog
+                .Where(l => !translatedCodes.Contains(l.Id)
+                            && !string.Equals(l.Id, page.LanguageCode, StringComparison.OrdinalIgnoreCase))
+                .Select(l => new LanguageOption(l.Id, l.NativeName, false))
+                .ToList();
+            var langNames = enabledCatalog
+                .ToDictionary(l => l.Id, l => l.NativeName, StringComparer.OrdinalIgnoreCase);
+
+            result.Add(new AdminPlatformViewModel.PlatformPage
+            {
+                Slug = slug,
+                PageId = page.Id,
+                Title = page.Title,
+                Translations = translations,
+                MissingLanguages = missingLanguages,
+                LangNames = langNames
+            });
+        }
+
+        return result;
     }
 
     // ── /admin/security — the audit + break-glass hub ─────────────────────

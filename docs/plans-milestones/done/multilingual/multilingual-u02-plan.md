@@ -6,7 +6,7 @@
 `docs/plans-milestones/done/plan-multilingual.md` (master register — invariants M·1–M·9,
 FACES M1–M13, unit-series rules) + the **U1** section of
 `docs/plans-milestones/done/multilingual-handoff-notes.md` (the two content
-docs + `M1DocTypes` indexes are already in place — the provider reads them).
+docs + `CoreDocTypes` indexes are already in place — the provider reads them).
 **No repo-wide scan.**
 
 ## Goal
@@ -18,7 +18,7 @@ Ship the per-request read seam — the `ITranslationProvider` interface and the
 1. `docs/design/multilingual-design.md` §Pinned contract §2 only — the exact
    interface signature + doc-comments (verbatim contract).
 2. `docs/plans-milestones/done/multilingual-handoff-notes.md` — the U1
-   section (the two content docs + `M1DocTypes` indexes are shipped; the `en`
+   section (the two content docs + `CoreDocTypes` indexes are shipped; the `en`
    floor + `LocaleSettings` seed are already in place — **do not re-do any of
    that**).
 3. `src/Kumunita.Core/Localization/TranslationResource.cs` (the UI-string doc —
@@ -29,7 +29,7 @@ Ship the per-request read seam — the `ITranslationProvider` interface and the
    `LocaleSettings` — the provider resolves effective language against these).
 6. `src/Kumunita.Core/Identity/EmailDeadLetterCounter.cs` (the
    store-composing read-service idiom — `IDocumentStore` + `QuerySession`).
-7. `src/Kumunita.Core/M1DocTypes.cs` (confirm the two content docs are registered
+7. `src/Kumunita.Core/CoreDocTypes.cs` (confirm the two content docs are registered
    with unique indexes — the provider's queries depend on the pair idiom).
 
 ## Deliverables (2 files)

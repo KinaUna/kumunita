@@ -101,7 +101,7 @@ trust boundary** (ADR 0005 C). Nothing in this lane touches UGC bodies.
 - **The existing seams are frozen and correct.** `TranslationResource` /
   `LocalizedPage`, `ITranslationProvider` + `TranslationProvider`,
   `ILocalizationService` + `LocalizationService` + `LanguageCompleteness`,
-  `LocaleCookie`, the `M1DocTypes` unique indexes, and the two `AddTransient`
+  `LocaleCookie`, the `CoreDocTypes` unique indexes, and the two `AddTransient`
   DI registrations all **stay as they are**. This lane adds **no** re-shape of
   any of them (the `ML` lane's drift rule holds). The **only** allowed Core
   additions are the new `KnownTranslationKeys` registry and one optional batch
@@ -229,7 +229,7 @@ Task<IReadOnlyDictionary<string, string>> GetTranslationsForAsync(string languag
 
 Everything else — the two content docs, `ITranslationProvider`, the existing
 `ILocalizationService` catalog/page/upsert methods, `LocaleCookie`, the
-`M1DocTypes` indexes, the two `AddTransient` registrations — is **frozen** (the
+`CoreDocTypes` indexes, the two `AddTransient` registrations — is **frozen** (the
 `ML` lane's pin). The admin `SaveTranslation` / `SavePage` / catalog-mutation
 controller actions already exist and are reused, not rewritten.
 
@@ -305,7 +305,7 @@ section presence).
 
 ### Per-unit entry-read list (the minimal files, each unit's "start here")
 
-- **U1** — `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (the `SeedLanguageCatalogAsync` step, ~lines 225–260, + the `SeedAsync` call site), `src/Kumunita.Core/Localization/TranslationResource.cs`, `LocalizedPage.cs`, `src/Kumunita.Core/M1DocTypes.cs` (the two schema pins). *No* other Core file. **Plus (read-only, for string extraction):** the in-scope views — `Views/Shared/{_Layout,_AccountNav}.cshtml`, `Views/Home/Index.cshtml`, `Views/Account/{Login,Signup}.cshtml`, `Views/Posts/{Index,Detail,New,Edit}.cshtml`, `Views/Groups/{Index,Detail,New,PostDetail}.cshtml`, `Views/Directory/Index.cshtml`, `Views/Profile/Edit.cshtml`, `Views/Admin/Index.cshtml` — to define the registry's `en` values as the **exact current** strings (U2–U5 do the view edits, not U1).
+- **U1** — `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (the `SeedLanguageCatalogAsync` step, ~lines 225–260, + the `SeedAsync` call site), `src/Kumunita.Core/Localization/TranslationResource.cs`, `LocalizedPage.cs`, `src/Kumunita.Core/CoreDocTypes.cs` (the two schema pins). *No* other Core file. **Plus (read-only, for string extraction):** the in-scope views — `Views/Shared/{_Layout,_AccountNav}.cshtml`, `Views/Home/Index.cshtml`, `Views/Account/{Login,Signup}.cshtml`, `Views/Posts/{Index,Detail,New,Edit}.cshtml`, `Views/Groups/{Index,Detail,New,PostDetail}.cshtml`, `Views/Directory/Index.cshtml`, `Views/Profile/Edit.cshtml`, `Views/Admin/Index.cshtml` — to define the registry's `en` values as the **exact current** strings (U2–U5 do the view edits, not U1).
 - **U2** — `src/Kumunita.Web/Security/LocaleCookie.cs`, `src/Kumunita.Core/Localization/ITranslationProvider.cs`, `src/Kumunita.Web/Views/Shared/_Layout.cshtml`, `_AccountNav.cshtml`, `src/Kumunita.Web/Views/_ViewImports.cshtml`.
 - **U3** — `src/Kumunita.Web/Views/Posts/{Index,Detail,New,Edit}.cshtml` + U1's `KnownTranslationKeys`.
 - **U4** — `src/Kumunita.Web/Views/Groups/{Index,Detail,New,PostDetail}.cshtml` + U1's registry.

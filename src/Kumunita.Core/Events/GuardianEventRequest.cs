@@ -58,7 +58,7 @@ public enum GuardianEventRequestStatus
 /// **Keyed per <c>(EventId, ChildId)</c>** (the lane's business key, the
 /// <see cref="EventRsvp" />'s <c>(EventId, UserId)</c> / the
 /// <see cref="GroupInvitation" />'s <c>(GroupId, UserId)</c> precedent): one
-/// pending request per child per event. The <see cref="M4DocTypes.Configure"/>
+/// pending request per child per event. The <see cref="EventDocTypes.Configure"/>
 /// surface registers a **unique** <c>(EventId, ChildId)</c> index. A resolved
 /// (Approved / Denied) request is superseded by a fresh <see cref="Pending" />
 /// row on the next child change — the <see cref="GuardianLink" />

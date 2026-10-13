@@ -80,7 +80,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     public async Task<Profile?> GetProfileAsync(string subjectId)
     {
         // Single document read — Profile's identity is SubjectId (pinned in
-        // M1DocTypes.Configure), so the equality probe lands on the document id.
+        // CoreDocTypes.Configure), so the equality probe lands on the document id.
         await using var session = store.QuerySession();
         return await session
             .Query<Profile>()
@@ -584,7 +584,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
 
     // ── ADR 0026 — group name/description translations ─────────────────────
     // Mirrors the ADR 0022 post-translation lane (PostService), in this context:
-    // a GroupTranslation row (at most one per language, the M1DocTypes unique
+    // a GroupTranslation row (at most one per language, the CoreDocTypes unique
     // index) added by the group's owner (Via: Owner) or a GlobalAdmin /
     // Translator (Via: Admin), a hand-written AccessAudit row in the same
     // session (C3), and a plain read seam (no decision, no audit — inherits the
@@ -849,7 +849,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         if (group is null)
             throw new InvalidOperationException($"Group not found: {groupId}");
 
-        // Business key (GroupId, UserId) — the unique index in M1DocTypes
+        // Business key (GroupId, UserId) — the unique index in CoreDocTypes
         // enforces "one row per (group, user)" (C-M2b·3, the same pair
         // convention as GroupMembership).
         var row = await session.Query<GroupInvitation>()
@@ -2085,6 +2085,53 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetProfileHomeShowUpcomingAsync(string subjectId, bool showUpcoming, string actorBy)
+    {
+        // The home "upcoming" display preference write lane. Mirrors
+        // SetProfileHideHomeIntroAsync exactly (the C-MED·8 single write-lane
+        // shape): the self-scope check happens at the Web boundary (the owner
+        // is the actor); this lane writes Profile.HomeShowUpcoming only. One
+        // session, one SaveChangesAsync (C3); no audit row (a Profile field
+        // write — the UpsertProfileAsync shape, "not an access decision").
+        // Fail closed on a missing profile (never load-or-create, the
+        // SetProfileTimezoneAsync pin). Strong consistency (C4): the new
+        // value is live on the very next GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.HomeShowUpcoming = showUpcoming;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetProfileHomeUpcomingMineOnlyAsync(string subjectId, bool mineOnly, string actorBy)
+    {
+        // The home "upcoming" scope write lane. Mirrors
+        // SetProfileHomeShowUpcomingAsync exactly (the C-MED·8 single
+        // write-lane shape): the self-scope check happens at the Web
+        // boundary (the owner is the actor); this lane writes
+        // Profile.HomeUpcomingMineOnly only. One session, one SaveChangesAsync
+        // (C3); no audit row (a Profile field write — the UpsertProfileAsync
+        // shape, "not an access decision"). Fail closed on a missing profile
+        // (never load-or-create, the SetProfileTimezoneAsync pin). Strong
+        // consistency (C4): the new value is live on the very next
+        // GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.HomeUpcomingMineOnly = mineOnly;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)
     {
         // ADR 0020 — the user's date-format override write lane. Mirrors
@@ -2855,7 +2902,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
 
     // ── ADR 0026 — community name/description translations ─────────────────
     // Mirrors the group lane above, in the community shape: a
-    // CommunityTranslation row (at most one per language, the M1DocTypes unique
+    // CommunityTranslation row (at most one per language, the CoreDocTypes unique
     // index) added by a GlobalAdmin or a Translator (both Via: Admin — a
     // community has no owner, so no AccessVia.Owner branch; a component
     // moderator governs its members, ADR 0012, not its name), a hand-written
@@ -3144,7 +3191,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         }
 
         // Same idempotent business-key upsert as SetCommunityMembershipAsync
-        // (the M1DocTypes unique index enforces one row per pair). A row on a
+        // (the CoreDocTypes unique index enforces one row per pair). A row on a
         // mandatory community is a harmless no-op — the union read already
         // includes the resident (kept so the forms round-trip with one lane).
         var existing = await session.Query<ComponentMembership>()
@@ -3460,7 +3507,7 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         await using var session = store.OpenSession(new SessionOptions());
 
         // One row per (GuardianId, ChildId) pair — the business key (the
-        // M1DocTypes unique index). The ADR 0038 §F acceptance lane reworks
+        // CoreDocTypes unique index). The ADR 0038 §F acceptance lane reworks
         // this seam: the assigned guardian's standing is now CONFIRMED, not
         // conferred — the row lands PENDING and the standing is minted only
         // on Accept (the guardian.create row is deferred to the accept seam).

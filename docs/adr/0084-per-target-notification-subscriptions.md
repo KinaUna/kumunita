@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-25
 Amends: **0076** (the M6 notifications context — this ADR **adds a new
-document** `NotificationSubscription` to the `M6DocTypes` surface, **adds
+document** `NotificationSubscription` to the `NotificationDocTypes` surface, **adds
 three new kinds** to the closed `NotificationKinds` vocabulary D2 froze,
 **amends the frozen `EmitAsync` surface** with a 7-arg overload + a gate
 step that consults the new subscription lane *first* (the ADR 0078
@@ -229,14 +229,14 @@ the `NotificationServiceTests.F13–F20` gate tests.
 **D6 — The `NotificationSubscription` document: the (recipient, kind,
 target) business key, upsert-only, never deleted.** A new
 `Kumunita.Core.Notifications.NotificationSubscription` doc on the
-`M6DocTypes` surface: `Id` (a `Guid` string, the Marten doc id),
+`NotificationDocTypes` surface: `Id` (a `Guid` string, the Marten doc id),
 `RecipientId` (the resident's subject id — the whole access story, D3 /
 F11), `Kind` (the code-owned `NotificationKinds` constant), `TargetId`
 (the community id / group id / parent-page id / `"announcements"`
 sentinel), `Enabled` (the resident's explicit choice — `true` or
 `false`), and `Updated` (the `DateTimeOffset` of the last upsert). The
 **business key** is `(RecipientId, Kind, TargetId)` — a unique index in
-the `M6DocTypes` surface (a second row for the same triple is the exact
+the `NotificationDocTypes` surface (a second row for the same triple is the exact
 failure the upsert forbids). The **upsert** semantics:
 `SetSubscriptionAsync` **never deletes** a row — an opt-in toggle-off
 stores an `Enabled = false` row (the gate consults the row's value, not
@@ -394,7 +394,7 @@ kinds for free — the suppression check in `EmitAsync` is kind-agnostic),
 and the `PagePaths.Href` / `PagePaths.Derive` seam (ADR 0039) are all
 **frozen seams**. This ADR adds **three kind constants + three emitters
 (both in the content lanes) + one new document (`NotificationSubscription`
-on the `M6DocTypes` surface) + three new public lanes on the frozen
+on the `NotificationDocTypes` surface) + three new public lanes on the frozen
 `NotificationService` + one 7-arg `EmitAsync` overload (the 6-arg is
 unchanged) + two new Web routes (the settings list GET/POST) + one new
 Web route (the per-page toggle) + one new view-model field
@@ -407,7 +407,7 @@ Web route (the per-page toggle) + one new view-model field
 `Subscribe_Post_Flips_Row_And_Redirects_To_Page`, 1 test; the
 `NotificationsControllerTests` count assertion `13 → 16`) + one
 `_AccountNav` link**, not a branch. **No new bounded context, no new
-`M*DocTypes` surface (the `M6DocTypes` surface is amended, not extended),
+`M*DocTypes` surface (the `NotificationDocTypes` surface is amended, not extended),
 no new `INotificationService` interface, no new `AccessAction`, no new
 `AccessVia`, no new `IAuthorizableResource` adapter, no new email
 mechanism, no new client dependency.** *Forbids:* a new authorization
@@ -423,7 +423,7 @@ mechanism outside M6's `EmitAsync`, a new bounded context, or a new
   `13 → 16`; and the `KnownTranslationKeys` registry gains 84 entries
   (21 keys × 4 languages) whose exact key-set parity across en/de/fr/da
   is enforced at build time. That is the whole kind-vocabulary delta.
-- The `M6DocTypes` surface gains the `NotificationSubscription` document
+- The `NotificationDocTypes` surface gains the `NotificationSubscription` document
   (the `(RecipientId, Kind, TargetId)` business key, a unique index). The
   `NotificationService` gains three public lanes
   (`GetSubscriptionsAsync` / `SetSubscriptionAsync` /

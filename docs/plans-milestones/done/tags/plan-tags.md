@@ -20,7 +20,7 @@ autocomplete can all be **one access-scoped read seam**: a tag is computed
 This is the first **shared-id-doc context after ADR 0011's `Media`**: `Tag` is
 referenced by two other contexts (`Posts` and `Pages`) the way `MediaObject`
 is, so it lives in its own `Kumunita.Core.Tags` context + `TagDocTypes`
-surface, exactly the M3 `M3DocTypes` registration pattern (the ADR 0004 §B.1
+surface, exactly the M3 `PostDocTypes` registration pattern (the ADR 0004 §B.1
 additive lane — delta-detected, idempotent, **no seeding**, no EF migration).
 Like M3, this lane therefore begins with a two-part design doc (U1/U2) that
 pins every seam, invariant, and test name before any unit implements — the
@@ -59,9 +59,9 @@ guard against *Distributed fragmentation* and *Accidental integration*.
   enumeration is excluded by design (it would leak a subject's existence).
 - **Versioned storage (ADR 0004 §B.1):** `Tag` / `TagTranslation` are
   **Marten-native** POCOs registered in a new parallel surface
-  `TagDocTypes.Configure(StoreOptions)` (analogous to `M3DocTypes` /
+  `TagDocTypes.Configure(StoreOptions)` (analogous to `PostDocTypes` /
   `MediaDocTypes`), wired into the existing boot paths **next to** the
-  `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` calls in
+  `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` / `PageDocTypes` calls in
   `Kumunita.Web/Program.cs` (~L75–93) + `Kumunita.Core/Bootstrap/SchemaBootstrap.cs`.
   No hand-rolled `FeatureSchemaBase` (that carve-out is reserved for
   operator-written tables like `AdminOverride`). `Post.TagIds` /
@@ -235,7 +235,7 @@ pauses and records `## U<m> — Drift pause` in the handoff note.
   names, the acceptance gate, and the drift-guard. **No code, no build.**
 - **Entry reads:** U1's Part 1 (the invariant table is the primary source),
   `docs/design/m3-posts-design.md` Part 2 (§2.1–§2.7, to emulate),
-  `Kumunita.Core/M3DocTypes.cs` (the registration shape U3 mirrors),
+  `Kumunita.Core/PostDocTypes.cs` (the registration shape U3 mirrors),
   `Kumunita.Core/Posts/Post.cs` (the additive-field history U4 mirrors),
   `Kumunita.Core/Posts/PostService.cs` §`AddPostTranslationAsync` (the
   audit idiom U5 mirrors), `Kumunita.Core/Pages/PageService.cs` (the
@@ -321,11 +321,11 @@ pauses and records `## U<m> — Drift pause` in the handoff note.
 - **Goal:** create the two POCOs (namespace `Kumunita.Core.Tags`) + the
   `TagDocTypes.Configure(StoreOptions)` registration surface + wire it into
   both boot paths (the dev loop in `Program.cs` and the all-env
-  `SchemaBootstrap`), mirroring the M3 `M3DocTypes` pattern exactly.
-- **Entry reads:** `Kumunita.Core/M3DocTypes.cs` (the shape to mirror),
+  `SchemaBootstrap`), mirroring the M3 `PostDocTypes` pattern exactly.
+- **Entry reads:** `Kumunita.Core/PostDocTypes.cs` (the shape to mirror),
   `Kumunita.Core/Pages/PageDocTypes.cs` (the `UniqueIndex` convention to
   mirror for `(TagId, LanguageCode)`), `Kumunita.Core/Bootstrap/SchemaBootstrap.cs`
-  (where `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` are
+  (where `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` / `PageDocTypes` are
   called — U3 adds `TagDocTypes` next to them), `Kumunita.Web/Program.cs`
   (~L75–93, the dev-loop path), `docs/design/tags-design.md` §2.2 (the
   exact shapes).
@@ -345,12 +345,12 @@ pauses and records `## U<m> — Drift pause` in the handoff note.
     `(TagId, LanguageCode)` unique-index convention from `PageDocTypes`).
   - `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — add the `using` + the
     `TagDocTypes.Configure(opts);` line next to the existing
-    `M1DocTypes.Configure(opts);` / `M3DocTypes.Configure(opts);` /
+    `CoreDocTypes.Configure(opts);` / `PostDocTypes.Configure(opts);` /
     `MediaDocTypes.Configure(opts);` / `PageDocTypes.Configure(opts);`
     cluster (one line added).
   - `src/Kumunita.Web/Program.cs` — add the `TagDocTypes.Configure(...)`
-    call in the dev-loop path, next to the existing `M1DocTypes.Configure` /
-    `M3DocTypes.Configure` / `MediaDocTypes.Configure` / `PageDocTypes.Configure`
+    call in the dev-loop path, next to the existing `CoreDocTypes.Configure` /
+    `PostDocTypes.Configure` / `MediaDocTypes.Configure` / `PageDocTypes.Configure`
     cluster (~L75–93, one line added).
 - **Exit:** `dotnet build` green; `TagDocTypes.cs` exists; the two POCOs
   compile; **no new test** (U4's seam tests are the first TG tests).

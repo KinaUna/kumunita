@@ -58,7 +58,8 @@ public class TranslationBulkSaveAllTests(PostgresFixture fixture) : IClassFixtur
             [key0] = "PL::" + key0,
             [key1] = "PL::" + key1,
             [key2] = string.Empty,   // blank — dropped, not erased (C-M15·4)
-        }, "admin-seed");
+        }, "admin-seed",
+            TestContext.Current.CancellationToken);
 
         // The blank row is not counted — only the two present non-blank
         // rows upserted.
@@ -96,7 +97,8 @@ public class TranslationBulkSaveAllTests(PostgresFixture fixture) : IClassFixtur
         {
             [key0] = "PL::" + key0,
             [key1] = "PL::" + key1,
-        }, actorId);
+        }, actorId,
+            TestContext.Current.CancellationToken);
         Assert.Equal(2, written);
 
         // Exactly ONE audit row for the whole batch (C-M15·6).
@@ -129,7 +131,7 @@ public class TranslationBulkSaveAllTests(PostgresFixture fixture) : IClassFixtur
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

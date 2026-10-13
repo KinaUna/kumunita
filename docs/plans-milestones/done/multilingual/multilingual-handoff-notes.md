@@ -26,7 +26,7 @@ onward create their own `multilingual-uNN-plan.md` as they start).
 
 **What's already shipped (the M1 seed surface this lane builds on):**
 - `LanguageCatalog` + `LocaleSettings` — `src/Kumunita.Core/Localization/LanguageCatalog.cs`.
-- Both registered on **`M1DocTypes`** (the existing surface — the design doc
+- Both registered on **`CoreDocTypes`** (the existing surface — the design doc
   appends the two new docs there, not a new `DocTypes` surface):
   `opts.Schema.For<LanguageCatalog>(); opts.Schema.For<LocaleSettings>();`.
 - Materialized by the first-run seeder — `FirstBootSeeder` step 4
@@ -55,14 +55,14 @@ onward create their own `multilingual-uNN-plan.md` as they start).
   test tables (cross-referenced to the design doc) · the **sealed-unit table
   (U1–U9)** · the unit-series rules.
 
-**Unit count: 9** — U1 (content docs + `M1DocTypes` indexes) · U2
+**Unit count: 9** — U1 (content docs + `CoreDocTypes` indexes) · U2
 (`ITranslationProvider`) · U3 (`ILocalizationService` + `LanguageCompleteness`)
 · U4 (`LocaleCookie` + DI) · U5 (`LanguagesController`) · U6 (settings page +
 static-page routes) · U7 (the 19 seam tests) · U8 (run + record the gate) ·
 U9 (close: `Milestones.cs` / README / ARCHITECTURE sync + folder moves).
 
 **Pinned counts (the freeze at a glance — see the design doc §Drift guard):**
-9 invariants (M·1–M·9) · 13 FACES (M1–M13) · 2 content docs · 2 `M1DocTypes`
+9 invariants (M·1–M·9) · 13 FACES (M1–M13) · 2 content docs · 2 `CoreDocTypes`
 unique indexes · 2 Core interfaces + 1 record · 1 Web HTTP seam (`LocaleCookie`)
 + 1 controller + settings/static-page routes · **19** test names (13 FACES + 6
 audit-row-shape) · 3 gate tests.
@@ -73,9 +73,9 @@ kickoff; `dotnet build Kumunita.slnx -c Debug` is **green** (doc-only — no cod
 touched); the `Kumunita.Web.Tests` assembly still passes (verified via the
 AGENTS.md `dotnet exec` path, **not** `dotnet test`); the plan is consistent
 with the already-bumped roadmap (verified, not re-edited). **Next: U1** (the
-content documents + the `M1DocTypes` indexes), per the unit register.
+content documents + the `CoreDocTypes` indexes), per the unit register.
 
-## U1 — Content documents + M1DocTypes indexes
+## U1 — Content documents + CoreDocTypes indexes
 
 **Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
 section written + plan file moved to `done/`.
@@ -87,7 +87,7 @@ section written + plan file moved to `done/`.
 - **New** `src/Kumunita.Core/Localization/LocalizedPage.cs` — the static-page
   doc: `Id` + (`Slug`, `LanguageCode`) + `Title`, `Body` (Markdown), `Updated`
   (sealed; M·7's row-retention note is here, the *behavior* is U3's).
-- **Modified** `src/Kumunita.Core/M1DocTypes.cs` — appended the two
+- **Modified** `src/Kumunita.Core/CoreDocTypes.cs` — appended the two
   registrations on the **existing** surface (no new `DocTypes` class, per
   ADR 0004 §B.1 additive — Marten's delta picks them up, **no re-seed**):
   `UniqueIndex(t => t.Key, t => t.LanguageCode)` and
@@ -366,7 +366,7 @@ seam tests):**
   IClassFixture<PostgresFixture>`. Each test drives the **shipped** Core
   seams (`TranslationProvider` / `LocalizationService`) over a fresh scratch
   Postgres DB (the `PostgresFixture` harness — the `PostServiceTests`
-  template, extended with `M3DocTypes.Configure` for M6's `Post` plant).
+  template, extended with `PostDocTypes.Configure` for M6's `Post` plant).
   - **FACES M1–M13:** each test seeds the M1 row (`en` catalog row +
     `LocaleSettings` singleton) via a private `SeedM1RowAsync` helper (mirrors
     `FirstBootSeeder.SeedLanguageCatalogAsync` exactly — idempotent
@@ -392,8 +392,8 @@ seam tests):**
 
 **Test-harness conventions (matching `PostServiceTests`):** fresh scratch
 DB per test (`PostgresFixture.NewDatabaseAsync`) → `DocumentStore.For` with
-`KumunitaFeature` + `AuthorizationFeature` + `M1DocTypes.Configure` +
-`M3DocTypes.Configure` → `ApplyAllConfiguredChangesToDatabaseAsync`. The
+`KumunitaFeature` + `AuthorizationFeature` + `CoreDocTypes.Configure` +
+`PostDocTypes.Configure` → `ApplyAllConfiguredChangesToDatabaseAsync`. The
 `Plant` / `UpsertTranslation` / `UpsertPage` / `SetDefault` helpers are
 direct write-session seeds (test fixture seeding, **not** service write
 seams) — the audit-row-shape tests drive the service's own methods for the

@@ -101,7 +101,7 @@ D3/D4 walls protect.
 
 - **New:** `Kumunita.Core/Messaging/` (5 files: `Conversation.cs`,
   `Message.cs`, `IMessagingService.cs`, `MessagingService.cs`, and the
-  records block), `M9DocTypes.cs`, one `DependencyInjection.cs`
+  records block), `MessagingDocTypes.cs`, one `DependencyInjection.cs`
   registration, one `LocaleSettings.MessagingEnabled` field, one
   `NotificationKinds.MessageNew` constant, `Kumunita.Web/Controllers/
   MessagesController.cs`, `Views/Messages/Index.cshtml` +
@@ -109,7 +109,7 @@ D3/D4 walls protect.
   `Kumunita.Web/Controllers/AdminMessagingController.cs` +
   `Views/AdminMessaging/Index.cshtml`, the `message.*` keys (9 × 4
   languages), two test classes (14 + 10 pins).
-- **Touched:** `SchemaBootstrap.cs` + `Program.cs` (one `M9DocTypes` call
+- **Touched:** `SchemaBootstrap.cs` + `Program.cs` (one `MessagingDocTypes` call
   each), `LocaleSettings`, `NotificationKinds` (one constant),
   `KnownTranslationKeys` (9 keys).
 - **Untouched (pinned):** every frozen interface; `Milestones.cs` / README
@@ -260,7 +260,7 @@ surfaced** (read-receipts are a deferred lane).
   `Body` ≤ `MaxBodyChars` (400 on over-length); no rendering pipeline, no
   attachments, no edit/delete lane.
 - **C-M9·7 · Marten-native documents, one new surface (ADR 0004 §B.1).**
-  `Conversation` + `Message` POCOs in `M9DocTypes.Configure(StoreOptions)`,
+  `Conversation` + `Message` POCOs in `MessagingDocTypes.Configure(StoreOptions)`,
   delta-detected, idempotent, wired into **both** boot paths
   (`Kumunita.Web/Program.cs` dev loop +
   `Kumunita.Core/Bootstrap/SchemaBootstrap.cs`); no hand-rolled
@@ -363,7 +363,7 @@ machinery is the lane that buys it back when the neighborhood wants it.
 ## Rollout & rollback
 
 Rollout is a normal deploy: the schema is purely additive
-(`M9DocTypes`, delta-detected + idempotent on both boot paths), the
+(`MessagingDocTypes`, delta-detected + idempotent on both boot paths), the
 feature is **off by default** (D2), so a fresh instance ships with zero
 new surface visible. Rollback: flip the toggle off (instant, the
 residents' data is untouched — the toggle gates *new* access, the
@@ -416,7 +416,7 @@ namespace Kumunita.Core.Messaging;
 /// One 1:1 conversation (D1). The pair is stored **sorted** (ParticipantA ≤
 /// ParticipantB, string compare) so the unordered pair has exactly one
 /// canonical form — the (ParticipantA, ParticipantB) unique index in
-/// M9DocTypes is the idempotency witness for F1.
+/// MessagingDocTypes is the idempotency witness for F1.
 public sealed class Conversation
 {
     public string Id { get; set; } = string.Empty;
@@ -440,11 +440,11 @@ public sealed class Message
 }
 ```
 
-`M9DocTypes.Configure(StoreOptions)`: index `Message` on
+`MessagingDocTypes.Configure(StoreOptions)`: index `Message` on
 `(ConversationId, Created)` for the thread read; a unique index on
 `Conversation` `(ParticipantA, ParticipantB)` for the F1 idempotency
 witness. Conventional `string` ids (`Guid.NewGuid().ToString("N")`), the
-`M3DocTypes` / `M6DocTypes` registration shape, both boot paths (the
+`PostDocTypes` / `NotificationDocTypes` registration shape, both boot paths (the
 U01 entry reads are the authority for the exact current lines).
 
 ## 2.2 The records + the seam (the block U01–U03 copy verbatim)
@@ -577,7 +577,7 @@ amendment to this section is a drift breach:**
 
 1. The §2.2 seam block (signatures + record shapes) — U01–U03 copy it
    verbatim; a signature change is an amendment, not an edit.
-2. The §2.1 document shapes (field names + the two `M9DocTypes`
+2. The §2.1 document shapes (field names + the two `MessagingDocTypes`
    indexes) — additive-only after U01.
 3. The §2.3 audit-row table (action strings, `TargetKind` values, `Via`
    values, the no-read-rows rule) — C-M9·3/4/5 witnesses.

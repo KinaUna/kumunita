@@ -33,7 +33,9 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
-    var reportReasonPlaceholder = await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
+    var reportReasonPlaceholder = Translation is null
+        ? Kumunita.Core.Localization.KnownTranslationKeys.EnValues["posts.report_reason_placeholder"]
+        : await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
     // Author avatar monogram fallback (the Directory pattern — avatar.ts hides
     // the <img> on the 404 the serving lane fails closed to; see site.css).
     string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
@@ -262,7 +264,12 @@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                              @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                             <div class="rc-body">
-                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                                @* M36 (ADR 0165 D6) — the @mention render pass: renders the
+                                   body through the FROZEN MarkdownRenderer, then linkifies each
+                                   resolved @<DisplayName> into <a class="mention">
+                                   href="/directory/{id}">. The self-exclusion input is the post's
+                                   own author (AuthorSubjectId). *@
+                                <partial name="_MentionRenderer" model="new MentionBodyModel(Model.Post.Body, Model.AuthorSubjectId)" />
                             </div>
                         </div>
                         @foreach (var t in Model.PostTranslations)
@@ -276,7 +283,10 @@
                             <div class="td-variant" data-td-variant="@t.LanguageCode"
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 <div class="rc-body">
-                                    @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
+                                    @* M36 (ADR 0165 D6) — a post translation's body is the same
+                                       author's content, so the self-exclusion input is the post's
+                                       author (AuthorSubjectId). *@
+                                    <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
                                 </div>
                             </div>
                         }
@@ -341,9 +351,12 @@
                     </div>
                 }
 
-                <div class="text-muted small mb-0">
-                    <kw-l key="posts.detail_why">You can see this post because you matched its audience (a grant of yours, or you are the author — the "owner branch" of the C1 empty-audience deny rule).</kw-l>
-                </div>
+                <details class="kw-audience-disclosure mb-0">
+                    <summary><kw-l key="posts.detail_why_label">Why can I see this?</kw-l></summary>
+                    <div class="text-muted small">
+                        <kw-l key="posts.detail_why">You can see this post because you matched its audience (a grant of yours, or you are the author — the "owner branch" of the C1 empty-audience deny rule).</kw-l>
+                    </div>
+                </details>
             </div>
 
             @* Author footer band (the Announcement Detail pattern): the author sits
@@ -608,9 +621,12 @@
                             <kw-l key="posts.reply_language_note">The language you're replying in — a tag, not a translation.</kw-l>
                         </div>
                     </div>
-                    <div class="text-muted small mb-3">
-                        <kw-l key="posts.reply_audience_note">Replies have no own audience — they are visible under this post's single audience decision. You are replying only where the post itself is visible.</kw-l>
-                    </div>
+                    <details class="kw-audience-disclosure mb-3">
+                        <summary><kw-l key="posts.reply_audience_note_label">Who can see replies?</kw-l></summary>
+                        <div class="text-muted small">
+                            <kw-l key="posts.reply_audience_note">Replies have no own audience — they are visible under this post's single audience decision. You are replying only where the post itself is visible.</kw-l>
+                        </div>
+                    </details>
                     <button type="submit" class="btn btn-primary"><kw-l key="posts.reply_submit">Reply</kw-l></button>
                 </form>
             </div>

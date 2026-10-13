@@ -30,7 +30,7 @@ namespace Kumunita.Core.Tests;
 /// <item>JR·3 — the state machine: a resolved (Approved / Declined) row is an
 /// invalid transition for approve / decline / withdraw; re-requesting resets a
 /// resolved row back to <c>Pending</c> (no second row — one per (group, user)
-/// business key, <see cref="M1DocTypes"/>'s <c>UniqueIndex</c>).</item>
+/// business key, <see cref="CoreDocTypes"/>'s <c>UniqueIndex</c>).</item>
 /// <item>C4 carried — approve makes the membership live on the <b>very next</b>
 /// <see cref="IUserInfoService.GetGroupIdsAsync"/> /
 /// <see cref="IUserInfoService.GetGroupsForUserAsync"/> call; a request and a
@@ -555,7 +555,7 @@ public class UserInfoServiceGroupJoinRequestTests(PostgresFixture fixture) : ICl
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

@@ -58,7 +58,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
 
         // Build the export bundle (the C-M15·2 round-trip partner, U01).
         var svc = new LocalizationService(store);
-        var matrix = await svc.GetBulkTranslationMatrixAsync();
+        var matrix = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         var codes = (await svc.ListLanguagesAsync())
             .OrderBy(c => c.SortOrder).Select(c => c.Id).ToList();
         var bundle = TranslationBulkExporter.Build(matrix, codes);
@@ -77,7 +77,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
         Assert.False(plRows.ContainsKey(key2), "key2 has no stored pl row — should be absent from the import (blank = no-op, C-M15·4)");
 
         // Apply the import for `pl`.
-        var written = await svc.UpsertManyTranslationsAsync("pl", plRows, "admin-seed");
+        var written = await svc.UpsertManyTranslationsAsync("pl", plRows, "admin-seed", TestContext.Current.CancellationToken);
         Assert.Equal(2, written);
 
         // Verify the store: key0 and key1 are present and correct; key2 is
@@ -89,7 +89,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
 
         // The round-trip is lossless: re-export and verify the matrix is
         // identical (C-M15·2).
-        var matrixAfter = await svc.GetBulkTranslationMatrixAsync();
+        var matrixAfter = await svc.GetBulkTranslationMatrixAsync(TestContext.Current.CancellationToken);
         var key0Row = matrixAfter.Single(r => r.Key == key0);
         var key1Row = matrixAfter.Single(r => r.Key == key1);
         var key2Row = matrixAfter.Single(r => r.Key == key2);
@@ -137,7 +137,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
         // Apply the import for `pl` (the caller may or may not call it for
         // an empty set — both are correct).
         if (import.RowsByLanguage.TryGetValue("pl", out var plRows) && plRows.Count > 0)
-            await new LocalizationService(store).UpsertManyTranslationsAsync("pl", plRows, "admin-seed");
+            await new LocalizationService(store).UpsertManyTranslationsAsync("pl", plRows, "admin-seed", TestContext.Current.CancellationToken);
 
         // The stored row is **byte-identical** — the blank cell did not
         // erase it (C-M15·4).
@@ -276,7 +276,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
 
         // Apply the import for `pl`.
         var svc = new LocalizationService(store);
-        var written = await svc.UpsertManyTranslationsAsync("pl", plRows, actorId);
+        var written = await svc.UpsertManyTranslationsAsync("pl", plRows, actorId, TestContext.Current.CancellationToken);
         Assert.Equal(2, written);
 
         // Exactly ONE audit row for the whole batch (C-M15·6).
@@ -352,7 +352,7 @@ public class TranslationBulkImporterTests(PostgresFixture fixture) : IClassFixtu
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

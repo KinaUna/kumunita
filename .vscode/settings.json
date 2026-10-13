@@ -1,5 +1,6 @@
 {
     "inlineChat.defaultModel": "qwen3.8:latest (ollama-models)",
+    "chat.agent.maxRequests": 500,
     "chat.tools.terminal.autoApprove": {
         "/^dotnet exec tests\\\\Kumunita\\.Web\\.Tests\\\\bin\\\\Debug\\\\net10\\.0\\\\Kumunita\\.Web\\.Tests\\.dll 2>&1 \\| Select-Object -Last 12$/": {
             "approve": true,

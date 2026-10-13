@@ -44,20 +44,29 @@ public sealed class AdminStorageMetricsController(
     /// The page size is the seam's default of 25 (F3).
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> Index([FromQuery] int page = 1)
+    public async Task<IActionResult> Index(
+        [FromQuery] int page = 1,
+        [FromQuery] int window = 90,   // M33·8 default trend window
+        CancellationToken ct = default)
     {
         // Clamp a hand-edited ?page=0/-1 to the first page (the view's pager
         // only ever links to page 1 and page+1, so this is defensive).
         page = Math.Max(1, page);
 
-        // The two reads are independent — start both (concurrent), then await
-        // each for its value. (Two *different* result types make Task.WhenAll
+        // The three reads are independent — start all (concurrent), then await
+        // each for its value. (The *different* result types make Task.WhenAll
         // resolve to the Task[] overload, so deconstruction isn't available —
         // await the held tasks explicitly instead.)
         var snapshotTask = metrics.GetSnapshotAsync();
         var perUserTask  = metrics.GetPerUserListAsync(page, 25);
+        // M33 additive (M33·1): the history read. The seam's pinned-window
+        // guard (M33·8) throws ArgumentOutOfRangeException on a value outside
+        // {30, 90, 180, 365} — the M13 windowDays precedent — which surfaces
+        // as a 400 via the existing global handler; no new error page.
+        var historyTask  = metrics.GetHistoryAsync(window, ct);
         var snapshot = await snapshotTask;
         var perUser  = await perUserTask;
+        var history  = await historyTask;
 
         // The "available" figure the admin sees. When the operator has set a
         // platform storage limit (Media__MaxPlatformBytes > 0), the available
@@ -89,7 +98,10 @@ public sealed class AdminStorageMetricsController(
             Items                = perUser.Items,
             TotalUsers           = perUser.TotalUsers,
             Page                 = perUser.Page,
-            HasMore              = perUser.HasMore
+            HasMore              = perUser.HasMore,
+            // M33 additive (M33·1): the Trend section projection.
+            History              = history.Points,
+            WindowDays           = window
         });
     }
 }

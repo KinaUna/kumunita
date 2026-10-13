@@ -2306,13 +2306,13 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers AccessAudit (the read lane's "no audit
+            // CoreDocTypes registers AccessAudit (the read lane's "no audit
             // row" pin needs it in the schema to query).
-            M1DocTypes.Configure(opts);
-            // M3DocTypes registers Announcement (the M3b "platform announcements"
+            CoreDocTypes.Configure(opts);
+            // PostDocTypes registers Announcement (the M3b "platform announcements"
             // lane's bounded context — the whole point of these tests) alongside
             // Post / PostReply / Report.
-            M3DocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -2353,5 +2353,67 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
         return await s.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 8 (announcement): the mention emitter is in the **publish** lane
+    // (M36·8, ADR 0037 — the draft gate). A resolved `@`-token on a published
+    // announcement stores ONE `announcement.mention` row (the per-recipient
+    // key + the `/announcements/{id}` linkPath, M36·4) + a staged email; a
+    // **draft** save (CreateAsync with IsDraft=true) stores **no** row (the
+    // mention fires only on publish); an unknown token stores none.
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Announcement_Published_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-ann-author";
+
+        var ann = new Announcement { Scope = AnnouncementScope.Public, Title = "T", Body = "@Ada help", IsDraft = true };
+        Announcement created;
+        await using (var s = newSession(boot.Store)) { created = await svc.CreateAsync(ann, author, new HashSet<string> { Roles.GlobalAdmin }, s); }
+        await using (var s2 = newSession(boot.Store)) { await svc.PublishAsync(created.Id, author, s2); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.AnnouncementMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.AnnouncementMention}:{created.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/announcements/{created.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.AnnouncementMention}:{created.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_Announcement_Draft_Mention_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-ann-draft-author";
+
+        var ann = new Announcement { Scope = AnnouncementScope.Public, Title = "T", Body = "@Ada help", IsDraft = true };
+        await using (var s = newSession(boot.Store)) { await svc.CreateAsync(ann, author, new HashSet<string> { Roles.GlobalAdmin }, s); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.AnnouncementMention));
+    }
+
+    [Fact]
+    public async Task M36_Announcement_Published_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
+        var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        const string author = "u-m36-ann-inert-author";
+
+        var ann = new Announcement { Scope = AnnouncementScope.Public, Title = "T", Body = "@Ghost help", IsDraft = true };
+        Announcement created;
+        await using (var s = newSession(boot.Store)) { created = await svc.CreateAsync(ann, author, new HashSet<string> { Roles.GlobalAdmin }, s); }
+        await using (var s2 = newSession(boot.Store)) { await svc.PublishAsync(created.Id, author, s2); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.AnnouncementMention));
     }
 }

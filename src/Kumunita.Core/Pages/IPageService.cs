@@ -222,10 +222,13 @@ public interface IPageService
     /// <summary>
     /// Adds a **user-added translation** of a page in the **caller's**
     /// in-flight session (C3; the ADR 0029 standing carried over). Standing
-    /// (ADR 0040, amending §3.7): a GlobalAdmin
+    /// (ADR 0040, amending §3.7, and ADR 0161): a GlobalAdmin
     /// (<see cref="Authorization.AccessVia.Admin"/>) or a Translator
-    /// (<see cref="Authorization.AccessVia.Admin"/>) — on **either** page
-    /// kind; a community Moderator has no standing on either kind. The
+    /// (<see cref="Authorization.AccessVia.Admin"/>) on **either** page kind,
+    /// and — since ADR 0161 — the **author** of a <see cref="PageKind.User"/>
+    /// (blog) page (<see cref="Authorization.AccessVia.Owner"/>) may translate
+    /// their own page (the same branch as the edit standing, so an editor can
+    /// translate). A community Moderator has no standing on either kind. The
     /// <c>(PageId, LanguageCode)</c> unique index (U01) is the add-only
     /// duplicate guard. A missing page is a
     /// <see cref="KeyNotFoundException"/> (404); a denied actor is a

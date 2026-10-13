@@ -574,6 +574,71 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.False(PageService.CanTranslatePage("u-member", RolesSet(Roles.Member), flat));
     }
 
+    // ─── ADR 0161 — the author-of-a-blog-page branch (an editor can translate) ─
+    //
+    // ADR 0161 closes the "a user who can edit a page should also be able to
+    // add/edit/remove translations" gap: the author of a PageKind.User (blog)
+    // page now qualifies for the translation standing — the same branch the
+    // edit standing uses (a blog page's edit standing is author ∪ GlobalAdmin,
+    // ADR 0040). A system page's author is an audit identity, not a standing
+    // branch (a system page is GlobalAdmin-only), so the branch is scoped to
+    // the User kind.
+
+    [Fact]
+    public void PG6_CanTranslatePage_AuthorOfBlogPage_Allows()
+    {
+        // A plain resident (no elevated role) who is the author of a blog
+        // page may translate it — the ADR 0161 author branch (the same branch
+        // as the edit standing).
+        var blogPage = new Page
+        {
+            Id = "pg6-t-auth-b", Kind = PageKind.User,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        Assert.True(PageService.CanTranslatePage("u-author", RolesSet(Roles.Member), blogPage));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_AuthorOfSystemPage_Denies()
+    {
+        // A system page's author is an audit identity, not a standing branch
+        // (a system page is GlobalAdmin-only, ADR 0040) — the ADR 0161 author
+        // branch is scoped to the User kind, so a plain resident who happens
+        // to be the stored author of a system page still cannot translate it.
+        var systemPage = new Page
+        {
+            Id = "pg6-t-auth-s", Kind = PageKind.System,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        Assert.False(PageService.CanTranslatePage("u-author", RolesSet(Roles.Member), systemPage));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_NonAuthorOfBlogPage_Denies()
+    {
+        // The author branch is author-specific: a plain resident who is NOT
+        // the blog page's author has no translation standing on it.
+        var blogPage = new Page
+        {
+            Id = "pg6-t-notauth", Kind = PageKind.User,
+            AuthorId = "u-someone-else", ComponentId = "comp-x",
+        };
+        Assert.False(PageService.CanTranslatePage("u-resident", RolesSet(Roles.Member), blogPage));
+    }
+
+    [Fact]
+    public void PG6_CheckTranslateStanding_AuthorOfBlogPage_Allows()
+    {
+        // The write-lane gate accepts the author of a blog page (ADR 0161) —
+        // no exception thrown.
+        var blogPage = new Page
+        {
+            Id = "pg6-t-gate-auth", Kind = PageKind.User,
+            AuthorId = "u-author", ComponentId = "comp-x",
+        };
+        PageService.CheckTranslateStanding("u-author", RolesSet(Roles.Member), blogPage);
+    }
+
     [Fact]
     public void PG6_CanTranslatePage_NullPageOrBlankActor_Denies()
     {
@@ -1744,7 +1809,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             // gone — destructive by design, ADR 0058).
             await using (var q2 = store.QuerySession())
             {
-                var after = await q2.LoadAsync<Page>(termsId);
+                var after = await q2.LoadAsync<Page>(termsId, TestContext.Current.CancellationToken);
                 Assert.Equal(seededEn.Body, after!.Body);
                 Assert.Equal(seededEn.Title, after.Title);
                 Assert.Equal(FirstBootSeeder.SourceLanguage, after.LanguageCode);
@@ -1933,7 +1998,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
         await using (var q = store.QuerySession())
         {
-            var after = await q.LoadAsync<Page>("pg6-res-blog");
+            var after = await q.LoadAsync<Page>("pg6-res-blog", TestContext.Current.CancellationToken);
             var seeded = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
             Assert.Equal(seeded.Body, after!.Body);
 
@@ -2195,7 +2260,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 .ToListAsync(ct);
             var pageIds = pages.Select(p => p.Id).ToHashSet();
             var audits = await q.Query<AccessAudit>()
-                .Where(a => a.Action == "page.reset" && pageIds.Contains(a.TargetId))
+                .Where(a => a.Action == "page.reset" && pageIds.Contains(a.TargetId!))
                 .ToListAsync(ct);
             Assert.Empty(audits);
         }
@@ -2217,8 +2282,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);   // U02 — the two new Page/PageTranslation docs
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
@@ -2238,8 +2303,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
@@ -2358,5 +2423,46 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         return await s.Query<AccessAudit>()
             .Where(a => a.TargetId == targetId && a.Action == action)
             .ToListAsync(ct);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 5 (page): a resolved `@`-token stores ONE `page.mention` row for
+    // the recipient (the per-recipient key + the `/pages/{id}` linkPath,
+    // M36·4) + a staged email; an unknown token (M36-5) stores none. The
+    // create lane is the publishing lane (M36·8 — no separate publish step
+    // for a page).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Page_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PageDocTypes.Configure);
+        var svc = new PageService(boot.Store, null, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-page-author";
+
+        Page page;
+        await using (var s = newSession(boot.Store)) { page = await svc.CreateAsync(new Page { Slug = "m36-page", Body = "@Ada can you help?", Kind = PageKind.User }, author, RolesSet(Roles.Member), s); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PageMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PageMention}:{page.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/pages/{page.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.PageMention}:{page.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_Page_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PageDocTypes.Configure);
+        var svc = new PageService(boot.Store, null, boot.Notifications, boot.Mentions);
+        const string author = "u-m36-page-inert-author";
+
+        await using (var s = newSession(boot.Store)) { await svc.CreateAsync(new Page { Slug = "m36-page-inert", Body = "@Ghost ping", Kind = PageKind.User }, author, RolesSet(Roles.Member), s); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PageMention));
     }
 }

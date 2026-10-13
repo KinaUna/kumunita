@@ -154,11 +154,11 @@ public class TimeLimitMiddlewareTests
         // UTC floor (deterministic — the wall clock is UTC regardless of the
         // machine's local time).
         userInfo.GetProfileAsync(Arg.Any<string>())
-            .Returns(Task.FromResult(new Profile { SubjectId = Subject, TimeZone = "UTC" }));
+            .Returns(Task.FromResult<Profile?>(new Profile { SubjectId = Subject, TimeZone = "UTC" }));
 
         var localization = Substitute.For<ILocalizationService>();
         localization.GetDefaultTimezoneAsync()
-            .Returns(Task.FromResult<string?>("UTC"));
+            .Returns(Task.FromResult("UTC"));
 
         var accessor = Substitute.For<IHttpContextAccessor>();
         accessor.HttpContext.Returns(context);

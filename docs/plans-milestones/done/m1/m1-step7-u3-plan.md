@@ -108,7 +108,7 @@ The deliverable is the confirmation, recorded in two artifacts:
   the caller's commit abandoned. No reorder needed.
 - **U3's scope discipline.** Touched 0 `src/` files. Did not touch `IdentityService.cs`
   (explicitly off-limits), `Program.cs` (U4's territory), the stager/DI (U2's), or
-  `M1DocTypes.cs` (R5). The only files this unit writes are the two `docs/` artifacts.
+  `CoreDocTypes.cs` (R5). The only files this unit writes are the two `docs/` artifacts.
 - **Baseline captured (U1's deferral fulfilled).** U1's handoff note said "U3 must
   capture the baseline count in ITS handoff section when it has a live Postgres
   available." `ClaimShapingInvariantBTests` is a pure unit test, so it *does* run here:

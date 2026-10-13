@@ -158,8 +158,10 @@ public sealed class PostsController(
         // it even though their implicit membership cannot be removed (ADR 0012).
         // Admin/moderator standing is unaffected (they still manage it) — the
         // block is the child's personal ceiling, read from the child's profile.
-        if (actor is not null
-            && !KumunitaPrincipal.IsGlobalAdmin(User)
+        // (`actor` is non-nullable by construction — `SubjectId(User) ?? string.Empty` —
+        // so the `actor is not null` guard it carried before was always true; dropping
+        // it also clears a Roslyn dataflow quirk (CS8604) that only this site tripped.)
+        if (!KumunitaPrincipal.IsGlobalAdmin(User)
             && !KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId)))
         {
             var effective = await userInfo.GetEffectiveCommunityIdsAsync(actor);
@@ -596,7 +598,13 @@ public sealed class PostsController(
         if (tags is not null && result.Post.TagIds.Count > 0)
         {
             var postTagIds = result.Post.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actor);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049 —
+            // the exact <c>EffectiveLanguageCode</c> chain the group-name and
+            // post-translation surfaces use) so a tag's <c>TagTranslation</c> in
+            // that language resolves; null (test-construction site) falls to the
+            // instance-default → en floor.
+            var tagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actor, tagPreferred);
             tagRows = readable
                 .Where(t => postTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))

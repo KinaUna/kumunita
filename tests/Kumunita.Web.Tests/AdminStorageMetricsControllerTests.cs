@@ -80,7 +80,7 @@ public class AdminStorageMetricsControllerTests
         // A GlobalAdmin gets 200 on GET /admin/storage (the Index action
         // resolves to a View over the projected AdminStorageMetricsViewModel).
         metrics
-            .GetSnapshotAsync()
+            .GetSnapshotAsync(Arg.Any<CancellationToken>())
             .Returns(new StorageMetricsSnapshot(
                 TotalUsedBytes:       10_000,
                 TotalVolumeBytes:    100_000,
@@ -91,7 +91,7 @@ public class AdminStorageMetricsControllerTests
                 AsOf:                 new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
 
         metrics
-            .GetPerUserListAsync(1, 25)
+            .GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>())
             .Returns(new PerUserStoragePage(
                 new[]
                 {
@@ -102,7 +102,7 @@ public class AdminStorageMetricsControllerTests
                 Page: 1,
                 HasMore: false));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var view = Assert.IsType<ViewResult>(action);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(view.Model);
         // The four headline metrics (C-SM·2/4, F1) project through:
@@ -118,8 +118,8 @@ public class AdminStorageMetricsControllerTests
         Assert.Equal(1, model.Page);
         Assert.False(model.HasMore);
 
-        await metrics.Received(1).GetSnapshotAsync();
-        await metrics.Received(1).GetPerUserListAsync(1, 25);
+        await metrics.Received(1).GetSnapshotAsync(Arg.Any<CancellationToken>());
+        await metrics.Received(1).GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -155,7 +155,7 @@ public class AdminStorageMetricsControllerTests
         store.LightweightSession().Returns(session);
 
         metrics
-            .GetSnapshotAsync()
+            .GetSnapshotAsync(Arg.Any<CancellationToken>())
             .Returns(new StorageMetricsSnapshot(
                 TotalUsedBytes:       0,
                 TotalVolumeBytes:     0,
@@ -166,14 +166,14 @@ public class AdminStorageMetricsControllerTests
                 AsOf:                 new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
 
         metrics
-            .GetPerUserListAsync(1, 25)
+            .GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>())
             .Returns(new PerUserStoragePage(
                 System.Array.Empty<PerUserStorageRow>(),
                 TotalUsers: 0,
                 Page: 1,
                 HasMore: false));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         Assert.IsType<ViewResult>(action);
 
         // Zero writes, zero new documents, zero AccessAudit rows (C-SM·6 /
@@ -181,10 +181,10 @@ public class AdminStorageMetricsControllerTests
         // never calls SaveChangesAsync.
         store.DidNotReceive().LightweightSession();
         session.DidNotReceive().Store(Arg.Any<object>());
-        session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await session.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
 
-        await metrics.Received(1).GetSnapshotAsync();
-        await metrics.Received(1).GetPerUserListAsync(1, 25);
+        await metrics.Received(1).GetSnapshotAsync(Arg.Any<CancellationToken>());
+        await metrics.Received(1).GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -204,7 +204,7 @@ public class AdminStorageMetricsControllerTests
             .ToList();
 
         metrics
-            .GetSnapshotAsync()
+            .GetSnapshotAsync(Arg.Any<CancellationToken>())
             .Returns(new StorageMetricsSnapshot(
                 TotalUsedBytes:       25_000,
                 TotalVolumeBytes:    100_000,
@@ -215,14 +215,14 @@ public class AdminStorageMetricsControllerTests
                 AsOf:                 new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
 
         metrics
-            .GetPerUserListAsync(1, 25)
+            .GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>())
             .Returns(new PerUserStoragePage(
                 rows,
                 TotalUsers: 3,
                 Page: 1,
                 HasMore: true));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var view = Assert.IsType<ViewResult>(action);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(view.Model);
 
@@ -235,7 +235,7 @@ public class AdminStorageMetricsControllerTests
         Assert.Equal(25, model.Items.Count);
         Assert.Equal(3, model.TotalUsers);
 
-        await metrics.Received(1).GetPerUserListAsync(1, 25);
+        await metrics.Received(1).GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -249,7 +249,7 @@ public class AdminStorageMetricsControllerTests
         // captured" bucket row (C-SM·5) is absent (no null/empty CreatedById
         // in the projected items).
         metrics
-            .GetSnapshotAsync()
+            .GetSnapshotAsync(Arg.Any<CancellationToken>())
             .Returns(new StorageMetricsSnapshot(
                 TotalUsedBytes:       5_000,
                 TotalVolumeBytes:    100_000,
@@ -260,7 +260,7 @@ public class AdminStorageMetricsControllerTests
                 AsOf:                 new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
 
         metrics
-            .GetPerUserListAsync(1, 25)
+            .GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>())
             .Returns(new PerUserStoragePage(
                 new[]
                 {
@@ -271,7 +271,7 @@ public class AdminStorageMetricsControllerTests
                 Page: 1,
                 HasMore: false));
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var view = Assert.IsType<ViewResult>(action);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(view.Model);
 
@@ -305,17 +305,17 @@ public class AdminStorageMetricsControllerTests
         const long free = 90_000, used = 10_000, limit = 50_000;
 
         var metrics = Substitute.For<IStorageMetricsService>();
-        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+        metrics.GetSnapshotAsync(Arg.Any<CancellationToken>()).Returns(new StorageMetricsSnapshot(
             TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
             UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
             AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
-        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+        metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
             Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
 
         var controller = BuildWithMetrics(metrics,
             new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = limit });
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(
             Assert.IsType<ViewResult>(action).Model);
 
@@ -331,17 +331,17 @@ public class AdminStorageMetricsControllerTests
         const long free = 90_000, used = 60_000, limit = 50_000;
 
         var metrics = Substitute.For<IStorageMetricsService>();
-        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+        metrics.GetSnapshotAsync(Arg.Any<CancellationToken>()).Returns(new StorageMetricsSnapshot(
             TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
             UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
             AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
-        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+        metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
             Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
 
         var controller = BuildWithMetrics(metrics,
             new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = limit });
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(
             Assert.IsType<ViewResult>(action).Model);
 
@@ -357,17 +357,17 @@ public class AdminStorageMetricsControllerTests
         const long free = 90_000, used = 10_000;
 
         var metrics = Substitute.For<IStorageMetricsService>();
-        metrics.GetSnapshotAsync().Returns(new StorageMetricsSnapshot(
+        metrics.GetSnapshotAsync(Arg.Any<CancellationToken>()).Returns(new StorageMetricsSnapshot(
             TotalUsedBytes: used, TotalVolumeBytes: 100_000, FreeVolumeBytes: free,
             UserContentUsedBytes: used, TotalUniqueFiles: 5, TotalDistinctUsers: 2,
             AsOf: new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero)));
-        metrics.GetPerUserListAsync(1, 25).Returns(new PerUserStoragePage(
+        metrics.GetPerUserListAsync(1, 25, Arg.Any<CancellationToken>()).Returns(new PerUserStoragePage(
             Array.Empty<PerUserStorageRow>(), TotalUsers: 0, Page: 1, HasMore: false));
 
         var controller = BuildWithMetrics(metrics,
             new Kumunita.Core.Media.MediaOptions { MaxPlatformBytes = 0 });
 
-        var action = await controller.Index(page: 1);
+        var action = await controller.Index(page: 1, ct: TestContext.Current.CancellationToken);
         var model = Assert.IsType<AdminStorageMetricsViewModel>(
             Assert.IsType<ViewResult>(action).Model);
 
@@ -406,6 +406,15 @@ public class AdminStorageMetricsControllerTests
             Kumunita.Core.Media.MediaOptions? mediaOptions = null)
     {
         metrics ??= Substitute.For<IStorageMetricsService>();
+
+        // M33-post: the U05 additive GetHistoryAsync read (M33·1) is not stubbed
+        // in the pre-existing M24 tests, so NSubstitute returns null → the
+        // controller's `await historyTask` throws NRE at Index line 89. Stub it
+        // to an empty 90-day history here (shared setup) so all 7 Index tests
+        // inherit it. The 3 M24 methods' pins are unchanged.
+        metrics
+            .GetHistoryAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new StorageHistoryResult(90, Array.Empty<StorageMetricsSample>()));
 
         var controller = new AdminStorageMetricsController(
             metrics,

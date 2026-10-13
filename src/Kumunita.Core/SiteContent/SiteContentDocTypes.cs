@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>SITE</c> (site content) bounded context's Marten-native document
 /// registration surface (ADR 0150, ADR 0004 §B.1) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="PageDocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PageDocTypes"/> /
 /// <see cref="MediaDocTypes"/> for the new <c>Kumunita.Core.SiteContent</c>
 /// context. The <see cref="SiteContent"/> singleton has the conventional
 /// <c>string</c> <c>Id</c> identity (fixed to the sentinel <c>singleton</c>),
@@ -31,5 +31,16 @@ public static class SiteContentDocTypes
         // the unqualified name in this parent namespace resolves to the *namespace*
         // (the type and namespace share the name `SiteContent`).
         opts.Schema.For<SiteContent.SiteContent>();
+
+        // ADR 0157 — the SITE-2 translation lane (the "future SITE-2
+        // translation lane" ADR 0150 §D5 named). One row per language of the
+        // singleton's hero text — the (LanguageCode) unique index enforces
+        // that at the DB layer (the PostTranslation (PostId, LanguageCode)
+        // convention, minus the parent key: the site is a singleton, so its
+        // single identity is implicit and the row is keyed only on its
+        // target language). Additive per ADR 0004 §B.1; the SiteContent
+        // singleton above is untouched.
+        opts.Schema.For<SiteContentTranslation>()
+               .UniqueIndex(t => t.LanguageCode);
     }
 }

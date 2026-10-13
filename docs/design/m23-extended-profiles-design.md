@@ -125,7 +125,7 @@ DocTypes surface (ADR 0004 §B.1).** `Profile` (the M1-registered doc,
 fields** (the `Post.Status` / `Post.TagIds` / `Profile.AvatarId` /
 `Profile.TimeZone` history on a POCO — delta-detected, idempotent, **no
 re-seed**, **no EF migration**, **no new `*DocTypes` surface** — `Profile`
-already registers in `M1DocTypes`; adding two fields is the §B.1 additive
+already registers in `CoreDocTypes`; adding two fields is the §B.1 additive
 lane):
 
 ```csharp

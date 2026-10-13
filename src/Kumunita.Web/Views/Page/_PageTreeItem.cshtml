@@ -5,16 +5,16 @@
    chevron → expand/collapse), and the children list is <details>'s
    default content — **collapsed by default** (no `open` attribute), so
    a long tree stays short until the resident opts into a branch.
-   Leaf pages render a plain row. Indentation comes from the nested
-   <ul>s (no inline padding-left), which also keeps the bordered-ledger
-   look (each <li> carries the 1px separator) at every depth.
-   No JS — <details> is native; this is the same affordance the
-   translation chips and RSVP details already use (Groups/Detail,
-   Event/Detail). *@
+   Leaf pages render a plain row. Indentation is driven purely by CSS
+   (the <li> nesting depth, via :has()), so each level indents cumulatively
+   and a branch's title aligns with its sibling leaves (the chevron sits
+   in a reserved gutter). No JS — <details> is native; this is the same
+   affordance the translation chips and RSVP details already use
+   (Groups/Detail, Event/Detail). *@
 @model Kumunita.Web.Models.PageNode
 @if (Model.Children.Count == 0)
 {
-    <li>
+    <li style="--kmb-page-depth: @Model.Depth">
         <a href="@Model.Path">@Model.Title</a>
         @if (Model.IsDraft)
         {
@@ -26,7 +26,7 @@
 }
 else
 {
-    <li>
+    <li style="--kmb-page-depth: @Model.Depth">
         <details class="kmb-page-branch">
             <summary>
                 <a href="@Model.Path">@Model.Title</a>

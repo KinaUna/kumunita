@@ -1,0 +1,97 @@
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@model IssueFormModel
+@inject ILocalizationService Localization
+@inject ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Report an issue";
+
+    // ── M32 (ADR 0155) — resolve the issue.* kw-l keys server-side ──
+    // The <kw-l> TagHelper can't wrap an attribute (the Razor trap in
+    // AGENTS.md: "A TagHelper tag inside a quoted attribute value renders as
+    // raw HTML text"), so labels/placeholders/buttons are resolved here via
+    // the same house seam the <kw-l> TagHelper uses
+    // (EffectiveLanguageCode.ResolveAsync + ITranslationProvider.GetAsync),
+    // with the KnownTranslationKeys.EnValues provider-floor fallback (ADR
+    // 0015 D1 — code is the floor, so a resident never sees a raw key even
+    // if the translation seam is absent). The M31 Error.cshtml house shape.
+    string? effLang = null;
+    if (Localization is not null && Translation is not null)
+    {
+        try { effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor?.HttpContext?.Request, Localization, Translation); }
+        catch { effLang = null; }
+    }
+
+    static async Task<string> L(string key, string? lang, ITranslationProvider? tp)
+    {
+        if (tp is not null && lang is not null)
+            return await tp.GetAsync(key, lang);
+        return KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key;
+    }
+
+    string isTitle   = await L("issue.title", effLang, Translation);
+    string isIntro   = await L("issue.intro", effLang, Translation);
+    string isDescL   = await L("issue.description.label", effLang, Translation);
+    string isDescP   = await L("issue.description.placeholder", effLang, Translation);
+    string isEmailL  = await L("issue.email.label", effLang, Translation);
+    string isEmailP  = await L("issue.email.placeholder", effLang, Translation);
+    string isSubmit  = await L("issue.submit", effLang, Translation);
+    string isThanks  = await L("issue.thanks", effLang, Translation);
+}
+
+<!-- ── M32 (ADR 0155) — the public general issue-submission surface (M32·4) ─
+     Public, anonymous-safe, non-blocking (no [Authorize] gate — the M31·2
+     500-report-form precedent). If the resident submitted the form, show the
+     issue.thanks confirmation; otherwise show the form (issue.* keys 1–8,
+     the U06 closed set). -->
+<div class="card" role="region" aria-label="@isTitle">
+    <div class="card-body">
+        @if (Model.FormSubmitted)
+        {
+            <!-- The post-submission confirmation (issue.thanks) — no
+                 redirect, no modal (the M31·2 shape, M32·4). -->
+            <div class="alert alert-success" role="status">
+                <p class="mb-0">@isThanks</p>
+            </div>
+        }
+        else
+        {
+            <h1 class="h4 card-title">@isTitle</h1>
+            <p class="card-text text-muted">@isIntro</p>
+
+            <form asp-controller="Issue" asp-action="PostNew" method="post">
+                @Html.AntiForgeryToken()
+
+                @* Shows only when ModelState has errors (a blank description →
+                   400 re-render, never a 500, M32·4). The house Setup.cshtml
+                   idiom. *@
+                <div asp-validation-summary="All" class="text-danger"></div>
+
+                <div class="mb-3">
+                    <label for="issue-description" class="form-label">@isDescL</label>
+                    <textarea name="Description" id="issue-description"
+                              class="form-control"
+                              rows="4"
+                              placeholder="@isDescP">@Model.Description</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="issue-email" class="form-label">@isEmailL</label>
+                    <input name="ContactEmail" id="issue-email"
+                           class="form-control"
+                           type="email"
+                           autocomplete="email"
+                           placeholder="@isEmailP"
+                           value="@(Model.ContactEmail ?? "")" />
+                </div>
+
+                <button type="submit" class="btn btn-primary">@isSubmit</button>
+            </form>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

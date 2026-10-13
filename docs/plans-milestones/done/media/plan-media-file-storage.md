@@ -146,7 +146,7 @@ appended *before* any follow-up action).
   `IMediaStore`) + §2.7 rules 5/6; `src/Kumunita.Core/CommunityOptions.cs`
   (options shape to mirror); `src/Kumunita.Core/DependencyInjection.cs`
   (where to register `IMediaFileStore` / `AddOptions<MediaOptions>`);
-  `src/Kumunita.Core/M3DocTypes.cs` (module doc-type surface shape, for
+  `src/Kumunita.Core/PostDocTypes.cs` (module doc-type surface shape, for
   context); `README.md` (the "one database" + self-hosted principle).
 - **Deliverables (3 new files + 1 edit):**
   - `src/Kumunita.Core/Media/MediaOptions.cs`
@@ -165,10 +165,10 @@ appended *before* any follow-up action).
 - **Entry reads:** design doc §2.2 (the `MediaObject` / `IMediaStore` /
   `LocalVolumeMediaStore` / `MediaDocTypes` shapes) + §2.7 rules 5/6; U1
   handoff (the `IMediaFileStore` + `MediaOptions` registrations);
-  `src/Kumunita.Core/M3DocTypes.cs` (the `MediaDocTypes.Configure(StoreOptions)`
+  `src/Kumunita.Core/PostDocTypes.cs` (the `MediaDocTypes.Configure(StoreOptions)`
   shape to mirror); `src/Kumunita.Core/DependencyInjection.cs` (where to add
   `IMediaStore`); `src/Kumunita.Web/Program.cs` (L52–93 — where
-  `MediaDocTypes.Configure(opts)` is called, next to `M1DocTypes` / `M3DocTypes`).
+  `MediaDocTypes.Configure(opts)` is called, next to `CoreDocTypes` / `PostDocTypes`).
 - **Deliverables (3 new files + 2 edits):**
   - `src/Kumunita.Core/Media/MediaObject.cs`
   - `src/Kumunita.Core/Media/IMediaStore.cs`
@@ -177,7 +177,7 @@ appended *before* any follow-up action).
   - `src/Kumunita.Core/DependencyInjection.cs` —
     `services.AddTransient<IMediaStore, LocalVolumeMediaStore>()`.
   - `src/Kumunita.Web/Program.cs` — call `MediaDocTypes.Configure(opts)`
-    next to `M1DocTypes.Configure(opts)` (and confirm
+    next to `CoreDocTypes.Configure(opts)` (and confirm
     `Services.Configure<MediaOptions>(…)` binds `Media__*`, mirroring
     `CommunityOptions`).
 - **Exit:** `run_build` green on `Kumunita.Core` **and** `Kumunita.Web`

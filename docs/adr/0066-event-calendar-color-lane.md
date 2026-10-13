@@ -44,7 +44,7 @@ RSVP to the event.
   the prior faint look. The EV-CAL / EV-DWM overlap ring is declared **after**
   this rule, so the amber clash signal still wins over a colored background.
 - **Marten needs nothing.** A new scalar `string?` property is picked up by
-  Marten's boot-time delta detection (`M4DocTypes` unchanged) — no manual
+  Marten's boot-time delta detection (`EventDocTypes` unchanged) — no manual
   migration, consistent with ADR 0004 §B's column-addition behavior.
 
 ## Consequences
