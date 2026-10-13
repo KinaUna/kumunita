@@ -6,9 +6,9 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M5</c> (Projects) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0067 D1) — the parallel surface
-/// to <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> /
+/// to <see cref="CoreDocTypes"/> / <see cref="PostDocTypes"/> /
 /// <see cref="MediaDocTypes"/> / <see cref="PageDocTypes"/> /
-/// <see cref="M4DocTypes"/> for the new <c>Kumunita.Core.Projects</c> context.
+/// <see cref="EventDocTypes"/> for the new <c>Kumunita.Core.Projects</c> context.
 /// All documents are POCOs with the conventional <c>string</c> <c>Id</c>
 /// identity (the M3 "string Id" convention), so only the business/feed
 /// indexes need pinning; everything else is Marten's default.
@@ -21,7 +21,7 @@ namespace Kumunita.Core;
 /// **Zero migrations for existing surfaces.**
 /// </para>
 /// </summary>
-public static class M5DocTypes
+public static class ProjectDocTypes
 {
     /// <summary>
     /// Registers the M5 (Projects) domain documents. Idempotent: calling twice
@@ -55,7 +55,7 @@ public static class M5DocTypes
         // Index(expr) and Index(expr, Action<ComputedIndex>), and
         // ComputedIndex exposes no Name property (only Casing / TenancyScope).
         // A computed index therefore cannot be named in this stack — so these
-        // use the unnamed form (the M4DocTypes `Event` / `EventRsvp` shape),
+        // use the unnamed form (the EventDocTypes `Event` / `EventRsvp` shape),
         // letting Marten auto-derive the names. This is the closest
         // expressible equivalent; the unique indexes below are unaffected.
         opts.Schema.For<TodoItem>()
@@ -70,7 +70,7 @@ public static class M5DocTypes
                // under Postgres' 64-char NAMEDATALEN cap, the file's own note)
                .Index(t => t.EventId)
                // the TBD "waiting on" lookup (ADR 0087 D1 — additive on
-               // M5DocTypes, zero migration for existing rows; the ADR 0004
+               // ProjectDocTypes, zero migration for existing rows; the ADR 0004
                // §B.1 delta-detect shape; unnamed: the auto-derived name stays
                // under Postgres' 64-char NAMEDATALEN cap, the note above)
                .Index(t => t.BlockedByTodoId);

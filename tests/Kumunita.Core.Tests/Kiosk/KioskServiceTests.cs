@@ -19,7 +19,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Usage.StorageMetricsHistoryTests"/> M33 <c>BootStoreAsync</c>
 /// precedent). The store registers the <see cref="KioskPlaylist"/> (the
 /// <see cref="KioskDocTypes"/> surface) + <see cref="AccessAudit"/> (the
-/// <see cref="M1DocTypes"/> surface) — the two doc types these pins read.
+/// <see cref="CoreDocTypes"/> surface) — the two doc types these pins read.
 /// The <see cref="KioskService"/> is the code under test (U03); these pin the
 /// *results* (the design doc §2.2 shapes), not the SQL. The
 /// <see cref="IAuthorizationService"/> is carried but **not** invoked
@@ -213,7 +213,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// two doc types these pins read: <see cref="KioskPlaylist"/> (the
     /// <see cref="KioskDocTypes"/> M35 surface) +
     /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> (the
-    /// <see cref="M1DocTypes"/> surface — the M35·5 audit-count assertions
+    /// <see cref="CoreDocTypes"/> surface — the M35·5 audit-count assertions
     /// query it, so it must be registered). The <see cref="KioskView"/> entry
     /// is a value object nested in the singleton (not a standalone doc — M35·9),
     /// so it needs no separate registration.</summary>
@@ -226,7 +226,7 @@ public sealed class KioskServiceTests(PostgresFixture fixture) : IClassFixture<P
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
             KioskDocTypes.Configure(opts);   // KioskPlaylist (the M35 doc)
-            M1DocTypes.Configure(opts);       // AccessAudit (the M35·5 zero/one-audit query)
+            CoreDocTypes.Configure(opts);       // AccessAudit (the M35·5 zero/one-audit query)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

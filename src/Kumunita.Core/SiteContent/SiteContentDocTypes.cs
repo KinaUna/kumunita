@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>SITE</c> (site content) bounded context's Marten-native document
 /// registration surface (ADR 0150, ADR 0004 §B.1) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="PageDocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PageDocTypes"/> /
 /// <see cref="MediaDocTypes"/> for the new <c>Kumunita.Core.SiteContent</c>
 /// context. The <see cref="SiteContent"/> singleton has the conventional
 /// <c>string</c> <c>Id</c> identity (fixed to the sentinel <c>singleton</c>),

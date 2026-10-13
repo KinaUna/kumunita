@@ -372,7 +372,7 @@ public class EscalationInboundEndpointTests(PostgresFixture fixture) : IClassFix
     /// singleton (the <see cref="Kumunita.Core.EscalationDocTypes.Configure"/>
     /// surface) + store it (Enabled, Endpoint, Token) and a matching
     /// <see cref="ErrorReport"/> row the forwarder's <c>ListAsync</c> read will
-    /// find. The <see cref="Kumunita.Core.M1DocTypes.Configure"/> surface is
+    /// find. The <see cref="Kumunita.Core.CoreDocTypes.Configure"/> surface is
     /// included for the <c>AccessAudit</c> doc (the repo's BootStoreAsync idiom).
     /// Returns the store + the report id to forward.
     /// </summary>
@@ -386,7 +386,7 @@ public class EscalationInboundEndpointTests(PostgresFixture fixture) : IClassFix
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             ErrorReportDocTypes.Configure(opts);
             EscalationDocTypes.Configure(opts);
         });

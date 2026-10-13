@@ -43,7 +43,7 @@
        no break-glass, no membership read (the lane owns its reads — ADR 0006-D).
 - **Out:** everything else — no `Post.cs` change (U4, done), no
   `Authorization/*` change (U5, done), no Web (U7/U8), **no tests** (U9), no
-  `M3DocTypes.cs` change, no ADR edit. The touched project is `Kumunita.Core`
+  `PostDocTypes.cs` change, no ADR edit. The touched project is `Kumunita.Core`
   only. `CreateReplyAsync` / `HidePostAsync` / `RemovePostAsync` / `GetPostAsync`
   / the two M3 feeds are **byte-untouched** (G·7 reply-inheritance reuses the
   existing lane-neutral `CreateReplyAsync`; the two M3 feeds already filter on

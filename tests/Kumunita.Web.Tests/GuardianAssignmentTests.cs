@@ -586,7 +586,7 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

@@ -345,7 +345,7 @@ tests (U08's), no Web surface / inbound endpoint yet (U04/U06), no kw-l keys
   **Drift note (non-blocking):** the design doc §2.2.6 wrote the
   multi-column index as the tuple form `.Index((t) => (t.RevokedAt, t.Created))`;
   the repo's Marten 9.31.2 / Weasel 9.29.0 does not accept that form (the
-  M5DocTypes U02 NOTE documents the same CS1501 hit + the workaround). U03
+  ProjectDocTypes U02 NOTE documents the same CS1501 hit + the workaround). U03
   used the anonymous-object form `.Index(t => new { t.RevokedAt, t.Created })`
   (the M5/M6/M17 precedent — the M17 Bookmark `(OwnerId, Created)` / M6
   Notification `(RecipientId, Created)` feed-ordering-index shape). The

@@ -417,7 +417,7 @@ public sealed class LocalVolumeMediaStore : IMediaStore
 }
 ```
 
-`src/Kumunita.Core/MediaDocTypes.cs` (parallel surface to `M1DocTypes` / `M3DocTypes`):
+`src/Kumunita.Core/MediaDocTypes.cs` (parallel surface to `CoreDocTypes` / `PostDocTypes`):
 ```csharp
 using Kumunita.Core.Media;
 using Marten;

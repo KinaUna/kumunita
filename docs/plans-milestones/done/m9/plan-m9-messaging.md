@@ -144,7 +144,7 @@ through the existing M6 `Notification` lane (D6).
   `Body` ≤ cap (400 on over-length); no rendering pipeline, no attachments,
   no edit/delete lane.
 - **C-M9·7 · Marten-native documents, one new surface (ADR 0004 §B.1).**
-  `Conversation` + `Message` POCOs in `M9DocTypes.Configure(StoreOptions)`,
+  `Conversation` + `Message` POCOs in `MessagingDocTypes.Configure(StoreOptions)`,
   delta-detected, idempotent, wired into **both** boot paths
   (`Kumunita.Web/Program.cs` dev loop + `Kumunita.Core/Bootstrap/SchemaBootstrap.cs`);
   no hand-rolled `FeatureSchemaBase`.
@@ -175,7 +175,7 @@ through the existing M6 `Notification` lane (D6).
 ## Approach
 
 - **Track A — Core (U00–U03):** the design doc + ADR (U00); documents +
-  `M9DocTypes` + boot wiring (U01); the toggle seams (U02);
+  `MessagingDocTypes` + boot wiring (U01); the toggle seams (U02);
   `IMessagingService` + `MessagingService` + pinned Core tests (U03).
 - **Track B — Web (U04–U05):** the resident surface (U04); the admin toggle
   surface (U05).
@@ -234,29 +234,29 @@ in the design doc (U01–U03 copy it verbatim), the locked audit-row shape.
 
 ---
 
-## U01 — Documents: `Conversation` + `Message` + `M9DocTypes` + boot wiring
+## U01 — Documents: `Conversation` + `Message` + `MessagingDocTypes` + boot wiring
 
 **Goal.** The two POCOs (namespace `Kumunita.Core.Messaging`), the
-`M9DocTypes.Configure(StoreOptions)` surface (a `(ConversationId, Created)`
+`MessagingDocTypes.Configure(StoreOptions)` surface (a `(ConversationId, Created)`
 index on `Message` for thread reads), and the wiring into **both** boot
 paths (the dev loop in `Kumunita.Web/Program.cs` +
 `Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — the M3 U3 precedent).
 
 **Entry reads (5).** `docs/design/m9-messaging-design.md` (§seams /
-§documents — the locked shapes); `src/Kumunita.Core/M3DocTypes.cs` (the
+§documents — the locked shapes); `src/Kumunita.Core/PostDocTypes.cs` (the
 registration shape to mirror — the actual current file);
 `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (the boot wiring point);
 `src/Kumunita.Web/Program.cs` (the dev-loop boot path);
 `docs/adr/0004-data-persistence-and-schema-evolution.md` (§B.1 only).
 
 **Deliverables (5).** `src/Kumunita.Core/Messaging/Conversation.cs`;
-`src/Kumunita.Core/Messaging/Message.cs`; `src/Kumunita.Core/M9DocTypes.cs`;
+`src/Kumunita.Core/Messaging/Message.cs`; `src/Kumunita.Core/MessagingDocTypes.cs`;
 `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (one call added);
 `src/Kumunita.Web/Program.cs` (one call added).
 
-**Exit.** Build green. `M9DocTypes` compiles; both boot paths reference it.
+**Exit.** Build green. `MessagingDocTypes` compiles; both boot paths reference it.
 **No test in this unit** (U03 owns the first M9 test). Handoff entry: the
-exact `M9DocTypes` lines, the two boot-path insertion points, any schema
+exact `MessagingDocTypes` lines, the two boot-path insertion points, any schema
 shape that drifted from the design doc.
 
 ---

@@ -21,7 +21,7 @@ public enum RsvpStatus
 /// user** — the <c>docs/ARCHITECTURE.md</c> §5 concurrency-token exception, keyed
 /// per <c>(EventId, UserId)</c>: a conflicting RSVP write is a no-op or
 /// self-converging; the resident's latest status is simply the truth. The
-/// <see cref="M4DocTypes.Configure"/> surface registers a **unique**
+/// <see cref="EventDocTypes.Configure"/> surface registers a **unique**
 /// <c>(EventId, UserId)</c> index (upsert semantics — exactly one row per
 /// <c>(EventId, UserId)</c>).
 /// <para>

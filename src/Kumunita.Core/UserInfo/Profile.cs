@@ -28,7 +28,7 @@ namespace Kumunita.Core.UserInfo;
 public sealed class Profile
 {
     /// <summary>Document identity — one profile per account. Mapped in
-    /// <c>M1DocTypes.Configure</c> via <see cref="Marten.StoreOptions.Schema"/>.Identity
+    /// <c>CoreDocTypes.Configure</c> via <see cref="Marten.StoreOptions.Schema"/>.Identity
     /// because Marten's default identity convention (a property named <c>Id</c>) won't
     /// pick this up. ADR 0004 §B.1.</summary>
     public string SubjectId { get; set; } = string.Empty;

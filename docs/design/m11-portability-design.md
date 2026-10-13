@@ -80,8 +80,8 @@ export/import code, no `manifest.json` shape, no archive reader/writer
 anywhere in the tree):
 
 1. **The Marten domain documents** across the registered `*DocTypes`
-   surfaces (`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` /
-   `M6DocTypes` / `M9DocTypes` / `MediaDocTypes` / `TagDocTypes` /
+   surfaces (`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` /
+   `NotificationDocTypes` / `MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` /
    `PageDocTypes`) — the **exact** closed content inventory + import order
    + reference map is locked from source in §inventory.
 2. **The ASP.NET Identity tables** in the `identity` schema (the
@@ -478,8 +478,8 @@ The `*.kumunita` is a ZIP (BCL `System.IO.Compression.ZipArchive`,
 
 > **LOCKED FROM SOURCE.** This is the **exact** closed set of content
 > documents M11 exports/imports, read from the `*DocTypes` surfaces
-> (`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes`
-> / `M9DocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`), **not
+> (`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes`
+> / `MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`), **not
 > invented**. U01's `PortabilityDocTypes` registry copies this table
 > **verbatim** (the `Type` / `Order` / `ReferenceFields` are data the
 > U02 export loop + the U05 apply / integrity loop iterate **generically**
@@ -608,17 +608,17 @@ either **credential material** (C-M11·2 forbids) or **operational state**
 
 | Excluded type | Surface | Why it is excluded (drift guard entry 1) |
 |---|---|---|
-| `IdentityToken` | `M1DocTypes` | Holds a high-entropy **secret `Token`** (the verification-link token + the seed-admin setup credential) — **credential material**; C-M11·2 forbids it from traveling. A re-created principal re-verifies (the D3 "secrets reset" semantic). |
-| `OutboxEmail` | `M1DocTypes` | The staged email row the durable handler writes — **operational** (an outbox, not resident content). A fresh instance's restore re-derives; an un-sent outbox row in a backup is a leak, not a fact. |
-| `EmailDeadLetter` | `M1DocTypes` | The domain dead-letter doc the durable handler writes on final failure — **operational** (a failure record, not resident content). |
-| `AccessAudit` | `M1DocTypes` | The audit trail — **operational** (a log, not resident content). A fresh instance's audit history is re-derivable from its own writes; the operator's pre-import backup is the rollback path. |
-| `AuditPurgeSummary` | `M1DocTypes` | The purge summary — **operational** (a maintenance record, not resident content). |
+| `IdentityToken` | `CoreDocTypes` | Holds a high-entropy **secret `Token`** (the verification-link token + the seed-admin setup credential) — **credential material**; C-M11·2 forbids it from traveling. A re-created principal re-verifies (the D3 "secrets reset" semantic). |
+| `OutboxEmail` | `CoreDocTypes` | The staged email row the durable handler writes — **operational** (an outbox, not resident content). A fresh instance's restore re-derives; an un-sent outbox row in a backup is a leak, not a fact. |
+| `EmailDeadLetter` | `CoreDocTypes` | The domain dead-letter doc the durable handler writes on final failure — **operational** (a failure record, not resident content). |
+| `AccessAudit` | `CoreDocTypes` | The audit trail — **operational** (a log, not resident content). A fresh instance's audit history is re-derivable from its own writes; the operator's pre-import backup is the rollback path. |
+| `AuditPurgeSummary` | `CoreDocTypes` | The purge summary — **operational** (a maintenance record, not resident content). |
 
 > **This is the D3/C-M11·2 no-secret boundary enforced at the source.**
 > U02's export loop iterates the §inventory list **only** (the 44 content
 > docs), never these five. U07's no-secret test witnesses it end-to-end
 > (the byte-scan finds none of the Identity credential columns). The
-> `LanguageCatalog` + `LocaleSettings` docs (also on `M1DocTypes`) are
+> `LanguageCatalog` + `LocaleSettings` docs (also on `CoreDocTypes`) are
 > **not** exported as `docs/` rows — they travel via `config.json`
 > (§config, D2/D7 resolved — drift guard entry 4).
 
@@ -935,7 +935,7 @@ the source** where the register's prose was imprecise):
 
 1. **`IdentityToken` is excluded from the content inventory** (C-M11·2
    / D3). The register's D7 "every registered domain document type"
-   contradicted the source: `IdentityToken` (on `M1DocTypes`) holds a
+   contradicted the source: `IdentityToken` (on `CoreDocTypes`) holds a
    high-entropy **secret `Token`** (the verification-link token + the
    seed-admin setup credential) — credential material the C-M11·2
    "no-secret" pin (the "single most load-bearing M11 invariant")
@@ -945,7 +945,7 @@ the source** where the register's prose was imprecise):
    at the source).
 2. **The four operational-state docs are excluded from the content
    inventory** (D1 / C-M11·5). `OutboxEmail` / `EmailDeadLetter` /
-   `AccessAudit` / `AuditPurgeSummary` (all on `M1DocTypes`) are
+   `AccessAudit` / `AuditPurgeSummary` (all on `CoreDocTypes`) are
    **operational** (an outbox / a dead-letter / an audit log / a purge
    summary) — not resident content. The D1 **restore** semantic (apply
    into a fresh instance; the operator's pre-import backup is the

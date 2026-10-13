@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-29
 Extends the **`TranslationResource` store + the `(Key, LanguageCode)`
-unique index on `M1DocTypes`** (ADR 0005 B), the **frozen
+unique index on `CoreDocTypes`** (ADR 0005 B), the **frozen
 `ILocalizationService` read/write seams** (`GetTranslationsForAsync` /
 `UpsertTranslationAsync` / `GetCompletenessAsync`, ADR 0005 D / the ML
 lane), the **closed `KnownTranslationKeys` registry + the en/de/fr/da

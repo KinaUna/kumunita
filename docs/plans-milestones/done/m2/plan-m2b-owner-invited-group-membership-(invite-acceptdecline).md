@@ -23,7 +23,7 @@
 ## Files
 Core:
 - `src/Kumunita.Core/UserInfo/GroupInvitation.cs` — new document + `InvitationStatus`.
-- `src/Kumunita.Core/M1DocTypes.cs` — register, UniqueIndex(GroupId, UserId).
+- `src/Kumunita.Core/CoreDocTypes.cs` — register, UniqueIndex(GroupId, UserId).
 - `src/Kumunita.Core/UserInfo/IUserInfoService.cs` — "M2b additions" seam block.
 - `src/Kumunita.Core/UserInfo/UserInfoService.cs` — implementation (mirror `AddGroupMemberAsync` session/audit shape).
 
@@ -46,7 +46,7 @@ Tests:
 ## Checklist
 - [x] Nav link (_AccountNav) + build
 - [x] m2b design doc (`docs/design/m2b-group-invitations.md`)
-- [x] Core document + schema (`GroupInvitation` + `M1DocTypes` UniqueIndex)
+- [x] Core document + schema (`GroupInvitation` + `CoreDocTypes` UniqueIndex)
 - [x] Core seam + implementation (7 seams on `IUserInfoService`)
 - [x] Web view models + controller + views (2 records, 4 routes, Index/Detail lanes)
 - [x] Tests (14 new Core seam tests + same-commit pin updates)

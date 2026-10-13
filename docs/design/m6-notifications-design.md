@@ -8,7 +8,7 @@
 >
 > **Status.** **Part 1 (U00) complete; Part 2 (U01) complete** — §6.1–§6.6
 > carry the **exact C# shapes** (the two documents + `NotificationKinds`, the
-> `M6DocTypes` registration, the full `NotificationService` surface, the
+> `NotificationDocTypes` registration, the full `NotificationService` surface, the
 > idempotency-key table, the pinned test names, the gate, and the
 > drift-guard); **ADR 0076 (Accepted)** is the decisions source; the roadmap
 > trio (M5 `StatusDone` / M6 `StatusNext` / M7 `StatusPlanned`) is
@@ -42,7 +42,7 @@ channel for the time-sensitive kinds).
 
 This is a **new bounded context** `Kumunita.Core.Notifications` (the
 `Notification` and `NotificationPreference` documents), **one new document
-surface** (`M6DocTypes`, the `M5DocTypes` pattern verbatim), **one new service**
+surface** (`NotificationDocTypes`, the `ProjectDocTypes` pattern verbatim), **one new service**
 (`NotificationService`, no `INotificationService` interface — the
 `EventService` / `ProjectService` precedent), **no new `AccessAction`**, **no
 new `AccessVia`**, **no new `IAuditableResource` adapter** (a notification is
@@ -96,7 +96,7 @@ that landing.
 
 - The **two documents** (`Notification`, `NotificationPreference`) in the new
   bounded context `Kumunita.Core.Notifications`.
-- The **one surface** (`M6DocTypes`, the `M5DocTypes` pattern verbatim).
+- The **one surface** (`NotificationDocTypes`, the `ProjectDocTypes` pattern verbatim).
 - The **one service** (`NotificationService` — the `EmitAsync` writer, the
   `ListInboxAsync` / `CountUnreadAsync` / `MarkAllReadAsync` read + state
   lanes, the `MarkReadAsync` / `MarkUnreadAsync` per-row state lanes (ADR
@@ -145,7 +145,7 @@ that landing.
 
 | # | Invariant | Decision |
 |---|-----------|----------|
-| **C-M6·1** | **One bounded context, two documents, one surface, additive.** `Kumunita.Core.Notifications` with `Notification`, `NotificationPreference`; one new surface `M6DocTypes` (the `M5DocTypes` pattern verbatim); Marten-native POCOs, conventional `string` `Id`, delta-detected + idempotent, no seeding, no EF, zero migrations for existing surfaces (ADR 0004 §B.1). | D1 |
+| **C-M6·1** | **One bounded context, two documents, one surface, additive.** `Kumunita.Core.Notifications` with `Notification`, `NotificationPreference`; one new surface `NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim); Marten-native POCOs, conventional `string` `Id`, delta-detected + idempotent, no seeding, no EF, zero migrations for existing surfaces (ADR 0004 §B.1). | D1 |
 | **C-M6·2** | **The kind vocabulary is a closed string set, code-owned.** `NotificationKinds` is a **static class** with **nine** `public const string` members (a code-owned, closed set — the M5 `KanbanStatuses` pattern; a resident *cannot* choose their own kind string — only the code's emitters can). **`PostMention` is reserved, not wired** (the constant + the `kw-l` keys exist; no emitter calls it in M6 — the mention-detection logic is a follow-on lane). The **other eight kinds** each have a **wired emitter** in M6 (U04 + the Web-side hook). | D2 |
 | **C-M6·3** | **A notification is a *personal read*, not an `AccessAction` decision.** A `Notification` row is **the recipient's own data** — the `RecipientId` is the whole access story; the inbox read lane does **not** call `IAuthorizationService` (there is no audience to evaluate, no `AccessAction` to check). **No `NotificationToAuditableResource` adapter exists** (a notification is not an *auditable resource* in the ADR 0006 sense). **No audit row is emitted for an inbox read** (the recipient reading their own notifications is not an *access decision* — the M1 `GetProfileAsync` owner-branch precedent). | D3 |
 | **C-M6·4** | **The idempotency key is the *emitter's* responsibility; a re-emission is a no-op.** Each emission supplies a **`notification:{kind}:{stable-source-id}`** idempotency key (the C3-envelope fix precedent — the `verify:{userId}:{attempt}` / `setup:{userId}` shape from the M1 step-7 plan, now with a `notification:` prefix). **The `IMailerStage.StageAsync` idempotency guarantee** (a duplicate key is a no-op, not a second email) is the **sole** dedup mechanism; the service does not re-check. **A re-emission of the same logical event is a no-op** (the C3 pin — the inbox row is stored once, the email is staged once, the envelope is published once). | D4 |
@@ -183,13 +183,13 @@ and gives them exact C# shapes in Part 2.
 
 **[PROPOSED]** — pins C-M6·1. `Kumunita.Core.Notifications` with two documents
 — `Notification`, `NotificationPreference` — and **one new document surface**
-`M6DocTypes` (the `M5DocTypes` pattern verbatim: the `M4DocTypes` /
-`M5DocTypes` precedent). Both are Marten-native POCOs with conventional
+`NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim: the `EventDocTypes` /
+`ProjectDocTypes` precedent). Both are Marten-native POCOs with conventional
 `string` `Id`, delta-detected + idempotent, no seeding, no EF. **Zero
 migrations for existing surfaces** (ADR 0004 §B.1 additive — the two docs are
 new; the surface is additive). *Forbids:* a third document, a migration on an
 existing surface, or an EF mapping for either doc. *Precedent reused:* the
-`M5DocTypes` registration surface verbatim (ADR 0004 §B).
+`ProjectDocTypes` registration surface verbatim (ADR 0004 §B).
 
 ### 5.2 The kind vocabulary is a closed string set, code-owned (D2)
 
@@ -470,7 +470,7 @@ public sealed class NotificationPreference
 }
 ```
 
-**`M6DocTypes`** — `src/Kumunita.Core/M6DocTypes.cs` (D1; the `M5DocTypes`
+**`NotificationDocTypes`** — `src/Kumunita.Core/NotificationDocTypes.cs` (D1; the `ProjectDocTypes`
 pattern verbatim — same file placement, same `Configure(StoreOptions)` shape):
 
 ```csharp
@@ -482,7 +482,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M6</c> (Notifications) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0076 D1) — the parallel surface
-/// to <see cref="M5DocTypes"/> for the new <c>Kumunita.Core.Notifications</c>
+/// to <see cref="ProjectDocTypes"/> for the new <c>Kumunita.Core.Notifications</c>
 /// context. Both documents are POCOs with the conventional <c>string</c>
 /// <c>Id</c> identity (the M5 convention), so only the feed/index needs
 /// pinning. The docs are new, not additive; the surface is additive —
@@ -490,7 +490,7 @@ namespace Kumunita.Core;
 /// applies the new tables idempotently at boot. **Zero migrations for
 /// existing surfaces.**
 /// </summary>
-public static class M6DocTypes
+public static class NotificationDocTypes
 {
     public static void Configure(StoreOptions opts)
     {
@@ -576,7 +576,7 @@ public sealed class NotificationService
     /// commit atomically). **Dedup (D4, F10):** if a <see cref="Notification"/>
     /// row with the same <paramref name="idempotencyKey"/> already exists
     /// (looked up on <paramref name="session"/>, the
-    /// <c>IdempotencyKey</c> index in <c>M6DocTypes</c>), the method returns
+    /// <c>IdempotencyKey</c> index in <c>NotificationDocTypes</c>), the method returns
     /// that existing row **without** storing a second row and **without**
     /// calling <c>StageAsync</c> — a re-emission of the same logical event is
     /// a no-op (no second inbox row, no second email). The key itself is the
@@ -707,7 +707,7 @@ logical event is a no-op — **no second inbox row, no second email.** The
 dedup has two layers, both keyed on the **same**
 `idempotencyKey`: (1) **inbox side** — `EmitAsync` looks up an existing
 `Notification` row by `IdempotencyKey` on the caller's session (the
-`IdempotencyKey` index in `M6DocTypes`) **before** storing; if one exists it
+`IdempotencyKey` index in `NotificationDocTypes`) **before** storing; if one exists it
 returns it and does not store a second row; (2) **email side** —
 `IMailerStage.StageAsync`'s idempotency guarantee (the `OutboxEmailStager`
 contract — a duplicate key is a no-op, not a second email) is the **sole**

@@ -59,7 +59,7 @@ Read directly, not assumed:
 1. **`LocalizedPage`** (`Kumunita.Core.Localization`) — a flat page doc: `Id`,
    `Slug` (`terms`|`about`|`help`), `LanguageCode`, `Title`, `Body` (Markdown),
    `Updated`, `ImageIds`. **No parent, no audience, no author.** Registered in
-   `M1DocTypes` with a `(Slug, LanguageCode)` unique index.
+   `CoreDocTypes` with a `(Slug, LanguageCode)` unique index.
 2. **`StaticPagesController`** — three hard-coded `HttpGet` routes (`/terms`,
    `/help`, `/about`) over `ITranslationProvider.GetPageAsync(slug, preferred)`.
    Public by construction (no authorization, no `AccessAudit`). `/about` falls
@@ -246,7 +246,7 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
 
 - A **`PageTranslation`** row (`Kumunita.Core.Pages`): `Id`, `PageId`,
   `LanguageCode`, `Title?`, `Body`, `AuthorId`, `Created` — **registered
-  alongside `Page`** (a new `PageDocTypes` surface, or added to `M3DocTypes`
+  alongside `Page`** (a new `PageDocTypes` surface, or added to `PostDocTypes`
   — the register's U01 picks the surface; the shape is fixed). `(PageId,
   LanguageCode)` unique index, the settled business-key convention.
 - **Authored-in** is `Page.LanguageCode` (ADR 0018) — the base body is

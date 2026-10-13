@@ -54,7 +54,7 @@ existing audience editor in the to-do composer is therefore *already* the
 "addressed to" control — **no composer change is required**; the group grants
 and the community picker do the addressing. This keeps the single-source
 `Audience` (ADR 0001-B) authoritative and adds **zero** new document fields
-(`M5DocTypes` is untouched).
+(`ProjectDocTypes` is untouched).
 
 The addressed-to projection is a **read** convenience: `ProjectsController`
 resolves the addressed groups' display names (`IUserInfoService.
@@ -123,7 +123,7 @@ dictionaries, preserving the parity pins): `projects.todo.claim`,
 
 ## Consequences
 
-- **No schema change.** Reusing `Audience` + `ComponentId` means `M5DocTypes`
+- **No schema change.** Reusing `Audience` + `ComponentId` means `ProjectDocTypes`
   and the migration surface are untouched — the capability is pure standing +
   projection, the ADR 0004 B-shape of "documents + projections, no event
   sourcing" stays intact.

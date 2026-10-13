@@ -256,7 +256,7 @@ by id and does not renumber or rename them:
 - **One settings doc + one doc surface + one DI line.** `CommunityStorageSettings`
   is the ADR 0004 §B.1 shape (Marten registers the POCO;
   `StorageSettingsDocTypes.Configure(opts)` is called once in `Program.cs`, the
-  same call-site family as `M1DocTypes` / `M3DocTypes` / `UsageDocTypes`).
+  same call-site family as `CoreDocTypes` / `PostDocTypes` / `UsageDocTypes`).
   **Zero migrations**, **zero new bounded context**.
 - **The per-user usage read is the M24 C-SM·7 seam, not a second query.**
   `IStorageSettingsService.GetPerUserUsageBytesAsync` delegates to

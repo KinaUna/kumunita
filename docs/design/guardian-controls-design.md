@@ -145,7 +145,7 @@ M1, heavier than a single-lane ADR.
   - `UserInfo/GuardianLink.cs` — the new relationship document (the
     `DelegationGrant` shape: `GuardianId`, `ChildId`, `Status` Active|Dissolved,
     `CreatedAt`, `DissolvedAt?`, `DissolvedBy?`). Registered on the **existing
-    `M1DocTypes`** surface (ADR 0004 §B.1 — it rides `Schema.For<DelegationGrant>()`'s
+    `CoreDocTypes`** surface (ADR 0004 §B.1 — it rides `Schema.For<DelegationGrant>()`'s
     neighbor; no new `*DocTypes`, no re-seed).
   - `UserInfo/IUserInfoService.cs` — the guardian-management seams (below).
   - `Authorization/Decision.cs` — `AccessVia.Guardian`, the **9th** value
@@ -290,7 +290,7 @@ New file `src/Kumunita.Core/UserInfo/GuardianLink.cs` (U02 authors). One row
 per (guardian, child) pair — the `DelegationGrant` / `GroupInvitation` shape;
 the `GroupMembership` business-key convention (surrogate `Id` is the Marten
 identity; `(GuardianId, ChildId)` is the business key, unique-indexed on the
-`M1DocTypes` surface in U02):
+`CoreDocTypes` surface in U02):
 
 ```csharp
 namespace Kumunita.Core.UserInfo;
@@ -358,7 +358,7 @@ public enum GuardianLinkStatus
 
 - **No** doc-side `IsActive` boolean (the `DelegationGrant.IsActiveAt` "service
   is the resolver" rule — G·2).
-- Registered (U02) on the **existing `M1DocTypes`** surface, a neighbor of
+- Registered (U02) on the **existing `CoreDocTypes`** surface, a neighbor of
   `opts.Schema.For<DelegationGrant>();`:
   `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);`
   (the `GroupInvitation` business-key convention; the surrogate `Id` is the
@@ -629,7 +629,7 @@ content (G·1).
 
 ## Rollout & rollback
 
-- **Schema:** the `GuardianLink` document rides the existing `M1DocTypes`
+- **Schema:** the `GuardianLink` document rides the existing `CoreDocTypes`
   surface (ADR 0004 §B.1 — additive, delta-detected by Marten, idempotent, no
   re-seed, no new `*DocTypes` file, no DDL change under Marten 9's JSONB
   `data` column — the ADR 0010 `IsPrivate` upgrade-path precedent). The
@@ -727,7 +727,7 @@ read; it is exercised only on the `IUserInfoService` management lanes.
   0003, 0012, m2b).
 - **Gate:** the 11 pinned seam tests + the 4 Web VM tests — see the
   `### Run result (GU acceptance gate — 2026-09-14)` section above (U10).
-- **Layout:** `GuardianLink` rides the existing `M1DocTypes` surface (ADR
+- **Layout:** `GuardianLink` rides the existing `CoreDocTypes` surface (ADR
   0004 §B.1, additive); `docs/ARCHITECTURE.md`'s `UserInfo/` line + doc-map
   carry the surface (U11).
 - **Non-decision (carried forward):** the GlobalAdmin `viaAdmin: true`

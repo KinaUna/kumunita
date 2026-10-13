@@ -4,7 +4,7 @@
 
 Steps 1–3 of M1 are complete (per `docs/plans-milestones/done/plan-m1-identity-groups-delegation-authorization.md`):
 - ADR 0006 interfaces materialized (`IUserInfoService` fully sketched at `src/Kumunita.Core/UserInfo/IUserInfoService.cs`, 89 lines).
-- M1 document POCOs land next to `Kumunita.Core/UserInfo/` and `Kumunita.Core/Authorization/` (`Profile`, `Group`, `GroupMembership`, `DelegationGrant`, `AccessAudit`, `AccessAction`, `IAuditableResource`, `Audience`); `M1DocTypes.cs` pins the non-default Marten conventions (e.g. `Profile`'s identity is `SubjectId`).
+- M1 document POCOs land next to `Kumunita.Core/UserInfo/` and `Kumunita.Core/Authorization/` (`Profile`, `Group`, `GroupMembership`, `DelegationGrant`, `AccessAudit`, `AccessAction`, `IAuditableResource`, `Audience`); `CoreDocTypes.cs` pins the non-default Marten conventions (e.g. `Profile`'s identity is `SubjectId`).
 - M0's `KumunitaFeature` + Marten 9 `FeatureSchemaBase` pattern already in use; M1's `mt` tables are versioned through the same path.
 - `tests/Kumunita.Core.Tests/PostgresFixture.cs` hands each test a fresh scratch Postgres DB.
 
@@ -39,7 +39,7 @@ If step 6 or step 8 surfaces a case where the derivation is wrong (e.g., a Globa
 
 ## `SeedComponentsAsync` upsert-by-key note
 
-Interface doc: "upsert by `key` / `Component.Id`." Marten's default identity convention picks the `Id` property (or whatever `M1DocTypes` pins). If the `Component` POCO's `Id` is a guid, the upsert must run *read-then-decide* on the `Key` field (stable per component: Safety, Maintenance, Social, Governance), not on `Id`. Implementation detail is left to this step.
+Interface doc: "upsert by `key` / `Component.Id`." Marten's default identity convention picks the `Id` property (or whatever `CoreDocTypes` pins). If the `Component` POCO's `Id` is a guid, the upsert must run *read-then-decide* on the `Key` field (stable per component: Safety, Maintenance, Social, Governance), not on `Id`. Implementation detail is left to this step.
 
 ## Invariants this step is accountable for
 
@@ -66,7 +66,7 @@ Interface doc: "upsert by `key` / `Component.Id`." Marten's default identity con
 
 ## Tests (`tests/Kumunita.Core.Tests/UserInfoServiceTests.cs`)
 
-Each test: `PostgresFixture.NewDatabaseAsync()` → fresh scratch DB → bootstrap Marten with `KumunitaFeature` + M1 feature + `M1DocTypes` conventions → construct `UserInfoService` → run → assert → `await store.DisposeAsync()`.
+Each test: `PostgresFixture.NewDatabaseAsync()` → fresh scratch DB → bootstrap Marten with `KumunitaFeature` + M1 feature + `CoreDocTypes` conventions → construct `UserInfoService` → run → assert → `await store.DisposeAsync()`.
 
 **Read path (3 tests):**
 1. `GetProfileAsync_RoundTrip_PreservesSubjectIdAndVisibility` — upsert via the service's own `UpsertProfileAsync`, read back; assert `SubjectId`, `DisplayName`, `Verified`, `Visibility.Mode/Grants`.

@@ -9,17 +9,17 @@ namespace Kumunita.Core.Tests;
 
 /// <summary>
 /// The <c>M17</c> U01 pin (ADR 0118 D1 / D4, the design doc §2.1): the
-/// <see cref="M17DocTypes"/> surface registers the <see cref="Bookmark"/>
+/// <see cref="BookmarkDocTypes"/> surface registers the <see cref="Bookmark"/>
 /// document with the **unique** business-key index on <c>(OwnerId,
 /// TargetKind, TargetId)</c> — the F1 idempotency witness (the M9
 /// <c>convo_uidx_pair</c> shape; a duplicate bookmark of the same owner +
 /// target commits exactly one row, the DB is the arbiter) — plus the
 /// non-unique <c>(OwnerId, Created)</c> list-ordering index. Verified against
-/// the *live* Postgres catalog (the <c>M16DocTypesDdlTests</c> shape), not the
+/// the *live* Postgres catalog (the <c>InventoryDocTypesDdlTests</c> shape), not the
 /// in-memory object graph. The test name is a doc-registration shape pin
 /// (outside the design doc's §2.5 seam list — the M16/U01 precedent).
 /// </summary>
-public class M17DocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class BookmarkDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
     private string _connection = "";
 
@@ -28,19 +28,19 @@ public class M17DocTypesDdlTests(PostgresFixture fixture) : IClassFixture<Postgr
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task M17DocTypes_RegistersBookmarkWithUniqueOwnerTargetIndex()
+    public async Task BookmarkDocTypes_RegistersBookmarkWithUniqueOwnerTargetIndex()
     {
         var ct = TestContext.Current.CancellationToken;
         using var store = DocumentStore.For(opts =>
         {
             opts.Connection(_connection);
             opts.DatabaseSchemaName = "mt";
-            // The sibling harnesses (M16DocTypesDdlTests / ProjectDocShapeTests)
+            // The sibling harnesses (InventoryDocTypesDdlTests / ProjectDocShapeTests)
             // add the two storage features before a *DocTypes surface — that is
             // the established shape that actually applies the document DDL.
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M17DocTypes.Configure(opts);
+            BookmarkDocTypes.Configure(opts);
         });
 
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
@@ -91,7 +91,7 @@ public class M17DocTypesDdlTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Contains("TargetId", idx.Expr!);
     }
 
-    // ── catalog helpers (the M16DocTypesDdlTests / AdminOverrideDdlTests shape) ──
+    // ── catalog helpers (the InventoryDocTypesDdlTests / AdminOverrideDdlTests shape) ──
 
     // Distinct column names on mt.<table> (information_schema).
     private async Task<List<string>> QueryColumnsAsync(string table)

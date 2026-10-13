@@ -16,7 +16,7 @@
 > zero new `Decide()` branch (C-M19·6, D5). The **only** schema changes are
 > **one additive `bool` on the existing `Profile` POCO** (`IsGuest`, D1 —
 > the ADR 0004 §B.1 `Blocked`/`Verified` additive-field precedent) **+ one
-> new document** (`GuestAccess`, D2 — registered on `M1DocTypes`) **+ one
+> new document** (`GuestAccess`, D2 — registered on `CoreDocTypes`) **+ one
 > closed enum** (`GuestSurface`, D4) **+ one new role-string constant**
 > (`Roles.Guest`, D5 — a new claim *value* on the existing `Kumunita.Role`
 > claim *type*; the `ClaimTypes.All` set is **untouched**). The closed
@@ -385,13 +385,13 @@ public sealed class GuestAccess
 }
 ```
 
-**The `M1DocTypes` registration** (U01 — the `GuestAccess` document is
+**The `CoreDocTypes` registration** (U01 — the `GuestAccess` document is
 Marten-native with a conventional `SubjectId` identity, like the other M1
 POCOs; the additive-surface delta is applied idempotently at boot — ADR
 0004 §B.1, zero migration):
 
 ```csharp
-// In M1DocTypes.Configure(StoreOptions opts), alongside the other Identity
+// In CoreDocTypes.Configure(StoreOptions opts), alongside the other Identity
 // POCOs — a conventional identity (Marten's default) — so one line:
 opts.Schema.For<Identity.GuestAccess>().Identity(g => g.SubjectId);
 ```
@@ -809,7 +809,7 @@ See §4 (the exact C# is verbatim above — the `[Flags]` `GuestSurface` enum
 (`None = 0`, `Announcements = 1`, `Events = 2`, `Directory = 4`), the
 `GuestAccess` document (`SubjectId`, `ValidFrom`, `ValidUntil`,
 `AllowedSurfaces` (the `[Flags]` **scalar** — §1.a amendment), `SetByAdmin`),
-and the `M1DocTypes` `Identity.GuestAccess` registration).
+and the `CoreDocTypes` `Identity.GuestAccess` registration).
 
 ### 9.2 The `Profile.IsGuest` additive flag (U01)
 

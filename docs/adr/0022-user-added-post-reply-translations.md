@@ -30,7 +30,7 @@ built on.
   - `ReplyTranslation` — `ReplyId`, `LanguageCode`, `Body`, `AuthorId`,
     `Created` (replies have no title).
 
-  Both are registered in `M3DocTypes` with a `UniqueIndex` on
+  Both are registered in `PostDocTypes` with a `UniqueIndex` on
   `(parent id, LanguageCode)`, so a post/reply carries **at most one
   translation per language** — adding a translation for a language that
   already has one overwrites that row (same standing, same actor). No own

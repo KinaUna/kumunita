@@ -104,13 +104,13 @@ var marten = builder.Services.AddMarten(opts =>
 
     // M1's Marten-native documents + their non-default conventions (Profile identity,
     // GroupMembership business-key index). ADR 0004 §B.1.
-    M1DocTypes.Configure(opts);
+    CoreDocTypes.Configure(opts);
 
     // M3's + M3b's Marten-native documents (Post, PostReply, Report — report
     // table-in-M3 / flow-in-M3b; and Announcement — the M3b "platform
     // announcements" lane). All use the conventional string Id, so no non-default
     // convention needed. ADR 0004 §B.1.
-    M3DocTypes.Configure(opts);
+    PostDocTypes.Configure(opts);
 
     // Media (plan U2): the media catalog doc (MediaObject) — its Id *is* the
     // content hash (C-MED·4), so Marten's default Id-unique mapping is the dedup;
@@ -164,7 +164,7 @@ var marten = builder.Services.AddMarten(opts =>
     // concurrency exception, the ADR 0054 §3.2 pin). Without this call the docs are
     // invisible to Marten (the M3/Media/Page/Tag precedent). The Event/EventRsvp
     // POCOs are new; the existing Post/Announcement/Page surfaces are untouched.
-    M4DocTypes.Configure(opts);
+    EventDocTypes.Configure(opts);
 
     // M5 (ADR 0067, plan U02): the Projects bounded context's documents
     // (TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement, ADR 0004 §B.1
@@ -173,7 +173,7 @@ var marten = builder.Services.AddMarten(opts =>
     // Without this call the docs are invisible to Marten (the M3/Media/Page/Tag/M4
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
-    M5DocTypes.Configure(opts);
+    ProjectDocTypes.Configure(opts);
 
     // M6 (ADR 0076 D1, plan U02): the Notifications bounded context's documents
     // (Notification + NotificationPreference, ADR 0004 §B.1 — the (RecipientId,
@@ -182,7 +182,7 @@ var marten = builder.Services.AddMarten(opts =>
     // to Marten (the M3/Media/Page/Tag/M4/M5 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M6DocTypes.Configure(opts);
+    NotificationDocTypes.Configure(opts);
 
     // M9 (ADR 0105 D1, plan U01): the Messaging bounded context's documents
     // (Conversation + Message, ADR 0004 §B.1 — the (ParticipantA,
@@ -192,7 +192,7 @@ var marten = builder.Services.AddMarten(opts =>
     // (the M3/Media/Page/Tag/M4/M5/M6 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M9DocTypes.Configure(opts);
+    MessagingDocTypes.Configure(opts);
 
     // M16 (ADR 0117 D1, plan U01): the Inventory bounded context's documents
     // (InventoryItem + InventoryCheckout, ADR 0004 §B.1 — the (ComponentId,
@@ -204,7 +204,7 @@ var marten = builder.Services.AddMarten(opts =>
     // to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M16DocTypes.Configure(opts);
+    InventoryDocTypes.Configure(opts);
 
     // M17 (ADR 0118 D1, plan U01): the Bookmarks bounded context's document
     // (Bookmark, ADR 0004 §B.1 — the (OwnerId, TargetKind, TargetId) unique
@@ -214,10 +214,10 @@ var marten = builder.Services.AddMarten(opts =>
     // M3/Media/Page/Tag/M4/M5/M6/M9/M16 precedent). The dev-only
     // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
     // boot both pick the surface up automatically.
-    M17DocTypes.Configure(opts);
+    BookmarkDocTypes.Configure(opts);
 
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
-    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to M3DocTypes /
+    // (UsageEvent, ADR 0004 §B.1 — a parallel surface to PostDocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses
     // the conventional string Id, so no non-default convention or
     // business-key index is pinned). Without this call the UsageEvent doc
@@ -225,7 +225,7 @@ var marten = builder.Services.AddMarten(opts =>
     UsageDocTypes.Configure(opts);
 
     // M21 (ADR 0122 D1, plan U01): the Document bounded context's document
-    // (Document, ADR 0004 §B.1 — a parallel surface to M17DocTypes /
+    // (Document, ADR 0004 §B.1 — a parallel surface to BookmarkDocTypes /
     // MediaDocTypes / UsageDocTypes, not additive on an existing one:
     // Document uses the conventional string Id, so no non-default convention
     // or business-key index is pinned). Without this call the Document doc is
@@ -254,7 +254,7 @@ var marten = builder.Services.AddMarten(opts =>
 
     // M31 (ADR 0154 D1, U03): the error-report bounded context's document
     // (ErrorReport, ADR 0004 §B.1 — a parallel surface to UsageDocTypes /
-    // M17DocTypes / DocumentDocTypes, not additive on an existing one:
+    // BookmarkDocTypes / DocumentDocTypes, not additive on an existing one:
     // ErrorReport uses the conventional string Id identity, so only the
     // (TriageStatus, Created) admin-list-ordering index is pinned). Without
     // this call the ErrorReport doc is invisible to Marten (the

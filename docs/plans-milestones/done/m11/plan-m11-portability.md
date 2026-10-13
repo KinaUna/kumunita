@@ -33,8 +33,8 @@
 > context, no export/import code, no `manifest.json` shape, no archive
 > reader/writer anywhere in the tree (grep-confirmed). What M11 builds on:
 > the **Marten domain documents** across the registered `*DocTypes` surfaces
-> (`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
-> `M9DocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`), the
+> (`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes` /
+> `MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`), the
 > **ASP.NET Identity** tables in the `identity` schema (the principals —
 > *not* the domain docs), the **content-addressed media volume** (ADR 0011,
 > `MediaObject` catalog doc + the bytes at `{root}/{Id[0..2]}/{Id}`), the
@@ -182,8 +182,8 @@ operator-plane sense.
   (fail-closed, C-M11·3) — the archive never imports a doc pointing at a
   phantom byte.
 - **D7 · The closed document inventory + import order is pinned in the design
-  doc from source.** U00 reads **every** `*DocTypes` surface (`M1DocTypes` /
-  `M3DocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` / `M9DocTypes` /
+  doc from source.** U00 reads **every** `*DocTypes` surface (`CoreDocTypes` /
+  `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes` / `MessagingDocTypes` /
   `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`) and locks the **exact**
   closed inventory — each entry: the document `Type`, its archive file
   (`docs/{Type}.json`), its **import order** (parents before children), and
@@ -369,8 +369,8 @@ recent milestone's doc, its §Invariants / §FACES / §drift-guard shape);
 `docs/adr/0107-pwa-and-responsive-design.md` + `docs/adr/0105-messaging.md`
 (the ADR shape to mirror — the operator-plane shape, the "a milestone" close,
 the deferred-lane language, and the ADR 0105 no-break-glass / floor
-precedent that D3/D4 build on); `src/Kumunita.Core/M1DocTypes.cs` +
-`M3DocTypes.cs` + `M4DocTypes.cs` + `M5DocTypes.cs` (the D7 inventory source —
+precedent that D3/D4 build on); `src/Kumunita.Core/CoreDocTypes.cs` +
+`PostDocTypes.cs` + `EventDocTypes.cs` + `ProjectDocTypes.cs` (the D7 inventory source —
 the registered document types + their business-key / feed indexes reveal the
 referential relationships); `src/Kumunita.Core/Media/IMediaFileStore.cs` +
 `IMediaStore.cs` + `MediaObject.cs` (the D6 media-travel shape — the
@@ -410,7 +410,7 @@ machinery they compose.
 **Entry reads (5).** `docs/design/m11-portability-design.md` (§manifest — the
 locked field set; §inventory — the locked `Type` / file / order /
 reference-fields list; §layout — the D2 archive layout);
-`src/Kumunita.Core/M1DocTypes.cs` + `M3DocTypes.cs` (the document types the
+`src/Kumunita.Core/CoreDocTypes.cs` + `PostDocTypes.cs` (the document types the
 registry enumerates — U00 pinned the list, U01 turns it into the registry
 data; the `M*DocTypes` surfaces confirm each type's namespace + the
 business-key fields the reference map needs); `src/Kumunita.Core/Media/IMediaFileStore.cs`
@@ -630,7 +630,7 @@ order; §inventory — the D7 reference map the integrity loop drives);
 registry — the seam U05 fills; the registry's `Order` + `ReferenceFields` the
 apply + the integrity loop consume); `src/Kumunita.Core/Media/IMediaFileStore.cs`
 (the `PutAsync` + the content-addressed layout the media apply writes to);
-`src/Kumunita.Core/M1DocTypes.cs` (the `Profile.SubjectId` identity + the
+`src/Kumunita.Core/CoreDocTypes.cs` (the `Profile.SubjectId` identity + the
 `GroupMembership` business key — the referential relationships the integrity
 loop checks the *against*, confirming the D7 reference map matches the
 source); `src/Kumunita.Core.Tests/PostgresFixture.cs` (the test harness the

@@ -46,11 +46,11 @@ the DI registration. **No Web change, no view change, no admin surface.**
 2. `src/Kumunita.Core/Localization/LanguageCatalog.cs` — the
    `LocaleSettings` singleton (the `Id = "singleton"` sentinel shape, the
    additive-field convention).
-3. `src/Kumunita.Core/M1DocTypes.cs` — the `LocaleSettings` registration
+3. `src/Kumunita.Core/CoreDocTypes.cs` — the `LocaleSettings` registration
    (the `opts.Schema.For<LocaleSettings>()` shape).
 4. `src/Kumunita.Core/DependencyInjection.cs` — the DI registration (the
    `AddTransient<IPageService>(sp => new PageService(...))` shape) + the
-   schema bootstrap (the `M1DocTypes.Configure(opts)` /
+   schema bootstrap (the `CoreDocTypes.Configure(opts)` /
    `PageDocTypes.Configure(opts)` shape).
 5. `src/Kumunita.Core/Identity/IdentityService.cs` — the
    `SetSignupOpenAsync` / `IsSignupOpenAsync` shape (the ADR 0050
@@ -82,7 +82,7 @@ the DI registration. **No Web change, no view change, no admin surface.**
    registration (the `AddTransient<ISiteContentService>(sp => new
    SiteContentService(sp.GetRequiredService<IDocumentStore>()))` shape) +
    the `SiteContentDocTypes.Configure(opts)` call in the schema bootstrap
-   (the `M1DocTypes.Configure(opts)` / `PageDocTypes.Configure(opts)` shape).
+   (the `CoreDocTypes.Configure(opts)` / `PageDocTypes.Configure(opts)` shape).
 
 ## Exit
 

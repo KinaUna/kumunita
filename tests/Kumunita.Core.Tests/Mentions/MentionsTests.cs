@@ -17,7 +17,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// Harness: the <see cref="PostgresFixture"/> fresh-scratch-database-per-test
 /// shape (the <c>KioskServiceTests</c> precedent). The store registers
-/// <see cref="M1DocTypes"/> (the <c>Profile</c> + <c>AccessAudit</c> tables these
+/// <see cref="CoreDocTypes"/> (the <c>Profile</c> + <c>AccessAudit</c> tables these
 /// pins read). The <see cref="MentionService"/> composes the frozen M2
 /// <see cref="DirectoryService"/> catalog read (M36·2 — reused, not re-shaped);
 /// the parser is pure (no DI, no I/O), so the three parser pins need no store.
@@ -181,7 +181,7 @@ public sealed class MentionsTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

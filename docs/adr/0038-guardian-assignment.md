@@ -55,7 +55,7 @@ model + the **one** `GuardianItem` record + the **one**
 appends (the "other guardians" list + the assign form) + the
 `guardian.assign.*` / `guardian.otherGuardians.*` localization keys. The
 rest is the GU lane's existing surface (byte-identical): the
-`CreateGuardianLinkAsync` seam, the `GuardianLink` POCO, the `M1DocTypes`
+`CreateGuardianLinkAsync` seam, the `GuardianLink` POCO, the `CoreDocTypes`
 registration, the five supervisory actions, the GU enforcement path — none
 of it moves.
 
@@ -263,7 +263,7 @@ call them out explicitly so they are not accidentally re-invoked:
   gains three fields — `ResolvedAt` / `ResolvedBy` (the ADR 0038 §F state
   transition) + `AssignedById` (the conferrer, the "who conferred the
   standing" legibility §D named as a limitation, now on the row itself
-  rather than only recoverable from the audit trail). The `M1DocTypes.
+  rather than only recoverable from the audit trail). The `CoreDocTypes.
   Configure` surface is otherwise unchanged.
 - **S·5 (audit shape) is re-shaped:** the `guardian.create` row (the
   standing-holder's GU seam's shape, byte-identical to what

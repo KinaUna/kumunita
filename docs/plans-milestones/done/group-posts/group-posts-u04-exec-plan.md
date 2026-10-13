@@ -18,7 +18,7 @@
   doc-comment (G·2 lane exclusivity + G·8 empty audience + ADR 0013 +
   ADR 0004 §B.1 additive precedent, the M3b `Status` ADD comment style).
   **One field, nothing else in this file** (the entry plan's Deliverables).
-- **Out:** everything else — no `M3DocTypes.cs` change (verified read-only:
+- **Out:** everything else — no `PostDocTypes.cs` change (verified read-only:
   `opts.Schema.For<Post>()` is registered there, line 26 — Marten's delta
   picks the new property up: **no re-seed, no new doc surface**, exactly
   M3b's `PostStatus` ADD lane), no `PostReply` change, no `PostService`
@@ -96,7 +96,7 @@
 - `Post.cs` diff: one `GroupId` property + one marker line + one summary;
   nothing else changed; default `string.Empty`; property placed after
   `Status`.
-- Ref-check: `M3DocTypes.cs` untouched (its `Schema.For<Post>()` line 26 is
+- Ref-check: `PostDocTypes.cs` untouched (its `Schema.For<Post>()` line 26 is
   the registration the delta applies against — cited, not modified); no
   `.cs` file modified except `Post.cs`.
 - Build output: solution builds green (zero errors; no new warnings from

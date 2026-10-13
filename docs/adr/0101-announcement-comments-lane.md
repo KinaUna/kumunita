@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-26
 Extends the **shipped M3b announcements surface** (the
-`Announcements/` feature module registered on the `M3DocTypes` surface) and the
+`Announcements/` feature module registered on the `PostDocTypes` surface) and the
 **comment precedent set**: the **C-M3·1** "comment-inherits the parent's
 visibility" rule (a comment carries **no** `Audience` of its own — its
 visibility inherits the parent's, so there is no second authorization evaluation
@@ -59,7 +59,7 @@ This is a **named lane on the already-shipped M3b surface** (like ADR
 ## Decision
 
 A new document type `Announcements.AnnouncementComment` (registered on the
-`M3DocTypes` surface — the additive-schema shape, ADR 0004 §B.1) carries:
+`PostDocTypes` surface — the additive-schema shape, ADR 0004 §B.1) carries:
 
 ```csharp
 public sealed class AnnouncementComment
@@ -217,7 +217,7 @@ the `KnownTranslationKeys_ParityTests` invariant holds.
   `LocaleSettings` (additive) and written by a dedicated GlobalAdmin
   controller (the test-pinned `AdminController` is left untouched).
 - The schema is purely additive (a new `AnnouncementComment` table + one
-  index on the `M3DocTypes` surface; a new `LocaleSettings` field); no existing
+  index on the `PostDocTypes` surface; a new `LocaleSettings` field); no existing
   table, index, or seam changes. The `Milestones.cs` / README Roadmap /
   `MilestonesTests.cs` triple is untouched (a named lane on the shipped M3b
   surface, not a milestone — the ADR 0086–0100 precedent).

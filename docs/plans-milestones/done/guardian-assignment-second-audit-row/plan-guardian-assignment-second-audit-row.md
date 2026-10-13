@@ -54,7 +54,7 @@ same pattern the GA lane used for `IIdentityService.FindSubjectByEmailAsync`.
 
 The lane is **small by design** — one seam, one audit verb, one changed
 line on the Web action, two tests, one ADR amendment section, one design-doc
-section. The GU enforcement path, the `GuardianLink` POCO, the `M1DocTypes`
+section. The GU enforcement path, the `GuardianLink` POCO, the `CoreDocTypes`
 registration, the five GU actions, and the `AccessVia` enum are all
 **byte-identical** (invariants S·2–S·4).
 
@@ -215,7 +215,7 @@ G-A·1, the resolution G-A·2, the self-assignment refusal G-A·5, the
   `guardian.assign` for conferral (GA-AR). (GA-AR-owned; inherits G-A·3's
   substance.)
 - **S·3 — POCO byte-identical.** `GuardianLink` has no new field, no new
-  enum value. `M1DocTypes` is unchanged. (GA-AR-owned; inherits G-A·3.)
+  enum value. `CoreDocTypes` is unchanged. (GA-AR-owned; inherits G-A·3.)
 - **S·4 — Standing unchanged.** The assigned guardian's standing is
   identical in kind to the creator's (G-A·3's substance, inherited). No
   new GU action, no new content read, no new "assigned" tier. The

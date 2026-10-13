@@ -456,7 +456,7 @@ public static class ServiceCollectionExtensions
         // M16 (ADR 0117, plan U02): the Inventory bounded context's service
         // seam (bounded context Kumunita.Core.Inventory — the "track where
         // items are, and optionally how much they are used by whom" surface:
-        // the InventoryItem + InventoryCheckout documents, the M16DocTypes
+        // the InventoryItem + InventoryCheckout documents, the InventoryDocTypes
         // surface, the InventoryItemToAuditableResource adapter). Same
         // "AddTransient with the store injected" shape as IProjectService
         // above; U02 lands the read lanes (ListItemsAsync / GetItemAsync /

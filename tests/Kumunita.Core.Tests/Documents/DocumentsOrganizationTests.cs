@@ -430,8 +430,8 @@ public class DocumentsOrganizationTests(PostgresFixture fixture) : IClassFixture
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);   // the Document + DocumentFolder surfaces
             TagDocTypes.Configure(opts);        // the Tag + TagTranslation surfaces (the TG attach lane)
         });

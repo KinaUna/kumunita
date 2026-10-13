@@ -3,10 +3,10 @@
 Status: Accepted
 Date: 2026-09-29
 Extends the **M5 Projects bounded-context precedent** (the
-`Kumunita.Core.Projects` context, the `M5DocTypes` surface, the
+`Kumunita.Core.Projects` context, the `ProjectDocTypes` surface, the
 `ProjectToAuditableResource` 6-member adapter, the C-M5·6
 creator-vs-broad-standing split — ADR 0086 / ADR 0106), the **M9
-`M9DocTypes` parallel-surface + unique-index-as-witness precedent**
+`MessagingDocTypes` parallel-surface + unique-index-as-witness precedent**
 (`convo_uidx_pair` — ADR 0105 D1), the **ADR 0004 §B.1
 delta-detected, idempotent, zero-migration document-surface shape**,
 the **frozen `IAuthorizationService` seam** (the 4-method surface + the
@@ -39,14 +39,14 @@ optionally how much they are used by whom.**"
 
 M5 (Projects) already proved the shape M16 copies: a **standalone core
 surface** on its own bounded context (`Kumunita.Core.Projects`), its own
-`M5DocTypes` Marten surface (the ADR 0004 §B.1 parallel-surface shape —
+`ProjectDocTypes` Marten surface (the ADR 0004 §B.1 parallel-surface shape —
 delta-detected, applied idempotently at boot, **zero migrations for
 existing surfaces**), one **adapter** onto the **frozen**
 `IAuthorizationService` (the `ProjectToAuditableResource` 6-member
 projection — `Id` / `Name` / `OwnerId` / `Audience` / `ComponentId` /
 `TargetKind`, the **only** difference being the `TargetKind` string),
 the **creator ∪ GlobalAdmin vs. broad-standing** split over its write
-lanes (C-M5·6), and the `projects.*` `kw-l` block. The M9 (`M9DocTypes`)
+lanes (C-M5·6), and the `projects.*` `kw-l` block. The M9 (`MessagingDocTypes`)
 precedent adds the **unique-index-as-witness** idiom — the
 `convo_uidx_pair` unique index is the F1 idempotency witness, making a
 concurrent double-open of a conversation fail at the **DB layer**
@@ -80,7 +80,7 @@ C-M3·2), `AuthorId` (the standing owner — D5), `Audience` (the **exact**
 (ADR 0018), `Created`, `Modified`) and `InventoryCheckout` (the
 append-only usage record — `Id`, `ItemId`, `BorrowerId`, `CheckedOutAt`,
 `CheckedInAt` nullable — open when null, `Note` optional), registered on
-a **new `M16DocTypes`** surface (the M9/M5 `*DocTypes` precedent — a
+a **new `InventoryDocTypes`** surface (the M9/M5 `*DocTypes` precedent — a
 parallel additive surface, delta-detected and applied idempotently at
 boot, **zero migrations** for existing surfaces; the `InventoryItem`
 `(ComponentId, Created)` + `(OwnerKind, Created)` feed/filter indexes;
@@ -211,10 +211,10 @@ Wolverine handler for inventory; a nudge emission in M16.
   (C-M16·1). The write standing is a **server-side probe** over the
   frozen seams (D5) — the Web `[Authorize]` is a convenience pre-gate,
   never the source of truth (F4).
-- **Zero migrations for existing surfaces** (D1): the `M16DocTypes`
+- **Zero migrations for existing surfaces** (D1): the `InventoryDocTypes`
   surface is **parallel** (the ADR 0004 §B.1 shape — delta-detected and
   applied idempotently at boot) — the two new tables + the three indexes
-  are additive; the `M1DocTypes` … `M9DocTypes` surfaces are
+  are additive; the `CoreDocTypes` … `MessagingDocTypes` surfaces are
   **byte-identical** after M16 (§drift-guard).
 - **The `private` standing is the narrowest** (D5): a resident's
   **personal** item (their own jersey, their own camera) is invisible to
@@ -333,7 +333,7 @@ U01–U06 executes it, and the U06 close flips the docs parity surface
   atomic transition — U03).
 - `src/Kumunita.Core/Inventory/InventoryRequests.cs` — new (the
   request DTOs — the sealed-record shape; U02).
-- `src/Kumunita.Core/M16DocTypes.cs` — new (the surface — the
+- `src/Kumunita.Core/InventoryDocTypes.cs` — new (the surface — the
   `InventoryItem` `(ComponentId, Created)` + `(OwnerKind, Created)`
   indexes; the `InventoryCheckout` `(ItemId, CheckedOutAt)` index + the
   **unique partial index** on `(ItemId)` where `CheckedInAt IS NULL` —
@@ -341,9 +341,9 @@ U01–U06 executes it, and the U06 close flips the docs parity surface
 - `src/Kumunita.Core/DependencyInjection.cs` — the
   `AddTransient<IInventoryService>(…)` registration (the M5 / M9 shape —
   **no** `INotificationService`, D8; U02).
-- `src/Kumunita.Web/Program.cs` — `M16DocTypes.Configure(opts);` added
+- `src/Kumunita.Web/Program.cs` — `InventoryDocTypes.Configure(opts);` added
   to the `*DocTypes.Configure(opts)` block (after
-  `M9DocTypes.Configure(opts)`; U01).
+  `MessagingDocTypes.Configure(opts)`; U01).
 - `src/Kumunita.Web/Models/InventoryViewModels.cs` — new (the view
   models; U04).
 - `src/Kumunita.Web/Controllers/InventoryController.cs` — new (the

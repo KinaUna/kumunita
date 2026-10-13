@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>TG</c> bounded context's Marten-native document registration
 /// surface (ADR 0004 §B.1, D1) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PostDocTypes"/> /
 /// <see cref="MediaDocTypes"/> / <see cref="PageDocTypes"/> for the new
 /// <c>Kumunita.Core.Tags</c> context (ADR 0011 shared-id-doc shape). Both
 /// documents use the conventional <c>string</c> <c>Id</c> identity; the
@@ -41,10 +41,10 @@ public static class TagDocTypes
         // ~44 chars) is under Postgres's 64-char NAMEDATALEN limit, so the
         // explicit name is not strictly required (unlike
         // AnnouncementTranslation's `ann_tr_uidx_ann_lang`, right at the
-        // edge — see M3DocTypes). It is used anyway for convention
+        // edge — see PostDocTypes). It is used anyway for convention
         // consistency across the `<Parent>Translation` doc family:
         // `pg_tr_uidx_page_lang` (PageDocTypes), `ann_tr_uidx_ann_lang`
-        // (M3DocTypes), `tg_tr_uidx_tag_lang` (here).
+        // (PostDocTypes), `tg_tr_uidx_tag_lang` (here).
         opts.Schema.For<Tags.TagTranslation>()
                .UniqueIndex("tg_tr_uidx_tag_lang",
                             t => t.TagId, t => t.LanguageCode);

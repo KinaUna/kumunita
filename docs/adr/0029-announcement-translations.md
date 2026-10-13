@@ -22,7 +22,7 @@ An **`AnnouncementTranslation`** POCO (`Kumunita.Core.Announcements`) stores a
 user-added translation of an announcement — `Id`, `AnnouncementId`,
 `LanguageCode`, `Title?` (a translation may title the announcement or not),
 `Body`, `AuthorId`, `Created` — registered on the `KumunitaFeature` document
-surface (the `M3DocTypes` registration) alongside the existing announcement and
+surface (the `PostDocTypes` registration) alongside the existing announcement and
 post-translation types. The `IAnnouncementService` gains two seams:
 
 - **read** — `GetAnnouncementTranslationsAsync(announcementId)` returns the

@@ -110,7 +110,7 @@ add an escalation forwarding lane — both are M32's.
   surface (M31·3).** The doc is a POCO with a conventional string `Id` (the
   `Posts/Report` / `Usage/UsageEvent` row-per-event shape), registered in a
   new `ErrorReportDocTypes.Configure(opts)` surface (the ADR 0004 §B.1
-  parallel-surface pattern, the `M3DocTypes` / `M4DocTypes` / `M6DocTypes`
+  parallel-surface pattern, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes`
   precedent). **No EF migration.** The delta is applied idempotently at boot
   (the `SchemaBootstrap` + the dev-loop `Program.cs` path both pick it up).
 - **The admin list is a GlobalAdmin-gated read (M31·4).** The
@@ -167,7 +167,7 @@ add an escalation forwarding lane — both are M32's.
   shape). The thin-token rule (ADR 0001-B) is held.
 - **The existing `Posts/Report` doc is untouched (M31·10).** M31 does not add
   fields to `Posts/Report`, does not change its `Status` vocabulary, does not
-  alter its `M3DocTypes` registration, does not touch the M3b moderation
+  alter its `PostDocTypes` registration, does not touch the M3b moderation
   queue. The two report concepts (platform-error vs content-moderation) are
   **separate docs in separate contexts** and the `TargetKind` strings are
   distinct (`"error-report"` vs `"post"` / `"reply"`).
@@ -317,7 +317,7 @@ appended *before* any follow-up action).
 (3) never introduces a test whose exact name is not in the §pinned-test-names
 list; (4) never re-shapes the `ErrorReport` doc's field set outside the
 design doc §2.2 pin (the M31·3 / ADR 0154 D1 pin); (5) never touches the
-existing `Posts/Report` doc or the `M3DocTypes` registration (the M31·10
+existing `Posts/Report` doc or the `PostDocTypes` registration (the M31·10
 pin — the two report concepts are separate); (6) never adds a new
 `AccessAction`, `Decide()` branch, or `IAuthorizationService` surface (the
 M31·9 pin); a new `AccessVia` enum value is permitted **only** if the design
@@ -466,8 +466,8 @@ note.
   mirror for `ErrorReportDocTypes`);
   `src/Kumunita.Core/DependencyInjection.cs` (where to register the new
   service);
-  `src/Kumunita.Web/Program.cs` lines 80–100 (the `M3DocTypes.Configure` /
-  `M4DocTypes.Configure` calls — where `ErrorReportDocTypes.Configure` goes);
+  `src/Kumunita.Web/Program.cs` lines 80–100 (the `PostDocTypes.Configure` /
+  `EventDocTypes.Configure` calls — where `ErrorReportDocTypes.Configure` goes);
   `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (the versioned boot path
   — confirm `ErrorReportDocTypes` is picked up automatically);
   `docs/adr/0153-admin-onboarding.md` (the M30 ADR — the format to mirror for
@@ -584,7 +584,7 @@ note.
   mirror);
   `src/Kumunita.Core/DependencyInjection.cs` (where to register);
   `src/Kumunita.Web/Program.cs` lines 80–100 (the
-  `M3DocTypes.Configure` / `M4DocTypes.Configure` calls — where
+  `PostDocTypes.Configure` / `EventDocTypes.Configure` calls — where
   `ErrorReportDocTypes.Configure` goes);
   `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (the versioned boot path
   — confirm the new surface is picked up automatically);
@@ -624,7 +624,7 @@ note.
     `IUsageAnalyticsService` → `UsageAnalyticsService` shape).
   - `src/Kumunita.Web/Program.cs` — add the
     `ErrorReportDocTypes.Configure(opts);` call next to the existing
-    `M3DocTypes.Configure(opts);` line (one line added).
+    `PostDocTypes.Configure(opts);` line (one line added).
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` green. The
   `ErrorReport` doc compiles; the `IErrorReportService` +
   `ErrorReportService` compile; the `ErrorReportDocTypes` is registered in

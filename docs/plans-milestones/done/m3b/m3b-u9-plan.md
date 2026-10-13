@@ -30,7 +30,7 @@ or what a prior unit already shipped, the sealed register + design doc win
   gate evidence / U7's surface and are outside the two-file deliverable).
 - `tests/Kumunita.Core.Tests/PostServiceTests.cs` — **confirmed** the helper
   shapes: `BootStoreAsync` (L833) uses `fixture.NewDatabaseAsync` +
-  `M1DocTypes.Configure` + `M3DocTypes.Configure` + `KumunitaFeature`/
+  `CoreDocTypes.Configure` + `PostDocTypes.Configure` + `KumunitaFeature`/
   `AuthorizationFeature` storage; `Services` (L855) composes
   `UserInfoService`/`AuthorizationService`/`PostService`; `Plant` (L871)
   stores a doc in a lightweight session and saves; `RunInSession` (L879)

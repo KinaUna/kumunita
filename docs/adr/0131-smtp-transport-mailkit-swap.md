@@ -147,7 +147,7 @@ Replace the BCL `System.Net.Mail.SmtpClient` with **MailKit's**
 
 - **Non-consequences:**
   - No schema change. The `OutboxEmail` / `EmailDeadLetter` domain documents
-    are untouched; the `M1DocTypes` surface is untouched.
+    are untouched; the `CoreDocTypes` surface is untouched.
   - No new `AccessAction` / `AccessVia` / `IAuditableResource` surface (the
     SMTP seam is not an authorization lane).
   - No new `kw-l` key, no view change, no route change.

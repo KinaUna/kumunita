@@ -30,7 +30,7 @@ row points at.
 ## Decision
 
 - **One additive field, not a new document.**
-  `Report` (M3-registered, `M3DocTypes`) gains
+  `Report` (M3-registered, `PostDocTypes`) gains
   `public string? ReplyId { get; set; }` — a **null = post-target**
   / **non-null = reply-target** discriminator. `PostId` stays
   populated in both cases: for a reply-targeted row it carries the

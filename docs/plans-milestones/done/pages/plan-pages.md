@@ -104,7 +104,7 @@ step (the order + single-in-progress pin).
 
 Add `Kumunita.Core.Pages`: `Page` (the §3.2 field set) + `PageTranslation`
 (the ADR 0022 shape: `Id`/`PageId`/`LanguageCode`/`Title?`/`Body`/`AuthorId`/
-`Created`). Register them on a new **`PageDocTypes`** surface (or `M3DocTypes`
+`Created`). Register them on a new **`PageDocTypes`** surface (or `PostDocTypes`
 — pick one, the design doc leaves it open): `Page` (conventional `Id`) +
 `(ParentId, Slug)` unique index (the `GroupMembership` business-key convention;
 root rows are `(null, Slug)`) + `PageTranslation` `(PageId, LanguageCode)`
@@ -233,7 +233,7 @@ the unique index, and a community-Moderator's standing is the ADR 0029 matrix
 ### U07 — Absorb complete: retire `LocalizedPage` (destructive, last)
 
 **Only after U01–U06 are green:** delete the `LocalizedPage` doc + its
-`M1DocTypes` registration + `ITranslationProvider.GetPageAsync` /
+`CoreDocTypes` registration + `ITranslationProvider.GetPageAsync` /
 `FindPageByImageIdAsync` + `ILocalizationService.UpsertPageAsync` + the
 `StaticPagesController`'s *fallback-to-`LocalizedPage`* path (it now reads the
 tree) + any `KnownTranslationKeys` page-string entries that were page-specific.

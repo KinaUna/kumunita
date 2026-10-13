@@ -241,7 +241,7 @@ named deferrals, §Scope).
   `.Schema.For<KioskPlaylist>` — the `SiteContentDocTypes` /
   `LocaleSettings` `*DocTypes` precedent, M35·1) + the **boot wiring** (the
   `Program.cs` dev-loop + the all-env `SchemaBootstrap`
-  `KioskDocTypes.Configure` call, the M3 `M3DocTypes` precedent);
+  `KioskDocTypes.Configure` call, the M3 `PostDocTypes` precedent);
 - the **`IKioskService` 2-method seam** (M35·1) — `GetPlaylistAsync`
   (the singleton read — **zero** `AccessAudit` rows, a `null`/empty return =
   no row configured — M35·5) + `SavePlaylistAsync` (the GlobalAdmin write —
@@ -384,8 +384,8 @@ run **M35·1 through M35·11** (contiguous; unlike M34, no deliberate gaps).
   0006-D) and **no** outbound channel.
 - **M35·9 — No new bounded context beyond `Kiosk`.** M35 **creates** the one
   new `Kiosk` context (M35·1); the board / calendar / todos contexts (M5
-  `Projects` + M4 `Events`) are **reused, not re-added** (the `M5DocTypes` /
-  `M4DocTypes` surfaces are **untouched**, M35·1 / M35·9). M35 adds **no** new
+  `Projects` + M4 `Events`) are **reused, not re-added** (the `ProjectDocTypes` /
+  `EventDocTypes` surfaces are **untouched**, M35·1 / M35·9). M35 adds **no** new
   doc **to an existing surface** and **no** new index to an existing doc.
 - **M35·10 — The closed `kiosk.*` `kw-l` key set is four-language.** Every
   new user-visible string M35 introduces is a `KnownTranslationKeys` entry

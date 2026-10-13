@@ -359,9 +359,9 @@ public class MessagingPerActorGateTests(PostgresFixture fixture) : IClassFixture
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);   // LocaleSettings + AccessAudit
-            M6DocTypes.Configure(opts);   // Notification (the M9 nudge table)
-            M9DocTypes.Configure(opts);   // Conversation + Message
+            CoreDocTypes.Configure(opts);   // LocaleSettings + AccessAudit
+            NotificationDocTypes.Configure(opts);   // Notification (the M9 nudge table)
+            MessagingDocTypes.Configure(opts);   // Conversation + Message
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

@@ -23,7 +23,7 @@ public enum TimeLimitMode
 /// document per child (id = the child's <see cref="ChildId"/> — the
 /// <see cref="Notifications.NotificationQuietSchedule"/> "one row per subject"
 /// shape, ADR 0121 D2, with <c>ChildId</c> in place of <c>RecipientId</c>;
-/// identity pinned to <c>ChildId</c> in <c>M1DocTypes</c>, next to
+/// identity pinned to <c>ChildId</c> in <c>CoreDocTypes</c>, next to
 /// <see cref="GuardianLink"/>). A child with two guardians shares **one**
 /// schedule (the <see cref="GuardianLink"/> multi-guardian shape).
 /// <see cref="Enabled"/> is the master on/off: <c>false</c> = "never

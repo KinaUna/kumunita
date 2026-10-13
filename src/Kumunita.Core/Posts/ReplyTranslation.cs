@@ -8,7 +8,7 @@ namespace Kumunita.Core.Posts;
 /// <para>
 /// One row per (reply, language) pair — the
 /// <c>(ReplyId, LanguageCode)</c> unique index
-/// (<see cref="M3DocTypes.Configure"/>) enforces that at the database layer
+/// (<see cref="PostDocTypes.Configure"/>) enforces that at the database layer
 /// (the <see cref="ComponentMembership"/> business-key convention). A reply
 /// is a body-only construct (C-M3·1 — no title of its own), so its
 /// translation carries <b>only</b> a <see cref="Body"/>.

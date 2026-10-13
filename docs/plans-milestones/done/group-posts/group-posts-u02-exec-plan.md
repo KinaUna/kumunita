@@ -28,7 +28,7 @@
 
 ## Constraints I keep pinned while I write
 - From **Part 1** (verbatim): G·1–G·8, G1–G13, "break-glass is not a deferral",
-  the single-additive note (no `M3DocTypes` change, `PostReply` unchanged),
+  the single-additive note (no `PostDocTypes` change, `PostReply` unchanged),
   "the '## Group posts — Closed (recorded)' section is a placeholder".
 - From **the master register**: the 19 test names (authoritative count and
   list), `GroupPostDraft(string GroupId, string? Title, string Body)`,
@@ -50,7 +50,7 @@
   `Posts/Post.cs` + `Posts/PostReply.cs` (POCO shapes, the `Status` additive
   precedent), `Posts/PostService.cs` (ctor, the four methods I reuse,
   `FeedResult`/`PostDetailResult` shapes, the M3 feed queries),
-  `M3DocTypes.cs` (where the `Post` surface is registered).
+  `PostDocTypes.cs` (where the `Post` surface is registered).
 
 ## Entry reads (done — all in `group-posts-u02-plan.md` / register lists)
 - `docs/design/group-posts-design.md` (Part 1, the whole file)
@@ -59,7 +59,7 @@
   `AccessAudit.cs`, `AuthorizationService.cs`
 - `src/Kumunita.Core/UserInfo/IUserInfoService.cs`, `Group.cs`
 - `src/Kumunita.Core/Posts/PostService.cs`, `Post.cs`, `PostReply.cs`,
-  `FeedResult.cs`, `PostDetailResult.cs`, `PostDraft.cs`, `M3DocTypes.cs`
+  `FeedResult.cs`, `PostDetailResult.cs`, `PostDraft.cs`, `PostDocTypes.cs`
 
 ## Findings (the draft's two problems + one structural win)
 1. **The 2-overload draft can't express the pinned row shapes.**

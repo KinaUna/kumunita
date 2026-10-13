@@ -29,8 +29,8 @@
 //   written + one guardian.event_rsvp_mode audit row Via: Guardian; a
 //   non-guardian → UnauthorizedAccessException.
 //
-// Harness: the EventServiceTests store shape (M1DocTypes + M3DocTypes +
-// M4DocTypes, fresh scratch Postgres per test) + the
+// Harness: the EventServiceTests store shape (CoreDocTypes + PostDocTypes +
+// EventDocTypes, fresh scratch Postgres per test) + the
 // GuardianApprovalLaneTests NotificationService wiring (real
 // NotificationService over a recording mailer + a Substitute
 // ITranslationProvider) — the GU lane's circular-dependency-avoidance
@@ -359,18 +359,18 @@ public sealed class GuardianEventRsvpGateTests(PostgresFixture fixture)
         var conn = await fixture.NewDatabaseAsync(ct);
 
         // The EventServiceTests store shape (the Event / EventRsvp /
-        // GuardianEventRequest surface = M4DocTypes) + the GU lane's
-        // Notification surface (M6DocTypes).
+        // GuardianEventRequest surface = EventDocTypes) + the GU lane's
+        // Notification surface (NotificationDocTypes).
         var store = DocumentStore.For(opts =>
         {
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

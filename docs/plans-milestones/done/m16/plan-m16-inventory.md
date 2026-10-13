@@ -68,7 +68,7 @@
 >
 > **The world seam (what M16 builds on):** M16 is a **new bounded context**
 > (`Kumunita.Core.Inventory`) with **two documents** (`InventoryItem`,
-> `InventoryCheckout`) on a **new `M16DocTypes`** surface (the M9/M5 precedent), an
+> `InventoryCheckout`) on a **new `InventoryDocTypes`** surface (the M9/M5 precedent), an
 > **adapter** onto the **frozen** `IAuthorizationService` (the M5 `ProjectToAuditableResource`
 > shape — an *adapter*, not a *branch*), and the **`inv.*` `kw-l` registry** + the 4
 > parity tests (the M5 `projects.*` key shape). It composes **only** the frozen seams —
@@ -130,7 +130,7 @@ So M16 is a **standalone core surface** (not a group/post feature) that tracks a
 - **D1 — Two documents, one new surface, no new bounded context.** M16 adds a new bounded
   context `Kumunita.Core.Inventory` with **two documents**: `InventoryItem` (the thing
   being tracked) and `InventoryCheckout` (the append-only usage record), registered on a
-  **new `M16DocTypes`** surface (the M9/M5 `*DocTypes` precedent — a parallel additive
+  **new `InventoryDocTypes`** surface (the M9/M5 `*DocTypes` precedent — a parallel additive
   surface, delta-detected and applied idempotently at boot, **zero migrations** for
   existing surfaces). The usage history is the `InventoryCheckout` records *inside* the
   same context — **not** a separate "Usage" bounded context.
@@ -296,7 +296,7 @@ Three tracks + a close, each unit atomic and self-contained. **U00 is the sign-o
 **Track A — Docs (U00).** The design doc (decisions/invariants/FACES + trade/§kw-l key
 list/gate tests/§drift-guard) + ADR 0117 + the ADR index row.
 
-**Track B — Core (U01, U02, U03).** U01 the context docs + `M16DocTypes` + the adapter.
+**Track B — Core (U01, U02, U03).** U01 the context docs + `InventoryDocTypes` + the adapter.
 U02 the read lanes + the service seam + the request DTOs + the DI registration. U03 the
 write lanes (create / edit / delete / check-out / check-in) + the standing probes + the
 atomic transition.
@@ -313,7 +313,7 @@ surfaces, in the same unit).
 | Unit | Track | One-line goal |
 |---|---|---|
 | **U00** | A | Design doc + ADR 0117 (lock D1–D8, C-M16·*, F1–F5 + trade, §kw-l, gate tests, §drift-guard) |
-| **U01** | B | `Kumunita.Core.Inventory` context: `InventoryItem` + `InventoryCheckout` + `M16DocTypes` (+ the open-checkout unique index) + the adapter |
+| **U01** | B | `Kumunita.Core.Inventory` context: `InventoryItem` + `InventoryCheckout` + `InventoryDocTypes` (+ the open-checkout unique index) + the adapter |
 | **U02** | B | Read lanes (`IInventoryService` + `InventoryService` list/detail/history) + `InventoryRequests.cs` + the DI registration + pinned Core tests |
 | **U03** | B | Write lanes (create / edit / delete / check-out / check-in) + the standing probes + the atomic transition + pinned Core tests |
 | **U04** | C | `InventoryController` + view models + list/detail/create views + the `inv.*` `kw-l` keys (×4) + pinned Web tests |
@@ -382,7 +382,7 @@ sign-off gate — no code unit may start until it is done.**
    Consequences) to mirror.
 5. `src/Kumunita.Core/Projects/ProjectToAuditableResource.cs` — the exact adapter
    shape (the 6-member projection) the design doc's §9.2 (adapter) section pins.
-6. `src/Kumunita.Core/M9DocTypes.cs` — the exact `*DocTypes` surface shape the design
+6. `src/Kumunita.Core/MessagingDocTypes.cs` — the exact `*DocTypes` surface shape the design
    doc's §2 (documents) section pins (the M9 `convo_uidx_pair` unique-index shape).
 
 **Deliverables (3 files).**
@@ -397,7 +397,7 @@ sign-off gate — no code unit may start until it is done.**
    lane + the recurring-checkout lane, each "own ADR"); `## §drift-guard — the frozen
    pins + the drift log`.
 2. `docs/adr/0117-inventory.md` — `Status: Accepted`; Context (the README M16 row);
-   Decision (D1–D8, the two documents + `M16DocTypes` + the adapter + the standing probe
+   Decision (D1–D8, the two documents + `InventoryDocTypes` + the adapter + the standing probe
    + the core-surface + no-notification stance); Consequences (the C-M16·* invariants).
 3. `docs/adr/README.md` — the index row for **0117** appended **after** the 0116 row
    (confirm 0117 is free first).
@@ -409,10 +409,10 @@ decisions, the key list, the gate tests). **No code unit may start until this is
 
 ---
 
-## U01 — The Inventory context (documents + `M16DocTypes` + the adapter)
+## U01 — The Inventory context (documents + `InventoryDocTypes` + the adapter)
 
 **Goal.** Create the `Kumunita.Core.Inventory` bounded context: the two documents
-(`InventoryItem`, `InventoryCheckout`), the `M16DocTypes` surface (with the
+(`InventoryItem`, `InventoryCheckout`), the `InventoryDocTypes` surface (with the
 open-checkout unique partial index), and the `InventoryItemToAuditableResource` adapter —
 all registered in `Program.cs`.
 
@@ -421,14 +421,14 @@ all registered in `Program.cs`.
 2. `src/Kumunita.Core/Projects/TodoItem.cs` — the document shape to mirror (the
    `Title`/`ComponentId`/`AuthorId`/`Audience`/`IsDeleted`/`LanguageCode`/`Created`/
    `Modified` field set).
-3. `src/Kumunita.Core/Messaging/Conversation.cs` — the M9 document + the `M9DocTypes`
+3. `src/Kumunita.Core/Messaging/Conversation.cs` — the M9 document + the `MessagingDocTypes`
    reference (the `convo_uidx_pair` unique-index shape).
-4. `src/Kumunita.Core/M9DocTypes.cs` — the exact `*DocTypes` surface shape (the
+4. `src/Kumunita.Core/MessagingDocTypes.cs` — the exact `*DocTypes` surface shape (the
    `opts.Schema.For<T>()` + `.UniqueIndex` idiom).
 5. `src/Kumunita.Core/Projects/ProjectToAuditableResource.cs` — the exact adapter
    shape (the 6-member projection; `TargetKind` is the only difference).
-6. `src/Kumunita.Web/Program.cs` (the `M5DocTypes.Configure(opts)` /
-   `M9DocTypes.Configure(opts)` block) — where `M16DocTypes.Configure(opts)` goes.
+6. `src/Kumunita.Web/Program.cs` (the `ProjectDocTypes.Configure(opts)` /
+   `MessagingDocTypes.Configure(opts)` block) — where `InventoryDocTypes.Configure(opts)` goes.
 7. `tests/Kumunita.Core.Tests/` (an existing doc-registration test, if present) — the
    pinned-test shape for the new surface.
 
@@ -444,7 +444,7 @@ all registered in `Program.cs`.
 2. `src/Kumunita.Core/Inventory/InventoryCheckout.cs` — the append-only usage record:
    `Id`, `ItemId`, `BorrowerId`, `CheckedOutAt`, `CheckedInAt` (nullable — open when
    null), `Note` (optional).
-3. `src/Kumunita.Core/M16DocTypes.cs` — the surface: `opts.Schema.For<InventoryItem>()`
+3. `src/Kumunita.Core/InventoryDocTypes.cs` — the surface: `opts.Schema.For<InventoryItem>()`
    (the `(ComponentId, Created)` + `(OwnerKind, Created)` feed/filter indexes) +
    `opts.Schema.For<InventoryCheckout>()` (the `(ItemId, CheckedOutAt)`
    thread-ordering index + the **unique partial index** on `(ItemId)` where
@@ -452,15 +452,15 @@ all registered in `Program.cs`.
 4. `src/Kumunita.Core/Inventory/InventoryItemToAuditableResource.cs` — the adapter (the
    **exact** `ProjectToAuditableResource` 6-member projection; `TargetKind = "inventory"`;
    `OwnerId = AuthorId`, `Audience = Item.Audience` projected verbatim).
-5. `src/Kumunita.Web/Program.cs` — `M16DocTypes.Configure(opts);` added to the
-   `*DocTypes.Configure(opts)` block (after `M9DocTypes.Configure(opts)`).
-6. A pinned Core test (in `tests/Kumunita.Core.Tests/`) — the `M16DocTypes` surface
+5. `src/Kumunita.Web/Program.cs` — `InventoryDocTypes.Configure(opts);` added to the
+   `*DocTypes.Configure(opts)` block (after `MessagingDocTypes.Configure(opts)`).
+6. A pinned Core test (in `tests/Kumunita.Core.Tests/`) — the `InventoryDocTypes` surface
    registers both documents + the unique partial index (the M9/M5 doc-registration test
    shape).
 
 **Exit.** `dotnet build Kumunita.slnx -c Debug` green **+** `dotnet exec
 tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` green. Append
-`## U01 — context docs + M16DocTypes + adapter` to the handoff notes (the field set, the
+`## U01 — context docs + InventoryDocTypes + adapter` to the handoff notes (the field set, the
 index set, the adapter's `TargetKind`).
 
 ---
@@ -539,7 +539,7 @@ unique partial index the F1 witness). The write lanes re-check standing **server
 3. `src/Kumunita.Core/Authorization/IAuthorizationService.cs` (the `CanAsync` +
    `IDocumentSession` overload) — the C3 same-transaction guarantee the write lanes
    compose.
-4. `src/Kumunita.Core/M9DocTypes.cs` (the `convo_uidx_pair` unique index) — the F1
+4. `src/Kumunita.Core/MessagingDocTypes.cs` (the `convo_uidx_pair` unique index) — the F1
    idempotency-witness shape the check-out lane enforces.
 5. `src/Kumunita.Core/Inventory/IInventoryService.cs` (U02) — the seam the write lanes
    extend (the M4 full-interface-first pin — U02 ships the reads, U03 appends the writes;

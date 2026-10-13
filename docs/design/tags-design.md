@@ -63,9 +63,9 @@ rule living in a comment instead of the invariant list below).
 
 - `Tag` / `TagTranslation` — new POCOs in the **new bounded context
   `Kumunita.Core.Tags`** (the ADR 0011 shared-id-doc shape, D1), registered in
-  the **new `TagDocTypes.Configure(StoreOptions)`** surface (the `M3DocTypes` /
+  the **new `TagDocTypes.Configure(StoreOptions)`** surface (the `PostDocTypes` /
   `MediaDocTypes` pattern), wired into both boot paths next to the existing
-  `M1DocTypes` / `M3DocTypes` / `MediaDocTypes` / `PageDocTypes` cluster.
+  `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes` / `PageDocTypes` cluster.
 - `Post.TagIds` / `Page.TagIds` — additive `string[]` fields (default empty),
   the ADR 0004 §B.1 additive pattern (D2). One field covers community *and*
   group posts (ADR 0013); `Page.TagIds` is populated only on `PageKind.User`
@@ -144,7 +144,7 @@ U2) will name each by id.
 | **C-TG·9** (TG-owned) | **Writes audit exactly one row:** attach / create / translate each resolve standing (→ `UnauthorizedAccessException` when denied) and, on success, write **one** hand-written `AccessAudit` row in the caller's session, single `SaveChangesAsync` — `tag.attach` (`TargetKind = "post"` / `"page"`), `tag.create` (`TargetKind = "tag"`), `tagtranslation.add` (`TargetKind = "tag"`); `Via` = `Owner` / `Admin` (ADR 0044 D7; the C3 idiom). | The C3 idiom (audit-on-write in the same transaction) applied to the tag lane. Detach is part of the same edit lane (re-saving the object's `TagIds`) (D7). There is **no** "delete tag" seam — a tag whose content is all removed is simply unreachable by the base query (D7 / D8). Tests F1 + the three audit-row tests. |
 | **C1** (ADR 0006) | Empty audience denies; a tag **never widens** a post's audience (ADR 0044 D2, D5). | The by-tag read reuses the post's existing `Decide()`, not a new branch; `Tag` carries no `Audience` (D1). |
 | **C3** (ADR 0006) | Audit always on for the **write** lanes (attach / create / translate); **reads** carry no row (ADR 0044 D7, realized as C-TG·8 / C-TG·9). | One `AccessAudit` row per write in the same transaction (C-TG·9); zero rows on reads (C-TG·8). |
-| **ADR 0004 §B.1** | `Tag` / `TagTranslation` are **Marten-native** POCOs, registered in `TagDocTypes` (new parallel surface), delta-detected, idempotent, **no seeding**, no EF migration; `Post.TagIds` / `Page.TagIds` are **additive fields** — a pre-existing post's `TagIds` read back **empty** after a warm re-boot (ADR 0044 D1, D2, D8). | The `M3DocTypes` / `MediaDocTypes` registration pattern exactly (D1 Consequences: additive, no migration). The `TagId, LanguageCode` pair is the DB-enforced business key (a `UniqueIndex`, the ADR 0026 convention). Test F11. |
+| **ADR 0004 §B.1** | `Tag` / `TagTranslation` are **Marten-native** POCOs, registered in `TagDocTypes` (new parallel surface), delta-detected, idempotent, **no seeding**, no EF migration; `Post.TagIds` / `Page.TagIds` are **additive fields** — a pre-existing post's `TagIds` read back **empty** after a warm re-boot (ADR 0044 D1, D2, D8). | The `PostDocTypes` / `MediaDocTypes` registration pattern exactly (D1 Consequences: additive, no migration). The `TagId, LanguageCode` pair is the DB-enforced business key (a `UniqueIndex`, the ADR 0026 convention). Test F11. |
 
 **Count: 12** (nine TG-owned + three called-on pins). This count (and the
 invariant-pin per row) is the input U2 needs to name the seam-test list and
@@ -193,7 +193,7 @@ Namespace conventions:
 - New bounded context: **`Kumunita.Core.Tags`** (`Tag`, `TagTranslation`,
   `ITagService` / `TagService`, `TagItem`) — the ADR 0011 shared-id-doc
   shape, exactly the ADR 0011 `MediaObject` model (D1).
-- Registration surface: `Kumunita.Core.TagDocTypes` (the `M3DocTypes` /
+- Registration surface: `Kumunita.Core.TagDocTypes` (the `PostDocTypes` /
   `PageDocTypes` pattern; U3 lands it).
 - Frozen surfaces the lane *calls but does not modify*:
   `Kumunita.Core.Authorization.IAuthorizationService`, the
@@ -337,7 +337,7 @@ public method to `PostService` or `PageService`**. Standing for *attach* is
 the object's own existing edit standing (D4); the tag-specific standing
 (translate) lives in `TagService` only.
 
-**Registration surface** (U3 lands it, mirroring `M3DocTypes` /
+**Registration surface** (U3 lands it, mirroring `PostDocTypes` /
 `PageDocTypes`):
 
 ```csharp
@@ -346,7 +346,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>TG</c> bounded context's Marten-native document registration
 /// surface (ADR 0004 §B.1, D1) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PostDocTypes"/> /
 /// <see cref="MediaDocTypes"/> / <see cref="PageDocTypes"/> for the new
 /// <c>Kumunita.Core.Tags</c> context (ADR 0011 shared-id-doc shape). Both
 /// documents use the conventional <c>string</c> <c>Id</c> identity; the

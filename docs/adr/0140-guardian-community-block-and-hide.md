@@ -192,7 +192,7 @@ perturbing the parity tests' closed-set assertions.
   scoped decisions (a `Profile` read the decision path did not previously
   perform) — every test harness that drives `AuthorizationService` through
   a store that does not register `Profile` (the `InventoryServiceTests`
-  minimal `M16DocTypes`-only store) must register `M1DocTypes`, the same as
+  minimal `InventoryDocTypes`-only store) must register `CoreDocTypes`, the same as
   its `PostServiceTests` / `ProjectServiceTests` siblings.
 - Frozen seams (`GetCommunityIdsAsync`, `ComponentMembership`, the ADR 0012
   mandatory lanes) are **byte-identical**; the new surface is three seams
@@ -216,5 +216,5 @@ perturbing the parity tests' closed-set assertions.
 - `KwLRegistryConsistencyTests` + `KnownTranslationKeys_ParityTests`: the
   four new keys present in all four dictionaries (D6).
 - `InventoryServiceTests`: unchanged behavior; the harness now registers
-  `M1DocTypes` so the community-branch `Profile` read resolves (see
+  `CoreDocTypes` so the community-branch `Profile` read resolves (see
   Consequences).

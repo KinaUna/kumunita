@@ -45,8 +45,8 @@ entry reads — it does not re-derive the register.
   row.
 - **Grounding facts verified at kickoff (U00's entry reads should re-verify,
   not trust this):** the closed document inventory spans nine `*DocTypes`
-  surfaces (`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` /
-  `M6DocTypes` / `M9DocTypes` / `MediaDocTypes` / `TagDocTypes` /
+  surfaces (`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` /
+  `NotificationDocTypes` / `MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` /
   `PageDocTypes`); the media volume is content-addressed
   (`MediaObject.Id` = the content hash, bytes at `{root}/{Id[0..2]}/{Id}`,
   `IMediaFileStore` / `IMediaStore`); the operator-surface house pattern is
@@ -205,7 +205,7 @@ Per the register's U01 entry reads:
 - `docs/design/m11-portability-design.md` — §manifest, §layout, §inventory,
   §drift-guard (the data U01 implements verbatim).
 - `src/Kumunita.Core/DependencyInjection.cs` — the `*DocTypes` registration
-  surfaces (`M1DocTypes` / `M3DocTypes` / … / `PageDocTypes`).
+  surfaces (`CoreDocTypes` / `PostDocTypes` / … / `PageDocTypes`).
 - `src/Kumunita.Core/Identity/*.cs` — the M1 domain document POCOs (the
   `subjectId` / `AvatarId` / `OwnerId` / `ComponentId` field shapes the
   reference map uses).

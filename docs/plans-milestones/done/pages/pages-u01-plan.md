@@ -18,7 +18,7 @@ unit: after it, the schema delta applies idempotently and the two docs exist.
 1. `docs/design/pages-design.md` §3.2 — the **exact** `Page` +
    `PageTranslation` field set + the field-provenance table (every field named
    to an existing idiom).
-2. `src/Kumunita.Core/M3DocTypes.cs` — the registration style + the
+2. `src/Kumunita.Core/PostDocTypes.cs` — the registration style + the
    `ann_tr_uidx_ann_lang` **short explicit index name** precedent (Postgres
    64-char `NAMEDATALEN`).
 3. `src/Kumunita.Core/Announcements/AnnouncementTranslation.cs` — the
@@ -40,7 +40,7 @@ unit: after it, the schema delta applies idempotently and the two docs exist.
 2. **`src/Kumunita.Core/Pages/PageTranslation.cs`** — the doc: `Id`, `PageId`,
    `LanguageCode`, `Title?`, `Body`, `AuthorId`, `Created`.
 3. **Registration** (pick **one** surface — recommend a new
-   `src/Kumunita.Core/Pages/PageDocTypes.cs`, the `M3DocTypes.cs` shape):
+   `src/Kumunita.Core/Pages/PageDocTypes.cs`, the `PostDocTypes.cs` shape):
    - `Page`: conventional `Id` + a **`(ParentId, Slug)`** unique index
      (root rows are `(null, Slug)`; the `GroupMembership` business-key
      convention).
@@ -62,7 +62,7 @@ unit: after it, the schema delta applies idempotently and the two docs exist.
 - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
   green — the schema delta applies **idempotently** (ADR 0004 §B.1), the two
   unique indexes present, and the existing `LocalizedPage` surface is
-  **untouched** (its `M1DocTypes` registration still there — U07 removes it).
+  **untouched** (its `CoreDocTypes` registration still there — U07 removes it).
 - The `Page`/`PageTranslation` POCOs are reviewable against the §3.2
   field-provenance table (every field names an existing idiom; no field is
   invented without an ADR anchor).
@@ -77,8 +77,8 @@ unit: after it, the schema delta applies idempotently and the two docs exist.
   `CreateAsync` here, stop — those are U02/U03. This unit is docs + indexes +
   DI only.
 - **Registration surface choice:** the register leaves `PageDocTypes` vs
-  `M3DocTypes` open. A **new `PageDocTypes.cs`** is the cleaner fit (a new
-  bounded context deserves its own surface — the `M3DocTypes` name implies
+  `PostDocTypes` open. A **new `PageDocTypes.cs`** is the cleaner fit (a new
+  bounded context deserves its own surface — the `PostDocTypes` name implies
   M3-specific docs). Record whichever you pick in the handoff section.
 - **`IsDeleted` is declared in U01** (part of the doc shape) but **acted on**
   in U03 (the soft-delete write lane) and U02 (the `CanSeeAsync` filter). The

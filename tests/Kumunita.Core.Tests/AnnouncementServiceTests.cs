@@ -2306,13 +2306,13 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers AccessAudit (the read lane's "no audit
+            // CoreDocTypes registers AccessAudit (the read lane's "no audit
             // row" pin needs it in the schema to query).
-            M1DocTypes.Configure(opts);
-            // M3DocTypes registers Announcement (the M3b "platform announcements"
+            CoreDocTypes.Configure(opts);
+            // PostDocTypes registers Announcement (the M3b "platform announcements"
             // lane's bounded context — the whole point of these tests) alongside
             // Post / PostReply / Report.
-            M3DocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -2368,7 +2368,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     [Fact]
     public async Task M36_Announcement_Published_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         const string author = "u-m36-ann-author";
@@ -2389,7 +2389,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     [Fact]
     public async Task M36_Announcement_Draft_Mention_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         const string author = "u-m36-ann-draft-author";
@@ -2404,7 +2404,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     [Fact]
     public async Task M36_Announcement_Published_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var svc = new AnnouncementService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
         const string author = "u-m36-ann-inert-author";
 

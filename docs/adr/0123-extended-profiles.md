@@ -41,7 +41,7 @@ M23 rides **frozen** seams, extending none of them:
 - **The ADR 0004 §B.1 additive-surface discipline** — the two new fields are
   **additive POCO fields on the existing `Profile` doc** (delta-detected,
   idempotent, **no re-seed**, **no migration**, **no new DocTypes surface** —
-  `Profile` already registers in `M1DocTypes`; D1).
+  `Profile` already registers in `CoreDocTypes`; D1).
 
 ## Context
 
@@ -105,7 +105,7 @@ surface (ADR 0004 §B.1).** The M1-registered `Profile` doc
 (`Kumunita.Core.UserInfo`) gains exactly two **additive POCO fields** (the
 `Post.Status` / `Post.TagIds` / `Profile.AvatarId` / `Profile.TimeZone` history
 — delta-detected, idempotent, **no re-seed**, **no EF migration**, **no new
-`*DocTypes` surface** — `Profile` already registers in `M1DocTypes`):
+`*DocTypes` surface** — `Profile` already registers in `CoreDocTypes`):
 `public string? Bio { get; set; }` (null/empty ⇒ no bio block) and
 `public string[] TagIds { get; set; } = []` (a `string[]` of **`Tag.Id`** values
 referencing the **frozen ADR 0044 `Tag`** — the `Post.TagIds` / `Page.TagIds`
@@ -254,7 +254,7 @@ reuses it as-is.
 - **The bio is a field on the `Profile`; the tags reference the frozen ADR 0044
   `Tag`** (D1, C-M23·6): **no** new document, **no** new context, **no** new
   DocTypes surface, **no** migration (the ADR 0004 §B.1 additive field lane) —
-  `Profile` already registers in `M1DocTypes`; adding two fields is delta-
+  `Profile` already registers in `CoreDocTypes`; adding two fields is delta-
   detected and idempotent, every existing row unchanged.
 - **The bio is rich content, null-safe** (D5, C-M23·5): rendered by the
   **existing** `MarkdownRenderer.RenderHtml` helper (the "single Markdown
@@ -331,7 +331,7 @@ captioning (D8·6).
   WYSIWYG + the single `MarkdownRenderer.RenderHtml` engine), and ADR 0090 D6 /
   M8 D4 (the `PageSize = 30` idiom + the bio-substring engine). The two existing
   profile adapters, the frozen ADR 0044 `Tag`/`ITagService` seams, and the
-  `M1DocTypes` registration are **unchanged** (C-M23·2/6). This is stated
+  `CoreDocTypes` registration are **unchanged** (C-M23·2/6). This is stated
   explicitly so a later reader knows M23 is an **additive profile + find-people
   surface, not a correction** — no earlier ADR's decisions are revised or
   re-scoped by this one.

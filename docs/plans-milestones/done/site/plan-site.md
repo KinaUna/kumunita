@@ -755,7 +755,7 @@ handoff note.
   `src/Kumunita.Core/Localization/LanguageCatalog.cs` (the
   `LocaleSettings` singleton — the `Id = "singleton"` sentinel
   shape, the additive-field convention),
-  `src/Kumunita.Core/M1DocTypes.cs` (the `LocaleSettings`
+  `src/Kumunita.Core/CoreDocTypes.cs` (the `LocaleSettings`
   registration — the `opts.Schema.For<LocaleSettings>()` shape),
   `src/Kumunita.Core/DependencyInjection.cs` (the DI
   registration — the `AddTransient<IPageService>(sp => new
@@ -792,7 +792,7 @@ handoff note.
      the DI registration (the `AddTransient<ISiteContentService>(sp
      => new SiteContentService(sp.GetRequiredService<IDocumentStore>()))`
      shape) + the `SiteContentDocTypes.Configure(opts)` call in
-     the schema bootstrap (the `M1DocTypes.Configure(opts)` /
+     the schema bootstrap (the `CoreDocTypes.Configure(opts)` /
      `PageDocTypes.Configure(opts)` shape).
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` green.
   Handoff note: a `## U03 — Core: SiteContent doc + service +

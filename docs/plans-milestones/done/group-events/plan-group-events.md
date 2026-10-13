@@ -31,7 +31,7 @@ events on the group page; excluded from the community feed/calendar.
 - **Data is one additive `Event` field, no new index (GE·2/GE·8).**
   `Event.GroupId` (`string`, default `string.Empty`) — ADR 0004 §B.1
   additive, the `Post.GroupId` precedent (delta-detected, idempotent, no
-  re-seed, **no** `M4DocTypes` index). Written only by
+  re-seed, **no** `EventDocTypes` index). Written only by
   `CreateGroupEventAsync`, which pins `ComponentId = string.Empty` and
   `Audience = new Audience()`. `EventService`'s constructor is **unchanged**.
 - **The community read seams gain an explicit filter (GE·2).**

@@ -4,7 +4,7 @@ namespace Kumunita.Core;
 
 /// <summary>
 /// The M31 error-report bounded context's Marten-native document
-/// registration surface (ADR 0004 §B.1, the UsageDocTypes / M3DocTypes
+/// registration surface (ADR 0004 §B.1, the UsageDocTypes / PostDocTypes
 /// parallel-surface shape). ErrorReport uses the conventional string Id
 /// identity (Marten default), so only the (TriageStatus, Created) index
 /// for the admin list ordering needs pinning.

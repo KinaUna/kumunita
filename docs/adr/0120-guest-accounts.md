@@ -246,7 +246,7 @@ per-surface fine-grained control (D7 lane 3); guest notification / messaging
 - `src/Kumunita.Core/Identity/IdentityService.cs` — the implementations of the
   two new members (the `SetSignupOpenAsync` body pattern, the single audited
   write lane) (D2).
-- `src/Kumunita.Core/M1DocTypes.cs` — the `Identity.GuestAccess` registration
+- `src/Kumunita.Core/CoreDocTypes.cs` — the `Identity.GuestAccess` registration
   (D2).
 - `src/Kumunita.Core/Identity/ThinPrincipal.cs` — the `Roles.Guest` constant
   (the `ClaimTypes.All` set **untouched**) (D5).

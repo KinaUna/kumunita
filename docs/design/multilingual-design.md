@@ -17,7 +17,7 @@
 
 M1 shipped the **seed surface** of ADR 0005: the `LanguageCatalog` and
 `LocaleSettings` POCOs (in `src/Kumunita.Core/Localization/`), registered on
-`M1DocTypes`, and materialized by the first-run seeder (`FirstBootSeeder` step 4) —
+`CoreDocTypes`, and materialized by the first-run seeder (`FirstBootSeeder` step 4) —
 the source-language `en` row (enabled, sort 0) and the instance default (`en`).
 `how-it-works.md` and `ARCHITECTURE.md` §8/§9 already name the two *unshipped*
 documents the ADR's module surface promises:
@@ -133,7 +133,7 @@ namespace Kumunita.Core.Localization;
 
 /// <summary>
 /// One UI-string translation (ADR 0005 B; M·2/M·4). The business key is
-/// (Key, LanguageCode) — the unique index in M1DocTypes enforces one text per key
+/// (Key, LanguageCode) — the unique index in CoreDocTypes enforces one text per key
 /// per language (the GroupMembership / ComponentMembership pair idiom). A resident
 /// never sees a blank label (M·1): a missing (Key, preferred) falls back to
 /// (Key, default) → (Key, "en") → the Key itself (M·9's floor is "en", always
@@ -170,10 +170,10 @@ public sealed class LocalizedPage
 }
 ```
 
-**The `M1DocTypes` registration** (the additive on the existing surface — the
+**The `CoreDocTypes` registration** (the additive on the existing surface — the
 `GroupMembership` unique-index idiom, ADR 0004 §B.1):
 ```csharp
-// M1DocTypes.Configure(StoreOptions) — appended after the existing
+// CoreDocTypes.Configure(StoreOptions) — appended after the existing
 // `opts.Schema.For<LanguageCatalog>(); opts.Schema.For<LocaleSettings>();` lines:
 opts.Schema.For<TranslationResource>()
        .UniqueIndex(t => t.Key, t => t.LanguageCode);   // business key (one text per key per language)
@@ -478,7 +478,7 @@ verbatim, rename it in the same commit + one-line drift note).
   `LanguageCompleteness` — the **exact** signatures and the audit-row shape table
   freeze when **U3** lands them; the provider's four-method shape freezes when
   **U2** lands it; Web consumes, never re-scopes.
-- **The `M1DocTypes` unique indexes** — freeze when **U1** lands them (Marten's
+- **The `CoreDocTypes` unique indexes** — freeze when **U1** lands them (Marten's
   delta detects the new docs — no re-seed, ADR 0004 §B.1).
 - **`LocaleCookie`** — the **one** Web HTTP seam (M·5/M·8); the cookie name
   `kumunita.locale` and the read/write/clear trio freeze when **U4** lands it.
@@ -490,7 +490,7 @@ verbatim, rename it in the same commit + one-line drift note).
   3. **never introduces a test** whose exact name is not in the §Pinned seam tests
      list (a rename only with a note — no silent drift);
   4. **never opens a new seam** beyond the pin (the two content docs, the two
-     interfaces, `LanguageCompleteness`, `LocaleCookie`, the `M1DocTypes` indexes)
+     interfaces, `LanguageCompleteness`, `LocaleCookie`, the `CoreDocTypes` indexes)
      — **any other Core/Web ADD is a `## U<m> — Drift pause`**; and **never
      re-shapes** the two documents / the two interfaces outside this pin;
   5. **if entry reads reveal this design doc is out of date**, the unit **pauses**
@@ -502,12 +502,12 @@ verbatim, rename it in the same commit + one-line drift note).
 | Invariants | 9 (M·1–M·9) | this doc |
 | FACES | 13 (M1–M13) | this doc |
 | content docs | 2 (`TranslationResource`, `LocalizedPage`) | U1 |
-| `M1DocTypes` unique indexes | 2 | U1 |
+| `CoreDocTypes` unique indexes | 2 | U1 |
 | Core interfaces | 2 (`ITranslationProvider`, `ILocalizationService`) + 1 record (`LanguageCompleteness`) | U2/U3 |
 | Web HTTP seams | 1 (`LocaleCookie`) + 1 controller (`LanguagesController`) + settings/static-page routes | U4–U6 |
 | test names | 19 (13 FACES + 6 audit-row-shape) | U7 |
 | gate tests | 3 (closed loop / handoff / part-vs-whole) | U8 |
-| `M1DocTypes` changes | **2 additive** (the two new docs — no re-seed) | U1 |
+| `CoreDocTypes` changes | **2 additive** (the two new docs — no re-seed) | U1 |
 
 ## Multilingual — Gate (recorded by U8)
 
@@ -548,7 +548,7 @@ test, and re-verifies the two assemblies stay green after the roadmap bump.
 
 **Consistency checklist (all confirmed):**
 - **Seams present (frozen when landed):** the 2 content docs
-  (`TranslationResource` / `LocalizedPage`, U1) + the 2 `M1DocTypes` unique
+  (`TranslationResource` / `LocalizedPage`, U1) + the 2 `CoreDocTypes` unique
   indexes (U1) · `ITranslationProvider` + `TranslationProvider` (U2) ·
   `ILocalizationService` + `LocalizationService` + `LanguageCompleteness` (U3) ·
   `LocaleCookie` (the **one** Web HTTP seam, U4) + the two `AddTransient` DI
@@ -570,7 +570,7 @@ test, and re-verifies the two assemblies stay green after the roadmap bump.
   **shipped** (roadmap row now **Done.**, `M4` now **Next.**) and the feature
   bullet restated as the live admin + resident surface.
 - **`ARCHITECTURE.md` §8/§9:** §9 "Current state" restated to **`ML` lane
-  shipped**; the `M1DocTypes` / `Localization/` tree note restated from "lands
+  shipped**; the `CoreDocTypes` / `Localization/` tree note restated from "lands
   with M6" to **shipped (ML)**; the value-chain milestone table de-`ML`-folds
   (multilingual is a *named lane*, like `GP`/media, not an M-letter row) — and
   M6's row no longer lists "multilingual".

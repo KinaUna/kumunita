@@ -336,8 +336,8 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

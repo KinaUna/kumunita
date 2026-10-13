@@ -217,7 +217,7 @@ public sealed class StorageMetricsHistoryTests(PostgresFixture fixture) : IClass
             opts.DatabaseSchemaName = "mt";
             MediaDocTypes.Configure(opts);            // MediaObject (the M24 snapshot read)
             StorageHistoryDocTypes.Configure(opts);   // StorageMetricsSample (the M33 doc)
-            M1DocTypes.Configure(opts);               // AccessAudit (the M33·4 zero-audit query)
+            CoreDocTypes.Configure(opts);               // AccessAudit (the M33·4 zero-audit query)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

@@ -435,11 +435,11 @@ public class MiscListSortTests(PostgresFixture fixture) : IClassFixture<Postgres
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);   // M21 (ADR 0122 D1)
-            M16DocTypes.Configure(opts);        // M16 (ADR 0117) — the inventory documents
+            InventoryDocTypes.Configure(opts);        // M16 (ADR 0117) — the inventory documents
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

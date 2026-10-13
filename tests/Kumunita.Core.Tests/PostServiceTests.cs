@@ -1206,8 +1206,8 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -1925,7 +1925,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public async Task M36_Post_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -1951,7 +1951,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public async Task M36_Post_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
         const string comp = "c-m36-inert";
@@ -1972,7 +1972,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public async Task M36_Post_Draft_Mention_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -1994,7 +1994,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public async Task M36_Reply_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -2025,7 +2025,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public async Task M36_Reply_MentionSelf_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         // The replier's own display name — the token matches the replier, who
         // is excluded by SubjectId (the M36-5 self pin).
         await MentionEmitters.PlantResidents(boot.Store, ("u-m36-self-replier", "Replier"));

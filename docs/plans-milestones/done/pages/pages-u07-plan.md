@@ -9,7 +9,7 @@
 ## Goal
 
 **Only after U01–U06 are green:** delete the `LocalizedPage` doc + its
-`M1DocTypes` registration + `ITranslationProvider.GetPageAsync` /
+`CoreDocTypes` registration + `ITranslationProvider.GetPageAsync` /
 `FindPageByImageIdAsync` + `ILocalizationService.UpsertPageAsync` + the
 `StaticPagesController`'s *fallback-to-`LocalizedPage`* path (it now reads the
 tree) + any `KnownTranslationKeys` page-string entries that were
@@ -41,7 +41,7 @@ migration is a no-op in effect** — the seeded pages (U05) already carry the
 ## Deliverables (closed set)
 
 1. **Delete `LocalizedPage`** — `src/Kumunita.Core/Localization/LocalizedPage.cs`
-   (the doc) + its **`M1DocTypes`** registration (the
+   (the doc) + its **`CoreDocTypes`** registration (the
    `.UniqueIndex(p => p.Slug, p => p.LanguageCode)`).
 2. **Delete `ITranslationProvider.GetPageAsync` / `FindPageByImageIdAsync`**
    (+ their impls in `LocalizationService`) — the page-specific read seams.

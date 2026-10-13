@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M6</c> (Notifications) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0076 D1) — the parallel surface
-/// to <see cref="M5DocTypes"/> for the new <c>Kumunita.Core.Notifications</c>
+/// to <see cref="ProjectDocTypes"/> for the new <c>Kumunita.Core.Notifications</c>
 /// context. Both documents are POCOs with the conventional <c>string</c>
 /// <c>Id</c> identity (the M5 convention), so only the feed/index needs
 /// pinning. The docs are new, not additive; the surface is additive —
@@ -14,7 +14,7 @@ namespace Kumunita.Core;
 /// applies the new tables idempotently at boot. **Zero migrations for
 /// existing surfaces.**
 /// </summary>
-public static class M6DocTypes
+public static class NotificationDocTypes
 {
     public static void Configure(StoreOptions opts)
     {
@@ -30,7 +30,7 @@ public static class M6DocTypes
 
         // NotificationPreference — the RecipientId is the document id (one
         // row per recipient; the §6.1 shape has no separate Id field), so the
-        // identity is pinned to RecipientId — the <see cref="M1DocTypes"/>
+        // identity is pinned to RecipientId — the <see cref="CoreDocTypes"/>
         // <c>Profile</c> precedent (<c>.Identity(p => p.SubjectId)</c>). A bare
         // <c>Schema.For&lt;NotificationPreference&gt;()</c> would fail Marten's
         // identity resolution at schema-compile time (InvalidDocumentException)
@@ -40,7 +40,7 @@ public static class M6DocTypes
 
         // ── ADR 0121 (M20) — the per-resident quiet schedule ────────────
         // One row per recipient; the RecipientId IS the document identity
-        // (the NotificationPreference shape — the M1DocTypes Profile
+        // (the NotificationPreference shape — the CoreDocTypes Profile
         // .Identity precedent). A bare Schema.For<NotificationQuietSchedule>()
         // would fail Marten's identity resolution; pin it (the same
         // InvalidDocumentException the NotificationPreference pin guards

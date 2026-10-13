@@ -59,8 +59,8 @@ internal static class MentionEmitters
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);   // Profile + AccessAudit
-            M6DocTypes.Configure(opts);   // Notification (the mention row the surface emits)
+            CoreDocTypes.Configure(opts);   // Profile + AccessAudit
+            NotificationDocTypes.Configure(opts);   // Notification (the mention row the surface emits)
             foreach (var cfg in surfaceDocTypes) cfg(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);

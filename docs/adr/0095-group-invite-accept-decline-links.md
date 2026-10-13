@@ -55,7 +55,7 @@ clickable buttons in the **inbox** and the `/groups` invitations card. The two
 are **independent** (either may be absent); only the `group.invite` lane
 supplies both.
 
-**Core — the `Notification` doc (`M6DocTypes` surface):** two additive
+**Core — the `Notification` doc (`NotificationDocTypes` surface):** two additive
 nullable fields, `AcceptPath?` + `DeclinePath?` (same-origin relative paths,
 the ADR 0085 `LinkPath` shape). Marten delta-detects them; **no explicit
 index** (display/debug only, never a query gate — the `IdempotencyKey` index

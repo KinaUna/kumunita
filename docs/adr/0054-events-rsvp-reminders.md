@@ -83,7 +83,7 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
     latest status is simply the truth (upsert semantics). **No
     `AccessAudit` row on an RSVP** — a routine resident action, not an
     access decision (the profile-edit posture).
-  - **`M4DocTypes`** — a new document surface (the `M3DocTypes` pattern
+  - **`EventDocTypes`** — a new document surface (the `PostDocTypes` pattern
     verbatim): `Event` (conventional `Id`) + a `(ComponentId, Start)`
     index (the feed ordering shape) + `EventRsvp` (the unique
     `(EventId, UserId)` index). **Zero migrations for existing surfaces** —

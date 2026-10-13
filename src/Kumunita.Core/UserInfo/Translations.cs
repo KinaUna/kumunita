@@ -22,7 +22,7 @@ namespace Kumunita.Core.UserInfo;
 /// posts and replies).
 /// <para>
 /// One row per (group, language) pair — the <c>(GroupId, LanguageCode)</c>
-/// unique index (<see cref="M1DocTypes.Configure"/>) enforces that at the
+/// unique index (<see cref="CoreDocTypes.Configure"/>) enforces that at the
 /// database layer (Marten's document identity is the surrogate <see cref="Id"/>,
 /// the same <see cref="GroupMembership"/> business-key convention as M1). The
 /// translation carries its own optional <see cref="Name"/> and optional
@@ -92,7 +92,7 @@ public sealed class GroupTranslation
 /// <para>
 /// One row per (community, language) pair — the
 /// <c>(ComponentId, LanguageCode)</c> unique index
-/// (<see cref="M1DocTypes.Configure"/>) enforces that at the database layer
+/// (<see cref="CoreDocTypes.Configure"/>) enforces that at the database layer
 /// (Marten's document identity is the surrogate <see cref="Id"/>, the same
 /// <see cref="ComponentMembership"/> business-key convention as M1). The
 /// translation carries its own optional <see cref="Name"/> and optional

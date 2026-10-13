@@ -68,7 +68,7 @@ The `kumunita_dpkeys` wiring is: `Dockerfile` `VOLUME /data/dataprotection-keys`
 
 Truth confirmed in shipped code: `Program.cs` `AddMarten` registers Weasel
 storage features (`opts.Storage.Add<KumunitaFeature>` /
-`AuthorizationFeature`, `M1DocTypes` / `M3DocTypes` / `MediaDocTypes`) and
+`AuthorizationFeature`, `CoreDocTypes` / `PostDocTypes` / `MediaDocTypes`) and
 `Bootstrap/SchemaBootstrap.cs:48` applies them via
 `ApplyAllConfiguredChangesToDatabaseAsync()` — delta detection against the
 live `mt` catalog, no ledger. `StoreOptions.Migrations` / `IMigration` /

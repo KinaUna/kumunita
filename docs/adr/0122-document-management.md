@@ -40,7 +40,7 @@ M21 rides **frozen** seams, extending none of them:
   disallowed type → 415, no file written) (D6, D7, D5).
 - **The ADR 0004 §B.1 additive-surface discipline** — the new `Document`
   document is registered on a **new parallel additive `DocumentDocTypes`
-  surface** (the `M17DocTypes` / `MediaDocTypes` shape — delta-detected,
+  surface** (the `BookmarkDocTypes` / `MediaDocTypes` shape — delta-detected,
   idempotent, no seeding, **zero migrations**), wired with one line in
   `Program.cs`'s `AddMarten` lambda (D1).
 
@@ -93,7 +93,7 @@ ADR 0011 content-addressed blob id), `Filename?`, `ContentType`, `SizeBytes`,
 `Audience` (non-null — the **only** access carrier), `OwnerId` (the uploader),
 `Created`, `Modified?` (present, set only on a future replace — null in M21).
 Registered on a **new parallel additive surface** `DocumentDocTypes.Configure`
-(the `M17DocTypes` / `MediaDocTypes` shape — delta-detected, idempotent, no
+(the `BookmarkDocTypes` / `MediaDocTypes` shape — delta-detected, idempotent, no
 seeding), wired with one line in `Program.cs` (D1). *Forbids:* a new
 relational table, a new `AccessAction`, a per-document `AccessVia`/standing, or
 encoding per-document access in an identity claim (C-M21·1/C-M21·2).

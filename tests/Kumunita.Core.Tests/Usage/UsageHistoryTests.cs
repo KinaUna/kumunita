@@ -242,7 +242,7 @@ public sealed class UsageHistoryTests(PostgresFixture fixture) : IClassFixture<P
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
             UsageDocTypes.Configure(opts);   // UsageEvent (the M13 doc the read GROUPs)
-            M1DocTypes.Configure(opts);      // AccessAudit (the M34·4 zero-audit query)
+            CoreDocTypes.Configure(opts);      // AccessAudit (the M34·4 zero-audit query)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

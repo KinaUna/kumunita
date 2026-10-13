@@ -9,7 +9,7 @@ namespace Kumunita.Core.Announcements;
 /// <para>
 /// One row per (announcement, language) pair — the
 /// <c>(AnnouncementId, LanguageCode)</c> unique index
-/// (<see cref="M3DocTypes.Configure"/>) enforces that at the database layer
+/// (<see cref="PostDocTypes.Configure"/>) enforces that at the database layer
 /// (Marten's document identity is the surrogate <see cref="Id"/>, the same
 /// <see cref="Kumunita.Core.UserInfo.GroupMembership"/> business-key
 /// convention as M1). The translation carries its own optional

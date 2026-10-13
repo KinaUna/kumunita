@@ -967,12 +967,12 @@ public class SearchServiceTests(PostgresFixture fixture) : IClassFixture<Postgre
     {
         return BootStoreAsync(store =>
         {
-            M1DocTypes.Configure(store);
-            M3DocTypes.Configure(store);
-            M4DocTypes.Configure(store);
+            CoreDocTypes.Configure(store);
+            PostDocTypes.Configure(store);
+            EventDocTypes.Configure(store);
             PageDocTypes.Configure(store);
-            M5DocTypes.Configure(store);
-            M16DocTypes.Configure(store);
+            ProjectDocTypes.Configure(store);
+            InventoryDocTypes.Configure(store);
             DocumentDocTypes.Configure(store);
             TagDocTypes.Configure(store);
         });

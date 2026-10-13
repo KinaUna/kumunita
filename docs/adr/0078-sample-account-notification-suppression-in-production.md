@@ -126,7 +126,7 @@ data" value is preserved.
   → sample accounts notified. The safe default is "notify," matching
   the M6 D7 posture that the inbox is the primary record.
 - **No change to the recipient's preference lane, the idempotency
-  contract, the dead-letter / health posture, or the `M6DocTypes`
+  contract, the dead-letter / health posture, or the `NotificationDocTypes`
   surface.** The gate is a pure early-return on the emission path; the
   durable-outbox trio, the `IMailerStage` idempotency guarantee, the
   `EmailDeadLetterWriter` + `/health` degraded gate, and the

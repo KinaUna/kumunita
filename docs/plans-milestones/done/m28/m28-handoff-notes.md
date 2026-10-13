@@ -45,7 +45,7 @@
   touches none of them).
 - **No code, no build, no test** (a docs unit, per the unit plan).
 
-## U01 — doc + enum + M1DocTypes
+## U01 — doc + enum + CoreDocTypes
 
 - **Doc fields (5, defaults):** `ChildId` (string, identity — the `GuardianLink.ChildId` analog),
   `Enabled` (bool, default `false` = the floor, C-M28·3), `Mode`
@@ -56,7 +56,7 @@
 - **Enum values (2):** `TimeLimitMode.Blocked = 0` (restricted DURING the
   window, the lean default), `TimeLimitMode.Allowed = 1` (restricted EXCEPT the
   window, the allow-list). Closed two-value enum (the ADR 0120 D4 idiom).
-- **M1DocTypes line:** new registration at `M1DocTypes.cs:78` —
+- **CoreDocTypes line:** new registration at `CoreDocTypes.cs:78` —
   `opts.Schema.For<UserInfo.GuardianTimeLimitSchedule>().Identity(s => s.ChildId);`
   added immediately after the `GuardianLink` line (`:69`); part of the GU
   surface (no new `*DocTypes`, no EF migration, ADR 0004 §B.1).
@@ -347,7 +347,7 @@ before §2.9 drift-guard — the M27 U11 shape). `m28-u08.md` stays in
 | Unit | One-line goal | Tests (count) | Deviations |
 |---|---|---|---|
 | U00 | Design doc + ADR 0151 (the sign-off gate) | 0 (a docs unit) | 1 recorded (D7 "14 keys" = 13 `guardian.timelimit.*` + 1 `account.time_limit.login_message`) |
-| U01 | `GuardianTimeLimitSchedule` doc + `TimeLimitMode` enum + `M1DocTypes` registration | 0 (U02's tests are the first) | 1 (doc-comment forward ref kept as `<c>` text to stay warning-free) |
+| U01 | `GuardianTimeLimitSchedule` doc + `TimeLimitMode` enum + `CoreDocTypes` registration | 0 (U02's tests are the first) | 1 (doc-comment forward ref kept as `<c>` text to stay warning-free) |
 | U02 | Pure `GuardianTimeLimitEvaluator` + pure tests | 7 (F1–F4 pure, all PASS) | 1 (F4 spec made consistent — `Hours=[22,23]` for a genuine zone flip) |
 | U03 | 3 `IUserInfoService` seams + impl + standing/audit | 7 (F5/C-M28·4/7, all PASS) | 1 (C-M28·5 pin reads "4-method surface" = 4 distinct names, stable to the two-form overload pattern) |
 | U04 | `TimeLimitMiddleware` + `Program.cs` + `?error=time-limit` landing | 3 (F6, all PASS) | 1 (the `?error=blocked`-shaped switch is in `Views/Account/Login.cshtml`, not `AccountController.cs`) + left 1 `KwLRegistryConsistencyTests` red on the not-yet-registered key (U05 resolved) |

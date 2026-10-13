@@ -176,7 +176,7 @@ public static class PortabilityValidate
             // Build the id set for check (c) resolution (the
             // <c>→ {DocType}</c> target). The identity field is
             // conventionally <c>Id</c> (the Marten default) — except
-            // <c>Profile</c> (its identity is <c>SubjectId</c>, M1DocTypes
+            // <c>Profile</c> (its identity is <c>SubjectId</c>, CoreDocTypes
             // §B.1). The <c>MediaObject</c> id set is the
             // <c>media_manifest</c> set (C-M11·3: the doc + the bytes are
             // a pair; check (d) verifies the bytes).

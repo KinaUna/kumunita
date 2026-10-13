@@ -69,7 +69,7 @@ things follow from the roadmap sentence:
    a catalog row — `Title`, `Summary?`, `MediaId`, `Filename?`, `ContentType`,
    `SizeBytes`, a **non-null `Audience`**, `OwnerId`, `Created`, `Modified?` —
    registered on a **new additive `DocumentDocTypes` surface** (ADR 0004 §B.1,
-   the `M17DocTypes` / `MediaDocTypes` shape), in a **new bounded context**
+   the `BookmarkDocTypes` / `MediaDocTypes` shape), in a **new bounded context**
    `Kumunita.Core.Documents`.
 2. **"…with per-document access controls"** = the document's **`Audience`** is
    the *entire* access story (ADR 0006-C1 **deny-by-default**: an empty audience
@@ -128,10 +128,10 @@ things follow from the roadmap sentence:
 surface (ADR 0004 §B.1).** A new document `Kumunita.Core.Documents.Document`
 (namespace `Kumunita.Core.Documents`, a **new bounded context** alongside
 `Posts` / `Events` / `Pages`), registered on a **new parallel additive surface**
-`DocumentDocTypes.Configure(StoreOptions)` (the `M17DocTypes` / `MediaDocTypes`
+`DocumentDocTypes.Configure(StoreOptions)` (the `BookmarkDocTypes` / `MediaDocTypes`
 shape — Marten-native POCO, conventional `Id` string, delta-detected +
 idempotent, **no seeding**), wired with **one line** in `Program.cs`'s
-`AddMarten` lambda (next to `M17DocTypes.Configure(opts);`,
+`AddMarten` lambda (next to `BookmarkDocTypes.Configure(opts);`,
 `SchemaBootstrap.cs` **not touched** — it calls no `*DocTypes.Configure`).
 Shape (locked by U00's design doc):
 
@@ -459,7 +459,7 @@ public sealed class Document
 }
 ```
 
-`DocumentDocTypes` (D1) — the new additive surface (the `M17DocTypes` /
+`DocumentDocTypes` (D1) — the new additive surface (the `BookmarkDocTypes` /
 `MediaDocTypes` shape — ADR 0004 §B.1, delta-detected, idempotent, no seeding):
 
 ```csharp
@@ -468,9 +468,9 @@ using Marten;
 namespace Kumunita.Core.Documents;
 
 /// <summary>
-/// The M21 additive doc surface (ADR 0004 §B.1 — the M17DocTypes /
+/// The M21 additive doc surface (ADR 0004 §B.1 — the BookmarkDocTypes /
 /// MediaDocTypes parallel-surface shape). Registered with one line in
-/// Program.cs's AddMarten lambda, next to M17DocTypes.Configure(opts);.
+/// Program.cs's AddMarten lambda, next to BookmarkDocTypes.Configure(opts);.
 /// SchemaBootstrap.cs is NOT touched (it calls no *DocTypes.Configure).
 /// </summary>
 public static class DocumentDocTypes

@@ -9,7 +9,7 @@ namespace Kumunita.Core.Tests;
 
 /// <summary>
 /// The <c>M16</c> U01 pin (ADR 0117 D1 / D2 / D4, the design doc §2 + §9.2):
-/// the <see cref="M16DocTypes"/> surface registers **both** documents
+/// the <see cref="InventoryDocTypes"/> surface registers **both** documents
 /// (<see cref="InventoryItem"/> + <see cref="InventoryCheckout"/>) and the
 /// **open-checkout unique partial index** (the F1 idempotency witness — at most
 /// one open checkout per item; a concurrent double-check-out's second commit
@@ -21,7 +21,7 @@ namespace Kumunita.Core.Tests;
 /// <c>KumunitaFeatureDdlTests</c> / <c>AdminOverrideDdlTests</c> shape), not the
 /// in-memory object graph.
 /// </summary>
-public class M16DocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public class InventoryDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
     private string _connection = "";
 
@@ -42,7 +42,7 @@ public class M16DocTypesDdlTests(PostgresFixture fixture) : IClassFixture<Postgr
             // the established shape that actually applies the document DDL.
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M16DocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
         });
 
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);

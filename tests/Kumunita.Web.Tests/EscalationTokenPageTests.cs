@@ -301,7 +301,7 @@ public class EscalationTokenPageTests(PostgresFixture fixture) : IClassFixture<P
     /// Boot a fresh scratch store with the two ESC doc types (the
     /// <see cref="Kumunita.Core.EscalationDocTypes.Configure"/> surface — the
     /// <c>EscalationOutboundConfig</c> singleton the save writes) + the
-    /// <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.M1DocTypes.Configure"/>)
+    /// <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.CoreDocTypes.Configure"/>)
     /// registered in the <c>DocumentStore.For</c> lambda — the
     /// <see cref="M15AcceptanceTests.BuildRealAsync"/> idiom in this assembly.
     /// </summary>
@@ -315,7 +315,7 @@ public class EscalationTokenPageTests(PostgresFixture fixture) : IClassFixture<P
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             EscalationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);

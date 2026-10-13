@@ -41,7 +41,7 @@ M22 rides **frozen** seams, extending none of them:
   EF migration**, **no new `*DocTypes` surface**, **no new `Program.cs`
   `AddMarten` line**, **no new bounded context**, **no new
   `IAuditableResource` adapter** — `Profile` already registers in
-  `M1DocTypes`; the M19 `IsGuest` / M23 `Bio` / M23 `TagIds` precedent on this
+  `CoreDocTypes`; the M19 `IsGuest` / M23 `Bio` / M23 `TagIds` precedent on this
   same doc, D1, C-M22·1).
 - **The thin-token rule (ADR 0001-B)** — the "is a new user" state is a
   **profile-field read** (`OnboardingCompletedAt` is `null`), **never** an

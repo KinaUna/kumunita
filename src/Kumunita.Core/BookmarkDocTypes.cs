@@ -6,8 +6,8 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M17</c> (Bookmarks) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0118 D1) — the parallel surface
-/// to <see cref="M9DocTypes"/> / <see cref="M5DocTypes"/> /
-/// <see cref="M16DocTypes"/> for the new <c>Kumunita.Core.Bookmarks</c>
+/// to <see cref="MessagingDocTypes"/> / <see cref="ProjectDocTypes"/> /
+/// <see cref="InventoryDocTypes"/> for the new <c>Kumunita.Core.Bookmarks</c>
 /// context. The one document is a POCO with the conventional <c>string</c>
 /// <c>Id</c> identity (the M9/M5 convention), so only the indexes need
 /// pinning. The doc is new, not additive; the surface is additive —
@@ -23,7 +23,7 @@ namespace Kumunita.Core;
 /// than app code (C-M17·4 / F1).
 /// </para>
 /// </summary>
-public static class M17DocTypes
+public static class BookmarkDocTypes
 {
     /// <summary>
     /// Registers the M17 (Bookmarks) domain document. Idempotent: calling

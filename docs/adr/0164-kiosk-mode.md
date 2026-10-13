@@ -144,8 +144,8 @@ M35 rides **frozen** seams, adding a small, additive delta:
   the M31 / M13 precedent). There is **no** `HttpClient` in Core (ADR 0006-D)
   and **no** outbound channel.
 - **D9 — No new bounded context beyond `Kiosk` (M35·9).** The M5 `Projects` +
-  M4 `Events` contexts are **reused, not re-added** (the `M5DocTypes` /
-  `M4DocTypes` surfaces are **untouched**). M35 adds **no** new doc **to an
+  M4 `Events` contexts are **reused, not re-added** (the `ProjectDocTypes` /
+  `EventDocTypes` surfaces are **untouched**). M35 adds **no** new doc **to an
   existing surface** and **no** new index to an existing doc.
 - **D10 — The closed `kiosk.*` `kw-l` key set is four-language (M35·10).** 8
   keys, each present, non-empty, in all four languages (en/de/fr/da), pinned

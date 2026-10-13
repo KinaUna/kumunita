@@ -19,7 +19,7 @@ namespace Kumunita.Core.Tests;
 /// <c>AccessAudit.TargetKind</c> discriminator, C-M21·3) and <c>ComponentId</c>
 /// <c>null</c> (a document is repository-level, never component-scoped,
 /// C-M21·2/C-M21·3). Verified against the *live* Postgres catalog (the
-/// <c>M16DocTypesDdlTests</c> / <c>M17DocTypesDdlTests</c> shape), not the
+/// <c>InventoryDocTypesDdlTests</c> / <c>BookmarkDocTypesDdlTests</c> shape), not the
 /// in-memory object graph. The test name is a doc-registration shape pin
 /// (outside the design doc's §9 gate list — the M16/U01 precedent; GATE-4 is
 /// the zero-new-authorization-surface pin this unit's adapter upholds).
@@ -40,7 +40,7 @@ public class DocumentDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<P
         {
             opts.Connection(_connection);
             opts.DatabaseSchemaName = "mt";
-            // The sibling harnesses (M16DocTypesDdlTests / M17DocTypesDdlTests)
+            // The sibling harnesses (InventoryDocTypesDdlTests / BookmarkDocTypesDdlTests)
             // add the two storage features before a *DocTypes surface — that is
             // the established shape that actually applies the document DDL.
             opts.Storage.Add<KumunitaFeature>();
@@ -214,7 +214,7 @@ public class DocumentDocTypesDdlTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("folder-1", doc.FolderId);
     }
 
-    // ── catalog helpers (the M16DocTypesDdlTests / AdminOverrideDdlTests shape) ──
+    // ── catalog helpers (the InventoryDocTypesDdlTests / AdminOverrideDdlTests shape) ──
 
     // Distinct column names on mt.<table> (information_schema).
     private async Task<List<string>> QueryColumnsAsync(string table)

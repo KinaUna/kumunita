@@ -174,8 +174,8 @@ themselves, fresh.
   0006-D) and **no** outbound channel.
 - **No new bounded context beyond `Kiosk` (M35·9).** M35 **creates** the one
   new `Kiosk` context (M35·1); the board / calendar / todos contexts (M5
-  `Projects` + M4 `Events`) are **reused, not re-added** (the `M5DocTypes` /
-  `M4DocTypes` surfaces are **untouched**, M35·1 / M35·9). M35 adds **no** new
+  `Projects` + M4 `Events`) are **reused, not re-added** (the `ProjectDocTypes` /
+  `EventDocTypes` surfaces are **untouched**, M35·1 / M35·9). M35 adds **no** new
   doc **to an existing surface** and **no** new index to an existing doc.
 - **The closed `kiosk.*` `kw-l` key set is four-language (M35·10).** Every new
   user-visible string M35 introduces is a `KnownTranslationKeys` entry present,
@@ -201,7 +201,7 @@ themselves, fresh.
   below) + the **`KioskDocTypes` registration surface** (the ADR 0004 §B.1
   shape — the M35·1 pin) + the **boot wiring** (the `Program.cs` dev-loop +
   the all-env `SchemaBootstrap` `KioskDocTypes.Configure` call, the M3
-  `M3DocTypes` precedent) + the **`IKioskService` seam** (the 2-method
+  `PostDocTypes` precedent) + the **`IKioskService` seam** (the 2-method
   surface — `GetPlaylistAsync` + `SavePlaylistAsync`) + the
   **`KioskService` impl** (the singleton read + the GlobalAdmin write with one
   `kiosk.save` audit row) + the **`KioskController`** (`GET /kiosk` the signed
@@ -480,7 +480,7 @@ records `## U<m> — Drift pause` in the handoff note.
   no-dep, no-`any` pin);
   `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` +
   `src/Kumunita.Web/Program.cs` (the two boot paths U03 wires
-  `KioskDocTypes.Configure` into — the M3 `M3DocTypes` precedent);
+  `KioskDocTypes.Configure` into — the M3 `PostDocTypes` precedent);
   `src/Kumunita.Web/Milestones.cs` (the `M35` row — confirm it is
   `StatusNext` + the **last** row — the M35·11 pin);
   `docs/adr/README.md` (the ADR index — confirm **0164** is free after the
@@ -751,7 +751,7 @@ records `## U<m> — Drift pause` in the handoff note.
   shape the `IKioskService` mirrors);
   `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` +
   `src/Kumunita.Web/Program.cs` (the two boot paths U03 wires
-  `KioskDocTypes.Configure` into — the M3 `M3DocTypes` precedent);
+  `KioskDocTypes.Configure` into — the M3 `PostDocTypes` precedent);
   `src/Kumunita.Core/DependencyInjection.cs` (where the
   `IKioskService` registration goes — the M31 `IErrorReportService` / M13
   `IUsageAnalyticsService` `AddTransient` precedent);

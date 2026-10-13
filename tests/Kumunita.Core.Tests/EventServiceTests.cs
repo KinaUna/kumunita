@@ -278,7 +278,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     //
     // The feed is ordered by <see cref="Event.Start"/> ascending (the
     // upcoming-events shape, the <c>(ComponentId, Start)</c> index) — the
-    // <see cref="M4DocTypes.Configure"/> ordering pin.
+    // <see cref="EventDocTypes.Configure"/> ordering pin.
 
     [Fact]
     public async Task M4_FeedOrderedStartAscending()
@@ -2670,9 +2670,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -2719,7 +2719,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     [Fact]
     public async Task M36_Event_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M4DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, EventDocTypes.Configure);
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
@@ -2744,7 +2744,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     [Fact]
     public async Task M36_Event_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M4DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, EventDocTypes.Configure);
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
         const string author = "u-m36-ev-inert-author";

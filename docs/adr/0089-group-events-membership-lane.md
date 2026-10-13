@@ -80,7 +80,7 @@ these shapes, and why nothing else*.
   `(GroupId)` index is added, **exactly as `Post.GroupId` has none** — at a
   single-neighborhood scale the group feed's candidate filter
   (`GroupId == groupId && !IsDeleted && !IsDraft`) range-scans fine without
-  one, and keeping the `M4DocTypes` surface untouched is the conservative
+  one, and keeping the `EventDocTypes` surface untouched is the conservative
   call. It is written **only** by `EventService.CreateGroupEventAsync`,
   which pins the write shape: `ComponentId = string.Empty` and
   `Audience = new Audience()` (GE·2, GE·8). `EventService`'s existing
@@ -199,7 +199,7 @@ these shapes, and why nothing else*.
   (service-internal, no signature change), and the `GroupEventDraft` /
   `GroupEventUpdate` records (types, not seams) — each an ADD, each recorded
   here so the surface stays auditable, per 0006-E's "add few, add stable."
-  The `M4DocTypes` surface and the `IAuthorizationService` surface gain
+  The `EventDocTypes` surface and the `IAuthorizationService` surface gain
   **nothing** (no new index, per the `Post.GroupId` precedent; the ADR 0013
   group seams are reused verbatim).
 

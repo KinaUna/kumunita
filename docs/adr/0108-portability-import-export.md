@@ -186,8 +186,8 @@ that re-encodes rather than reuses the content-addressed path.
 
 **D7 — The closed document inventory + import order is pinned in the design
 doc from source.** U00 reads **every** `*DocTypes` surface
-(`M1DocTypes` / `M3DocTypes` / `M4DocTypes` / `M5DocTypes` / `M6DocTypes` /
-`M9DocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`) and locks
+(`CoreDocTypes` / `PostDocTypes` / `EventDocTypes` / `ProjectDocTypes` / `NotificationDocTypes` /
+`MessagingDocTypes` / `MediaDocTypes` / `TagDocTypes` / `PageDocTypes`) and locks
 the **exact** closed inventory — each entry: the document `Type`, its
 archive file (`docs/{Type}.json`), its **import order** (parents before
 children), and its **reference fields** (which of its fields point at

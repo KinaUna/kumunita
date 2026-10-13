@@ -729,7 +729,7 @@ public interface IUserInfoService
     /// Idempotent on the <c>(componentId, userId)</c> pair: an existing row is
     /// re-stamped with <paramref name="actorId"/> and the new timestamp rather
     /// than duplicated (the business key is unique — the index in
-    /// <see cref="M1DocTypes"/> enforces it). Appends an
+    /// <see cref="CoreDocTypes"/> enforces it). Appends an
     /// <see cref="Authorization.AccessAudit"/> row (action
     /// "community.add-member", targetKind "component", via Admin, outcome
     /// Allow) in the same transaction as the row (invariant C3).
@@ -868,7 +868,7 @@ public interface IUserInfoService
     // ── ADR 0026 — group & community name/description translations ─────────
     // The "separate feature" ADR 0021's scope boundary deferred (and ADR 0022
     // shipped for posts/replies). Two documents in this context
-    // (GroupTranslation / CommunityTranslation, registered in M1DocTypes), an
+    // (GroupTranslation / CommunityTranslation, registered in CoreDocTypes), an
     // add-only write lane each (a hand-written AccessAudit row, C3), a plain
     // read seam each (no decision, no audit — inherits the parent's reach),
     // and a public standing probe each the Web uses to decide whether to show

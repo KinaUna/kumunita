@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M9</c> (Messaging) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0105 D1) — the parallel surface
-/// to <see cref="M6DocTypes"/> for the new <c>Kumunita.Core.Messaging</c>
+/// to <see cref="NotificationDocTypes"/> for the new <c>Kumunita.Core.Messaging</c>
 /// context. Both documents are POCOs with the conventional <c>string</c>
 /// <c>Id</c> identity (the M6 convention), so only the indexes need
 /// pinning. The docs are new, not additive; the surface is additive —
@@ -14,7 +14,7 @@ namespace Kumunita.Core;
 /// applies the new tables idempotently at boot. **Zero migrations for
 /// existing surfaces.**
 /// </summary>
-public static class M9DocTypes
+public static class MessagingDocTypes
 {
     public static void Configure(StoreOptions opts)
     {

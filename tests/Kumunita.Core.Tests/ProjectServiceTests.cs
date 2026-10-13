@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests;
 /// pinned ~25-test surface; the 16 Core names are the §2.7 table verbatim).
 /// The shape follows <see cref="EventServiceTests"/> verbatim — same
 /// <see cref="PostgresFixture"/>, same <c>BootStoreAsync</c> (+ the
-/// <see cref="M5DocTypes"/> registration surface), same <c>Plant</c> helper,
+/// <see cref="ProjectDocTypes"/> registration surface), same <c>Plant</c> helper,
 /// same <c>Services</c> composition — the <c>UserInfoService</c> +
 /// <c>AuthorizationService</c> + <c>ProjectService</c> trio the U01
 /// <c>AddTransient</c> registration mirrors — fresh scratch Postgres per test
@@ -4599,10 +4599,10 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -4649,7 +4649,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task M36_TodoComment_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M5DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
@@ -4670,7 +4670,7 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     [Fact]
     public async Task M36_TodoComment_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M5DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, ProjectDocTypes.Configure);
         var authz = new AuthorizationService(boot.Store, boot.UserInfo);
         var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
         const string author = "u-m36-todo-inert-author";

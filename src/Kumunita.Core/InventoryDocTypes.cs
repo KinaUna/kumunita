@@ -7,7 +7,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M16</c> (Inventory) bounded context's Marten-native document
 /// registration surface (ADR 0004 §B.1 / ADR 0117 D1) — the parallel surface
-/// to <see cref="M9DocTypes"/> / <see cref="M5DocTypes"/> for the new
+/// to <see cref="MessagingDocTypes"/> / <see cref="ProjectDocTypes"/> for the new
 /// <c>Kumunita.Core.Inventory</c> context. Both documents are POCOs with the
 /// conventional <c>string</c> <c>Id</c> identity (the M9/M5 convention), so only
 /// the indexes need pinning. The docs are new, not additive; the surface is
@@ -23,7 +23,7 @@ namespace Kumunita.Core;
 /// DB the arbiter of at-most-one-open-checkout rather than app code (C-M16·3 / F1).
 /// </para>
 /// </summary>
-public static class M16DocTypes
+public static class InventoryDocTypes
 {
     /// <summary>
     /// Registers the M16 (Inventory) domain documents. Idempotent: calling twice
@@ -42,7 +42,7 @@ public static class M16DocTypes
         // filter, **never** a gate — C-M3·2 / C-M16·5). Unnamed: Marten 9.31.2 /
         // Weasel 9's ComputedIndex exposes Casing / TenancyScope but no Name in
         // the fluent form the feed indexes use, so these auto-derive their
-        // names (the M5/M9 feed-index shape — the M5DocTypes note).
+        // names (the M5/M9 feed-index shape — the ProjectDocTypes note).
         opts.Schema.For<InventoryItem>()
                .Index(i => new { i.ComponentId, i.Created })
                .Index(i => new { i.OwnerKind, i.Created });

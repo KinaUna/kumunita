@@ -36,7 +36,7 @@ The `ML` / `ML-UI` lanes already shipped the substrate (the store, the
 provider, the registry, the editor):
 
 - **One store** — the `TranslationResource` doc (`Key`, `LanguageCode`,
-  `Text`; the `(Key, LanguageCode)` unique index on `M1DocTypes`, ADR
+  `Text`; the `(Key, LanguageCode)` unique index on `CoreDocTypes`, ADR
   0005 B) — a single row per key per language, the business key is
   `(Key, LanguageCode)`.
 - **One closed key registry** — `KnownTranslationKeys` (`AllKeys` in
@@ -62,7 +62,7 @@ role, no new dependency**.
 
 M15 builds entirely on **frozen, verified seams** (grep-confirmed):
 
-1. **The `TranslationResource` store + the `M1DocTypes` unique index** —
+1. **The `TranslationResource` store + the `CoreDocTypes` unique index** —
    the store the bulk view projects over and the batch lane writes back
    to (the same row the frozen `UpsertTranslationAsync` upserts).
 2. **The `ILocalizationService` read seams** — `GetTranslationsForAsync`
@@ -187,7 +187,7 @@ row per commit — and it is named, bounded, and reversible (§FACES trade).
 
 **Unchanged (the frozen surface — C-M15·7/8, the drift-guard frozen list
 is the verbatim set in §drift-guard):** the `TranslationResource` doc,
-its `(Key, LanguageCode)` unique index on `M1DocTypes`, the seeder
+its `(Key, LanguageCode)` unique index on `CoreDocTypes`, the seeder
 floors, the `UpsertTranslationAsync` / `GetTranslationsForAsync` /
 `GetCompletenessAsync` seams, the `SaveTranslation` route, the ML-UI U6
 per-row editor, `KnownTranslationKeys_ParityTests` +
@@ -287,7 +287,7 @@ noted):
   the **service**; the controller adds none (the ADR 0021 idiom).
 
 **Depended on** (frozen, unchanged — the §drift-guard list):
-`TranslationResource` + the `M1DocTypes` unique index; the frozen
+`TranslationResource` + the `CoreDocTypes` unique index; the frozen
 `ILocalizationService` seams (`GetTranslationsForAsync` — the matrix's
 round-trips; `UpsertTranslationAsync` — the row write the batch composes;
 `GetCompletenessAsync` — the editor's completeness view);
@@ -773,7 +773,7 @@ doc; **untouched** after M15):
 7. `tests/Kumunita.Web.Tests/`'s `KwLRegistryConsistencyTests` —
    **unreshaped** (same extension shape).
 8. The `TranslationResource` doc + the `(Key, LanguageCode)` unique
-   index on `M1DocTypes` + the seeder floors — **byte-identical**
+   index on `CoreDocTypes` + the seeder floors — **byte-identical**
    (C-M15·8).
 
 **The drift log:** (none at U00 — the locked D1–D10 match the register

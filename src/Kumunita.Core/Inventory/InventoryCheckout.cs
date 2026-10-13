@@ -14,7 +14,7 @@ namespace Kumunita.Core.Inventory;
 /// does not create a second record.
 /// </para>
 /// <para>
-/// **At most one open record per item** (D4 / F1): the <see cref="M16DocTypes"/>
+/// **At most one open record per item** (D4 / F1): the <see cref="InventoryDocTypes"/>
 /// unique partial index on <c>(ItemId)</c> where <c>CheckedInAt IS NULL</c> is the
 /// **idempotency witness** — a concurrent double-check-out's second commit fails at
 /// the DB layer (the M9 <c>convo_uidx_pair</c> shape — the DB is the arbiter, not

@@ -168,7 +168,7 @@ public sealed class MessagingService : IMessagingService
 
         // The pair is stored **sorted** (ParticipantA < ParticipantB) so the
         // unordered pair has exactly one canonical form — the
-        // <c>convo_uidx_pair</c> unique index (M9DocTypes) is the F1
+        // <c>convo_uidx_pair</c> unique index (MessagingDocTypes) is the F1
         // idempotency witness: a second open of the same pair (either order)
         // finds the existing conversation instead of violating the index.
         var (participantA, participantB) =

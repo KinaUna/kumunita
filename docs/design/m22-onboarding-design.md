@@ -280,7 +280,7 @@ D4's skip-vs-finish shape). Both are resolved against the live codebase:
   `src/Kumunita.Core/UserInfo/Profile.cs`: the existing doc already carries
   **ten** additive fields in the ADR 0004 §B.1 shape (`AvatarId`, `TimeZone`,
   `DateFormat`, `EmailLanguage`, and the M23 `Bio`/`TagIds` precedent), all
-  registered in `M1DocTypes` (no new DocTypes surface, no new boot line, no
+  registered in `CoreDocTypes` (no new DocTypes surface, no new boot line, no
   `SchemaBootstrap.cs` change). The **single nullable
   `DateTimeOffset?`** (not a `bool + DateTime` pair, and not a plain `bool`)
   is locked because (a) it matches the `SetProfileTimezoneAsync` /
@@ -394,7 +394,7 @@ scope lane + the frozen lanes it links into.
 The **exact** additive member on `Kumunita.Core.UserInfo.Profile` (D1,
 §1.a-C1 locked). The doc already carries ten additive fields in the ADR 0004
 §B.1 shape (`AvatarId`, `TimeZone`, `DateFormat`, `EmailLanguage`, `Bio`,
-`TagIds` — all delta-detected, all registered in `M1DocTypes`). Adding
+`TagIds` — all delta-detected, all registered in `CoreDocTypes`). Adding
 `OnboardingCompletedAt` follows the same shape:
 
 ```csharp
@@ -415,7 +415,7 @@ precedent verbatim): delta-detected, idempotent, **no re-seed, no EF
 migration, no new `*DocTypes` surface, no new `Program.cs` `AddMarten` line,
 no `SchemaBootstrap.cs` change, no new bounded context, no new
 `IAuditableResource` adapter, no new storage lane**. The `Profile` doc is
-already registered in `M1DocTypes`; adding a field is the §B.1 additive lane
+already registered in `CoreDocTypes`; adding a field is the §B.1 additive lane
 (the M19 `IsGuest` / M23 `Bio` / M23 `TagIds` history on this same doc).
 A **new** profile (a `new Profile()` at bootstrap) reads `null` for
 `OnboardingCompletedAt` — the floor (banner shows, nav entry present).

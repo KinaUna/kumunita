@@ -1958,7 +1958,7 @@ public sealed class ProjectService : IProjectService
         session.Store(board);
 
         // The initial KanbanLane rows (the (BoardId, Order) business key — the
-        // M5DocTypes unique index). A lane has no Audience of its own
+        // ProjectDocTypes unique index). A lane has no Audience of its own
         // (C-M5·3 — its visibility is the board's).
         foreach (var laneRequest in request.Lanes)
         {
@@ -2983,7 +2983,7 @@ public sealed class ProjectService : IProjectService
             return lane;                                   // edge — no-op (nothing written).
 
         // **The park-and-swap.** The <c>(BoardId, Order)</c> pair is a unique
-        // index (M5DocTypes), and Postgres enforces a non-deferrable unique
+        // index (ProjectDocTypes), and Postgres enforces a non-deferrable unique
         // index **row-by-row** — a direct two-lane transposition (B→2 while C
         // still holds 2, or C→1 while B still holds 1) transiently duplicates
         // the pair and is refused (23505; a single UPDATE … CASE over both

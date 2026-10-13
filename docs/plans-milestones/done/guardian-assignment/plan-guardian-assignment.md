@@ -150,7 +150,7 @@ standing**, through the same seam, with the same audit verb. The difference is
   the five GU actions, no content read. The GA lane does not touch
   `IAuthorizationService`, does not touch `AccessVia`, does not touch the GU
   enforcement path. The `GuardianLink` POCO is **byte-identical** (no new
-  field, no new enum value, no renumbering). The `M1DocTypes` registration is
+  field, no new enum value, no renumbering). The `CoreDocTypes` registration is
   **byte-identical** (the `GuardianLink` line is already there — U02 of the GU
   lane).
 - **`Milestones.cs` + the README + `MilestonesTests.cs` flip together** (the

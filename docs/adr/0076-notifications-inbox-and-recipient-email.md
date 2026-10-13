@@ -5,7 +5,7 @@ Date: 2026-09-24
 Amends: **0001** (the M1 durable-email trio — the
 `IMailerStage.StageAsync` seam + `OutboxEmailStager` + `OutboxEmailHandler` +
 `EmailDeadLetterWriter` — *reused verbatim*, no signature change),
-**0004** (§B.1 additive — the two new documents + the new `M6DocTypes`
+**0004** (§B.1 additive — the two new documents + the new `NotificationDocTypes`
 surface; zero migrations for existing surfaces), **0006** (the frozen
 `IAuthorizationService` / `IAuditableResource` surface — **no new adapter**,
 no new `AccessAction`, no new `AccessVia`; a notification is a *personal
@@ -65,7 +65,7 @@ moved) by the U01 close of this ADR on `Milestones.cs` + the README Roadmap +
 and `NotificationPreference` (the per-recipient settings row:
 `RecipientId` as the document id, `KindsEnabled?` — a subset of the nine
 kind constants, `null` / empty = all enabled, `Updated?`) — and **one new
-document surface** `M6DocTypes` (the `M5DocTypes` pattern verbatim).
+document surface** `NotificationDocTypes` (the `ProjectDocTypes` pattern verbatim).
 Conventional `string` `Id`, delta-detected + idempotent, no seeding, no EF.
 **Zero migrations for existing surfaces** (ADR 0004 §B.1 — the two docs are
 new; the surface is additive). *Forbids:* a third document, a migration on an
@@ -106,7 +106,7 @@ precedent — the `verify:{userId}:{attempt}` / `setup:{userId}` shape, now with
 a `notification:` prefix; the eight key shapes are pinned in the design doc
 §6.3). Dedup is keyed on that same key on **both** channels: the
 **inbox side** via an `EmitAsync` look-up of an existing `Notification` row
-by `IdempotencyKey` (the `M6DocTypes` index — a same-key re-emission returns
+by `IdempotencyKey` (the `NotificationDocTypes` index — a same-key re-emission returns
 the existing row and stores nothing), and the **email side** via the
 `IMailerStage.StageAsync` idempotency guarantee (the `OutboxEmailStager`
 contract — a duplicate key is a no-op, not a second email; the service does
@@ -200,7 +200,7 @@ a new UI dependency.
 ## Consequences
 
 - One new bounded context (`Kumunita.Core.Notifications`), one new document
-  surface (`M6DocTypes`), one new service (`NotificationService` — the
+  surface (`NotificationDocTypes`), one new service (`NotificationService` — the
   `EventService` / `ProjectService` shape, no `INotificationService`
   interface), one new Web controller (`NotificationsController` — the
   `/notifications` inbox, the `/notifications/unread-count` poller endpoint,

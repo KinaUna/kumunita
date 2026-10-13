@@ -12,7 +12,7 @@
 >
 > **What this is:** one **additive `string? BlockedByTodoId` field on
 > `TodoItem`** (a *hint, never a gate* — C-M5·3 / C-M3·2 discipline),
-> **additive on the `M5DocTypes` surface** (one `Index`, zero new surface,
+> **additive on the `ProjectDocTypes` surface** (one `Index`, zero new surface,
 > zero migrations for existing rows), **additive `IProjectService` seams**
 > (the `blockedOnly` feed filter on `ListTodosAsync`, the `Blocker?` chip
 > surface on `TodoDetailResult`, the `BlockedByTodoId` / `ClearBlockedBy`
@@ -34,7 +34,7 @@
 > matrix **creator ∪ assignee ∪ GlobalAdmin** (the C-M5·6 to-do matrix —
 > the `AssignTodoAsync` shape), the `KanbanStatuses` closed display
 > vocabulary (ADR 0069) for the chip's status text, the `kw-l` registry
-> (ADR 0015) for the four new keys × 4 languages, and the `M5DocTypes`
+> (ADR 0015) for the four new keys × 4 languages, and the `ProjectDocTypes`
 > surface (the ADR 0004 §B.1 delta-detect — one new index, zero
 > migration). **No code in this unit — no build, no tests.**
 >
@@ -74,7 +74,7 @@ server-side refusal.
 - **D1 — one optional pointer, additive, zero migration.** One
   `string? BlockedByTodoId` on **`TodoItem`** (the ADR 0004 §B.1 / ADR 0086
   `ProjectId` additive shape; existing rows simply have `null`); registered
-  on `M5DocTypes` with one `Index` on `(BlockedByTodoId)`. **The singular
+  on `ProjectDocTypes` with one `Index` on `(BlockedByTodoId)`. **The singular
   pointer is the design** — `ParentId?` / `GoalId?` / `ProjectId?` are all
   single-optional-FK idioms; a to-do waiting on *three* things uses the
   `ParentId` subtask structure or three to-dos, not a list.
@@ -147,7 +147,7 @@ server-side refusal.
 | Unit | Title | Deliverable shape |
 |------|-------|-------------------|
 | **U00** | Design doc + **ADR 0087** (sign-off) | `docs/design/tbd-todo-dependency-design.md` (the D1–D9 above, the exact C# seam shapes, the pinned test names, the three-test gate, the drift-guard) + `docs/adr/0087-todo-dependency-blocked-by-lane.md` (the decisions **Accepted** — the status flips from `Proposed` on sign-off) + `docs/adr/README.md` index row (status **Proposed** until sign-off). **No code, no build.** |
-| **U01** | `TodoItem.BlockedByTodoId` + `M5DocTypes` index | `src/Kumunita.Core/Projects/TodoItem.cs` (the one additive field, the C-TBD·1 comment discipline); `M5DocTypes.Configure` extended (the one `Index` on `(BlockedByTodoId)` — the ADR 0004 §B.1 delta-detect shape, zero migration); `dotnet build` clean; a `TBD` Core pin (the doc shape compiles + registers + existing M5 / PL pins behave unchanged). |
+| **U01** | `TodoItem.BlockedByTodoId` + `ProjectDocTypes` index | `src/Kumunita.Core/Projects/TodoItem.cs` (the one additive field, the C-TBD·1 comment discipline); `ProjectDocTypes.Configure` extended (the one `Index` on `(BlockedByTodoId)` — the ADR 0004 §B.1 delta-detect shape, zero migration); `dotnet build` clean; a `TBD` Core pin (the doc shape compiles + registers + existing M5 / PL pins behave unchanged). |
 | **U02** | `IProjectService` additive seams (the write lane + the read surfaces) | `IProjectService` (additive: `ListTodosAsync` gains `blockedOnly`; `TodoDetailResult` gains `Blocker?`; `CreateTodoRequest` / `UpdateTodoRequest` gain the `BlockedByTodoId` / `ClearBlockedBy` fields; `ListPickerTodosAsync` added — the exact C# in the design doc §7.2); `ProjectService` implements (the `blockedOnly` candidate-set narrowing, the chip resolution over the **existing** `TodoItemToAuditableResource`, the C-TBD·3 cycle guard, the C-M5·6 standing re-check, the C3 404-vs-403 split, the `AccessAudit` rows); `ProjectServiceTests` pinned tests (the 11 Core pins, the design doc §7.5). |
 | **U03** | Web: the chip + picker + feed toggle | `ProjectsController` (additive: `TodosIndex` reads `?blockedOnly=` — the ADR 0073 `unassignedOnly` precedent, **no new route**; `TodoDetail` resolves the chip; `CreateGet` / `UpdatePost` seed the picker + read the fields); `Models/ProjectViewModels.cs` (the `BlockerChip` view-model + the picker seed shape); `Views/Projects/TodoDetail.cshtml` (the chip — the `kw-l` `todo.*` keys), the board's card partial (the chip), `Create.cshtml` / `Edit.cshtml` (the blocker picker — the `ParentId` `<select>` mirror, the `ClearBlockedBy` hidden field), `TodosIndex.cshtml` (the feed toggle); `KnownTranslationKeys.cs` (the 4 `todo.*` keys × 4 languages); `dotnet build` clean; the `ProjectsControllerTests` pinned tests (the 6 Web pins, the design doc §7.5). |
 | **U04** | Close: doc sync + README + handoff notes + the gate | `docs/adr/0087-todo-dependency-blocked-by-lane.md` (the status flips **Proposed → Accepted**; the Date confirmed); `docs/adr/README.md` (the ADR 0087 row, the `Accepted` status); `docs/ARCHITECTURE.md` §5 (the `Projects/` block — the `TodoItem` `BlockedByTodoId` field, the "waiting on" chip + picker + filter — the canonical surface this lane settles; the §3 tree untouched — no new file beyond the field); `README.md` Roadmap (the **`TBD`** lane entry — the one-sentence shape, the ADR 0087 reference, the **Done** marker); `docs/design/tbd-todo-dependency-design.md` (the **gate** section — the three-test record, the handoff pointer); `tbd-handoff-notes.md` (the U00–U04 sections appended, the **gate** section); the lane folder **moved** to `docs/plans-milestones/done/tbd/` (the M5 / PL close-unit precedent). |
@@ -220,7 +220,7 @@ server-side refusal.
 
 - `docs/design/m5-projects-design.md` (the **M5 design doc** — the lane
   template this one builds on; the `TodoItem` shape, the `IProjectService`
-  surface, the `TodoItemToAuditableResource` adapter, the `M5DocTypes`
+  surface, the `TodoItemToAuditableResource` adapter, the `ProjectDocTypes`
   surface, the standing matrix, the C-M5·4 string-status pin, the C-M5·6
   standing matrix, the C-M5·7 cycle-guard shape).
 - `docs/design/pl-goals-projects-design.md` (the **PL design doc** — the
@@ -233,7 +233,7 @@ server-side refusal.
   standing matrix; confirm what is frozen + the ADD-is-a-new-ADR rule).
 - `docs/adr/0086-goals-projects-lane.md` (the **immediate precedent** — the
   `ProjectId?` additive-field shape this lane's `BlockedByTodoId` mirrors,
-  the `ProjectId` index on `M5DocTypes`, the project-picker / feed-filter
+  the `ProjectId` index on `ProjectDocTypes`, the project-picker / feed-filter
   shape, the named-lane + ADR-index row shape).
 - `docs/adr/0084-per-target-notification-subscriptions.md` +
   `0085-notification-item-link-and-reply-highlight.md` (the
@@ -265,7 +265,7 @@ server-side refusal.
 - `src/Kumunita.Core/Projects/KanbanStatuses.cs` (the **closed display
   vocabulary** — the chip's status text is the blocker's `Status` string
   rendered verbatim; the "unknown" glyph fallback for free-text values).
-- `src/Kumunita.Core/M5DocTypes.cs` (the **existing** surface — the one
+- `src/Kumunita.Core/ProjectDocTypes.cs` (the **existing** surface — the one
   new `TodoItem.BlockedByTodoId` index is **additive** on it; the
   `TodoItem.ProjectId` index is the immediate template).
 - `src/Kumunita.Web/Controllers/ProjectsController.cs` (the **existing**

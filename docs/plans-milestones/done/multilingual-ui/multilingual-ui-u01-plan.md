@@ -24,7 +24,7 @@ creates an `about` page at runtime — the plan's pinned U1 decision (b)).
   `SeedLanguageCatalogAsync` step (~lines 225–260) + the `SeedAsync` call site.
 - `src/Kumunita.Core/Localization/{TranslationResource,LocalizedPage}.cs` — the
   two POCOs (property names, `Id` = `Guid` string "N" convention).
-- `src/Kumunita.Core/M1DocTypes.cs` — the two `UniqueIndex` pins (confirm they
+- `src/Kumunita.Core/CoreDocTypes.cs` — the two `UniqueIndex` pins (confirm they
   already exist — **U1 adds no index**).
 - `src/Kumunita.Core/Localization/LocalizationService.cs` — `UpsertTranslationAsync`
   / `UpsertPageAsync` (the authoritative pair-upsert idiom to mirror: query-then-

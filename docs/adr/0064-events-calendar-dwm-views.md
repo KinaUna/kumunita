@@ -42,7 +42,7 @@ decision.** M5 stays Projects; M6 stays Portability.
 
 ### D1 — Zero Core change (the headline decision)
 
-No field is added to `Event`, `EventRsvp`, or `EventTranslation`; `M4DocTypes`
+No field is added to `Event`, `EventRsvp`, or `EventTranslation`; `EventDocTypes`
 is untouched; no `FeatureSchemaBase` migration; the boot paths are untouched;
 no EF; **no** seam added on `IEventService` or
 `IAuthorizationService` / `IUserInfoService` / `IIdentityService`. The
@@ -176,7 +176,7 @@ landing later is a **new named lane**, not an extension of this one.
 ### The invariants (pinned verbatim)
 
 - **C-DWM·1** — Zero Core change. No seam added, no `Event` / `EventRsvp` /
-  `EventTranslation` field, no `M4DocTypes` / boot-path change, no EF, no new
+  `EventTranslation` field, no `EventDocTypes` / boot-path change, no EF, no new
   audit row shape. The only additive C# is the additive view-model fields
   (`View` + `WindowDays`, `MonthLabel`→`Label`) and the `?view=` param on the
   existing `Calendar` action. The `ListInRangeAsync` seam is **reused,

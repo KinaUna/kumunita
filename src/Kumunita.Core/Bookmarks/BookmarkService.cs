@@ -180,7 +180,7 @@ public sealed class BookmarkService : IBookmarkService
 
         // F1 — the unique (OwnerId, TargetKind, TargetId) row is at-most-one:
         // an existing row is the no-op (AlreadyBookmarked), one row, one
-        // Created. The M17DocTypes unique index is the DB witness.
+        // Created. The BookmarkDocTypes unique index is the DB witness.
         var existing = await session.Query<Bookmark>()
             .Where(b => b.OwnerId == ownerId && b.TargetKind == targetKind && b.TargetId == targetId)
             .FirstOrDefaultAsync()

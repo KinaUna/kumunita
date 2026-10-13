@@ -88,7 +88,7 @@ shape.
 - **Additive schema (ADR 0004 §B.1).** `Post.DeletedAt` and
   `PostReply.DeletedAt` are nullable `DateTimeOffset` fields. Marten's
   schema builder picks them up on the existing doc-type surface
-  (`M3DocTypes.Configure` already registers `For<Post>()` /
+  (`PostDocTypes.Configure` already registers `For<Post>()` /
   `For<PostReply>()`). No seed reset, no schema-file change. Existing rows
   read `DeletedAt = null` (live) — zero migration risk.
 

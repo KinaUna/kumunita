@@ -10,7 +10,7 @@
 >
 > **What this is:** the first **content-with-time** milestone: a new bounded
 > context `Kumunita.Core.Events` (the `Event` + `EventRsvp` documents), one
-> **new document surface** (`M4DocTypes`), a **new service seam**
+> **new document surface** (`EventDocTypes`), a **new service seam**
 > (`IEventService`), a **new Web surface** (`EventController` + views), and
 > **one new §6.4 scheduled job** (`EventReminders`, the second of the three §6.4
 > jobs — `AuditPurge` shipped in M1; `VerifyDigest` stays deferred) built on the
@@ -54,7 +54,7 @@ M2 shipped **awareness** (directory, profile, groups). M4 is the next arrow —
 "going", and get a reminder email the day before. It introduces **one new
 bounded context** (`Kumunita.Core.Events`), **two new documents** (`Event`,
 `EventRsvp`), **one new service seam** (`IEventService`), **one new document
-surface** (`M4DocTypes`), **one new Web controller** (`EventController`) +
+surface** (`EventDocTypes`), **one new Web controller** (`EventController`) +
 views, and **one new §6.4 scheduled job** (`EventReminders`) — the second of
 the three §6.4 jobs named in `docs/ARCHITECTURE.md` §6.4. The authorization
 path is the **frozen** `IAuthorizationService` through a new
@@ -71,7 +71,7 @@ trio. This is the first milestone that **introduces a new scheduled job** —
 ## Assumptions
 
 - **Scope = events + RSVP + reminders.** In: the `Event` + `EventRsvp`
-  documents, the `M4DocTypes` surface, the `IEventService` read + write
+  documents, the `EventDocTypes` surface, the `IEventService` read + write
   surface, the `EventToAuditableResource` adapter, the `EventReminders`
   §6.4 job (the `EventReminderService` + `EventReminderHandler` +
   `EventReminderTick` trio), the `EventController` + views + nav entry, the
@@ -194,11 +194,11 @@ arrow; the single-in-progress pin moves to M4 as PG closes).
 to `[DECIDED]` in the ADR's decision section; `Milestones.cs` + README +
 `MilestonesTests` green; **no other code changed.**
 
-### U01 — `Event` + `EventRsvp` docs + `M4DocTypes` registration + boot wiring
+### U01 — `Event` + `EventRsvp` docs + `EventDocTypes` registration + boot wiring
 
 Add `Kumunita.Core.Events`: `Event` (the §3.1 field set) + `EventRsvp`
 (the §3.2 shape: `Id`/`EventId`/`UserId`/`Status: Going|Maybe|No`/`At`).
-Register them on a new **`M4DocTypes`** surface (the `M3DocTypes` pattern
+Register them on a new **`EventDocTypes`** surface (the `PostDocTypes` pattern
 verbatim): `Event` (conventional `Id`) + `(ComponentId, Start)` index (the
 feed ordering shape) + `EventRsvp` `(EventId, UserId)` **unique** index
 (the last-write-wins concurrency exception — a conflicting RSVP is a
@@ -470,7 +470,7 @@ additive on top of the existing lanes).
 | Unit | Deliverable | Exit (green) | Status |
 |---|---|---|---|
 | U00 | ADR 0054 + `M4` milestone + README + `MilestonesTests` | docs/adr green, no other code | ☐ |
-| U01 | `Event`/`EventRsvp` docs + `M4DocTypes` + DI | Core tests green, indexes present | ☐ |
+| U01 | `Event`/`EventRsvp` docs + `EventDocTypes` + DI | Core tests green, indexes present | ☐ |
 | U02 | `EventToAuditableResource` adapter | adapter compiles, frozen `IAuthorizationService` | ☐ |
 | U03 | read lanes + standing matrix | `M4_*` auth family green | ☐ |
 | U04 | write lanes (create/edit/publish/delete + RSVP) + C3 audit | write-lane tests green | ☐ |

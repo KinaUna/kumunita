@@ -6,13 +6,13 @@ namespace Kumunita.Core;
 
 /// <summary>
 /// M3's (including M3b's) Marten-native document registration surface (ADR 0004 §B.1)
-/// — the parallel surface to <see cref="M1DocTypes"/> for the posts bounded context
+/// — the parallel surface to <see cref="CoreDocTypes"/> for the posts bounded context
 /// (<c>Kumunita.Core.Posts</c>) plus the M3b "platform announcements" lane
 /// (<c>Kumunita.Core.Announcements</c>). All documents are POCOs with the
 /// conventional <c>string</c> <c>Id</c> identity, so no non-default convention
 /// (identity, business-key index) needs pinning: Marten's defaults apply.
 /// </summary>
-public static class M3DocTypes
+public static class PostDocTypes
 {
     /// <summary>
     /// Registers the M3/M3b domain documents. Idempotent: calling twice is safe —

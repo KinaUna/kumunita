@@ -5,7 +5,7 @@ Date: 2026-09-24
 Amends: **0076** (the M6 notification surface — D2's *nine-kind* closed set
 becomes an **eleven-kind** closed set: the two admin-lane kinds
 `account.signup` / `account.verified` join `NotificationKinds`; the
-`NotificationService.EmitAsync` seam, the `M6DocTypes` surface, the durable
+`NotificationService.EmitAsync` seam, the `NotificationDocTypes` surface, the durable
 email trio, and the per-recipient preference lane are **reused verbatim** —
 no signature change), **0005 / 0015** (the `LocaleSettings` singleton + the
 closed `KnownTranslationKeys` registry — one additive gate field on the

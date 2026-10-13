@@ -76,7 +76,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
     /// scratch Postgres database (the <see cref="NotificationsControllerTests"
     /// .BootStoreAsync"/> shape) with the M6 surface so the
     /// <see cref="NotificationQuietSchedule"/> table exists (its identity is
-    /// pinned to <c>RecipientId</c> in <see cref="M6DocTypes"/>).</summary>
+    /// pinned to <c>RecipientId</c> in <see cref="NotificationDocTypes"/>).</summary>
     private async Task<IDocumentStore> BootStoreAsync()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -86,7 +86,7 @@ public class LocaleControllerQuietSectionTests(PostgresFixture fixture) : IClass
             opts.Connection(conn);
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
-            M6DocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

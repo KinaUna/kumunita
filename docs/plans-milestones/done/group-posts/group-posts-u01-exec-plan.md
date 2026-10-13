@@ -31,7 +31,7 @@
   changing the statements.
 - **Single additive, no doc-surface change.** `Post.GroupId` is the one additive
   on the `Post` POCO (ADR 0004 §B.1, the M3b `Status` ADD precedent); it needs no
-  `M3DocTypes` change (Marten's delta picks it up) and `PostReply` is unchanged. I
+  `PostDocTypes` change (Marten's delta picks it up) and `PostReply` is unchanged. I
   state this in Context/Scope so U4 does not add a second doc surface.
 - **Two-part doc discipline.** Part 1 does *not* define exact C# (that is U2 /
   Part 2). I only *name* the seams and point at U2 for the frozen shapes — keeping

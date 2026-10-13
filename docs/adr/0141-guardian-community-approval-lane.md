@@ -62,7 +62,7 @@ community lane — both deep-linking at the child's **manage-child page**
   `Id` (surrogate PK, `Guid-N`), `ComponentId`, `UserId` (the supervised
   child), `RequestedBy` (the admin / moderator who initiated the add),
   `Status`, `RequestedAt`, `ResolvedAt?`, `ResolvedBy?`. Registered in
-  `M1DocTypes.Configure` with `UniqueIndex(ComponentId, UserId)` — the same
+  `CoreDocTypes.Configure` with `UniqueIndex(ComponentId, UserId)` — the same
   one-row-per-(component, user) business-key convention as
   `ComponentMembership` and `GroupInvitation`.
 - **No new group type.** The guardian's *reject* of a child's group

@@ -81,17 +81,17 @@ public sealed class UserPortabilityAcceptanceTests(PostgresFixture fixture) : IC
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);
-            M9DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
             MediaDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
             DocumentDocTypes.Configure(opts);
-            M17DocTypes.Configure(opts);
+            BookmarkDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

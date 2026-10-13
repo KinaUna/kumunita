@@ -42,7 +42,7 @@
 | design doc §2.2 + §2.7 + invariants | the exact type shapes to implement |
 | `src/Kumunita.Core/CommunityOptions.cs` | the options shape to mirror |
 | `src/Kumunita.Core/DependencyInjection.cs` | the `AddOptions<…>` + `AddTransient<…>` registration idiom |
-| `src/Kumunita.Core/M3DocTypes.cs` | doc-type-surface shape (context only — U1 does **not** add a doc surface) |
+| `src/Kumunita.Core/PostDocTypes.cs` | doc-type-surface shape (context only — U1 does **not** add a doc surface) |
 | `README.md` | "one database" + self-hosted principle (the volume fits the model) |
 
 ## Steps (each leaves the tree in a buildable state)

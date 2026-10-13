@@ -23,7 +23,7 @@ M1 built and M3's F3/F8 tests proved *absent*, not broken.
   projects, notifications, export/iCal/federation/MCP) is in M3b — those stay
   M4/M5/M6 per M1's original OOS close.
 - **`Report` table already exists** (`src/Kumunita.Core/Posts/Report.cs`,
-  registered in `src/Kumunita.Core/M3DocTypes.cs`, 7 fields, `Status` nullable,
+  registered in `src/Kumunita.Core/PostDocTypes.cs`, 7 fields, `Status` nullable,
   no index, no surface, no tests). M3b does **not** re-register it; M3b adds
   the *workflow* (write lanes) over the existing table.
 - **`ModeratorAccess` is the sole moderator gate (C5).** M1 seeded all four
@@ -47,7 +47,7 @@ M1 built and M3's F3/F8 tests proved *absent*, not broken.
 - **`Post.Status` is additive, not a breaking reshape.** M3's `Post` POCO
   (`src/Kumunita.Core/Posts/Post.cs`) has no `Status` column today. Adding a
   nullable-with-default `Status` enum is a Marten-native additive schema
-  change (ADR 0004 §B.1 precedent already used by M3's `M3DocTypes`) — no
+  change (ADR 0004 §B.1 precedent already used by M3's `PostDocTypes`) — no
   migration step, no re-seed. U1/U2 pin the exact enum shape and default.
 - **Reply route is a micro-fix, not a new seam.** `PostService.CreateReplyAsync`
   (Core, M3 U6) already exists and is the only write seam (C3). The M3b unit
@@ -196,7 +196,7 @@ existing `SetComponentModeratorAccessAsync` seam.
 - **Entry reads:** `docs/design/m3b-moderation.md` §2.2/§2.3, `src/Kumunita.Core/Posts/Report.cs`,
   `src/Kumunita.Core/Posts/PostToAuditableResource.cs` (the pattern for a new
   service composing `IUserInfoService` + `IAuthorizationService`),
-  `src/Kumunita.Core/M3DocTypes.cs` (confirm `Report` already registered —
+  `src/Kumunita.Core/PostDocTypes.cs` (confirm `Report` already registered —
   no new `Configure` call needed).
 - **Deliverables (1 file, new):** `src/Kumunita.Core/Moderation/ModerationService.cs`
   — ctor (`IUserInfoService`, `IAuthorizationService`, `IDocumentStore`);

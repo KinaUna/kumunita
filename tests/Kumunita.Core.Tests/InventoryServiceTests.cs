@@ -14,7 +14,7 @@ namespace Kumunita.Core.Tests;
 /// The shape follows <see cref="PostServiceTests"/> /
 /// <see cref="ProjectServiceTests"/> verbatim — same
 /// <see cref="PostgresFixture"/>, same <c>BootStoreAsync</c> (+ the
-/// <see cref="M16DocTypes"/> registration surface), same <c>Plant</c> helper,
+/// <see cref="InventoryDocTypes"/> registration surface), same <c>Plant</c> helper,
 /// same <c>Services</c> composition (the <c>UserInfoService</c> +
 /// <c>AuthorizationService</c> + <c>InventoryService</c> trio U02's
 /// <c>AddTransient</c> registration mirrors), fresh scratch Postgres per test
@@ -443,14 +443,14 @@ public class InventoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers Profile — the AuthorizationService decision
+            // CoreDocTypes registers Profile — the AuthorizationService decision
             // (ResolveActorAsync) reads the actor's Profile for the guardian's
             // per-community block (GetEffectiveCommunityIdsAsync) on every
             // community-scoped read, so this surface needs Profile registered,
             // the same as the PostServiceTests / ProjectServiceTests harness
-            // (the M16DocTypes + M1DocTypes composition).
-            M1DocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            // (the InventoryDocTypes + CoreDocTypes composition).
+            CoreDocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

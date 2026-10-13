@@ -69,7 +69,7 @@ controller, no tests in this unit** — those are U4–U7.
   `AttachmentIds` (**3rd** additive field), same shape/comment (adjust the
   ordinal to 3rd).
 - **Zero migrations** (ADR 0004 §B.1): additive POCO fields, no Marten schema
-  change, no `M1DocTypes` / `M3DocTypes` edit.
+  change, no `CoreDocTypes` / `PostDocTypes` edit.
 
 ### Three reverse-lookup seams (C-ATT·4 — query, not body-parse)
 - `IPostService.FindPostByAttachmentIdAsync(string mediaId, CancellationToken

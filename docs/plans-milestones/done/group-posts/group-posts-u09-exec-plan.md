@@ -12,7 +12,7 @@ presentation-only.
 1. Design doc §2.5 — the 19 exact names + file name `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs`.
 2. `tests/Kumunita.Core.Tests/PostServiceTests.cs` — the M3 scaffolding to mirror:
    `PostgresFixture` + `BootStoreAsync` (fresh scratch DB per test, `mt` schema,
-   `KumunitaFeature` + `AuthorizationFeature` + `M1DocTypes` + `M3DocTypes`),
+   `KumunitaFeature` + `AuthorizationFeature` + `CoreDocTypes` + `PostDocTypes`),
    the real-service `Services(store)` trio, `Plant` / `RunInSession` helpers,
    `PostAudits` audit-row query shape.
 3. `tests/Kumunita.Core.Tests/UserInfoServiceGroupsU9Tests.cs` — group setup via
@@ -38,7 +38,7 @@ presentation-only.
   - The **19** `[Fact]`s, **exact names** per §2.5 (character-for-character; a rename is a
     drift event, §2.7).
   - Mirror M3's `PostServiceTests` scaffolding: same `PostgresFixture`, same
-    `BootStoreAsync` (adding `M1DocTypes` + `M3DocTypes` + the two storage features),
+    `BootStoreAsync` (adding `CoreDocTypes` + `PostDocTypes` + the two storage features),
     real `UserInfoService` + `AuthorizationService` + `PostService` trio, `Plant` /
     `RunInSession` helpers, `GroupPostAudits` query (TargetKind `"grouppost"`).
   - **G·4 fixtures:** #8 plants a `ModeratorAssignment` (denial must hold); #9 plants a

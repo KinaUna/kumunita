@@ -1,6 +1,6 @@
 # M4 — Events, RSVPs & reminders — rolling handoff log
 
-> **TL;DR:** Shipped M4 (Events, RSVPs & reminders, ADR 0054) + U13 (GlobalAdmin edit/delete write override): the `Event` / `EventRsvp` docs, the `IEventService` write lanes (`CreateAsync` / `PublishAsync` / `UpdateAsync` / `DeleteAsync` / `RsvpAsync`), the §6.4 scheduled `EventReminders` job, the `EventToAuditableResource` adapter + the `M4DocTypes` surface, and the 25 pinned seam tests (T01–T25) green end-to-end (Core 670/670, Web 351/351).
+> **TL;DR:** Shipped M4 (Events, RSVPs & reminders, ADR 0054) + U13 (GlobalAdmin edit/delete write override): the `Event` / `EventRsvp` docs, the `IEventService` write lanes (`CreateAsync` / `PublishAsync` / `UpdateAsync` / `DeleteAsync` / `RsvpAsync`), the §6.4 scheduled `EventReminders` job, the `EventToAuditableResource` adapter + the `EventDocTypes` surface, and the 25 pinned seam tests (T01–T25) green end-to-end (Core 670/670, Web 351/351).
 > **Seam it created:** `Kumunita.Core.Events` — the `actorRoles`-bearing `UpdateAsync` / `DeleteAsync` (the U13 seam that honors ADR 0054 §3.4 server-side) + the `AuditViaFor(actorId, authorId)` helper (the author → `AccessVia.Owner`; a non-author actor, reachable only via the GlobalAdmin override, → `AccessVia.Admin`) — the audit-tag correctness fix that the U05(f) drift note flagged as "a Core change, out of U05 scope" and carried through U12.
 > **Do not re-litigate:** the §3.7 master list is **25** names (T01–T25) — U13 added T24 / T25 (`M4_GlobalAdminOverrideEditEndToEnd` / `M4_GlobalAdminOverrideDeleteEndToEnd`) as the §3.8 row-3 part-vs-whole gate, which was red for the GlobalAdmin branch before U13 (the U09 `M4_GlobalAdminOverrideEdit` (T09) pin only drove the **pure** `CheckEditStanding` helper, not the **lane** — green CI, red seam); `PublishAsync` remains **author-only** (ADR 0037 — a non-author GlobalAdmin is still denied publish), and `CreateAsync` / `RsvpAsync` are unchanged (the `StaticEmptyRoles` sentinel is now used only by create / publish).
 
@@ -55,7 +55,7 @@ further open decisions carried into U01.
   — all §3.x sections marked **[DECIDED — ADR 0054]**; **zero `[PROPOSED]`
   markers remain** (verified by grep). §4 lists the exact C# seams
   (`IEventService`, `EventReminderService`, `EventReminderHandler`,
-  `EventReminderTick`, `EventReminderOptions`, the `M4DocTypes` surface).
+  `EventReminderTick`, `EventReminderOptions`, the `EventDocTypes` surface).
 - **The 23 pinned seam test names** (design doc §3.7 = the master list, ADR
   0054 Decision): T01 `M4_MemberSeesUpcomingEventFeed` · T02
   `M4_NullAudienceEventIsPublic` · T03 `M4_CommunityAudienceSeesFeed` · T04
@@ -107,15 +107,15 @@ further open decisions carried into U01.
 
 **U00 exit gate met. STOP — do NOT start U01.**
 
-## U01 — Event/EventRsvp docs + M4DocTypes
+## U01 — Event/EventRsvp docs + EventDocTypes
 
 - **(a) Files added:**
   - `src/Kumunita.Core/Events/Event.cs` — the §3.1 POCO (exact field set,
     byte-for-byte the design-doc shape; `Body` / `ReminderEnabled` naming).
   - `src/Kumunita.Core/Events/EventRsvp.cs` — the §3.2 POCO + the
     `RsvpStatus` enum (`Going` / `Maybe` / `No`).
-  - `src/Kumunita.Core/M4DocTypes.cs` — the new parallel doc surface
-    (the `M3DocTypes` pattern verbatim; root-level file, like
+  - `src/Kumunita.Core/EventDocTypes.cs` — the new parallel doc surface
+    (the `PostDocTypes` pattern verbatim; root-level file, like
     `PageDocTypes.cs` / `TagDocTypes.cs`).
   - `src/Kumunita.Core/Events/IEventService.cs` — the §4 seam (exact
     signatures; U03/U04 implement the bodies).
@@ -131,13 +131,13 @@ further open decisions carried into U01.
     `IEventService → EventService` transient registered next to
     `IAnnouncementService` / `IPageService` (the "AddTransient with the
     store injected" shape).
-  - **Modified:** `src/Kumunita.Web/Program.cs` — `M4DocTypes.Configure(opts)`
+  - **Modified:** `src/Kumunita.Web/Program.cs` — `EventDocTypes.Configure(opts)`
     wired into the dev-loop path next to the `TagDocTypes.Configure(opts)`
     line (one call added). `SchemaBootstrap.cs` was **not** touched: it
     applies the *storage-feature* steps and never calls the doc surfaces
     directly — the doc surfaces are registered at the `StoreOptions` level
     (Program.cs), the same as M1/M3/Media/Page/Tag.
-- **(b) The two indexes confirmed** (in `M4DocTypes.Configure`):
+- **(b) The two indexes confirmed** (in `EventDocTypes.Configure`):
   - `Event` — a regular composite **feed-ordering** index
     `(ComponentId, Start)` (the design-doc §4 "feed ordering shape"; a
     filter-then-sort optimization, not an integrity constraint).
@@ -160,7 +160,7 @@ further open decisions carried into U01.
     `.Index(e => new { e.ComponentId, e.Start })` — the documented
     composite-index idiom, same column order, non-unique. The
     `(EventId, UserId)` **unique** index uses the `params` form
-    `.UniqueIndex(r => r.EventId, r => r.UserId)` (the `M3DocTypes` /
+    `.UniqueIndex(r => r.EventId, r => r.UserId)` (the `PostDocTypes` /
     `PageDocTypes` precedent).
 - **(d) Drift pauses:** **none.** No new `AccessAction` / `AccessVia` /
   authorization branch; no new audience mechanism (`Event.Audience` is the
@@ -209,7 +209,7 @@ further open decisions carried into U01.
   `Audience` is nullable (the `Post`/`Page` precedent — `Post` is non-null by
   construction, but `Event.Audience` is `Authorization.Audience?`, so the
   nullable projection is the correct §3.3 shape); no frozen seam
-  re-shaped; `Event` / `EventRsvp` / `M4DocTypes` / `EventService` (U01),
+  re-shaped; `Event` / `EventRsvp` / `EventDocTypes` / `EventService` (U01),
   `Milestones.cs` / README / `MilestonesTests`, and the read/write lanes
   (U03/U04) all untouched.
 
@@ -229,7 +229,7 @@ further open decisions carried into U01.
   - `tests/Kumunita.Core.Tests/EventServiceTests.cs` — **new** file. 17 `M4_*`
     tests (read + standing authorization family only; **not** the full 23-test
     U09 list). Follows the `PostServiceTests` harness template:
-    `PostgresFixture`, `BootStoreAsync` (registers `M4DocTypes.Configure`), a
+    `PostgresFixture`, `BootStoreAsync` (registers `EventDocTypes.Configure`), a
     `Services(store)` tuple, a `Plant` helper, an `Audience(GrantKind, id)`
     helper, and `await_ThrowsUnauthorized`.
 - **(b) The four read lanes + two standing helpers (signatures confirmed
@@ -298,7 +298,7 @@ further open decisions carried into U01.
     list is a public detail read (the actor's own row is exposed separately by
     `GetMyRsvpAsync`), so no actor was added.
   - `Decision.Allowed` / `VisibleSet.Visible` are the correct accessors;
-    `M4DocTypes` / `Event` / `EventRsvp` / `EventToAuditableResource` (U02) /
+    `EventDocTypes` / `Event` / `EventRsvp` / `EventToAuditableResource` (U02) /
     `EventRequests` all untouched; **no** `Milestones.cs` / README /
     `MilestonesTests` change (U12's job); write lanes (U04) and the full
     U09 23-test list remain out of scope.
@@ -318,7 +318,7 @@ further open decisions carried into U01.
     `AudiencesEqual` / `ListsEqual` (no-op-change detection for the
     `UpdateAsync` `Modified` stamp), and the `StaticEmptyRoles` constant
     (see (d) drift). The `IEventService` seam, `Event` / `EventRsvp` /
-    `M4DocTypes` / `EventToAuditableResource` (U02) / the four **read**
+    `EventDocTypes` / `EventToAuditableResource` (U02) / the four **read**
     lanes + two standing helpers (U03) are all **untouched**.
   - `src/Kumunita.Core/Events/EventRequests.cs` — added
     `IReadOnlyList<string>? ImageIds` and `IReadOnlyList<string>?
@@ -568,8 +568,8 @@ further open decisions carried into U01.
   - `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` — **new** file. The
     **5 `EventReminderServiceTests`** (T19–T23 from the §3.7 master list), the
     `AuditPurgeServiceTests` / `SideEffectHarnessTests` shape to mirror — the
-    `PostgresFixture` + `BootStoreAsync` (`M1DocTypes` + `M3DocTypes` +
-    `M4DocTypes` Configure, `ApplyAllConfiguredChangesToDatabaseAsync`) + `Plant`
+    `PostgresFixture` + `BootStoreAsync` (`CoreDocTypes` + `PostDocTypes` +
+    `EventDocTypes` Configure, `ApplyAllConfiguredChangesToDatabaseAsync`) + `Plant`
     helpers, plus a `RecordingMailer` test double (NSubstitute `IMailerStage` that
     records the staged `IdempotencyKey` + `Recipient` pairs).
 - **(b) The §3.6 contract (the 4 pins):**
@@ -614,7 +614,7 @@ further open decisions carried into U01.
     dispatches over SMTP on a successful commit. The U07 service does not
     reference `OutboxEmailHandler` or `SmtpSender` (those stay in
     `Kumunita.Web/SideEffects/`).
-  - **`Event` / `EventRsvp` / `M4DocTypes` / `IEventService` / `EventService`
+  - **`Event` / `EventRsvp` / `EventDocTypes` / `IEventService` / `EventService`
     / `EventToAuditableResource` are untouched** — the reminder service reads
     the `Event` + `EventRsvp` documents directly (a read, not a write seam
     change) and does not touch the U01–U05 surface.
@@ -1187,7 +1187,7 @@ red seam). The §3.7 master list is now **25** names (T01–T25).
 **(f) What did NOT change.** `CreateAsync` / `PublishAsync` (publish remains
 author-only, ADR 0037 — a non-author GlobalAdmin is still denied publish),
 `RsvpAsync` (no audit row), the `StaticEmptyRoles` sentinel (create/publish
-only), the `Event` / `EventRsvp` doc shapes, the `M4DocTypes` surface, the
+only), the `Event` / `EventRsvp` doc shapes, the `EventDocTypes` surface, the
 §6.4 reminder job, and the `EventToAuditableResource` adapter.
 
 **U13 exit gate met: the code honors ADR 0054 §3.4 (GlobalAdmin edit/delete

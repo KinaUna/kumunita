@@ -45,7 +45,7 @@
 > **M15 is a world-seam over one already-shipped store.** The platform's
 > UI strings live in **one** document — `TranslationResource`
 > (`Key`, `LanguageCode`, `Text`, the `(Key, LanguageCode)` unique index
-> on `M1DocTypes`, ADR 0005 B) — with a **closed key registry** in code
+> on `CoreDocTypes`, ADR 0005 B) — with a **closed key registry** in code
 > (`KnownTranslationKeys`, `EnValues` as the floor, per-language baselines
 > for de/fr/da, ADR 0042/0045) and a live **`/admin/languages`** surface
 > whose key-managed editor (the ML-UI U6 `Translations` view) saves
@@ -59,7 +59,7 @@
 > spreadsheet, a colleague's file) and bring it **back**.
 >
 > What M15 builds on (all grep-confirmed frozen seams): the
-> `TranslationResource` doc + the `M1DocTypes` unique index (the store the
+> `TranslationResource` doc + the `CoreDocTypes` unique index (the store the
 > bulk view projects), the `ILocalizationService` read seams
 > (`GetTranslationsForAsync` — one round-trip `key → text` map, the batch
 > read the editor already uses; `GetCompletenessAsync` — the

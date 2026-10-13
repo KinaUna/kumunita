@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-10-07
 Amends: 0028 (a new GU seam + a new GU doc + one GU audit verb — all compatible ADDs; the GU standing / G·1–G·5 invariants are unchanged), 0006-E (three additive `IUserInfoService` seams, named here)
-References: 0121 (the `QuietScheduleEvaluator` / `NotificationQuietSchedule` pure-evaluator + doc shape this ADR mirrors, polarity-inverted), 0019 (the wall-clock-first effective-zone resolution the evaluator + middleware use), 0004 §B.1 (the additive doc type on the existing `M1DocTypes` surface)
+References: 0121 (the `QuietScheduleEvaluator` / `NotificationQuietSchedule` pure-evaluator + doc shape this ADR mirrors, polarity-inverted), 0019 (the wall-clock-first effective-zone resolution the evaluator + middleware use), 0004 §B.1 (the additive doc type on the existing `CoreDocTypes` surface)
 
 ## Context
 
@@ -53,12 +53,12 @@ enforcement-history auditing. *Forbids:* a `Profile` field for the schedule
 `NotificationQuietSchedule` precedent), or a per-feature gate.
 
 **D2 — The doc is per-child (id = `ChildId`), registered on the existing
-`M1DocTypes` GU surface (the `GuardianLink` neighbor).** One row per child — the
+`CoreDocTypes` GU surface (the `GuardianLink` neighbor).** One row per child — the
 exact `NotificationQuietSchedule` "one row per subject" shape (ADR 0121 D2),
 with `ChildId` in place of `RecipientId`. A child with **two** guardians shares
 **one** schedule (the `GuardianLink` multi-guardian shape; the second guardian
 sets/clears the same row via the same guardian-gated seam). Registered **next
-to `GuardianLink`** on `M1DocTypes` (the GU lane's surface, ADR 0028 §B; the ADR
+to `GuardianLink`** on `CoreDocTypes` (the GU lane's surface, ADR 0028 §B; the ADR
 0004 §B.1 additive-doc-type precedent — delta-detected, idempotent, **no** new
 `*DocTypes`, **no** EF migration, **no** DDL). The seeder does **not** seed a
 schedule for any child (a fresh child has no schedule — the C-M28·3 floor).
@@ -204,7 +204,7 @@ auditing (the M13 ADR 0114 `UsageEvent` shape). (5) Per-content time limits.
   with no `GuardianTimeLimitSchedule` row (or a disabled schedule) is always
   allowed — the GU lane's "we decided not to restrict" default is preserved.
 - **Zero migrations** (D2): the one new `GuardianTimeLimitSchedule` document is
-  delta-detected and applied idempotently at boot on the existing `M1DocTypes`
+  delta-detected and applied idempotently at boot on the existing `CoreDocTypes`
   surface (the ADR 0004 §B.1 additive-surface shape) — every existing row reads
   its pre-M28 state, unchanged.
 - **The cardinal privacy rule is held** (G·1-adjacent): the enforcement read is
@@ -276,7 +276,7 @@ resident self-service time limit (D9·1); per-feature / per-content restrictions
 - `src/Kumunita.Core/UserInfo/UserInfoService.cs` — the three-seam
   implementation (the active-link + GlobalAdmin gate, the one audit row, the
   strong-consistency read) (D4).
-- `src/Kumunita.Core/M1DocTypes.cs` — the `GuardianTimeLimitSchedule`
+- `src/Kumunita.Core/CoreDocTypes.cs` — the `GuardianTimeLimitSchedule`
   registration (next to `GuardianLink`) (D2).
 - `src/Kumunita.Web/Security/TimeLimitMiddleware.cs` — new (the enforcement
   gate) (D5).

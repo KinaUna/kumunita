@@ -38,7 +38,7 @@ namespace Kumunita.Core;
 /// the delta via the existing <c>ApplyAllConfiguredChangesToDatabaseAsync()</c>.
 /// </para>
 /// </summary>
-public static class M1DocTypes
+public static class CoreDocTypes
 {
     /// <summary>
     /// Registers the M1 domain documents and pins the small non-default conventions

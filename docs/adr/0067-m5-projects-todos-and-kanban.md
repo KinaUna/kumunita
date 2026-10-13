@@ -110,7 +110,7 @@ additive).
     placement's visibility is the to-do's **and** the board's; it is **not**
     itself an auditable resource (no
     `BoardItemPlacementToAuditableResource`).
-  - **`M5DocTypes`** — a new document surface (the `M4DocTypes` pattern
+  - **`ProjectDocTypes`** — a new document surface (the `EventDocTypes` pattern
     verbatim): `TodoItem` (conventional `Id` + a `(ComponentId, Created)`
     feed-ordering index + a `ParentId` index); `KanbanBoard` (conventional
     `Id` + a `(ComponentId, Created)` feed-ordering index); `KanbanLane`
@@ -254,7 +254,7 @@ additive).
   string-status / nullable-`MaxItems` shape), the two adapters
   (`TargetKind = "todo"` / `"board"` — the **exact** strings), the
   `IProjectService` full surface (the read + write + placement signatures
-  verbatim — frozen in U04), the DTOs, the `M5DocTypes` surface, the
+  verbatim — frozen in U04), the DTOs, the `ProjectDocTypes` surface, the
   standing matrix, the `kw-l` keys, the 16 Core + 8 Web test names, and the
   three-test gate — all frozen pins; any mismatch is a `## U<m> — Drift
   pause` per the lane's unit-series rule §9.

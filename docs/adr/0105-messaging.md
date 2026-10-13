@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-27
 Amends: **0004** (§B.1 additive — the two new documents + the new
-`M9DocTypes` surface + one `LocaleSettings` field; zero migrations for
+`MessagingDocTypes` surface + one `LocaleSettings` field; zero migrations for
 existing surfaces), **0006** (the frozen `IAuthorizationService` /
 `IAuditableResource` surface — **no new adapter**, no new
 `AccessAction`, no new `AccessVia`, no `Decide()` branch; a message is a
@@ -74,8 +74,8 @@ is the primary tier; the register
 `Conversation` (`Id`, `ParticipantA`, `ParticipantB` — the pair stored
 **sorted**, `Created`, `LastMessageAt?`) and `Message` (`Id`,
 `ConversationId`, `SenderId`, `Body`, `Created`, `ReadBy?`,
-`LanguageCode`) — and **one new document surface** `M9DocTypes` (the
-`M3DocTypes` / `M6DocTypes` pattern; a `(ConversationId, Created)` index
+`LanguageCode`) — and **one new document surface** `MessagingDocTypes` (the
+`PostDocTypes` / `NotificationDocTypes` pattern; a `(ConversationId, Created)` index
 on `Message`, a unique `(ParticipantA, ParticipantB)` index on
 `Conversation`). Conventional `string` ids, delta-detected + idempotent,
 wired into **both** boot paths (the dev loop + `SchemaBootstrap`).
@@ -233,7 +233,7 @@ witness). Web: `MessagesControllerTests` over NSubstitute
 ## Consequences
 
 - One new bounded context (`Kumunita.Core.Messaging`), one new document
-  surface (`M9DocTypes`), one additive `LocaleSettings` field (the floor
+  surface (`MessagingDocTypes`), one additive `LocaleSettings` field (the floor
   **inverted to off**), one additive `NotificationKinds` constant +
   emitter, one new service + registration, one new resident controller +
   two views, one new admin controller + view, one nav entry, 9 `kw-l`

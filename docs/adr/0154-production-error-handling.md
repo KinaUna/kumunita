@@ -47,7 +47,7 @@ and a resident may file a *general issue* not tied to an error page). M31 does
   migration needed), it does not re-shape the existing two.
 - **The doc is Marten-native, registered in a new parallel surface** (D3). The
   `ErrorReportDocTypes.Configure(opts)` surface (ADR 0004 §B.1, the
-  `UsageDocTypes` / `M3DocTypes` parallel-surface precedent) pins one
+  `UsageDocTypes` / `PostDocTypes` parallel-surface precedent) pins one
   `.Schema.For<ErrorReport>()` + the `(TriageStatus, Created)` index for the
   admin list ordering. **No EF migration** — the delta is applied
   idempotently at boot (the `SchemaBootstrap` versioned path + the dev-loop

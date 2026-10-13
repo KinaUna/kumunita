@@ -56,17 +56,17 @@ closed loop / handoff / part-vs-whole. **Roadmap confirm:** M5 stays
 `TodoItem.cs`, `KanbanBoard.cs`, `KanbanLane.cs`, `BoardItemPlacement.cs`
 (verbatim §2.2; no `BoardId`/`LaneId`/`Order` on `TodoItem`, no `IsDraft`,
 no `Audience` on `KanbanLane`/`BoardItemPlacement`); (b) the registration
-surface, `src/Kumunita.Core/M5DocTypes.cs`. **One edit site:**
-`src/Kumunita.Web/Program.cs`, `M5DocTypes.Configure(opts);` added immediately
-after `M4DocTypes.Configure(opts);` (both boot paths pick the surface up
+surface, `src/Kumunita.Core/ProjectDocTypes.cs`. **One edit site:**
+`src/Kumunita.Web/Program.cs`, `ProjectDocTypes.Configure(opts);` added immediately
+after `EventDocTypes.Configure(opts);` (both boot paths pick the surface up
 automatically). **`dotnet build Kumunita.slnx -c Debug` is green.**
 **One deviation (recorded per the unit-series drift rule):** design-doc §2.4
 pins the feed/lookup indexes as named `.Index(expr, "idx_…")`, but Marten
 9.31.2 / Weasel 9.29.0 expose no way to name a computed index (the only
 overloads are `Index(expr)` and `Index(expr, Action<ComputedIndex>)`, and
 `ComputedIndex` has no `Name` property — only `Casing`/`TenancyScope`).
-`M5DocTypes.cs` therefore uses the unnamed `.Index(expr)` form (the exact
-`M4DocTypes` precedent) for `TodoItem` (×2) and `KanbanBoard` (×1); all
+`ProjectDocTypes.cs` therefore uses the unnamed `.Index(expr)` form (the exact
+`EventDocTypes` precedent) for `TodoItem` (×2) and `KanbanBoard` (×1); all
 unique indexes are unaffected.
 
 ## U03 — adapters

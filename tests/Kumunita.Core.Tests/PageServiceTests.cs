@@ -2282,8 +2282,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);   // U02 — the two new Page/PageTranslation docs
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
@@ -2303,8 +2303,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

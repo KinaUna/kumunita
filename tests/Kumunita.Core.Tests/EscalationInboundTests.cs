@@ -45,7 +45,7 @@ namespace Kumunita.Core.Tests;
 /// <para>
 /// <b>Harness (the M32 <see cref="ErrorReportResolveTests"/> idiom):</b> the
 /// same <c>DocumentStore.For</c> lambda wiring
-/// <see cref="Kumunita.Core.M1DocTypes.Configure"/> (the
+/// <see cref="Kumunita.Core.CoreDocTypes.Configure"/> (the
 /// <c>AccessAudit</c> doc) + <see cref="Kumunita.Core.ErrorReportDocTypes.Configure"/>
 /// (the <c>ErrorReport</c> doc, which the four ESC·2 additive fields ride) +
 /// <see cref="Kumunita.Core.EscalationDocTypes.Configure"/> (the
@@ -332,7 +332,7 @@ public class EscalationInboundTests(PostgresFixture fixture) : IClassFixture<Pos
 
     /// <summary>
     /// Boot a fresh scratch store with the <c>AccessAudit</c> doc
-    /// (<see cref="Kumunita.Core.M1DocTypes.Configure"/>), the
+    /// (<see cref="Kumunita.Core.CoreDocTypes.Configure"/>), the
     /// <c>ErrorReport</c> doc (<see cref="Kumunita.Core.ErrorReportDocTypes.Configure"/>,
     /// which the four ESC·2 additive fields ride), and the
     /// <c>EscalationToken</c> + <c>EscalationOutboundConfig</c> docs (the
@@ -351,7 +351,7 @@ public class EscalationInboundTests(PostgresFixture fixture) : IClassFixture<Pos
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             ErrorReportDocTypes.Configure(opts);
             EscalationDocTypes.Configure(opts);
         });

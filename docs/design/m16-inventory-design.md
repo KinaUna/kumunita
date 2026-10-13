@@ -10,7 +10,7 @@
 > **A standalone core surface** (a roadmap letter, not a named lane): one
 > **new bounded context** `Kumunita.Core.Inventory` with **two
 > documents** (`InventoryItem`, `InventoryCheckout`) on a **new
-> `M16DocTypes`** surface (the M9 `M9DocTypes` / M5 `M5DocTypes`
+> `InventoryDocTypes`** surface (the M9 `MessagingDocTypes` / M5 `ProjectDocTypes`
 > precedent — additive, idempotent, **zero migrations** for existing
 > surfaces), one **adapter** onto the **frozen**
 > `IAuthorizationService` (the exact M5 `ProjectToAuditableResource`
@@ -47,7 +47,7 @@ surface** on its own bounded context (`Kumunita.Core.Projects`), its own
 projection — `Id` / `Name` / `OwnerId` / `Audience` / `ComponentId` /
 `TargetKind`, the **only** difference being the `TargetKind` string), the
 **creator ∪ GlobalAdmin vs. broad-standing** split over its write lanes
-(C-M5·6), and a `projects.*` `kw-l` block. The M9 (`M9DocTypes`)
+(C-M5·6), and a `projects.*` `kw-l` block. The M9 (`MessagingDocTypes`)
 precedent adds the **unique-index-as-witness** idiom — the
 `convo_uidx_pair` partial-ish unique index is the F1 idempotency witness,
 making a concurrent double-open of a conversation fail at the DB layer
@@ -73,12 +73,12 @@ frozen seams**:
    C-M3·2); `TargetKind = "inventory"` (the **exact** string — the
    `AccessAudit.TargetKind` discriminator for this line of decisions,
    C3).
-3. **The `*DocTypes` parallel-surface shape** (`src/Kumunita.Core/M9DocTypes.cs`)
+3. **The `*DocTypes` parallel-surface shape** (`src/Kumunita.Core/MessagingDocTypes.cs`)
    — `opts.Schema.For<T>()` + named indexes; `ApplyAllConfiguredChangesTo
    DatabaseAsync()` delta-detects and applies the new tables
    **idempotently** at boot (ADR 0004 §B.1) — **zero migrations for
    existing surfaces**. The M9 `convo_uidx_pair` (`UniqueIndex("convo_uidx_pair", c => c.ParticipantA, c => c.ParticipantB)`)
-   is the **F1 idempotency witness** the `M16DocTypes` open-checkout
+   is the **F1 idempotency witness** the `InventoryDocTypes` open-checkout
    unique partial index copies (the witness of at-most-one-open-checkout).
 4. **The M5 standing split** (C-M5·6 / ADR 0086) — the write lanes'
    **creator ∪ GlobalAdmin** standing probe (the `ProjectService`
@@ -121,7 +121,7 @@ scratch handoff note is
 
 **In (shipped by M16):** the `Kumunita.Core/Inventory/` bounded context
 — the two documents `InventoryItem` + `InventoryCheckout` (U01), the
-`M16DocTypes` surface with the **unique partial index** on `(ItemId)`
+`InventoryDocTypes` surface with the **unique partial index** on `(ItemId)`
 where `CheckedInAt IS NULL` (the F1 witness, U01), the
 `InventoryItemToAuditableResource` adapter (the exact M5 6-member
 projection, `TargetKind = "inventory"`, U01), the read lanes
@@ -189,7 +189,7 @@ split is the invariant that keeps the two from leaking into each other.
   `IInventoryService.cs` + `InventoryService.cs` (the read lanes U02,
   the write lanes + standing probes U03), `InventoryRequests.cs` (the
   request DTOs — the sealed-record shape).
-- **`Kumunita.Core/M16DocTypes.cs`** (new surface) —
+- **`Kumunita.Core/InventoryDocTypes.cs`** (new surface) —
   `opts.Schema.For<InventoryItem>()` (the `(ComponentId, Created)` +
   `(OwnerKind, Created)` feed/filter indexes) +
   `opts.Schema.For<InventoryCheckout>()` (the `(ItemId, CheckedOutAt)`
@@ -200,9 +200,9 @@ split is the invariant that keeps the two from leaking into each other.
   `AddTransient<IInventoryService>(sp => new InventoryService(store,
   IUserInfoService, IAuthorizationService))` registration (the M5 / M9
   shape — **no** `INotificationService`, D8, U02).
-- **`Kumunita.Web/Program.cs`** — `M16DocTypes.Configure(opts);` added to
+- **`Kumunita.Web/Program.cs`** — `InventoryDocTypes.Configure(opts);` added to
   the `*DocTypes.Configure(opts)` block (after
-  `M9DocTypes.Configure(opts)`, U01).
+  `MessagingDocTypes.Configure(opts)`, U01).
 - **`Kumunita.Web/Models/InventoryViewModels.cs`** (new — U04) +
   **`Kumunita.Web/Controllers/InventoryController.cs`** (new — U04:
   list / detail / create; U05: edit / delete / check-out / check-in) +
@@ -229,7 +229,7 @@ verbatim set below):** `IAuthorizationService` (the 4-method surface +
 the group lane), the `AccessAction` set (`Read` / `Moderate`), the
 `AccessVia` set (Owner / Admin + the existing values), `Decide()`,
 `IUserInfoService`, the `Post` `Audience` type, the existing
-`*DocTypes` surfaces (`M1DocTypes` … `M9DocTypes`), the
+`*DocTypes` surfaces (`CoreDocTypes` … `MessagingDocTypes`), the
 `KnownTranslationKeys` existing blocks, the `TranslationResource` store,
 and every existing controller / view / view-model.
 
@@ -244,11 +244,11 @@ and every existing controller / view / view-model.
   affected — a unit that adds, drops, or re-types a field is a drift
   event (C-M16·3 pins the append-only record shape).
 
-- **`M16DocTypes`** (D1/D4, U01) — the parallel surface
-  (`src/Kumunita.Core/M16DocTypes.cs`, the exact `M9DocTypes` shape):
+- **`InventoryDocTypes`** (D1/D4, U01) — the parallel surface
+  (`src/Kumunita.Core/InventoryDocTypes.cs`, the exact `MessagingDocTypes` shape):
 
   ```csharp
-  public static class M16DocTypes
+  public static class InventoryDocTypes
   {
       public static void Configure(StoreOptions opts)
       {
@@ -271,8 +271,8 @@ and every existing controller / view / view-model.
   }
   ```
 
-  Registered in `Program.cs` (`M16DocTypes.Configure(opts)` after
-  `M9DocTypes.Configure(opts)`). Delta-detected + applied idempotently
+  Registered in `Program.cs` (`InventoryDocTypes.Configure(opts)` after
+  `MessagingDocTypes.Configure(opts)`). Delta-detected + applied idempotently
   at boot — **zero migrations for existing surfaces** (ADR 0004 §B.1).
 
 - **`InventoryItemToAuditableResource`** (D2, U01) — the **exact** M5
@@ -370,7 +370,7 @@ write (C3, via the `IDocumentSession` overloads).
 **How we know it works** (the pinned tests per unit + the three
 acceptance tests, §gate):
 
-- **U01 (Core)** — the `M16DocTypes` surface registers both documents +
+- **U01 (Core)** — the `InventoryDocTypes` surface registers both documents +
   the unique partial index (the M9/M5 doc-registration test shape); the
   adapter's projection (the 6 members, `TargetKind = "inventory"`).
 - **U02 (Core)** — (a) the list's **single aggregate** `AccessAudit` row
@@ -521,7 +521,7 @@ carried to M16.
 **Deployment:** a surface-milestone — two documents + one new surface +
 one adapter + one service seam + one controller + four views + one nav
 entry + twenty registry keys. **One idempotent delta** at boot:
-`M16DocTypes` is delta-detected and applied by
+`InventoryDocTypes` is delta-detected and applied by
 `ApplyAllConfiguredChangesToDatabaseAsync()` (ADR 0004 §B.1) — the two
 new tables + the three indexes, **zero migrations for existing
 surfaces** (D1). The twenty `inv.*` keys are seeded by the existing
@@ -631,7 +631,7 @@ used by whom" the row names — a fact, not a claim).
   adds a new bounded context `Kumunita.Core.Inventory` with **two
   documents**: `InventoryItem` (the thing being tracked) and
   `InventoryCheckout` (the append-only usage record), registered on a
-  **new `M16DocTypes`** surface (the M9/M5 `*DocTypes` precedent — a
+  **new `InventoryDocTypes`** surface (the M9/M5 `*DocTypes` precedent — a
   parallel additive surface, delta-detected and applied idempotently at
   boot, **zero migrations** for existing surfaces). The usage history is
   the `InventoryCheckout` records *inside* the same context — **not** a
@@ -894,8 +894,8 @@ M16 row, **in the same unit**).
 6. The `Post` `Audience` type — **byte-identical** (D2/D3 — the
    `InventoryItem.Audience` is the **exact** same type; the adapter
    projects it verbatim, never mutates it).
-7. The existing `*DocTypes` surfaces (`M1DocTypes` … `M9DocTypes`) —
-   **byte-identical** (D1 — the `M16DocTypes` surface is **parallel**,
+7. The existing `*DocTypes` surfaces (`CoreDocTypes` … `MessagingDocTypes`) —
+   **byte-identical** (D1 — the `InventoryDocTypes` surface is **parallel**,
    never additive on an old one).
 8. The `TranslationResource` store + the `TranslationResource` lane —
    **byte-identical** (D8 — M16 takes no notification emitter; the
@@ -913,7 +913,7 @@ M16 row, **in the same unit**).
 the named trade, the §kw-l key list, and the §gate test names match the
 register verbatim; the source was checked against the live
 `ProjectToAuditableResource` (the 6-member projection — the adapter
-shape), the `M9DocTypes` surface (the `*DocTypes` + the
+shape), the `MessagingDocTypes` surface (the `*DocTypes` + the
 `convo_uidx_pair` unique-index shape), the ADR 0116 shape (the ADR
 Status/Context/Decision/Consequences + the deferred-lane + affected-files
 sections), and the ADR 0117-free confirmation against

@@ -69,7 +69,7 @@ record, calls `Decide`, and on a `Record` decision writes one
 `try/catch` (C-M13·5 — a capture failure degrades to a log line, never a
 500). The two skip rules: no endpoint ⇒ skip (a true 404); static file
 ⇒ skip (noise). The `UsageEvent` is a **new** document on a **new**
-`UsageDocTypes` surface (the `M3DocTypes` / `M5DocTypes` precedent — one
+`UsageDocTypes` surface (the `PostDocTypes` / `ProjectDocTypes` precedent — one
 `*DocTypes.Configure(opts)` call per bounded context, ADR 0004 §B.1).
 
 **D2 — A closed `SurfaceKey` list (26 top-level segments + `"other"`

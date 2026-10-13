@@ -42,7 +42,7 @@
   nothing more.
 - **Single additive, no doc-surface change** (U1's note): `Post.GroupId` is
   the one additive on the `Post` POCO (ADR 0004 §B.1, the M3b `Status` ADD
-  precedent); no `M3DocTypes` change, `PostReply` unchanged, `PostService`
+  precedent); no `PostDocTypes` change, `PostReply` unchanged, `PostService`
   ctor unchanged (ADR 0006-D: the lane owns every membership read).
 - **Frozen signatures untouched.** The ADR must say the ADR 0006-E lane is
   *additive* (M2 `GetProfilesAsync` / M3b `Moderate` ADD precedent) — never
@@ -94,7 +94,7 @@
        `CanAsync`/`CanSeeAsync` byte-identity; `GetProfilesAsync` /
        `Moderate` ADD precedent.
      - **The data is one additive.** `Post.GroupId` per ADR 0004 §B.1 (M3b
-       `Status` precedent — delta-detected, no re-seed, **no** `M3DocTypes`
+       `Status` precedent — delta-detected, no re-seed, **no** `PostDocTypes`
        change); written only via `CreateGroupPostAsync`
        (`ComponentId = string.Empty`, `Audience = new Audience()`);
        `PostReply` unchanged (G·7 — replies inherit, lane-neutral).

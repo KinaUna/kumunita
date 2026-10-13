@@ -45,7 +45,7 @@ methods, no signature change to any pinned M1/M2/m2b method):
 - `GroupJoinRequest` document (one row per (group, user)): `Id` (surrogate
   PK, `Guid-N`), `GroupId`, `UserId` (the requesting resident), `Status`,
   `RequestedAt`, `ResolvedAt?`, `ResolvedBy?`. Registered in
-  `M1DocTypes.Configure` with `UniqueIndex(GroupId, UserId)` — the same
+  `CoreDocTypes.Configure` with `UniqueIndex(GroupId, UserId)` — the same
   one-row-per-(group, user) business-key convention as `GroupMembership` and
   `GroupInvitation`.
 

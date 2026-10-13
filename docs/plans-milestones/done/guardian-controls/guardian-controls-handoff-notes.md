@@ -22,7 +22,7 @@
   child's community & group memberships, approve a group invitation sent to the
   child, and hand the account over to independence when the child comes of age.
   Standing is a 9th `AccessVia` value + a `GuardianLink` doc on the existing
-  `M1DocTypes` surface; the five supervisory seams are ADDs on `IUserInfoService`
+  `CoreDocTypes` surface; the five supervisory seams are ADDs on `IUserInfoService`
   (ADR 0006-E lane); the content path (`CanAsync` / `CanSeeAsync`) is
   **untouched** (G·1 — load-bearing).
 - **Out of scope (the named deferrals, ADR 0028 §E):** no content read (G·1),
@@ -50,11 +50,11 @@
 - **(d) G·1 pin:** `AccessVia.Guardian` appears on **no** `CanAsync` / `CanSeeAsync` content decision — the lane's load-bearing honesty; a unit that puts it on the content path is a drift pause, not a deviation (unit-series rule §5).
 - **(e) Drift pause:** none — the design doc's prose was consistent with ADR 0028 and the frozen `IUserInfoService` surface; nothing to resolve or carry forward.
 
-## U02 — GuardianLink + M1DocTypes
+## U02 — GuardianLink + CoreDocTypes
 
-- **Date:** 2026-09-14. Created `src/Kumunita.Core/UserInfo/GuardianLink.cs` (POCO + `GuardianLinkStatus` enum, matching the §Pinned contract verbatim) and added one additive line to `src/Kumunita.Core/M1DocTypes.cs`. **`dotnet build Kumunita.slnx -c Debug` green.** No new test (U09 pins the lane's tests).
+- **Date:** 2026-09-14. Created `src/Kumunita.Core/UserInfo/GuardianLink.cs` (POCO + `GuardianLinkStatus` enum, matching the §Pinned contract verbatim) and added one additive line to `src/Kumunita.Core/CoreDocTypes.cs`. **`dotnet build Kumunita.slnx -c Debug` green.** No new test (U09 pins the lane's tests).
 - **(a) POCO fields (verbatim):** `string Id` (surrogate PK), `string GuardianId` (the creator — G·4), `string ChildId` (the target), `GuardianLinkStatus Status` (the two-state machine), `DateTimeOffset CreatedAt`, `DateTimeOffset? DissolvedAt`, `string? DissolvedBy`. Enum: `GuardianLinkStatus { Active, Dissolved }` (file-scoped, like `InvitationStatus`).
-- **(b) `M1DocTypes` line:** `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);` — placed **immediately after** `opts.Schema.For<DelegationGrant>();`, with the one-line comment `// GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)`. No other line in `Configure` changed.
+- **(b) `CoreDocTypes` line:** `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);` — placed **immediately after** `opts.Schema.For<DelegationGrant>();`, with the one-line comment `// GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)`. No other line in `Configure` changed.
 - **(c) Unique-index fields:** `(GuardianId, ChildId)` (the business-key pair, per the `GroupInvitation` convention; the surrogate `Id` is the Marten identity).
 - **(d) Confirmed:** **no** doc-side `IsActive` boolean and **no** `Scope` field (G·2 — the service is the resolver; the guardian does not act *as* the child).
 - **(e) Compile warnings:** none.
@@ -149,8 +149,8 @@
 - **(b) `docs/ARCHITECTURE.md` — the two GU lines (the layout flip):**
   - **Tree line (~L85):** `UserInfo/` comment extended — `…; GU ✓ (ADR 0028) — GuardianLink (account-scope supervision: suspend / membership curation / invitation approval; **no content read**, G·1) + the AccessVia.Guardian standing (the 9th value) + the IUserInfoService guardian seams (formation / suspend / dissolve); see design/guardian-controls-design.md § GU — Closed (recorded) (2026-09-14)`.
   - **Doc-map line (after `DelegationGrant`):** `GuardianLink     { id, guardianId, childId, status: Active|Dissolved, createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR 0028): the account-scope supervision link (standing off an Active row, G·2); dissolve one-way (G·5)`.
-  - **Untouched (as directed):** the `M1DocTypes.cs` / `M3DocTypes.cs` / `MediaDocTypes.cs` lines (GU rides the **existing** `M1DocTypes` surface, ADR 0004 §B.1, additive — U02's one line) and the `Events/` / `Projects/` lines (M4/M5 stay planned).
-- **(c) Design-doc Close section:** `## GU — Closed (recorded) (2026-09-14)` appended at the **very end** of `docs/design/guardian-controls-design.md` (after the `## Three tests (run before "ready")` block) — the ADR 0028 decision-record line, the gate reference (→ U10's `### Run result`), the `M1DocTypes` layout note, the GlobalAdmin `viaAdmin: true` admin-shell carried-forward non-decision (ADR 0028 §C, §D G·5), and "M4/M5/M6 untouched". **Append-only held** — nothing above the U10 `### Run result` rewritten.
+  - **Untouched (as directed):** the `CoreDocTypes.cs` / `PostDocTypes.cs` / `MediaDocTypes.cs` lines (GU rides the **existing** `CoreDocTypes` surface, ADR 0004 §B.1, additive — U02's one line) and the `Events/` / `Projects/` lines (M4/M5 stay planned).
+- **(c) Design-doc Close section:** `## GU — Closed (recorded) (2026-09-14)` appended at the **very end** of `docs/design/guardian-controls-design.md` (after the `## Three tests (run before "ready")` block) — the ADR 0028 decision-record line, the gate reference (→ U10's `### Run result`), the `CoreDocTypes` layout note, the GlobalAdmin `viaAdmin: true` admin-shell carried-forward non-decision (ADR 0028 §C, §D G·5), and "M4/M5/M6 untouched". **Append-only held** — nothing above the U10 `### Run result` rewritten.
 - **(d) The move to `done/`:** 13 GU files moved from `docs/plans-milestones/in-progress/` → `done/` (the register `plan-guardian-controls.md` + `guardian-controls-u01…u11-plan.md` + this handoff-notes file), one self-contained `Move-Item` (no `$vars`, no here-strings). **No stray non-GU file** was in `in-progress/` (confirmed this session) — all 13 are GU-lane files. **`in-progress/` is now empty.**
 - **(e) No C# changed + no build:** confirmed — this unit touched exactly 3 files (`docs/ARCHITECTURE.md`, `docs/design/guardian-controls-design.md`, this notes file) and moved 13; no `src/` or `tests/` file was opened, no `dotnet build` was run (U10's GREEN gate stands).
 - **(f) Anomalies:** none. The one cross-check worth noting for the next lane: the Close section's "Gate:" bullet names the **4 Web VM tests** (U10's `GuardianViewModelsTests.cs`) alongside the **11** Core tests — the gate is 11 + 4, not 11 alone; a future lane re-reading the design doc should not mistake the 11-pin for the whole gate.
@@ -162,7 +162,7 @@
 | Unit | One-liner goal | Tests (this unit) | Deviations |
 | --- | --- | --- | --- |
 | **U01** | Finalize the pinned contract in the design doc (the `GuardianLink` POCO, the 5 `IUserInfoService` seams + 2 membership branches, `AccessVia.Guardian`, the 11 pinned test names, the acceptance gate + drift-guard) | none (docs) | none |
-| **U02** | `GuardianLink` POCO + `M1DocTypes` registration (additive line, no re-seed) | none (U09 pins) | none |
+| **U02** | `GuardianLink` POCO + `CoreDocTypes` registration (additive line, no re-seed) | none (U09 pins) | none |
 | **U03** | `AccessVia.Guardian` — the 9th value (append after `Group`, no renumber) | none (U09 pins) | none |
 | **U04** | Core seams: `CreateGuardianLinkAsync` / `SuspendChildAsync` / `UnsuspendChildAsync` / `DissolveGuardianLinkAsync` (standing live off the active link, deny-by-default) | none (U09 pins) | none |
 | **U05** | Membership curation admits the guardian standing (a `Via: Guardian` branch on the 4 existing lanes; "record the narrower standing") | none (U09 pins) | one internal helper (`GateGuardianStandingAsync`) added; signatures unchanged |

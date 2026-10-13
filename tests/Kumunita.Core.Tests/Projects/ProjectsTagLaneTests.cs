@@ -382,10 +382,10 @@ public class ProjectsTagLaneTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
-            M4DocTypes.Configure(opts);
-            M5DocTypes.Configure(opts);        // the Projects surfaces (todo + board)
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
+            EventDocTypes.Configure(opts);
+            ProjectDocTypes.Configure(opts);        // the Projects surfaces (todo + board)
             TagDocTypes.Configure(opts);       // the Tag + TagTranslation surfaces (the TG attach lane)
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

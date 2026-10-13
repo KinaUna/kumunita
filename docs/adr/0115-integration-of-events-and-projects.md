@@ -15,7 +15,7 @@ closed-subset emitter + the two iCal routes + the serve idiom** (ADR 0112
 / ADR 0034 / ADR 0108), the **`kw-l` closed-key registry + en/de/fr/da
 parity pins** (ADR 0015), the **WY·3 closed-subset + tsc-only discipline**
 (ADR 0031), the **attachment / file-serve idiom** (ADR 0034 / ADR 0108),
-the **`M5DocTypes` additive-index surface** (ADR 0004 §B.1), the
+the **`ProjectDocTypes` additive-index surface** (ADR 0004 §B.1), the
 **module-boundary contract** (a bounded context per concern, ADR 0006),
 the **no-standing-to-carry-a-secret posture** (ADR 0028), the
 **author-only edit lanes** (ADR 0014 / ADR 0016 / ADR 0017), and the
@@ -71,7 +71,7 @@ to-do is *for* one event — the `ProjectId` "a to-do is *in* one project"
 precedent), **not** on `CreateTodoRequest` / `UpdateTodoRequest` (D3 — the
 `ProjectId` precedent: association is a dedicated lane, not the main form).
 One additive `(EventId)` single-field index on the `TodoItem` block in
-`M5DocTypes` joins the `ProjectId` / `BlockedByTodoId` indexes in the same
+`ProjectDocTypes` joins the `ProjectId` / `BlockedByTodoId` indexes in the same
 **unnamed** form (the computed-index naming constraint recorded in the
 file's own note — the auto-derived name stays under Postgres' 64-char
 `NAMEDATALEN` cap). Additive-only, delta-detected, idempotent at boot,
@@ -311,7 +311,7 @@ milestone's decision record (U00); the unit series U01–U07 executes it.
 
 - `src/Kumunita.Core/Projects/TodoItem.cs` — the one additive `EventId?`
   field (D1).
-- `src/Kumunita.Core/M5DocTypes.cs` — the one additive `(EventId)` index
+- `src/Kumunita.Core/ProjectDocTypes.cs` — the one additive `(EventId)` index
   (D1).
 - `src/Kumunita.Core/Projects/IProjectService.cs` +
   `src/Kumunita.Core/Projects/ProjectService.cs` — the two additive seams

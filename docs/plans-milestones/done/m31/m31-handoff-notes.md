@@ -52,13 +52,13 @@
 > - **Frozen base (unchanged)** — the `Posts/Report` doc
 >   (`src/Kumunita.Core/Posts/Report.cs`, the M3b content-moderation report,
 >   ADR 0023) is **untouched** (M31·10 — M31 does not add fields to it, does
->   not reuse it, does not change its `M3DocTypes` registration); the
+>   not reuse it, does not change its `PostDocTypes` registration); the
 >   `Usage/UsageEvent` row-per-event doc shape (the POCO + the conventional
 >   string `Id`) is the registration shape M31 mirrors (not a field source —
 >   the `ErrorReport` field set is the 11-member ceiling in the register's
 >   Assumptions, pinned by the design doc §2.2 in U02); the ADR 0004 §B.1
 >   parallel-surface pattern (the `ErrorReportDocTypes.Configure(opts)`
->   shape, the `M3DocTypes` / `M4DocTypes` / `M6DocTypes` / `UsageDocTypes`
+>   shape, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes` / `UsageDocTypes`
 >   precedent — `UsageDocTypes` is the closest analog, a row-per-event
 >   surface) is the registration shape; the ADR 0015 D1 `kw-l` provider-floor
 >   discipline (the `en` value is the source text); the ADR 0001-B thin-token
@@ -121,7 +121,7 @@ next unit (U01 — design doc Part 1) needs:
     `Status?` (nullable until M3b's write lane sets it), `At`
     (`DateTimeOffset`), `ReplyId?` (the ADR 0023 target discriminator).
   - **Untouched flag:** M31 does **not** add fields to this doc, does **not**
-    reuse it, does **not** alter its `M3DocTypes` registration, does **not**
+    reuse it, does **not** alter its `PostDocTypes` registration, does **not**
     touch the M3b moderation queue. The `TargetKind` strings are distinct:
     M31's `ErrorReport` audit row uses `"error-report"`; the existing
     `Posts/Report` doc uses `"post"` / `"reply"` (per the register's M31·10
@@ -142,21 +142,21 @@ next unit (U01 — design doc Part 1) needs:
 - **The ADR 0004 §B.1 parallel-surface precedent (the `ErrorReportDocTypes`
   registration shape):**
   - The `*DocTypes.Configure(opts)` block in `src/Kumunita.Web/Program.cs`
-    spans lines **107–243** (the `M1DocTypes` at 107 through the
+    spans lines **107–243** (the `CoreDocTypes` at 107 through the
     `StorageSettingsDocTypes` at 243). `UsageDocTypes` is at **line 225** —
     the closest analog to M31's `ErrorReportDocTypes` (both are row-per-event
     surfaces). U03 adds the `ErrorReportDocTypes.Configure(opts);` call next
     to this block (one line added, per the register's U03 deliverable).
   - The `*DocTypes` surfaces registered in `Program.cs` (the precedent list
-    the register names, all confirmed present): `M1DocTypes` (107) ·
-    `M3DocTypes` (113) · `MediaDocTypes` (119) · `PageDocTypes` (125) ·
+    the register names, all confirmed present): `CoreDocTypes` (107) ·
+    `PostDocTypes` (113) · `MediaDocTypes` (119) · `PageDocTypes` (125) ·
     `SiteContentDocTypes` (134) · `SurfaceLabelsDocTypes` (143) ·
-    `AdminOnboardingDocTypes` (152) · `TagDocTypes` (158) · `M4DocTypes`
-    (167) · `M5DocTypes` (176) · `M6DocTypes` (185) · `M9DocTypes` (195) ·
-    `M16DocTypes` (207) · `M17DocTypes` (217) · `UsageDocTypes` (225) ·
+    `AdminOnboardingDocTypes` (152) · `TagDocTypes` (158) · `EventDocTypes`
+    (167) · `ProjectDocTypes` (176) · `NotificationDocTypes` (185) · `MessagingDocTypes` (195) ·
+    `InventoryDocTypes` (207) · `BookmarkDocTypes` (217) · `UsageDocTypes` (225) ·
     `DocumentDocTypes` (235) · `StorageSettingsDocTypes` (243). The register's
-    U00 entry-read #5 and U03 entry-read #6 both name the `M3DocTypes` /
-    `M4DocTypes` / `M6DocTypes` precedent; all three are present.
+    U00 entry-read #5 and U03 entry-read #6 both name the `PostDocTypes` /
+    `EventDocTypes` / `NotificationDocTypes` precedent; all three are present.
 - **The ADR index (`docs/adr/README.md`) — 0154 is free:**
   - 0150 — SITE (Site content customization) — `Accepted`
   - 0151 — M28 (Guardian time limits) — `Accepted`
@@ -169,7 +169,7 @@ next unit (U01 — design doc Part 1) needs:
   draft):**
   - **ADR 0004 §B.1** — Marten-native, parallel-surface pattern (the
     `ErrorReportDocTypes.Configure(opts)` registration shape; the
-    `M3DocTypes` / `M4DocTypes` / `M6DocTypes` / `UsageDocTypes` precedent).
+    `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes` / `UsageDocTypes` precedent).
   - **ADR 0001-B** — the thin-token rule (the admin surface is
     `[Authorize(Roles = GlobalAdmin)]`; "may this actor see that resource?"
     is resolved by the `Authorization` service per request, not encoded in an

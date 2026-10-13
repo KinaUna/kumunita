@@ -14,7 +14,7 @@
 > **Status.** **Part 1 (U00) LOCKED; Part 2 (U00) LOCKED.** The decisions
 > D1–D12 are locked in **ADR 0086 (Accepted, 2026-09-25)**; **Part 2** (the
 > exact C# shapes, the additive `IProjectService` seams, the request DTOs,
-> the `M5DocTypes` additive shape, the pinned test names, the three-test
+> the `ProjectDocTypes` additive shape, the pinned test names, the three-test
 > acceptance gate, and the drift-guard) follows in the "Seams & contracts"
 > section below. **U00 authors both parts** (the M5 two-unit U00/U01 split is
 > not required — this lane is smaller).
@@ -30,7 +30,7 @@
 > invariants (C-PL·1…8); the FACES (F1–F10); the parts affected; the
 > feedback-loop shape; and the risks. **Part 2:** the exact POCO field sets,
 > the two adapters, the additive `IProjectService` seams, the request DTOs,
-> the `M5DocTypes` additive shape, the pinned test names, the gate, and the
+> the `ProjectDocTypes` additive shape, the pinned test names, the gate, and the
 > drift-guard.
 
 ## 1. What this lane is
@@ -91,7 +91,7 @@ builds on without re-inventing:
    the field-by-field provenance shape (§9.1 mirrors it), the two 6-member
    adapters (§9.2 mirrors them verbatim), the standing re-check helpers
    (`CheckBoardStanding` creator ∪ GlobalAdmin — ADR 0070), the
-   `AccessAudit` row shape (C3), and the `M5DocTypes` surface (§9.5
+   `AccessAudit` row shape (C3), and the `ProjectDocTypes` surface (§9.5
    extends it additively).
 2. **`Audience`** (`Kumunita.Core.Authorization`) — the exact post
    `Audience` doc (ADR 0001-B / 0036; `null` = public, the frozen
@@ -148,7 +148,7 @@ builds on without re-inventing:
     the ADR 0042 / 0045 set) + the ADR 0052 warm-boot baseline backfill that
     covers new keys' `de`/`fr`/`da` rows automatically. The `pl.*` keys
     (D11) are additive on it.
-12. **`M5DocTypes`** (`Kumunita.Core`) — the existing surface the two new
+12. **`ProjectDocTypes`** (`Kumunita.Core`) — the existing surface the two new
     docs + the two `ProjectId` indexes register on (the ADR 0004 §B.1
     delta-detect shape; the unnamed-computed-index constraint noted there
     applies to the new `(ComponentId, Created)` indexes too).
@@ -164,7 +164,7 @@ the lane plan are retired by this lock.
 ### 3.1 Two new documents, one existing context (D1)
 `ProjectGoal` + `Project` (ns `Kumunita.Core.Projects`, the M5 context — a
 *new* context would be overkill for two docs that share the same standing /
-audience / renderer surface). Additive on **`M5DocTypes`** (ADR 0004 §B.1 —
+audience / renderer surface). Additive on **`ProjectDocTypes`** (ADR 0004 §B.1 —
 the surface already delta-detects; zero new surface file, zero migration for
 existing docs). *(C-PL·8.)*
 
@@ -320,7 +320,7 @@ board-view is a follow-on lane).
   `/projects/projects/…`) are additive; the nav tab is the only visible
   change on the M5 views.
 - **C-PL·8 — Additive only.** Two new documents + two new adapters on the
-  existing `Projects` context (D1); the `M5DocTypes` surface and the
+  existing `Projects` context (D1); the `ProjectDocTypes` surface and the
   `IProjectService` seam grow **additively** (new docs registered, new
   optional feed-filter param, new lanes) — every existing M5 call site
   compiles and behaves **unchanged** (the ADR 0004 §B.1 + frozen-surface
@@ -369,7 +369,7 @@ board-view is a follow-on lane).
   `ProjectRequests.cs` — U01 settles; the shape is pinned in §9.4).
 - **`TodoItem` / `KanbanBoard`** — one additive `ProjectId?` field each
   (U01; the C-PL·3 feed-filter pin).
-- **`M5DocTypes`** — additive registration: the two new docs + the
+- **`ProjectDocTypes`** — additive registration: the two new docs + the
   `(ComponentId, Created)` feed indexes on each + the `GoalId` index on
   `Project` + the `ProjectId` index on `TodoItem` / `KanbanBoard` (U01).
 - **`IProjectService` + `ProjectService`** — additive seams (U02–U04, U09):
@@ -464,7 +464,7 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
 > **Part 2 status.** **Locked** — ADR 0086 (Accepted, 2026-09-25) is the
 > decisions source; this section is the **frozen reference tier** U01–U09
 > code against. The two POCOs + two adapters (§9.1 / §9.2), the additive
-> `IProjectService` seams (§9.3), the request DTOs (§9.4), the `M5DocTypes`
+> `IProjectService` seams (§9.3), the request DTOs (§9.4), the `ProjectDocTypes`
 > additive shape (§9.5), the pinned test names (§9.6), the three-test
 > acceptance gate (§9.7), and the drift-guard (§9.8) are **frozen pins** — a
 > mismatch is a `## U<m> — Drift pause` per the lane plan's unit-series
@@ -774,15 +774,15 @@ public sealed record UpdateProjectRequest
 }
 ```
 
-## 9.5 The `M5DocTypes` additive shape (exact C#)
+## 9.5 The `ProjectDocTypes` additive shape (exact C#)
 
-Additive on the existing `M5DocTypes.Configure` (the four M5 registrations
+Additive on the existing `ProjectDocTypes.Configure` (the four M5 registrations
 stay byte-for-byte; the two new doc blocks + the two `ProjectId` indexes are
 appended — the unnamed-computed-index constraint noted in the existing file
 applies to the new `(ComponentId, Created)` indexes too):
 
 ```csharp
-// Kumunita.Core/M5DocTypes.cs — the two additive PL registrations (ADR 0086 D1 / D2 / D3 / D4).
+// Kumunita.Core/ProjectDocTypes.cs — the two additive PL registrations (ADR 0086 D1 / D2 / D3 / D4).
 
 // ProjectGoal — conventional string Id (Marten's default); the
 // (ComponentId, Created) **feed-ordering** index (the ListGoalsAsync feed
@@ -941,7 +941,7 @@ silent addition. **The two adapters** (§9.2) — the 6-member projection,
 additive `IProjectService` seams** (§9.3) — the signatures verbatim; an ADD
 beyond this list is a **new ADR**; a re-scope of one is a drift event.
 **The four request DTOs** (§9.4) — the exact field sets. **The
-`M5DocTypes` additive shape** (§9.5) — the two new docs + the four new
+`ProjectDocTypes` additive shape** (§9.5) — the two new docs + the four new
 indexes, no unique indexes. **The ~20 pinned test names** (§9.6) — the
 master list; a rename / renumber is a break. **The three-test gate** (§9.7)
 — closed loop / handoff / part-vs-whole.
@@ -951,6 +951,6 @@ master list; a rename / renumber is a break. **The three-test gate** (§9.7)
 *Part 1 (U00) — context, scope, the locked decisions D1–D12, the 8
 invariants C-PL·1–8, and the 10 FACES F1–F10. **No code, no build, no
 tests.** Part 2 (U00) — the exact C# shapes, the additive `IProjectService`
-seams, the request DTOs, the `M5DocTypes` additive shape, the pinned test
+seams, the request DTOs, the `ProjectDocTypes` additive shape, the pinned test
 names, the three-test gate, and the drift-guard, locked by **ADR 0086
 (Accepted, 2026-09-25)**.*

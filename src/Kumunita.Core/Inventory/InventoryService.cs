@@ -217,7 +217,7 @@ public sealed class InventoryService : IInventoryService
     // and *standing* (this action decision) from leaking into each other. The
     // **F1 atomic transition** (the <c>CurrentHolderId</c> flip + the
     // append/close of the <see cref="InventoryCheckout"/> in **one**
-    // <c>SaveChangesAsync</c>) is witnessed by the <see cref="M16DocTypes"/>
+    // <c>SaveChangesAsync</c>) is witnessed by the <see cref="InventoryDocTypes"/>
     // unique partial index <c>inv_uidx_item_open</c> — a concurrent
     // double-check-out's second commit fails at the DB layer (the loser sees
     // "already checked out"), making the DB the arbiter rather than app code.
@@ -365,7 +365,7 @@ public sealed class InventoryService : IInventoryService
     /// **owner ∪ GlobalAdmin** over a <c>private</c> item; **any signed-in
     /// member** over a <c>community</c> / <c>shared</c> item (the C-M16·5
     /// broad standing — visibility is the read lanes' <c>CanAsync(Read)</c>,
-    /// already passed). The <see cref="M16DocTypes"/> unique partial index
+    /// already passed). The <see cref="InventoryDocTypes"/> unique partial index
     /// <c>inv_uidx_item_open</c> on <c>(ItemId) where CheckedInAt IS NULL</c>
     /// is the **F1 idempotency witness** — a concurrent double-check-out's
     /// second commit fails at the DB layer (the loser sees "already checked
@@ -512,7 +512,7 @@ public sealed class InventoryService : IInventoryService
     /// <summary>
     /// Recognizes a Postgres **unique violation** (SQLSTATE <c>23505</c>)
     /// anywhere in the exception chain (the F1 witness — the
-    /// <see cref="M16DocTypes"/> <c>inv_uidx_item_open</c> partial index
+    /// <see cref="InventoryDocTypes"/> <c>inv_uidx_item_open</c> partial index
     /// refusing a second open checkout, the M9 <c>convo_uidx_pair</c> shape —
     /// the DB is the arbiter of at-most-one-open-checkout, C-M16·3 / F1).
     /// </summary>

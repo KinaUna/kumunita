@@ -39,9 +39,9 @@ namespace Kumunita.Core.Tests;
 /// <c>*DocTypes.Configure</c> call in this repo lives in the host's
 /// <c>AddMarten</c> lambda, not in <c>DependencyInjection.cs</c>. This harness
 /// wires the SAME <see cref="EscalationDocTypes.Configure"/> +
-/// <see cref="Kumunita.Core.M1DocTypes.Configure"/> calls in its own
+/// <see cref="Kumunita.Core.CoreDocTypes.Configure"/> calls in its own
 /// <c>DocumentStore.For</c> lambda — without it the <c>EscalationToken</c> doc
-/// is invisible to Marten. <c>M1DocTypes.Configure</c> registers the
+/// is invisible to Marten. <c>CoreDocTypes.Configure</c> registers the
 /// <c>AccessAudit</c> doc (the audit-row half of the
 /// <see cref="EscalationTokenService"/> generate / revoke write lanes, the
 /// ESC·9 pin).
@@ -240,7 +240,7 @@ public class EscalationTokenTests(PostgresFixture fixture) : IClassFixture<Postg
     /// Boot a fresh scratch store with the two ESC doc types (the
     /// <see cref="Kumunita.Core.EscalationDocTypes.Configure"/> surface — the
     /// <c>EscalationToken</c> + the <c>EscalationOutboundConfig</c>) + the
-    /// <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.M1DocTypes.Configure"/>)
+    /// <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.CoreDocTypes.Configure"/>)
     /// registered in the <c>DocumentStore.For</c> lambda — the
     /// <see cref="ErrorReportResolveTests.BootStoreAsync"/> idiom.
     /// </summary>
@@ -253,7 +253,7 @@ public class EscalationTokenTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             EscalationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

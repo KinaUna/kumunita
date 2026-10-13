@@ -3,7 +3,7 @@
 Status: Accepted
 Date: 2026-09-25 (sign-off U00, 2026-09-25)
 Amends: **0067** (the M5 `Projects` context — this ADR adds **one optional field**
-to `TodoItem` (`BlockedByTodoId`, additive on the `M5DocTypes` surface, the
+to `TodoItem` (`BlockedByTodoId`, additive on the `ProjectDocTypes` surface, the
 ADR 0086 `ProjectId`-on-`TodoItem` precedent) and **additive seams** on the
 frozen `IProjectService` — `ListTodosAsync` / `GetTodoAsync` gain the
 optional `blockedOnly` / `Blocker` surface, `UpdateTodoRequest` /
@@ -68,7 +68,7 @@ anyway — D5).
 - **D1 — one optional pointer, additive, zero migration.** One
   `string? BlockedByTodoId` on **`TodoItem`** (the ADR 0004 §B.1 / ADR 0086
   `ProjectId` additive shape; existing rows simply have `null`); registered
-  on `M5DocTypes` with one `Index` on `(BlockedByTodoId)` (the
+  on `ProjectDocTypes` with one `Index` on `(BlockedByTodoId)` (the
   unnamed-computed-index constraint from ADR 0004 §B.1 noted there applies).
   **The singular pointer is the design** — `ParentId?` / `GoalId?` /
   `ProjectId?` are all single-optional-FK idioms; a to-do waiting on *three*
@@ -146,7 +146,7 @@ its weight); and any **enforced** dependency (D2).
 
 ## Consequences
 
-- The `M5DocTypes` surface gains **one index** (`TodoItem.BlockedByTodoId`)
+- The `ProjectDocTypes` surface gains **one index** (`TodoItem.BlockedByTodoId`)
   — delta-detected at boot (ADR 0004 §B.1), **zero migration** for existing
   rows.
 - The frozen `IAuthorizationService` path is **untouched** (the chip reuses

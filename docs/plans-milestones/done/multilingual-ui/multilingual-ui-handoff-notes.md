@@ -61,7 +61,7 @@ rows to be complete against). This lane closes that.
 - `LocaleCookie` (Web, `Security/`) — `Name = "kumunita.locale"`, `Read` /
   `Write` (365-day, `HttpOnly`, `SameSite=Lax`) / `Clear`. The **only** Web
   HTTP seam (M·5/M·8).
-- `M1DocTypes.cs` — `opts.Schema.For<TranslationResource>().UniqueIndex(Key,
+- `CoreDocTypes.cs` — `opts.Schema.For<TranslationResource>().UniqueIndex(Key,
   LanguageCode)` + `opts.Schema.For<LocalizedPage>().UniqueIndex(Slug,
   LanguageCode)` (lines ~93–95). Present.
 - DI — `DependencyInjection.cs` lines 138–139:
@@ -147,7 +147,7 @@ L1–L9 + acceptance gate) · U9 (close: ADR 0015 + roadmap + folder moves).
   text to the code's current values; leaves non-`en` rows and admin-created
   `about` untouched. Mirrors the `LocalizationService.Upsert*` pair idiom
   (query-then-`Store`, surrogate `Id` "N" convention) — no re-shape of a frozen
-  seam, no new index (the `M1DocTypes` pins were confirmed present and left
+  seam, no new index (the `CoreDocTypes` pins were confirmed present and left
   alone).
 
 **Deviations:** none against the plan. The only build fix was the

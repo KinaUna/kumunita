@@ -89,7 +89,7 @@ pristine **or** warm, never both), exactly the ADR 0047 D2 / ADR 0052 split.
   (a sample event's English title), the lane finds the matching
   non-deleted `Event` by that title and creates the row for each of
   `de` / `fr` / `da` **if — and only if — no row for that
-  `(EventId, LanguageCode)` already exists** (the `M4DocTypes` unique index
+  `(EventId, LanguageCode)` already exists** (the `EventDocTypes` unique index
   enforces one text per event per language). A registry key with no matching
   event (e.g. a sample event deleted in-app) is skipped — nothing to
   backfill for it.

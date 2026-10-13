@@ -12,7 +12,7 @@
 > section per unit, never rewritten).
 >
 > **The M1 seed is already shipped** — `LanguageCatalog` / `LocaleSettings` are in
-> `src/Kumunita.Core/Localization/`, registered on `M1DocTypes`, and materialized
+> `src/Kumunita.Core/Localization/`, registered on `CoreDocTypes`, and materialized
 > by the first-run seeder (`FirstBootSeeder` step 4: the `en` row + the `en`
 > default). This lane builds **on top of that**: the two content documents
 > (`TranslationResource` / `LocalizedPage`), the per-request read path
@@ -70,7 +70,7 @@ boundary** (ADR 0005 C), not a feature this lane ships.
   `languageCode`, `text`) and `LocalizedPage` (`slug`, `languageCode`, `title`,
   `body` Markdown, `updated`) are Marten docs in `mt` — the pair-idiom business
   key (surrogate `Id` + `UniqueIndex` on the pair), exactly `GroupMembership` /
-  `ComponentMembership`. Registered on `M1DocTypes` (the existing surface —
+  `ComponentMembership`. Registered on `CoreDocTypes` (the existing surface —
   ADR 0004 §B.1 additive: Marten's delta picks up the new docs, **no re-seed**).
   No new `DocTypes` surface.
 - **The read path is one HTTP-free provider (M·1–M·3, M·8, M·9).**
@@ -113,7 +113,7 @@ boundary** (ADR 0005 C), not a feature this lane ships.
 ## Approach
 
 Three tracks, sequenced. **Track A (Core, U1–U3):** the two content documents +
-`M1DocTypes` indexes (U1), the `ITranslationProvider` read seam (U2), the
+`CoreDocTypes` indexes (U1), the `ITranslationProvider` read seam (U2), the
 `ILocalizationService` admin seam + `LanguageCompleteness` (U3). **Track B
 (Web, U4–U6):** the `LocaleCookie` + DI (U4), the `LanguagesController`
 admin surface (U5), the settings page + static-page routes (U6). **Track C
@@ -155,7 +155,7 @@ file moved to `done/`).
 §Drift guard; (3) never introduces a test whose exact name is not in the design
 doc §Pinned seam tests list (a rename only with a note — no silent drift); (4)
 never opens a new seam beyond the design doc's pin (the two content docs, the two
-interfaces + `LanguageCompleteness`, `LocaleCookie`, the `M1DocTypes` indexes)
+interfaces + `LanguageCompleteness`, `LocaleCookie`, the `CoreDocTypes` indexes)
 — **any other Core/Web ADD is a `## U<m> — Drift pause`**; (5) never re-shapes
 `TranslationResource` / `LocalizedPage` / `ITranslationProvider` /
 `ILocalizationService` outside the design doc's §Pinned contract; (6) if entry
@@ -168,8 +168,8 @@ reads reveal the design doc is out of date, the unit **pauses** and records
 
 ```
 // The two content documents (the design doc §Pinned contract §1):
-TranslationResource  { Id, Key, LanguageCode, Text }           // pair idiom; M1DocTypes unique index (Key, LanguageCode)
-LocalizedPage        { Id, Slug, LanguageCode, Title, Body, Updated }  // pair idiom; M1DocTypes unique index (Slug, LanguageCode)
+TranslationResource  { Id, Key, LanguageCode, Text }           // pair idiom; CoreDocTypes unique index (Key, LanguageCode)
+LocalizedPage        { Id, Slug, LanguageCode, Title, Body, Updated }  // pair idiom; CoreDocTypes unique index (Slug, LanguageCode)
 
 // The read seam (HTTP-free, M·8) — the design doc §Pinned contract §2:
 Task<string>                       ResolveEffectiveLanguageAsync(string? preferredLanguageCode);
@@ -256,7 +256,7 @@ GlobalAdmin sets the default to `pl` → a resident with **no** preference sees
 
 | U | Goal (one line) | Plan file (in-progress → done on exit) |
 |---|---|---|
-| U1 | The two content documents (`TranslationResource` / `LocalizedPage`) + the `M1DocTypes` unique indexes | `multilingual-u01-plan.md` |
+| U1 | The two content documents (`TranslationResource` / `LocalizedPage`) + the `CoreDocTypes` unique indexes | `multilingual-u01-plan.md` |
 | U2 | The `ITranslationProvider` read seam + `TranslationProvider` impl | `multilingual-u02-plan.md` |
 | U3 | The `ILocalizationService` admin seam + `LocalizationService` impl + `LanguageCompleteness` | `multilingual-u03-plan.md` |
 | U4 | The `LocaleCookie` helper + the Core DI registrations | `multilingual-u04-plan.md` |

@@ -71,7 +71,7 @@ not re-derive the register.
      D5 shape); a failed email never rolls back the message.
   5. **The `Conversation` pair is stored sorted** (`ParticipantA ≤
      ParticipantB`) + a **unique `(ParticipantA, ParticipantB)` index**
-     in `M9DocTypes` — the F1 idempotency witness; the plan text named
+     in `MessagingDocTypes` — the F1 idempotency witness; the plan text named
      the index only for `Message`.
   6. **`Message.LanguageCode` added** (ADR 0018 authored-in tag,
      default `"en"`) — the display/translation lane's entry field,
@@ -122,11 +122,11 @@ not re-derive the register.
   (U02/U03/U06 copy them by name).
 - **Next:** U01 (see `in-progress/messaging-u01.md`).
 
-## U01 — documents + M9DocTypes + boot wiring
+## U01 — documents + MessagingDocTypes + boot wiring
 
 - **Entry state:** design doc §2.1/§2.2 LOCKED (U00 locked D1–D8, no veto);
-  no `Messaging/` context, no `M9DocTypes`, and no `Conversation` / `Message`
-  anywhere yet (grep-confirmed greenfield). `M3DocTypes.cs` read in full as
+  no `Messaging/` context, no `MessagingDocTypes`, and no `Conversation` / `Message`
+  anywhere yet (grep-confirmed greenfield). `PostDocTypes.cs` read in full as
   the registration shape to mirror; `Program.cs` `AddMarten` lambda read as
   the boot-wiring site; `SchemaBootstrap.cs` read in full.
 - **Files written (all three new):**
@@ -139,17 +139,17 @@ not re-derive the register.
     `Created` / `ReadBy?` / `LanguageCode` (default `"en"` — the ADR 0018
     authored-in tag, the U00 drift-guard pin 6). `sealed`, `Body =
     string.Empty` (the 2000-char cap is U03's service rule, not the doc).
-  - `src/Kumunita.Core/M9DocTypes.cs` — the registration surface (the
-    `M6DocTypes` shape — a `public static class` with one
+  - `src/Kumunita.Core/MessagingDocTypes.cs` — the registration surface (the
+    `NotificationDocTypes` shape — a `public static class` with one
     `Configure(StoreOptions opts)` method; no hand-rolled
     `FeatureSchemaBase`, ADR 0004 §B.1).
 - **Modified (one line + comment block):** `src/Kumunita.Web/Program.cs`
-  — `M9DocTypes.Configure(opts);` added **after** the
-  `M6DocTypes.Configure(opts);` call (line 135 pre-edit) inside the
+  — `MessagingDocTypes.Configure(opts);` added **after** the
+  `NotificationDocTypes.Configure(opts);` call (line 135 pre-edit) inside the
   `AddMarten(opts => { … })` lambda. Neighbor line it sat next to: the
-  `M6DocTypes.Configure(opts);` call (the M6 U02 precedent location, the
+  `NotificationDocTypes.Configure(opts);` call (the M6 U02 precedent location, the
   last doc-surface registration before the lambda closes).
-- **(a) `M9DocTypes` `.Schema.For` lines + the two index definitions, exactly
+- **(a) `MessagingDocTypes` `.Schema.For` lines + the two index definitions, exactly
   as written:**
   ```csharp
   opts.Schema.For<Conversation>()
@@ -165,11 +165,11 @@ not re-derive the register.
   thread-ordering index (the M6 `Notification` `(RecipientId, Created)`
   feed-ordering shape, not an integrity constraint). Both use conventional
   `string` ids (Marten's default) — **no** `.Identity(...)` pin needed
-  (the `M6DocTypes` `NotificationPreference` `Identity` pin is specific to
+  (the `NotificationDocTypes` `NotificationPreference` `Identity` pin is specific to
   that doc's no-separate-`Id` shape and does not apply here).
 - **(b) Boot-path insertion point (single registration — the M3/M4/M6
   precedent):** one line in one file, `src/Kumunita.Web/Program.cs`
-  (the `AddMarten` lambda, after `M6DocTypes.Configure(opts)`). **The plan
+  (the `AddMarten` lambda, after `NotificationDocTypes.Configure(opts)`). **The plan
   register's "two boot paths" instruction — add a line to
   `SchemaBootstrap.cs` too — is a misdescription, verified against the
   actual code and every prior milestone's handoff note:**
@@ -183,7 +183,7 @@ not re-derive the register.
   same precedent and explicitly records this as the M3/U3 deviation; the
   M4 U01 and M6 U02 handoff notes both record the same "1 line in 1 file,
   `SchemaBootstrap.cs` was **not** touched" shape. **Not a drift-pause** —
-  the frozen §2.1 pin is the `M9DocTypes` type + the `Configure(StoreOptions)`
+  the frozen §2.1 pin is the `MessagingDocTypes` type + the `Configure(StoreOptions)`
   signature, both preserved verbatim; the *file* the registration call
   belongs in is determined by the actual codebase shape, which the entry
   reads are the authority for (the design doc §2.1 text says "the U01 entry
@@ -204,7 +204,7 @@ not re-derive the register.
   columns only ("a unique index on `Conversation` `(ParticipantA,
   ParticipantB)`") without a literal index name. This implementation gives
   it an explicit short name, `convo_uidx_pair`, mirroring the
-  `M3DocTypes` `ann_tr_uidx_ann_lang` explicit-name precedent (the
+  `PostDocTypes` `ann_tr_uidx_ann_lang` explicit-name precedent (the
   auto-derived `mt_doc_conversation_uidx_participant_aparticipant_b`
   is 46 chars — within Postgres's 64-char NAMEDATALEN limit, so it is not
   *required* here, but it is the codebase's consistent shape for a
@@ -213,7 +213,7 @@ not re-derive the register.
   M6 `Notification` `(RecipientId, Created)` feed index does too).
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` green (5 projects,
   zero errors, zero warnings on the new files). No test in this unit —
-  U03 owns the first M9 test. `M9DocTypes` compiles; both the dev-loop
+  U03 owns the first M9 test. `MessagingDocTypes` compiles; both the dev-loop
   (`Program.cs` `AddMarten` lambda) and the all-env apply path
   (`SchemaBootstrap.ApplyAsync` → `ApplyAllConfiguredChangesToDatabaseAsync`)
   pick the surface up automatically (the M3/M4/M5/M6 precedent).
@@ -224,7 +224,7 @@ not re-derive the register.
 ## U02 — toggle seams
 
 - **Entry state:** design doc §D2/§2.2/§2.3 LOCKED (U00); `Conversation` /
-  `Message` + `M9DocTypes` landed (U01); no `IMessagingService` /
+  `Message` + `MessagingDocTypes` landed (U01); no `IMessagingService` /
   `MessagingService` anywhere yet (grep-confirmed). `AnnouncementService.cs`
   `AreAnnouncementCommentsEnabledAsync` / `SetAnnouncementCommentsEnabledAsync`
   read in full as the floor + write-row shape; `LanguageCatalog.cs`
@@ -277,9 +277,9 @@ not re-derive the register.
     `HiddenCount` null (the ADR 0101
     `SetAnnouncementCommentsEnabled_Closed_StoresFlagAndAuditRow` shape).
   - Harness notes: `BootStoreAsync` mirrors `AnnouncementServiceTests`
-    (fresh scratch Postgres per test) but registers `M9DocTypes` instead of
-    `M3DocTypes` (the `LocaleSettings` + `AccessAudit` rows come from
-    `M1DocTypes` in both); the `AuditRows` helper is copied verbatim.
+    (fresh scratch Postgres per test) but registers `MessagingDocTypes` instead of
+    `PostDocTypes` (the `LocaleSettings` + `AccessAudit` rows come from
+    `CoreDocTypes` in both); the `AuditRows` helper is copied verbatim.
 - **Drift:** none. The design doc's locked seam block, the audit-row
   table, the `false`-floor text, and the ADR 0101 precedent all fit the
   actual code exactly; the one plan-text nuance ("`IIdentityService`
@@ -296,7 +296,7 @@ not re-derive the register.
 ## U03 — core seams
 
 - **Entry state:** design doc §D1–D8/§2.2/§2.3 LOCKED (U00); `Conversation` /
-  `Message` + `M9DocTypes` landed (U01); the two toggle seams +
+  `Message` + `MessagingDocTypes` landed (U01); the two toggle seams +
   `IMessagingService` landed (U02). `NotificationService.EmitAsync` (9-arg
   overload) read in full (the nudge seam — **concrete class, not an
   interface**, optional `IOptions<NotificationOptions>?` +
@@ -373,7 +373,7 @@ not re-derive the register.
     with the **12 pinned behavior pins** (U02's 2 toggle pins are preserved
     verbatim — not rewritten). A new harness helper
     `BootStoreWithNotificationsAsync` (the `NotificationServiceTests`
-    shape) registers `M6DocTypes` (so the `Notification` table exists for
+    shape) registers `NotificationDocTypes` (so the `Notification` table exists for
     the nudge pin) and constructs the `NotificationService` over the frozen
     seams: a real `IDocumentStore`, an `IUserInfoService` substitute
     (returns `null` for every `GetProfileAsync` — the `OtherDisplayName`
@@ -853,7 +853,7 @@ not re-derive the register.
   5. `docs/ARCHITECTURE.md` (shape-of-code, three additive insertions):
      the `Messaging/` context row added to the solution tree (after the
      `Search/` row — the M9 ✓ ADR 0105 shape: the two docs + the
-     `M9DocTypes` surface + the `IMessagingService` / `MessagingService`
+     `MessagingDocTypes` surface + the `IMessagingService` / `MessagingService`
      seams + the participant-by-id access story + the write audit
      `TargetKind`s `message` / `messaging.toggle` + the M6-lane
      `message.new` nudge); the §3 feature-modules list gains
@@ -904,7 +904,7 @@ not re-derive the register.
   `ConversationList` / `ConversationDetail` records on the ADR 0090
   `HasMore` discipline. `MessagingService` composes the
   `IDocumentStore` + optional `IUserInfoService` / `NotificationService`
-  (the ADR 0077 idiom). `M9DocTypes` carries the two docs
+  (the ADR 0077 idiom). `MessagingDocTypes` carries the two docs
   (`Conversation` + `Message`), the unique `(ParticipantA, ParticipantB)`
   pair index (the F1 idempotency witness) + the
   `(ConversationId, Created)` thread index.
@@ -928,7 +928,7 @@ not re-derive the register.
   6. **C-M9·6** plain-text, capped (2000), immutable —
      `Send_BlankBody_ArgumentException` / `Send_OverCap_ArgumentException`.
   7. **C-M9·7** Marten-native documents, one new surface —
-     `M9DocTypes` delta-detected, idempotent, wired into the dev-loop
+     `MessagingDocTypes` delta-detected, idempotent, wired into the dev-loop
      boot path (the `SchemaBootstrap.ApplyAsync` apply path consumes it
      via `ApplyAllConfiguredChangesToDatabaseAsync`).
 - **The test floor as closed:** `MessagingServiceTests` **14/14**

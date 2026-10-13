@@ -1,7 +1,7 @@
 # Pages lane (`PG`) — handoff notes (scratch tier)
 
 > **TL;DR:** Shipped the `PG` Pages lane (ADR 0039): a `Page` / `PageTranslation` tree that **absorbs and retires the legacy `LocalizedPage`**, a `MountPoint` resolver for the two UI slots (`footer/community`, `help/account`), the composer + translation surface, the navbar entry, and the `kw-l` registry consistency test — with the 2026-09-17 design-decision amendment (pages now default non-public / community-visible, consistent with posts).
-> **Seam it created:** `Kumunita.Core.Pages` — the `IPageService` + `PageDocTypes` surface + the `PageToAuditableResource` adapter; the legacy `LocalizedPage` document, its `M1DocTypes` index, the `ITranslationProvider.GetPageAsync` / `FindPageByImageIdAsync` seams, the `ILocalizationService.GetPageAsync` / `UpsertPageAsync` pair, and the ML-UI admin page editor (`PreviewPage` / `SavePage`) are all **deleted** (U07, the destructive close) — `LanguageCompleteness` is now 3-prop, and `StaticPagesController` is 2-arg.
+> **Seam it created:** `Kumunita.Core.Pages` — the `IPageService` + `PageDocTypes` surface + the `PageToAuditableResource` adapter; the legacy `LocalizedPage` document, its `CoreDocTypes` index, the `ITranslationProvider.GetPageAsync` / `FindPageByImageIdAsync` seams, the `ILocalizationService.GetPageAsync` / `UpsertPageAsync` pair, and the ML-UI admin page editor (`PreviewPage` / `SavePage`) are all **deleted** (U07, the destructive close) — `LanguageCompleteness` is now 3-prop, and `StaticPagesController` is 2-arg.
 > **Do not re-litigate:** pages **default non-public / community-visible** (the 2026-09-17 amendment that reverses ADR 0039 §3.4's "pages default public") — the public *capability* is retained (`IsPublic = true`), the seeded `about` / `terms` / `help` pages are public by the **seeder** (not the composer default), and the `CommunityId` seed in `PageController.New()` is **load-bearing** (removing it would drop the default back to "denies everyone," C1 — empty-audience-denies).
 
 > **Three-tier contract.** This lane has three written surfaces, in order of
@@ -99,7 +99,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
   §3.7 over the ADR 0029 announcement matrix).
 - `src/Kumunita.Core/Pages/PageDocTypes.cs` — **the chosen registration
   surface** (a new surface, per the plan's recommendation — a new bounded
-  context gets its own `*DocTypes`, the `M1DocTypes`/`M3DocTypes`/
+  context gets its own `*DocTypes`, the `CoreDocTypes`/`PostDocTypes`/
   `MediaDocTypes` parallel-shape precedent). Two registrations, two unique
   indexes:
   - `Page`: conventional `Id` + a **`(ParentId, Slug)`** unique index
@@ -109,7 +109,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
   - `PageTranslation`: conventional `Id` + a **`(PageId, LanguageCode)`**
     unique index with the **explicit short name `pg_tr_uidx_page_lang`**
     (convention-consistency with the `ann_tr_uidx_ann_lang` precedent in
-    `M3DocTypes`; the auto-derived name is ~48 chars so it is not *required*,
+    `PostDocTypes`; the auto-derived name is ~48 chars so it is not *required*,
     but the repo idiom for the `<Parent>Translation` doc family is an explicit
     short name, so this one gets one too).
 - `src/Kumunita.Core/Pages/IPageService.cs` — the service seam (the
@@ -140,7 +140,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
   the Testcontainers spin-up, the normal Core.Tests wall clock). The schema
   delta (the two new tables + the two unique indexes) applied idempotently
   against the live Postgres in every test fixture that boots a store with
-  `M1DocTypes.Configure` + `M3DocTypes.Configure` — the existing test suite is
+  `CoreDocTypes.Configure` + `PostDocTypes.Configure` — the existing test suite is
   the idempotency + no-regression proof for this structure unit (there is no
   dedicated U01 test yet; U02's `PG_*` family is the first behavioral test).
 - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
@@ -149,11 +149,11 @@ fresh-agent unit, so it has no `## U0` log section here.)_
   call in the `AddMarten` lambda) didn't regress the Web host's Marten setup.
 - `git --no-pager status --short` — the change set is exactly the closed U01
   deliverable set: `M src/Kumunita.Core/DependencyInjection.cs`,
-  `M src/Kumunita.Web/Program.cs`, `?? src/Kumunita.Core/Pages/`. **`M1DocTypes.cs`
+  `M src/Kumunita.Web/Program.cs`, `?? src/Kumunita.Core/Pages/`. **`CoreDocTypes.cs`
   is untouched** (the `LocalizedPage` registration + its `(Slug, LanguageCode)`
   index are still there — U07 removes them), and **no `LocalizedPage` file was
   modified** (the `grep` for `LocalizedPage` in `src/` shows the same
-  pre-existing references as before U01 — the `M1DocTypes` registration + the
+  pre-existing references as before U01 — the `CoreDocTypes` registration + the
   `ITranslationProvider.GetPageAsync` / `ILocalizationService.UpsertPageAsync`
   seams U07 retires).
 
@@ -183,7 +183,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
 2. **The `PageTranslation` index uses an explicit short name
    (`pg_tr_uidx_page_lang`) even though the auto-derived name is under the
    64-char limit** — a deliberate convention-consistency choice with the
-   `ann_tr_uidx_ann_lang` precedent in `M3DocTypes` (the plan's "pick an
+   `ann_tr_uidx_ann_lang` precedent in `PostDocTypes` (the plan's "pick an
    explicit short name if the auto-derived name would exceed 64 chars" is a
    *necessity* trigger; I chose the explicit name anyway so the
    `<Parent>Translation` doc family reads uniformly: `ann_tr_uidx_ann_lang`,
@@ -195,7 +195,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
 **What the next agent (U02) must know** that isn't already in the plan:
 
 - The **two unique indexes are live in the schema** now (the Core test fixtures
-  that boot a store with `M1DocTypes` + `M3DocTypes` + `PageDocTypes`
+  that boot a store with `CoreDocTypes` + `PostDocTypes` + `PageDocTypes`
   configured — once U02's harness adds the `PageDocTypes.Configure` call to its
   `BootStoreAsync`, the same 433-test green run becomes the U02 structural
   gate; the `LocalizedPage` surface is **still registered** alongside
@@ -232,7 +232,7 @@ fresh-agent unit, so it has no `## U0` log section here.)_
   default public" decision (ADR 0039).
 
 **Status: U01 GREEN.** Build clean (zero warnings), Core tests 433/433 green,
-Web tests 203/203 green, `LocalizedPage`/`M1DocTypes` untouched. **Next unit:
+Web tests 203/203 green, `LocalizedPage`/`CoreDocTypes` untouched. **Next unit:
 U02** (the read lanes + `PageToAuditableResource` + the standing matrix —
 the first behavioral unit of the lane).
 
@@ -362,12 +362,12 @@ the first behavioral unit of the lane).
 - **`GetByMountPointAsync` returns `Page?`** (`null` = unmounted), not
   `Page` — the Web layer (U04) skips the link on `null`. The two known slots
   are `"footer/community"` and `"help/account"`.
-- **No `LocalizedPage`/`M1DocTypes` was touched** (U07 retires it), and **no
+- **No `LocalizedPage`/`CoreDocTypes` was touched** (U07 retires it), and **no
   Web code** was added (U04).
 
 **Status: U02 GREEN.** Build clean (zero warnings), Core tests **475/475** green
 (433 pre-existing + 42 new `PG_*`), the adapter compiles against the **frozen**
-`IAuthorizationService` with no signature change, `LocalizedPage`/`M1DocTypes`
+`IAuthorizationService` with no signature change, `LocalizedPage`/`CoreDocTypes`
 untouched, no Web code. **Next unit: U03** (the write lanes
 `CreateAsync`/`UpdateAsync`/`PublishAsync`/`MoveAsync`/`DeleteAsync`/
 `AddTranslationAsync`, each with its C3 `AccessAudit` row, `TargetKind =
@@ -376,7 +376,7 @@ untouched, no Web code. **Next unit: U03** (the write lanes
 ## U3 — write lanes + C3 audit
 
 **What I built** (all in `Kumunita.Core.Pages` + the U02 test file; no Web
-code — U04, no `LocalizedPage`/`M1DocTypes` touched — U07):
+code — U04, no `LocalizedPage`/`CoreDocTypes` touched — U07):
 
 - `src/Kumunita.Core/Pages/IPageService.cs` (modified) — added the six
   write-lane signatures (the C3 caller-session `IDocumentSession` shape, the
@@ -519,7 +519,7 @@ code — U04, no `LocalizedPage`/`M1DocTypes` touched — U07):
   deliverable set: `M src/Kumunita.Core/Pages/IPageService.cs`,
   `M src/Kumunita.Core/Pages/PageService.cs`,
   `M tests/Kumunita.Core.Tests/PageServiceTests.cs`. **`LocalizedPage`/
-  `M1DocTypes` untouched** (U07 retires it), and **no Web code** was added
+  `CoreDocTypes` untouched** (U07 retires it), and **no Web code** was added
   (U04).
 
 **Drift from the plan** (three, all minor and recorded per protocol):
@@ -685,7 +685,7 @@ code — U04, no `LocalizedPage`/`M1DocTypes` touched — U07):
 **Exit-gate status (this unit):** (1) `dotnet build Kumunita.slnx -c Debug`
 green, zero warnings — ✅; (2) `dotnet exec ...Kumunita.Web.Tests.dll` green
 — 218/218 (203 baseline + 15 PageControllerTests) — ✅; (3) `LocalizedPage` /
-`M1DocTypes` / `Kumunita.Core` untouched — ✅ (verified by `git status`); (4)
+`CoreDocTypes` / `Kumunita.Core` untouched — ✅ (verified by `git status`); (4)
 this handoff section appended — ✅.
   Web layer's `DocumentStore.LightweightSession()`).
 - **The `ImageIds`/`AttachmentIds` are set by the Web layer before calling
@@ -718,12 +718,12 @@ this handoff section appended — ✅.
   authoritative root-slug guard. U04's composer should surface a clear
   error if the user tries to create a root page with a slug that already
   exists at the root level.
-- **No `LocalizedPage`/`M1DocTypes` was touched** (U07 retires it), and
+- **No `LocalizedPage`/`CoreDocTypes` was touched** (U07 retires it), and
   **no Web code** was added (U04).
 
 **Status: U03 GREEN.** Build clean (zero warnings), Core tests
 **505/505** green (475 pre-existing + 30 new `PG3_*`), Web tests
-**203/203** green (no regression), `LocalizedPage`/`M1DocTypes`
+**203/203** green (no regression), `LocalizedPage`/`CoreDocTypes`
 untouched, no Web code. **Next unit: U04** (the `PageController` + the
 tree browse + the post view + the composer — the Web surface).
 
@@ -826,7 +826,7 @@ files):
   `M src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (+ the Core test file);
   `M src/Kumunita.Web/Controllers/StaticPagesController.cs`; and the four Web
   test files (+ one new). **`IPageService`/`PageService`/`Page`/`PageTranslation`/
-  `LocalizedPage`/`M1DocTypes`/`PageDocTypes`/registration are all untouched**
+  `LocalizedPage`/`CoreDocTypes`/`PageDocTypes`/registration are all untouched**
   (the frozen seams) — `git status` confirms no Core `Pages/` file changed.
 
 **Drift from the plan** (one, the load-bearing one, recorded per protocol —
@@ -897,7 +897,7 @@ this is the U05 drift-pause (e) decision, not a silent deviation):
 
 **Status: U05 GREEN.** Build clean (zero warnings), Web tests **224/224** green
 (218 pre-existing + 6 new `PG5_*`/retarget), Core tests **508/508** green (505
-pre-existing + 3 new `PG5_*`), `LocalizedPage`/`M1DocTypes`/`IPageService`/
+pre-existing + 3 new `PG5_*`), `LocalizedPage`/`CoreDocTypes`/`IPageService`/
 `PageService`/`Page`/registration **untouched** (the frozen seams — verified by
 `git status`), the `about`-unseeded drift pin recorded. **Next unit: U06**
 (per the register — the remaining unit before U07's destructive
@@ -1074,7 +1074,7 @@ pointing at the tree. No new surface, no new ADR — it's a removal.
 
 - **`src/Kumunita.Core/Localization/LocalizedPage.cs` — DELETED.** The legacy
   static-page document is gone.
-- **`src/Kumunita.Core/M1DocTypes.cs`** — removed the `LocalizedPage`
+- **`src/Kumunita.Core/CoreDocTypes.cs`** — removed the `LocalizedPage`
   unique-index registration (the doc-type registration surface no longer lists
   it).
 - **`src/Kumunita.Core/Localization/ITranslationProvider.cs` +

@@ -1212,8 +1212,8 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -1438,7 +1438,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_GroupPost_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var userInfo = boot.UserInfo;
         var authz = new AuthorizationService(boot.Store, userInfo);
         var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -1464,7 +1464,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_GroupPost_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var userInfo = boot.UserInfo;
         var authz = new AuthorizationService(boot.Store, userInfo);
         var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -1485,7 +1485,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_GroupPost_Draft_Mention_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var userInfo = boot.UserInfo;
         var authz = new AuthorizationService(boot.Store, userInfo);
         var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
@@ -1510,7 +1510,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_GroupPostReply_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, PostDocTypes.Configure);
         var userInfo = boot.UserInfo;
         var authz = new AuthorizationService(boot.Store, userInfo);
         var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);

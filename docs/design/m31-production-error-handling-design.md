@@ -47,7 +47,7 @@
 >
 > **The frozen base.** M31 is built **on top of** the ADR 0004 §B.1
 > Marten-native / parallel-surface pattern (the `ErrorReportDocTypes`
-> registration shape, the `M3DocTypes` / `M4DocTypes` / `M6DocTypes` /
+> registration shape, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes` /
 > `UsageDocTypes` precedent), the ADR 0001-B thin-token rule (the admin
 > surface is `[Authorize(Roles = GlobalAdmin)]`), the ADR 0006 C3
 > single-write-lane shape (one write session storing the `ErrorReport` doc +
@@ -224,7 +224,7 @@ note.
   parallel surface.** The doc is a POCO with a conventional string `Id` (the
   `Posts/Report` / `Usage/UsageEvent` row-per-event shape), registered in a
   new `ErrorReportDocTypes.Configure(opts)` surface (the ADR 0004 §B.1
-  parallel-surface pattern, the `M3DocTypes` / `M4DocTypes` / `M6DocTypes`
+  parallel-surface pattern, the `PostDocTypes` / `EventDocTypes` / `NotificationDocTypes`
   precedent). **No EF migration.** The delta is applied idempotently at boot
   (the `SchemaBootstrap` + the dev-loop `Program.cs` path both pick it up).
 - **M31·4 — The admin list is a GlobalAdmin-gated read.** The
@@ -280,7 +280,7 @@ note.
   thin-token rule (ADR 0001-B) is held.
 - **M31·10 — The existing `Posts/Report` doc is untouched.** M31 does not add
   fields to `Posts/Report`, does not change its `Status` vocabulary, does not
-  alter its `M3DocTypes` registration, does not touch the M3b moderation
+  alter its `PostDocTypes` registration, does not touch the M3b moderation
   queue. The two report concepts (platform-error vs content-moderation) are
   **separate docs in separate contexts** and the `TargetKind` strings are
   distinct (`"error-report"` vs `"post"` / `"reply"`).
@@ -636,7 +636,7 @@ public sealed class ErrorReportService : IErrorReportService
 ```
 
 **The `ErrorReportDocTypes` registration surface** (ADR 0004 §B.1, the
-`UsageDocTypes` / `M3DocTypes` parallel-surface shape — the `UsageDocTypes`
+`UsageDocTypes` / `PostDocTypes` parallel-surface shape — the `UsageDocTypes`
 is the closest analog, a row-per-event surface). One `.Schema.For<ErrorReport>()`
 call + the `(TriageStatus, Created)` index for the admin list ordering (the
 `WHERE TriageStatus = ? ORDER BY Created DESC` query).
@@ -649,7 +649,7 @@ namespace Kumunita.Core;
 
 /// <summary>
 /// The M31 error-report bounded context's Marten-native document
-/// registration surface (ADR 0004 §B.1, the UsageDocTypes / M3DocTypes
+/// registration surface (ADR 0004 §B.1, the UsageDocTypes / PostDocTypes
 /// parallel-surface shape). ErrorReport uses the conventional string Id
 /// identity (Marten default), so only the (TriageStatus, Created) index
 /// for the admin list ordering needs pinning.

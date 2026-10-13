@@ -12,7 +12,7 @@
 >
 > **What this is:** a **new bounded context** `Kumunita.Core.Projects` (the
 > `TodoItem`, `KanbanBoard`, `KanbanLane`, `BoardItemPlacement` documents),
-> **one new document surface** (`M5DocTypes`), **one new service seam**
+> **one new document surface** (`ProjectDocTypes`), **one new service seam**
 > (`IProjectService`), **two new authorization adapters**
 > (`TodoItemToAuditableResource`, `KanbanBoardToAuditableResource`), **one new
 > Web controller** (`ProjectsController`) + views + nav, and **one new
@@ -87,7 +87,7 @@ timestamp renders through the **one** `kw-dt`; the assignee chip reuses the
   copy to (board), move to (board), assign to (user), remove / delete) and
   **Kanban boards** (create / list / detail; lanes; each lane an optional
   `MaxItems` limit + an optional `Status`; auto status-update on
-  move-to-lane). **In:** the four documents, `M5DocTypes`, the
+  move-to-lane). **In:** the four documents, `ProjectDocTypes`, the
   `IProjectService` read + write + placement surface, the two
   `ToAuditableResource` adapters, `ProjectsController` + views + nav, the
   `client/lib/projects-board.ts` module + `site.css` + `kw-l` keys × 4
@@ -217,7 +217,7 @@ timestamp renders through the **one** `kw-dt`; the assignee chip reuses the
 ## Approach
 
 Four tracks, sequenced — exactly like M4. **Track A (Core model, U02–U03):**
-the four POCOs in `Kumunita.Core.Projects`, the `M5DocTypes` registration +
+the four POCOs in `Kumunita.Core.Projects`, the `ProjectDocTypes` registration +
 boot wiring (U02), and the two `ToAuditableResource` adapters (U03).
 **Track B (Core service, U04–U06):** `IProjectService` — U04 declares the
 **full** interface (read + write + placement signatures, verbatim from the
@@ -310,7 +310,7 @@ records `## U<m> — Drift pause` in the handoff note.
 
 - **C-M5·1 — One bounded context, four documents, one surface, additive.**
   `Kumunita.Core.Projects` with `TodoItem`, `KanbanBoard`, `KanbanLane`,
-  `BoardItemPlacement`; one new surface `M5DocTypes` (the `M4DocTypes` pattern
+  `BoardItemPlacement`; one new surface `ProjectDocTypes` (the `EventDocTypes` pattern
   verbatim); Marten-native POCOs, conventional `string` `Id`, delta-detected +
   idempotent, no seeding, no EF, zero migrations for existing surfaces (ADR
   0004 §B.1). *(ADR 0067 D1.)*
@@ -443,7 +443,7 @@ suites still green — the lane is additive, nothing regressed).
 |------|-----------------|------|
 | **U00** | Design doc Part 1 — context, scope, decisions D1–D12, invariants C-M5·1…11, FACES F1–F10. No code. | `U00.md` |
 | **U01** | Design doc Part 2 (exact C# shapes, the full `IProjectService` surface, the ~24 pinned tests, gate, drift-guard) + **ADR 0067** + **roadmap confirm** (M5 is already the single `StatusNext`; U1 stays `StatusNext`, M6 stays `StatusPlanned`). | `U01.md` |
-| **U02** | `TodoItem`, `KanbanBoard`, `KanbanLane`, `BoardItemPlacement` POCOs + `M5DocTypes` registration + boot wiring (both boot paths). | `U02.md` |
+| **U02** | `TodoItem`, `KanbanBoard`, `KanbanLane`, `BoardItemPlacement` POCOs + `ProjectDocTypes` registration + boot wiring (both boot paths). | `U02.md` |
 | **U03** | `TodoItemToAuditableResource` + `KanbanBoardToAuditableResource` adapters (the two `TargetKind`s: `"todo"` / `"board"`). | `U03.md` |
 | **U04** | `IProjectService` — the **full** interface (read + write + placement signatures, verbatim) + the **read-lane** impl (standalone to-do list / detail + subtasks; board list / detail + lanes + placements); write + placement as `NotImplementedException` stubs. | `U04.md` |
 | **U05** | The **write lanes** — to-do create / edit (incl. reparent + the hierarchy cycle guard) / assign / add-subtask / delete (cascading); board create (with lanes) / lane update (title / `Status` / `MaxItems` / order) / board delete (cascades lanes + placements). Standing re-checked server-side. | `U05.md` |

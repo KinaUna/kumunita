@@ -60,7 +60,7 @@ text's literal promise):
 |---|---|
 | `Kumunita.Core/UserInfo/Profile.cs` | New `EventRsvpMode` enum + `Profile.EventRsvpMode` field (default `GuardianApproves`) |
 | `Kumunita.Core/Events/GuardianEventRequest.cs` | **New file** — the request-row document + its 3-state machine |
-| `Kumunita.Core/M4DocTypes.cs` | Registers `GuardianEventRequest` + the unique `(EventId, ChildId)` index |
+| `Kumunita.Core/EventDocTypes.cs` | Registers `GuardianEventRequest` + the unique `(EventId, ChildId)` index |
 | `Kumunita.Core/Notifications/NotificationKinds.cs` | Two new opt-OUT kinds: `guardian.event_request`, `guardian.event_rsvp` |
 | `Kumunita.Core/UserInfo/IUserInfoService.cs` + impl | `SetChildEventRsvpModeAsync` (the `SetChildMessagingRestrictionAsync` shape verbatim) |
 | `Kumunita.Core/Events/IEventService.cs` + impl | The gate in `RsvpAsync`; `ApproveEventRsvpAsync` / `DenyEventRsvpAsync` / `VetoEventRsvpAsync`; `GetPendingEventRsvpRequestsAsync` / `GetChildRsvpsAsync` |
@@ -138,7 +138,7 @@ The ADR 0144 §B–§G tables are the contract. The load-bearing pins:
 - **Rollout:** the `GuardianEventRequest` table + the
   `profile.eventrsvpmode` column are additive (Marten's
   `ApplyAllConfiguredChangesToDatabaseAsync` picks them up on the next boot,
-  the `M4DocTypes` / M1-profile surfaces); existing rows are unaffected
+  the `EventDocTypes` / M1-profile surfaces); existing rows are unaffected
   (the new profile field defaults to `GuardianApproves` on read — the
   `??` fallback in the gate covers any row written before the column
   existed, so a migration-ordering race is fail-protective by

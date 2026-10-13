@@ -63,7 +63,7 @@ commit). **No code, no build.**
    ("the service (not the document) is the resolver — this helper is the
    single truth for 'active'"). U01's `GuardianLink` mirrors this (the "service
    is the resolver" pin, not a doc-side boolean).
-7. `src/Kumunita.Core/M1DocTypes.cs` §`Configure` (~line 48) — where
+7. `src/Kumunita.Core/CoreDocTypes.cs` §`Configure` (~line 48) — where
    `GuardianLink` will register (a neighbor of `opts.Schema.For<
    DelegationGrant>();` at ~line 61) and the **business-key convention** to
    mirror: `opts.Schema.For<GroupInvitation>().UniqueIndex(i => i.GroupId,

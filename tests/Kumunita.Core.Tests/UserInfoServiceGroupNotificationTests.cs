@@ -6,9 +6,9 @@
 //   template — the "You've been added to the group {0}" shape).
 // · InviteGroupMemberAsync → kind group.invite, same shape (kind + key).
 //
-// Harness: the single-store shape (the `mt` schema — M1DocTypes for the
+// Harness: the single-store shape (the `mt` schema — CoreDocTypes for the
 // Group/GroupMembership/GroupInvitation/Profile/AccessAudit tables +
-// M6DocTypes for the Notification/NotificationPreference tables), the
+// NotificationDocTypes for the Notification/NotificationPreference tables), the
 // NotificationServiceTests shape with a real NotificationService over a
 // recording mailer + a Substitute ITranslationProvider, and a
 // UserInfoService wired with an IServiceProvider that resolves the same
@@ -243,8 +243,8 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 
@@ -348,8 +348,8 @@ public sealed class UserInfoServiceGroupNotificationTests(PostgresFixture fixtur
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M6DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

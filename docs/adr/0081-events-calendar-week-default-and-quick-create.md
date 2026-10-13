@@ -78,7 +78,7 @@ month grid to single-line separators with no inter-cell margin.
   *grid math* changes (only its status as the default). The invalid/absent
   `?view=` fallback is `week`.
 - **No Core / schema / seam / migration change.** The `IEventService` surface
-  and `M4DocTypes` are untouched (the `ListInRangeAsync` seam was already
+  and `EventDocTypes` are untouched (the `ListInRangeAsync` seam was already
   window-agnostic and is reused unchanged). `EventEditorModel.QuickCreate` is
   a Web-layer shape signal — no `CreateEventRequest` field, no document, no
   audit action added.

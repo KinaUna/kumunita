@@ -1842,7 +1842,7 @@ public sealed class PostService
 
     // ─── ADR 0048 — edit + delete lane for post/reply translations ───────
     // The ADR 0022 write lane was add-only (one row per (parent, language)
-    // pair, enforced by the unique index in M3DocTypes). ADR 0048 lifts the
+    // pair, enforced by the unique index in PostDocTypes). ADR 0048 lifts the
     // "add-only" pin: a standing-holder (the same matrix as the add lane —
     // author / GlobalAdmin / (community-lane) component-moderator) may now
     // **update** the existing (parent, language) row in place, or **remove**

@@ -65,7 +65,7 @@ Each unit is one self-contained step a fresh agent can complete and hand off:
 | --- | --- | --- | --- |
 | U00 | Design doc + ADR 0121 (the sign-off gate) | docs-only | none (no build/test) |
 | U01 | **Open M20** — `Milestones.cs` flip to `StatusNext`, `MilestonesTests` re-pin, README/STATUS parity | Web + docs | `Kumunita.Web.Tests` |
-| U02 | `NotificationQuietSchedule` doc + `M6DocTypes` reg + pure timezone-aware `IsQuietNow` evaluator + owner-scope read/write seams | Core | `Kumunita.Core.Tests` |
+| U02 | `NotificationQuietSchedule` doc + `NotificationDocTypes` reg + pure timezone-aware `IsQuietNow` evaluator + owner-scope read/write seams | Core | `Kumunita.Core.Tests` |
 | U03 | `Notification.EmailDeferred` additive field + the `EmitAsync` quiet gate (defer email, keep inbox) | Core | `Kumunita.Core.Tests` |
 | U04 | `NotificationFlushService` (the §6.4 pure flush) + `LocaleSettings.QuietCheckMinutes` additive field | Core | `Kumunita.Core.Tests` |
 | U05 | `NotificationFlushHandler`/`Tick` (Web §6.4 adapter) + `Program.cs` first-tick seed + DI wiring | Web | `Kumunita.Web.Tests` |
@@ -165,7 +165,7 @@ during quiet.
 
 A new document `Kumunita.Core.Notifications.NotificationQuietSchedule` (id =
 the recipient's `SubjectId`, the `NotificationPreference` "one row per
-recipient" shape — identity pinned to `RecipientId` in `M6DocTypes`, the ADR
+recipient" shape — identity pinned to `RecipientId` in `NotificationDocTypes`, the ADR
 0004 §B.1 additive-surface precedent). Shape (locked by U00's design doc §4):
 
 ```csharp
@@ -506,7 +506,7 @@ delivered by the single per-resident, email-only, timezone-aware schedule.
   unit onward. A later unit may read an earlier unit's code, but never re-derive
   a D#.
 - **One write lane per unit.** U02 owns the `NotificationQuietSchedule` doc +
-  the `M6DocTypes` registration + the evaluator + the two owner-scope seams.
+  the `NotificationDocTypes` registration + the evaluator + the two owner-scope seams.
   U03 owns the `Notification.EmailDeferred` field + the `EmitAsync` gate. U04
   owns the `NotificationFlushService` + the `LocaleSettings` field + the
   cadence write seam. U05 owns the Web handler/tick + `Program.cs` + DI. U06

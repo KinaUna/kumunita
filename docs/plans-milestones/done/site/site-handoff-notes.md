@@ -389,8 +389,8 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
   date):** the register / design doc name the `SiteContentDocTypes.Configure(opts)`
   host call as part of "the schema bootstrap" in `DependencyInjection.cs`, and the
   U03 plan deliverable #5 says the `Configure` call goes in `DependencyInjection.cs`.
-  In this repo **all** `*DocTypes.Configure` calls (`M1DocTypes` / `M3DocTypes` /
-  `MediaDocTypes` / `PageDocTypes` / `TagDocTypes` / `M4DocTypes` / …) live in the
+  In this repo **all** `*DocTypes.Configure` calls (`CoreDocTypes` / `PostDocTypes` /
+  `MediaDocTypes` / `PageDocTypes` / `TagDocTypes` / `EventDocTypes` / …) live in the
   `AddMarten(opts => { … })` lambda in `src/Kumunita.Web/Program.cs` (lines 107-130);
   `DependencyInjection.cs` (Core, ADR 0006-D "Core carries no HTTP types") registers
   services only and has **no** `StoreOptions` / `AddMarten` surface, so the `Configure`
@@ -724,7 +724,7 @@ order (U00, U01, … U08). Never rewrite a prior section. -->
      SiteContent.SiteContentService(store)` + `SiteContent
      .SiteContent.SingletonId`; asserts `AccessVia.Admin` + action
      `"site.save"` + `TargetKind "site"`. Has `BootStoreAsync()` (wires
-     `M1DocTypes.Configure` + `M3DocTypes.Configure` +
+     `CoreDocTypes.Configure` + `PostDocTypes.Configure` +
      `SiteContentDocTypes.Configure` in the `DocumentStore.For` lambda)
      and `SeedRowAsync(store, ct)` (stores a `SiteContent` row so
      `SaveAsync` is not a no-op — the service no-ops when the row is

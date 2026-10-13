@@ -496,7 +496,7 @@ Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorMo
   - **Total:** 8/8 passed, 0 failed. **Closed loop** (the assigned guardian's standing is live on their next read) + **handoff** (the assigned guardian, now a full guardian, can suspend / un-suspend / curate / approve over the child) + **part-vs-whole** (all 8 pass together) — the gate holds.
 - **Drift pauses carried from U06 (named, not silently resolved):** (i) `Detail.cshtml` uses plain `name="Email"` (not `asp-for="Email"`) — the pinned `@model` is `MembershipEditorModel` (no `Email` property), so the `asp-for` TagHelper is uncompilable; the `Assign` action binds `AssignGuardianForm.Email` by its own property name on the POST, matching the existing curation-forms convention; (ii) the `guardian.create` audit row's `ActorId` is the **assigned** guardian (the `CreateGuardianLinkAsync(childId, guardianId)` seam sets `ActorId = guardianId`, and `guardianId` is the `assignedId` the `Assign` action passes) — the pinned contract §D prose says "assigning guardian", but the byte-identical GU seam (G-A·3 forbids a new seam) sets it to the assigned guardian; the tests assert the real behavior; (iii) `Kumunita.Web.Tests` now carries its own `PostgresFixture` (a byte-for-byte copy of `Kumunita.Core.Tests`'s) — the repo's documented convention ("Web.Tests is NSubstitute-only, Testcontainers lives in Core.Tests") is overridden by the explicit U06 requirement to run the 5 pinned tests against a real store.
 - **Cross-lane red surfaced (NOT in GA's deliverables, not fixed by GA):** `GuardianViewModelsTests.MembershipEditorModel_Is_Exact_Four_Field_Projection` (GU lane, pre-existing) asserts exactly `{ "ChildId", "CommunityIds", "GroupIds", "PendingInvitations" }`, but U04 legitimately added `GuardianItems` as the 5th field → that test is **red** in the full `Kumunita.Web.Tests` suite (1 failure out of 200 total). This is a cross-lane breakage outside GA's sealed scope — surfaced to the user as a decision (update the GU projection test to expect 5 fields vs. leave it) rather than silently fixed or ignored.
-- **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR 0004 §B.1 additive; `M1DocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); `docs/ARCHITECTURE.md`'s `Identity/` + `UserInfo/` lines carry the surface (U07).
+- **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR 0004 §B.1 additive; `CoreDocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); `docs/ARCHITECTURE.md`'s `Identity/` + `UserInfo/` lines carry the surface (U07).
 - **Non-decisions (ADR 0038 §E, each named, carried forward):** no remove path (a co-guardian dissolving *another* co-guardian's link, or the child dissolving a co-guardian's link — the ADR 0028 G·5 safety valve remains the only "dissolve any active link" path); no acceptance/consent step on the assigned guardian; no bulk assign (one email per form); no self-assignment (refused, G-A·5, not a lane); no second audit verb (`guardian.create` is the one verb); no email notification to the assigned guardian. Each re-litigates as an ADR 0038 amendment, not a toggle.
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane discipline: GA is not a renumber).
 
@@ -530,7 +530,7 @@ is now on the **audit trail**, not the relationship document — the
     guardianId)` unchanged in signature, behavior, and audit shape; the
     GU lane's `AddChild` call site unchanged.
   - **S·3 — POCO byte-identical:** `GuardianLink` has no new field / enum
-    value; `M1DocTypes` unchanged.
+    value; `CoreDocTypes` unchanged.
   - **S·4 — Standing unchanged:** the assigned guardian's standing is
     identical in kind to the creator's; no new GU action / content read /
     "assigned" tier; the `IAuthorizationService` frozen surface unchanged.
@@ -562,7 +562,7 @@ is now on the **audit trail**, not the relationship document — the
   truth is 11 (5 Core + 6 Web) — see the § Pinned seam tests
   reconciliation note.)
 - **GU lane byte-identity (confirmed by reading the file):**
-  `CreateGuardianLinkAsync`, the `GuardianLink` POCO, `M1DocTypes`, the
+  `CreateGuardianLinkAsync`, the `GuardianLink` POCO, `CoreDocTypes`, the
   five GU actions, `AccessVia`, and the GU enforcement path are all
   byte-identical (S·2, S·3, S·4) — the new seam is additive.
 - **Drift-guard (frozen):** the `AssignGuardianLinkAsync` seam + its

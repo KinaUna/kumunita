@@ -1143,8 +1143,8 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M3DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            PostDocTypes.Configure(opts);
             PageDocTypes.Configure(opts);
             TagDocTypes.Configure(opts);   // U3 — the two new Tag/TagTranslation docs
         });

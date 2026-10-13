@@ -6,7 +6,7 @@ namespace Kumunita.Core;
 /// <summary>
 /// The <c>M4</c> (Events) bounded context's Marten-native document registration
 /// surface (ADR 0004 §B.1 / ADR 0054) — the parallel surface to
-/// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> / <see cref="MediaDocTypes"/> /
+/// <see cref="CoreDocTypes"/> / <see cref="PostDocTypes"/> / <see cref="MediaDocTypes"/> /
 /// <see cref="PageDocTypes"/> for the new <c>Kumunita.Core.Events</c> context. All
 /// documents are POCOs with the conventional <c>string</c> <c>Id</c> identity (the
 /// M3 "string Id" convention), so only the business/feed indexes need pinning;
@@ -19,7 +19,7 @@ namespace Kumunita.Core;
 /// <c>Page</c> surfaces are untouched. **Zero migrations for existing surfaces.**
 /// </para>
 /// </summary>
-public static class M4DocTypes
+public static class EventDocTypes
 {
     /// <summary>
     /// Registers the M4 (Events) domain documents. Idempotent: calling twice is
@@ -57,7 +57,7 @@ public static class M4DocTypes
         //
         // The auto-derived name (mt_doc_eventrsvp_uidx_event_iduser_id, ~40 chars)
         // is under Postgres's 64-char NAMEDATALEN limit, so no explicit name is
-        // required (unlike M3DocTypes' AnnouncementTranslation edge case).
+        // required (unlike PostDocTypes' AnnouncementTranslation edge case).
         opts.Schema.For<EventRsvp>()
                .UniqueIndex(r => r.EventId, r => r.UserId);
 
@@ -70,7 +70,7 @@ public static class M4DocTypes
         //
         // The auto-derived name (mt_doc_eventtranslation_uidx_event_idlanguage_code,
         // ~50 chars) is under Postgres's 64-char NAMEDATALEN limit, so no explicit
-        // name is required (unlike M3DocTypes' AnnouncementTranslation edge case).
+        // name is required (unlike PostDocTypes' AnnouncementTranslation edge case).
         opts.Schema.For<EventTranslation>()
                .UniqueIndex(t => t.EventId, t => t.LanguageCode);
 

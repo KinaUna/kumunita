@@ -9,8 +9,8 @@ access) — design
 >
 > **A standalone core surface** (a roadmap letter, not a named lane): one
 > **new bounded context** `Kumunita.Core.Bookmarks` with **one document**
-> (`Bookmark`) on a **new `M17DocTypes`** surface (the M9 `M9DocTypes` /
-> M5 `M5DocTypes` precedent — additive, idempotent, **zero migrations** for
+> (`Bookmark`) on a **new `BookmarkDocTypes`** surface (the M9 `MessagingDocTypes` /
+> M5 `ProjectDocTypes` precedent — additive, idempotent, **zero migrations** for
 > existing surfaces), **no adapter at all** (a bookmark is a *personal-by-id*
 > record, the ADR 0105 participant-by-id shape — D2), and the **`bm.*`**
 > `kw-l` registry block (the §kw-l below).
@@ -68,14 +68,14 @@ The precedents M17 composes:
    The owner's own bookmark list is exactly this: `Where(b =>
    b.OwnerId == ownerId)`, **zero** `AccessAudit` rows, **zero**
    `CanSeeAsync` passes over the bookmark rows (C-M17·2).
-3. **The `*DocTypes` parallel-surface shape** (`M9DocTypes` /
-   `M5DocTypes`) — `opts.Schema.For<T>()` + named indexes;
+3. **The `*DocTypes` parallel-surface shape** (`MessagingDocTypes` /
+   `ProjectDocTypes`) — `opts.Schema.For<T>()` + named indexes;
    `ApplyAllConfiguredChangesToDatabaseAsync()` delta-detects and
    applies the new table **idempotently** at boot (ADR 0004 §B.1) —
    **zero migrations for existing surfaces**. The M9 `convo_uidx_pair`
    (`UniqueIndex("convo_uidx_pair", c => c.ParticipantA, c =>
    c.ParticipantB)`) is the **F1 idempotency witness** the
-   `M17DocTypes` unique index on `(OwnerId, TargetKind, TargetId)`
+   `BookmarkDocTypes` unique index on `(OwnerId, TargetKind, TargetId)`
    copies (the witness of at-most-one-row-per-owner-target).
 4. **The closed-string-set idiom** (the M5 `KanbanStatuses` shape) —
    `TargetKind` is a **string** restricted to the closed set
@@ -118,7 +118,7 @@ scratch handoff note is
 
 - The `Bookmark` document (ns `Kumunita.Core.Bookmarks`; `Id` / `OwnerId`
   / `TargetKind` / `TargetId` / `Created` — §2.1) and the **new
-  `M17DocTypes`** surface (the **unique** index on `(OwnerId,
+  `BookmarkDocTypes`** surface (the **unique** index on `(OwnerId,
   TargetKind, TargetId)` + a non-unique `(OwnerId, Created)`
   list-ordering index; ADR 0004 §B.1 additive, **zero migrations** for
   existing surfaces).
@@ -162,7 +162,7 @@ register.
 
 - **`Kumunita.Core`** — a **new bounded context**
   `Kumunita.Core/Bookmarks/` (`Bookmark`, `IBookmarkService`,
-  `BookmarkService`, the result records, `M17DocTypes`) + its DI
+  `BookmarkService`, the result records, `BookmarkDocTypes`) + its DI
   registration in `DependencyInjection.cs`.
 - **`Kumunita.Web`** — `BookmarksController` + the `Views/Bookmarks/`
   list view + the `_BookmarkButton` partial + the five target detail
@@ -183,7 +183,7 @@ one document surface, one Web controller + partial — and it depends on
 **access model** (audiences, groups, delegation, moderator scope): a
 bookmark is **not** an audience, an `AccessVia`, or a standing — it is a
 pointer (C-M17·1 / D2). There is **no migration path** to plan: the
-`M17DocTypes` surface is delta-detected and applied idempotently at boot
+`BookmarkDocTypes` surface is delta-detected and applied idempotently at boot
 (ADR 0004 §B.1), and the **only** audited call in the milestone is the
 D3 write-lane check, which is the **target's own** frozen
 `CanAsync(Read)` (the target's own audit row, in the target's own
@@ -209,7 +209,7 @@ public sealed class Bookmark
 
 /// The new parallel surface (ADR 0004 §B.1 — additive, idempotent, zero
 /// migrations for existing surfaces).
-public static class M17DocTypes
+public static class BookmarkDocTypes
 {
     public static void Configure(Marten.Schema.StoreOptions opts)
     {
@@ -472,11 +472,11 @@ The named trade (dangling-row UX vs. leak surface) is the priced cost.
 
 ## Rollout & rollback
 
-Deploy: the `M17DocTypes` surface delta-detects and applies at boot
+Deploy: the `BookmarkDocTypes` surface delta-detects and applies at boot
 (ADR 0004 §B.1 — idempotent, **zero migrations** for existing surfaces);
 no seeder step, no data migration, no feature flag (D6 — there is
 **nothing to roll back**: removing the `Bookmark` table + the
-`M17DocTypes` registration restores the pre-M17 state; no row is
+`BookmarkDocTypes` registration restores the pre-M17 state; no row is
 referenced by anything). See `docs/OPS.md`.
 
 ## Risks
@@ -517,7 +517,7 @@ resident already crosses.
 - **D1 — One document, one new surface, one new bounded context.** M17
   adds a new bounded context `Kumunita.Core.Bookmarks` with **one
   document**: `Bookmark` (`OwnerId`, `TargetKind`, `TargetId`,
-  `Created`), registered on a **new `M17DocTypes`** surface (the M9/M5
+  `Created`), registered on a **new `BookmarkDocTypes`** surface (the M9/M5
   `*DocTypes` precedent — a parallel additive surface, delta-detected and
   applied idempotently at boot, **zero migrations** for existing
   surfaces). `TargetKind` is a **string** restricted to the closed set

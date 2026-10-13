@@ -822,7 +822,7 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// Add a **user-added translation** of a to-do into a language other than
     /// the one it was authored in (ADR 0088). One row per
     /// <c>(todoItemId, languageCode)</c> pair (the
-    /// <see cref="M5DocTypes.Configure"/>'s <c>(TodoItemId, LanguageCode)</c>
+    /// <see cref="ProjectDocTypes.Configure"/>'s <c>(TodoItemId, LanguageCode)</c>
     /// unique index). <b>Standing (ADR 0088 D3):</b> the to-do's
     /// <b>creator</b> (<see cref="AccessVia.Owner"/>), the to-do's
     /// <b>assignee</b> (the ADR 0067 assignee branch, <see cref="AccessVia.Admin"/>),
@@ -891,7 +891,7 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// Add a **user-added translation** of a Kanban board into a language other
     /// than the one it was authored in (ADR 0088). One row per
     /// <c>(boardId, languageCode)</c> pair (the
-    /// <see cref="M5DocTypes.Configure"/>'s <c>(BoardId, LanguageCode)</c>
+    /// <see cref="ProjectDocTypes.Configure"/>'s <c>(BoardId, LanguageCode)</c>
     /// unique index). <b>Standing (ADR 0088 D3):</b> the board's
     /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
     /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>
@@ -959,7 +959,7 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// Add a **user-added translation** of a project into a language other than
     /// the one it was authored in (ADR 0088). One row per
     /// <c>(projectId, languageCode)</c> pair (the
-    /// <see cref="M5DocTypes.Configure"/>'s <c>(ProjectId, LanguageCode)</c>
+    /// <see cref="ProjectDocTypes.Configure"/>'s <c>(ProjectId, LanguageCode)</c>
     /// unique index). <b>Standing (ADR 0088 D3):</b> the project's
     /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
     /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>

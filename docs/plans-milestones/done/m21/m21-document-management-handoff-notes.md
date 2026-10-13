@@ -89,7 +89,7 @@
   `DocumentDocTypes` block shows it in namespace `Kumunita.Core.Documents`
   using `opts.PatchDocuments<Document>(d => d.Audience)`. That is **not** the
   codebase shape: `PatchDocuments` is used **nowhere** in `src/`, and every
-  sibling `*DocTypes` (`UsageDocTypes` / `M17DocTypes` / `PageDocTypes` /
+  sibling `*DocTypes` (`UsageDocTypes` / `BookmarkDocTypes` / `PageDocTypes` /
   `MediaDocTypes`) lives at top-level `src/Kumunita.Core/` in namespace
   `Kumunita.Core` and calls `opts.Schema.For<T>()`. The **unit plan (authoritative)
   + ADR 0122 D1** both specify `Schema.For<Document>()` + `Kumunita.Core`, so

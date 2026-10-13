@@ -374,7 +374,7 @@ public sealed class M16AcceptanceGateTests(PostgresFixture fixture) : IClassFixt
     /// <summary>
     /// The full-stack boot: a fresh scratch Postgres DB (the
     /// <see cref="PostgresFixture"/>) + the real Marten store (the
-    /// <c>M16DocTypes</c> + <c>M1DocTypes</c> registration surfaces) +
+    /// <c>InventoryDocTypes</c> + <c>CoreDocTypes</c> registration surfaces) +
     /// the real service trio (<c>UserInfoService</c> +
     /// <c>AuthorizationService</c> + <c>InventoryService</c>).
     /// </summary>
@@ -391,8 +391,8 @@ public sealed class M16AcceptanceGateTests(PostgresFixture fixture) : IClassFixt
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
-            M16DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
+            InventoryDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
 

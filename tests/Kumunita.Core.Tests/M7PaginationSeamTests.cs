@@ -412,25 +412,25 @@ public class M7PaginationSeamTests(PostgresFixture fixture) : IClassFixture<Post
     // ── Store boot (per doc-type surface) ────────────────────────────────────
 
     private Task<IDocumentStore> BootPostsStoreAsync()
-        => BootAsync(store => { M1DocTypes.Configure(store); M3DocTypes.Configure(store); });
+        => BootAsync(store => { CoreDocTypes.Configure(store); PostDocTypes.Configure(store); });
 
     private Task<IDocumentStore> BootEventsStoreAsync()
-        => BootAsync(store => { M1DocTypes.Configure(store); M3DocTypes.Configure(store); M4DocTypes.Configure(store); });
+        => BootAsync(store => { CoreDocTypes.Configure(store); PostDocTypes.Configure(store); EventDocTypes.Configure(store); });
 
     private Task<IDocumentStore> BootProjectsStoreAsync()
         => BootAsync(store =>
         {
-            M1DocTypes.Configure(store); M3DocTypes.Configure(store);
-            M4DocTypes.Configure(store); M5DocTypes.Configure(store);
+            CoreDocTypes.Configure(store); PostDocTypes.Configure(store);
+            EventDocTypes.Configure(store); ProjectDocTypes.Configure(store);
         });
 
     private Task<IDocumentStore> BootAnnouncementsStoreAsync()
-        => BootAsync(store => { M1DocTypes.Configure(store); M3DocTypes.Configure(store); });
+        => BootAsync(store => { CoreDocTypes.Configure(store); PostDocTypes.Configure(store); });
 
     private Task<IDocumentStore> BootTagStoreAsync()
         => BootAsync(store =>
         {
-            M1DocTypes.Configure(store); M3DocTypes.Configure(store);
+            CoreDocTypes.Configure(store); PostDocTypes.Configure(store);
             PageDocTypes.Configure(store); TagDocTypes.Configure(store);
         });
 

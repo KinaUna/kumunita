@@ -28,7 +28,7 @@ public enum JoinRequestStatus
 /// <see cref="JoinRequestStatus"/> is the single state field; the business key
 /// (<c>GroupId</c>, <c>UserId</c>) is the same pair shape as
 /// <see cref="GroupMembership"/> and <see cref="GroupInvitation"/>, enforced
-/// by the unique index in <see cref="M1DocTypes"/>'s <c>Configure</c> —
+/// by the unique index in <see cref="CoreDocTypes"/>'s <c>Configure</c> —
 /// <see cref="Id"/> is the surrogate PK for clean Marten identity.
 /// <para>
 /// The <b>membership fact</b> itself never lands on this document — approving

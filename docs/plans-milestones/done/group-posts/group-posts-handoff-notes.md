@@ -28,7 +28,7 @@
   invariants; the invariant/FACES numbers are frozen for the rest of the
   milestone.
 - `Post.GroupId` is the **single additive** on the `Post` POCO (ADR 0004 §B.1,
-  the M3b `Status` ADD precedent) — **no `M3DocTypes` change**, **no** second
+  the M3b `Status` ADD precedent) — **no `PostDocTypes` change**, **no** second
   doc surface; `PostReply` is unchanged. `AccessVia.Group` (8th value) + the two
   `CanSeeGroupAsync` overloads are the group lane's ADDs on
   `IAuthorizationService` (frozen signatures untouched — ADR 0006-E). The
@@ -181,7 +181,7 @@
   register's 2-overload draft) + `AccessVia.Group` (8th value, appended
   after `Admin`; frozen `CanAsync`/`CanSeeAsync` byte-identical).
   `Post.GroupId` stays the **single additive** (ADR 0004 §B.1, the M3b
-  `Status` precedent — no `M3DocTypes` change, no new doc surface);
+  `Status` precedent — no `PostDocTypes` change, no new doc surface);
   `PostReply` / `PostService` ctor **unchanged** (ADR 0006-D: the lane owns
   its reads).
 - **Break-glass, moderator peek, non-member authoring** are recorded in the
@@ -217,8 +217,8 @@
   (only members may create or see it), empty ⇒ component post (M3/M3b)
   unchanged, **ADR 0013**, and the ADR 0004 §B.1 additive precedent (the
   M3b `Status` ADD).
-- **No `M3DocTypes.cs` change** (verified read-only — the registration
-  surface is `opts.Schema.For<Post>()` at `M3DocTypes.cs:26`; that file is
+- **No `PostDocTypes.cs` change** (verified read-only — the registration
+  surface is `opts.Schema.For<Post>()` at `PostDocTypes.cs:26`; that file is
   the one to cite, not modify): Marten's delta picks the new property up —
   delta-detected, idempotent, **no re-seed**, exactly M3b's `PostStatus`
   ADD lane, no second doc surface.
@@ -431,8 +431,8 @@ group-lane signatures + the create-gate `IDocumentSession`-overload instruction)
   which reads `IUserInfoService` **itself**; `PostService` never reads
   `IsMemberOf` / grants.
 - **No doc-types change:** `Post` is already a registered document (U1, via
-  `M1DocTypes.WithDocument<Post>()`); writing `Post` rows in the group lane needs
-  no new doc type. I did not touch `M3DocTypes` / `M1DocTypes`.
+  `CoreDocTypes.WithDocument<Post>()`); writing `Post` rows in the group lane needs
+  no new doc type. I did not touch `PostDocTypes` / `CoreDocTypes`.
 - **No ADR / design-doc edits** (unit-series rule: only create/modify files in
   Deliverables); **no `GroupPostController`** (U7); **no `GroupPosts` page** (U8);
   **no seam tests** (U9).
@@ -478,7 +478,7 @@ or committed; the user is asked to review first.**
 1. Did **not** implement the `GroupPostController` (U7).
 2. Did **not** implement the `GroupPosts` page (U8).
 3. Did **not** write any seam tests (U9 owns #1–9 of the 19).
-4. Did **not** modify `M3DocTypes` / `M1DocTypes` / `M5DocTypes` / `M6DocTypes`
+4. Did **not** modify `PostDocTypes` / `CoreDocTypes` / `ProjectDocTypes` / `NotificationDocTypes`
    (U1 — already landed; the `Post` registration already lives there).
 5. Did **not** implement the **moderator** path — the group lane has **no** moderator
    branch by design (G·4).

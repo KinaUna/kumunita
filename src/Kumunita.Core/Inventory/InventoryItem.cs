@@ -32,7 +32,7 @@ namespace Kumunita.Core.Inventory;
 /// item is in the pool / at home; set = currently checked out to that resident.
 /// The transition (set on check-out, cleared on check-in) is the F1 atomic state
 /// flip, witnessed by the open-checkout unique partial index on
-/// <see cref="M16DocTypes"/> — at most one open <see cref="InventoryCheckout"/>
+/// <see cref="InventoryDocTypes"/> — at most one open <see cref="InventoryCheckout"/>
 /// per item at a time.
 /// </para>
 /// </summary>

@@ -65,7 +65,7 @@ consumes no letter.
 
 - `Post.GroupId` **additive** field (`string`, default `string.Empty`.
   non-empty ⇒ the post is a group-channel post). ADR 0004 §B.1 additive —
-  delta-detected, idempotent, no re-seed, **no `M3DocTypes` change** (Marten's
+  delta-detected, idempotent, no re-seed, **no `PostDocTypes` change** (Marten's
   `Schema.For<Post>()` delta picks up the new property); `PostReply` is
   **unchanged** (lane-neutral). **[U4]**
 - The `IAuthorizationService` **group lane**: `AccessVia.Group` (the **8th**
@@ -443,7 +443,7 @@ public sealed record GroupPostDraft(string GroupId, string? Title, string Body);
 ```csharp
 // ── Post (Posts/Post.cs) — the **single additive** (ADR 0004 §B.1; the M3b
 //    `Status` ADD precedent — Marten's delta picks up the property: no
-//    M3DocTypes change, no re-seed). All other POCO members (Id,
+//    PostDocTypes change, no re-seed). All other POCO members (Id,
 //    ComponentId, AuthorId, Title, Body, Audience, Created, Modified,
 //    Status) + PostStatus + PostReply are **untouched**.
 public sealed class Post
@@ -692,7 +692,7 @@ event, §2.7):
   additive lane, M1's Admin-APPEND precedent).
 - **`Post.GroupId`** — the **one** additive property on `Post` (empty
   default = a component post; non-empty = a group-lane post, G·2);
-  `PostReply` / `PostStatus` unchanged; **zero** `M3DocTypes` changes
+  `PostReply` / `PostStatus` unchanged; **zero** `PostDocTypes` changes
   (Marten's delta detects the property — "no re-seed") — freeze when
   **U4** lands it.
 - **`GroupPostDraft(GroupId, Title?, Body)`** — no `Audience` member (G·8) —
@@ -727,7 +727,7 @@ event, §2.7):
 | `PostService` public ADDs (§2.2) | 3 | U6 |
 | test names (§2.5) | 19 | U9 |
 | gate tests (§2.4) | 3 | U10 |
-| `M3DocTypes` changes | **0** | — |
+| `PostDocTypes` changes | **0** | — |
 
 ## Group posts — Gate (recorded by U10)
 

@@ -153,7 +153,7 @@ locked text.
 ### 3.1 Zero Core change (D1) **locked — [DECIDED — ADR 0064]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
-`M4DocTypes` is untouched; no `FeatureSchemaBase` migration; the boot paths
+`EventDocTypes` is untouched; no `FeatureSchemaBase` migration; the boot paths
 are untouched; no EF; **no** seam added on `IEventService` or
 `IAuthorizationService` / `IUserInfoService` / `IIdentityService`. The
 `ListInRangeAsync` seam is **reused, unchanged** — it is *already*
@@ -267,7 +267,7 @@ carry them verbatim.
 ## 4. Invariants (pinned for `EV-DWM`)
 
 - **C-DWM·1 — Zero Core change.** No seam added, no `Event` / `EventRsvp` /
-  `EventTranslation` field, no `M4DocTypes` / boot-path change, no EF, no new
+  `EventTranslation` field, no `EventDocTypes` / boot-path change, no EF, no new
   audit row shape. The only additive C# is the additive view-model fields
   (`View` + `WindowDays`, `MonthLabel`→`Label`) and the `?view=` param on
   the existing `Calendar` action. The `ListInRangeAsync` seam is **reused,

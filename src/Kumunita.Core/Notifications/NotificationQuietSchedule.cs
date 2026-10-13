@@ -22,7 +22,7 @@ public enum QuietScheduleMode
 /// M20 (ADR 0121, D2) — the per-resident notification-quiet schedule. One
 /// document per recipient (id = the recipient's <see cref="RecipientId"/> —
 /// the <see cref="NotificationPreference"/> "one row per recipient" shape;
-/// identity pinned to <c>RecipientId</c> in <c>M6DocTypes</c>).
+/// identity pinned to <c>RecipientId</c> in <c>NotificationDocTypes</c>).
 /// <see cref="Enabled"/> is the master on/off: <c>false</c> = "never quiet"
 /// (the floor — every notification's email flows, exactly as pre-M20,
 /// C-M20·3). When <see cref="Enabled"/> is <c>true</c>, the quiet verdict is

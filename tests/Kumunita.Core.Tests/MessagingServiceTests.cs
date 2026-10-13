@@ -504,13 +504,13 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            // M1DocTypes registers LocaleSettings (the toggle's home) and
+            // CoreDocTypes registers LocaleSettings (the toggle's home) and
             // AccessAudit (the audit-row pin needs it in the schema).
-            M1DocTypes.Configure(opts);
-            // M9DocTypes registers Conversation / Message (the M9 surface
+            CoreDocTypes.Configure(opts);
+            // MessagingDocTypes registers Conversation / Message (the M9 surface
             // the service writes to; the U02 toggle pins only touch
             // LocaleSettings, but the schema is the full lane's).
-            M9DocTypes.Configure(opts);
+            MessagingDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -526,7 +526,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
     }
 
     /// <summary>
-    /// The U03 harness: a scratch store with <c>M6DocTypes</c> registered
+    /// The U03 harness: a scratch store with <c>NotificationDocTypes</c> registered
     /// (so the <see cref="Notification"/> table exists for the nudge pin),
     /// a <see cref="MessagingService"/> constructed with a
     /// <see cref="NotificationService"/> (the ADR 0077 optional-nudge-param
@@ -545,9 +545,9 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);   // LocaleSettings + AccessAudit
-            M6DocTypes.Configure(opts);   // Notification (the D6 nudge table)
-            M9DocTypes.Configure(opts);   // Conversation + Message
+            CoreDocTypes.Configure(opts);   // LocaleSettings + AccessAudit
+            NotificationDocTypes.Configure(opts);   // Notification (the D6 nudge table)
+            MessagingDocTypes.Configure(opts);   // Conversation + Message
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
@@ -615,7 +615,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_Message_MentionResolved_StoresOneRow_AndStagesEmail()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M9DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, MessagingDocTypes.Configure);
         var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
         await svc.SetMessagingEnabledAsync(true, "u-admin");
         await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
@@ -635,7 +635,7 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
     [Fact]
     public async Task M36_Message_MentionUnknown_StoresNoRow()
     {
-        var boot = await MentionEmitters.BootAsync(fixture, M9DocTypes.Configure);
+        var boot = await MentionEmitters.BootAsync(fixture, MessagingDocTypes.Configure);
         var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
         await svc.SetMessagingEnabledAsync(true, "u-admin");
 

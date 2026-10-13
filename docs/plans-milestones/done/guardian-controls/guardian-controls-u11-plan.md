@@ -68,9 +68,9 @@ in U10).
   `  GuardianLink     { id, guardianId, childId, status: Active|Dissolved,
   createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR 0028): the account-scope
   supervision link (standing off an Active row, G·2); dissolve one-way (G·5)`.
-- **Do not** touch the `M1DocTypes.cs` / `M3DocTypes.cs` / `MediaDocTypes.cs`
-  lines (GU rides the **existing** `M1DocTypes` surface, ADR 0004 §B.1,
-  additive — U02's one line; the tree line already names `M1DocTypes.cs`, so
+- **Do not** touch the `CoreDocTypes.cs` / `PostDocTypes.cs` / `MediaDocTypes.cs`
+  lines (GU rides the **existing** `CoreDocTypes` surface, ADR 0004 §B.1,
+  additive — U02's one line; the tree line already names `CoreDocTypes.cs`, so
   no new doc-types line is added). **Do not** touch the Events / Projects
   lines (M4/M5 stay planned).
 
@@ -93,7 +93,7 @@ read; it is exercised only on the `IUserInfoService` management lanes.
   0003, 0012, m2b).
 - **Gate:** the 11 pinned seam tests + the 4 Web VM tests — see the
   `### Run result (GU acceptance gate — <DATE>)` section above (U10).
-- **Layout:** `GuardianLink` rides the existing `M1DocTypes` surface (ADR
+- **Layout:** `GuardianLink` rides the existing `CoreDocTypes` surface (ADR
   0004 §B.1, additive); `docs/ARCHITECTURE.md`'s `UserInfo/` line + doc-map
   carry the surface (U11).
 - **Non-decision (carried forward):** the GlobalAdmin `viaAdmin: true`

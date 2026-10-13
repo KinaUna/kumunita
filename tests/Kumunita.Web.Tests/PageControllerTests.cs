@@ -1223,9 +1223,9 @@ public class PageControllerTests(PostgresFixture fixture) : IClassFixture<Postgr
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<Kumunita.Core.KumunitaFeature>();
             opts.Storage.Add<Kumunita.Core.Authorization.AuthorizationFeature>();
-            Kumunita.Core.M1DocTypes.Configure(opts);
-            Kumunita.Core.M3DocTypes.Configure(opts);
-            Kumunita.Core.M6DocTypes.Configure(opts);
+            Kumunita.Core.CoreDocTypes.Configure(opts);
+            Kumunita.Core.PostDocTypes.Configure(opts);
+            Kumunita.Core.NotificationDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
         return store;

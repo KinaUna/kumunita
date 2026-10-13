@@ -143,7 +143,7 @@ public sealed class EventService : IEventService
     /// event is "upcoming" until it starts; the <see cref="ListPastAsync"/>
     /// lane is its exact mirror on <c>Start &lt; nowUtc</c>), ordered by
     /// <see cref="Event.Start"/> ascending (the feed-ordering index,
-    /// <see cref="M4DocTypes.Configure"/>); the
+    /// <see cref="EventDocTypes.Configure"/>); the
     /// <paramref name="componentId"/> is a *filter, never a gate*
     /// (C-M3·2); the survivors are <see
     /// cref="IAuthorizationService.CanSeeAsync(string, AccessAction, System.Collections.Generic.IEnumerable{IAuditableResource})"/>
@@ -1162,7 +1162,7 @@ public sealed class EventService : IEventService
     /// exception, keyed per <c>(EventId, UserId)</c>: upserts the actor's single
     /// RSVP row with the latest <see cref="RsvpStatus"/>. A resident's latest
     /// status is simply the truth; a conflicting write is a no-op or
-    /// self-converging (the <see cref="M4DocTypes"/> unique
+    /// self-converging (the <see cref="EventDocTypes"/> unique
     /// <c>(EventId, UserId)</c> index is the DB-enforced business key).
     /// <para>
     /// Standing (server-side, C3): **any signed-in resident** who may RSVP —

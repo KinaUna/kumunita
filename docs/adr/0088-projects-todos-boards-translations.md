@@ -74,7 +74,7 @@ Each row:
 | `AuthorId` | the last actor to add / edit the row. |
 | `Created` | the last add / edit stamp. |
 
-Registered on the **`M5DocTypes`** document surface (the M5/PL docs already
+Registered on the **`ProjectDocTypes`** document surface (the M5/PL docs already
 register there) with a **`(ParentId, LanguageCode)` unique index** per POCO,
 mirroring the `PostTranslation` / `AnnouncementTranslation` / `EventTranslation`
 business-key convention (one row per parent per language). The auto-derived

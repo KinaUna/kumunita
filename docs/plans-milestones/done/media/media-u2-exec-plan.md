@@ -37,7 +37,7 @@
   lowercase-hex SHA-256 (C-MED·4), so Marten's default Id-unique mapping IS
   the dedup — no business-key index.
 - **`MediaDocTypes.Configure(opts)` MUST be called in `Program.cs`** next to
-  `M1DocTypes`/`M3DocTypes` — otherwise the doc is invisible to Marten
+  `CoreDocTypes`/`PostDocTypes` — otherwise the doc is invisible to Marten
   (C-MED·7 drift, the pinned risk in `media-u2-plan.md`).
 - **Marten 9 (9.31.2) is async-only:** sessions are
   `await using var session = _store.LightweightSession();` — the codebase
@@ -51,7 +51,7 @@
 |------|-----|
 | design doc §2.2 + §2.7 + invariants | the exact type shapes to implement |
 | handoff `## U1` (scratch tier) | `IMediaFileStore` + `MediaOptions` registrations to compose |
-| `src/Kumunita.Core/M3DocTypes.cs` | `Configure(StoreOptions)` surface shape to mirror |
+| `src/Kumunita.Core/PostDocTypes.cs` | `Configure(StoreOptions)` surface shape to mirror |
 | `src/Kumunita.Core/DependencyInjection.cs` | where `IMediaStore` registers |
 | `src/Kumunita.Web/Program.cs` (L44–88) | the `MediaDocTypes.Configure(opts)` call-site + the `Media__*` binding |
 | `Kumunita.Core.csproj` | Marten 9.31.2 → the async-session idiom choice |
@@ -68,7 +68,7 @@
 5. edit `src/Kumunita.Core/DependencyInjection.cs` —
    `services.AddTransient<IMediaStore, LocalVolumeMediaStore>();`.
 6. edit `src/Kumunita.Web/Program.cs` — `MediaDocTypes.Configure(opts);` after
-   `M3DocTypes.Configure(opts);` + confirm
+   `PostDocTypes.Configure(opts);` + confirm
    `builder.Services.Configure<MediaOptions>(… GetSection(MediaOptions.SectionName))`
    (the `Media__*` binding).
 7. **Exit:** `run_build` green on `Kumunita.slnx` (covers `Kumunita.Core` **and**

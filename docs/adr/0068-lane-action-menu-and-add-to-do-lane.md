@@ -68,7 +68,7 @@ Two already-accepted decisions constrain this lane:
   `UnauthorizedAccessException` (403). One `AccessAudit` row
   (`board.move_lane`, `TargetKind = "board"`) commits with the write.
   **The transposition is executed as a park-and-swap, not a two-row update:**
-  `KanbanLane` carries a unique index on `(BoardId, Order)` (M5DocTypes), and
+  `KanbanLane` carries a unique index on `(BoardId, Order)` (ProjectDocTypes), and
   Postgres enforces a non-deferrable unique index **row-by-row**, so a direct
   swap (moving lane B to C's slot while C still holds it — or vice-versa)
   transiently duplicates the pair and is refused (`23505`). The lanes are
@@ -124,7 +124,7 @@ Two already-accepted decisions constrain this lane:
   sensible (partially moved) state rather than a corrupted one.
 - **No new document, no new schema, no migration:** the lane and the
   placement shapes are unchanged from ADR 0067; only the write seam and the
-  view surface change. The M5DocTypes `(BoardId, Order)` unique index is
+  view surface change. The ProjectDocTypes `(BoardId, Order)` unique index is
   what forces the park-and-swap and is untouched.
 - `Move left` / `Move right` are **only rendered** for a lane that actually
   has a neighbor in that direction (`hasLeft` / `hasRight` computed in the

@@ -3,7 +3,7 @@ namespace Kumunita.Core.Bookmarks;
 /// <summary>
 /// The bookmark toggle outcome (M17 / ADR 0118 D3/D4, design doc §2.2 — locked
 /// verbatim). A bookmark is a personal pin with no audience decision (D2):
-/// the toggle is idempotent (F1 — the <c>M17DocTypes</c> unique index on
+/// the toggle is idempotent (F1 — the <c>BookmarkDocTypes</c> unique index on
 /// <c>(OwnerId, TargetKind, TargetId)</c> is the at-most-one-row witness),
 /// and the write-lane visibility check (D3) re-runs the target's own frozen
 /// <c>CanAsync(Read)</c> before any row is created — a Deny or an absent

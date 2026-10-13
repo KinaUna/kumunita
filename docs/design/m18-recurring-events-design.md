@@ -59,7 +59,7 @@
 > (the author ∪ GlobalAdmin matrix). It does **not** add a new `AccessAction`,
 > a new `AccessVia`, a new `Decide()` branch, a new adapter, a new
 > `IAuthorizationService` method, a new `RecurrenceSeries` doc, a new
-> `M4DocTypes` surface, a versioned migration, a `RRULE` line in the ICS
+> `EventDocTypes` surface, a versioned migration, a `RRULE` line in the ICS
 > output, or a per-occurrence override surface (C-M18·5, D8, the §drift-guard
 > below). Every register unit (U01's types+expander, U02's create, U03's
 > skip/undelete, U04's cascade, U05's composer, U06's detail page, U07's
@@ -121,11 +121,11 @@ fields** — `RecurrenceHeadId: string?` (non-null on non-head occurrences,
 links back to the head row; `null` on the head itself and on all
 non-recurring events) and `RecurrenceRule: EventRecurrenceRule?` (non-null
 **only on the head row**, carrying the author's rule so a later edit can
-re-expand). No new doc type, no new index, no `M4DocTypes` change — both
+re-expand). No new doc type, no new index, no `EventDocTypes` change — both
 fields are additive on the existing `Event` POCO (the ADR 0004 §B "additive
 surface" shape — the `ComponentId` / `TagIds` / `ImageIds` / `AttachmentIds`
 precedent). *Forbids:* a unit reaching for a new `RecurrenceSeries` doc, a
-new `M4DocTypes` surface, a versioned migration, or a read-time expansion
+new `EventDocTypes` surface, a versioned migration, or a read-time expansion
 path.
 
 **D2 — Closed rule shape.** `EventRecurrenceRule` is a **closed** struct:
@@ -1174,7 +1174,7 @@ key list in the design doc or ADR outside U00; a unit adding a file
 outside its own Deliverables; a unit extending a frozen seam
 (`IAuthorizationService` / `Decide()` / `AccessAction` / `AccessVia`
 / the ADR 0059 trio / `IMailerStage`); a unit adding a
-`RecurrenceSeries` doc, a new `M4DocTypes` surface, a versioned
+`RecurrenceSeries` doc, a new `EventDocTypes` surface, a versioned
 migration, a `BYDAY`/`BYMONTHDAY`/`BYSETPOS`/`EXRULE` rule, a
 per-occurrence override surface, a group-event recurrence surface, a
 `RRULE` line in the ICS output, a new `kw-l` namespace, or a new

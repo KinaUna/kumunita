@@ -1,4 +1,4 @@
-# GU U02 — `GuardianLink` POCO + `M1DocTypes` registration
+# GU U02 — `GuardianLink` POCO + `CoreDocTypes` registration
 
 > **Sealed unit.** One fresh agent, ~32K context window. This file is
 > self-contained: it names every entry read, every deliverable, and the exit
@@ -11,7 +11,7 @@
 
 Create the `GuardianLink` relationship document (the `DelegationGrant`/
 `GroupInvitation` shape) + the `GuardianLinkStatus` enum, and register them on
-the **existing** `M1DocTypes` surface — an additive line (no new `*DocTypes`,
+the **existing** `CoreDocTypes` surface — an additive line (no new `*DocTypes`,
 no re-seed, ADR 0004 §B.1). **No seam logic, no tests.**
 
 ## Context you need (read these first, in this order)
@@ -21,7 +21,7 @@ no re-seed, ADR 0004 §B.1). **No seam logic, no tests.**
    source for this unit. Match it verbatim.
 2. `docs/adr/0028-guardian-controls-account-scope-supervision.md` §B (the
    relationship: one row per (guardian, child) pair, `Status` two-state,
-   dissolve one-way) + §C (the `GuardianLink` rides the existing `M1DocTypes`
+   dissolve one-way) + §C (the `GuardianLink` rides the existing `CoreDocTypes`
    surface, ADR 0004 §B.1, additive).
 3. `src/Kumunita.Core/UserInfo/Group.cs` §`DelegationGrant` (~line 79) — the
    **shape precedent**: `Id`, `OwnerId`, `DelegateId`, `Scope`, `From`, `To?`,
@@ -32,7 +32,7 @@ no re-seed, ADR 0004 §B.1). **No seam logic, no tests.**
    enum placement (file-scoped, top of the file) + the `ResolvedAt?` /
    `ResolvedBy?` "set when the row leaves Pending, null while live" pattern to
    mirror for `DissolvedAt?` / `DissolvedBy?`.
-5. `src/Kumunita.Core/M1DocTypes.cs` §`Configure` (~line 48) — where
+5. `src/Kumunita.Core/CoreDocTypes.cs` §`Configure` (~line 48) — where
    `GuardianLink` registers: a neighbor of `opts.Schema.For<DelegationGrant>();`
    (~line 61), and the **business-key convention** to mirror:
    `opts.Schema.For<GroupInvitation>().UniqueIndex(i => i.GroupId, i =>
@@ -63,7 +63,7 @@ no re-seed, ADR 0004 §B.1). **No seam logic, no tests.**
   `DelegationGrant`'s, not this doc's — the guardian does not act *as* the
   child, ADR 0028 §C / the design doc's "opposite direction" note).
 
-### 2. `src/Kumunita.Core/M1DocTypes.cs` (modify)
+### 2. `src/Kumunita.Core/CoreDocTypes.cs` (modify)
 
 - Add **one** line immediately after `opts.Schema.For<DelegationGrant>();`:
   `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);`
@@ -73,10 +73,10 @@ no re-seed, ADR 0004 §B.1). **No seam logic, no tests.**
 ## Exit
 
 `dotnet build Kumunita.slnx -c Debug` green. `GuardianLink.cs` compiles; the
-`M1DocTypes` line is additive (no other line changed). **No new test** (U09
+`CoreDocTypes` line is additive (no other line changed). **No new test** (U09
 pins the lane's tests). Handoff note (append): 4–5 lines starting
-`## U02 — GuardianLink + M1DocTypes` — (a) the POCO's fields (verbatim),
-(b) the exact `M1DocTypes` line + its placement (after `DelegationGrant`),
+`## U02 — GuardianLink + CoreDocTypes` — (a) the POCO's fields (verbatim),
+(b) the exact `CoreDocTypes` line + its placement (after `DelegationGrant`),
 (c) the unique-index fields (`GuardianId`, `ChildId`), (d) a confirmation there
 is **no** doc-side `IsActive` boolean and **no** `Scope` field, (e) any compile
 warnings.

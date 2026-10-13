@@ -18,7 +18,7 @@ namespace Kumunita.Core.Tests;
 /// Each test hands itself a fresh scratch Postgres DB (<see cref="PostgresFixture.NewDatabaseAsync"/>)
 /// so no test clobbers another's catalog. The Marten store is bootstrapped with M0's
 /// <see cref="KumunitaFeature"/>, M1's hand-rolled <see cref="AuthorizationFeature"/>, and the
-/// M1 domain-document registrations (<see cref="M1DocTypes.Configure"/>), then applied against the
+/// M1 domain-document registrations (<see cref="CoreDocTypes.Configure"/>), then applied against the
 /// fresh DB via <c>ApplyAllConfiguredChangesToDatabaseAsync</c> — the same template the M0/M1 DDL
 /// tests use, extended with the document registrations the read paths need.
 /// </para>
@@ -140,7 +140,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     // enabledOnly=true filters to enabled components; enabledOnly=false returns
     // every component. Crucially: NEITHER call appends an AccessAudit row — the
     // C-M3·2 "candidate filter is not an access decision" pin at the unit
-    // level. Component.Id is the document identity (M1DocTypes, conventional
+    // level. Component.Id is the document identity (CoreDocTypes, conventional
     // string), so two enabled + one disabled rows are planted directly through
     // a write session.
 
@@ -401,7 +401,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);

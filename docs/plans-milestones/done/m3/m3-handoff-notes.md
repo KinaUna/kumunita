@@ -48,9 +48,9 @@
   verbatim in §2.1): **returns a *candidate* set; C-M3·2 says never a
   visible set; C-M3·2 says no own `AccessAudit` row; C-M3·3 says the row
   shape is fixed to feed aggregate + detail decision.**
-- **Storage registration (M3DocTypes step):**
-  `M3DocTypes.Configure(StoreOptions)` — new parallel document surface
-  analogous to `M1DocTypes`.
+- **Storage registration (PostDocTypes step):**
+  `PostDocTypes.Configure(StoreOptions)` — new parallel document surface
+  analogous to `CoreDocTypes`.
   (the four components are already seeded in M1's `FirstBootSeeder`).
   **No hand-rolled `FeatureSchemaBase` in M3** (the carve-out is for
   operator-written tables like `AdminOverride`); U1 records the veto that
@@ -87,7 +87,7 @@
   surface **plus** the single M3 ADD pinned above), §2.2 new M3-owned Core
   types (exact C# for `Post`, `PostReply`, `Report`,
   `PostToAuditableResource`, `PostService` ctor + public methods,
-  `M3DocTypes.Configure` signature)
+  `PostDocTypes.Configure` signature)
   (unauth ⇒ empty set; verified ⇒ `GetComponentsAsync(true)` candidate set;
   unverified ⇒ own component only or empty (U2 decision); moderator ⇒ same
   as verified; missing component ⇒ empty), §2.4 reply-inherits rule (C-M3
@@ -138,7 +138,7 @@
   whole, closed-loop + handoff are the parts; all must pass together,
   plus the M1-inherited + M2-inherited anchors re-run unchanged).
 - **(d) `Report` table-in-M3 / flow-in-M3b flag (§2.2 + §2.6):** `Report`
-  is registered in M3 (`M3DocTypes.Configure(StoreOptions)`, U3 lands
+  is registered in M3 (`PostDocTypes.Configure(StoreOptions)`, U3 lands
   this) as a *dormant* table — 7 fields
   `(Id, PostId, ReporterId, ComponentId?, Reason?, Status?, At)`,
   `Status` **nullable** (M3b's write lane sets it), **no** surface /
@@ -158,7 +158,7 @@
   (`Post` / `PostReply` / `Report`). All frozen in §2.6; any mismatch is a
   `## U<m> — Drift pause`.
 - **(f) Unit-owner references in Part 2 follow the plan register:**
-  U3 = `Post/PostReply/Report` + `M3DocTypes`; U4 = `GetComponentsAsync`
+  U3 = `Post/PostReply/Report` + `PostDocTypes`; U4 = `GetComponentsAsync`
   + `F9` unit-test; U5 = `PostToAuditableResource`; U6 = `PostService` +
   records + the 4 methods; U7 = `PostsController` + VMs; U8 = Razor views;
   U9 = the 18-test file; U10 = the gate record; U11/U12 = the close.
@@ -166,11 +166,11 @@
   Part 2 text wins (the drift-guard lane, §2.6).
 - **No code, no build** (design-only unit, per the plan). U3 is next.
 
-## U3 — documents + M3DocTypes + boot
-- **(a) `M3DocTypes.cs` line count:** 3 `.Schema.For` calls — `Post`, `PostReply`, `Report` (all conventional `string Id`; no `Identity(...)`, no `UniqueIndex(...)` — Marten defaults apply; the `(PostId, Status)` business-key index is deferred to M3b when it owns the report write lane).
-- **(b) Boot-path lines added:** 1 line in one file — `src/Kumunita.Web/Program.cs` **line 72** (`M3DocTypes.Configure(opts);`, immediately after `M1DocTypes.Configure(opts)` at line 67, inside the `AddMarten(opts => { … })` lambda). **Deviation from the plan register:** plan U3 Deliverables listed two boot-path insertions — `SchemaBootstrap.cs` + `Program.cs` — "the dev loop in Program.cs and the all-env SchemaBootstrap". Actual M1 precedent (verified in the codebase): `M1DocTypes.Configure(opts)` is called **exactly once**, in `Program.cs`'s `AddMarten` lambda. `SchemaBootstrap.ApplyAsync` does **not** call `M1DocTypes.Configure` — it only calls `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`, which *consumes* every stored `Schema.For<T>`/`Storage.Add<T>` registration (including `M1DocTypes`'s) in all environments. The design doc §2.2 prose "Wired by U3 into both boot paths: SchemaBootstrap.cs (called from ApplyAllConfiguredChangesToDatabaseAsync) and Program.cs" conflates the *registration* call (which belongs in the `AddMarten` lambda) with the *apply* call (which is environment-agnostic and already in `SchemaBootstrap`). M3 follows the same single-registration shape as M1 — the all-env apply path picks it up automatically, so no edit to `SchemaBootstrap.cs` is needed. Recorded here, not a drift-pause (M1's precedent + the actual code are authoritative over the plan-register misdescription; the frozen §2.6 pins are the `M3DocTypes` type and its `Configure(StoreOptions)` signature — both are preserved verbatim).
+## U3 — documents + PostDocTypes + boot
+- **(a) `PostDocTypes.cs` line count:** 3 `.Schema.For` calls — `Post`, `PostReply`, `Report` (all conventional `string Id`; no `Identity(...)`, no `UniqueIndex(...)` — Marten defaults apply; the `(PostId, Status)` business-key index is deferred to M3b when it owns the report write lane).
+- **(b) Boot-path lines added:** 1 line in one file — `src/Kumunita.Web/Program.cs` **line 72** (`PostDocTypes.Configure(opts);`, immediately after `CoreDocTypes.Configure(opts)` at line 67, inside the `AddMarten(opts => { … })` lambda). **Deviation from the plan register:** plan U3 Deliverables listed two boot-path insertions — `SchemaBootstrap.cs` + `Program.cs` — "the dev loop in Program.cs and the all-env SchemaBootstrap". Actual M1 precedent (verified in the codebase): `CoreDocTypes.Configure(opts)` is called **exactly once**, in `Program.cs`'s `AddMarten` lambda. `SchemaBootstrap.ApplyAsync` does **not** call `CoreDocTypes.Configure` — it only calls `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()`, which *consumes* every stored `Schema.For<T>`/`Storage.Add<T>` registration (including `CoreDocTypes`'s) in all environments. The design doc §2.2 prose "Wired by U3 into both boot paths: SchemaBootstrap.cs (called from ApplyAllConfiguredChangesToDatabaseAsync) and Program.cs" conflates the *registration* call (which belongs in the `AddMarten` lambda) with the *apply* call (which is environment-agnostic and already in `SchemaBootstrap`). M3 follows the same single-registration shape as M1 — the all-env apply path picks it up automatically, so no edit to `SchemaBootstrap.cs` is needed. Recorded here, not a drift-pause (M1's precedent + the actual code are authoritative over the plan-register misdescription; the frozen §2.6 pins are the `PostDocTypes` type and its `Configure(StoreOptions)` signature — both are preserved verbatim).
 - **(c) `Report` registered, `Status` nullable, no index, no seed:** table-in-M3 / flow-in-M3b (design doc §2.2 + §2.6 flag). No write lane, no surface, no tests in M3 — U3's POCO is the *registration artifact only*; the M3b u
-- **(d) Compile warnings on new POCOs:** none. Both `Kumunita.Core` and `Kumunita.Web` build green with zero warnings on the four new/modified files (`src/Kumunita.Core/Posts/Post.cs`, `PostReply.cs`, `Report.cs`, `src/Kumunita.Core/M3DocTypes.cs`, `src/Kumunita.Web/Program.cs`).
+- **(d) Compile warnings on new POCOs:** none. Both `Kumunita.Core` and `Kumunita.Web` build green with zero warnings on the four new/modified files (`src/Kumunita.Core/Posts/Post.cs`, `PostReply.cs`, `Report.cs`, `src/Kumunita.Core/PostDocTypes.cs`, `src/Kumunita.Web/Program.cs`).
 
 ## U4 — GetComponentsAsync + F9
 
@@ -217,7 +217,7 @@ DI: no registration change — `IUserInfoService → UserInfoService` already ri
 - **No new test, no core, no design-doc edit** (U9 owns the 18-name file; U10 owns the gate; U11 closes).
 
 ## U9 — seam tests (18)
-- **(a) Test file:** `tests/Kumunita.Core.Tests/PostServiceTests.cs` — 18 `[Fact]`s, one per §2.4 pinned name; harness mirrors M2's `DirectoryServiceTests` / `DirectoryServiceTests_U6` (shared `PostgresFixture` container, one fresh scratch DB per test, `BootStoreAsync` adds `M1DocTypes.Configure` + `M3DocTypes.Configure`).
+- **(a) Test file:** `tests/Kumunita.Core.Tests/PostServiceTests.cs` — 18 `[Fact]`s, one per §2.4 pinned name; harness mirrors M2's `DirectoryServiceTests` / `DirectoryServiceTests_U6` (shared `PostgresFixture` container, one fresh scratch DB per test, `BootStoreAsync` adds `CoreDocTypes.Configure` + `PostDocTypes.Configure`).
 - **(b) 18 names (verbatim, per §2.4):** `F1_FeedVisibleToAudienceMember` · `F2_FeedHiddenFromNonMember` · `F3_FeedDeniesModeratorOnAudiencePost` · `F4_EmptyAudiencePostAuthorSeesOwnDraft` · `F4_EmptyAudiencePostDeniesNonAuthor` · `F5_MembershipChangeReScopesNextRequest` · `F6_DelegateWithReadInScopeSeesAuthorPost` · `F7_DelegateWithoutReadDenies` · `F8_ComponentIsFilterNotAccessGate` · `F9_CandidateFilterEmitsNoAuditRow` · `F10_ReplyVisibleIffParentVisible` · `F10_ReplyNotEvaluatedOnParentDeny` · `Feed_AggregateAuditRowShape` · `Detail_DecisionAuditRowShape_ViaOwner` · `Detail_DecisionAuditRowShape_ViaAudience` · `Detail_DecisionAuditRowShape_ViaDelegation` · `AuthorAudienceWrittenVerbatim` · `PostService_MakesNoModerateCall`.
 - **(c) 18/18 green.** `run_build` green on `Kumunita.Core.Tests`; `run_tests` on `PostServiceTests` reports **18 discovered, 18 executed, 18 passed, 0 failed** (verified run, not assumed). **No gate recorded** (U10); **no e2e authored** (U11); **no design-doc edit** (U10/U11).
 - **Interpretation pin for U10 (F3/F8/F16 — C5 absence):** the tests assert the C5 pin as *"the component's `ModeratorAccess` flag is left at its default-OFF state + an assignment row is planted + the moderator is not in the audience ⇒ Deny on the audience lane, and the M3 post lane's `AccessAudit.Action` column is always `read` (never the reserved `moderate` action id)*". This is consistent with M1's own §4.4 branch #2 (the moderation branch is M1's, and when its flag is ON it `Allow`s regardless of action id — an M3b lane, not these names' pin). F3/F8/F16 therefore do **not** flip the flag ON and expect a Deny (that would contradict M1's branch); they assert the *absence* in the M3 service lane exactly as Part 1's C5 pin wording says. If U10's gate reading of F3/F8 expects the opposite (flag ON ⇒ Deny), the gate must be reconciled against M1's `AuthorizationService.Decide` branch #2 and the §4.4 pin, not against these tests' wording.
@@ -243,7 +243,7 @@ M3 — Posts, component lists, (deferred report flow) — is closed. This table 
 |---|---|---|---|
 | U1 | Design doc Part 1 — scope pin (M3b deferral block as M3's "out-of-scope" close), 11 invariants, 10 FACES rows, drift-guard, `## M3 — Closed (recorded)` placeholder | — (design-only) | None. Count slip on "12 invariants" (body is authoritative: 11) flagged by U1, confirmed by U2; not a §2.6 drift-pause. |
 | U2 | Design doc Part 2 — the 18 pinned names in §2.4, the 3 gate names in §2.5, the reply-inherits 4-shape table, the 5-state candidate-filter table, §2.6 frozen counts (11 invariants + 10 FACES + 18 names + 2 tables + 3 records + 4 PostService methods + 6-member adapter + 3 POCOs), §2.7 drift-guard | — (design-only) | None. Confirms U1's count reconciliation (11 invariants, 18 names). |
-| U3 | `Post` / `PostReply` / `Report` POCOs + `M3DocTypes.Configure(StoreOptions)`; boot wiring in `Program.cs`'s `AddMarten` lambda; `Report` registered dormant (7 fields, `Status` nullable, no index, no surface, no tests) | 0 new; `Kumunita.Core.Tests` still green at 87 inherited (U9 adds 18) | Boot-path deviation: plan said two insertion sites (`SchemaBootstrap.cs` + `Program.cs`); actual M1 precedent is **one** insertion (`Program.cs`) since `SchemaBootstrap` already applies all `Schema.For<T>` via `ApplyAllConfiguredChangesToDatabaseAsync`. Not a drift-pause — M1's precedent is authoritative. |
+| U3 | `Post` / `PostReply` / `Report` POCOs + `PostDocTypes.Configure(StoreOptions)`; boot wiring in `Program.cs`'s `AddMarten` lambda; `Report` registered dormant (7 fields, `Status` nullable, no index, no surface, no tests) | 0 new; `Kumunita.Core.Tests` still green at 87 inherited (U9 adds 18) | Boot-path deviation: plan said two insertion sites (`SchemaBootstrap.cs` + `Program.cs`); actual M1 precedent is **one** insertion (`Program.cs`) since `SchemaBootstrap` already applies all `Schema.For<T>` via `ApplyAllConfiguredChangesToDatabaseAsync`. Not a drift-pause — M1's precedent is authoritative. |
 | U4 | `IUserInfoService.GetComponentsAsync(bool enabledOnly)` add + the `GetComponentsAsync_CandidateFilterEmitsNoAuditRow` unit test (C-M3·2 unit pin: no `AccessAudit` row from the candidate filter) | F9 test: `GetComponentsAsync_CandidateFilterEmitsNoAuditRow` (2 enabled + 1 disabled shape, zero audit rows) | `IUserInfoService` count slip: plan says 15 (11 M1 + 3 M2 + 1 M3); actual is **16** (12 M1 + 3 M2 + 1 M3). Same convention as U1 (12 vs 11 invariants): flag, not a drift-pause. Frozen pin — the *signature* — is preserved verbatim in U4. |
 | U5 | `PostToAuditableResource` — the single `Post` → `IAuthorizationService` adapter; 6-member mapping with `TargetKind = "post"` (C-M3·3 exact string) | — | None. `Name` 60-char truncation resolution: plan-register's 57+"..." shape wins over §2.2's 60-char no-ellipsis snippet (recorded, not a drift-pause — the *frozen* pin counts are preserved). |
 | U6 | `PostService` (feed/detail/create/reply) + `FeedResult` / `PostDetailResult` / `PostDraft` DTOs; DI registration; C-M3·1 reply-inherits + C-M3·2 candidate-filter + C-M3·3 same-transaction pins | — | `PostDetailResult.Post` is `Post?` nullable (the two fail-closed lanes — not-found vs deny — share one shape, mirroring M2's `DirectoryDetail.Profile?`). U7 branches on it. |
@@ -283,7 +283,7 @@ All prior units' flagged slips are reconciled here (no §2.6 drift-pause raised;
 
 - **`IUserInfoService` public-method count (U4 flagged):** 16 is the accurate count (12 M1 + 3 M2 + 1 M3 = 16; the plan-register's "15" headline undercounts M1 by 1, the same slip as M2 U3's "12 vs 11"). The *frozen* pin is the **signature** `Task<IReadOnlyList<Component>> GetComponentsAsync(bool enabledOnly)` — preserved. 16 is the close's number.
 - **Invariant count (U1 flagged):** 11 is the accurate count (C-M3·1/2/3 + C1–C6(6) + 2 companion ADRs (ADR 0001-B, ADR 0003 §SoD) = 11. The *plan's* headline "12" was a documentation slip; the body's bullet list is authoritative and the U2 reconciliation confirms 11. The *frozen* pins are the **invariant ids** (C-M3·1/2/3, C1–C6) — preserved. 11 is the close's number.
-- **Boots-path (U3 flagged):** 1 registration call in `Program.cs` (not 2; M1's precedent is authoritative). The *frozen* pin is `M3DocTypes.Configure(StoreOptions)` in the `AddMarten` lambda — preserved.
+- **Boots-path (U3 flagged):** 1 registration call in `Program.cs` (not 2; M1's precedent is authoritative). The *frozen* pin is `PostDocTypes.Configure(StoreOptions)` in the `AddMarten` lambda — preserved.
 - **`Name` truncation (U5 flagged):** 57+"..." shape (plan-register pin) — preserved.
 - **File count (U8 flagged):** 5 distinct file edits (3 views + nav line + JS handler) — the *frozen* pin is "3 new views + 1 nav line + 1 JS handler" — preserved.
 - **E2E authoring (U10 flagged):** not authored by any M3 unit; a future milestone lands the runtime and authors the spec.

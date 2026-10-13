@@ -49,7 +49,7 @@ user-approved decisions in the plan
 
 1. One new Core document, `GroupInvitation` (+ the
    `InvitationStatus` enum) — the invitation row with its state machine.
-2. The `M1DocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
+2. The `CoreDocTypes` registration, `UniqueIndex(GroupId, UserId)` (the
    one-row-per-(group, user) business-key convention of
    `GroupMembership`).
 3. Seven new named seams on `IUserInfoService` (ADR 0006-E compatible
@@ -161,7 +161,7 @@ sealed class GroupInvitation
 }
 ```
 
-`M1DocTypes.Configure` registers the row:
+`CoreDocTypes.Configure` registers the row:
 
 ```csharp
 opts.Schema.For<GroupInvitation>()

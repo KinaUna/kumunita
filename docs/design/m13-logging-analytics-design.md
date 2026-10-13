@@ -104,11 +104,11 @@ verified against the source at U00:
    .GetSection(TOptions.SectionName))` bind shape `FileSinkOptions`
    mirrors.
 7. **The `*DocTypes.Configure(opts)` registration surface**
-   (`Program.cs`'s Marten block, `M1DocTypes` / `M3DocTypes` / …) and
+   (`Program.cs`'s Marten block, `CoreDocTypes` / `PostDocTypes` / …) and
    `src/Kumunita.Core/Bootstrap/SchemaBootstrap.cs` — the one-line
    `UsageDocTypes.Configure(opts);` additions U02 makes (ADR 0004 §B.1).
-8. **The `M3DocTypes` "string Id" convention**
-   (`src/Kumunita.Core/M3DocTypes.cs`) — `UsageEvent` uses the
+8. **The `PostDocTypes` "string Id" convention**
+   (`src/Kumunita.Core/PostDocTypes.cs`) — `UsageEvent` uses the
    conventional `string Id`, so no non-default convention or
    business-key index is needed (the M3 / Media precedent).
 
@@ -196,7 +196,7 @@ not by discipline).
   `IAccessAction` / `AccessVia` / `Decide()`, `IUserInfoService`, the
   `AccessAudit` schema (M1 reads the table only via `Analytics.cshtml`
   labels — the one new row shape on export is a *write* shaped on the
-  existing POCO, not a schema change), `M1DocTypes` … `M9DocTypes`
+  existing POCO, not a schema change), `CoreDocTypes` … `MessagingDocTypes`
   (the `Usage` docs get their **own** `UsageDocTypes` surface, the
   ADR 0004 §B.1 "a parallel surface per bounded context" rule).
 
@@ -266,7 +266,7 @@ capture does not log the request, it stores a `UsageEvent`, so the
 C-M13·2 boundary holds).
 
 **Migration path.** `UsageEvent` is a **new** document on a **new**
-`UsageDocTypes` surface (the `M3DocTypes` / `M5DocTypes` precedent — one
+`UsageDocTypes` surface (the `PostDocTypes` / `ProjectDocTypes` precedent — one
 `*DocTypes.Configure(opts)` call per bounded context): no existing schema
 is touched, no existing row is touched, rollback is a redeploy of the
 previous image (the table + rows are inert; the purge tick of the next
@@ -350,7 +350,7 @@ limitation; loosening it is a deliberate ADR revisit, §deferred lanes).
   piece fails.
 - **Coherent** (strengthened): every surface mirrors a shipped precedent
   (the `AuditPurgeHandler` tick, the `AuditPurgeService` static shape,
-  the `AdminController` gate, the `kw-l` registry, the `M3DocTypes`
+  the `AdminController` gate, the `kw-l` registry, the `PostDocTypes`
   registration) — no new idiom is introduced (C-M13·6: zero new
   authorization surface).
 - **Flexible** (consumed): the window is pinned to 7/30/90 (D3), the
@@ -374,7 +374,7 @@ limitation; loosening it is a deliberate ADR revisit, §deferred lanes).
 
 The deploy is a redeploy of the usual image (`OPS.md`): boot runs
 `SchemaBootstrap.ApplyAsync` (the `UsageEvent` doc is created on the
-`UsageDocTypes` surface, idempotent — the `M3DocTypes` precedent), the
+`UsageDocTypes` surface, idempotent — the `PostDocTypes` precedent), the
 `AddFileSink` call runs its one `Retain` boot pass (deleting
 `app-*.log` files older than the `RetentionDays` value), the
 `UsagePurgeTick` is seeded by the existing `AuditPurgeHandler`-style boot
@@ -383,14 +383,14 @@ pattern (the `IntegrateWithWolverine()` Postgres-backed schedule — the
 request writes the first `UsageEvent` row. **Rollback:** redeploy the
 previous image; the `mt` schema's `usageevent` table + rows are inert
 (unregistered by the previous image's `*DocTypes` surfaces, the
-`M3DocTypes`-style parallel-surface rule means they are invisible to it),
+`PostDocTypes`-style parallel-surface rule means they are invisible to it),
 the `app-*.log` files remain on disk (they are not referenced by the
 previous image), and the `UsagePurgeTick` in the Wolverine queue is
 simply unhandled (a no-op, the `AuditPurgeHandler` "re-yield of the same
 message type" shape means it is not a different message the previous
 image would misinterpret). No migration is needed; no data is lost; the
 operator's `AccessAudit` row (if they exported before the rollback)
-survives (it is on the `M1DocTypes` surface, untouched by M13).
+survives (it is on the `CoreDocTypes` surface, untouched by M13).
 
 ## Risks
 
@@ -579,7 +579,7 @@ public static class UsageCapturePolicy
 ```
 
 The `UsageDocTypes` registration surface,
-`src/Kumunita.Core/Usage/UsageDocTypes.cs` (the `M3DocTypes` shape
+`src/Kumunita.Core/Usage/UsageDocTypes.cs` (the `PostDocTypes` shape
 verbatim — one `opts.Schema.For<UsageEvent>()` call, the conventional
 `string Id`, **no** business-key index — the M3 "string Id" convention):
 
@@ -590,7 +590,7 @@ namespace Kumunita.Core.Usage;
 
 /// <summary>
 /// The M13 usage bounded context's Marten-native document registration
-/// surface (ADR 0004 §B.1, the <c>M3DocTypes</c> / <c>M5DocTypes</c>
+/// surface (ADR 0004 §B.1, the <c>PostDocTypes</c> / <c>ProjectDocTypes</c>
 /// parallel-surface shape). <see cref="UsageEvent"/> uses the
 /// conventional <c>string Id</c> identity (the M3 "string Id"
 /// convention), so no non-default convention (identity, business-key

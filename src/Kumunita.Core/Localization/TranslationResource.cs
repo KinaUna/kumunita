@@ -2,7 +2,7 @@ namespace Kumunita.Core.Localization;
 
 /// <summary>
 /// One UI-string translation (ADR 0005 B; M·2/M·4). The business key is
-/// (Key, LanguageCode) — the unique index in M1DocTypes enforces one text per key
+/// (Key, LanguageCode) — the unique index in CoreDocTypes enforces one text per key
 /// per language (the GroupMembership / ComponentMembership pair idiom). A resident
 /// never sees a blank label (M·1): a missing (Key, preferred) falls back to
 /// (Key, default) → (Key, "en") → the Key's registry <c>en</c> source text

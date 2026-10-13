@@ -42,7 +42,7 @@ language, without any of the control-plane standing.
   - `CommunityTranslation` — `ComponentId`, `LanguageCode`, optional
     `Name?`, optional `Description?`, `AuthorId`, `Created`.
 
-  Both are registered in `M1DocTypes` with a `UniqueIndex` on the business-key
+  Both are registered in `CoreDocTypes` with a `UniqueIndex` on the business-key
   pair — `(GroupId, LanguageCode)` / `(ComponentId, LanguageCode)` — the same
   convention as `GroupMembership` / `ComponentMembership` (surrogate `Id` is
   the Marten identity, the pair is the DB-enforced business key). A

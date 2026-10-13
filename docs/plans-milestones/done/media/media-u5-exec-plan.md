@@ -16,7 +16,7 @@
   - `tests/Kumunita.Core.Tests/UserInfo/ProfileAvatarLaneTests.cs` — the
     three §2.5 lane names (set / clear / missing-profile), on the
     existing `PostgresFixture` (scratch DB per test) + a scratch `mt`
-    schema over `M1DocTypes` (the `Profile` doc; the lane writes only the
+    schema over `CoreDocTypes` (the `Profile` doc; the lane writes only the
     `string?` `AvatarId` — **no `MediaObject` doc is stored or loaded**, and
     the store schema needs no `MediaDocTypes` surface).
 - **Out:** U4's implementation (done — read-only), U6–U9's Web surface,
@@ -57,7 +57,7 @@
   (`IClassFixture`) + `NewDatabaseAsync` scratch DB per test +
   `DocumentStore.For(opts => { Connection; DatabaseSchemaName = "mt";
   opts.Storage.Add<KumunitaFeature>(); opts.Storage.Add<AuthorizationFeature>();
-  M1DocTypes.Configure(opts); })` + one
+  CoreDocTypes.Configure(opts); })` + one
   `ApplyAllConfiguredChangesToDatabaseAsync`. Profile seeded through the
   service's own `UpsertProfileAsync(profile, new ProfileUpdate(5×null))` —
   the exact bootstrap idiom at `UserInfoServiceTests` L62 (an all-null patch
@@ -85,7 +85,7 @@
 | `tests/Kumunita.Core.Tests/Media/LocalVolumeMediaStoreTests.cs` (L1–60) | the `KnownHash` constant + namespace-sealed-class shape |
 | `src/Kumunita.Core/UserInfo/Profile.cs` (full) | POCO defaults (`Visibility` defaults to `new Audience()`), `ProfileUpdate` 5-positional form |
 | `src/Kumunita.Core/UserInfo/UserInfoService.cs` L872–891 | the shipped lane impl (load / throw / set / store / save) — the tests pin exactly this |
-| `src/Kumunita.Core/M1DocTypes.cs` (full) | `Profile` identity mapping (`Identity(p => p.SubjectId)`) — confirms the scratch schema needs `M1DocTypes` |
+| `src/Kumunita.Core/CoreDocTypes.cs` (full) | `Profile` identity mapping (`Identity(p => p.SubjectId)`) — confirms the scratch schema needs `CoreDocTypes` |
 
 ## Steps (each leaves the tree in a buildable state)
 

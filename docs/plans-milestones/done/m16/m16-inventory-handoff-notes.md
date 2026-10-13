@@ -18,7 +18,7 @@ locked text is in `docs/design/m16-inventory-design.md`
 `docs/adr/0117-inventory.md` `## Decision`):
 
 - **D1** — Two documents (`InventoryItem` + `InventoryCheckout`), one
-  new `M16DocTypes` surface (the M9/M5 parallel-surface precedent —
+  new `InventoryDocTypes` surface (the M9/M5 parallel-surface precedent —
   additive, idempotent, **zero migrations** for existing surfaces), **no
   new bounded context** beyond `Kumunita.Core.Inventory`; the usage
   history is the `InventoryCheckout` records *inside* the same context
@@ -112,7 +112,7 @@ the M5 creator-vs-broad-standing trade C-M5·6 carried to M16), the
 §kw-l list, and the §gate names match the register
 (`docs/plans-milestones/plan-m16-inventory.md`) **verbatim**; the
 source was checked against the live `ProjectToAuditableResource`
-(the 6-member projection — the adapter shape), the `M9DocTypes` surface
+(the 6-member projection — the adapter shape), the `MessagingDocTypes` surface
 (the `*DocTypes` + the `convo_uidx_pair` unique-index shape), the
 ADR 0116 shape (the ADR Status/Context/Decision/Consequences + the
 deferred-lane + affected-files sections), and the ADR 0117-free
@@ -137,7 +137,7 @@ this is done** — U00 is now done, so the U01–U06 unit series may
 proceed in order (each reading **only its own unit plan + its entry
 reads**).
 
-## U01 — context docs + M16DocTypes + adapter
+## U01 — context docs + InventoryDocTypes + adapter
 
 **(a) The field set** (the locked list from the design doc §2 — a unit
 that adds, drops, or re-types a field is a drift event):
@@ -159,7 +159,7 @@ that adds, drops, or re-types a field is a drift event):
   `CheckedInAt` (nullable — **open when null**; set = closed) ·
   `Note` (optional).
 
-**(b) The index set** (`M16DocTypes`, `src/Kumunita.Core/M16DocTypes.cs`):
+**(b) The index set** (`InventoryDocTypes`, `src/Kumunita.Core/InventoryDocTypes.cs`):
 
 - `InventoryItem` — `(ComponentId, Created)` feed-ordering +
   `(OwnerKind, Created)` filter (unnamed — the M5 `ComputedIndex`
@@ -170,8 +170,8 @@ that adds, drops, or re-types a field is a drift event):
   `inv_uidx_item_open` (the M9 `convo_uidx_pair` shape — at most one
   open checkout per item; a concurrent double-check-out's second commit
   fails at the DB layer, C-M16·3 / F1).
-- Registered in `Program.cs` — `M16DocTypes.Configure(opts);` added
-  **after** `M9DocTypes.Configure(opts)` (before the M13 block).
+- Registered in `Program.cs` — `InventoryDocTypes.Configure(opts);` added
+  **after** `MessagingDocTypes.Configure(opts)` (before the M13 block).
 
 **(c) The adapter's `TargetKind`:** `"inventory"` — the **exact**
 string (C3, the `AccessAudit.TargetKind` discriminator). The adapter
@@ -188,8 +188,8 @@ string (C3, the `AccessAudit.TargetKind` discriminator). The adapter
    9.31.2 has no first-class partial-index API; the working mechanism is
    `opts.Schema.For<T>().Index(expr, idx => { idx.IsUnique = true;
    idx.Name = "..."; idx.Predicate = "data ->> 'CheckedInAt' IS NULL";
-   })`. **Correction to the in-repo note** in `M5DocTypes.cs` (and
-   `M4DocTypes`): that note claims `ComputedIndex` "exposes no `Name`
+   })`. **Correction to the in-repo note** in `ProjectDocTypes.cs` (and
+   `EventDocTypes`): that note claims `ComputedIndex` "exposes no `Name`
    property (only Casing / TenancyScope)." That is **stale / wrong** —
    against the installed stack, `ComputedIndex` (a
    `Weasel.Postgresql.Tables.IndexDefinition`) exposes **`Name`,
@@ -218,7 +218,7 @@ string (C3, the `AccessAudit.TargetKind` discriminator). The adapter
    `ApplyAllConfiguredChangesToDatabaseAsync` (that path only applies
    the storage features + Weasel migrations). The sibling doc-shape
    tests (`ProjectDocShapeTests`, `MessagingServiceTests`) therefore
-   **round-trip-store their docs first**; the new `M16DocTypesDdlTests`
+   **round-trip-store their docs first**; the new `InventoryDocTypesDdlTests`
    follows the same shape (store + load both docs, then inspect the
    live catalog). A DDL-only test that skips the store round-trip will
    not see the doc tables.
@@ -228,7 +228,7 @@ string (C3, the `AccessAudit.TargetKind` discriminator). The adapter
    join (the repo's own `AdminOverrideDdlTests` shape) or the one-arg
    `to_regclass('mt.mt_doc_inventorycheckout')` form.
 
-**(e) The pin** (`tests/Kumunita.Core.Tests/M16DocTypesDdlTests.cs`,
+**(e) The pin** (`tests/Kumunita.Core.Tests/InventoryDocTypesDdlTests.cs`,
 2 tests — both pass): `Apply_Registers_BothDocs_And_OpenCheckout_UniquePartialIndex`
 (both tables exist with the `id` + `data` Marten core, and the
 `mt_doc_inventorycheckout` table carries a **unique** index with a
@@ -794,7 +794,7 @@ NSubstitute double):
   present (C-M16·2 / C3 / C-M16·3).
 
 The tests boot the full store trio (`UserInfoService` → `AuthorizationService`
-→ `InventoryService`) on `M1DocTypes` + `M16DocTypes` over a fresh
+→ `InventoryService`) on `CoreDocTypes` + `InventoryDocTypes` over a fresh
 `PostgresFixture` database, and drive the **real** `InventoryController`
 with a real `ClaimsPrincipal` (`Kumunita.Sub` / `Kumunita.Role`) +
 `DefaultHttpContext` — the same path the browser takes.

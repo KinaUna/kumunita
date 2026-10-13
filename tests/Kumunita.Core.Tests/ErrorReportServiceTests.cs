@@ -56,7 +56,7 @@ namespace Kumunita.Core.Tests;
 /// <see cref="Kumunita.Core.ErrorReportDocTypes.Configure"/> call in its own
 /// <c>DocumentStore.For</c> lambda (the <see cref="AdminOnboardingServiceTests.BootStoreAsync"/>
 /// idiom) — without it the <c>ErrorReport</c> doc is invisible to Marten.
-/// <see cref="Kumunita.Core.M1DocTypes.Configure"/> is included because it
+/// <see cref="Kumunita.Core.CoreDocTypes.Configure"/> is included because it
 /// registers the <c>AccessAudit</c> doc (the audit-row half of every write).
 /// </para>
 public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
@@ -404,7 +404,7 @@ public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<Po
     /// <summary>
     /// Boot a fresh scratch store with the <c>ErrorReport</c> doc type
     /// (the <see cref="Kumunita.Core.ErrorReportDocTypes.Configure"/> surface)
-    /// + the <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.M1DocTypes.Configure"/>)
+    /// + the <c>AccessAudit</c> doc (via <see cref="Kumunita.Core.CoreDocTypes.Configure"/>)
     /// registered in the <c>DocumentStore.For</c> lambda — the
     /// <see cref="AdminOnboardingServiceTests.BootStoreAsync"/> idiom.
     /// </summary>
@@ -417,7 +417,7 @@ public class ErrorReportServiceTests(PostgresFixture fixture) : IClassFixture<Po
             opts.DatabaseSchemaName = "mt";
             opts.Storage.Add<KumunitaFeature>();
             opts.Storage.Add<AuthorizationFeature>();
-            M1DocTypes.Configure(opts);
+            CoreDocTypes.Configure(opts);
             ErrorReportDocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(

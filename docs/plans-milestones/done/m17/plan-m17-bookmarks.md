@@ -126,7 +126,7 @@ gets a non-leaky 404 and **no audit row**.
 - **D1 — One document, one new surface, one new bounded context.** M17 adds a
   new bounded context `Kumunita.Core.Bookmarks` with **one document**:
   `Bookmark` (`OwnerId`, `TargetKind`, `TargetId`, `Created`), registered on a
-  **new `M17DocTypes`** surface (the M9/M5 `*DocTypes` precedent — a parallel
+  **new `BookmarkDocTypes`** surface (the M9/M5 `*DocTypes` precedent — a parallel
   additive surface, delta-detected and applied idempotently at boot, **zero
   migrations** for existing surfaces). `TargetKind` is a **string** restricted
   to the closed set {`post`, `event`, `todo`, `announcement`, `page`} — the
@@ -291,7 +291,7 @@ sign-off gate (no code unit may start before it).**
 **Track A — Docs (U00).** The design doc (decisions/invariants/FACES + trade/
 §kw-l key list/gate tests/§drift-guard) + ADR 0118 + the ADR index row.
 
-**Track B — Core (U01, U02).** U01 the context doc + `M17DocTypes` (+ the
+**Track B — Core (U01, U02).** U01 the context doc + `BookmarkDocTypes` (+ the
 unique index). U02 the service seam (`IBookmarkService`: list / bookmark /
 unbookmark) + the D3 write-lane visibility check + the D5 degraded resolution
 + the DI registration + pinned Core tests.
@@ -312,7 +312,7 @@ D8 four surfaces, in the same unit).
 | Unit | Track | One-line goal |
 |---|---|---|
 | **U00** | A | Design doc + ADR 0118 (lock D1–D8, C-M17·*, F1–F5 + trade, §kw-l, gate tests, §drift-guard) |
-| **U01** | B | `Kumunita.Core.Bookmarks` context: `Bookmark` + `M17DocTypes` (the `(OwnerId, TargetKind, TargetId)` unique index) + boot wiring |
+| **U01** | B | `Kumunita.Core.Bookmarks` context: `Bookmark` + `BookmarkDocTypes` (the `(OwnerId, TargetKind, TargetId)` unique index) + boot wiring |
 | **U02** | B | `IBookmarkService` + `BookmarkService` (list / bookmark-with-visibility-check / unbookmark / degraded resolution) + the DI registration + pinned Core tests |
 | **U03** | C | `BookmarksController` + `/bookmarks` list view (grouped, degraded rows, unbookmark) + the `bm.*` `kw-l` keys (×4) + the nav entry + pinned Web tests |
 | **U04** | C | the `_BookmarkButton` partial + the `POST /bookmarks/toggle` action + wiring into the five target detail views + pinned Web tests |
