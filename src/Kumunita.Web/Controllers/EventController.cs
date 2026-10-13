@@ -847,6 +847,31 @@ public sealed class EventController : Controller
             }
         }
 
+        // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+        // **linked boards** section (the reverse read seam's page, mapped to
+        // <see cref="LinkedBoardRow"/> rows): the seam's
+        // <c>CanSeeAsync(Read)</c> pass already ran on every row (C-M14·1 /
+        // C-M14·4, no new surface). Page 0 — the detail surface, not a paged
+        // list; the <c>HasMore</c> signal is ignored (the section is
+        // display-only, the <see cref="LinkedTodoRow"/> "one section, not a
+        // feed" precedent). An empty <c>Items</c> ⇒ <c>LinkedBoards</c> stays
+        // <c>null</c> and the view renders nothing (no empty-state section
+        // for an absent linkage — C-M14·2).
+        IReadOnlyList<LinkedBoardRow>? linkedBoards = null;
+        if (projects is not null)
+        {
+            var linkedBoardsPage = await projects.ListBoardsForEventAsync(ev.Id, actorId, 0, HttpContext.RequestAborted);
+            if (linkedBoardsPage.Items.Count > 0)
+            {
+                linkedBoards = linkedBoardsPage.Items
+                    .Select(b => new LinkedBoardRow(
+                        BoardId: b.Id,
+                        Title: b.Title,
+                        LinkPath: "/projects/boards/" + b.Id))
+                    .ToList();
+            }
+        }
+
         // M18 (ADR 0119, D7 / F2 / F3 / C-M18·4) — the detail-page series
         // shape (U06). The head carries the rule (D3); a non-head sibling
         // carries <c>RecurrenceHeadId</c> = head.Id. The series chip (F2) is
@@ -889,6 +914,7 @@ public sealed class EventController : Controller
             CanTranslate: canTranslate,
             OriginalLanguageCode: ev.LanguageCode,
             LinkedTodos: linkedTodos,
+            LinkedBoards: linkedBoards,
             IsPartOfSeries: isPartOfSeries,
             IsHead: isHead,
             IsNonHead: isNonHead,
@@ -896,6 +922,125 @@ public sealed class EventController : Controller
             Rule: rule);
 
         return View(vm);
+    }
+
+    /// <summary>
+    /// <c>POST /events/{id}/todos</c> — the **inline "add a to-do to this
+    /// event"** write lane (ADR 0115 D3, the M14 interlock's to-do-creation
+    /// shape). A **thin Web lane** (ADR 0006-D: routes + shape) that composes
+    /// the two **frozen** <see cref="IProjectService"/> seams the
+    /// <see cref="ProjectsController"/> <c>POST /projects/todos</c> lane
+    /// already uses: <see cref="IProjectService.CreateTodoAsync"/> (the
+    /// to-do is published on creation — D8a) + <see
+    /// cref="IProjectService.SetTodoEventAsync"/> (the association is a
+    /// dedicated lane, not a request field — C-M14·7). **Any signed-in
+    /// resident** becomes the to-do's author (the C-M5·6 <c>Owner</c>
+    /// standing — the <see cref="CreatePost"/> create-lane shape); the
+    /// <c>EventId</c> is the route's event (the "add to **this** event"
+    /// intent — the to-do's <see cref="Kumunita.Core.Projects.TodoItem
+    /// .EventId"/> is set in the follow-on <c>SetTodoEventAsync</c> call,
+    /// the <c>ProjectsController.CreatePost</c> "association after create"
+    /// idiom). <b>Audience:</b> the to-do is public (the ADR 0001-B
+    /// <c>null</c> shape — the <c>AddSubtaskAsync</c> inline composer shape;
+    /// the event's own <c>Audience</c> is a separate concern, the to-do
+    /// inherits the platform's "published on creation" posture). <b>
+    /// Language:</b> materialized from the instance default server-side (ADR
+    /// 0018 — the <c>CreateTodoAsync</c> lane's <c>ResolveLanguageCodeAsync</c>
+    /// floor). <b>No tags / dates / assignee / component</b> (the inline
+    /// composer shape — the <c>AddSubtaskAsync</c> <c>ComponentId: null</c> /
+    /// <c>TagSlugs: null</c> shape; the full to-do surface is
+    /// <c>/projects/todos/new</c>). A missing / unreadable event is 404 (the
+    /// <c>SetTodoEventAsync</c> guard, C-M14·3); a denied actor is 403 (the
+    /// <c>CreateTodoAsync</c> standing — the frozen <c>CheckTodoStanding</c>
+    /// path); a blank title is a 400 (the <c>CreatePost</c> shape-refusal
+    /// pin). The flash + redirect to <c>/events/{id}</c> (the "redirect
+    /// after write" precedent — the new to-do appears in the page's
+    /// "Linked to-dos" section immediately).
+    /// </summary>
+    [HttpPost("/events/{id}/todos")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTodo(string id, [FromForm] string? title)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actorId))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to add a to-do.");
+            return View("Detail", id);
+        }
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            ModelState.AddModelError(string.Empty, "A title is required.");
+            return View("Detail", id);
+        }
+        if (projects is null)
+        {
+            ModelState.AddModelError(string.Empty, "To-dos are not available on this instance.");
+            return View("Detail", id);
+        }
+
+        // ADR 0001-B — the to-do is public (the ADR 0001-B `null` shape —
+        // the `AddSubtaskAsync` inline composer shape; the event's own
+        // Audience is a separate concern, the to-do inherits the platform's
+        // "published on creation" posture). ADR 0018 — the language is
+        // materialized from the instance default server-side (the
+        // `CreateTodoAsync` lane's `ResolveLanguageCodeAsync` floor).
+        var request = new CreateTodoRequest
+        {
+            Title = title.Trim(),
+            Body = null,
+            ComponentId = null, // the inline composer shape (the `AddSubtaskAsync` `ComponentId: null` shape)
+            AssigneeId = null,
+            ParentId = null,
+            BlockedByTodoId = null,
+            StartAt = null,
+            DueAt = null,
+            Audience = null, // ADR 0001-B — public
+            LanguageCode = null, // ADR 0018 — instance-default floor
+            TagSlugs = null, // the inline composer shape (the `AddSubtaskAsync` `TagSlugs: null` shape)
+        };
+
+        TodoItem todo;
+        try
+        {
+            todo = await projects.CreateTodoAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ModelState.AddModelError(string.Empty, "You do not have permission to add a to-do.");
+            return View("Detail", id);
+        }
+
+        // ADR 0115 D3 (C-M14·7) — the **event association** on the new
+        // to-do. The frozen `CreateTodoRequest` carries no `EventId` (Core
+        // is frozen — C-M14·7), so the association is applied **after** the
+        // to-do exists, through the `SetTodoEventAsync` seam (the
+        // `ProjectsController.CreatePost` "association after create" idiom).
+        // A missing / unreadable event (a race past the Detail lane's own
+        // read above) is refused 404 by the seam's guard (C-M14·3) — the
+        // to-do is still created (no error is surfaced over an
+        // already-successful create).
+        try
+        {
+            await projects.SetTodoEventAsync(
+                todo.Id, actorId, RoleSet(User), id, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            // The event was soft-deleted after the Detail lane's read above
+            // — the to-do is created (public), the association is not.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The actor cannot read the event — the to-do is created
+            // (public), the association is not.
+        }
+
+        TempData["info"] = "To-do added.";
+        return Redirect($"/events/{id}");
     }
 
     // ── M12 (ADR 0112) — the iCal lane (lane 1: the per-event file) ──────────

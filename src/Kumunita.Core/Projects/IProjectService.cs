@@ -190,6 +190,32 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default, SortSpec? sort = null, int? pageSize = null); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
+    /// The **reverse read seam** of the M14 interlock carried to the board
+    /// surface — the boards **linked to this event**: the
+    /// <see cref="ListBoardsAsync"/> shape filtered to one event (the
+    /// <see cref="ListTodosForEventAsync"/> "list X for a Y" reverse-read
+    /// precedent). The candidate set is <c>!IsDeleted</c> with
+    /// <see cref="KanbanBoard.EventId"/> equal to <paramref name="eventId"/> —
+    /// **a filter, never a gate** (C-M14·1: the <c>EventId</c> narrows the
+    /// candidate set; it never changes the audience decision — a board is
+    /// visible iff it passes its **own** <c>CanSeeAsync(Read)</c>). The
+    /// survivors are <c>CanSeeAsync(Read)</c>-filtered (C6 / C3) over the
+    /// **existing** <see cref="KanbanBoardToAuditableResource"/> (C-M14·4 — no
+    /// new adapter, no new <c>AccessAction</c> / <c>AccessVia</c> /
+    /// <c>Decide()</c> branch); ordered by <c>Created</c> descending; paged
+    /// with <c>HasMore = candidates.Count == PageSize</c> (ADR 0090 D1/D3).
+    /// **One aggregate** <c>AccessAudit</c> row (<c>TargetKind = "board"</c>,
+    /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape; a 0-
+    /// candidate page reports <c>HasMore: false</c> and emits **no** decision
+    /// row (C-M7·5). The seam returns **only boards the actor may read** — an
+    /// event with zero readable linked boards returns an **empty page**, never
+    /// a 404/403 (the event's own detail page decides its own visibility —
+    /// this lane is called only from a page that already passed the event's
+    /// <c>Read</c> decision).
+    /// </summary>
+    Task<BoardPage> ListBoardsForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default, int? pageSize = null); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
+
+    /// <summary>
     /// The boards the actor may <c>Read</c> on which this to-do is placed —
     /// the <c>BoardItemPlacement</c> rows for <paramref name="todoItemId"/>
     /// resolve to their <see cref="KanbanBoard"/> (non-deleted), each
@@ -688,6 +714,28 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// caller's session (C3).
     /// </summary>
     Task<KanbanBoard> SetBoardProjectAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The **M14 interlock** (ADR 0115 D3) carried to the board surface: sets
+    /// <c>KanbanBoard.EventId</c> to <paramref name="eventId"/> (<c>null</c> =
+    /// **clear the link** — the <see cref="SetBoardProjectAsync"/>
+    /// null-clears rule). **Creator ∪ GlobalAdmin** over the **board** (the
+    /// ADR 0070 board-edit precedent, re-checked **server-side** — C-M14·3; the
+    /// assignee branch does **not** apply to a board — C-M5·6; the Web
+    /// <c>[Authorize]</c> is a convenience pre-gate only, never the source of
+    /// truth). The board must exist and be <c>!IsDeleted</c> (<see
+    /// cref="KeyNotFoundException"/> — 404). A non-null <c>eventId</c> that is
+    /// **non-existent, soft-deleted, or not readable by the actor is refused**
+    /// (<see cref="KeyNotFoundException"/> — 404, the non-leaky split,
+    /// C-M14·3; the standing decision is the frozen <see
+    /// cref="IAuthorizationService"/> <c>CanAsync(Read)</c> path over the
+    /// event — **you can only link to an event you can see**; C-M14·4 — no new
+    /// authorization surface). <c>AuthorId</c> / <c>Created</c> preserved
+    /// untouched; <c>Modified</c> stamped; one <c>AccessAudit</c> row
+    /// (<c>board.set_event</c>, <c>TargetKind = "board"</c>) commits
+    /// **atomically** with the write (C3).
+    /// </summary>
+    Task<KanbanBoard> SetBoardEventAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default);
 
     // --- PL delete lanes (U09) — additive on the frozen M5 surface (ADR 0086) ---
     //

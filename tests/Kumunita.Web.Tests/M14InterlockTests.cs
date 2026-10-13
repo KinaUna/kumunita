@@ -112,6 +112,11 @@ public class M14InterlockTests(PostgresFixture fixture) : IClassFixture<Postgres
         var detailProjects = Substitute.For<IProjectService>();
         detailProjects.ListTodosForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
             .Returns(new TodoPage(new List<TodoItem> { todo }, false));
+        // The M14 interlock's board sibling — no boards are linked to the
+        // event in this closed-loop test, so the reverse read seam returns an
+        // empty page (the section renders nothing — C-M14·2).
+        detailProjects.ListBoardsForEventAsync(eventId, actor, 0, Arg.Any<CancellationToken>(), Arg.Any<int?>())
+            .Returns(new BoardPage(Array.Empty<Kumunita.Core.Projects.KanbanBoard>(), false));
         var detailEvents = Substitute.For<IEventService>();
         detailEvents.GetAsync(eventId, actor, Arg.Any<CancellationToken>()).Returns(ev);
         detailEvents.GetEventTranslationsAsync(eventId).Returns(new List<EventTranslation>());

@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.59.0 entry (the ONB lane) — 0.58.0 (ADR 0165) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.60.0 entry (the Events↔boards lane) — 0.59.0 (ONB) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -87,17 +87,24 @@ public sealed class WhatsNewTests
         // entry eight rows back; the SITE-2 hero-translation lane (ADR 0157)
         // 0.50.0 entry nine rows back; the M33 (storage metrics history)
         // 0.49.0 entry ten rows back; the M32 (issue submission & escalation)
-        // 0.48.0 entry eleven rows back.
+        // 0.48.0 entry twelve rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.59.0" && head.Date == "2026-10-13",
-            "The ONB onboarding walk-through lane 0.59.0 (2026-10-13) entry must be the head of the registry; got "
+            head.Version == "0.60.0" && head.Date == "2026-10-13",
+            "The Events↔boards lane 0.60.0 (2026-10-13) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("onboarding", StringComparison.OrdinalIgnoreCase)),
-            "The 0.59.0 head entry must name the onboarding walk-through capability.");
+            head.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
+                                 && c.Contains("event", StringComparison.OrdinalIgnoreCase)),
+            "The 0.60.0 head entry must name the Events ↔ boards linkage capability.");
 
-        // The M36 @mentions entry (ADR 0165) slides one row back.
+        // The ONB onboarding walk-through entry slides one row back.
+        var onb = WhatsNew.All.Single(v => v.Version == "0.59.0");
+        Assert.True(
+            onb.Changes.Any(c => c.Contains("onboarding", StringComparison.OrdinalIgnoreCase)),
+            "The 0.59.0 entry must name the onboarding walk-through capability.");
+
+        // The M36 @mentions entry (ADR 0165) slides two rows back.
         var m36 = WhatsNew.All.Single(v => v.Version == "0.58.0");
         Assert.True(
             m36.Changes.Any(c => c.Contains("mention", StringComparison.OrdinalIgnoreCase)),

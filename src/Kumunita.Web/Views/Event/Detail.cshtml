@@ -619,5 +619,70 @@
                 </div>
             </div>
         }
+
+        @* ADR 0115 D2 (M14 interlock carried to the board surface) — the
+           **linked boards** section (the reverse read seam's page, U01's
+           board sibling). Rendered **only** when non-empty: `LinkedBoards`
+           is `null` when the event has no linked readable boards, so an
+           absent linkage renders nothing — no empty-state section (C-M14·2).
+           One row per board: a title link to the board detail (the
+           checklist / plan surface the event's prep to-dos live on). *@
+        @if (Model.LinkedBoards is { Count: > 0 })
+        {
+            <div class="card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3"><kw-l key="events.linked_boards">Linked boards</kw-l></h2>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var b in Model.LinkedBoards)
+                        {
+                            <li class="py-1">
+                                <a href="@b.LinkPath">@b.Title</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        @* M14 interlock (ADR 0115 D3) — the inline "Add a to-do to this
+           event" composer (the <c>POST /events/{id}/todos</c> lane's
+           affordance). A compact one-field form (the <c>AddSubtaskAsync</c>
+           inline composer shape — title only; the full to-do surface is
+           <c>/projects/todos/new</c>): the created to-do is public (ADR
+           0001-B <c>null</c> shape) + linked to **this** event (the
+           <c>SetTodoEventAsync</c> seam's write). A plain
+           <c>&lt;form&gt;</c> / <c>&lt;input&gt;</c> (the ADR 0031 tsc-only
+           discipline — no new JS). Rendered for any signed-in actor (the
+           class-level <c>[Authorize]</c> already guarantees a resident; the
+           lane's own standing re-check is the enforcement — C-M14·3). The
+           <c>aria-label</c> / <c>placeholder</c> are server-resolved (the
+           <c>kw-l</c> TagHelper cannot wrap an attribute; the en floor is the
+           non-HTTP render's fallback — the <c>RsvpLabel</c> /
+           <c>confirmSkip</c> idiom above). *@
+        @{
+            var addTodoLabel = "Add a to-do to this event";
+            if (Translation is not null)
+                addTodoLabel = await Translation.GetAsync("events.add_todo.title", defaultVariant);
+        }
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 mb-2"><kw-l key="events.add_todo.title">Add a to-do to this event</kw-l></h2>
+                <p class="text-muted small mb-3">
+                    <kw-l key="events.add_todo.hint">A quick way to add a checklist item or prep task that belongs to this event.</kw-l>
+                </p>
+                <form method="post" action="@($"/events/{Model.Event.Id}/todos")">
+                    @Html.AntiForgeryToken()
+                    <div class="d-flex gap-2">
+                        <input class="form-control" type="text" name="title"
+                               maxlength="120" required
+                               aria-label="@addTodoLabel"
+                               placeholder="@addTodoLabel" />
+                        <button type="submit" class="btn btn-primary flex-shrink-0">
+                            <kw-l key="events.add_todo.submit">Add to-do</kw-l>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>

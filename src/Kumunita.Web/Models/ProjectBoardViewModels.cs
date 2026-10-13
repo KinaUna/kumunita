@@ -38,7 +38,12 @@ public sealed record BoardRow(
     // dangle — the row is a display surface, never a gate, C-PL·3). The
     // "Add to Project…" dropdown item preselects the current choice so the
     // modal's picker opens on it (the BoardEdit set-project card idiom).
-    string? ProjectId = null);
+    string? ProjectId = null,
+    // ADR 0115 (M14 interlock carried to the board surface) — the board's
+    // **event association** as stored (may dangle — the row is a display
+    // surface, never a gate, C-M14·1). The "Link to event…" picker preselects
+    // the current choice so it opens on it (the set-event card idiom).
+    string? EventId = null);
 
 /// <summary>
 /// The <b>board feed</b> view model (the <c>GET /projects/boards</c> read
@@ -182,6 +187,23 @@ public sealed record BoardDetailViewModel(
     // board itself; the `pl.board.project_link` kw-l key labels it).
     string? ProjectId = null,
     string? ProjectTitle = null,
+    // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+    // **event link** on the board detail (the D2 dangling-safe rule: all
+    // three fields are `null` when the board has no `EventId`, or the target
+    // event is soft-deleted / unreadable by the actor — the chip is then
+    // omitted entirely, never a 404/403 for the board itself; the
+    // `board.event_link` kw-l key labels it).
+    string? EventId = null,
+    string? EventTitle = null,
+    string? EventLinkPath = null,
+    // ADR 0115 D3 (M14 interlock carried to the board surface) — the
+    // **event picker** on the board detail (the <c>set-event</c> lane's
+    // affordance; the <c>POST /projects/boards/{id}/set-event</c> form).
+    // <see cref="BoardEventPicker"/> carries the actor's visible events + the
+    // board's current selection. `null` = the actor has no visible events —
+    // the picker card hides (the ADR 0086 D9 <c>Projects.Count &gt; 0</c>
+    // hide rule; the picker is a display surface, never a gate, C-M14·4).
+    BoardEventPicker? EventPicker = null,
     // ADR 0086 D9 — the board-head ⋮ menu's **project picker** options
     // (the <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…"
     // modal — a **display** surface, never a gate (C-PL·3). Empty ⇒ the
@@ -204,6 +226,28 @@ public sealed record BoardDetailViewModel(
     // decision already ran; a dangling TagId simply drops (renders as
     // nothing, not a 404). Empty = no chips.
     IReadOnlyList<(string Slug, string DisplayedName)>? Tags = null);
+
+/// <summary>
+/// The **event picker** affordance on the board detail (ADR 0115 D3, the M14
+/// interlock carried to the board surface — the <c>set-event</c> lane's UI).
+/// Carries the actor's visible events (<see cref="Options"/>) + the board's
+/// current selection (<see cref="CurrentEventId"/>).
+/// <para>
+/// **<see cref="Options"/>** is the actor's visible events — the **frozen**
+/// <see cref="Kumunita.Core.Events.IEventService.ListMineAsync"/> (the
+/// actor's own events, authored ∪ RSVPed — the ADR 0065 posture), **capped
+/// at 25** for the <c>&lt;select&gt;</c> (a display cap, never a gate —
+/// C-M14·4). **<see cref="CurrentEventId"/>** is the board's stored
+/// <see cref="Kumunita.Core.Projects.KanbanBoard.EventId"/> (the <c>&lt;
+/// select&gt;</c> prefill — the association the lane is editing). An empty
+/// <see cref="Options"/> list hides the picker card in the view (a picker
+/// with no options is a noise surface, not a control — the ADR 0086 D9
+/// hide rule).
+/// </para>
+/// </summary>
+public sealed record BoardEventPicker(
+    IReadOnlyList<(string Id, string Name)> Options,
+    string? CurrentEventId = null);
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +

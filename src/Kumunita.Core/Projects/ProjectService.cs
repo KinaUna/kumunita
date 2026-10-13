@@ -739,6 +739,65 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// The **reverse read seam** of the M14 interlock carried to the board
+    /// surface (ADR 0115 D2, the board sibling of
+    /// <see cref="ListTodosForEventAsync"/>) — the <see cref="ListBoardsAsync"/>
+    /// shape filtered to one event: candidates are the non-deleted boards with
+    /// <see cref="KanbanBoard.EventId"/> == <paramref name="eventId"/> —
+    /// **a filter, never a gate** (C-M14·1 — the <c>EventId</c> narrows the
+    /// candidate set, it never changes the audience decision); the survivors
+    /// are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass;
+    /// C3, the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "board"</c>) over the **existing**
+    /// <see cref="KanbanBoardToAuditableResource"/> (C-M14·4 — no new adapter);
+    /// ordered by <see cref="KanbanBoard.Created"/> descending; paged with
+    /// <c>HasMore = candidates.Count == PageSize</c> (ADR 0090 D1/D3). A 0-
+    /// candidate page reports <c>HasMore: false</c> and runs **before** any
+    /// decision (no audit row — C-M7·5). The lane returns **only** boards the
+    /// actor may read — never a 404/403 (the event's own detail page decides
+    /// its own visibility — the lane is called only from a page that already
+    /// passed the event's <c>Read</c> decision).
+    /// </summary>
+    public async Task<BoardPage> ListBoardsForEventAsync(string eventId, string actorId, int page, CancellationToken ct = default, int? pageSize = null)
+    {
+        if (page < 1) page = 1;
+        int ps = PageSizer.ResolveOverride(pageSize, PageSize);
+
+        await using var session = _store.QuerySession();
+        // The M14 event link carried to the board surface: a feed filter,
+        // never a gate (C-M14·1) — the board's own Audience decision stays the
+        // access boundary (C-M5·3), exactly the `projectId` filter discipline
+        // in ListBoardsAsync above.
+        var candidates = await session.Query<KanbanBoard>()
+            .Where(b => !b.IsDeleted && b.EventId == eventId)
+            .OrderByDescending(b => b.Created)
+            .Skip((page - 1) * ps).Take(ps)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        // C-M7·5 (D8) — the 0-candidate early return reports no further page
+        // (ADR 0090 D1) and runs **before** any decision (no audit row).
+        if (candidates.Count == 0)
+            return new BoardPage(Array.Empty<KanbanBoard>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == ps;
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "board"), from that single call (the ListBoardsAsync
+        // shape). Standalone form (no IDocumentSession overload): this is a
+        // plain read with no in-flight caller transaction (the M2 ListAsync
+        // precedent).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(b => new KanbanBoardToAuditableResource(b)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return new BoardPage(candidates.Where(b => visibleIds.Contains(b.Id)).ToList(), hasMore);
+    }
+
+    /// <summary>
     /// The boards the actor may <c>Read</c> on which this to-do is placed
     /// (the "link(s) to the Kanban board(s) it is associated with, **if the
     /// user has access to them**" surface, used by the notification inbox card):
@@ -2848,6 +2907,74 @@ public sealed class ProjectService : IProjectService
 
         session.Store(board);
         session.Store(AccessAuditFactory.SingleTarget(actorId, "board.set_project", TargetKindBoard, board.Id, StandingMatrix.AuditVia(actorId, board.AuthorId)));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return board;
+    }
+
+    /// <summary>
+    /// **M14 interlock (ADR 0115 D3)** carried to the board surface: sets
+    /// <see cref="KanbanBoard.EventId"/> to <paramref name="eventId"/>
+    /// (<c>null</c> = clear the link — the <see cref="SetBoardProjectAsync"/>
+    /// null-clears rule). Standing (server-side, C3): **creator ∪ GlobalAdmin**
+    /// over the **board** (the <see cref="CheckBoardStanding"/> shape — the
+    /// ADR 0070 board-edit precedent; the assignee branch does not apply to a
+    /// board, C-M5·6). **Event guard** (the M14 drift entry 1 carried to the
+    /// board): a non-null <paramref name="eventId"/> must point at an event
+    /// that exists (404 otherwise), is not soft-deleted (404), and that the
+    /// actor may Read (403) — the frozen <see cref="IAuthorizationService"/>
+    /// <c>CanAsync(Read)</c> path over the <see
+    /// cref="EventToAuditableResource"/> (C-M14·3/4 — "a read is not a
+    /// decision", ADR 0054); checked **before** the board write (the
+    /// <see cref="SetBoardProjectAsync"/> target-visibility shape).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped. One <see cref="AccessAudit"/> row (<c>board.set_event</c>,
+    /// <c>TargetKind = "board"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task<KanbanBoard> SetBoardEventAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? eventId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId)) throw new KeyNotFoundException("A board id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a board with an event.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** board: creator ∪ GlobalAdmin (the ADR 0070 board-edit
+        // precedent) — the assignee branch does not apply to a board (C-M5·6).
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // The event guard (ADR 0115 D3, drift entry 1): a non-null eventId
+        // must point at an event that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — the frozen
+        // IAuthorizationService.CanAsync(Read) path over the
+        // EventToAuditableResource (C-M14·3/4 — "a read is not a decision",
+        // ADR 0054); `null` = clear the link — no guard.
+        if (eventId is not null)
+        {
+            var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+            if (@event is null)
+                throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+            if (@event.IsDeleted)
+                throw new KeyNotFoundException($"Event '{eventId}' was not found.");
+
+            var eventDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new EventToAuditableResource(@event))
+                .ConfigureAwait(false);
+            if (!eventDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read event '{eventId}'.");
+        }
+
+        board.EventId = eventId;                          // `null` = clear the link.
+        board.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(board);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "board.set_event", TargetKindBoard, board.Id, StandingMatrix.AuditVia(actorId, board.AuthorId)));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }

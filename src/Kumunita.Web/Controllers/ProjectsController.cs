@@ -1898,7 +1898,11 @@ public sealed class ProjectsController : Controller
             Modified: board.Modified,
             // ADR 0086 D9 — the stored association (may dangle — display
             // only); the "Add to Project…" modal preselects it.
-            ProjectId: board.ProjectId);
+            ProjectId: board.ProjectId,
+            // ADR 0115 (M14 interlock carried to the board surface) — the
+            // stored event association (may dangle — display only); the
+            // "Link to event…" picker preselects it.
+            EventId: board.EventId);
     }
 
     /// <summary>
@@ -2133,6 +2137,39 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+        // **event link**: resolve the board's `EventId` to a readable,
+        // non-deleted event title for the detail view, through the **frozen**
+        // <see cref="Kumunita.Core.Events.IEventService.GetAsync"/> (a
+        // single <c>CanAsync(Read)</c> decision). The D2 dangling-safe rule:
+        // a soft-deleted target (404) or an unreadable one (403) leaves all
+        // three fields `null`, and the chip is omitted entirely — **not** a
+        // 404/403 for the board itself (C-M14·2 — a read convenience, never an
+        // error; the target's title / id are not leaked). Only when `EventId`
+        // is non-empty is <c>GetAsync</c> called (a `null` association is the
+        // common case — no extra read).
+        string? eventLinkId = null;
+        string? eventLinkTitle = null;
+        if (events is not null && result.Board.EventId is { Length: > 0 })
+        {
+            try
+            {
+                var linked = await events.GetAsync(result.Board.EventId, actorId, HttpContext.RequestAborted);
+                eventLinkId = linked.Id;
+                eventLinkTitle = linked.Title;
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted event — the association dangles; the chip is
+                // hidden (C-M14·2), the board itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // An event the actor may not read — a hidden chip, not a 403
+                // for the board (C-M14·2).
+            }
+        }
+
         // ADR 0088 — the board's user-added translations (the ADR 0027
         // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
         // shape). A "a read, not a decision" surface; the parent board's
@@ -2176,6 +2213,19 @@ public sealed class ProjectsController : Controller
             // ADR 0086 D9 — the project link (the D6 dangling rule above).
             ProjectId: projectLinkId,
             ProjectTitle: projectLinkTitle,
+            // ADR 0115 D2 (M14 interlock carried to the board surface) — the
+            // event link (the D2 dangling rule above).
+            EventId: eventLinkId,
+            EventTitle: eventLinkTitle,
+            EventLinkPath: eventLinkId is not null ? $"/events/{eventLinkId}" : null,
+            // ADR 0115 D3 (M14 interlock carried to the board surface) — the
+            // "Link to event…" picker (a display surface, never a gate —
+            // C-M14·4; empty ⇒ the card hides, the ADR 0086 D9 F10 rule). The
+            // <see cref="SeedEventPickerAsync"/> seed offers the actor's own
+            // events; the board's stored <c>EventId</c> prefills it.
+            EventPicker: new BoardEventPicker(
+                Options: await SeedEventPickerAsync(),
+                CurrentEventId: result.Board.EventId),
             // ADR 0086 D9 — the ⋮ menu's "Add to Project…" modal picker
             // (a display surface, never a gate — C-PL·3; empty ⇒ the item
             // + modal hide, the BoardEdit F10 rule).
@@ -2420,6 +2470,53 @@ public sealed class ProjectsController : Controller
         TempData["info"] = string.IsNullOrWhiteSpace(projectId)
             ? "Project cleared."
             : "Project set.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/set-event</c> — the **event
+    /// association** write lane (ADR 0115 D3 / C-M14·3, the M14 interlock
+    /// carried to the board surface — the <c>TodoSetEvent</c> shape verbatim,
+    /// the <c>BoardSetProject</c> board-standing sibling). A **standalone**
+    /// form POST (its own small form on the board detail — **not** the main
+    /// board update form, whose frozen <see
+    /// cref="Kumunita.Core.Projects.UpdateBoardRequest"/> is untouched).
+    /// Sets the board's <see cref="Kumunita.Core.Projects.KanbanBoard
+    /// .EventId"/> through the <see
+    /// cref="IProjectService.SetBoardEventAsync"/> seam; a blank / <c>null</c>
+    /// choice posts <c>null</c> = **clear** the association. **Creator ∪
+    /// GlobalAdmin** over the board — the service's server-side standing
+    /// re-check + event guard (C-M14·3) is the enforcement; the controller
+    /// does no standing math (the ADR 0006-D split). A missing board is 404,
+    /// a denied actor 403, a missing / unreadable event 404 (the seam's
+    /// decision as truth, C-M14·3).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/set-event")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardSetEvent(string id, [FromForm] string? eventId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetBoardEventAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(eventId) ? null : eventId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(eventId)
+            ? "Event link cleared."
+            : "Event linked.";
         return Redirect($"/projects/boards/{id}");
     }
 

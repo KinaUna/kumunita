@@ -1897,6 +1897,24 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Linked event",
             ["events.linked_todos"] = "Linked to-dos",
 
+            // ── M14 (ADR 0115 D2/D3, the interlock carried to the board
+            //    surface) — the board's event chip + the event detail's linked
+            //    boards section + the board detail's "Link to event…" picker
+            //    labels (the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["board.event_link"] = "Linked event",
+            ["board.link_to_event"] = "Link to event…",
+            ["board.event_hint"] = "An event link is a display surface — it groups this board under the event, it never limits who can see it.",
+            ["events.linked_boards"] = "Linked boards",
+
+            // ── M14 (ADR 0115 D3) — the inline "Add a to-do to this event"
+            //    composer (the POST /events/{id}/todos lane's affordance on
+            //    the event detail page; the closed-key registry +
+            //    KnownTranslationKeys_ParityTests enforce the × 4) ──
+            ["events.add_todo.title"] = "Add a to-do to this event",
+            ["events.add_todo.hint"] = "A quick way to add a checklist item or prep task that belongs to this event.",
+            ["events.add_todo.submit"] = "Add to-do",
+
             // ── M14 (ADR 0115 D3) — the U04 set-event picker labels (the
             //    to-do detail's "Link to event" form label + the
             //    <select>'s placeholder / clear option; the closed-key
@@ -4603,6 +4621,25 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Verknüpfte Veranstaltung",
             ["events.linked_todos"] = "Verknüpfte To-dos",
 
+            // ── M14 (ADR 0115 D2/D3, die Verknüpfung auf die Board-Oberfläche
+            //    übertragen) — das Board-Veranstaltungs-Badge + die
+            //    „Verknüpfte Boards"-Sektion + das „Mit Veranstaltung
+            //    verknüpfen…"-Auswahl-Label (die Schlüssel-Registry + die
+            //    KnownTranslationKeys_ParityTests erzwingen die × 4) ──
+            ["board.event_link"] = "Verknüpfte Veranstaltung",
+            ["board.link_to_event"] = "Mit Veranstaltung verknüpfen…",
+            ["board.event_hint"] = "Eine Veranstaltungs-Verknüpfung ist eine Anzeige — sie gruppiert dieses Board unter der Veranstaltung, begrenzt aber nie, wer es sehen kann.",
+            ["events.linked_boards"] = "Verknüpfte Boards",
+
+            // ── M14 (ADR 0115 D3) — der Inline-„Aufgabe zu dieser
+            //    Veranstaltung hinzufügen"-Komponist (die POST
+            //    /events/{id}/todos-Lane auf der Veranstaltungsdetailseite;
+            //    die Schlüssel-Registry + KnownTranslationKeys_ParityTests
+            //    erzwingen die × 4) ──
+            ["events.add_todo.title"] = "Aufgabe zu dieser Veranstaltung hinzufügen",
+            ["events.add_todo.hint"] = "Ein schneller Weg, um eine Checklisten-Eintrag oder Vorbereitungs-Aufgabe zu dieser Veranstaltung hinzuzufügen.",
+            ["events.add_todo.submit"] = "Aufgabe hinzufügen",
+
             // ── M14 (ADR 0115 D3) — die U04 set-event-Picker-Beschriftungen
             //    (To-do-Details: Formularbeschriftung + Platzhalter/Clear-Option) ──
             ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
@@ -7159,6 +7196,24 @@ public static class KnownTranslationKeys
             ["todo.event_link"] = "Événement lié",
             ["events.linked_todos"] = "To-dos liés",
 
+            // ── M14 (ADR 0115 D2/D3, l'interconnexion portée à la surface
+            //    board) — le badge événement du board + la section « Boards
+            //    liés » + le libellé du sélecteur « Lier à un événement… »
+            //    (la registry de clés + KnownTranslationKeys_ParityTests
+            //    imposent les × 4) ──
+            ["board.event_link"] = "Événement lié",
+            ["board.link_to_event"] = "Lier à un événement…",
+            ["board.event_hint"] = "Un lien d'événement est une surface d'affichage — il regroupe ce board sous l'événement, sans jamais limiter qui peut le voir.",
+            ["events.linked_boards"] = "Boards liés",
+
+            // ── M14 (ADR 0115 D3) — le composeur inline « Ajouter une to-do
+            //    à cet événement » (la lane POST /events/{id}/todos sur la
+            //    page de détail de l'événement ; la registry de clés +
+            //    KnownTranslationKeys_ParityTests imposent les × 4) ──
+            ["events.add_todo.title"] = "Ajouter une to-do à cet événement",
+            ["events.add_todo.hint"] = "Une façon rapide d'ajouter un élément de liste de vérification ou une tâche de préparation à cet événement.",
+            ["events.add_todo.submit"] = "Ajouter",
+
             // ── M14 (ADR 0115 D3) — les deux libellés du sélecteur U04 set-event
             //    (détail de la to-do : libellé du formulaire + option
             //    placeholder / effacement) ──
@@ -9706,6 +9761,23 @@ public static class KnownTranslationKeys
             // ── M14 (ADR 0115 D2) — de to U03-lænkemærkater arrangementer ↔ to-dos ──
             ["todo.event_link"] = "Knyttet arrangement",
             ["events.linked_todos"] = "Knyttede to-dos",
+
+            // ── M14 (ADR 0115 D2/D3, samspillet båret over på board-overfladen)
+            //    — boardets arrangement-badge + „Knyttede boards"-sektion +
+            //    „Knyt til arrangement…"-vælgermærkatet (nøgleregisteret +
+            //    KnownTranslationKeys_ParityTests pålægger × 4) ──
+            ["board.event_link"] = "Knyttet arrangement",
+            ["board.link_to_event"] = "Knyt til arrangement…",
+            ["board.event_hint"] = "En arrangementet-lænke er et displayoverflade — den grupperer dette board under arrangementet, men begrænser aldrig, hvem der kan se det.",
+            ["events.linked_boards"] = "Knyttede boards",
+
+            // ── M14 (ADR 0115 D3) — den inline „Tilføj en to-do til dette
+            //    arrangement"-komponist (POST /events/{id}/todos-lanen på
+            //    arrangementets detailside; nøgleregisteret +
+            //    KnownTranslationKeys_ParityTests pålægger × 4) ──
+            ["events.add_todo.title"] = "Tilføj en to-do til dette arrangement",
+            ["events.add_todo.hint"] = "En hurtig måde at tilføje et tjeklisten-punkt eller en forberedelsesopgave til dette arrangement.",
+            ["events.add_todo.submit"] = "Tilføj to-do",
 
             // ── M14 (ADR 0115 D3) — de to U04 set-event-vælgermærkater
             //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──

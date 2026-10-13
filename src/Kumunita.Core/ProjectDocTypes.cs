@@ -82,7 +82,13 @@ public static class ProjectDocTypes
                .Index(b => new { b.ComponentId, b.Created })
                // the `ProjectId` feed-filter lookup (the PL `projectId`
                // filter — a feed filter, never a gate, ADR 0086 D4 / C-PL·3)
-               .Index(b => b.ProjectId);
+               .Index(b => b.ProjectId)
+               // the `EventId` feed-filter lookup (the M14 interlock carried to
+               // the board surface — a feed filter, never a gate, ADR 0115
+               // D1 / C-M14·1 — the `TodoItem.EventId` precedent; unnamed: the
+               // auto-derived name stays under Postgres' 64-char NAMEDATALEN
+               // cap, the file's own note)
+               .Index(b => b.EventId);
 
         // KanbanLane — conventional string Id; the (BoardId, Order) **unique**
         // index (a lane's position within its board is a business key — the
