@@ -460,11 +460,464 @@ each FACE; the drift-guard (Part 2) re-pins the invariant ↔ FACE binding.
 
 ## Part 2 (U02) — the seams & contracts
 
-*(Authored by U02. This section — the exact `MentionTokens` parser contract, the
-`IMentionService` seam shape, the per-surface emitter call shape (the seven
-surfaces), the `MentionRenderer` render-pass contract, the closed mention `kw-l`
-key set (7 kinds × 4 keys, with the en floor + the de/fr/da baselines), the
-`Preferences.cshtml` toggle change, the pinned test names, the three-test
-acceptance gate, and the drift guard — is authored by U02 on top of this
-Part 1. Part 1's invariants (M36·1–M36·10) + FACES (M36-1–M36-9) are the
-contract Part 2 fills.)*
+Part 2 pins the **exact** shapes U03–U09 implement. Part 1's invariants
+(M36·1–M36·10) + FACES (M36-1–M36-9) are the contract these shapes fill; this
+section is the **authoritative** pin for the signatures, the call shape, and the
+test names — when a later unit's reading of a register line conflicts with a
+signature here, **this section wins**.
+
+### Part 2.0 — the frozen directory seam, pinned to the real shape (drift note)
+
+Part 1, the ADR, and the register all name the M2 directory read seam
+"`IDirectoryService`." The **actual** code (verified, U02) is a **concrete
+`sealed class`**, not an interface — this is **M2's recorded Deviation 1** (the
+M2 handoff note: "U5 deliberately shipped `DirectoryService` as a concrete
+`sealed class`, not behind `IDirectoryService`; no interface invented"). The
+frozen seam M36 composes is therefore:
+
+```csharp
+// src/Kumunita.Core/UserInfo/DirectoryService.cs — CONCRETE, sealed (M2 Deviation 1)
+public sealed class DirectoryService
+{
+    public DirectoryService(IUserInfoService userInfo, IAuthorizationService authz);
+
+    // The frozen read seam M36 composes (M36·2 — reused, not re-shaped):
+    //  Task<DirectoryList> ListAsync(string viewerSubjectId)
+    //    → DirectoryList(IReadOnlyList<Profile> Visible)  // every NON-blocked resident
+    //  Each Profile exposes: string SubjectId, string DisplayName, bool Blocked.
+    //  (ListAsync already filters `!p.Blocked`; the seam is a pure catalog read —
+    //   no IAuthorizationService call, no AccessAudit row — M2 §2.2.)
+    // DetailAsync(string viewerSubjectId, string targetSubjectId) — NOT used by M36
+    //   (the directory detail gate runs on click, on the link's target surface — M36·5).
+}
+```
+
+> **Drift pin (recorded, not resolved by U02):** the prose's "`IDirectoryService`"
+> is a **shorthand for the concrete `DirectoryService` class** — there is no
+> `IDirectoryService` interface in the codebase. U03 implements the
+> `IMentionService` / `MentionService` over the **concrete `DirectoryService`**
+> (ctor `MentionService(DirectoryService directory)` + `AddTransient<IMentionService,
+> MentionService>`), exactly as the M3 register's §Assumptions and U03/U04 specs
+> already write the `DirectoryService` (not `IDirectoryService`) composition.
+> This note pins that to a later unit: the **seam M36 composes is `DirectoryService`
+> (concrete)**, and no unit may invent an `IDirectoryService` interface to "clean
+> it up" (that would re-shape the frozen M2 surface — forbidden by M36·2 / unit
+> series rule 5).
+
+### Part 2.1 — the `MentionTokens` pure parser (M36·1 / M36·2, M36-1)
+
+A **static, pure, no-dep** helper in `namespace Kumunita.Core.Mentions` (the
+`UgcSnippets` / `KanbanStatuses` shape — no docs in the parser itself, no deps):
+
+```csharp
+namespace Kumunita.Core.Mentions;
+
+public static class MentionTokens
+{
+    /// <summary>
+    /// Scan a Markdown body for `@<token>` occurrence strings. Returns the
+    /// ORDERED, DE-DUPLICATED list of candidate tokens (a token = `@` + a run
+    /// of non-whitespace characters). A token is **not** extracted from inside
+    /// a Markdown code span (``` fenced), inline code (` `…` `), a link
+    /// (`[text](url)`), or an image (`![alt](url)`). A lone `@` or a trailing
+    /// `@` (no following non-whitespace character) yields **no** token.
+    /// A null / whitespace body yields an **empty** list.
+    /// </summary>
+    public static IReadOnlyList<string> ExtractTokens(string? body);
+}
+```
+
+**Token shape + rules (pinned, M36-1):**
+
+- a **token** is `@` + a **maximal run of non-whitespace characters** that
+  follows it (greedy to the next whitespace, end-of-string, or a Markdown
+  structural delimiter that ends a token — an open `(`, an open `[`, a backtick,
+  or the start of a ` ``` ` fence line). The `@` is **not** part of the returned
+  value: `@Ada` → the list contains `"Ada"` (the **display-name** candidate, not
+  the `@`-prefixed form) — the resolver matches against `Profile.DisplayName`.
+- **de-duplication** is **case-insensitive** and **order-preserving**: `@Ada @Ada
+  @Bob` → `["Ada", "Bob"]` (M36-1 pin); the **first** occurrence's spelling is
+  kept (the resolver is case-insensitive, so the spelling is not load-bearing).
+- **code-span exclusion** (M36·2 / M36-1): a `@word` inside a fenced code block
+  (``` … ```), inside inline code (`` `…` ``), inside a link (`[text](…)` —
+  including the `[text]` part), or inside an image (`![alt](…)` — including the
+  `[alt]` part) is **never** extracted. This is the `PlainTextPreview` pin — a
+  `@` in a code block is code, not a mention.
+- **lone / trailing `@`** (M36-1): `say @` → `[]`; `@` at the very end with no
+  following non-whitespace → `[]`; `@ @Bob` → `["Bob"]` (the first `@` is
+  inert, the second is a token).
+- the parser is **pure** — no `IDocumentSession`, no service, no I/O, no
+  localization; it is a string transform, trivially unit-testable in isolation
+  (the M36-1 / M36·1 pin).
+
+### Part 2.2 — the `IMentionService` seam (M36·2 / M36·9, M36-4, M36-5)
+
+One **service** interface + one impl, in `namespace Kumunita.Core.Mentions`:
+
+```csharp
+namespace Kumunita.Core.Mentions;
+
+public interface IMentionService
+{
+    /// <summary>
+    /// Resolve `@`-tokens (the <see cref="MentionTokens.ExtractTokens"/> output)
+    /// to the resident ids they mention. A token resolves to a resident's
+    /// <c>SubjectId</c> **iff** exactly one non-blocked resident (as listed by
+    /// the frozen <c>DirectoryService.ListAsync</c>) has a display name equal
+    /// to the token (case-insensitive, ordinal) AND that resident is **not** the
+    /// <paramref name="authorId"/>. A token matching **zero** residents (unknown)
+    /// or **two or more** (ambiguous) is **inert** — dropped, never a guess
+    /// (M36-5). The result is the **de-duplicated, order-preserving** set of
+    /// resolved recipient ids (order = first token occurrence order).
+    /// </summary>
+    /// <remarks>
+    /// This is a **read, not a decision** (M36·5): it composes the frozen
+    /// <c>DirectoryService.ListAsync</c> catalog read and does **no**
+    /// <c>IAuthorizationService</c> call and writes **zero** <c>AccessAudit</c>
+    /// rows. It composes the **concrete** <c>DirectoryService</c> (M2 Deviation 1,
+    /// Part 2.0) — it does **not** invent an <c>IDirectoryService</c> interface.
+    /// It is **HTTP-free + Wolverine-free** (M36·9, ADR 0006-D).
+    /// </remarks>
+    Task<IReadOnlyCollection<string>> ResolveAsync(
+        IReadOnlyCollection<string> tokens,
+        string authorId,
+        CancellationToken ct = default);
+}
+
+public sealed class MentionService : IMentionService
+{
+    public MentionService(DirectoryService directory);   // the frozen M2 seam (Part 2.0)
+    // Task<IReadOnlyCollection<string>> ResolveAsync(...) — composes ListAsync
+}
+```
+
+**The inert rule (pinned, M36-4 / M36-5, M36-5):**
+
+- **exactly one** non-blocked, non-author resident matches (case-insensitive
+  ordinal `DisplayName` equality) → the token resolves to that resident's
+  `SubjectId`.
+- **zero** matches (unknown name) → **inert**, dropped (M36-5).
+- **two or more** matches (a shared display name) → **inert**, dropped — never a
+  guess, never notify the wrong resident (M36·2 / M36-5).
+- a match on the **author's own** `SubjectId` → **inert**, dropped — the author
+  is never notified of their own mention (M36-5).
+- the **author exclusion** is by `SubjectId` (not display name) — the author is
+  dropped even if a different resident shares the author's display name.
+- **blocked** residents never match: `DirectoryService.ListAsync` already returns
+  only non-blocked residents, so a blocked resident is **invisible to mention
+  resolution** (M36-4, M36-5) — no extra `Blocked` filter is needed in
+  `MentionService`.
+- **zero `AccessAudit` rows** are written by `ResolveAsync` (M36·5) — it is a
+  pure catalog read; the F7 "a mention emission emits no audit row" pin is
+  preserved at the resolver level.
+- **no `HttpClient`, no Wolverine handler, no outbound channel** (M36·9, ADR
+  0006-D) — `MentionService` composes the frozen directory read only; the only
+  outbound channel in the milestone is the frozen M6 email lane (the `EmitAsync`
+  caller, not the resolver).
+
+**DI registration (pinned, M36·9 — the M6 `AddTransient<NotificationService>`
+precedent):**
+
+```csharp
+services.AddTransient<IMentionService, MentionService>(sp =>
+    new MentionService(sp.GetRequiredService<DirectoryService>()));
+```
+
+(the `DirectoryService` is the concrete M2 seam — Part 2.0 — registered
+`AddTransient<DirectoryService>` per the M2 handoff note; U03 confirms the
+existing registration shape and adds the one additive line).
+
+### Part 2.3 — the per-surface emitter call shape (M36·4 / M36·8, M36-2, M36-7)
+
+In **each** of the seven in-scope surfaces' **publishing** write lane, the
+additive mention-emitter step runs **after** the content is stored and **before**
+the single `SaveChangesAsync` (the M6 `CreateReplyAsync` emitter template —
+`EmitAsync` does not commit; the lane's own `SaveChangesAsync` is the single
+commit, ADR 0076 D5 / C3, M36·4). The frozen method signatures + audit rows of
+each surface are **untouched**; the step is *inside* the lane (M36·4).
+
+**The shared call shape (pinned, M36·4):**
+
+```csharp
+// (1) extract candidate tokens (pure, Part 2.1):
+var tokens = MentionTokens.ExtractTokens(body);
+if (tokens.Count > 0)
+{
+    // (2) resolve to recipient ids (the frozen directory read, Part 2.2):
+    var recipients = await _mentions.ResolveAsync(tokens, authorId, ct).ConfigureAwait(false);
+    // (3) emit one notification per resolved recipient (the frozen M6 writer):
+    foreach (var recipientId in recipients)
+    {
+        await _notifications.EmitAsync(
+            session,
+            recipientId: recipientId,
+            kind: <the surface's mention kind>,          // NotificationKinds.* (Part 2.5)
+            idempotencyKey: $"notification:{kind}:{contentId}:{recipientId}",  // M36·4
+            body: UgcSnippets.Truncate(body),            // the M6 U04 precedent, 200-char cap
+            targetId: null,                              // mention kinds are NOT in OptInKinds (M36·3)
+            linkPath: <the surface's content detail path>,  // Part 2.5 table
+            ct: ct).ConfigureAwait(false);
+    }
+}
+```
+
+- the **per-recipient idempotency key** is
+  `notification:{kind}:{contentId}:{recipientId}` (M36·4) — the recipient id is
+  **part of the key** so each mentionee stores their own inbox row + gets their
+  own email, while a re-emission of the same (content, recipient) pair is a
+  no-op (ADR 0076 D4 / F10 preserved). The `{contentId}` is the stable id of the
+  content row just stored (the post id / reply id / page id / event id / to-do
+  comment id / group post id / announcement id / message id — the lane's own
+  `Guid`); it is **not** regenerated per call.
+- `targetId` is **null** for all seven mention kinds (they are **not** in
+  `NotificationKinds.OptInKinds` — M36·3), so the ADR 0084 per-target
+  subscription gate short-circuits; the resident's per-kind **email** toggle
+  still gates the **email** (the M6 D7 shape — the inbox row always stores, the
+  email respects the preference).
+- the **frozen M6 gates** apply unchanged (the `EmitAsync` writer, not M36):
+  the dedup on the key, the per-kind email preference gate (the resident's
+  opt-OUT toggle, M36-5), the **quiet-hours** gate (ADR 0121), and the
+  **sample-suppression** gate (ADR 0078 — a sample account in production stores
+  no inbox row, no email, no side effects). M36 adds none of these; it only
+  calls the writer.
+- the **draft gate** (M36·8, M36-7): the emitter runs only on the **publishing**
+  lane — the **publish** seam for the draft-capable surfaces (post / group post
+  / announcement — the ADR 0037 author-only idempotent publish lane) and the
+  **create** lane for the non-draft surfaces (page / event / to-do comment /
+  message). A draft **save** runs **no** mention emitter (the ADR 0037 draft is
+  author-only); the mention fires only when the author later **publishes**.
+
+**The seven surfaces + their kind + content path (pinned, M36·3 / M36·4):**
+
+| # | Surface | Publishing lane (frozen) | Mention kind | `linkPath` |
+|---|---------|--------------------------|--------------|-----------|
+| 1 | community **post** | `PostService.CreatePostAsync` (publish) | `post.mention` | `/posts/{postId}` |
+| 2 | community **reply** | `PostService.CreateReplyAsync` | `post.mention` | `/posts/{postId}#reply-{replyId}` |
+| 3 | **group post** | `PostService.CreateGroupPostAsync` (publish) | `group.post.mention` | `/groups/{groupId}/posts/{postId}` |
+| 4 | **group post reply** | `PostService.CreateGroupPostReplyAsync` | `group.post.mention` | `/groups/{groupId}/posts/{postId}#reply-{replyId}` |
+| 5 | **page** | `PageService` create lane | `page.mention` | `/pages/{pageId}` |
+| 6 | **event** | `EventService` create lane | `event.mention` | `/events/{eventId}` |
+| 7 | **to-do comment** | `ProjectService.CreateTodoCommentAsync` | `todo.mention` | `/projects/todos/{todoId}#comment-{commentId}` |
+| 8 | **announcement** | `AnnouncementService` publish lane | `announcement.mention` | `/announcements/{announcementId}` |
+| 9 | **message** | `MessagingService.SendAsync` | `message.mention` | `/messages/{conversationId}` |
+
+> **Note (register vs. table):** the register's §Assumptions names **seven**
+> surfaces + one mention kind each, with the community post + reply sharing
+> `post.mention` and the group post + reply sharing `group.post.mention` — so
+> the **seven mention kinds** collapse to **nine content lanes** (the table
+> above is the authoritative lane→kind→path map). The "seven mention kinds"
+> count (M36·3) is the number of **distinct** `NotificationKinds` values, not
+> the number of lanes. U04 wires lanes 1–2 (post + reply, `post.mention`);
+> U05 wires lanes 3–9 (the six remaining kinds' lanes).
+
+### Part 2.4 — the `MentionRenderer` render-pass contract (M36·6, M36-3, M36-6)
+
+The render pass is a **plain-TS, no-dep, no-`any`** module
+(`client/lib/mention-renderer.ts`, the ADR 0031 `expand-page.ts` /
+`calendar-fullscreen.ts` IIFE shape) that runs **after** the frozen
+`MarkdownRenderer.RenderHtml` (the one-renderer pin, **unchanged** — M36·6).
+It is a **display transform**, not a Markdown construct, and it is **idempotent**.
+
+**Inputs (pinned, M36·6):**
+
+- the **rendered HTML body** — the output of `MarkdownRenderer.RenderHtml` for
+  the content's Markdown (the server-rendered `<div>` / `<p>` the surface view
+  already emits).
+- the **resolved mention map** — an `IReadOnlyDictionary<string, string>`
+  (display-name → resident `SubjectId`) the **controller** resolved **once** via
+  `IMentionService.ResolveAsync` (the same read the emitter used — the resolver
+  is called in the Web boundary for the render pass, not re-issued per
+  surface). The map is **serialized** to the page as a `data-mention-map` JSON
+  attribute on the body element (the server-rendered map the pass reads) — a
+  closed, code-owned structure, not a resident-controlled string.
+
+**The rewrite rule (pinned, M36-3 / M36-6):**
+
+- the pass scans the rendered body's **text nodes** for `@<DisplayName>` where
+  `<DisplayName>` is a key in the resolved map (case-insensitive).
+- it rewrites **only** a match whose **ancestor chain contains no**
+  `<a>`, `<code>`, `<pre>`, or `<img>` element and whose text is **not**
+  already part of an `href` value (the M36-6 skip rule).
+- the rewrite is exactly
+  `<a class="mention" href="/directory/{residentId}">@<DisplayName></a>` — the
+  `class="mention"` is a **style hook** for `site.css` (Part 2.6), the `href`
+  targets the resident's **directory detail** surface (the frozen M2 gate runs
+  on click — M36·5, "a link is not a grant").
+- **no-op** for every token **not** in the resolved map — an unresolved /
+  ambiguous / blocked / self `@name` stays **plain text** (the map contains only
+  resolved names, M36-4 / M36-5).
+- **idempotent**: the pass matches `@name` **text**, not `href`; running it
+  twice over the same body yields the same output (an already-linked mention —
+  its text is now inside an `<a>` — is skipped by the ancestor rule, M36-6).
+- **zero new npm package, zero build step** (M36·6, ADR 0031) — the pass is
+  plain TS over the existing `client/lib` module; the tsc build picks it up with
+  no new build step.
+
+**`site.css` rule (pinned, M36·7):**
+
+```css
+.mention { color: var(--kw-mention); text-decoration: none; }
+.mention:hover { text-decoration: underline; }
+```
+
+(the `--kw-mention` custom property is the existing palette token; if absent,
+U07 adds it to the existing `:root` token block — a one-line additive).
+
+### Part 2.5 — the closed mention `kw-l` key set (M36·7, M36-9)
+
+The seven mention kinds each contribute **four** keys (the M6 `post.reply` key
+shape, `notification.{kind}.subject` / `.body`, plus the M6 per-kind badge +
+preference-label pair) — **7 kinds × 4 keys = 28 keys × four languages
+(en/de/fr/da)**, all **present, non-empty**:
+
+| kind | badge | preference label | subject (new) | body (new) |
+|------|-------|------------------|---------------|------------|
+| `post.mention` | *exists* | *exists* | **new** | **new** |
+| `group.post.mention` | new | new | new | new |
+| `page.mention` | new | new | new | new |
+| `event.mention` | new | new | new | new |
+| `todo.mention` | new | new | new | new |
+| `announcement.mention` | new | new | new | new |
+| `message.mention` | new | new | new | new |
+
+- the **`post.mention`** `notifications.kind.post.mention` (badge) +
+  `notifications.preference.post.mention.label` keys **already exist** from M6's
+  reserved set (verified, U02 — present in all four languages); **only** its
+  `notification.post.mention.subject` / `.body` templates are new (M36·7).
+- the **six new kinds** contribute all **four** keys each (badge + preference
+  label + subject + body) — all new, all four languages (M36·7).
+- the **en floor** (the ADR 0015 D1 provider-floor discipline): the `en` value
+  is the **source text**; the `de` / `fr` / `da` values are U06's to author
+  (M36·7 four-language pin). The subject ends in a sentence break and the body
+  ends in a trailing space (the M6 `post.reply` shape — the UGC snippet is
+  **appended after one space** at emit time, `template + " " + snippet`, no
+  placeholder substitution).
+- the **existing** `kw-l` key sets (the M6 notification set, the M2 directory
+  set, the per-surface sets) are **untouched** (M36·7 additive-only pin).
+- the closure is pinned by `KwLRegistryConsistencyTests` +
+  `KnownTranslationKeys_ParityTests` (M36-9) — a missing / empty /
+  single-language key fails the build.
+
+### Part 2.6 — the `Preferences.cshtml` toggle change (M36·7, M36-5)
+
+The M6 `Views/Notifications/Preferences.cshtml` ships `post.mention` as a
+**present-but-disabled** toggle with a "coming soon" badge (the C-M6·2
+special-case, verified, U02 — `var reserved = kind == NotificationKinds
+.PostMention;` + the `opacity-50` / `disabled` / `checked` suppression + the
+`notifications.preferences.coming_soon` badge). M36's change:
+
+- **remove** the `reserved` special-case entirely — the `var reserved = …`
+  line, the `opacity-50` class, the `disabled` attribute, the `checked`
+  suppression, and the "coming soon" `<kw-l>` badge are all **gone** (M36·7).
+- `post.mention` then renders as a **normal opt-OUT switch** like every other
+  resident-facing kind (its preference row gates the **email**, not the inbox —
+  the M6 D7 shape, M36-5).
+- the **six new kinds** render automatically — the `Known` loop already renders
+  **every** kind in `NotificationKinds.Known`, so adding the six kinds to
+  `Known` (Part 2.5) is sufficient; the view change is **purely** the removal of
+  the `reserved` special-case (M36·7).
+
+### Part 2.7 — the pinned test names (M36·8)
+
+**Core — `MentionsTests`** (`tests/Kumunita.Core.Tests/Mentions/MentionsTests.cs`):
+
+- `MentionTokens_ExtractTokens_DeDuplicatesAndOrders` — `@Ada @Ada @Bob` → `[Ada, Bob]` (M36-1).
+- `MentionTokens_ExtractTokens_ExcludesCodeSpansAndLinks` — `@code` inside a code span / inline code / link / image → no `code` token (M36-1 / M36·2).
+- `MentionTokens_ExtractTokens_LoneAndTrailingAtYieldNoToken` — `@` / trailing `@` → no token (M36-1).
+- `ResolveAsync_ExactlyOneNonBlockedNonAuthor_Resolves` — one match (not the author) → that resident's id (M36·2).
+- `ResolveAsync_ZeroMatches_YieldsNoId` — unknown name → no id (M36-5 inert).
+- `ResolveAsync_TwoOrMoreMatches_YieldsNoId` — ambiguous → no id (M36-5).
+- `ResolveAsync_AuthorsOwnName_YieldsNoId` — self → no id (M36-5).
+- `ResolveAsync_WritesZeroAccessAuditRows` — a read, not a decision (M36·5).
+
+**Web — `MentionRendererTests`** (`tests/Kumunita.Web.Tests/MentionRendererTests.cs`):
+
+- `Render_Pass_RewritesResolvedMentionToDirectoryLink` — `@Ada` + resolved map → `<a class="mention" href="/directory/{id}">@Ada</a>` (M36-3 / M36·6).
+- `Render_Pass_UnresolvedTokenIsPlainText` — `@Unknown` → no-op (M36·6).
+- `Render_Pass_IsIdempotent` — running twice = same output (M36-6).
+- `Render_Pass_SkipsInsideAnchorAndCode` — `@Ada` inside `<a>` / `<code>` → skipped (M36-6).
+
+**Per-surface emitter tests** (additive, in the existing per-surface test
+classes): for each of the **nine** content lanes (Part 2.3 table), when the body
+mentions a **resolved** resident → one `Notification` inbox row for the
+recipient (kind = the surface's mention kind, key =
+`notification:{kind}:{contentId}:{recipientId}`) + a staged best-effort email
+(M36-2 / M36·4); when the body mentions the **author** or an **ambiguous** /
+**unknown** name → **no** `Notification` row (M36-5); a **draft** save (post /
+group post / announcement) → **no** `Notification` row (M36·8, M36-7).
+
+### Part 2.8 — the three-test acceptance gate (M36·8)
+
+U09 runs the three-part gate (the in-process `dotnet exec` path — the
+`AGENTS.md` test-runner quirk; **not** `dotnet test` / the `run_tests` tool):
+
+1. **`MentionsTests`** (Core) — the 8 test names in Part 2.7 **green** (the
+   `MentionTokens` parser + the `IMentionService.ResolveAsync` inert rule).
+2. **`MentionRendererTests`** (Web) — the 4 test names in Part 2.7 **green**
+   (the render-pass contract).
+3. **the per-surface emitter tests** — the resolved / self-ambiguous-unknown /
+   draft-save scenarios **green** across the nine lanes (the M36-2 / M36-5 /
+   M36·8 pins).
+
++ the **`kw-l` parity** closure (`KwLRegistryConsistencyTests` +
+`KnownTranslationKeys_ParityTests`) **green** (M36-9), and the **`Milestones`**
+pin **green** (the `M36_Is_The_Single_InProgress_Milestone_And_The_Last` test —
+Part 2.9 confirms the re-pin is already in place). The gate is **PASS** when all
+four suites are green; any red is a **blocker**, not a stopping point (read the
+error, adjust, continue — the `AGENTS.md` "don't pause mid-task" doctrine).
+
+### Part 2.9 — the drift guard
+
+The **invariant ↔ FACE ↔ test** binding, re-pinned here (U10 re-pins it again at
+close):
+
+- **M36·1** (one shared module, no new context/doc/index) ↔ **M36-1** (the
+  parser is pure) ↔ `MentionsTests.MentionTokens_*` (Part 2.7). U03's
+  `Kumunita.Core.Mentions` is the **only** new Core surface; U10's close flip
+  adds **no** doc / index / context.
+- **M36·2** (`@` + `DisplayName`, no `Profile` field) ↔ **M36-1 / M36-4 / M36-5**
+  ↔ `ResolveAsync_*` (Part 2.7). U02 pinned the seam to the **concrete
+  `DirectoryService`** (Part 2.0) — no unit may invent `IDirectoryService`.
+- **M36·3** (the seven kinds) ↔ **M36-5** (the toggles render) ↔ the `kw-l`
+  parity closure (Part 2.8). U05 adds the six kinds to `Known`; U06 authors the
+  28 keys.
+- **M36·4** (the per-recipient key) ↔ **M36-2** (the notification fires) ↔ the
+  per-surface emitter tests (Part 2.7). The key shape
+  `notification:{kind}:{contentId}:{recipientId}` is **load-bearing** (the
+  dedup + the multi-recipient shape).
+- **M36·5** (no new authorization surface) ↔ **M36-4 / M36-8** ↔
+  `ResolveAsync_WritesZeroAccessAuditRows` (Part 2.7). The render pass is a
+  display transform; the directory gate runs on click.
+- **M36·6** (the post-render pass, idempotent) ↔ **M36-3 / M36-6** ↔
+  `MentionRendererTests.*` (Part 2.7). The frozen `MarkdownRenderer` is
+  **untouched**.
+- **M36·7** (the 28 `kw-l` keys, four-language) ↔ **M36-5 / M36-9** ↔ the `kw-l`
+  parity closure (Part 2.8) + the `Preferences.cshtml` change (Part 2.6).
+- **M36·8** (the publish-lane detection) ↔ **M36-7** (the draft inertness) ↔ the
+  draft-save emitter tests (Part 2.7). The emitter runs on the publishing lane
+  only.
+- **M36·9** (Core HTTP-free + Wolverine-free) ↔ **M36-1 / M36-2 / M36-5** ↔
+  `MentionsTests.*` (Part 2.7) + U03's `MentionService` (no `HttpClient`, no
+  handler).
+- **M36·10** (the six-member close flip, M36 the new last) ↔ U10. The
+  `MilestonesTests` pin is **already re-pinned** in the current codebase (verified,
+  U02): `Roadmap_Covers_M0_Through_M36_Plus_Named_Lanes_In_Order` +
+  `M36_Is_The_Single_InProgress_Milestone_And_The_Last` + `Shipped_Milestones
+  _Are_Marked_Done` (gains `M36`). U10 flips M36 `StatusNext` → `StatusDone`,
+  adds **no** `M37` row, and adds the `WhatsNew.cs` `0.x.0` entry naming M36 +
+  ADR 0165 (the required sixth close-flip member).
+
+**ADR confirmation (U00 verified, U02 re-confirmed):** **0165** is the next
+free number after **0164** (M35, kiosk) in the ADR index
+(`docs/adr/README.md`); the ADR `0165-mentions.md` is **present, Status:
+Accepted, dated 2026-10-12**. Part 2 is **ADR 0165's** D1–D10, pinned to the
+shapes above.
+
+**Drift-pause rule (U02–U10):** if a unit's entry reads reveal this Part 2
+contradicts the **actual code** (a signature, a kind, a `kw-l` key, a lane
+method, a `Milestones.cs` row), the unit **pauses** and records `## U<m> —
+Drift pause` in the handoff note (the register's unit-series rule 13) — it does
+**not** silently rewrite the pin. U02's one recorded drift: the prose's
+"`IDirectoryService`" shorthand → the **concrete `DirectoryService`** class
+(Part 2.0) — **resolved** (the seam is the concrete class; no interface to
+invent), not a pause.

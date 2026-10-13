@@ -96,3 +96,106 @@
 >   (M36·10).
 
 <!-- U00 appends its section below this line. One ## section per unit, in order (U00, U01, … U10). Never rewrite a prior section. -->
+
+## U02 — Design doc Part 2
+
+Finalized `docs/design/m36-mentions-design.md` Part 2 (appended to Part 1; the
+stub placeholder was replaced). No code, no build, no test (docs-only). Part 2
+pins, against the **actual** verified code shapes:
+
+- **Part 2.0 — the frozen directory seam, pinned to the real shape.** The prose's
+  "`IDirectoryService`" (ADR 0165 D1/D2/D9, Part 1, the register) is a
+  **shorthand for the concrete `sealed class DirectoryService`** — there is **no**
+  `IDirectoryService` interface in the codebase (M2's recorded **Deviation 1**:
+  "U5 deliberately shipped `DirectoryService` as a concrete `sealed class`, not
+  behind `IDirectoryService`"). The frozen read seam M36 composes is
+  `Task<DirectoryList> ListAsync(string viewerSubjectId)` →
+  `DirectoryList(IReadOnlyList<Profile> Visible)` of **non-blocked** residents
+  (each `Profile` exposes `SubjectId` / `DisplayName` / `Blocked`); `ListAsync`
+  is a pure catalog read (no `IAuthorizationService`, no `AccessAudit` row).
+  **U03 implements `MentionService(DirectoryService directory)` over the concrete
+  class** and must **not** invent an `IDirectoryService` interface (that would
+  re-shape the frozen M2 surface — forbidden by M36·2 / unit-series rule 5).
+- **Part 2.1 — `MentionTokens.ExtractTokens(string? body) → IReadOnlyList<string>`**
+  (static, pure, no-dep, `namespace Kumunita.Core.Mentions`, the `UgcSnippets`
+  shape): ordered, de-duplicated (case-insensitive, order-preserving) `@`-token
+  candidates; a token = `@` + maximal run of non-whitespace; **excluded** from
+  fenced code / inline code / link / image; a lone `@` / trailing `@` → no token;
+  the **`@` is not part of the returned value** (`@Ada` → `"Ada"`, the display-name
+  candidate).
+- **Part 2.2 — `IMentionService.ResolveAsync(IReadOnlyCollection<string> tokens,
+  string authorId, CancellationToken ct) → Task<IReadOnlyCollection<string>>`**
+  (the resolved resident `SubjectId`s): **inert** for zero matches (unknown),
+  two-or-more matches (ambiguous — never a guess), and the author's own `SubjectId`
+  (self); **exactly one** non-blocked, non-author resident match (case-insensitive
+  ordinal `DisplayName`) resolves. `MentionService` composes the **concrete**
+  `DirectoryService.ListAsync` (Part 2.0); **zero** `AccessAudit` rows (a read,
+  not a decision, M36·5); no `HttpClient`, no Wolverine (M36·9, ADR 0006-D). DI:
+  `AddTransient<IMentionService, MentionService>(sp => new
+  MentionService(sp.GetRequiredService<DirectoryService>()))`.
+- **Part 2.3 — the per-surface emitter call shape** (the frozen M6
+  `EmitAsync` writer; the M6 `CreateReplyAsync` template — `EmitAsync` does not
+  commit, the lane's own `SaveChangesAsync` is the single commit): extract →
+  resolve → `foreach recipient → EmitAsync(session, recipientId, kind,
+  idempotencyKey: $"notification:{kind}:{contentId}:{recipientId}", body:
+  UgcSnippets.Truncate(body), targetId: null, linkPath: <content detail path>,
+  ct)`. **Nine content lanes** (the seven mention kinds collapse — post+reply
+  share `post.mention`, group-post+reply share `group.post.mention`): the
+  lane→kind→`linkPath` table is pinned (community post `/posts/{postId}`;
+  community reply `/posts/{postId}#reply-{replyId}`; group post
+  `/groups/{groupId}/posts/{postId}`; group-post reply `…#reply-{replyId}`; page
+  `/pages/{pageId}`; event `/events/{eventId}`; to-do comment
+  `/projects/todos/{todoId}#comment-{commentId}`; announcement
+  `/announcements/{announcementId}`; message `/messages/{conversationId}`).
+  `targetId` is **null** (the seven kinds are **not** in `OptInKinds` — M36·3);
+  the frozen M6 gates (dedup, the email preference gate, the ADR 0121 quiet-hours,
+  the ADR 0078 sample-suppression) apply unchanged. The emitter runs on the
+  **publishing** lane only (draft-save inert — M36·8). U04 wires lanes 1–2;
+  U05 wires lanes 3–9.
+- **Part 2.4 — the `MentionRenderer` render pass** (`client/lib/mention-renderer.ts`,
+  plain-TS, no-dep, no-`any`, the ADR 0031 IIFE shape; runs **after** the frozen
+  `MarkdownRenderer.RenderHtml`, which is **unchanged**): reads the rendered HTML
+  body + the `data-mention-map` JSON (display-name → resident id, the controller
+  resolved once via `IMentionService`); rewrites **only** a `@<DisplayName>` text
+  node whose ancestor chain has **no** `<a>`/`<code>`/`<pre>`/`<img>` and is not
+  part of an `href` to `<a class="mention" href="/directory/{id}">@<DisplayName>
+  </a>`; **no-op** for every token not in the map (unresolved/ambiguous/blocked/
+  self → plain text); **idempotent** (matches `@name` text, not `href`); zero new
+  npm package / build step. `site.css` adds `.mention { color: var(--kw-mention);
+  text-decoration: none; }` + `:hover { text-decoration: underline; }`.
+- **Part 2.5 — the 28 `kw-l` keys** (7 kinds × 4 keys × en/de/fr/da, all
+  present/non-empty): `notifications.kind.{kind}` /
+  `notifications.preference.{kind}.label` / `notification.{kind}.subject` /
+  `notification.{kind}.body`. The **`post.mention`** badge + preference-label keys
+  **already exist** (M6's reserved set, verified all four languages); **only** its
+  `subject` / `body` are new. The **six new kinds** contribute all four keys each
+  (all new). The `en` value is the source text (ADR 0015 D1); the `de`/`fr`/`da`
+  are U06's. Pinned by `KwLRegistryConsistencyTests` +
+  `KnownTranslationKeys_ParityTests`.
+- **Part 2.6 — the `Preferences.cshtml` change:** **remove** the C-M6·2
+  `reserved` special-case (the `var reserved = kind == NotificationKinds
+  .PostMention` line + `opacity-50` + `disabled` + `checked` suppression + the
+  `notifications.preferences.coming_soon` badge — verified present, U02). The
+  `Known` loop already renders every kind, so the six new kinds render
+  automatically once U05 adds them to `Known`.
+- **Part 2.7 — the pinned test names:** `MentionsTests` (Core, 8) +
+  `MentionRendererTests` (Web, 4) + the per-surface emitter tests (the nine lanes
+  × resolved/self-ambiguous-unknown/draft-save). **Part 2.8 — the three-test
+  acceptance gate** (the in-process `dotnet exec` path, not `dotnet test` /
+  `run_tests`): `MentionsTests` green + `MentionRendererTests` green + the
+  per-surface emitter tests green + the `kw-l` parity closure green + the
+  `MilestonesTests` re-pin green. **Part 2.9 — the drift guard** re-pins the
+  invariant↔FACE↔test binding.
+- **`MilestonesTests` state (verified, U02):** already re-pinned to **M36 is the
+  single in-progress, and the last** — `Roadmap_Covers_M0_Through_M36_Plus_Named
+  _Lanes_In_Order` (M36 is the last id) + `Shipped_Milestones_Are_Marked_Done`
+  (through M35) + `M36_Is_The_Single_InProgress_Milestone_And_The_Last`. U10
+  flips M36 `StatusNext` → `StatusDone`, adds **no** `M37`, and adds the
+  `WhatsNew.cs` `0.58.0` entry naming M36 + ADR 0165.
+- **ADR 0165 re-confirmed:** `docs/adr/0165-mentions.md` present, **Status:
+  Accepted**, dated **2026-10-12**; **0165** is the next free number after
+  **0164** (M35, kiosk) in the ADR index.
+
+**One recorded drift (resolved, not a pause):** the prose's "`IDirectoryService`"
+→ the **concrete `DirectoryService`** class (Part 2.0). U03 implements over the
+concrete class; no interface to invent.
