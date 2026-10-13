@@ -1419,4 +1419,118 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
             return inner.CanSeeGroupFeedAsync(actorId, groupId, candidateCount, session);
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 3 (group post): a resolved `@`-token stores ONE
+    // <c>group.post.mention</c> row for the recipient (the per-recipient key +
+    // the <c>/groups/{groupId}/posts/{postId}</c> linkPath, M36·4) + a staged
+    // email; an unknown token (M36-5) stores none; a **draft** group post
+    // (M36·8) stores none. The <c>PostService</c> is built with the frozen
+    // <see cref="Notifications.NotificationService"/> +
+    // <see cref="Mentions.MentionService"/> seams (the shared
+    // <see cref="MentionEmitters"/> harness).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Lane 3 (M36·4) — a group post whose body mentions a resolved
+    /// resident stores exactly one <c>group.post.mention</c> row (the
+    /// <c>/groups/{groupId}/posts/{postId}</c> linkPath) and stages one email.</summary>
+    [Fact]
+    public async Task M36_GroupPost_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var userInfo = boot.UserInfo;
+        var authz = new AuthorizationService(boot.Store, userInfo);
+        var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string owner = "u-m36-gp-owner";
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var group = await userInfo.CreateGroupAsync(owner, "M36 family", null);
+
+        var post = await RunInSession(boot.Store, s => svc.CreateGroupPostAsync(
+            new GroupPostDraft(group.Id, "Title", "@Ada bring the projector"), owner, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.GroupPostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.GroupPostMention}:{post.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/groups/{group.Id}/posts/{post.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.GroupPostMention}:{post.Id}:ada", email.Key);
+    }
+
+    /// <summary>Lane 3 (M36-5 inert) — a group post whose body mentions an
+    /// unknown resident stores **no** <c>group.post.mention</c> row and stages
+    /// no email.</summary>
+    [Fact]
+    public async Task M36_GroupPost_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var userInfo = boot.UserInfo;
+        var authz = new AuthorizationService(boot.Store, userInfo);
+        var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string owner = "u-m36-gp-inert-owner";
+        var group = await userInfo.CreateGroupAsync(owner, "M36 inert family", null);
+
+        await RunInSession(boot.Store, s => svc.CreateGroupPostAsync(
+            new GroupPostDraft(group.Id, null, "@Ghost ping"), owner, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.GroupPostMention));
+        Assert.Empty(boot.Staged);
+    }
+
+    /// <summary>Lane 3 (M36·8 draft gate) — a **draft** group post whose body
+    /// mentions a resolved resident stores **no** <c>group.post.mention</c> row
+    /// (the mention emitter runs only on the publishing lane, ADR 0037).</summary>
+    [Fact]
+    public async Task M36_GroupPost_Draft_Mention_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var userInfo = boot.UserInfo;
+        var authz = new AuthorizationService(boot.Store, userInfo);
+        var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string owner = "u-m36-gp-draft-owner";
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var group = await userInfo.CreateGroupAsync(owner, "M36 draft family", null);
+
+        await RunInSession(boot.Store, s => svc.CreateGroupPostAsync(
+            new GroupPostDraft(group.Id, null, "@Ada help", IsDraft: true), owner, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.GroupPostMention));
+    }
+
+    /// <summary>Lane 4 (M36·4) — a **group post reply** (Part 2.3 lane 4) whose
+    /// body mentions a resolved resident stores exactly one
+    /// <c>group.post.mention</c> row (the shared <c>CreateReplyAsync</c> lane
+    /// is lane-aware: the parent post's non-empty <c>GroupId</c> selects the
+    /// group kind + the <c>/groups/{groupId}/posts/{postId}#reply-{replyId}</c>
+    /// linkPath) and stages one email. The parent post body carries no mention
+    /// (so only the reply's mention fires — lane 3 is covered above).</summary>
+    [Fact]
+    public async Task M36_GroupPostReply_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var userInfo = boot.UserInfo;
+        var authz = new AuthorizationService(boot.Store, userInfo);
+        var svc = new PostService(userInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string owner = "u-m36-gpr-owner";
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var group = await userInfo.CreateGroupAsync(owner, "M36 reply family", null);
+
+        // Parent group post: plain body (no mention) so only the reply fires.
+        var post = await RunInSession(boot.Store, s => svc.CreateGroupPostAsync(
+            new GroupPostDraft(group.Id, "Title", "A post with no mention"), owner, s));
+
+        var reply = await RunInSession(boot.Store, s => svc.CreateReplyAsync(
+            post.Id, owner, "@Ada bring the projector", s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.GroupPostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.GroupPostMention}:{reply.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/groups/{group.Id}/posts/{post.Id}#reply-{reply.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.GroupPostMention}:{reply.Id}:ada", email.Key);
+    }
 }

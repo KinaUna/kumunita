@@ -4636,4 +4636,50 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         w.Store(document);
         await w.SaveChangesAsync(ct);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 7 (to-do comment): a resolved `@`-token stores ONE `todo.mention`
+    // row for the recipient (the per-recipient key + the
+    // `/projects/todos/{todoId}#comment-{commentId}` linkPath, M36·4) + a
+    // staged email; an unknown token (M36-5) stores none. The comment lane
+    // is the publishing lane (M36·8 — no separate publish step).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_TodoComment_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M5DocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-todo-author";
+        const string todoId = "m36-todo-1";
+        await Plant(boot.Store, new TodoItem { Id = todoId, Title = "Water the plants", AuthorId = author });
+
+        var comment = await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ada can you water them?", null);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.TodoMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.TodoMention}:{comment.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/projects/todos/{todoId}#comment-{comment.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.TodoMention}:{comment.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_TodoComment_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M5DocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new ProjectService(boot.Store, authz, boot.UserInfo, boot.Notifications, null, null, null, boot.Mentions);
+        const string author = "u-m36-todo-inert-author";
+        const string todoId = "m36-todo-inert";
+        await Plant(boot.Store, new TodoItem { Id = todoId, Title = "T", AuthorId = author });
+
+        await svc.CreateTodoCommentAsync(todoId, author, new HashSet<string> { Roles.Member }, "@Ghost ping", null);
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.TodoMention));
+    }
 }

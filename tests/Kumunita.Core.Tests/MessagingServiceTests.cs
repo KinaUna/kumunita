@@ -602,4 +602,47 @@ public class MessagingServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await using var s = store.QuerySession();
         return await s.Query<Notification>().ToListAsync(ct);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 9 (message): a resolved `@`-token stores ONE `message.mention`
+    // row for the recipient (the per-recipient key + the `/messages/{convoId}`
+    // linkPath, M36·4) + a staged email; an unknown token (M36-5) stores
+    // none. Messaging has **no** draft concept (M36·8 — the send **is** the
+    // publishing lane), so no draft case applies.
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Message_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M9DocTypes.Configure);
+        var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await svc.SetMessagingEnabledAsync(true, "u-admin");
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+
+        var convo = await svc.OpenConversationAsync("alice", "bob");
+        await svc.SendAsync(convo.Id, "alice", "@Ada hi");
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.MessageMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.StartsWith($"notification:{Notifications.NotificationKinds.MessageMention}:", row.IdempotencyKey);
+        Assert.EndsWith(":ada", row.IdempotencyKey);
+        Assert.Equal($"/messages/{convo.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key.EndsWith(":ada") && e.Recipient == "ada@ex.net");
+    }
+
+    [Fact]
+    public async Task M36_Message_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M9DocTypes.Configure);
+        var svc = new MessagingService(boot.Store, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await svc.SetMessagingEnabledAsync(true, "u-admin");
+
+        var convo = await svc.OpenConversationAsync("alice", "bob");
+        await svc.SendAsync(convo.Id, "alice", "@Ghost hi");
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.MessageMention));
+    }
 }

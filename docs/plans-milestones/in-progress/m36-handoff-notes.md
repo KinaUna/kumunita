@@ -632,3 +632,126 @@ render-boundary wire-in (post + reply surfaces). Build green
   what a C# xunit class can exercise. The render pass's idempotency +
   skip-inside-`<a>` / `<code>` rules are all testable as pure string
   transforms.
+
+## U08 — Test pins (Core + Web + per-surface emitters)
+
+Implemented the M36 **pinned test pins** (design doc Part 2.7, M36·8; ADR
+0165) — the M35-U08 / M34-U08 **test-only** unit (the M36·1 "no production
+code change" intent is *not* honored literally: the pinned tests surfaced and
+we fixed **two** genuine production bugs — see the two "bug caught by the pin"
+notes below; that is the pin doing its job, per the AGENTS.md "a failed pinned
+test is a recoverable step — fix the code, don't weaken the pin" doctrine).
+Build green + **all** tests green.
+
+**Sources read first:** the register
+`plan-m36-mentions.md` §U08 + §Assumptions (the test model — the exact test
+names); design doc Part 2.7 (the pinned names — the **authoritative** name
+list, per unit-series rule 3) + Part 2.8 (the U09 acceptance gate) + Part 2.9
+(the drift guard); U03's `Mentions.cs` (`MentionTokens` + `IMentionService`),
+the per-surface emitters (U04/U05), U07's `MentionRenderer`, and the
+`PostgresFixture` + `KioskServiceTests` structural templates.
+
+- **`tests/Kumunita.Core.Tests/Mentions/MentionsTests.cs` (new) — the 8
+  pinned Core tests.** All 8 names match Part 2.7 **exactly** (unit-series
+  rule 3 — never re-shape a pinned name, never add an unnamed test):
+  `MentionTokens_ExtractTokens_DeDuplicatesAndOrders`,
+  `MentionTokens_ExtractTokens_ExcludesCodeSpansAndLinks`,
+  `MentionTokens_ExtractTokens_LoneAndTrailingAtYieldNoToken`,
+  `ResolveAsync_ExactlyOneNonBlockedNonAuthor_Resolves`,
+  `ResolveAsync_ZeroMatches_YieldsNoId`, `ResolveAsync_TwoOrMoreMatches_YieldsNoId`,
+  `ResolveAsync_AuthorsOwnName_YieldsNoId`, `ResolveAsync_WritesZeroAccessAuditRows`.
+  A local `BootAsync` boots the M1 doc store + a real `UserInfoService` + the
+  frozen M2 `DirectoryService` (with a substituted `IAuthorizationService` — a
+  pure catalog read, zero audit) + `MentionService`; `PlantResidents` plants
+  verified, non-blocked `Profile`s to pin the resolver's inert rule (M36-2 /
+  M36-5).
+- **`tests/Kumunita.Web.Tests/MentionRendererTests.cs` (new) — the 4 pinned
+  Web tests.** All 4 names match Part 2.7 **exactly**:
+  `Render_Pass_RewritesResolvedMentionToDirectoryLink`,
+  `Render_Pass_UnresolvedTokenIsPlainText`, `Render_Pass_IsIdempotent`,
+  `Render_Pass_SkipsInsideAnchorAndCode`. **Pure-function** tests (the U07
+  shape resolution): each calls the **C#**
+  `Kumunita.Web.Security.MentionRenderer.Render(html, map)` — no JS/TS test,
+  no DI, no fixture (the `MarkdownRendererTests` precedent).
+- **`tests/Kumunita.Core.Tests/Mentions/MentionEmitters.cs` (new) — the
+  shared per-surface harness.** A single `BootAsync` (M1 + M6 doc types + the
+  caller's surface doc type; real `UserInfoService` + frozen `DirectoryService`
+  + `MentionService` + `NotificationService` with a substituted
+  `IMailerStage` that **records** the staged `(key, recipient, subject, body)`
+  tuples) + `PlantResidents` + `AllNotifications`. Lets the seven per-surface
+  test classes share one harness without re-deriving the DI graph.
+- **The per-surface emitter tests (additive, in the existing per-surface
+  classes) — all nine content lanes (Part 2.3 table).** Each lane's publishing
+  step, on a body that mentions a resolved resident, stores exactly **one**
+  `Notification` row (kind = the surface's mention kind; the per-recipient key
+  `notification:{kind}:{contentId}:{recipientId}`, M36·4) + stages a
+  best-effort email; on an unknown token (M36-5) stores none; a **draft** save
+  (post / group post / announcement) stores none (M36·8, ADR 0037).
+  - `PostServiceTests` (lanes 1–2, post + reply): 5 tests (post resolved /
+    unknown / draft; reply resolved / self-inert).
+  - `GroupPostServiceTests` (lanes 3–4, group post + group post **reply**):
+    4 tests (group post resolved / unknown / draft; group post **reply**
+    resolved — the shared `CreateReplyAsync` lane is lane-aware: the parent
+    post's non-empty `GroupId` selects the group kind + the
+    `/groups/{groupId}/posts/{postId}#reply-{replyId}` linkPath).
+  - `PageServiceTests` (lane 5): 2 tests (resolved / unknown).
+  - `EventServiceTests` (lane 6): 2 tests (resolved / unknown).
+  - `ProjectServiceTests` (lane 7, to-do comment): 2 tests (resolved /
+    unknown; kind `todo.mention`).
+  - `AnnouncementServiceTests` (lane 8, draft-gated): 3 tests (published
+    resolved / draft / published unknown).
+  - `MessagingServiceTests` (lane 9): 2 tests (resolved / unknown; no draft
+    concept — the send *is* the publishing lane).
+- **Bug caught by a pin #1 (U03, Core parser) — fixed in
+  `src/Kumunita.Core/Mentions/Mentions.cs`:** the pinned test
+  `MentionTokens_ExtractTokens_ExcludesCodeSpansAndLinks` **failed** on first
+  run. Root cause: `BuildExcludedMask`'s inline-code-span **close** branch had
+  an off-by-one — the `for (k = i; k >= 0; k--)` loop started *at* the closing
+  backtick instead of *before* it, so the interior text between the backticks
+  was never marked excluded and a `@token` inside `` `…` `` leaked through.
+  Fixed to `for (k = i - 1; k >= 0; k--)`. **The pin caught a real U03 bug** —
+  this is a legitimate production change the pin required (documented here per
+  the unit instructions), not a test weakening.
+- **Bug caught by a pin #2 (U07, Web render pass) — fixed in
+  `src/Kumunita.Web/Security/MentionRenderer.cs`:** the pinned tests
+  `Render_Pass_IsIdempotent` + `Render_Pass_SkipsInsideAnchorAndCode`
+  **failed** on first run. Root cause: `ParseTag` stripped the `</` prefix of
+  a **close** tag but never the leading `<` of an **open** tag, so the name
+  scan (`TakeWhile`) stopped immediately at `<` and `local` came back **empty
+  for every open tag**. `IsSkipTag` therefore never matched, the skip-depth
+  counter never incremented, and `Rewrite` ran at "depth 0" even *inside*
+  `<a>` / `<code>` / `<pre>` — so the pass linkified the interior of its own
+  mention anchor (breaking idempotency) and the interior of a foreign anchor.
+  Fixed `ParseTag` to strip the leading `<` on open tags (and `<`+`/` on close
+  tags) before the name scan; this also corrects the `img` / `br`
+  self-closing detection (the `local is "img" or "br"` check now actually
+  matches). The pass now honors the M36·6 skip + idempotency pins. **The pin
+  caught a real U07 bug** — again a legitimate production change the pin
+  required, not a test weakening.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 0
+  errors. (20 pre-existing warnings across the solution — unrelated to this
+  unit.)
+- **Test results (the in-process `dotnet exec` path — the AGENTS.md
+  test-runner quirk; **not** `dotnet test` / the `run_tests` tool):**
+  - **`Kumunita.Core.Tests` — Total 1493, Errors 0, Failed 0, Skipped 2.**
+    All 8 pinned Core names + all 20 per-surface emitter tests (across the nine
+    lanes: post ×5, group post + group post reply ×4, page ×2, event ×2, to-do
+    comment ×2, announcement ×3, message ×2) green. (The M36 surface grew from
+    1478 — the point at which the 8 `MentionsTests` + the 5 post-lane tests
+    first went green — to 1493 with the remaining six surfaces' tests.)
+  - **`Kumunita.Web.Tests` — Total 1043, Errors 0, Failed 0, Skipped 1.**
+    (All 4 pinned `MentionRendererTests` green after the `ParseTag` fix; no
+    regressions.)
+- **Frozen surfaces untouched (unit-series rules 4–11):** the frozen
+  `MarkdownRenderer`, the frozen U03 `IMentionService` + `MentionService` +
+  `MentionTokens`, the frozen M2 `DirectoryService` read seam, and the frozen
+  U04/U05 per-surface emitters are all **reused, not re-shaped** — this unit
+  adds **test code only** (plus the two bug fixes above, which correct an
+  off-by-one and a prefix-strip; they change no seam, no signature, no
+  behavior beyond making the pin pass). No new `AccessAudit` row, no new
+  dependency, no new build step, no doc / index / context.
+- **Next unit (U09):** the **three-test acceptance gate** (Part 2.8) — run the
+  four green suites via the in-process path and confirm the
+  `MentionsTests` (8) + `MentionRendererTests` (4) + the per-surface emitter
+  tests (9 lanes) + the `kw-l` parity closure + the `Milestones` pin are all
+  green (any red is a **blocker**, not a stopping point).

@@ -126,8 +126,14 @@ public static class MentionTokens
 
             if (inInline)
             {
-                // Close: mark the interior back to the previous backtick.
-                for (var k = i; k >= 0; k--)
+                // Close: mark the interior **back to, but excluding, the opening
+                // backtick** so an `@word` between the two backticks is code, not a
+                // mention (the M36-1 / M36·2 code-span-exclude pin). The opening
+                // backtick was already marked in the open branch, and the close
+                // backtick itself is marked below — so the loop starts one step
+                // before the close and stops *before* the open (leaving both
+                // backtick delimiters already-excluded, not re-marked).
+                for (var k = i - 1; k >= 0; k--)
                 {
                     if (body[k] == '`') break;
                     if (!excluded[k]) excluded[k] = true;

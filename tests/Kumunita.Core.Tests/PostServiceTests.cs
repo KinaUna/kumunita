@@ -1904,4 +1904,144 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.NotNull(loaded);
         return loaded!;
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pins.
+    // Lane 1 (community post) + lane 2 (community reply): a resolved `@`-token
+    // stores ONE <c>post.mention</c> row for the recipient (the per-recipient
+    // key <c>notification:post.mention:{contentId}:{recipientId}</c>, M36·4) +
+    // a staged best-effort email (M6 D7); an inert token (unknown — M36-5)
+    // stores none; a draft save (M36·8) stores none. The <c>PostService</c> is
+    // built with the frozen <see cref="NotificationService"/> +
+    // <see cref="Mentions.MentionService"/> seams (the shared
+    // <see cref="MentionEmitters"/> harness).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Lane 1 (M36·4) — a community post whose body mentions a
+    /// resolved resident stores exactly one <c>post.mention</c> row for the
+    /// recipient (the per-recipient key + the <c>/posts/{id}</c> linkPath) and
+    /// stages one best-effort email (the M6 D7 gate — the recipient has an
+    /// email).</summary>
+    [Fact]
+    public async Task M36_Post_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-post";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ada can you bring the projector?", new Audience());
+        var post = await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{post.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/posts/{post.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{post.Id}:ada", email.Key);
+    }
+
+    /// <summary>Lane 1 (M36-5 inert) — a community post whose body mentions an
+    /// unknown resident stores **no** <c>post.mention</c> row (a mention is
+    /// never a guess) and stages no email.</summary>
+    [Fact]
+    public async Task M36_Post_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-inert";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ghost ping", new Audience());
+        await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-inert-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+        Assert.Empty(boot.Staged);
+    }
+
+    /// <summary>Lane 1 (M36·8 draft gate) — a **draft** community post whose
+    /// body mentions a resolved resident stores **no** <c>post.mention</c> row
+    /// (the mention emitter runs only on the publishing lane, ADR 0037).</summary>
+    [Fact]
+    public async Task M36_Post_Draft_Mention_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-draft";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+
+        var draft = new PostDraft(comp, "Title", "@Ada can you help", new Audience(), IsDraft: true);
+        await RunInSession(boot.Store, s =>
+            svc.CreatePostAsync(draft, "u-m36-draft-author", new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+    }
+
+    /// <summary>Lane 2 (M36·4) — a community reply (a parent post with an empty
+    /// <c>GroupId</c>) whose body mentions a resolved resident stores exactly
+    /// one <c>post.mention</c> row for the recipient (the
+    /// <c>/posts/{postId}#reply-{replyId}</c> linkPath) and stages one email.</summary>
+    [Fact]
+    public async Task M36_Reply_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string comp = "c-m36-reply";
+        const string parent = "m36-reply-parent";
+        await Plant(boot.Store, new Component { Id = comp, Name = "Safety", Enabled = true });
+        await Plant(boot.Store, new Post
+        {
+            Id = parent, ComponentId = comp, AuthorId = "u-m36-parent-author",
+            Body = "parent", Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+        });
+
+        var reply = await RunInSession(boot.Store, s =>
+            svc.CreateReplyAsync(parent, "u-m36-replier", "@Ada thanks", s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PostMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{reply.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/posts/{parent}#reply-{reply.Id}", row.LinkPath);
+        var email = Assert.Single(boot.Staged);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PostMention}:{reply.Id}:ada", email.Key);
+    }
+
+    /// <summary>Lane 2 (M36-5 inert) — a community reply whose body mentions the
+    /// **replier's** own name stores **no** <c>post.mention</c> row (the author
+    /// is never notified of their own mention — M36-5 self pin).</summary>
+    [Fact]
+    public async Task M36_Reply_MentionSelf_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M3DocTypes.Configure);
+        // The replier's own display name — the token matches the replier, who
+        // is excluded by SubjectId (the M36-5 self pin).
+        await MentionEmitters.PlantResidents(boot.Store, ("u-m36-self-replier", "Replier"));
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new PostService(boot.UserInfo, authz, boot.Store, null, boot.Notifications, boot.Mentions);
+        const string parent = "m36-self-parent";
+        await Plant(boot.Store, new Post
+        {
+            Id = parent, ComponentId = "c-m36-self", AuthorId = "u-m36-self-pauthor",
+            Body = "parent", Created = DateTimeOffset.UtcNow, Audience = new Audience(),
+        });
+
+        await RunInSession(boot.Store, s =>
+            svc.CreateReplyAsync(parent, "u-m36-self-replier", "@Replier oops", s));
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PostMention));
+    }
 }

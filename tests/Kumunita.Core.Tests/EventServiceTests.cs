@@ -2705,4 +2705,59 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         w.Store(document);
         await w.SaveChangesAsync(ct);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 6 (event): a resolved `@`-token stores ONE `event.mention` row for
+    // the recipient (the per-recipient key + the `/events/{id}` linkPath,
+    // M36·4) + a staged email; an unknown token (M36-5) stores none. The
+    // event create lane is the publishing lane (M36·8 — no separate publish
+    // step; the mention emitter is not draft-gated, unlike post/group post/
+    // announcement).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Event_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M4DocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-ev-author";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "Town hall", Body = "@Ada can you bring the projector?",
+            Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+        });
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.EventMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.EventMention}:{ev.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/events/{ev.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.EventMention}:{ev.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_Event_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, M4DocTypes.Configure);
+        var authz = new AuthorizationService(boot.Store, boot.UserInfo);
+        var svc = new EventService(boot.Store, authz, boot.UserInfo, boot.Notifications, boot.Mentions);
+        const string author = "u-m36-ev-inert-author";
+
+        await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "T", Body = "@Ghost ping",
+            Start = new DateTimeOffset(2099, 6, 1, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2099, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+        });
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.EventMention));
+    }
 }

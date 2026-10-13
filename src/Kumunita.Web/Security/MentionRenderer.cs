@@ -226,7 +226,18 @@ public static class MentionRenderer
     {
         var t = tag.Trim();
         var isClose = t.StartsWith("</", StringComparison.Ordinal);
-        if (isClose) t = t[2..].Trim();
+        // Strip the tag's leading bracket(s) so the name scan starts at the
+        // first identifier char — for a close tag `</a>` that is `</` (two),
+        // for an open tag `<a …>` that is a single `<`. (An earlier version
+        // stripped `</` only, leaving the open tag's leading `<` in place; the
+        // name scan then stopped immediately at `<` and `local` came back
+        // empty for every open tag — so skip-depth was never incremented and
+        // the pass linkified the interior of its own `<a>` / `<code>` /
+        // `<pre>`, breaking the M36-6 skip + idempotency pins.)
+        if (isClose)
+            t = t[2..].TrimStart();
+        else
+            t = t[1..].TrimStart();
 
         var local = new string(t.TakeWhile(ch => char.IsLetterOrDigit(ch) || ch == '-').ToArray());
         return (local.Length == 0 ? string.Empty : local.ToLowerInvariant(), isClose);

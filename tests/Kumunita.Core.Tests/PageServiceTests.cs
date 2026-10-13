@@ -2424,4 +2424,45 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             .Where(a => a.TargetId == targetId && a.Action == action)
             .ToListAsync(ct);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // M36 (ADR 0165, Part 2.7) — the per-surface mention emitter pin.
+    // Lane 5 (page): a resolved `@`-token stores ONE `page.mention` row for
+    // the recipient (the per-recipient key + the `/pages/{id}` linkPath,
+    // M36·4) + a staged email; an unknown token (M36-5) stores none. The
+    // create lane is the publishing lane (M36·8 — no separate publish step
+    // for a page).
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task M36_Page_MentionResolved_StoresOneRow_AndStagesEmail()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PageDocTypes.Configure);
+        var svc = new PageService(boot.Store, null, boot.Notifications, boot.Mentions);
+        await MentionEmitters.PlantResidents(boot.Store, ("ada", "Ada"));
+        const string author = "u-m36-page-author";
+
+        Page page;
+        await using (var s = newSession(boot.Store)) { page = await svc.CreateAsync(new Page { Slug = "m36-page", Body = "@Ada can you help?", Kind = PageKind.User }, author, RolesSet(Roles.Member), s); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        var row = Assert.Single(notifs, n => n.Kind == Notifications.NotificationKinds.PageMention);
+        Assert.Equal("ada", row.RecipientId);
+        Assert.Equal($"notification:{Notifications.NotificationKinds.PageMention}:{page.Id}:ada", row.IdempotencyKey);
+        Assert.Equal($"/pages/{page.Id}", row.LinkPath);
+        Assert.Contains(boot.Staged, e => e.Key == $"notification:{Notifications.NotificationKinds.PageMention}:{page.Id}:ada");
+    }
+
+    [Fact]
+    public async Task M36_Page_MentionUnknown_StoresNoRow()
+    {
+        var boot = await MentionEmitters.BootAsync(fixture, PageDocTypes.Configure);
+        var svc = new PageService(boot.Store, null, boot.Notifications, boot.Mentions);
+        const string author = "u-m36-page-inert-author";
+
+        await using (var s = newSession(boot.Store)) { await svc.CreateAsync(new Page { Slug = "m36-page-inert", Body = "@Ghost ping", Kind = PageKind.User }, author, RolesSet(Roles.Member), s); }
+
+        var notifs = await MentionEmitters.AllNotifications(boot.Store);
+        Assert.Empty(notifs.Where(n => n.Kind == Notifications.NotificationKinds.PageMention));
+    }
 }
