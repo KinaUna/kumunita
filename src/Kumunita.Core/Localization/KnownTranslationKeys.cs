@@ -1921,6 +1921,16 @@ public static class KnownTranslationKeys
             //    registry + KnownTranslationKeys_ParityTests enforce the × 4) ──
             ["todo.set_event.label"] = "Link to event",
             ["todo.set_event.pick"] = "Choose an event",
+            // The "create a new event" modal (the to-do detail's
+            // set-event picker's second affordance): the <select>'s
+            // special option, the modal's title + hint, and the submit
+            // button. The en floor is the server fallback (a null
+            // provider — a non-HTTP render — degrades to en). The
+            // closed-key registry + KnownTranslationKeys_ParityTests
+            // enforce the × 4.
+            ["todo.set_event.create_new"] = "Create a new event…",
+            ["todo.set_event.create_hint"] = "Create a new event to link to this to-do. It is saved as a draft — you can publish it from the event's detail page.",
+            ["todo.set_event.create_submit"] = "Create and link",
 
             // ── M14 (ADR 0115 D4) — the two U06 VTODO affordances (the to-do
             //    detail's "Add to calendar" link + the to-do index's feed
@@ -4644,6 +4654,9 @@ public static class KnownTranslationKeys
             //    (To-do-Details: Formularbeschriftung + Platzhalter/Clear-Option) ──
             ["todo.set_event.label"] = "Mit Veranstaltung verknüpfen",
             ["todo.set_event.pick"] = "Veranstaltung wählen",
+            ["todo.set_event.create_new"] = "Neue Veranstaltung erstellen…",
+            ["todo.set_event.create_hint"] = "Erstellen Sie eine neue Veranstaltung, um sie mit dieser Aufgabe zu verknüpfen. Sie wird als Entwurf gespeichert — Sie können sie auf der Detailseite der Veranstaltung veröffentlichen.",
+            ["todo.set_event.create_submit"] = "Erstellen und verknüpfen",
 
             // ── M14 (ADR 0115 D4) — die zwei U06 VTODO-Oberflächen
             //    (To-do-Details: „Zum Kalender hinzufügen" + To-do-Index:
@@ -7219,6 +7232,9 @@ public static class KnownTranslationKeys
             //    placeholder / effacement) ──
             ["todo.set_event.label"] = "Lier à un événement",
             ["todo.set_event.pick"] = "Choisir un événement",
+            ["todo.set_event.create_new"] = "Créer un nouvel événement…",
+            ["todo.set_event.create_hint"] = "Créez un nouvel événement à lier à cette to-do. Il est enregistré en brouillon — vous pouvez le publier depuis sa page de détail.",
+            ["todo.set_event.create_submit"] = "Créer et lier",
 
             // ── M14 (ADR 0115 D4) — les deux surfaces VTODO U06 (détail de la
             //    to-do : lien « Ajouter à l'agenda » + index des to-dos : lien
@@ -9783,6 +9799,9 @@ public static class KnownTranslationKeys
             //    (to-do-detail: formularmærkat + pladsholder/tøm-option) ──
             ["todo.set_event.label"] = "Knyt til arrangement",
             ["todo.set_event.pick"] = "Vælg et arrangement",
+            ["todo.set_event.create_new"] = "Opret et nyt arrangement…",
+            ["todo.set_event.create_hint"] = "Opret et nyt arrangement, der skal knyttes til denne to-do. Det gemmes som udkast — du kan publicere det fra arrangementets detailside.",
+            ["todo.set_event.create_submit"] = "Opret og knyt",
 
             // ── M14 (ADR 0115 D4) — de to U06 VTODO-overflader (to-do-detail:
             //    "Tilføj til kalender"-link + to-do-index: feed-link; ADR 0112's

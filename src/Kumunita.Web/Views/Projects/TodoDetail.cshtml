@@ -533,22 +533,33 @@
                    untouched — C-M14·7). The picker is a **display surface,
                    never a gate** (C-M14·4): the service's
                    <c>SetTodoEventAsync</c> standing re-check + event guard
-                   on write is the enforcement (C-M14·3). The card is hidden
-                   when the actor has no visible events (the ADR 0086 D9
-                   hide rule — a picker with no options is a noise surface,
-                   not a control). The clear option (blank value) is always
-                   first — a blank / <c>null</c> choice posts <c>null</c> =
-                   **clear** the association. No new JS — one native
-                   <c>&lt;form&gt;</c> / <c>&lt;select&gt;</c> (the ADR 0031
-                   tsc-only discipline). *@
-                @if (Model.EventPicker is { Options.Count: > 0 })
+                   on write is the enforcement (C-M14·3). The clear option
+                   (blank value) is always first — a blank / <c>null</c>
+                   choice posts <c>null</c> = **clear** the association.
+                   The **"create a new event"** affordance (the
+                   <c>todo.set_event.create_new</c> sentinel option → the
+                   modal below) is always available to an authenticated
+                   actor — the service's <c>CreateAsync</c> standing is
+                   **any signed-in resident**, so the card is rendered
+                   whenever the picker is non-null. The existing-event
+                   options are conditionally rendered from <see
+                   cref="TodoEventPicker.Options"/> (the ADR 0086 D9 hide
+                   rule still applies to the *existing-events* subset — a
+                   select with only the sentinel is still useful: "create
+                   new" is the affordance). No new JS module — a single
+                   inline <c>script</c> in the Scripts section intercepts
+                   the form's submit when the sentinel is selected and
+                   opens the Bootstrap modal (the ADR 0071 convention, the
+                   ADR 0081 quick-create idiom carried to the to-do
+                   surface). *@
+                @if (Model.EventPicker is not null)
                 {
                     <div class="card mb-3">
                         <div class="card-body">
                             <label class="form-label fw-semibold" for="set-event-select">
                                 <kw-l key="todo.set_event.label">Link to event</kw-l>
                             </label>
-                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/set-event")" style="margin:0;">
+                            <form id="set-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/set-event")" style="margin:0;">
                                 @Html.AntiForgeryToken()
                                 <select class="form-select" id="set-event-select" name="eventId">
                                     <option value="">
@@ -558,6 +569,9 @@
                                     {
                                         <option value="@id" selected="@(id == Model.EventPicker.CurrentEventId ? "selected" : null)">@name</option>
                                     }
+                                    <option value="__new__">
+                                        <kw-l key="todo.set_event.create_new">Create a new event…</kw-l>
+                                    </option>
                                 </select>
                                 <div class="d-flex gap-2 mt-2">
                                     <button type="submit" class="btn btn-sm btn-outline-primary">
@@ -565,6 +579,71 @@
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+
+                    @* The **"create a new event" modal** (the ADR 0071
+                       Bootstrap modal convention; the ADR 0081 quick-create
+                       idiom carried to the to-do detail's set-event
+                       picker). Opens when the __new__ sentinel is selected
+                       and the form is submitted (the inline JS in the
+                       Scripts section intercepts the submit and opens the
+                       modal). The modal's form POSTs to the new
+                       <c>POST /projects/todos/{id}/create-event</c> lane,
+                       which composes the frozen
+                       <c>IEventService.CreateAsync</c> +
+                       <c>IProjectService.SetTodoEventAsync</c> (create
+                       first, then link — the correct failure mode for "I
+                       created an event but couldn't link it": the event
+                       stays as a draft the author can review + publish from
+                       /events/{id}, the link is just not set). Start / End
+                       are pre-filled from the picker's seeded defaults
+                       (the actor's current wall-clock time in their
+                       effective zone — the ADR 0019 wall-clock contract).
+                       The audience is the community-visible default (ADR
+                       0036 floor). The event is saved as a draft (ADR 0037
+                       floor). *@
+                    <div class="modal fade" id="create-event-modal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form id="create-event-form" method="post" action="@($"/projects/todos/{Model.Todo.Id}/create-event")">
+                                    @Html.AntiForgeryToken()
+                                    <div class="modal-header">
+                                        <h5 class="modal-title"><kw-l key="events.new_event">New event</kw-l></h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="text-muted small mb-3">
+                                            <kw-l key="todo.set_event.create_hint">Create a new event to link to this to-do. It is saved as a draft — you can publish it from the event's detail page.</kw-l>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="ce-title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
+                                            <input class="form-control" type="text" id="ce-title" name="Title" maxlength="120" required />
+                                            <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
+                                        </div>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col">
+                                                <label class="form-label" for="ce-start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
+                                                <input class="form-control" type="datetime-local" id="ce-start" name="Start" required
+                                                       value="@Model.EventPicker.Start.ToString("yyyy-MM-ddTHH:mm")" />
+                                            </div>
+                                            <div class="col">
+                                                <label class="form-label" for="ce-end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
+                                                <input class="form-control" type="datetime-local" id="ce-end" name="End" required
+                                                       value="@Model.EventPicker.End.ToString("yyyy-MM-ddTHH:mm")" />
+                                            </div>
+                                        </div>
+                                        <div class="mb-1">
+                                            <label class="form-label" for="ce-location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
+                                            <input class="form-control" type="text" id="ce-location" name="Location" />
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                                        <button type="submit" class="btn btn-primary"><kw-l key="todo.set_event.create_submit">Create and link</kw-l></button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 }
@@ -890,4 +969,19 @@
        image button is omitted (data-rich-editor-no-image). One include covers
        every .rc-editor root the module finds. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+
+    @* ADR 0115 D3 (M14 interlock) — the **"create a new event"
+       affordance** on the set-event picker (the
+       <c>todo.set_event.create_new</c> sentinel option → the modal
+       above). The ADR 0031 tsc-only discipline applies: the JS lives
+       in <c>client/lib/todo-set-event.ts</c>, compiled to
+       <c>wwwroot/js/lib/todo-set-event.js</c> by <c>tsc</c> — never
+       an inline script (CSP's <c>script-src 'self'</c> forbids inline
+       scripts). The module intercepts the set-event form's submit when
+       the <c>__new__</c> sentinel is selected and opens the Bootstrap
+       modal (the ADR 0071 convention; the ADR 0081 quick-create idiom
+       carried to the to-do surface). When the modal is closed without
+       submitting, the select is reset to blank so a subsequent submit
+       doesn't POST the sentinel. *@
+    <script type="module" src="~/js/lib/todo-set-event.js"></script>
 }
