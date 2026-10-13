@@ -80,6 +80,7 @@ public static class Milestones
         new("M34", "Analytics history — the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve", StatusDone),
         new("M35", "Kiosk mode — a full-page / full-screen display that automatically cycles a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval", StatusDone),
         new("M36", "@mentions — a cross-surface @<resident> reference token: type a resident's directory display name after an @, the platform resolves it against the resident directory and notifies the mentioned resident on that surface (posts, replies, pages, events, to-dos, group posts, announcements, messages) and renders the name as a link to their directory page", StatusDone),
+        new("M37", "Personal notes — a private note a resident attaches to any content entity (posts, group posts, events, pages, projects, to-dos, boards, documents, people); like M17 bookmarks but the notes are organizable: the author nests them into a personal folder tree (categories) + free author-set tags; author-only — invisible to every other resident and to any GlobalAdmin who is not the author", StatusNext),
     };
 
     public static string BadgeClass(string status) => status switch
