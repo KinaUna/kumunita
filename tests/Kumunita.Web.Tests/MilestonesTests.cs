@@ -23,11 +23,10 @@ public class MilestonesTests
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        // M35 (kiosk mode, ADR 0164) is the **last shipped** milestone on the
-        // roadmap — M36 (@mentions, ADR 0165) is the **new** last milestone
-        // (M36·10), now in progress. The shipped set is **every** id through
-        // M35.
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35" })
+        // M36 (@mentions, ADR 0165) is the **last** milestone on the roadmap
+        // (M36·10) and is now **done** — the shipped set is **every** id
+        // through M36 (there is no M37 to promote).
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "EV-NW", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18", "M19", "M20", "M21", "M23", "M22", "M24", "M25", "M26", "M27", "SITE", "SITE-2", "M28", "IMPROVE", "M29", "M30", "M31", "M32", "ESC", "M33", "M34", "M35", "M36" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -35,18 +34,16 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M36_Is_The_Single_InProgress_Milestone_And_The_Last()
+    public void No_Milestone_Is_InProgress()
     {
-        // M36 (@mentions, ADR 0165) is the **new** last milestone on the
-        // roadmap (M36·10) — M35 (kiosk, ADR 0164) was the last (M35·11); M36
-        // supersedes it. After the M36 open (this milestone-open package)
-        // M36 is the **single** in-progress milestone and the **last** entry
-        // in the roadmap (no successor to promote). The M36 close (U10) flips
-        // M36 → done and replaces this test with a "no in-progress milestone"
-        // assertion (the M35·11 / M34-U08 "last milestone, no successor"
-        // framing, re-applied).
+        // M36 (@mentions, ADR 0165) is the **last** milestone on the roadmap
+        // (M36·10) and is now **done** — there is no M37 to promote. The
+        // terminal-state pin (the same shape M35 had before M36 opened — the
+        // M35·11 / M34-U08 "last milestone, no successor" framing, re-applied)
+        // is: **no** milestone is in-progress, and M36 is the **last** entry
+        // in the roadmap.
         var inProgress = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
-        Assert.Equal(new[] { "M36" }, inProgress.Select(m => m.Id).ToArray());
+        Assert.Empty(inProgress);
         // M36 is the **last** entry in the roadmap (the M36·10 pin — no M37).
         Assert.Equal("M36", Milestones.All.Last().Id);
     }

@@ -802,3 +802,107 @@ the per-surface emitters (U04/U05), U07's `MentionRenderer`, and the
 - **Next unit (U10):** the **six-member close flip** (M36·10) — `Milestones.cs`
   / README / `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` /
   `WhatsNew.cs`; M36 is the **new last** milestone — no successor to promote.
+
+## U10 — Close flip
+
+Executed the **six-member close flip** (M36·10) + the required **seventh**
+file (the `WhatsNewTests` head re-pin — a *consequence* of adding the
+0.58.0 entry, not a new close-flip member) + the plan-file moves. **M36 is
+now done** — the **last** milestone on the roadmap (M36·10). No successor to
+promote. Build green + Web tests green.
+
+- **Six files changed (the close-flip members, in order):**
+  1. **`src/Kumunita.Web/Milestones.cs`** — the `M36` row: `StatusNext` →
+     `StatusDone`. **No** `M37` row added (M36 is the **last** milestone — the
+     M36·10 pin).
+  2. **`README.md`** — the Roadmap M36 entry: `**In progress.** (ADR 0165)` →
+     `**Done.** (ADR 0165)`.
+  3. **`docs/STATUS.md`** — the status block: the M35 "M35 is done" entry
+     gained a new **M36 is done** entry (the same `**M35 is done**` /
+     `**M36 is done**` shape, the M35·11 precedent re-applied) + the
+     "M36 is the last milestone on the roadmap" framing (M36·10).
+  4. **`docs/ARCHITECTURE.md`** — the milestone-status paragraph: the M35
+     kiosk entry gained a new **M36 @mentions is shipped** entry (the same
+     "**M35 kiosk mode is shipped**" / "**M36 @mentions is shipped**" shape,
+     the M35·11 precedent re-applied) + the "M36 is the last milestone on the
+     roadmap" framing (M36·10).
+  5. **`tests/Kumunita.Web.Tests/MilestonesTests.cs`** — the re-pin:
+     `Shipped_Milestones_Are_Marked_Done` gained `M36` (the shipped set is now
+     **every** id through M36); `M36_Is_The_Single_InProgress_Milestone_And_
+     The_Last` was **replaced** with `No_Milestone_Is_InProgress` (the
+     terminal-state pin — **no** milestone is in-progress, M36 is the **last**
+     entry; the same shape M35 had before M36 opened — the M35·11 / M34-U08
+     "last milestone, no successor" framing, re-applied);
+     `Roadmap_Covers_M0_Through_M36_Plus_Named_Lanes_In_Order` is **unchanged**
+     (the order is unchanged — M36 is still the last id).
+  6. **`src/Kumunita.Web/WhatsNew.cs`** — the next `0.x.0` entry added
+     (newest-first, the `0.58.0` row — date `2026-10-13`, the current date)
+     naming M36 + ADR 0165 (the required sixth close-flip member, ADR 0110 /
+     AGENTS.md). The 0.57.0 (M35, ADR 0164) entry slides one row back.
+- **Seventh file (a consequence, not a close-flip member):**
+  **`tests/Kumunita.Web.Tests/WhatsNewTests.cs`** — the head pin re-pinned:
+  `The_Improve_Lane_Reduction_Entry_Is_Shipped` (0.57.0 head, ADR 0164) was
+  **replaced** with `The_M36_Mentions_Entry_Is_Shipped` (0.58.0 head, ADR
+  0165, date 2026-10-13, "mention" in the head entry) + the 0.57.0 kiosk entry
+  now asserts as "one row back" (the same sliding-window discipline the
+  previous close flip applied when M35 became the head). The downstream pin
+  chain (0.56.0 upcoming, 0.55.0 analytics, 0.54.0 page translations, 0.53.0
+  nested help guides, 0.52.0 escalation, 0.51.0 surface labels, 0.50.0 site
+  content hero, 0.49.0 storage metrics history, 0.48.0 issue submission,
+  0.47.0 error handling, 0.46.0 admin onboarding) is **unchanged** (their
+  "N rows back from the head" comments now count from the new 0.58.0 head —
+  the row positions are correct, the comments are cosmetic).
+- **Plan files moved (after the U10 handoff section was appended):**
+  - `docs/plans-milestones/in-progress/m36-u00.md` →
+    `docs/plans-milestones/done/m36/m36-u00.md`
+  - `docs/plans-milestones/in-progress/m36-u01.md` →
+    `docs/plans-milestones/done/m36/m36-u01.md`
+  - `docs/plans-milestones/in-progress/m36-u10.md` →
+    `docs/plans-milestones/done/m36/m36-u10.md`
+  - `docs/plans-milestones/in-progress/plan-m36-mentions.md` →
+    `docs/plans-milestones/done/m36/plan-m36-mentions.md`
+  - **`m36-handoff-notes.md`** stays in `in-progress/` per the unit
+    instructions (the U10 section was appended **before** the move — the
+    handoff notes "stay in `in-progress/` until the final `## U10 — Close
+    flip` section is appended," which is now appended, so the move of the
+    handoff notes is the *next* step after the move above — the instruction
+    is ambiguous on whether the handoff notes move too; the M35 precedent
+    (the `done/m35/m35-handoff-notes.md` file is present in `done/m35/`)
+    says the handoff notes move with the unit files, so the move below
+    includes `m36-handoff-notes.md` as the **last** file moved, after the
+    U10 section is already appended to it).
+  - `docs/plans-milestones/in-progress/m36-handoff-notes.md` →
+    `docs/plans-milestones/done/m36/m36-handoff-notes.md` (**last** file
+    moved — the U10 section above is already in it).
+- **Test results (the in-process `dotnet exec` path — the `AGENTS.md`
+  test-runner quirk; **not** `dotnet test` / the `run_tests` tool):**
+  - **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded.**
+    0 Warning(s), 0 Error(s), Time Elapsed 00:00:17.89.
+  - **`Kumunita.Web.Tests`** — Total: **1043**, Errors: **0**, Failed: **0**,
+    Skipped: **1** (the skip is `ImproveHarnessTests.ImproveCheck_Gate_Passes`
+    — `pwsh` not on PATH on this machine; the gate script cannot run locally,
+    CI has PowerShell 7). **Time: 18.155s.**
+- **Gate verification (the close-flip pins, all green within the 1043 Web
+  tests):**
+  - **`MilestonesTests`** — `Roadmap_Covers_M0_Through_M36_Plus_Named_Lanes_
+    In_Order` (M36 is the last id) + `Shipped_Milestones_Are_Marked_Done`
+    (every id through M36 is `StatusDone`) + `No_Milestone_Is_InProgress`
+    (no milestone is `StatusNext`, M36 is the last) +
+    `No_Milestone_Has_Blank_Title` — all green.
+  - **`WhatsNewTests`** — `The_M36_Mentions_Entry_Is_Shipped` (0.58.0 head,
+    ADR 0165, date 2026-10-13, "mention" in the head entry) + the downstream
+    sliding-window pins (0.57.0 kiosk one row back, 0.56.0 upcoming two rows
+    back, …) — all green.
+- **No drift pause.** No pin was re-shaped. No test name was changed (the
+  `M36_Is_The_Single_InProgress_Milestone_And_The_Last` →
+  `No_Milestone_Is_InProgress` rename + the
+  `The_Improve_Lane_Reduction_Entry_Is_Shipped` →
+  `The_M36_Mentions_Entry_Is_Shipped` rename are the **intended** close-flip
+  re-pins the register names, not drift).
+- **M36 is closed.** The roadmap's terminal state after M36's close is
+  "all done, no in-progress" (the M35·11 / M34-U08 "last milestone, no
+  successor" framing, re-applied — the `MilestonesTests.No_Milestone_Is_
+  InProgress` pin holds). **M36 is the last milestone on the roadmap** —
+  there is no M37 to promote (M36·10). The platform is feature-complete on
+  the current roadmap; future work is named-lane territory (the ADR 0013 /
+  0011 / 0005 precedent).

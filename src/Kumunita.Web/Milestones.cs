@@ -79,7 +79,7 @@ public static class Milestones
         new("M33", "Storage metrics history — the M24 admin surface gains a trend view over time so an operator can estimate whether the instance's capacity is sufficient in the future", StatusDone),
         new("M34", "Analytics history — the M13 analytics surface gains a trend view over time so an operator can see usage patterns evolve", StatusDone),
         new("M35", "Kiosk mode — a full-page / full-screen display that automatically cycles a preset list of views (e.g. Kanban board A, calendar week, Kanban board B, calendar today, todos), changing view on a set interval and refreshing each view's content on a separate, faster interval", StatusDone),
-        new("M36", "@mentions — a cross-surface @<resident> reference token: type a resident's directory display name after an @, the platform resolves it against the resident directory and notifies the mentioned resident on that surface (posts, replies, pages, events, to-dos, group posts, announcements, messages) and renders the name as a link to their directory page", StatusNext),
+        new("M36", "@mentions — a cross-surface @<resident> reference token: type a resident's directory display name after an @, the platform resolves it against the resident directory and notifies the mentioned resident on that surface (posts, replies, pages, events, to-dos, group posts, announcements, messages) and renders the name as a link to their directory page", StatusDone),
     };
 
     public static string BadgeClass(string status) => status switch
