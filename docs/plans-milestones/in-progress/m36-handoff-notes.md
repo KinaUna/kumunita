@@ -755,3 +755,50 @@ the per-surface emitters (U04/U05), U07's `MentionRenderer`, and the
   `MentionsTests` (8) + `MentionRendererTests` (4) + the per-surface emitter
   tests (9 lanes) + the `kw-l` parity closure + the `Milestones` pin are all
   green (any red is a **blocker**, not a stopping point).
+
+## U09 — Acceptance gate PASS
+
+- **Gate (Part 2.8) — all four suites green → PASS.**
+- **Build:** `dotnet build Kumunita.slnx -c Debug` —
+  **Build succeeded.** 0 Warning(s), 0 Error(s), Time Elapsed 00:00:02.40.
+- **Test results (the in-process `dotnet exec` path — the `AGENTS.md`
+  test-runner quirk; **not** `dotnet test` / the `run_tests` tool):**
+  - **`Kumunita.Web.Tests`** — Total: **1043**, Errors: **0**, Failed: **0**,
+    Skipped: **1** (the skip is `ImproveHarnessTests.ImproveCheck_Gate_Passes`
+    — `pwsh` not on PATH on this machine; the gate script cannot run locally,
+    CI has PowerShell 7). **Time: 15.613s.**
+  - **`Kumunita.Core.Tests`** — Total: **1493**, Errors: **0**, Failed: **0**,
+    Skipped: **2**. **Time: 143.064s.** (Testcontainers `postgres:18`
+    started; all containers cleaned up on exit.)
+- **Gate-half verification (all present and green within the totals above):**
+  - **`MentionsTests`** (Core, `tests/Kumunita.Core.Tests/Mentions/`) —
+    **8 tests**, all green:
+    `MentionTokens_ExtractTokens_DeDuplicatesAndOrders`,
+    `MentionTokens_ExtractTokens_ExcludesCodeSpansAndLinks`,
+    `MentionTokens_ExtractTokens_LoneAndTrailingAtYieldNoToken`,
+    `ResolveAsync_ExactlyOneNonBlockedNonAuthor_Resolves`,
+    `ResolveAsync_ZeroMatches_YieldsNoId`,
+    `ResolveAsync_TwoOrMoreMatches_YieldsNoId`,
+    `ResolveAsync_AuthorsOwnName_YieldsNoId`,
+    `ResolveAsync_WritesZeroAccessAuditRows`.
+  - **`MentionRendererTests`** (Web, `tests/Kumunita.Web.Tests/`) —
+    **4 tests**, all green:
+    `Render_Pass_RewritesResolvedMentionToDirectoryLink`,
+    `Render_Pass_UnresolvedTokenIsPlainText`,
+    `Render_Pass_IsIdempotent`,
+    `Render_Pass_SkipsInsideAnchorAndCode`.
+  - **Per-surface emitter tests** — 20 tests across the nine lanes (post ×5,
+    group post + group post reply ×4, page ×2, event ×2, to-do comment ×2,
+    announcement ×3, message ×2), all green (documented in U08).
+  - **`kw-l` parity closure** — `KwLRegistryConsistencyTests` (Web) +
+    `KnownTranslationKeys_ParityTests` (Core), both present and green within
+    the totals above (M36-9 / M36·7 pin).
+  - **`Milestones` pin** —
+    `Roadmap_Covers_M0_Through_M36_Plus_Named_Lanes_In_Order` +
+    `M36_Is_The_Single_InProgress_Milestone_And_The_Last` (both present and
+    green within the 1043 Web tests — confirming the `M36` row is
+    `StatusNext`, the open pre-close state, M36·10).
+- **No drift pause.** No pin was re-shaped. No test name was changed.
+- **Next unit (U10):** the **six-member close flip** (M36·10) — `Milestones.cs`
+  / README / `STATUS.md` / `ARCHITECTURE.md` / `MilestonesTests.cs` /
+  `WhatsNew.cs`; M36 is the **new last** milestone — no successor to promote.
