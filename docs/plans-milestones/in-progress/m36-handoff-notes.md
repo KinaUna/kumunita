@@ -401,3 +401,67 @@ seven mention kinds are opt-OUT).
   en/de/fr/da (the 7 kinds × 4 keys = 28 keys, the M36·7 pin) + the
   `Preferences.cshtml` toggle change (the `post.mention` "coming soon" badge
   removed, the six new kinds' toggles rendered).
+
+## U06 — kw-l + toggle
+
+- **Goal:** author the 28 mention `kw-l` keys × en/de/fr/da (M36·7) + the
+  `Preferences.cshtml` toggle change (M36·7). No new Core service, no new
+  emitter, no new build target.
+- **Deliverables (4 files, modified):**
+  - `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — 28 mention
+    `kw-l` keys added to the `EnValues` / `DeValues` / `FrValues` / `DaValues`
+    blocks (inserted after the M9 `message.new` block and before the GU
+    community-approval lane block, in each of the four language sections).
+    Per kind: `notifications.kind.{kind}` (badge) /
+    `notifications.preference.{kind}.label` / `notification.{kind}.subject` /
+    `notification.{kind}.body`. The `post.mention` badge + preference label
+    already existed from M6's reserved set (verified — present in all four
+    languages); U06 added only its `subject` / `body` templates (2 new keys
+    per language for `post.mention`). The six new kinds
+    (`group.post.mention` / `page.mention` / `event.mention` /
+    `todo.mention` / `announcement.mention` / `message.mention`) each
+    contributed all four keys (6 × 4 = 24 new keys per language). Total: 26
+    new keys per language (2 for `post.mention` + 24 for the six siblings);
+    104 new keys across four languages.
+  - `src/Kumunita.Web/Views/Notifications/Preferences.cshtml` — the
+    `post.mention` reserved/disabled special-case removed: the `var reserved =
+    …` line, the `opacity-50` class, the `disabled` attribute, the `checked`
+    suppression, and the `notifications.preferences.coming_soon` badge are all
+    gone. All seven mention kinds now render as normal opt-OUT switches (the
+    six new kinds appear automatically once in `NotificationKinds.Known`).
+  - `tests/Kumunita.Web.Tests/NotificationsControllerTests.cs` — the
+    `Assert.Equal(22, vm.AllKinds.Count)` pin re-pinned to
+    `Assert.Equal(28, vm.AllKinds.Count)` (22 + 6 new kinds = 28; the
+    `post.mention` reserved kind was already in the count from M6).
+- **en values (source text, the ADR 0015 D1 provider-floor discipline):**
+  - `post.mention`: "You were mentioned" / "You were mentioned: "
+  - `group.post.mention`: "You were mentioned in a group post" /
+    "You were mentioned in a group post: "
+  - `page.mention`: "You were mentioned on a page" /
+    "You were mentioned on a page: "
+  - `event.mention`: "You were mentioned in an event" /
+    "You were mentioned in an event: "
+  - `todo.mention`: "You were mentioned in a to-do" /
+    "You were mentioned in a to-do comment: "
+  - `announcement.mention`: "You were mentioned in an announcement" /
+    "You were mentioned in an announcement: "
+  - `message.mention`: "You were mentioned in a message" /
+    "You were mentioned in a message: "
+  - All subject values end in a sentence break; all body values end in a
+    trailing space (the M6 `post.reply` shape — the UGC snippet is appended
+    after one space at emit time).
+- **de/fr/da values (authored this unit):** German, French, and Danish
+  translations for all 26 new keys per language, following the same shape
+  (subject ends with a period, body ends with a colon + space).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 0
+  warnings, 0 errors.
+- **Tests:** `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/
+  Kumunita.Web.Tests.dll` — **Total: 1039, Errors: 0, Failed: 0, Skipped: 1,
+  Time: 17.711s** (the `NotificationsControllerTests.AllKinds.Count == 28`
+  pin green; the `KwLRegistryConsistencyTests` + `KnownTranslationKeys_
+  ParityTests` four-language closure green).
+- **No drift pause** (all entry reads consistent with the design doc Part 2.5
+  + Part 2.6 pins).
+- **Next unit (U07):** implement the `MentionRenderer` render pass (plain-TS,
+  no-dep, no-`any`, the ADR 0031 pin) + wire it into the in-scope surfaces'
+  render boundary + the `site.css` `.mention` rule (M36·6 / M36·7).

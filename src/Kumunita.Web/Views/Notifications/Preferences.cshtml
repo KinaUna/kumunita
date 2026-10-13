@@ -33,34 +33,21 @@
                     <div class="d-grid gap-2" style="max-width: 24rem;">
                         @foreach (var kind in Model.AllKinds)
                         {
-                            @* C-M6·2 — <c>post.mention</c> is reserved, not wired:
-                               the toggle ships **present but disabled** (no
-                               emitter calls the kind in M6 — a disabled
-                               checkbox is not submitted, so it can never
-                               enter the bound <c>KindsEnabled</c> list; the
-                               "coming soon" badge is the UI signal).
-                               C-M6·9 — the lean-default: <c>null</c> (no
-                               preference yet) renders every toggle checked. *@
-                            var reserved = kind == NotificationKinds.PostMention;
+                            @* C-M6·9 — the lean-default: <c>null</c> (no
+                               preference yet) renders every toggle checked.
+                               M36 (ADR 0165, M36·7) — the <c>post.mention</c>
+                               reserved/disabled special-case is removed: all
+                               seven mention kinds now render as normal
+                               opt-OUT switches (the six new kinds appear
+                               automatically once added to <c>Known</c>). *@
                             var isChecked = Model.KindsEnabled is null || Model.KindsEnabled.Contains(kind);
-                            <div class="form-check form-switch @(reserved ? "opacity-50" : null)">
+                            <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        id="@($"pref-{kind}")"
                                        name="KindsEnabled" value="@kind"
-                                       @(isChecked && !reserved ? "checked" : null)
-                                       @(reserved ? "disabled" : null) />
+                                       @(isChecked ? "checked" : null) />
                                 <label class="form-check-label" for="@($"pref-{kind}")">
-                                    @* The per-kind label key (the frozen dotted shape —
-                                       <c>notifications.preference.{kind}.label</c>);
-                                       the kw-l fallback text is inert (all nine are
-                                       registered, U07). *@
                                     <kw-l key="@($"notifications.preference.{kind}.label")">@kind</kw-l>
-                                    @if (reserved)
-                                    {
-                                        <span class="badge text-bg-light text-dark ms-1">
-                                            <kw-l key="notifications.preferences.coming_soon">coming soon</kw-l>
-                                        </span>
-                                    }
                                 </label>
                             </div>
                         }

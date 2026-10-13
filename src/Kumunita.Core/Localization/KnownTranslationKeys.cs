@@ -2073,6 +2073,41 @@ public static class KnownTranslationKeys
             ["notification.message.new.subject"] = "A new message",
             ["notification.message.new.body"] = "A resident sent you a message: ",
 
+            // ── M36 (ADR 0165, M36·7) — the cross-surface @mention kw-l key set ──
+            // 7 kinds × 4 keys = 28 keys. post.mention badge + preference label
+            // already exist (M6 reserved set); only its subject/body are new.
+            // The six sibling kinds (group.post / page / event / todo /
+            // announcement / message .mention) contribute all four keys each.
+            // Subject ends in a sentence break; body ends in a trailing space
+            // (the M6 post.reply shape — the UGC snippet is appended after one
+            // space at emit time, `template + " " + snippet`).
+            ["notification.post.mention.subject"] = "You were mentioned",
+            ["notification.post.mention.body"] = "You were mentioned: ",
+            ["notifications.kind.group.post.mention"] = "Group post mention",
+            ["notifications.preference.group.post.mention.label"] = "Mentions in group posts",
+            ["notification.group.post.mention.subject"] = "You were mentioned in a group post",
+            ["notification.group.post.mention.body"] = "You were mentioned in a group post: ",
+            ["notifications.kind.page.mention"] = "Page mention",
+            ["notifications.preference.page.mention.label"] = "Mentions on pages",
+            ["notification.page.mention.subject"] = "You were mentioned on a page",
+            ["notification.page.mention.body"] = "You were mentioned on a page: ",
+            ["notifications.kind.event.mention"] = "Event mention",
+            ["notifications.preference.event.mention.label"] = "Mentions on events",
+            ["notification.event.mention.subject"] = "You were mentioned in an event",
+            ["notification.event.mention.body"] = "You were mentioned in an event: ",
+            ["notifications.kind.todo.mention"] = "To-do mention",
+            ["notifications.preference.todo.mention.label"] = "Mentions on to-dos",
+            ["notification.todo.mention.subject"] = "You were mentioned in a to-do",
+            ["notification.todo.mention.body"] = "You were mentioned in a to-do comment: ",
+            ["notifications.kind.announcement.mention"] = "Announcement mention",
+            ["notifications.preference.announcement.mention.label"] = "Mentions in announcements",
+            ["notification.announcement.mention.subject"] = "You were mentioned in an announcement",
+            ["notification.announcement.mention.body"] = "You were mentioned in an announcement: ",
+            ["notifications.kind.message.mention"] = "Message mention",
+            ["notifications.preference.message.mention.label"] = "Mentions in messages",
+            ["notification.message.mention.subject"] = "You were mentioned in a message",
+            ["notification.message.mention.body"] = "You were mentioned in a message: ",
+
             // ── GU community-approval lane (ADR 0141) — the guardian-facing
             // kind + nudge templates (the template ends with ": " — the
             // emitter appends the UGC snippet, here the group/community name
@@ -4715,6 +4750,40 @@ public static class KnownTranslationKeys
             ["notification.message.new.subject"] = "Neue Nachricht",
             ["notification.message.new.body"] = "Ein Bewohner hat dir eine Nachricht geschickt: ",
 
+            // ── M36 (ADR 0165, M36·7) — die Querflächenerwähnungs- kw-l-Schlüssel ──
+            // 7 Arten × 4 Schlüssel = 28 Schlüssel. post.mention-Badge +
+            // Präferenzlabel existieren bereits (M6-reserviert); nur deren
+            // Betreff/Text sind neu. Die sechs Schwesternarten liefern alle
+            // vier Schlüssel. Betreff endet mit Satzende; Text endet mit
+            // Leerzeichen (die M6 post.reply-Form — das UGC-Fragment wird
+            // beim Emission mit einem Leerzeichen angehängt).
+            ["notification.post.mention.subject"] = "Du wurdest erwähnt",
+            ["notification.post.mention.body"] = "Du wurdest erwähnt: ",
+            ["notifications.kind.group.post.mention"] = "Erwähnung im Gruppenbeitrag",
+            ["notifications.preference.group.post.mention.label"] = "Erwähnungen in Gruppenbeiträgen",
+            ["notification.group.post.mention.subject"] = "Du wurdest in einem Gruppenbeitrag erwähnt",
+            ["notification.group.post.mention.body"] = "Du wurdest in einem Gruppenbeitrag erwähnt: ",
+            ["notifications.kind.page.mention"] = "Erwähnung auf einer Seite",
+            ["notifications.preference.page.mention.label"] = "Erwähnungen auf Seiten",
+            ["notification.page.mention.subject"] = "Du wurdest auf einer Seite erwähnt",
+            ["notification.page.mention.body"] = "Du wurdest auf einer Seite erwähnt: ",
+            ["notifications.kind.event.mention"] = "Erwähnung bei einer Veranstaltung",
+            ["notifications.preference.event.mention.label"] = "Erwähnungen bei Veranstaltungen",
+            ["notification.event.mention.subject"] = "Du wurdest bei einer Veranstaltung erwähnt",
+            ["notification.event.mention.body"] = "Du wurdest bei einer Veranstaltung erwähnt: ",
+            ["notifications.kind.todo.mention"] = "Erwähnung in einer Aufgabe",
+            ["notifications.preference.todo.mention.label"] = "Erwähnungen in Aufgaben",
+            ["notification.todo.mention.subject"] = "Du wurdest in einer Aufgabe erwähnt",
+            ["notification.todo.mention.body"] = "Du wurdest in einem Aufgabenkommentar erwähnt: ",
+            ["notifications.kind.announcement.mention"] = "Erwähnung in einem Hinweis",
+            ["notifications.preference.announcement.mention.label"] = "Erwähnungen in Hinweisen",
+            ["notification.announcement.mention.subject"] = "Du wurdest in einem Hinweis erwähnt",
+            ["notification.announcement.mention.body"] = "Du wurdest in einem Hinweis erwähnt: ",
+            ["notifications.kind.message.mention"] = "Erwähnung in einer Nachricht",
+            ["notifications.preference.message.mention.label"] = "Erwähnungen in Nachrichten",
+            ["notification.message.mention.subject"] = "Du wurdest in einer Nachricht erwähnt",
+            ["notification.message.mention.body"] = "Du wurdest in einer Nachricht erwähnt: ",
+
             // ── GU community-approval lane (ADR 0141) — die Betreuer-Art ──
             ["notifications.kind.guardian.group_invite"] =
                 "Gruppen-Einladung für dein Kind",
@@ -7244,6 +7313,40 @@ public static class KnownTranslationKeys
             ["notification.message.new.subject"] = "Nouveau message",
             ["notification.message.new.body"] = "Un résident t'a envoyé un message : ",
 
+            // ── M36 (ADR 0165, M36·7) — les clés kw-l de mention transversale ──
+            // 7 types × 4 clés = 28 clés. Le badge + le libellé de préférence
+            // post.mention existent déjà (réservé M6) ; seul son objet/corps
+            // est nouveau. Les six types frères fournissent les quatre clés.
+            // L'objet se termine par une fin de phrase ; le corps se termine
+            // par une espace (la forme post.reply M6 — l'extrait UGC est
+            // ajouté après une espace à l'émission).
+            ["notification.post.mention.subject"] = "Vous avez été mentionné",
+            ["notification.post.mention.body"] = "Vous avez été mentionné : ",
+            ["notifications.kind.group.post.mention"] = "Mention dans un message de groupe",
+            ["notifications.preference.group.post.mention.label"] = "Les mentions dans les messages de groupe",
+            ["notification.group.post.mention.subject"] = "Vous avez été mentionné dans un message de groupe",
+            ["notification.group.post.mention.body"] = "Vous avez été mentionné dans un message de groupe : ",
+            ["notifications.kind.page.mention"] = "Mention sur une page",
+            ["notifications.preference.page.mention.label"] = "Les mentions sur les pages",
+            ["notification.page.mention.subject"] = "Vous avez été mentionné sur une page",
+            ["notification.page.mention.body"] = "Vous avez été mentionné sur une page : ",
+            ["notifications.kind.event.mention"] = "Mention à un événement",
+            ["notifications.preference.event.mention.label"] = "Les mentions à des événements",
+            ["notification.event.mention.subject"] = "Vous avez été mentionné dans un événement",
+            ["notification.event.mention.body"] = "Vous avez été mentionné dans un événement : ",
+            ["notifications.kind.todo.mention"] = "Mention dans une tâche",
+            ["notifications.preference.todo.mention.label"] = "Les mentions dans les tâches",
+            ["notification.todo.mention.subject"] = "Vous avez été mentionné dans une tâche",
+            ["notification.todo.mention.body"] = "Vous avez été mentionné dans un commentaire de tâche : ",
+            ["notifications.kind.announcement.mention"] = "Mention dans une annonce",
+            ["notifications.preference.announcement.mention.label"] = "Les mentions dans les annonces",
+            ["notification.announcement.mention.subject"] = "Vous avez été mentionné dans une annonce",
+            ["notification.announcement.mention.body"] = "Vous avez été mentionné dans une annonce : ",
+            ["notifications.kind.message.mention"] = "Mention dans un message",
+            ["notifications.preference.message.mention.label"] = "Les mentions dans les messages",
+            ["notification.message.mention.subject"] = "Vous avez été mentionné dans un message",
+            ["notification.message.mention.body"] = "Vous avez été mentionné dans un message : ",
+
             // ── GU community-approval lane (ADR 0141) — l'art du tuteur ──
             ["notifications.kind.guardian.group_invite"] =
                 "Invitation à un groupe pour ton enfant",
@@ -9747,6 +9850,40 @@ public static class KnownTranslationKeys
             ["notifications.preference.message.new.label"] = "Beskeder fra andre beboere",
             ["notification.message.new.subject"] = "Ny besked",
             ["notification.message.new.body"] = "En beboer har sendt dig en besked: ",
+
+            // ── M36 (ADR 0165, M36·7) — tværflade nævnelse kw-l-nøgler ──
+            // 7 typer × 4 nøgler = 28 nøgler. post.mention-badge +
+            // præference-label findes allerede (M6-reserveret); kun dens
+            // emne/krop er nye. De seks søskendetyper leverer alle fire
+            // nøgler. Emne ender med sætningsafslutning; krop ender med et
+            // mellemrum (M6 post.reply-formen — UGC-uddraget tilføjes efter
+            // et mellemrum ved emissionen).
+            ["notification.post.mention.subject"] = "Du blev nævnt",
+            ["notification.post.mention.body"] = "Du blev nævnt: ",
+            ["notifications.kind.group.post.mention"] = "Nævnelse i gruppeindlæg",
+            ["notifications.preference.group.post.mention.label"] = "Nævnelser i gruppeindlæg",
+            ["notification.group.post.mention.subject"] = "Du blev nævnt i et gruppeindlæg",
+            ["notification.group.post.mention.body"] = "Du blev nævnt i et gruppeindlæg: ",
+            ["notifications.kind.page.mention"] = "Nævnelse på en side",
+            ["notifications.preference.page.mention.label"] = "Nævnelser på sider",
+            ["notification.page.mention.subject"] = "Du blev nævnt på en side",
+            ["notification.page.mention.body"] = "Du blev nævnt på en side: ",
+            ["notifications.kind.event.mention"] = "Nævnelse ved et arrangement",
+            ["notifications.preference.event.mention.label"] = "Nævnelser ved arrangementer",
+            ["notification.event.mention.subject"] = "Du blev nævnt i et arrangement",
+            ["notification.event.mention.body"] = "Du blev nævnt i et arrangement: ",
+            ["notifications.kind.todo.mention"] = "Nævnelse i en opgave",
+            ["notifications.preference.todo.mention.label"] = "Nævnelser i opgaver",
+            ["notification.todo.mention.subject"] = "Du blev nævnt i en opgave",
+            ["notification.todo.mention.body"] = "Du blev nævnt i en opgavekommentar: ",
+            ["notifications.kind.announcement.mention"] = "Nævnelse i en meddelelse",
+            ["notifications.preference.announcement.mention.label"] = "Nævnelser i meddelelser",
+            ["notification.announcement.mention.subject"] = "Du blev nævnt i en meddelelse",
+            ["notification.announcement.mention.body"] = "Du blev nævnt i en meddelelse: ",
+            ["notifications.kind.message.mention"] = "Nævnelse i en besked",
+            ["notifications.preference.message.mention.label"] = "Nævnelser i beskeder",
+            ["notification.message.mention.subject"] = "Du blev nævnt i en besked",
+            ["notification.message.mention.body"] = "Du blev nævnt i en besked: ",
 
             // ── GU community-approval lane (ADR 0141) — den vagts type ──
             ["notifications.kind.guardian.group_invite"] =
