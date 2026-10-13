@@ -3562,3 +3562,37 @@ body.kmb-page-expanded #events-calendar:fullscreen .page-expand-close {
   transition: opacity 0.3s ease;
 }
 
+/* Disclosure: the audience / visibility explanation notes on the
+   post / group-post / announcement / to-do detail pages. These are
+   informational (they explain *who can see* the post, a reply, or a
+   comment) and were previously always visible as muted prose, which
+   distracted from the primary actions. They are now collapsed by
+   default in a native <details> — the same affordance the pages tree
+   (_PageTreeItem.cshtml) and the translation chips use — so the label
+   is the only thing shown until the resident opts into the detail.
+   No JS: <details> is native. The summary is the visible affordance
+   (a muted, small, clickable label); the note text is the collapsed
+   content below it. The Bootstrap `small` class already gives the
+   0.875rem size; `text-muted` the muted color. */
+.kw-audience-disclosure > summary {
+  cursor: pointer;
+  list-style-position: inside;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color, #6c757d);
+}
+.kw-audience-disclosure > summary:hover {
+  text-decoration: underline;
+}
+.kw-audience-disclosure > summary::-webkit-details-marker {
+  cursor: pointer;
+}
+.kw-audience-disclosure[open] > summary {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.kw-audience-disclosure > .text-muted {
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+  margin-top: 0.25rem;
+}
+

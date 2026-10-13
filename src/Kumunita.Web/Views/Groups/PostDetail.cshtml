@@ -400,10 +400,13 @@
                    scoped moderator standing does not reach a group lane, and
                    break-glass is explicitly *unavailable*, G·4 — not a
                    deferral). *@
-                <div class="text-muted small mb-0">
-                    You can see this post because you are a current member of
-                    the group.
-                </div>
+                <details class="kw-audience-disclosure mb-0">
+                    <summary>Why can I see this?</summary>
+                    <div class="text-muted small">
+                        You can see this post because you are a current member of
+                        the group.
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -703,11 +706,14 @@
                             translation.
                         </div>
                     </div>
-                    <div class="text-muted small mb-3">
-                        Replies have no own audience — they are visible under
-                        this post's single group-membership decision. You are
-                        replying only where the post itself is visible.
-                    </div>
+                    <details class="kw-audience-disclosure mb-3">
+                        <summary>Who can see replies?</summary>
+                        <div class="text-muted small">
+                            Replies have no own audience — they are visible under
+                            this post's single group-membership decision. You are
+                            replying only where the post itself is visible.
+                        </div>
+                    </details>
                     <button type="submit" class="btn btn-primary">Reply</button>
                 </form>
             </div>

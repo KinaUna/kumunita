@@ -250,6 +250,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "This comment has been deleted by its author.",
             ["projects.todo.comment_delete"] = "Delete",
             ["projects.todo.comment_audience_note"] = "Comments have no own audience — they are visible under this to-do's single audience decision. You are commenting only where the to-do itself is visible.",
+            ["projects.todo.comment_audience_note_label"] = "Who can see comments?",
             ["projects.todo.back"]           = "← Back to to-dos",
             ["projects.todo.untitled"]       = "Untitled to-do",
             ["projects.todo.edit"]           = "Edit",
@@ -1253,6 +1254,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "You can see this post because you were allowed to view it — " +
                 "either you're the author, or it was shared with you or your groups.",
+            ["posts.detail_why_label"] = "Why can I see this?",
             ["posts.report_button"] = "Report this post",
             ["posts.reply_report_button"] = "Report this reply",
             ["posts.report_reason_label"] = "What's wrong?",
@@ -1275,6 +1277,7 @@ public static class KnownTranslationKeys
                 "Replies have no own audience — they are visible under " +
                 "this post's single audience decision. You are replying " +
                 "only where the post itself is visible.",
+            ["posts.reply_audience_note_label"] = "Who can see replies?",
             ["posts.reply_submit"] = "Reply",
             ["posts.reply_edit"] = "Edit",
             ["posts.reply_save"] = "Save",
@@ -1674,6 +1677,7 @@ public static class KnownTranslationKeys
                 "public announcement, and follow this announcement's own " +
                 "audience (a community-targeted one is visible to that " +
                 "community's residents).",
+            ["announcements.comment_audience_note_label"] = "Who can see comments?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Last updated:",
@@ -3052,6 +3056,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Dieser Kommentar wurde von seinem Autor gelöscht.",
             ["projects.todo.comment_delete"] = "Löschen",
             ["projects.todo.comment_audience_note"] = "Kommentare haben kein eigenes Publikum — sie sind unter der einzelnen Publikumsentscheidung dieser Aufgabe sichtbar. Du kommentierst nur dort, wo die Aufgabe selbst sichtbar ist.",
+            ["projects.todo.comment_audience_note_label"] = "Wer sieht Kommentare?",
             ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
             ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
             ["projects.todo.edit"]           = "Bearbeiten",
@@ -3993,6 +3998,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Du kannst diesen Beitrag sehen, weil er dir freigegeben wurde — " +
                 "entweder du bist Autor:in, oder er wurde mit dir oder deinen Gruppen geteilt.",
+            ["posts.detail_why_label"] = "Warum sehe ich das?",
             ["posts.report_button"] = "Diesen Beitrag melden",
             ["posts.reply_report_button"] = "Diese Antwort melden",
             ["posts.report_reason_label"] = "Was ist schiefgelaufen?",
@@ -4015,6 +4021,7 @@ public static class KnownTranslationKeys
                 "Antworten haben kein eigenes Publikum — sie sind unter " +
                 "der einzelnen Publikumsentscheidung dieses Beitrags sichtbar. " +
                 "Du antwortest nur dort, wo der Beitrag selbst sichtbar ist.",
+            ["posts.reply_audience_note_label"] = "Wer sieht Antworten?",
             ["posts.reply_submit"] = "Antworten",
             ["posts.reply_edit"] = "Bearbeiten",
             ["posts.reply_save"] = "Speichern",
@@ -4398,6 +4405,7 @@ public static class KnownTranslationKeys
                 "auch bei einer öffentlichen Ankündigung — und folgen dem " +
                 "eigenen Publikum dieser Ankündigung (eine an eine " +
                 "Community gerichtete ist deren Anwohner:innen sichtbar).",
+            ["announcements.comment_audience_note_label"] = "Wer sieht Kommentare?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Zuletzt aktualisiert:",
@@ -5675,6 +5683,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Ce commentaire a été supprimé par son auteur.",
             ["projects.todo.comment_delete"] = "Supprimer",
             ["projects.todo.comment_audience_note"] = "Les commentaires n'ont pas d'audience propre — ils sont visibles sous la décision d'audience unique de cette tâche. Tu ne commentes que là où la tâche elle-même est visible.",
+            ["projects.todo.comment_audience_note_label"] = "Qui peut voir les commentaires ?",
             ["projects.todo.back"]           = "← Retour aux tâches",
             ["projects.todo.untitled"]       = "Tâche sans titre",
             ["projects.todo.edit"]           = "Modifier",
@@ -6539,6 +6548,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Tu peux voir cette publication parce qu'elle t'a été accordée — " +
                 "soit tu en es l'auteur, soit elle a été partagée avec toi ou tes groupes.",
+            ["posts.detail_why_label"] = "Pourquoi est-ce que je vois ça ?",
             ["posts.report_button"] = "Signaler cette publication",
             ["posts.reply_report_button"] = "Signaler cette réponse",
             ["posts.report_reason_label"] = "Quel est le problème ?",
@@ -6561,6 +6571,7 @@ public static class KnownTranslationKeys
                 "Les réponses n'ont pas d'audience propre — elles sont visibles " +
                 "selon la décision d'audience unique de cette publication. " +
                 "Tu réponds uniquement là où la publication elle-même est visible.",
+            ["posts.reply_audience_note_label"] = "Qui peut voir les réponses ?",
             ["posts.reply_submit"] = "Répondre",
             ["posts.reply_edit"] = "Modifier",
             ["posts.reply_save"] = "Enregistrer",
@@ -6946,6 +6957,7 @@ public static class KnownTranslationKeys
                 "connectés — même sur une annonce publique — et suivent le " +
                 "public de cette annonce (une annonce destinée à une " +
                 "communauté est visible par les habitants de celle-ci).",
+            ["announcements.comment_audience_note_label"] = "Qui peut voir les commentaires ?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Dernière mise à jour :",
@@ -8228,6 +8240,7 @@ public static class KnownTranslationKeys
             ["projects.todo.comment_deleted"] = "Denne kommentar er slettet af dens forfatter.",
             ["projects.todo.comment_delete"] = "Slet",
             ["projects.todo.comment_audience_note"] = "Kommentarer har intet eget publikum — de er synlige under denne opgaves enkelte publikumsafgørelse. Du kommenterer kun hvor opgaven selv er synlig.",
+            ["projects.todo.comment_audience_note_label"] = "Hvem kan se kommentarerne?",
             ["projects.todo.back"]           = "← Tilbage til opgaverne",
             ["projects.todo.untitled"]       = "Opgave uden navn",
             ["projects.todo.edit"]           = "Rediger",
@@ -9085,6 +9098,7 @@ public static class KnownTranslationKeys
             ["posts.detail_why"] =
                 "Du kan se dette indlæg, fordi det er blevet delt med dig — " +
                 "enten er du forfatteren, eller det er delagt med dig eller dine grupper.",
+            ["posts.detail_why_label"] = "Hvorfor kan jeg se det?",
             ["posts.report_button"] = "Rapportér dette indlæg",
             ["posts.reply_report_button"] = "Rapportér dette svar",
             ["posts.report_reason_label"] = "Hvad er der galt?",
@@ -9107,6 +9121,7 @@ public static class KnownTranslationKeys
                 "Svar har ingen egen modtagerkreds — de er synlige under " +
                 "dette indlægs ene modtagerkredsbeslutning. " +
                 "Du svarer kun der, hvor indlægget selv er synligt.",
+            ["posts.reply_audience_note_label"] = "Hvem kan se svarene?",
             ["posts.reply_submit"] = "Svar",
             ["posts.reply_edit"] = "Rediger",
             ["posts.reply_save"] = "Gem",
@@ -9486,6 +9501,7 @@ public static class KnownTranslationKeys
                 "officiel meddelelse — og følger denne meddelelses eget " +
                 "publikum (en meddelelse rettet til et fællesskab er synligt " +
                 "for dets indboere).",
+            ["announcements.comment_audience_note_label"] = "Hvem kan se kommentarerne?",
 
             // ── static pages (Page — the terms/help shell) ───────────────────
             ["static.last_updated"] = "Sidst opdateret:",

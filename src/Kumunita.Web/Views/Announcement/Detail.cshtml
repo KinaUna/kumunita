@@ -514,9 +514,12 @@
                                     <kw-l key="posts.reply_language_note">The language you're commenting in — a tag, not a translation.</kw-l>
                                 </div>
                             </div>
-                            <div class="text-muted small mb-3">
-                                <kw-l key="announcements.comment_audience_note">Comments are visible to signed-in residents only, even on a public announcement, and under this announcement's own audience (a community-targeted one is visible to that community's residents).</kw-l>
-                            </div>
+                            <details class="kw-audience-disclosure mb-3">
+                                <summary><kw-l key="announcements.comment_audience_note_label">Who can see comments?</kw-l></summary>
+                                <div class="text-muted small">
+                                    <kw-l key="announcements.comment_audience_note">Comments are visible to signed-in residents only, even on a public announcement, and under this announcement's own audience (a community-targeted one is visible to that community's residents).</kw-l>
+                                </div>
+                            </details>
                             <button type="submit" class="btn btn-primary"><kw-l key="announcements.comment_submit">Comment</kw-l></button>
                         </form>
                     </div>
