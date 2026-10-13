@@ -264,7 +264,12 @@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                              @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                             <div class="rc-body">
-                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                                @* M36 (ADR 0165 D6) — the @mention render pass: renders the
+                                   body through the FROZEN MarkdownRenderer, then linkifies each
+                                   resolved @<DisplayName> into <a class="mention">
+                                   href="/directory/{id}">. The self-exclusion input is the post's
+                                   own author (AuthorSubjectId). *@
+                                <partial name="_MentionRenderer" model="new MentionBodyModel(Model.Post.Body, Model.AuthorSubjectId)" />
                             </div>
                         </div>
                         @foreach (var t in Model.PostTranslations)
@@ -278,7 +283,10 @@
                             <div class="td-variant" data-td-variant="@t.LanguageCode"
                                  @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 <div class="rc-body">
-                                    @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
+                                    @* M36 (ADR 0165 D6) — a post translation's body is the same
+                                       author's content, so the self-exclusion input is the post's
+                                       author (AuthorSubjectId). *@
+                                    <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
                                 </div>
                             </div>
                         }

@@ -10,6 +10,7 @@
    _RichEditorToggle idiom). *@
 @model Kumunita.Web.Views.Shared.PostReplyModel
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
@@ -55,7 +56,13 @@
                                        auto-selects a translation of it). *@
                                     <div class="td-variant" data-td-variant="@r.OriginalLanguageCode"
                                          @(replyOriginalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
+                                        <div class="rc-body">
+                                            @* M36 (ADR 0165 D6) — the @mention render pass: renders
+                                               through the FROZEN MarkdownRenderer, then linkifies each
+                                               resolved @<DisplayName>. The self-exclusion input is the
+                                               reply's own author (r.AuthorSubjectId). *@
+                                            <partial name="_MentionRenderer" model="new MentionBodyModel(r.Body, r.AuthorSubjectId)" />
+                                        </div>
                                     </div>
 
                                     @* One variant per user-added translation — hidden by
@@ -66,7 +73,12 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                                            <div class="rc-body">
+                                                @* M36 (ADR 0165 D6) — a reply translation's body is the
+                                                   same replier's content, so the self-exclusion input
+                                                   is the reply's author (r.AuthorSubjectId). *@
+                                                <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, r.AuthorSubjectId)" />
+                                            </div>
                                         </div>
                                     }
 

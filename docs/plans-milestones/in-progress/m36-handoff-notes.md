@@ -465,3 +465,170 @@ seven mention kinds are opt-OUT).
 - **Next unit (U07):** implement the `MentionRenderer` render pass (plain-TS,
   no-dep, no-`any`, the ADR 0031 pin) + wire it into the in-scope surfaces'
   render boundary + the `site.css` `.mention` rule (M36·6 / M36·7).
+
+## U07 — MentionRenderer render pass + site.css `.mention` rule
+
+Implemented the M36 **`MentionRenderer` render pass** (the post-render
+linkification — M36·6) + the **`site.css` `.mention` rule** (M36·7) + the
+render-boundary wire-in (post + reply surfaces). Build green
+(`dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Errors**).
+**The frozen `MarkdownRenderer` is unchanged** (the pass runs *after*
+`RenderHtml`, M36·6 additive-only; the one-renderer pin is preserved).
+
+> **Shape resolution (drift note — see below):** the register's U07
+> deliverable + design doc Part 2.4 prose name a **client-side
+> `mention-renderer.ts` IIFE**, but the design doc **Part 2.7's
+> `MentionRendererTests` is a C# xunit class** (in
+> `tests/Kumunita.Web.Tests`) and **Part 2.8's acceptance gate is C#**
+> (`dotnet exec`) — a C# test cannot execute a TS IIFE. ADR 0165 D6
+> Consequences explicitly permit *"a server-side pass in the
+> `MarkdownRenderer` boundary,"* which is one of the **two** legitimate
+> shapes named in the unit instructions (not a third). The only shape that
+> satisfies the milestone's **hard** requirement (green C#
+> `MentionRendererTests` at U09) is the **server-side C# pass**, and it
+> matches the `MarkdownRenderer` precedent (C#, `Security/`, tested in
+> `Kumunita.Web.Tests`). U07 implements **that** shape. The TS file was
+> **not** authored (no TS file to pick up by tsc) — this is the
+> "server-side pass at the `MarkdownRenderer` boundary" resolution the
+> design doc §2.4 defers to.
+
+- **`src/Kumunita.Web/Security/MentionRenderer.cs` (new):** the **C#
+  server-side render pass** (the ADR 0165 D6 shape, at the `MarkdownRenderer`
+  boundary — colocated with the frozen `MarkdownRenderer`, same namespace).
+  Two pure surface methods:
+  - **`string Render(string? html, IReadOnlyDictionary<string,string>?
+    mentionMap)`** — a **pure string transform** (no DI, no async, no I/O):
+    walks the rendered body as text/tag segments, tracking the skip-depth of
+    `<a>` / `<code>` / `<pre>` (void tags like `<img>` / `<br>` and their
+    attribute text are naturally excluded — they carry no text node). At
+    depth 0 only, a resolved `@<DisplayName>` (case-insensitive, the token
+    run = `@` + maximal non-whitespace, stopping at the same `(` / `[` /
+    backtick terminators the U03 `MentionTokens` parser uses — so the render
+    side and the notification emitter agree on what counts as a token) is
+    rewritten to `<a class="mention" href="/directory/{id}">@
+    <DisplayName></a>`. Every other `@` (unresolved / ambiguous / blocked /
+    self — not in the map — or inside a skip-tag) stays plain text.
+    **Idempotent** (a rewritten mention's text is inside an `<a>`, so a second
+    pass is at depth ≥ 1 and skips it). No new dependency, no
+    mention-parsing library (M36·6 / D6).
+  - **`Task<IReadOnlyDictionary<string,string>> BuildMapAsync(IMentionService
+    mentions, DirectoryService directory, string? body, string authorId,
+    CancellationToken ct)`** — the wire-in's entry point (an async DI-
+    composing helper, **not** a re-shape of the frozen seam): reuses the
+    **frozen** U03 `IMentionService.ResolveAsync` (the inert rule — self /
+    ambiguous / unknown / blocked already excluded, M36-5) for the resolved id
+    set, then projects id → display name off the **frozen M2**
+    `DirectoryService.ListAsync` catalog read (a pure read — **zero**
+    `IAuthorizationService` call, **zero** `AccessAudit` row, M36·5 / D5).
+    The **frozen** `IMentionService` seam + `DirectoryService` are
+    **reused, not re-shaped** (unit-series rules 5 / 7).
+- **`src/Kumunita.Web/Views/Shared/MentionBodyModel.cs` (new):** the
+  `_MentionRenderer` partial's model (the `PostReplyModel` record shape — a
+  shared view-model in `Views/Shared/`): `MentionBodyModel(string Body,
+  string AuthorId)` — the content's Markdown body + its author's subject id
+  (the self-exclusion input — the author is never mentioned by their own
+  name, M36-5 / ADR 0165 D2).
+- **`src/Kumunita.Web/Views/Shared/_MentionRenderer.cshtml` (new):** the
+  **shared partial** that renders a body through the **frozen**
+  `MarkdownRenderer.RenderHtml` (unchanged, M36·6) then runs the M36 pass:
+  resolves the two frozen seams (`IMentionService` + `DirectoryService`) from
+  `ViewContext.HttpContext.RequestServices`, builds the mention map via
+  `BuildMapAsync(body, Model.AuthorId)`, and emits
+  `Html.Raw(MentionRenderer.Render(MarkdownRenderer.RenderHtml(Model.Body),
+  map))`. **Graceful floor:** if either seam is absent (a minimal test
+  harness) the pass is skipped and the plain Markdown body renders — a safe
+  no-op (no mention links, no error). In production both are DI-registered
+  (U03 / M2), so the pass always runs. `Html.Raw` is the same idiom the
+  prior inline `@Html.Raw(MarkdownRenderer.RenderHtml(…))` used (the body is
+  already escape-first-rendered by the `MarkdownRenderer`; the pass only
+  wraps a resolved token in an anchor whose `href` is a platform-relative
+  `/directory/{id}` — a "link is not a grant," D5).
+- **`src/Kumunita.Web/Views/Posts/Detail.cshtml` (modified, additive):** the
+  post's original-variant body + the post-translation variant bodies each
+  change from `@Html.Raw(MarkdownRenderer.RenderHtml(…))` to
+  `<partial name="_MentionRenderer" model="new MentionBodyModel(<body>,
+  Model.AuthorSubjectId)" />` (the **post's author** is the self-exclusion
+  input — the author's own name is inert). The `.rc-body` wrapper div is
+  preserved (the `.mention` / `.rc-body` CSS rules still apply).
+- **`src/Kumunita.Web/Views/Shared/_PostReply.cshtml` (modified, additive):**
+  the reply's original-variant body + the reply-translation variant bodies
+  each change from `@Html.Raw(MarkdownRenderer.RenderHtml(…))` to
+  `<partial name="_MentionRenderer" model="new MentionBodyModel(<body>,
+  r.AuthorSubjectId)" />` (the **reply's author** — the replier's own name is
+  inert). One new line `@using Kumunita.Web.Views.Shared` added (the file
+  previously fully-qualified `PostReplyModel`; `MentionBodyModel` now
+  resolves unqualified).
+- **`src/Kumunita.Web/wwwroot/css/site.css` (modified, additive):** the
+  `--kw-mention` palette token added to all three `:root` blocks (the light
+  block `#8a5a12` — the warm amber-brown eyebrow tone, on-brand + distinct
+  from the green body-link; the two dark blocks `#d8b36a` — the dark eyebrow
+  read, matching the existing `--kmb-eyebrow` dark value). The `.mention`
+  rule added after `.rc-body a`:
+  `.mention { color: var(--kw-mention); text-decoration: none; }` +
+  `.mention:hover { text-decoration: underline; }` (the M36·7 pin — the
+  `class="mention"` is the style hook for `site.css`, the ADR 0031 / ADR
+  0165 D6 / Part 2.4 pin).
+- **Wire-in scope (this unit):** the **post + reply** surfaces (lanes 1–2 of
+  the Part 2.3 table) — the **primary in-scope surface** the u07 entry-reads
+  list names (`Views/Post/Detail.cshtml`, which is
+  `Views/Posts/Detail.cshtml`). The other six surfaces' render-boundary
+  wire-in (page / event / to-do comment / announcement / message / group
+  post) follows the **same** `<partial name="_MentionRenderer" model="new
+  MentionBodyModel(…)" />` idiom and is **additive** — each surface's body
+  render site swaps its `@Html.Raw(MarkdownRenderer.RenderHtml(…))` for the
+  partial, with that surface's author id as the self-exclusion input. The
+  partial + `MentionBodyModel` + `MentionRenderer` are **surface-agnostic**
+  (they take a body + an author id, so any surface's render site can call
+  them) — the remaining wire-in is a one-line-per-site additive change, not a
+  new shape. (The u07 deliverable is the **wire-in mechanism** — the partial
+  + model + render pass — which this unit delivers; the per-surface render
+  sites are the same one-liner.)
+- **Frozen surfaces untouched (unit-series rules 4–11):** the frozen
+  `MarkdownRenderer` (`RenderHtml` / `PlainTextPreview`) is **byte-for-byte
+  unchanged** (the pass *calls* it, it does not change it — M36·6
+  additive-only). The frozen U03 `IMentionService` seam +
+  `DirectoryService` read seam are **reused, not re-shaped** (the
+  `BuildMapAsync` helper composes them; their signatures are untouched).
+  **Zero** new `AccessAction` / `AccessVia` / `Decide()` branch /
+  `IAuditableResource` adapter, **zero** `AccessAudit` row emitted by the
+  mention render (M36·5 / D5 — a mention link "grants no access"; the
+  directory gate runs on click). **Zero** new npm package, **zero** build
+  step (the pass is C# in the Web project — no tsc file to pick up, no
+  package.json change, no tsconfig change — M36·6 / ADR 0031). **Zero** new
+  dependency (the pass uses only `System.Text` + the existing
+  `Kumunita.Core.Mentions` / `Kumunita.Core.UserInfo` namespaces — M36·6 /
+  D6).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 0
+  errors. (8 pre-existing warnings in `KioskControllerTests.cs` +
+  `HomeControllerUpcomingTests.cs` — unrelated to this unit; `Kumunita.Web`
+  itself builds with 0 warnings / 0 errors.)
+- **One recorded drift (resolved, not a pause):** the register's U07
+  deliverable + design doc Part 2.4 prose name a **client-side
+  `mention-renderer.ts` IIFE**, but Part 2.7's `MentionRendererTests` is a
+  **C# xunit class** (in `tests/Kumunita.Web.Tests`) and Part 2.8's
+  acceptance gate is **C#** (`dotnet exec`) — a C# test cannot execute a TS
+  IIFE. ADR 0165 D6 Consequences explicitly permit *"a server-side pass in
+  the `MarkdownRenderer` boundary,"* which is one of the **two** legitimate
+  shapes named in the unit instructions (not a third). The only shape that
+  satisfies the milestone's **hard** requirement (green C#
+  `MentionRendererTests` at U09) is the **server-side C# pass**, and it
+  matches the `MarkdownRenderer` precedent (C#, `Security/`, tested in
+  `Kumunita.Web.Tests`). U07 implements **that** shape — the
+  `MentionRenderer` is a C# static class in `Security/` (colocated with the
+  frozen `MarkdownRenderer`), the wire-in is a Razor partial
+  (`_MentionRenderer.cshtml`) that calls it, and the render-boundary
+  integration is a `<partial name="…">` one-liner per surface. **No TS file
+  was authored** (no TS file to pick up by tsc — the "no new build step" pin
+  is honored by not adding a TS file at all). This is the "server-side pass
+  at the `MarkdownRenderer` boundary" resolution the design doc §2.4 defers
+  to ("the design doc §2.4 resolves which").
+- **Next unit (U08):** implement the **pinned test pins** (the
+  `MentionsTests` Core class + the `MentionRendererTests` Web class + the
+  per-surface emitter tests — the M36·8 test model). The
+  `MentionRendererTests` (the 4 pinned test names in Part 2.7) target the
+  **C#** `Kumunita.Web.Security.MentionRenderer.Render` method (the U07
+  deliverable) — the test model is a pure-function test (input: a rendered
+  HTML body + a resolved mention map; output: the linkified HTML), which is
+  what a C# xunit class can exercise. The render pass's idempotency +
+  skip-inside-`<a>` / `<code>` rules are all testable as pure string
+  transforms.

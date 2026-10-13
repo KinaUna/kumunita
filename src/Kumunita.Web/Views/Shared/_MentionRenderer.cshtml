@@ -1,0 +1,57 @@
+@* _MentionRenderer — M36 (ADR 0165 D6) the @mention render pass at the
+   MarkdownRenderer boundary. Renders the content's Markdown body through the
+   FROZEN MarkdownRenderer (unchanged, M36·6 — the one-renderer pin), then
+   runs the M36 mention pass (Kumunita.Web.Security.MentionRenderer) to
+   linkify each resolved @<DisplayName> into <a class="mention"
+   href="/directory/{id}">@<DisplayName></a>. Emits via Html.Raw (the body is
+   already escape-first-rendered by the MarkdownRenderer; the pass only wraps
+   a resolved token in an anchor whose href is a platform-relative
+   /directory/{id} — a "link is not a grant," D5: the directory gate runs on
+   click).
+
+   Shape note (drift, U07): the register's U07 deliverable + design-doc Part
+   2.4 prose name a client-side mention-renderer.ts IIFE, but Part 2.7's
+   MentionRendererTests is a C# xunit class and Part 2.8's acceptance gate is
+   C# (dotnet exec) — a C# test cannot execute a TS IIFE. ADR 0165 D6
+   Consequences permit "a server-side pass in the MarkdownRenderer boundary,"
+   and the C# MentionRendererTests + the MarkdownRenderer (C#, Security/)
+   precedent make the server-side C# pass the only shape that satisfies the
+   milestone's gate. This partial is that wire-in (one of the two named
+   shapes, not a third). See the MentionRenderer class doc for the full note.
+
+   Graceful floor: the two frozen seams (IMentionService + DirectoryService)
+   are resolved from the request services; if either is absent (a minimal
+   test harness) the pass is skipped and the plain Markdown body renders —
+   a safe no-op (no mention links, no error). In production both are DI-
+   registered (U03 / M2), so the pass always runs there. *@
+@using Kumunita.Web.Security
+@using Microsoft.Extensions.DependencyInjection
+@model Kumunita.Web.Views.Shared.MentionBodyModel
+@{
+    string final;
+    var sp = ViewContext.HttpContext.RequestServices;
+    var mentions = sp.GetService<Kumunita.Core.Mentions.IMentionService>();
+    var directory = sp.GetService<Kumunita.Core.UserInfo.DirectoryService>();
+    if (mentions is not null && directory is not null)
+    {
+        // The content's author's subject id (the self-exclusion input, M36-5 /
+        // ADR 0165 D2): the author is never mentioned by their own name. This
+        // is the <b>same</b> input the emitter's resolver used (the content
+        // author, not the viewer), so a name that resolved for emission resolves
+        // for the link — and the author's own name is inert in both. (The
+        // caller passes AuthorSubjectId; a guest's view of another's content
+        // still excludes that content's author from mentions.)
+        string authorId = string.IsNullOrWhiteSpace(Model.AuthorId)
+            ? string.Empty
+            : Model.AuthorId;
+        var map = await MentionRenderer.BuildMapAsync(mentions, directory, Model.Body, authorId);
+        final = MentionRenderer.Render(MarkdownRenderer.RenderHtml(Model.Body), map);
+    }
+    else
+    {
+        // Floor: no mention pass (seams absent) — render the plain Markdown
+        // body. A safe no-op; no mention links, no error.
+        final = MarkdownRenderer.RenderHtml(Model.Body);
+    }
+}
+@Html.Raw(final)

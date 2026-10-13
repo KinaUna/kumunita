@@ -215,6 +215,10 @@
      width: the pull-up merely fills the navbar's own mb-3 gap, it never
      overlaps the bar. */
   --kmb-navbar-tab-offset: 1rem;
+  /* M36 (ADR 0165 D6/D7) — the @mention link color (the warm attention tone,
+     distinct from the green body-link so a resident reads "a person" not a URL).
+     The .mention rule is defined below in the rich-content section. */
+  --kw-mention: #8a5a12;
 }
 
 /* ==========================================================================
@@ -322,6 +326,7 @@
     --kmb-surface: #16241c;    /* the "white card" fill in dark */
     --kmb-surface-2: #1b2d24;  /* nested / raised panels */
     --kmb-band: #0c1510;       /* the features band (lighter than canvas) */
+    --kw-mention: #d8b36a;     /* M36 (ADR 0165 D7) — dark-theme mention link */
   }
 }
 html[data-kmb-theme='dark'] {
@@ -378,6 +383,7 @@ html[data-kmb-theme='dark'] {
   --kmb-ink: #e6ece7;
   --kmb-ink-soft: #c3cec6;
   --kmb-muted: #8fa196;
+  --kw-mention: #d8b36a;       /* M36 (ADR 0165 D7) — dark-theme mention link */
   --kmb-eyebrow: #d8b36a;
   --kmb-cream: #f2f6f2;
   --kmb-amber-soft: #f0c97e;
@@ -2148,6 +2154,20 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 .rc-body a {
   text-underline-offset: 2px;
+}
+
+/* M36 (ADR 0165 D6/D7) — the @mention link: a resolved @<DisplayName>
+   linkified by the MentionRenderer render pass into <a class="mention"
+   href="/directory/{id}">. The warm --kw-mention tone (the eyebrow / attention
+   color) distinguishes it from the green body-link, so a resident reads "a
+   person being addressed" rather than a URL. No underline by default; hover
+   reveals the underline (the .mention style hook — the M36·7 pin). */
+.mention {
+  color: var(--kw-mention);
+  text-decoration: none;
+}
+.mention:hover {
+  text-decoration: underline;
 }
 
 /* RC image (the U02 emission <img … class="rc-image" loading="lazy" /> carries
