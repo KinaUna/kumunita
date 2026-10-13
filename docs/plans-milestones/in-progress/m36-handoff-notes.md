@@ -330,3 +330,74 @@ lane — the method signatures + audit rows are **untouched** (M36·4 additive).
   `announcement.mention` / `message.mention`) to `NotificationKinds.Known`
   (M36·3). The `OptInKinds` table stays **untouched** (all seven mention
   kinds are opt-OUT).
+
+## U05 — Six-surface emitters
+
+Wired the **six remaining surfaces'** mention emitters + added the **six new
+kinds** to the closed `NotificationKinds` vocabulary (the M36·3 / M36·4
+pins). Each surface's write lane is **extended additively** — the frozen
+method signatures + audit rows are **untouched**; the mention-emitter step is
+*inside* each lane (M36·4). The `OptInKinds` table is **untouched** (all
+seven mention kinds are opt-OUT).
+
+- **Six new kinds (M36·3):** `NotificationKinds.cs` gains the constants
+  `GroupPostMention` / `PageMention` / `EventMention` / `TodoMention` /
+  `AnnouncementMention` / `MessageMention`, **appended to `Known`** after the
+  core resident-facing kinds (after `MessageNew`) and before the
+  guardian/admin-adjacent lane (`GuardianGroupInvite` …) — the register's
+  "after the existing resident-facing kinds, before the admin-lane kinds"
+  order. The reserved `PostMention` kind stays at the top (wired in U04).
+- **Per-surface emitters (M36·4) — the `MentionTokens.ExtractTokens` →
+  `IMentionService.ResolveAsync` → `EmitAsync` triad**, per-recipient key
+  `notification:{kind}:{contentId}:{recipientId}`, `UgcSnippets.Truncate(body)`,
+  `targetId: null`, the Part 2.3 `linkPath`:
+  - **Page** (`PageService.CreateAsync`, lane 5, `page.mention`,
+    `/pages/{pageId}`) — body = `page.Body`.
+  - **Event** (`EventService.CreateAsync`, lane 6, `event.mention`,
+    `/events/{eventId}`) — body = `event.Body`.
+  - **To-do comment** (`ProjectService.CreateTodoCommentAsync`, lane 7,
+    `todo.mention`, `/projects/todos/{todoId}#comment-{commentId}`) — body =
+    the comment body.
+  - **Announcement** (`AnnouncementService.PublishAsync`, lane 8,
+    `announcement.mention`, `/announcements/{announcementId}`) — body =
+    `announcement.Body`; the **publish lane is the M36·8 draft gate** (a
+    draft save runs no mention emitter; the mention fires only on
+    publish).
+  - **Message** (`MessagingService.SendAsync`, lane 9, `message.mention`,
+    `/messages/{conversationId}`) — body = the message body; send **is** the
+    publishing lane (no draft concept).
+  - **Group post** (`PostService.CreateGroupPostAsync`, lane 3,
+    `group.post.mention`, `/groups/{groupId}/posts/{postId}`) — body =
+    `post.Body`; **draft-gated** (`!(draft.IsDraft ?? false)`), mirroring the
+    adjacent group-post member emission.
+  - **Group post reply** (lane 4, `group.post.mention`,
+    `/groups/{groupId}/posts/{postId}#reply-{replyId}`) — see the **drift
+    note** below (the code has a *single* `CreateReplyAsync`, not a separate
+    `CreateGroupPostReplyAsync`); made **lane-aware** there.
+- **Resolver:** the **`IMentionService`** interface (resolved, already
+  DI-registered in U03) — the same pattern `PostService` used in U04. Each of
+  the six services gains an **`IMentionService?` optional ctor param (CS1736)**
+  + the `DependencyInjection.cs` registration arg (`sp.GetRequiredService<
+  Mentions.IMentionService>()`). No `IDirectoryService` invented (the M36·2
+  "reused, not re-shaped" pin; the `MentionService` composes the concrete
+  `DirectoryService`).
+- **Drift note (design doc Part 2.3 lane 4 vs. code):** the design doc /
+  register name a `PostService.CreateGroupPostReplyAsync` lane, but the code
+  has **no such method** — group post replies flow through the **same
+  `CreateReplyAsync`** as community replies. U05 honored the intent (lane 4 =
+  a group post reply emits `group.post.mention` at the group reply
+  `linkPath`) by making `CreateReplyAsync`'s U04 mention emitter **lane-
+  aware**: it loads the parent post (already loaded one step up for the
+  `PostReply` emission) and, when `parent.GroupId` is non-empty, selects the
+  `group.post.mention` kind + `/groups/{groupId}/posts/{postId}#reply-{
+  replyId}` path; otherwise it keeps the U04 `post.mention` + `/posts/{
+  postId}#reply-{replyId}`. The U04 community-reply behavior is
+  **byte-identical** for a community parent. No new authorization surface, no
+  `AccessAudit` row (M36·5).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, 0
+  warnings, 0 errors.
+- **No drift pause beyond the lane-4 note above** (recorded, not a blocker).
+- **Next unit (U06):** author the **closed mention `kw-l` key set** ×
+  en/de/fr/da (the 7 kinds × 4 keys = 28 keys, the M36·7 pin) + the
+  `Preferences.cshtml` toggle change (the `post.mention` "coming soon" badge
+  removed, the six new kinds' toggles rendered).

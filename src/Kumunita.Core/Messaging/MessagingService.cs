@@ -54,14 +54,22 @@ public sealed class MessagingService : IMessagingService
     // message + audit row and skips the notification emission.
     private readonly NotificationService? _notifications;
 
+    // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_notifications`) so the
+    // existing test call sites keep compiling unchanged.
+    private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
+
     public MessagingService(
         IDocumentStore store,
         IUserInfoService? userInfo = null,
-        NotificationService? notifications = null)
+        NotificationService? notifications = null,
+        Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo;         // null = no directory read (the U02 pins construct with store only)
         _notifications = notifications;   // null = nudge lane unwired (U02's 2 pins)
+        _mentions = mentions;
     }
 
     public async Task<bool> IsMessagingEnabledAsync()
@@ -377,6 +385,41 @@ public sealed class MessagingService : IMessagingService
                     linkPath: $"/messages/{convo.Id}",
                     ct: ct)
                 .ConfigureAwait(false);
+        }
+
+        // M36 (ADR 0165, U05) — the message mention emitter (Part 2.3 lane 9,
+        // `message.mention`). Additive, *inside* the send lane (the frozen
+        // method signature + audit row untouched). Messaging has **no** draft
+        // concept (M36·8 — the send **is** the publishing lane). Extract
+        // candidate `@`-tokens from the message body, resolve them against the
+        // frozen directory read (the author is never a recipient — M36-5 self
+        // pin), and emit one `message.mention` notification per resolved
+        // recipient on the write session. The per-recipient idempotency key
+        // (M36·4) keeps a re-emission of the same (message, recipient) pair a
+        // no-op (ADR 0076 D4 / F10). `EmitAsync` does not commit; the
+        // `SaveChangesAsync` below is the single commit (C3). No new
+        // authorization surface, no `AccessAudit` row (M36·5 — a mention is a
+        // personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Kumunita.Core.Mentions.MentionTokens.ExtractTokens(body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId, ct)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: Notifications.NotificationKinds.MessageMention,
+                        idempotencyKey: $"notification:message.mention:{messageId}:{recipientId}",
+                        body: Notifications.UgcSnippets.Truncate(body),
+                        targetId: null,
+                        linkPath: $"/messages/{convo.Id}",
+                        ct: ct).ConfigureAwait(false);
+                }
+            }
         }
 
         // The D5 send row (design doc §2.3): Action = "message.send",

@@ -129,6 +129,67 @@ public static class NotificationKinds
     /// </summary>
     public const string MessageNew = "message.new";
 
+    // ── M36 (ADR 0165) — the cross-surface @mention kinds ──────────────────
+    // ADR 0165 (M36·3) — the reserved <c>post.mention</c> kind (above) goes
+    // live and six sibling kinds join the closed vocabulary, one per
+    // additional in-scope surface (the Part 2.3 lane→kind→path table). All
+    // seven mention kinds are **resident-facing, opt-OUT** (not in
+    // <see cref="OptInKinds"/> — the ADR 0076 D2 posture, same as
+    // <see cref="PostReply"/> / <see cref="GroupPost"/>): enabled until the
+    // resident stores an explicit <c>Enabled = false</c> row. The emitter is
+    // the per-surface mention-emitter step (the
+    // <see cref="Mentions.IMentionService"/>-resolved recipient loop) in the
+    // surface's publishing lane (the per-recipient idempotency key
+    // <c>notification:{kind}:{contentId}:{recipientId}</c>, M36·4).
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — a group post (or its reply) mentions the
+    /// resident. Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Posts.PostService"/> group-post + group-post-reply mention
+    /// steps (the Part 2.3 lane 3 / lane 4).
+    /// </summary>
+    public const string GroupPostMention = "group.post.mention";
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — a page's body mentions the resident.
+    /// Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Pages.PageService"/> create-lane mention step (Part 2.3
+    /// lane 5).
+    /// </summary>
+    public const string PageMention = "page.mention";
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — an event's body mentions the resident.
+    /// Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Events.EventService"/> create-lane mention step (Part 2.3
+    /// lane 6).
+    /// </summary>
+    public const string EventMention = "event.mention";
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — a to-do comment's body mentions the resident.
+    /// Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Projects.ProjectService.CreateTodoCommentAsync"/> mention
+    /// step (Part 2.3 lane 7).
+    /// </summary>
+    public const string TodoMention = "todo.mention";
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — an announcement's body mentions the resident.
+    /// Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Announcements.AnnouncementService"/> publish-lane mention
+    /// step (Part 2.3 lane 8 — draft-gated, M36·8).
+    /// </summary>
+    public const string AnnouncementMention = "announcement.mention";
+
+    /// <summary>
+    /// M36 (ADR 0165, M36·3) — a direct 1:1 message's body mentions the
+    /// resident. Resident-facing, opt-OUT. Emitter: the
+    /// <see cref="Messaging.MessagingService.SendAsync"/> mention step (Part
+    /// 2.3 lane 9).
+    /// </summary>
+    public const string MessageMention = "message.mention";
+
     // ── GU community-approval lane — the guardian-facing pair ─────────────
 
     /// <summary>
@@ -236,6 +297,12 @@ public static class NotificationKinds
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
         Announcement, CommunityPost, PageChild, MessageNew,
+        // M36 (ADR 0165, M36·3) — the six sibling mention kinds (the reserved
+        // post.mention is already at the top of this set). Resident-facing,
+        // opt-OUT; grouped with the other core resident-facing kinds, ahead
+        // of the guardian / admin-adjacent lane that trails them.
+        GroupPostMention, PageMention, EventMention,
+        TodoMention, AnnouncementMention, MessageMention,
         GuardianGroupInvite, GuardianCommunityInvite, GuardianAssign,
         GuardianEventRequest, GuardianEventRsvp,
     ];

@@ -787,24 +787,41 @@ public sealed class PostService
             }
         }
 
-        // M36 (ADR 0165, U04) — the mention emitter (the reserved
-        // `post.mention` kind going live on the reply surface, M36·3 /
-        // M36·4). Additive, *inside* the lane (the frozen method signature +
-        // audit rows untouched): extract candidate `@`-tokens from the reply
-        // body, resolve them against the frozen directory read (the author is
-        // never a recipient — M36-5 self pin), and emit one `post.mention`
-        // notification per resolved recipient on the caller's session. The
-        // per-recipient idempotency key (M36·4) keeps a re-emission of the
-        // same (reply, recipient) pair a no-op (ADR 0076 D4 / F10). The
-        // `linkPath` anchors to the reply (M36·4 — the Part 2.5 table, lane 2).
-        // `EmitAsync` does not commit; the `SaveChangesAsync` below is the
-        // single commit (C3). No new authorization surface, no `AccessAudit`
-        // row (M36·5 — a mention is a personal read).
+        // M36 (ADR 0165, U04 + U05) — the mention emitter on the reply
+        // surface, **lane-aware** (M36·3 / M36·4). The reply lane is shared
+        // by community replies (Part 2.3 lane 2, `post.mention`) and group
+        // post replies (Part 2.3 lane 4, `group.post.mention`) — the code has
+        // a **single** `CreateReplyAsync` (no separate group-reply method), so
+        // the parent post's `GroupId` (non-empty ⇒ group lane) selects the
+        // kind + the `linkPath`. Additive, *inside* the lane (the frozen
+        // method signature + audit rows untouched): extract candidate
+        // `@`-tokens from the reply body, resolve them against the frozen
+        // directory read (the author is never a recipient — M36-5 self pin),
+        // and emit one mention notification per resolved recipient on the
+        // caller's session. The per-recipient idempotency key (M36·4) keeps a
+        // re-emission of the same (reply, recipient) pair a no-op (ADR 0076
+        // D4 / F10); the key's kind + the `linkPath` are the lane-selected
+        // values above. `EmitAsync` does not commit; the `SaveChangesAsync`
+        // below is the single commit (C3). No new authorization surface, no
+        // `AccessAudit` row (M36·5 — a mention is a personal read).
         if (_mentions is not null && _notifications is not null)
         {
             var mentionTokens = Mentions.MentionTokens.ExtractTokens(reply.Body);
             if (mentionTokens.Count > 0)
             {
+                // Lane detection (Part 2.3 lane 2 vs. lane 4): the parent
+                // post's GroupId distinguishes a community reply (empty ⇒
+                // `post.mention`, `/posts/{postId}#reply-{replyId}`) from a
+                // group post reply (non-empty ⇒ `group.post.mention`,
+                // `/groups/{groupId}/posts/{postId}#reply-{replyId}`).
+                var replyParent = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+                var isGroupLane = replyParent is not null && !string.IsNullOrEmpty(replyParent.GroupId);
+                var mentionKind = isGroupLane
+                    ? NotificationKinds.GroupPostMention
+                    : NotificationKinds.PostMention;
+                var mentionLinkPath = isGroupLane
+                    ? $"/groups/{replyParent!.GroupId}/posts/{postId}#reply-{reply.Id}"
+                    : $"/posts/{postId}#reply-{reply.Id}";
                 var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
                     .ConfigureAwait(false);
                 foreach (var recipientId in mentionRecipients)
@@ -812,11 +829,11 @@ public sealed class PostService
                     await _notifications.EmitAsync(
                         session,
                         recipientId: recipientId,
-                        kind: NotificationKinds.PostMention,
-                        idempotencyKey: $"notification:post.mention:{reply.Id}:{recipientId}",
+                        kind: mentionKind,
+                        idempotencyKey: $"notification:{mentionKind}:{reply.Id}:{recipientId}",
                         body: UgcSnippets.Truncate(reply.Body),
                         targetId: null,
-                        linkPath: $"/posts/{postId}#reply-{reply.Id}",
+                        linkPath: mentionLinkPath,
                         ct: default).ConfigureAwait(false);
                 }
             }
@@ -1542,6 +1559,41 @@ public sealed class PostService
                     linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
                     targetId: draft.GroupId,
                     ct: default).ConfigureAwait(false);
+            }
+        }
+
+        // M36 (ADR 0165, U05) — the group post mention emitter (Part 2.3
+        // lane 3, `group.post.mention`). Additive, *inside* the lane (the
+        // frozen method signature + audit rows untouched). Draft-gated
+        // (M36·8, ADR 0037): the same `!(draft.IsDraft ?? false)` pin as the
+        // group-post member emission above. Extract candidate `@`-tokens from
+        // the post body, resolve them against the frozen directory read (the
+        // author is never a recipient — M36-5 self pin), and emit one
+        // `group.post.mention` notification per resolved recipient on the
+        // caller's session. The per-recipient idempotency key (M36·4) keeps a
+        // re-emission of the same (post, recipient) pair a no-op (ADR 0076
+        // D4 / F10). `EmitAsync` does not commit; the `SaveChangesAsync`
+        // below is the single commit (C3). No new authorization surface, no
+        // `AccessAudit` row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null && !(draft.IsDraft ?? false))
+        {
+            var mentionTokens = Mentions.MentionTokens.ExtractTokens(post.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.GroupPostMention,
+                        idempotencyKey: $"notification:group.post.mention:{post.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(post.Body),
+                        targetId: null,
+                        linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
+                        ct: default).ConfigureAwait(false);
+                }
             }
         }
 

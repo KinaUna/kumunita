@@ -65,12 +65,20 @@ public sealed class PageService : IPageService
     // The DI registration passes the live Notifications.NotificationService.
     private readonly NotificationService? _notifications;
 
+    // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_tags` / `_notifications`)
+    // so the existing test call sites keep compiling unchanged.
+    private readonly Mentions.IMentionService? _mentions;
+
     public PageService(IDocumentStore store, ITagService? tags = null,
-        NotificationService? notifications = null)
+        NotificationService? notifications = null,
+        Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
         _notifications = notifications;
+        _mentions = mentions;
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -738,6 +746,39 @@ public sealed class PageService : IPageService
                     linkPath: linkPath,
                     targetId: parentId,
                     ct: default).ConfigureAwait(false);
+            }
+        }
+
+        // M36 (ADR 0165, U05) — the page mention emitter (Part 2.3 lane 5,
+        // `page.mention`). Additive, *inside* the lane (the frozen method
+        // signature + audit rows untouched): extract candidate `@`-tokens
+        // from the page body, resolve them against the frozen directory read
+        // (the author is never a recipient — M36-5 self pin), and emit one
+        // `page.mention` notification per resolved recipient on the caller's
+        // session. The per-recipient idempotency key (M36·4) keeps a
+        // re-emission of the same (page, recipient) pair a no-op (ADR 0076
+        // D4 / F10). `EmitAsync` does not commit; the `SaveChangesAsync`
+        // below is the single commit (C3). No new authorization surface, no
+        // `AccessAudit` row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Mentions.MentionTokens.ExtractTokens(page.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.PageMention,
+                        idempotencyKey: $"notification:page.mention:{page.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(page.Body),
+                        targetId: null,
+                        linkPath: $"/pages/{page.Id}",
+                        ct: default).ConfigureAwait(false);
+                }
             }
         }
 

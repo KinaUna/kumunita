@@ -56,12 +56,20 @@ public sealed class AnnouncementService : IAnnouncementService
     // passes the live Notifications.NotificationService.
     private readonly NotificationService? _notifications;
 
+    // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_notifications`) so the
+    // existing test call sites keep compiling unchanged.
+    private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
+
     public AnnouncementService(IDocumentStore store, IUserInfoService userInfo,
-        NotificationService? notifications = null)
+        NotificationService? notifications = null,
+        Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _notifications = notifications;
+        _mentions = mentions;
     }
 
     /// <summary>
@@ -538,6 +546,7 @@ public sealed class AnnouncementService : IAnnouncementService
         // commits the flip + the inbox rows atomically (C3).
         if (_notifications is not null)
         {
+            // ── existing per-member / per-profile emission (ADR 0084) ─────
             if (announcement.CommunityId is { } communityId)
             {
                 var members = await session.Query<UserInfo.ComponentMembership>()
@@ -575,6 +584,43 @@ public sealed class AnnouncementService : IAnnouncementService
                         body: UgcSnippets.Truncate(announcement.Title),
                         linkPath: $"/announcements/{announcement.Id}",
                         targetId: targetId,
+                        ct: default).ConfigureAwait(false);
+                }
+            }
+        }
+
+        // M36 (ADR 0165, U05) — the announcement mention emitter (Part 2.3
+        // lane 8, `announcement.mention`). Additive, *inside* the publish
+        // lane (the frozen method signature + audit rows untouched). This
+        // lane **is** the draft gate (M36·8, ADR 0037): `PublishAsync` is
+        // called only on the draft→live transition, so a mention in a draft
+        // body never notifies until the author publishes. Extract candidate
+        // `@`-tokens from the announcement body, resolve them against the
+        // frozen directory read (the author is never a recipient — M36-5
+        // self pin), and emit one `announcement.mention` notification per
+        // resolved recipient on the caller's session. The per-recipient
+        // idempotency key (M36·4) keeps a re-emission of the same
+        // (announcement, recipient) pair a no-op (ADR 0076 D4 / F10).
+        // `EmitAsync` does not commit; the `SaveChangesAsync` below is the
+        // single commit (C3). No new authorization surface, no `AccessAudit`
+        // row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Kumunita.Core.Mentions.MentionTokens.ExtractTokens(announcement.Body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: NotificationKinds.AnnouncementMention,
+                        idempotencyKey: $"notification:announcement.mention:{announcement.Id}:{recipientId}",
+                        body: UgcSnippets.Truncate(announcement.Body),
+                        targetId: null,
+                        linkPath: $"/announcements/{announcement.Id}",
                         ct: default).ConfigureAwait(false);
                 }
             }

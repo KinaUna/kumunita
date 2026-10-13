@@ -73,10 +73,17 @@ public sealed class ProjectService : IProjectService
     // pin), the <c>PostService._tags</c> no-op idiom.
     private readonly ITagService? _tags;
 
+    // M36 (ADR 0165, U05) — the mention-resolution read seam (the U03
+    // `Mentions.IMentionService`, the M36·1 / M36·2 / M36·9 pins). **Optional**
+    // (nullable default, the same CS1736 shape as `_tags` / `_notifications`)
+    // so the existing test call sites keep compiling unchanged.
+    private readonly Kumunita.Core.Mentions.IMentionService? _mentions;
+
     public ProjectService(
         IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
         NotificationService? notifications = null, ITranslationProvider? translator = null,
-        ILocalizationService? localization = null, ITagService? tags = null)
+        ILocalizationService? localization = null, ITagService? tags = null,
+        Kumunita.Core.Mentions.IMentionService? mentions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
@@ -85,6 +92,7 @@ public sealed class ProjectService : IProjectService
         _translator = translator;
         _localization = localization;
         _tags = tags;
+        _mentions = mentions;
     }
 
     // --- Sort (M26 U6) ---------------------------------------------------------
@@ -541,6 +549,40 @@ public sealed class ProjectService : IProjectService
 
         session.Store(comment);
         session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.comment.create", TargetKindTodo, todoId, AccessVia.Owner));
+
+        // M36 (ADR 0165, U05) — the to-do comment mention emitter (Part 2.3
+        // lane 7, `todo.mention`). Additive, *inside* the lane (the frozen
+        // method signature + audit row untouched): extract candidate
+        // `@`-tokens from the comment body, resolve them against the frozen
+        // directory read (the author is never a recipient — M36-5 self pin),
+        // and emit one `todo.mention` notification per resolved recipient on
+        // the write session. The per-recipient idempotency key (M36·4) keeps a
+        // re-emission of the same (comment, recipient) pair a no-op (ADR 0076
+        // D4 / F10). `EmitAsync` does not commit; the `SaveChangesAsync`
+        // below is the single commit (C3). No new authorization surface, no
+        // `AccessAudit` row (M36·5 — a mention is a personal read).
+        if (_mentions is not null && _notifications is not null)
+        {
+            var mentionTokens = Kumunita.Core.Mentions.MentionTokens.ExtractTokens(body);
+            if (mentionTokens.Count > 0)
+            {
+                var mentionRecipients = await _mentions.ResolveAsync(mentionTokens, actorId, ct)
+                    .ConfigureAwait(false);
+                foreach (var recipientId in mentionRecipients)
+                {
+                    await _notifications.EmitAsync(
+                        session,
+                        recipientId: recipientId,
+                        kind: Notifications.NotificationKinds.TodoMention,
+                        idempotencyKey: $"notification:todo.mention:{comment.Id}:{recipientId}",
+                        body: Notifications.UgcSnippets.Truncate(body),
+                        targetId: null,
+                        linkPath: $"/projects/todos/{todoId}#comment-{comment.Id}",
+                        ct: ct).ConfigureAwait(false);
+                }
+            }
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return comment;
     }

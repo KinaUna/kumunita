@@ -287,7 +287,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<UserInfo.IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M9 (ADR 0105, plan U02/U03): the messaging-side service seam (bounded
         // context Kumunita.Core.Messaging — direct 1:1 signed-in resident
@@ -301,7 +302,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Messaging.IMessagingService>(sp => new Messaging.MessagingService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IUserInfoService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
@@ -314,7 +316,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Tags.ITagService>(),
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
@@ -410,7 +413,11 @@ public static class ServiceCollectionExtensions
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
             // is optional (CS1736), production wiring passes the registered
             // instance so the event.rsvp emitter fires (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // M36 (ADR 0165, U05) — the mention-resolution read seam; the
+            // ctor param is optional (CS1736), production wiring passes the
+            // registered instance so the event.mention emitter fires.
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M5 (ADR 0067, plan U04): the Projects bounded context's service seam
         // (bounded context Kumunita.Core.Projects — the "outcome" arrow: the
@@ -440,7 +447,11 @@ public static class ServiceCollectionExtensions
             // <c>AttachToBoardAsync</c>, then persist the resolved ids onto the
             // doc — the <c>PostService._tags</c> shape). Optional (CS1736); the
             // production wiring passes the registered instance so tags attach.
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            // M36 (ADR 0165, U05) — the mention-resolution read seam; the
+            // ctor param is optional (CS1736), production wiring passes the
+            // registered instance so the todo.mention emitter fires.
+            sp.GetRequiredService<Mentions.IMentionService>()));
 
         // M16 (ADR 0117, plan U02): the Inventory bounded context's service
         // seam (bounded context Kumunita.Core.Inventory — the "track where
