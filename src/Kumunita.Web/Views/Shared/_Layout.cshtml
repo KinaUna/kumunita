@@ -26,6 +26,14 @@
     {
         "common.close",
         "common.cancel",
+        // Onboarding walk-through modal (M22/M30 rework): the "Step X of Y"
+        // counter template (the common.step_of {0}/{1} placeholders, resolved
+        // in the effective language) + the iframe title fallback. Read by
+        // client/lib/onboarding-modal.ts from this bundle (the L(key, fallback)
+        // idiom). The Previous / Next button labels are server-rendered
+        // <kw-l> in the partial, so they are not needed here.
+        "common.step_of",
+        "common.title",
         "rc.editor.error_generic",
         "rc.editor.link.title",
         "rc.editor.link.url",
@@ -184,9 +192,31 @@
     // 0001-B: a preference, never a claim). Default B (compact top row);
     // variant C (icon rail) is the explicit opt-in.
     var navVariant = NavLayoutCookie.Read(Context.Request);
+
+    // Onboarding walk-through modal (M22/M30 rework) — this page is being
+    // iframed by the shared _OnboardingModal (the M35 kiosk "frame the
+    // surface's own route" idiom): the Sec-Fetch-Dest: iframe fetch-metadata
+    // signal (browser-driven, CSP-legal, no route change needed) is true only
+    // when a same-origin <iframe> loads the page. When set, the body carries
+    // the kmb-embed class and site.css hides the page chrome (navbar / footer
+    // / banners / toasts) so the framed page reads as a focused panel inside
+    // the modal — the ADR 0104 / M35 chrome-hide idiom. A direct navigation
+    // (Sec-Fetch-Dest: document) never sets it, so the page is unchanged when
+    // visited normally. A header-reading failure degrades to "not embedded"
+    // (the safe floor — the full page renders).
+    bool kmbEmbed = false;
+    try
+    {
+        if (Context.Request.Headers.TryGetValue("Sec-Fetch-Dest", out var dest))
+            kmbEmbed = string.Equals(dest.ToString(), "iframe", System.StringComparison.OrdinalIgnoreCase);
+    }
+    catch
+    {
+        // Non-HTTP render / missing context — not embedded (the floor).
+    }
 }
 
-<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null)">
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null) @(navVariant == NavLayoutCookie.Rail ? "kmb-nav-rail-mode" : null) @(kmbEmbed ? "kmb-embed" : null)">
     @* Flash toast — the one, uniform flash-message surface (TempData["info"]
        / ["error"]). Renders a fixed top-right Bootstrap toast when the
        controller left a flash value on the last redirect. Replaces the

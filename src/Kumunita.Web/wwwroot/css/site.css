@@ -977,6 +977,46 @@ body.kmb-page-expanded .page-expand-close {
   background: #fff;
 }
 
+/* ── Onboarding walk-through modal (M22/M30 rework) — the framed page ──────
+   When a settings page is loaded inside the shared _OnboardingModal's iframe
+   (the M35 kiosk "frame the surface's own route" idiom), _Layout.cshtml sets
+   body.kmb-embed (the Sec-Fetch-Dest: iframe signal). Hide the page chrome
+   (navbar / footer / banners / toasts) so the framed page reads as a focused
+   panel inside the modal — the ADR 0104 / M35 chrome-hide idiom. The flash
+   toast stays VISIBLE inside the frame: it is the save-success feedback the
+   resident/admin sees after saving the setting in the modal. The settings
+   sub-nav (.kmb-tab-under-navbar) is neutralized (its negative margin-top
+   assumes the navbar it hangs under; in the embed there is no navbar) and
+   given a little top padding so the first control isn't flush at the top.
+   A direct navigation (Sec-Fetch-Dest: document) never sets the class, so
+   the page is unchanged when visited normally. */
+body.kmb-embed {
+  margin-bottom: 0;
+}
+body.kmb-embed .navbar,
+body.kmb-embed .kmb-footer,
+body.kmb-embed .kumunita-pinned-announcement,
+body.kmb-embed .kumunita-onboarding-banner,
+body.kmb-embed .kmb-whatsnew-toast {
+  display: none;
+}
+/* Neutralize the settings sub-nav's negative margin (it hangs under the
+   navbar, which is hidden here) so the first heading isn't clipped. */
+body.kmb-embed .kmb-tab-under-navbar {
+  margin-top: 0;
+  border-top: 0;
+  border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+}
+/* The framed page's iframe inside the modal needs an explicit size — an
+   <iframe> defaults to a ~150px tall, full-width box; give it a tall, full-
+   width, borderless panel that fills the modal body (the M35 kiosk iframe
+   sizing idiom). */
+.kmb-onboarding-iframe {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+}
+
 .lead {
   font-weight: 400;
   line-height: 1.6;

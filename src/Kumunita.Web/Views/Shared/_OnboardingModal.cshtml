@@ -1,0 +1,172 @@
+@*
+    _OnboardingModal.cshtml — the SHARED onboarding walk-through modal (the
+    M22 resident / M30 admin "open the setting in a modal + previous / next
+    navigation" rework).
+
+    Both walks render through this ONE partial with their own step list
+    (@model, an IReadOnlyList<OnboardingStep> — the shared record the
+    OnboardingViewModel and AdminOnboardingViewModel both expose as
+    .Steps); the markup is identical, only the step data differs.
+
+    Model (the M35 kiosk "frame the surface's own route" idiom, M35·6 reuse):
+    the modal iframes the current step's surface's OWN route (the surface's
+    full view — its form, anti-forgery token, and save lane all work, the
+    M35·6 "reuse, not re-author" pin). The modal therefore never re-implements
+    a write lane (the M22 D3 / M30·7 "rides frozen lanes" pin, resident- /
+    admin-scope): it frames the page that already owns the setting. Framing is
+    CSP-legal (frame-ancestors 'self'; the M35 kiosk precedent) and the framed
+    page drops its page chrome while iframed (the layout's kmb-embed body
+    class, driven by the Sec-Fetch-Dest: iframe fetch-metadata signal — the
+    ADR 0104 / M35 chrome-hide idiom).
+
+    client/lib/onboarding-modal.ts drives: the iframe src (the current step's
+    route), the title + description (swapped per step), the previous / next
+    buttons, and the "Step X of Y" counter — walking the hidden
+    .kmb-onb-step-meta list (one per step, in order) that this partial renders.
+    The main page's step buttons (the .kmb-onb-open, carrying data-ob-index)
+    open the modal at the step the resident / admin chose.
+
+    Localized strings: the previous / next button labels are <kw-l> (the
+    closed common.* set) — the kw-l TagHelper renders the element (it cannot
+    wrap an attribute), so the per-step titles + descriptions (which must be
+    text for the attribute) are resolved in the effective language here via
+    Translation.GetAsync (the house idiom — the grant.count_selected /
+    _WhatsNewToast shape, the ADR 0049 chain). A null provider (a non-HTTP
+    render) degrades to blank — the step's label still renders server-side in
+    the main page list, and the kw-l floor covers the button labels.
+*@
+@using Kumunita.Web.Security
+@model IReadOnlyList<OnboardingStep>
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    // The effective language (the ADR 0049 chain — the same seam the <kw-l>
+    // TagHelper resolves UI strings through), so the step titles + descriptions
+    // match the surrounding page. A null provider (a non-HTTP render) or a
+    // resolution failure degrades to the en floor / blank.
+    string effLang = "en";
+    if (Translation is not null)
+    {
+        try
+        {
+            effLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        }
+        catch
+        {
+            // Keep the en floor on a resolution failure — the label must never
+            // blank the modal (the kw-l floor, ADR 0015 D1).
+        }
+    }
+
+    // The modal + close button's accessible names are server-resolved (the
+    // a11y.* closed set — the kw-l TagHelper can't wrap an attribute). A null
+    // provider degrades to the en floor.
+    string ariaModal = "Account setup";
+    string ariaClose = "Close";
+    if (Translation is not null)
+    {
+        try
+        {
+            ariaModal = await Translation.GetAsync("a11y.onboarding_region", effLang);
+            ariaClose = await Translation.GetAsync("a11y.close", effLang);
+        }
+        catch
+        {
+            // Keep the en floor on a resolution failure.
+        }
+    }
+
+    // Resolve each step's title + description to text (for the data-* attribute
+    // — the kw-l element can't be placed in an attribute), in the effective
+    // language. Batched in ONE query (GetManyAsync — the house idiom, no N
+    // round-trips). A null provider / blank key / resolution failure degrades
+    // to blank (the step's label still renders server-side in the main page
+    // list, and the kw-l floor covers the button labels). The resident walk's
+    // description keys are empty → resolved to "" (the view renders the label
+    // only; see the step-meta desc attribute).
+    var stepLabels = new string[Model.Count];
+    var stepDescs = new string[Model.Count];
+    if (Translation is not null)
+    {
+        try
+        {
+            var keys = new List<string>(Model.Count * 2);
+            for (var i = 0; i < Model.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(Model[i].LabelKey)) keys.Add(Model[i].LabelKey);
+                if (!string.IsNullOrWhiteSpace(Model[i].DescriptionKey)) keys.Add(Model[i].DescriptionKey);
+            }
+            if (keys.Count > 0)
+            {
+                var resolved = await Translation.GetManyAsync(keys, effLang);
+                for (var i = 0; i < Model.Count; i++)
+                {
+                    stepLabels[i] = resolved.TryGetValue(Model[i].LabelKey, out var lb) ? lb ?? string.Empty : string.Empty;
+                    stepDescs[i] = string.IsNullOrWhiteSpace(Model[i].DescriptionKey)
+                        ? string.Empty
+                        : (resolved.TryGetValue(Model[i].DescriptionKey, out var dc) ? dc ?? string.Empty : string.Empty);
+                }
+            }
+        }
+        catch
+        {
+            // Keep the blank floor on a resolution failure — the main page list
+            // still renders the labels; the modal degrades to label-only.
+        }
+    }
+}
+
+<div class="modal fade kmb-onboarding-modal" id="kmb-onboarding-modal" tabindex="-1"
+     role="dialog" aria-modal="true" aria-labelledby="kmb-onb-modal-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="me-auto">
+                    <h5 class="modal-title" id="kmb-onb-modal-title"></h5>
+                    <div class="kmb-onb-desc small text-muted" id="kmb-onb-modal-desc" hidden></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@ariaClose"></button>
+            </div>
+            <div class="modal-body kmb-onb-body">
+                <iframe class="kmb-onboarding-iframe" id="kmb-onb-iframe" title="@ariaModal"></iframe>
+            </div>
+            <div class="modal-footer d-flex align-items-center justify-content-between kmb-onb-footer">
+                <button type="button" class="btn btn-outline-secondary kmb-onb-prev" id="kmb-onb-prev">
+                    <kw-l key="common.previous">Previous</kw-l>
+                </button>
+                <span class="kmb-onb-counter text-nowrap text-muted" id="kmb-onb-counter" aria-live="polite"></span>
+                <button type="button" class="btn btn-outline-secondary kmb-onb-next" id="kmb-onb-next">
+                    <kw-l key="common.next">Next</kw-l>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* The per-step meta (the TS's indexed source of truth): one .kmb-onb-step-meta
+   per step, in order, each carrying data-index / data-route / data-label /
+   data-desc. The label + description are server-resolved in the effective
+   language (Resolve above — the kw-l element can't be placed in an attribute).
+   Hidden — the onboarding-modal.ts module reads them; they are not rendered
+   content (the kiosk .kmb-kiosk-slide-meta idiom). *@
+<div class="kmb-onb-steps" hidden>
+    @for (var i = 0; i < Model.Count; i++)
+    {
+        var step = Model[i];
+        <div class="kmb-onb-step-meta"
+             data-index="@i"
+             data-route="@step.Route"
+             data-label="@stepLabels[i]"
+             data-desc="@stepDescs[i]"></div>
+    }
+</div>
+<!-- Onboarding walk-through modal (M22/M30 rework; the shared _OnboardingModal
+     partial above): wires the .kmb-onb-open step buttons to open the modal at
+     the chosen step, and the previous / next buttons + the "Step X of Y"
+     counter to walk the .kmb-onb-step-meta list (iframing each step's surface's
+     own route, the M35 kiosk idiom). Self-guards on pages without
+     #kmb-onboarding-modal, so loading it globally is safe (the expand-page.ts
+     idiom). No new npm package / build step (the ADR 0031 / M35·7 pin). -->
+<script type="module" src="~/js/lib/onboarding-modal.js"></script>

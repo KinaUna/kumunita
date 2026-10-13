@@ -865,6 +865,14 @@ public static class KnownTranslationKeys
             //    #kumunita-strings JSON block in _Layout.cshtml) ──────────
             ["common.close"]  = "Close",
             ["common.cancel"] = "Cancel",
+            // Onboarding walk-through (M22/M30 modal rework) — the previous /
+            // next / done buttons in the shared _OnboardingModal partial + the
+            // "Step X of Y" counter the client/lib/onboarding-modal.ts formats
+            // from the #kumunita-strings bundle ({0}/{1} placeholders).
+            ["common.previous"] = "Previous",
+            ["common.next"]     = "Next",
+            ["common.done"]     = "Done",
+            ["common.step_of"]  = "Step {0} of {1}",
             ["rc.editor.error_generic"] = "Something went wrong.",
             ["rc.editor.link.title"]    = "Insert link",
             ["rc.editor.link.url"]      = "URL",
@@ -3630,6 +3638,10 @@ public static class KnownTranslationKeys
             // ── Client-JS-Strings (P0-6: #kumunita-strings-Bundle) ────────
             ["common.close"]  = "Schließen",
             ["common.cancel"] = "Abbrechen",
+            ["common.previous"] = "Zurück",
+            ["common.next"]     = "Weiter",
+            ["common.done"]     = "Fertig",
+            ["common.step_of"]  = "Schritt {0} von {1}",
             ["rc.editor.error_generic"] = "Etwas ist schiefgelaufen.",
             ["rc.editor.link.title"]    = "Link einfügen",
             ["rc.editor.link.url"]      = "URL",
@@ -6179,6 +6191,10 @@ public static class KnownTranslationKeys
             // ── chaînes du JS client (P0-6 : le bundle #kumunita-strings) ─
             ["common.close"]  = "Fermer",
             ["common.cancel"] = "Annuler",
+            ["common.previous"] = "Précédent",
+            ["common.next"]     = "Suivant",
+            ["common.done"]     = "Terminé",
+            ["common.step_of"]  = "Étape {0} sur {1}",
             ["rc.editor.error_generic"] = "Quelque chose s'est mal passé.",
             ["rc.editor.link.title"]    = "Insérer un lien",
             ["rc.editor.link.url"]      = "URL",
@@ -8733,6 +8749,10 @@ public static class KnownTranslationKeys
             // ── klient-JS-strenge (P0-6: #kumunita-strings-bundlen) ───────
             ["common.close"]  = "Luk",
             ["common.cancel"] = "Annuller",
+            ["common.previous"] = "Forrige",
+            ["common.next"]     = "Næste",
+            ["common.done"]     = "Færdig",
+            ["common.step_of"]  = "Trin {0} af {1}",
             ["rc.editor.error_generic"] = "Noget gik galt.",
             ["rc.editor.link.title"]    = "Indsæt link",
             ["rc.editor.link.url"]      = "URL",

@@ -61,41 +61,49 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.58.0 entry (ADR 0165) — 0.57.0 (ADR 0164) slides one row back")]
-    public void The_M36_Mentions_Entry_Is_Shipped()
+    [Fact(DisplayName = "The newest-first head is the 0.59.0 entry (the ONB lane) — 0.58.0 (ADR 0165) slides one row back")]
+    public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
         // ADR 0110 / AGENTS.md) so a copy-paste that drops or re-orders an
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The M36 @mentions milestone (ADR 0165, this close flip
-        // — M36 is the **last** milestone on the roadmap, M36·10) is now the
-        // newest shipped (the 0.58.0 entry), so it is the head; the M35
-        // kiosk-mode milestone (ADR 0164) 0.57.0 entry slides one row back;
-        // the home upcoming events & to-dos lane (ADR 0163) 0.56.0 entry
-        // slides two rows back; the M34 (analytics history) milestone (ADR
-        // 0162) 0.55.0 entry slides three rows back; the ADR 0161
-        // page-translation-standing lane (the editor can translate their own
-        // page + the /admin/platform translation surface) 0.54.0 entry four
-        // rows back; the NESTED nested-help-guides lane (ADR 0160, the UG
-        // guide tree's second level) 0.53.0 entry five rows back; the ESC
-        // escalation-authorization lane (ADR 0159) 0.52.0 entry six rows
+        // slides down. The ONB onboarding walk-through lane (the resident
+        // /onboarding + admin /admin/onboarding rework — each step opens in a
+        // modal with Previous / Next navigation + a "Step X of Y" counter) is
+        // now the newest shipped (the 0.59.0 entry), so it is the head; the
+        // M36 @mentions milestone (ADR 0165) 0.58.0 entry slides one row
+        // back; the M35 kiosk-mode milestone (ADR 0164) 0.57.0 entry slides
+        // two rows back; the home upcoming events & to-dos lane (ADR 0163)
+        // 0.56.0 entry slides three rows back; the M34 (analytics history)
+        // milestone (ADR 0162) 0.55.0 entry slides four rows back; the ADR
+        // 0161 page-translation-standing lane (the editor can translate their
+        // own page + the /admin/platform translation surface) 0.54.0 entry
+        // five rows back; the NESTED nested-help-guides lane (ADR 0160, the
+        // UG guide tree's second level) 0.53.0 entry six rows back; the ESC
+        // escalation-authorization lane (ADR 0159) 0.52.0 entry seven rows
         // back; the LBL-2 surface-label-translation lane (ADR 0158) 0.51.0
-        // entry seven rows back; the SITE-2 hero-translation lane (ADR 0157)
-        // 0.50.0 entry eight rows back; the M33 (storage metrics history)
-        // 0.49.0 entry nine rows back; the M32 (issue submission & escalation)
-        // 0.48.0 entry ten rows back.
+        // entry eight rows back; the SITE-2 hero-translation lane (ADR 0157)
+        // 0.50.0 entry nine rows back; the M33 (storage metrics history)
+        // 0.49.0 entry ten rows back; the M32 (issue submission & escalation)
+        // 0.48.0 entry eleven rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.58.0" && head.Date == "2026-10-13",
-            "The M36 @mentions milestone ADR 0165 0.58.0 (2026-10-13) entry must be the head of the registry; got "
+            head.Version == "0.59.0" && head.Date == "2026-10-13",
+            "The ONB onboarding walk-through lane 0.59.0 (2026-10-13) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("mention", StringComparison.OrdinalIgnoreCase)),
-            "The 0.58.0 head entry must name the M36 @mentions capability.");
+            head.Changes.Any(c => c.Contains("onboarding", StringComparison.OrdinalIgnoreCase)),
+            "The 0.59.0 head entry must name the onboarding walk-through capability.");
 
-        // The M35 kiosk-mode entry (ADR 0164) slides one row back.
+        // The M36 @mentions entry (ADR 0165) slides one row back.
+        var m36 = WhatsNew.All.Single(v => v.Version == "0.58.0");
+        Assert.True(
+            m36.Changes.Any(c => c.Contains("mention", StringComparison.OrdinalIgnoreCase)),
+            "The 0.58.0 entry must name the M36 @mentions capability.");
+
+        // The M35 kiosk-mode entry (ADR 0164) slides two rows back.
         var kiosk = WhatsNew.All.Single(v => v.Version == "0.57.0");
         Assert.True(
             kiosk.Changes.Any(c => c.Contains("kiosk", StringComparison.OrdinalIgnoreCase)),

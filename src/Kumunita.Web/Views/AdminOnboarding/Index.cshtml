@@ -36,21 +36,31 @@
 @* The seven step cards (M30·7): the closed set the view model carries, in the
    README / Milestones.cs order. Each card = a localized title (Step.LabelKey)
    + a one-line description (Step.DescriptionKey) + the "visit this setting"
-   link (adminonboarding.visit) into the existing admin surface (Step.Route).
-   Links-only (M30·7): no inline control, no per-step POST, no persisted step
-   cursor, no completion gate — the walk-through's *only* write is the
-   CompleteAsync lane (M30·1, M30·6). *@
+   button (adminonboarding.visit) that opens the existing admin surface
+   (Step.Route) in the shared _OnboardingModal (the M35 kiosk "frame the
+   surface's own route" idiom). The modal's Previous / Next buttons then walk
+   the remaining steps in order — a clean linear process. Links-only (M30·7):
+   no inline control, no per-step POST, no persisted step cursor, no
+   completion gate — the walk-through's *only* write is the CompleteAsync
+   lane (M30·1, M30·6). *@
 <ol class="list-group kmb-admin-onboarding-steps">
-    @foreach (var step in Model.Steps)
+    @for (var i = 0; i < Model.Steps.Count; i++)
     {
+        var step = Model.Steps[i];
         <li class="list-group-item d-flex align-items-center gap-2">
             <span class="me-auto me-2">
                 <span class="d-block fw-semibold"><kw-l key="@step.LabelKey"></kw-l></span>
                 <span class="d-block text-muted small"><kw-l key="@step.DescriptionKey"></kw-l></span>
             </span>
-            <a class="btn btn-sm btn-outline-primary text-nowrap" href="@step.Route">
+            @* The "visit this setting" button: opens the shared modal at this
+               step (the onboarding-modal.ts module reads data-ob-index). It
+               is a <button>, not an <a>, so it carries no navigation — the
+               modal is the navigation. The label is the closed
+               adminonboarding.visit key (the M30·6 set). *@
+            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap kmb-onb-open"
+                    data-ob-index="@i">
                 <kw-l key="adminonboarding.visit">Visit this setting</kw-l>
-            </a>
+            </button>
         </li>
     }
 </ol>
@@ -65,3 +75,14 @@
         <button type="submit" class="btn btn-primary"><kw-l key="adminonboarding.complete">Mark as complete</kw-l></button>
     </form>
 </div>
+
+@* The SHARED onboarding modal (the M22/M30 rework): one Bootstrap modal the
+   step buttons above open, iframing the current step's admin surface (the
+   M35 kiosk idiom) with Previous / Next navigation across the closed step
+   set. The partial renders the modal + the .kmb-onb-step-meta list (from the
+   SAME Model.Steps the list above iterates, so the order agrees) + loads
+   client/lib/onboarding-modal.js. The modal body is the surface's own page —
+   its form, anti-forgery token, and save lane all work unmodified. The "Mark
+   as complete" write (the one audited lane, M30·4) stays on this main page —
+   the modal only frames the settings the admin visits. *@
+@await Html.PartialAsync("_OnboardingModal", Model.Steps)
