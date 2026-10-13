@@ -199,3 +199,67 @@ pins, against the **actual** verified code shapes:
 **One recorded drift (resolved, not a pause):** the prose's "`IDirectoryService`"
 → the **concrete `DirectoryService`** class (Part 2.0). U03 implements over the
 concrete class; no interface to invent.
+
+## U03 — Core module
+
+Implemented the one new shared Core module `Kumunita.Core.Mentions` (M36·1) — the
+`MentionTokens` pure parser + the `IMentionService` seam + the `MentionService`
+impl + the additive `AddTransient<IMentionService>` DI registration. Build green
+(`dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Warnings, 0
+Errors**).
+
+- **`src/Kumunita.Core/Mentions/Mentions.cs` (new):**
+  - `MentionTokens.ExtractTokens(string? body) → IReadOnlyList<string>` — static,
+    pure, no-dep (the `UgcSnippets` / `KanbanStatuses` shape). Returns the **ordered, de-duplicated** candidate tokens (`@`
+    + a maximal run of non-whitespace, the `@` itself **not** included — the
+    resolver matches against `Profile.DisplayName`). Excludes `@word` inside a
+    fenced code block (``` … ```), an inline code span (`` `…` ``), a link
+    (`[text](…)` text), or an image (`![alt](…)` text) via a `bool[]`
+    excluded-mask (Part 2.1 / M36-1 / M36·2 pins). A lone / trailing `@` (no
+    following token-eligible character) yields **no** token; a null / whitespace
+    body yields **an empty list**; de-dup is **case-insensitive,
+    order-preserving** (first occurrence's spelling kept). Token-run terminators
+    are whitespace + the Markdown structural delimiters `(` / `[` / backtick
+    (Part 2.1 pin); a fence line is always preceded by a newline (whitespace) so
+    the run stops at the whitespace first.
+  - `IMentionService.ResolveAsync(IReadOnlyCollection<string> tokens, string
+    authorId, CancellationToken ct = default) → Task<IReadOnlyCollection<string>>`
+    — the M36·2 / M36·9 / M36-4 / M36-5 read seam.
+  - `MentionService(DirectoryService directory)` — composes the **frozen** M2
+    **concrete** `DirectoryService.ListAsync` catalog read (M36·2 — reused, not
+    re-shaped). The **inert rule** (M36-5): a token resolves to exactly one
+    non-blocked, non-author resident's `SubjectId` **iff** the case-insensitive
+    ordinal `DisplayName` match count is **exactly one**; **zero** (unknown) or
+    **two or more** (ambiguous) → **dropped, never a guess**; the **author** is
+    excluded by `SubjectId` (not display name) even if another resident shares
+    the author's display name; **blocked** residents are already excluded by
+    `ListAsync` (no extra filter needed). Result is **de-duplicated,
+    order-preserving** (first token-occurrence order). **Zero**
+    `IAuthorizationService` call, **zero** `AccessAudit` row (M36·5 — the F7
+    "a mention emission emits no audit row" pin at the resolver level). **No**
+    `HttpClient`, **no** Wolverine handler (M36·9, ADR 0006-D).
+  - **No `IDirectoryService` interface invented** (Part 2.0 drift pin — the M2
+    Deviation 1 concrete-class shape is preserved; unit-series rule 5 "reused,
+    not re-shape" holds).
+- **`src/Kumunita.Core/DependencyInjection.cs` (modified, additive):** one new
+  `services.AddTransient<Mentions.IMentionService>(sp => new Mentions.MentionService(
+  sp.GetRequiredService<DirectoryService>()))` line placed immediately after the
+  existing `AddTransient<DirectoryService>` registration (the M6
+  `AddTransient<NotificationService>` / M2 `AddTransient<DirectoryService>`
+  factory-form precedent; the M35 `Kiosk.IKioskService` fully-qualified
+  type/namespace idiom — `Mentions.IMentionService`). The `DirectoryService` is
+  the concrete M2 seam (Part 2.0); the `IMentionService` is the new stable seam
+  the per-surface emitters (U04/U05) will resolve.
+- **`Kumunita.Core.csproj` (unmodified):** SDK-style project — the new `Mentions`
+  folder is auto-included; no `<Compile>` item, no `<PackageReference>`, no
+  doc-type surface, no EF migration (M36·1 — a mention is **derived**, not
+  captured; M36·9 — no new dependency).
+- **No drift pause.** The `## U02` "One recorded drift (resolved)" note (the
+  `IDirectoryService` → concrete `DirectoryService` shorthand) is the only
+  drift in the register; U03 honored it exactly (ctor over the concrete class,
+  no interface invented).
+- **Next unit (U04):** wire the **post + reply** mention emitters in the
+  `PostService` post-create + reply-create lanes (the reserved `post.mention`
+  kind going live — the M6 `CreateReplyAsync` `EmitAsync` call site is the
+  template; the per-recipient key
+  `notification:post.mention:{contentId}:{recipientId}` — M36·4).

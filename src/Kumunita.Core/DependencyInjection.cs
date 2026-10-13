@@ -195,6 +195,18 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IUserInfoService>(),
                 sp.GetRequiredService<IAuthorizationService>()));
 
+        // M36 (ADR 0165, U03): the @mentions shared module — the one new Core
+        // read seam (M36·1). A plain store-composing read over the frozen M2
+        // DirectoryService catalog seam (M36·2 — reused, not re-shaped): it
+        // composes ListAsync, does no IAuthorizationService call, writes zero
+        // AccessAudit rows (M36·5), and carries no HttpClient / Wolverine
+        // handler (M36·9, ADR 0006-D). Fully qualified Mentions.IMentionService
+        // for the type/namespace idiom (like SiteContent.ISiteContentService).
+        // Resolves the concrete DirectoryService (Part 2.0 — no IDirectoryService
+        // interface is invented).
+        services.AddTransient<Mentions.IMentionService>(sp => new Mentions.MentionService(
+            sp.GetRequiredService<DirectoryService>()));
+
         // M23 (ADR 0123 D4): the find-people composition root — the
         // DirectoryService shape above, extended with the host-registered Marten
         // IDocumentStore (the tag resolve + the CanSeeAsync aggregate audit row)
