@@ -110,9 +110,20 @@ public interface ITagService
     /// the actor may already read (the C-TG·2 base query), each with a
     /// use-count and the display name resolved to the actor's language
     /// (ADR 0005 preference order, D5). No <c>AccessAudit</c> row (C-TG·8).
-
+    /// <para>
+    /// <paramref name="preferredLanguageCode"/> is the actor's **per-request
+    /// effective** language (the Web's <c>EffectiveLanguageCode</c> chain —
+    /// the <c>kumunita.locale</c> cookie → the first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor). When
+    /// non-null it is the top of the ADR 0005 preference order for resolving
+    /// each tag's display name, so a tag's <see cref="TagTranslation"/> in that
+    /// language is shown; when null the resolution collapses to the instance
+    /// default → <c>en</c> floor (the Core-only behavior the seam's own tests
+    /// pin). A display input — never an access decision (C-TG·1).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId);
+    Task<IReadOnlyList<TagItem>> ListForActorAsync(
+        string actorId, string? preferredLanguageCode = null);
 
     /// <summary>
     /// The by-tag post results, **paged** (ADR 0090 D6, M7 U01 — the design
@@ -155,8 +166,17 @@ public interface ITagService
     /// <c>starts_with(displayName, prefix) OR starts_with(slug, prefix)</c>,
     /// where <c>displayName</c> is the name resolved in the viewer's language;
     /// **capped at ≤ 10**. No <c>AccessAudit</c> row (C-TG·8).
+    /// <para>
+    /// <paramref name="preferredLanguageCode"/> is the actor's **per-request
+    /// effective** language (the Web's <c>EffectiveLanguageCode</c> chain) — the
+    /// top of the ADR 0005 preference order for the <c>displayName</c> both the
+    /// rows and the <c>startsWith</c> filter resolve against; when null it
+    /// collapses to the instance default → <c>en</c> floor (the Core-only
+    /// behavior). A display input — never an access decision (C-TG·1).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId);
+    Task<IReadOnlyList<TagItem>> SuggestAsync(
+        string prefix, string actorId, string? preferredLanguageCode = null);
 
     // ── Standing probes (C-TG·5; a display pin, not a gate — the real deny
     //    is the write-lane re-check, the <c>PostService.CanAddTranslation</c>

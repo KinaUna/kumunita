@@ -961,7 +961,7 @@ public sealed class EventController : Controller
         Dictionary<string, IReadOnlyList<string>>? categories = null;
         if (tags is not null && ev.TagIds.Count > 0)
         {
-            var readable = await tags.ListForActorAsync(actorId);
+            var readable = await tags.ListForActorAsync(actorId, await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider));
             var readableById = readable.ToDictionary(t => t.Tag.Id, StringComparer.Ordinal);
             var names = ev.TagIds
                 .Where(readableById.ContainsKey)
@@ -1029,7 +1029,7 @@ public sealed class EventController : Controller
         Dictionary<string, IReadOnlyList<string>>? categories = null;
         if (tags is not null && items.Any(e => e.TagIds.Count > 0))
         {
-            var readable = await tags.ListForActorAsync(actorId);
+            var readable = await tags.ListForActorAsync(actorId, await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider));
             var readableById = readable.ToDictionary(t => t.Tag.Id, StringComparer.Ordinal);
             categories = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
             foreach (var e in items)

@@ -598,7 +598,13 @@ public sealed class PostsController(
         if (tags is not null && result.Post.TagIds.Count > 0)
         {
             var postTagIds = result.Post.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actor);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049 —
+            // the exact <c>EffectiveLanguageCode</c> chain the group-name and
+            // post-translation surfaces use) so a tag's <c>TagTranslation</c> in
+            // that language resolves; null (test-construction site) falls to the
+            // instance-default → en floor.
+            var tagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actor, tagPreferred);
             tagRows = readable
                 .Where(t => postTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))

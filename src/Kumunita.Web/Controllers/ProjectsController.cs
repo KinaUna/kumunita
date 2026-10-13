@@ -892,7 +892,11 @@ public sealed class ProjectsController : Controller
         if (tags is not null && result.Todo.TagIds.Count > 0)
         {
             var todoTagIds = result.Todo.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actorId);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049)
+            // so a tag's <c>TagTranslation</c> in that language resolves; null
+            // (test-construction site) falls to the instance-default → en floor.
+            var tagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actorId, tagPreferred);
             tagRows = readable
                 .Where(t => todoTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
@@ -2146,7 +2150,11 @@ public sealed class ProjectsController : Controller
         if (tags is not null && result.Board.TagIds.Count > 0)
         {
             var boardTagIds = result.Board.TagIds.ToHashSet(StringComparer.Ordinal);
-            var readable = await tags.ListForActorAsync(actorId);
+            // The viewer's per-request effective language (ADR 0005 / ADR 0049)
+            // so a tag's <c>TagTranslation</c> in that language resolves; null
+            // (test-construction site) falls to the instance-default → en floor.
+            var boardTagPreferred = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider);
+            var readable = await tags.ListForActorAsync(actorId, boardTagPreferred);
             boardTagRows = readable
                 .Where(t => boardTagIds.Contains(t.Tag.Id))
                 .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))

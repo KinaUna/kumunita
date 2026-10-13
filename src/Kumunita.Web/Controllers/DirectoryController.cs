@@ -139,7 +139,13 @@ public sealed class DirectoryController(
         var translations = await session.Query<TagTranslation>()
             .Where(t => idSet.Contains(t.TagId)).ToListAsync();
 
-        var effective = await translationProvider.ResolveEffectiveLanguageAsync((string?)null);
+        // The viewer's per-request effective language (ADR 0005 / ADR 0049 —
+        // the exact <c>EffectiveLanguageCode</c> chain the group-name and
+        // post-translation surfaces use) so a tag's <c>TagTranslation</c> in
+        // that language resolves; null (no context / test site) falls to the
+        // instance-default → en floor.
+        var effective = await EffectiveLanguageCode.ResolvePreferredAsync(HttpContext?.Request, localization, translationProvider)
+            ?? "en";
         var translated = translations
             .Where(t => string.Equals(t.LanguageCode, effective, StringComparison.Ordinal))
             .ToDictionary(t => t.TagId, t => t.Name, StringComparer.Ordinal);
