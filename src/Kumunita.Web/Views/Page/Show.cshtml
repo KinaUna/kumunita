@@ -1,5 +1,6 @@
 @model Kumunita.Web.Models.PageShowViewModel
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
@@ -243,7 +244,7 @@
                                 @Model.Title
                             }
                         </h1>
-                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                        <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(Model.Body, Model.AuthorSubjectId ?? string.Empty)" /></div>
                     </div>
 
                     @* One variant per stored translation — the viewer's-language one is
@@ -258,7 +259,7 @@
                             {
                                 <h1 class="mb-1">@t.Title</h1>
                             }
-                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                            <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId ?? string.Empty)" /></div>
                         </div>
                     }
 

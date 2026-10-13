@@ -2,6 +2,7 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Core.Messaging
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject ITranslationProvider Translation
 @inject ILocalizationService Localization
 @{
@@ -114,7 +115,7 @@
                                     }
                                 </span>
                             </div>
-                            <div class="message-body">@m.Body</div>
+                            <div class="message-body"><partial name="_MentionRendererPlain" model="new MentionBodyModel(m.Body, m.SenderId)" /></div>
                         </div>
                     </li>
                 }

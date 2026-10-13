@@ -1,6 +1,7 @@
 @model Kumunita.Web.Models.EventDetailViewModel
 @using Kumunita.Core.Events
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
@@ -335,7 +336,7 @@
                     <div class="td-variant" data-td-variant="@originalCode"
                          @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                         @* The full body — rendered through the one MarkdownRenderer (R·1). *@
-                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
+                        <div class="rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(Model.Event.Body, Model.Event.AuthorId)" /></div>
                     </div>
 
                     @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
@@ -343,7 +344,7 @@
                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                         <div class="td-variant" data-td-variant="@t.LanguageCode"
                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                            <div class="rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.Event.AuthorId)" /></div>
                         </div>
                     }
 

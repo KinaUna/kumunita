@@ -336,6 +336,7 @@ public sealed class PageController(
             page.IsDraft,
             isAuthor,
             authorProfile?.DisplayName,
+            page.AuthorId,
             communityName,
             canTranslate,
             defaultVariant,

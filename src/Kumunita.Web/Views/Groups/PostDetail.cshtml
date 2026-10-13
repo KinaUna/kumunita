@@ -1,5 +1,6 @@
 @model Kumunita.Web.Models.GroupPostDetailViewModel
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
@@ -326,7 +327,7 @@
                                     : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
                             </h4>
                             <div class="mb-3 rc-body">
-                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                                <partial name="_MentionRenderer" model="new MentionBodyModel(Model.Post.Body, Model.AuthorSubjectId)" />
                             </div>
                         </div>
 
@@ -344,7 +345,7 @@
                                     <h4>@t.Title</h4>
                                 }
                                 <div class="mb-3 rc-body">
-                                    @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
+                                    <partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" />
                                 </div>
                             </div>
                         }
@@ -442,7 +443,7 @@
                                        auto-selects a translation of it). *@
                                     <div class="td-variant" data-td-variant="@r.OriginalLanguageCode"
                                          @(replyOriginalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
+                                        <div class="rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(r.Body, r.AuthorSubjectId)" /></div>
                                     </div>
 
                                     @* One variant per user-added translation — hidden by
@@ -453,7 +454,7 @@
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant" data-td-variant="@t.LanguageCode"
                                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                                            <div class="rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, r.AuthorSubjectId)" /></div>
                                         </div>
                                     }
 

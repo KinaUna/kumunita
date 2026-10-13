@@ -1,0 +1,48 @@
+@* _MentionRendererPlain — M36 (ADR 0165 D6) the @mention render pass for a
+   PLAIN-TEXT body (the messaging surface renders its message bodies as
+   escaped text, `@m.Body`, not through the frozen MarkdownRenderer — the
+   messaging surface never adopted Rich Content). It mirrors _MentionRenderer
+   but escapes the body first, then runs the SAME frozen MentionRenderer pass
+   over the escaped text: escaping produces no real tags, so the pass treats
+   the whole string as a text segment at skip-depth 0 and linkifies a resolved
+   `@<DisplayName>` (rewriting it to <a class="mention" href="/directory/{id}">
+   @<DisplayName></a>) while every other character stays HTML-escaped (a lone
+   `@`, an unresolved / ambiguous / blocked / self name — not in the map — stays
+   plain escaped text). Reuses the frozen MentionRenderer.Render + BuildMapAsync
+   (M36·5 — no re-derivation of the inert rule, zero AccessAudit row) and the
+   two frozen seams (IMentionService + DirectoryService). Graceful floor: if
+   either seam is absent (a minimal test harness) the escaped plain body
+   renders — a safe no-op (no mention links, no error). *
+   The frozen MarkdownRenderer is untouched (M36·6 — this partial does not call
+   it; it composes the escape + the pass instead). *@
+@using Kumunita.Web.Security
+@using Microsoft.Extensions.DependencyInjection
+@model Kumunita.Web.Views.Shared.MentionBodyModel
+@{
+    // Escape the body (the plain-text surface never Markdown-renders it) so any
+    // `@` the resident typed stays a literal, and any `<` / `>` / `&` stay inert.
+    string escaped = System.Net.WebUtility.HtmlEncode(Model.Body);
+
+    string final;
+    var sp = ViewContext.HttpContext.RequestServices;
+    var mentions = sp.GetService<Kumunita.Core.Mentions.IMentionService>();
+    var directory = sp.GetService<Kumunita.Core.UserInfo.DirectoryService>();
+    if (mentions is not null && directory is not null)
+    {
+        // The content's author's subject id (the self-exclusion input, M36-5 /
+        // ADR 0165 D2): the author is never mentioned by their own name. The
+        // same input the emitter's resolver used (the message's sender, not the
+        // viewer), so a name that resolved for emission resolves for the link.
+        string authorId = string.IsNullOrWhiteSpace(Model.AuthorId)
+            ? string.Empty
+            : Model.AuthorId;
+        var map = await MentionRenderer.BuildMapAsync(mentions, directory, Model.Body, authorId);
+        final = MentionRenderer.Render(escaped, map);
+    }
+    else
+    {
+        // Floor: no mention pass (seams absent) — the escaped plain body.
+        final = escaped;
+    }
+}
+@Html.Raw(final)

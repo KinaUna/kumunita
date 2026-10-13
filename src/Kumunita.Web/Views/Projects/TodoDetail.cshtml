@@ -1,5 +1,6 @@
 @model Kumunita.Web.Models.TodoDetailViewModel
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @using Kumunita.Core.Projects
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
@@ -740,7 +741,6 @@
                     .Where(c => c.ParentId is not null)
                     .GroupBy(c => c.ParentId!)
                     .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Created).ToList());
-                string CommentBodyHtml(string body) => Kumunita.Web.Security.MarkdownRenderer.RenderHtml(body);
             }
 
             @if (topLevel.Count == 0)
@@ -777,7 +777,7 @@
                                     </div>
                                     @if (c.DeletedAt is null)
                                     {
-                                        <div class="rc-body mt-1">@Html.Raw(CommentBodyHtml(c.Body))</div>
+                                        <div class="rc-body mt-1"><partial name="_MentionRenderer" model="new MentionBodyModel(c.Body, c.AuthorId)" /></div>
                                     }
                                 </div>
                             </div>
@@ -813,7 +813,7 @@
                                                 </div>
                                                 @if (r.DeletedAt is null)
                                                 {
-                                                    <div class="rc-body mt-1">@Html.Raw(CommentBodyHtml(r.Body))</div>
+                                                    <div class="rc-body mt-1"><partial name="_MentionRenderer" model="new MentionBodyModel(r.Body, r.AuthorId)" /></div>
                                                 }
                                             </div>
                                         </div>

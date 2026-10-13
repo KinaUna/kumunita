@@ -1,6 +1,7 @@
 @model Kumunita.Web.Models.AnnouncementDetailViewModel
 @using Kumunita.Core.Announcements
 @using Kumunita.Web.Security
+@using Kumunita.Web.Views.Shared
 @inject Kumunita.Core.Localization.ILocalizationService Localization
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
@@ -333,7 +334,7 @@
                         @* The full body (the /announcements list shows the
                            first 250 characters and links here). Rendered
                            through the one MarkdownRenderer (R·1). *@
-                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                        <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(Model.Body, Model.AuthorSubjectId)" /></div>
                     </div>
 
                     @* One variant per user-added translation — hidden by
@@ -349,7 +350,7 @@
                             {
                                 <h1 class="mb-1">@t.Title</h1>
                             }
-                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                            <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" /></div>
                         </div>
                     }
 

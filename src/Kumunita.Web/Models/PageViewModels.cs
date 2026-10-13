@@ -164,6 +164,14 @@ public sealed record PageShowViewModel(
     bool IsDraft,
     bool CanEdit,
     string? AuthorDisplayName,
+    /// <summary>
+    /// The page author's subject id (<see cref="Kumunita.Core.Pages.Page.AuthorId"/>)
+    /// — the mention render pass's self-exclusion input (M36-5 / ADR 0165 D2): the
+    /// author is never mentioned by their own name. A display convenience, not a
+    /// gate (the same "a read, not a decision" pin as <c>AuthorDisplayName</c>);
+    /// <c>null</c> when the author id is empty. *
+    /// </summary>
+    string? AuthorSubjectId,
     string? CommunityDisplayName,
     /// <summary>
     /// The ADR 0029 "add a translation" affordance flag (the display pin —
