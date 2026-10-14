@@ -2382,6 +2382,12 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
 
+            // ── M37 (ADR 0167) — the personal-note surface: the U04 _NoteButton
+            // references these two keys; the full 24-key pn.* block (the §kw-l
+            // list, locked in the design doc) is registered by U05.
+            ["pn.note.attach"]              = "Note",
+            ["pn.note.attached"]            = "Noted.",
+
             // ── M21 (ADR 0122) — document management: the /documents feed +
             // detail + upload form (D5 standing, D6 download, D7 Deny → 404).
             // U04 authors the COMPLETE 12-key closed set; U03's views consume.
@@ -5068,6 +5074,11 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
 
+            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
+            // the full 24-key pn.* block is registered by U05).
+            ["pn.note.attach"]              = "Notiz",
+            ["pn.note.attached"]            = "Notiert.",
+
             // ── M21 (ADR 0122) — Dokumentverwaltung: die /documents-Feed- +
             // Detail- + Upload-Oberfläche (D5 Standing, D6 Download, D7
             // Deny → 404). U04 erstellt das komplette 12-Schlüssel-Satz;
@@ -7648,6 +7659,11 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
 
+            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
+            // the full 24-key pn.* block is registered by U05).
+            ["pn.note.attach"]              = "Note",
+            ["pn.note.attached"]            = "Noté.",
+
             // ── M21 (ADR 0122) — gestion des documents : la liste /documents +
             // la page détail + le formulaire de dépôt (D5 standing, D6
             // téléchargement, D7 refus → 404). U04 crée le jeu fermé de 12
@@ -10212,6 +10228,11 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
+
+            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
+            // the full 24-key pn.* block is registered by U05).
+            ["pn.note.attach"]              = "Noter",
+            ["pn.note.attached"]            = "Noteret.",
 
             // ── M21 (ADR 0122) — dokumenthåndtering: /documents-feed +
             // detalje + upload-formular (D5 standing, D6 download, D7

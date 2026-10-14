@@ -33,6 +33,17 @@
             <p class="lede text-muted">@Model.Document.Summary</p>
         }
 
+        @* M37 (ADR 0167) — the note-attach affordance (D1 closed TargetKind set:
+           "document" — the M37 closed set's vocabulary; the M17 bookmark closed set
+           does not include "document", so there is no M17 sibling on this surface).
+           The partial resolves the F1 witness via the seam's HasNoteAsync — zero
+           audit, no target read (C-M37·2). The D3 write-lane visibility check runs
+           in the seam at POST (C-M37·3). The kw-l keys referenced (pn.note.attach /
+           pn.note.attached) are registered by U05 — U04 references them but does not
+           register them. *@
+        @{ var _pn = ("document", Model.Document.Id, $"/documents/{Model.Document.Id}"); }
+        <partial name="_NoteButton" model="@_pn" />
+
         @* ── Organization (the "documents organization" lane) ────────────────
            The tag chip row (the Posts/Detail.cshtml shape — a label, never a
            gate, C-TG·1): each badge links to the by-tag view (/tags/{slug}).

@@ -256,6 +256,18 @@
                                 <span class="d-inline-flex">
                                     <partial name="_BookmarkButton" model="@_bm" />
                                 </span>
+
+                                @* M37 (ADR 0167) — the note-attach affordance (D1 closed
+                                   TargetKind set: "post" — the same vocabulary as the M17
+                                   bookmark). The partial resolves the F1 witness (the
+                                   "noted" state) via the seam's HasNoteAsync — zero audit,
+                                   no target read (C-M37·2). The D3 write-lane visibility
+                                   check runs in the seam at POST (C-M37·3). The kw-l keys
+                                   referenced (pn.note.attach / pn.note.attached) are
+                                   registered by U05 — U04 references them but does not
+                                   register them. *@
+                                @{ var _pn = ("post", Model.Post.Id, $"/posts/{Model.Post.Id}"); }
+                                <partial name="_NoteButton" model="@_pn" />
                             </div>
                         </div>
 

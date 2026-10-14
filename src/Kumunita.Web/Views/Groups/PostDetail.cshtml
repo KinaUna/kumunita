@@ -67,6 +67,17 @@
                    top-right of the main card. *@
                 @{ var _bm = ("post", Model.Post.Id, $"/groups/{Model.GroupId}/posts/{Model.Post.Id}"); }
                 <partial name="_BookmarkButton" model="@_bm" />
+                @* M37 (ADR 0167) — the note-attach affordance (D1 closed TargetKind set:
+                   "grouppost" — the M37 closed set uses "grouppost", distinct from the
+                   M17 "post" vocabulary, for the note's own identity; the M17 bookmark
+                   uses "post" for both community + group posts). The partial resolves
+                   the F1 witness via the seam's HasNoteAsync — zero audit, no target
+                   read (C-M37·2). The D3 write-lane visibility check runs in the seam
+                   at POST (C-M37·3). The kw-l keys referenced (pn.note.attach /
+                   pn.note.attached) are registered by U05 — U04 references them but
+                   does not register them. *@
+                @{ var _pn = ("grouppost", Model.Post.Id, $"/groups/{Model.GroupId}/posts/{Model.Post.Id}"); }
+                <partial name="_NoteButton" model="@_pn" />
                 @* Author-only edit entry point (ADR 0016 — the edit lane is
                    author-only at the Web layer, so a non-author never sees
                    the button and there is no 404/403 surface to reach from
