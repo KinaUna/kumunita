@@ -310,6 +310,12 @@
                    decide it. Placed at the top-right of the main card. *@
                 @{ var _bm = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
                 <partial name="_BookmarkButton" model="@_bm" />
+                @* M37 (ADR 0167) — the personal-note button (the D1 closed TargetKind
+                   set now includes "announcement"). The button opens a Bootstrap
+                   modal where the user can add / edit / delete their note without
+                   leaving the page. *@
+                @{ var _pn = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
+                <partial name="_NoteButton" model="@_pn" />
                 @* TD (ADR 0027) — the authored-in language is the first,
                    default-visible variant; each added translation is a hidden
                    variant; the chip row is a selector that swaps them. The

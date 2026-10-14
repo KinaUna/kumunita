@@ -120,6 +120,16 @@ public interface IPersonalNoteService
     /// </summary>
     Task<bool> HasNoteAsync(string ownerId, string targetKind, string targetId);
 
+    /// <summary>
+    /// The owner's own note for a specific target — zero audit (C-M37·2).
+    /// Returns <c>null</c> when no note exists for this (owner, kind, id)
+    /// (a valid state, not an error — the Web layer maps null to 404 or
+    /// renders an empty modal). A non-owner gets <c>null</c> (no leak —
+    /// the ADR 0105 "operator has no read standing" precedent).
+    /// </summary>
+    Task<NoteRow?> GetNoteByTargetAsync(
+        string ownerId, string targetKind, string targetId);
+
     // ── Folder-tree methods (U03 — stubbed in U02, implemented in U03) ────
 
     /// <summary>

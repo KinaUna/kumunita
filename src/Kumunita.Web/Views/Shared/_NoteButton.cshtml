@@ -1,70 +1,88 @@
-@* M37 (ADR 0167) — the shared note-attach button (the per-target affordance on
-   the nine detail surfaces — the M37 `TargetKind` closed set). Two states,
-   resolved per target (F1 — "the button reflects 'noted' on reload"):
-   • **Not noted** (the default) — an "attach a note" button posting to
-     /notes/attach (the D3 write-lane visibility check + the F1 idempotency
-     run in the seam at POST — the sole writer, C-M37·1: the controller /
-     view never re-derives access).
-   • **Noted** — a "noted" indicator (a no-op; the button reflects the
-     F1 witness on reload — the `HasNoteAsync` query is the "noted"
-     state; the note row is keyed on the owner's own row, so a
-     dangling row still answers true — D7 / F4).
+@* M37 (ADR 0167) — the shared note button + modal (the per-target affordance
+   on the ten detail surfaces — the M37 TargetKind closed set including
+   "announcement"). The button opens a Bootstrap modal where the user can
+   add / edit / delete their note without leaving the page.
+   • **Not noted** — "Add note" button (opens the modal in create mode).
+   • **Noted** — "View note" button (opens the modal pre-filled with the
+     existing body; the delete button is visible).
    The state is resolved per target by the partial itself, via
    IPersonalNoteService.HasNoteAsync (the F1 witness, zero audit — the
    C-M37·2 shape: no AccessAudit row, no CanAsync pass, no target read;
-   the M17 `IsBookmarkedAsync` precedent). The partial is the sole place
-   the state is resolved — it makes exactly one such read and calls no
-   other service (the "no owner-list load to decide the button's label"
-   pin holds; the read is targeted, not the full list). An unsigned-in
-   visitor (no SubjectId) resolves "not noted" with no query (the
-   C-M37·2 "operator has no read standing" gate). Plain form POST (no JS)
-   for the write lane. The `data-target-kind` / `data-target-id`
-   attributes carry the target's identity (the D3 write-lane check
-   re-runs the target's own frozen `Read` decision — the same call the
-   detail page uses); the `data-has-note` attribute is the F1 witness
-   (the "noted" state on reload, resolved here by `HasNoteAsync`).
-   The `pn.note.attach` / `pn.note.attached` kw-l keys are **referenced**
-   but **not registered** — U05 owns the §kw-l key registration. *@
+   the M17 IsBookmarkedAsync precedent). The partial is the sole place
+   the state is resolved. An unsigned-in visitor (no SubjectId) sees
+   nothing (the C-M37·2 "operator has no read standing" gate — no query
+   is made).
+   The note-modal.ts client module handles the AJAX (fetch existing note,
+   create / update / delete) — the server is authoritative (C3). The
+   data-target-kind / data-target-id / data-has-note attributes carry the
+   target's identity + the initial state for the client module. *@
 @model (string TargetKind, string TargetId, string? ReturnUrl)
 @using Kumunita.Web.Security
 @inject Kumunita.Core.PersonalNotes.IPersonalNoteService Notes
 @{
     var ownerId = User is not null ? KumunitaPrincipal.SubjectId(User) : null;
-    var noted = ownerId is not null
-        && await Notes.HasNoteAsync(ownerId, Model.TargetKind, Model.TargetId);
+    bool noted = false;
+    if (ownerId is not null)
+        noted = await Notes.HasNoteAsync(ownerId, Model.TargetKind, Model.TargetId);
 }
-<div class="d-flex justify-content-end mb-3" data-note-button
-     data-target-kind="@Model.TargetKind"
-     data-target-id="@Model.TargetId"
-     data-has-note="@(noted ? "true" : "false")">
-    @if (noted)
-    {
-        @* Noted (the F1 witness — the button reflects "noted" on reload).
-           A static indicator, not a form: the note already exists for
-           this (owner, target), so there is nothing to POST. Removing the
-           note is the /notes list surface's job (U05 — the per-row
-           controls); the partial is the *attach* affordance only. *@
-        <span class="btn btn-sm btn-secondary" aria-pressed="true">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
-            <kw-l key="pn.note.attached">Noted</kw-l>
-        </span>
-    }
-    else
-    {
-        @* Not noted (the default) — the "attach a note" lane (the D3
-           write-lane visibility check + the F1 idempotency run in the
-           seam at POST). The returnUrl hidden input sends the controller
-           back to this surface (the redirect-back shape — the M17
-           BookmarksController precedent). *@
-        <form method="post" action="/notes/attach" style="margin:0;">
-            @Html.AntiForgeryToken()
-            <input type="hidden" name="targetKind" value="@Model.TargetKind" />
-            <input type="hidden" name="targetId" value="@Model.TargetId" />
-            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-            <button type="submit" class="btn btn-sm btn-outline-secondary">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
-                <kw-l key="pn.note.attach">Note</kw-l>
-            </button>
-        </form>
-    }
-</div>
+@if (ownerId is not null)
+{
+    <div class="d-flex justify-content-end mb-3" data-note-button
+         data-target-kind="@Model.TargetKind"
+         data-target-id="@Model.TargetId"
+         data-has-note="@(noted ? "true" : "false")">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#note-modal">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg>
+            @if (noted)
+            {
+                <kw-l key="pn.note.view">View note</kw-l>
+            }
+            else
+            {
+                <kw-l key="pn.note.add">Add note</kw-l>
+            }
+        </button>
+    </div>
+
+    @* The Bootstrap modal (the ADR 0071 / ADR 0115 modal shape — server-
+       rendered HTML, the client module note-modal.ts drives the AJAX).
+       One modal per page (each detail view renders exactly one _NoteButton).
+       The save / delete are NOT a <form> — the client module handles the
+       AJAX via fetch (CSP's script-src 'self' requires a module file; the
+       ADR 0031 tsc-only discipline). *@
+    <div class="modal fade" id="note-modal" tabindex="-1"
+         aria-labelledby="note-modal-label" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="note-modal-label">
+                        <kw-l key="pn.note.body_label">Your note</kw-l>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <textarea class="form-control" id="note-modal-textarea" rows="5"
+                              placeholder="…"></textarea>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <div>
+                        <button type="button" class="btn btn-danger" id="note-modal-delete"
+                                style="display:none;">
+                            <kw-l key="pn.note.delete">Delete</kw-l>
+                        </button>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <kw-l key="common.cancel">Cancel</kw-l>
+                        </button>
+                        <button type="button" class="btn btn-primary" id="note-modal-save">
+                            <kw-l key="common.save">Save</kw-l>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

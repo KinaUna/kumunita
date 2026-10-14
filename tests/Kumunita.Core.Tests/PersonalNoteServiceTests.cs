@@ -1,11 +1,14 @@
 using Kumunita.Core;
+using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
 using Kumunita.Core.PersonalNotes;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
 using Marten;
+using NSubstitute;
 using Xunit;
 
 namespace Kumunita.Core.Tests;
@@ -561,6 +564,81 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Contains(aFolders, f => f.Id == folderA.Id);
     }
 
+    // ── Announcement lane (ADR 0167 D1 extension, M17 obs-4 shape) ─────
+
+    [Fact]
+    public async Task F2_AttachAnnouncement_VisiblePublicTarget_Created()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-ann-owner";
+        const string annId = "ann-visible-public";
+
+        // ADR 0037 — IsDraft = false. Scope = Public, CommunityId = null
+        // → visible to every viewer regardless of roles (the GetAsync path
+        // the detail page uses).
+        await Plant(store, new Announcement
+        {
+            Id = annId,
+            AuthorId = "u-ann-author",
+            Title = "Visible public announcement",
+            Body = "body",
+            Scope = AnnouncementScope.Public,
+            CommunityId = null,
+            IsDraft = false,
+            LanguageCode = "en",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // D3 write-lane check passes: CreateNoteAsync returns the fresh row.
+        var row = await RunInSession(store, s => svc.CreateNoteAsync(
+            owner, "announcement", annId, "my note", s));
+        Assert.Equal(annId, row.TargetId);
+        Assert.Equal("/announcements/" + annId, row.Link);
+        Assert.False(row.Degraded);
+
+        // The owner's list resolves the row (title + link present, body intact).
+        var list = await svc.ListNotesAsync(owner);
+        var group = Assert.Single(list.Groups, g => g.Kind == "announcement");
+        var noteRow = Assert.Single(group.Items);
+        Assert.Equal(annId, noteRow.TargetId);
+        Assert.Equal("my note", noteRow.Body);
+    }
+
+    [Fact]
+    public async Task F2_AttachAnnouncement_Draft_NonAuthor_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-annb-owner";    // not the author
+        const string annId = "ann-draft";
+
+        // ADR 0037 — the draft announcement's author is NOT the owner. The
+        // detail page's own GetAsync returns null for a non-author, so the
+        // D3 write-lane check must refuse (KeyNotFoundException → 404).
+        await Plant(store, new Announcement
+        {
+            Id = annId,
+            AuthorId = "u-annb-author",
+            Title = "Draft announcement",
+            Body = "body",
+            Scope = AnnouncementScope.Public,
+            CommunityId = null,
+            IsDraft = true,
+            LanguageCode = "en",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        // D3: the target's own read returned null ⇒ Refused (404), no row.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => svc.CreateNoteAsync(
+                owner, "announcement", annId, "body", s)));
+
+        // No PersonalNote row survives.
+        var rows = await Notes(store, owner);
+        Assert.DoesNotContain(rows, n => n.TargetId == annId);
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()
@@ -588,7 +666,17 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         var authz = new AuthorizationService(store, userInfo);
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
-        var svc = new PersonalNoteService(userInfo, authz, store, events, projects);
+        // ADR 0167 D1 (extension) — the announcement lane (the M17
+        // BookmarkService shape, ADR 0118 D3/F2 obs-4): real
+        // AnnouncementService over the same store (PostDocTypes is
+        // already configured by BootStoreAsync); NSubstitute for the
+        // IIdentityService (the role set is empty for the test actors
+        // — GetBySubjectAsync returns null for the synthetic subject
+        // ids, so the announcement read degrades to the no-role path).
+        var announcements = new AnnouncementService(store, userInfo);
+        var identity = Substitute.For<IIdentityService>();
+        identity.GetBySubjectAsync(Arg.Any<string>()).Returns((ThinPrincipal?)null);
+        var svc = new PersonalNoteService(userInfo, authz, store, events, projects, announcements, identity);
         return (userInfo, authz, svc);
     }
 

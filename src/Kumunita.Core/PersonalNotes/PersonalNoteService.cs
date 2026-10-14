@@ -1,6 +1,8 @@
+using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Documents;
 using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -40,19 +42,21 @@ public sealed class PersonalNoteService : IPersonalNoteService
         new HashSet<string>(StringComparer.Ordinal)
         {
             "post", "grouppost", "event", "page", "project",
-            "todo", "board", "document", "directory",
+            "todo", "board", "document", "directory", "announcement",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
         ["post", "grouppost", "event", "page", "project",
-         "todo", "board", "document", "directory"];
+         "todo", "board", "document", "directory", "announcement"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
     private readonly IEventService _events;
     private readonly IProjectService _projects;
+    private readonly IAnnouncementService _announcements;
+    private readonly IIdentityService _identity;
 
     /// <summary>
     /// Composes the frozen seams over the host-registered Marten
@@ -69,13 +73,23 @@ public sealed class PersonalNoteService : IPersonalNoteService
         IAuthorizationService authz,
         IDocumentStore store,
         IEventService events,
-        IProjectService projects)
+        IProjectService projects,
+        IAnnouncementService announcements,
+        IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        // ADR 0167 D1 (extension) — the announcement lane's two seams, the
+        // M17 BookmarkService shape (ADR 0118 D3/F2 obs-4): the frozen
+        // IAnnouncementService (the detail page's own read) + the frozen
+        // IIdentityService (the owner's real standing — the roles never
+        // cross the IPersonalNoteService seam; the same composition
+        // category as the already-composed IUserInfoService).
+        _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
+        _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
 
     // ── CreateNoteAsync (D3 write-lane check; F1 idempotent) ──────────────
@@ -373,6 +387,39 @@ public sealed class PersonalNoteService : IPersonalNoteService
             .Where(n => n.OwnerId == ownerId && n.TargetKind == targetKind && n.TargetId == targetId)
             .AnyAsync()
             .ConfigureAwait(false);
+    }
+
+    // ── GetNoteByTargetAsync (C-M37·2 zero-audit personal read) ──────────
+
+    /// <inheritdoc />
+    public async Task<NoteRow?> GetNoteByTargetAsync(
+        string ownerId, string targetKind, string targetId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetKind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetId);
+
+        // C-M37·2 — a personal read over the owner's own row, by the
+        // identity predicate alone: no AccessAudit row, no CanAsync pass
+        // over the note rows (the ADR 0105 "operator has no read standing"
+        // precedent). A non-owner — a GlobalAdmin included — gets null
+        // (no leak that the note exists).
+        await using var q = _store.QuerySession();
+        var note = await q.Query<PersonalNote>()
+            .Where(n => n.OwnerId == ownerId
+                        && n.TargetKind == targetKind
+                        && n.TargetId == targetId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (note is null)
+            return null;
+
+        // D7 — resolve via the pure, non-auditing doc load (the same
+        // mechanism as the list read — C-M37·2). A dead / hidden target
+        // degrades to (null, null); the body remains visible (D4).
+        var (title, link) =
+            await ResolveForListAsync(note.TargetKind, note.TargetId, ownerId).ConfigureAwait(false);
+        return ToNoteRow(note, title, link);
     }
 
     // ── Folder-tree methods (U03 — the D6 implementations) ────────────────
@@ -739,6 +786,19 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 return (profile.DisplayName, $"/directory/{targetId}");
             }
 
+            case "announcement":
+            {
+                var a = await s.LoadAsync<Announcement>(targetId).ConfigureAwait(false);
+                if (a is null)
+                    return (null, null);
+                // ADR 0037 — the author-only draft gate (the M17 BookmarkService
+                // announcement shape, re-applied; a pure ordinal check — no
+                // CanAsync, no audit row).
+                if (a.IsDraft && !string.Equals(a.AuthorId, ownerId, StringComparison.Ordinal))
+                    return (null, null);
+                return (a.Title, $"/announcements/{targetId}");
+            }
+
             default:
                 return (null, null);
         }
@@ -901,6 +961,35 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 if (!decision.Allowed)
                     return (false, null, null);
                 return (true, profile.DisplayName, $"/directory/{targetId}");
+            }
+
+            case "announcement":
+            {
+                // The announcement lane has no AccessAudit / CanAsync of its
+                // own — its GetAsync is the whole visibility gate (the
+                // scope-vs-role split), returning null when not visible.
+                //
+                // ADR 0167 D1 (extension, the M17 BookmarkService shape, ADR
+                // 0118 D3/F2 obs-4): the write-lane check must re-run *the
+                // same read the detail page uses*, so the owner's real
+                // standing is in play. The PersonalNotes seam hands us only
+                // an owner id (roles never cross the frozen IPersonalNoteService
+                // seam), so we resolve the owner's thin-principal role set
+                // in-Core via the frozen IIdentityService (the same category
+                // of composition as the already-composed IUserInfoService)
+                // and hand that set to the announcement read. A GlobalAdmin /
+                // community-moderator who is not a member therefore resolves a
+                // community-targeted row — matching the detail page — instead
+                // of the old lapse of an empty role set denying them.
+                var principal = await _identity.GetBySubjectAsync(actorId).ConfigureAwait(false);
+                var roles = principal is not null
+                    ? new HashSet<string>(principal.Roles, StringComparer.Ordinal)
+                    : new HashSet<string>(StringComparer.Ordinal);
+                var a = await _announcements.GetAsync(targetId, actorId, roles)
+                    .ConfigureAwait(false);
+                if (a is null)
+                    return (false, null, null);
+                return (true, a.Title, $"/announcements/{targetId}");
             }
 
             default:

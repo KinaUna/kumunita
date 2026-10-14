@@ -515,7 +515,12 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<Events.IEventService>(),
-            sp.GetRequiredService<Projects.IProjectService>()));
+            sp.GetRequiredService<Projects.IProjectService>(),
+            // ADR 0167 D1 (extension) — the announcement lane (the M17
+            // BookmarkService shape, ADR 0118 D3/F2 obs-4 re-applied): the
+            // detail page's own read + the owner's real standing.
+            sp.GetRequiredService<Announcements.IAnnouncementService>(),
+            sp.GetRequiredService<IIdentityService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

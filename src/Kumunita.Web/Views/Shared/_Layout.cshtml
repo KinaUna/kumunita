@@ -66,6 +66,12 @@
         "tag.suggest.remove_prefix",
         "notif.fallback",
         "kiosk.slide_denied",
+        // M37 (ADR 0167) — the note-modal client strings (note-modal.ts).
+        "pn.note.body_label",
+        "pn.note.delete_confirm",
+        "pn.note.add",
+        "pn.note.view",
+        "pn.note.attached",
     };
     string clientStringsJson = "{}";
     if (Translation is not null)
@@ -650,6 +656,14 @@
          pages without #kiosk-stage, so loading it globally is safe (the
          expand-page.js idiom). No new npm package / build step (M35·7). -->
     <script type="module" src="~/js/lib/kiosk.js"></script>
+    <!-- M37 (ADR 0167) — the personal-note modal (client/lib/note-modal.ts,
+         tsc-built). Wires the _NoteButton partial's Bootstrap modal to the
+         JSON API endpoints (GET/POST/PUT/DELETE /notes/api/...): add /
+         edit / delete a note without leaving the page. Self-guards on pages
+         without the [data-note-button] anchor (every page except the ten
+         detail surfaces), so loading it globally is safe (the expand-page.js
+         idiom). -->
+    <script type="module" src="~/js/lib/note-modal.js"></script>
     <!-- M10 U03 (ADR 0107 D5/D10) — the PWA install affordance + the
          service-worker registration (client/lib/pwa-install.ts, tsc-built).
          Registers /sw.js (U02's passive SW) and reveals the #pwa-install

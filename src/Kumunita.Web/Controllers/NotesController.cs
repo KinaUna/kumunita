@@ -273,4 +273,142 @@ public sealed class NotesController(
         var has = await notes.HasNoteAsync(actorId, targetKind, targetId);
         return Ok(new { has });
     }
+
+    // ── JSON API endpoints (the note-modal AJAX surface) ────────────────
+    //
+    // These endpoints are used by the Bootstrap modal in _NoteButton.cshtml
+    // (the "add / edit / delete note without leaving the page" UX). They
+    // follow the same D2 personal-by-id + C-M37·2 zero-audit shape as the
+    // existing routes; the only difference is JSON response (200/404)
+    // instead of a redirect, so the modal can update its UI in-place.
+
+    /// <summary>
+    /// <c>GET /notes/api/{targetKind}/{targetId}</c> — the owner's note for
+    /// this target, returned as JSON. 404 when no note exists (the modal
+    /// opens in "create" mode) or when the caller has no read standing
+    /// (C-M37·2 non-leaky 404).
+    /// </summary>
+    [HttpGet("/notes/api/{targetKind}/{targetId}")]
+    public async Task<IActionResult> GetNoteForTarget(string targetKind, string targetId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        var note = await notes.GetNoteByTargetAsync(actorId, targetKind, targetId);
+        if (note is null)
+            return NotFound();
+
+        return Ok(new
+        {
+            note.Id,
+            note.Body,
+            note.Created,
+            note.Modified,
+            note.Tags,
+            note.Degraded,
+            note.Title,
+        });
+    }
+
+    /// <summary>
+    /// <c>POST /notes/api/attach</c> — create or update the note for this
+    /// target (F1 idempotent: the unique index guarantees one row per
+    /// (owner, kind, id)). JSON body: <c>{ targetKind, targetId, body }</c>.
+    /// 404 when the target is invisible (D3 write-lane check) or the caller
+    /// has no read standing.
+    /// </summary>
+    [HttpPost("/notes/api/attach")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApiAttach([FromBody] NoteAttachRequest req)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(req?.TargetKind) ||
+            string.IsNullOrWhiteSpace(req?.TargetId))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            var row = await notes.CreateNoteAsync(
+                actorId, req.TargetKind, req.TargetId, req.Body ?? string.Empty, session);
+            await session.SaveChangesAsync();
+            return Ok(new { row.Id, row.Body, row.Created, row.Modified, row.Tags });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>PUT /notes/api/{noteId}</c> — update the note's body (D4: the
+    /// body's new revision, the <c>Modified</c> timestamp is the witness).
+    /// JSON body: <c>{ body }</c>. 404 when the note does not exist or the
+    /// caller is not the owner (C-M37·2 non-leaky 404).
+    /// </summary>
+    [HttpPut("/notes/api/{noteId}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApiUpdate(string noteId, [FromBody] NoteUpdateRequest req)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            var row = await notes.UpdateNoteBodyAsync(
+                actorId, noteId, req?.Body ?? string.Empty, session);
+            await session.SaveChangesAsync();
+            return Ok(new { row.Id, row.Body, row.Created, row.Modified, row.Tags });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>DELETE /notes/api/{noteId}</c> — remove the note by id. 404 when
+    /// the note does not exist or the caller is not the owner (C-M37·2
+    /// non-leaky 404; D7/F4 — a dangling note is still removable).
+    /// </summary>
+    [HttpDelete("/notes/api/{noteId}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApiDelete(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        var status = await notes.DeleteNoteAsync(actorId, noteId, session);
+        if (status == NoteDeleteStatus.NotNoted)
+            return NotFound();
+
+        await session.SaveChangesAsync();
+        return Ok(new { deleted = true });
+    }
+}
+
+/// <summary>
+/// The JSON request body for <c>POST /notes/api/attach</c>.
+/// </summary>
+public sealed class NoteAttachRequest
+{
+    public string TargetKind { get; init; } = string.Empty;
+    public string TargetId { get; init; } = string.Empty;
+    public string? Body { get; init; }
+}
+
+/// <summary>
+/// The JSON request body for <c>PUT /notes/api/{noteId}</c>.
+/// </summary>
+public sealed class NoteUpdateRequest
+{
+    public string? Body { get; init; }
 }
