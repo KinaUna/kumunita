@@ -216,6 +216,22 @@ var marten = builder.Services.AddMarten(opts =>
     // boot both pick the surface up automatically.
     BookmarkDocTypes.Configure(opts);
 
+    // M37 (ADR 0167 D1, plan U01): the PersonalNotes bounded context's two
+    // documents (PersonalNote + NoteFolder, ADR 0004 §B.1 — the
+    // (OwnerId, TargetKind, TargetId) unique business-key index on
+    // PersonalNote (the D3/F1 idempotency witness, the M17 Bookmark shape,
+    // the M9 convo_uidx_pair shape), the (OwnerId, Created) list-ordering
+    // index + the (OwnerId, FolderId) folder-tree list index on
+    // PersonalNote, and the (OwnerId, ParentId, Name) unique index + the
+    // (OwnerId, ParentId) folder-tree list index on NoteFolder (the D6
+    // witness)). Without this call the PersonalNote / NoteFolder docs are
+    // invisible to Marten (the M3/Media/Page/Tag/M4/M5/M6/M9/M16/M17
+    // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and
+    // the SchemaBootstrap versioned boot both pick the surface up
+    // automatically (SchemaBootstrap.cs does not call any *DocTypes
+    // surface — the Program.cs registration is the only boot wiring).
+    PersonalNotesDocTypes.Configure(opts);
+
     // M13 (ADR 0114 D1, plan U02): the Usage bounded context's document
     // (UsageEvent, ADR 0004 §B.1 — a parallel surface to PostDocTypes /
     // MediaDocTypes / …, not additive on an existing one: UsageEvent uses

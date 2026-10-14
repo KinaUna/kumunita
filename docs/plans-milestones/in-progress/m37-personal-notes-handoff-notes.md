@@ -41,7 +41,13 @@ verbatim into the design doc by U00.
 - **ADR 0167 row** — `docs/adr/README.md` index ends at 0166 (line 177); **0167 confirmed free** and appended after 0166 with `Status: Accepted`. ADR 0167 authored at `docs/adr/0167-personal-notes.md`; design doc at `docs/design/m37-personal-notes-design.md` (§2.1–§2.7 locked verbatim). **Drift: none.**
 
 ## U01 — `PersonalNote` + `NoteFolder` + `PersonalNotesDocTypes` + boot wiring
-_U01 appends this section when it completes._
+
+- **(a)** `PersonalNote` field set: `Id`, `OwnerId`, `TargetKind` (string, closed 9-kind set), `TargetId`, `Body`, `FolderId?`, `Tags?` (`IReadOnlyList<string>?`), `Created`, `Modified?` — **confirmed: no `Audience` / `IsDeleted` / `ComponentId` / `LanguageCode`**.
+- **(b)** `NoteFolder` field set: `Id`, `OwnerId`, `ParentId?`, `Name`, `Created` — **confirmed: no `Audience` / `IsDeleted` / `ComponentId` / `LanguageCode`**.
+- **(c)** Four indexes on `PersonalNotesDocTypes`: unique `pn_uidx_owner_target` on `(OwnerId, TargetKind, TargetId)` (D3/F1 witness); non-unique `(OwnerId, Created)` list-ordering; non-unique `(OwnerId, FolderId)` folder-tree list; unique `nf_uidx_owner_parent_name` on `(OwnerId, ParentId, Name)` (D6 witness); non-unique `(OwnerId, ParentId)` folder-tree list.
+- **(d)** Boot wiring: `PersonalNotesDocTypes.Configure(opts);` added at `Program.cs` line 233 (immediately after `BookmarkDocTypes.Configure`). **`SchemaBootstrap.cs` was NOT touched** — it does not call any `*DocTypes.Configure` (it calls `store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync()` only); mirroring M17 exactly.
+- **(e)** Two pinned test names: `PersonalNotesDocTypes_RegistersPersonalNoteWithUniqueOwnerTargetIndex` + `PersonalNotesDocTypes_RegistersNoteFolderWithUniqueOwnerParentNameIndex` (doc-registration shape pins, outside §2.5 seam list — the M17/U01 precedent, recorded here).
+- **(f)** POCO compile warnings: **none** (build: 0 warnings, 0 errors). One initial compile error (`.Index` with named first arg + `new {}` lambda) fixed to match the codebase's unnamed `.Index(n => new { ... })` idiom.
 
 ## U02 — `IPersonalNoteService` note CRUD + tag normalization + D3 write-lane check + D7 degraded resolution + DI + pinned Core tests
 _U02 appends this section when it completes._
