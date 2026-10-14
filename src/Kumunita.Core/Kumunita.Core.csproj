@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.18.1" />
-    <PackageReference Include="Marten" Version="9.50.1" />
+    <PackageReference Include="Marten" Version="9.50.2" />
     <!-- Raw parameterised SQL on the hand-rolled mt."AdminOverride" table
          (ConsumeBreakGlassAsync, the break-glass consume write). Matches the Npgsql
          10.0.x the rest of the tree (Web, Core.Tests) already pins; makes the
@@ -54,7 +54,7 @@
           Kumunita.Web.csproj (R4 — do not let a transitive bump drift one
           of them; WolverineFx.Marten 6.33 pulls WolverineFx >= 6.33 so the
           two stay locked together as they already are in Web). -->
-    <PackageReference Include="WolverineFx" Version="6.50.0" />
+    <PackageReference Include="WolverineFx" Version="6.50.2" />
     <!-- EF Core design-time: lets `dotnet ef migrations add ...` discover AppDbContext
           without booting the Web host (the DesignTimeDbContextFactory seam). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">

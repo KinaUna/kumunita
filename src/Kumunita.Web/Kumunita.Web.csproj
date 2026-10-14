@@ -21,13 +21,13 @@
          WolverineFx 6.33.0 directly for the transactional-outbox `IMessageContext`
          enqueue. Both projects pin the same version (R4: no skew). See
          docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md. -->
-    <PackageReference Include="WolverineFx" Version="6.50.0" />
-    <PackageReference Include="WolverineFx.Marten" Version="6.50.0" />
+    <PackageReference Include="WolverineFx" Version="6.50.2" />
+    <PackageReference Include="WolverineFx.Marten" Version="6.50.2" />
     <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)
          in the core package. This reference auto-registers it so TypeLoadMode.Dynamic
          handlers (OutboxEmail, Fault<>, AuditPurge) compile at startup — see
          wolverinefx.net/guide/codegen.html. -->
-    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.50.0" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.50.2" />
   </ItemGroup>
 
   <ItemGroup>
