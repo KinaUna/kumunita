@@ -233,6 +233,200 @@ public sealed class NotesControllerTests
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
+    // ── Per-row + folder write-lane pins (the /notes list's controls) ─────
+    //
+    // These pin the C-M37·2 non-leaky-404 split (a non-owner, a GlobalAdmin
+    // included, gets a 404 and the seam is **not** called — the ADR 0105
+    // "operator has no read standing" precedent) + the C3 commit-on-success
+    // shape (the controller commits; the seam never does) for the per-row
+    // note controls (edit / move / delete) + the folder-tree controls (new /
+    // delete) that the /notes list view links to. The seam's read / write
+    // decisions are the seam's; this layer pins the controller's mapping +
+    // the non-leaky-404 split + the commit-on-success.
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/edit</c> (the D4 body-revision lane): the
+    /// owner saves a new body → the controller returns a
+    /// <see cref="RedirectResult"/> (back to <c>/notes</c>), calls the
+    /// seam's <see cref="IPersonalNoteService.UpdateNoteBodyAsync"/> with
+    /// the actor's <c>SubjectId</c> as the <c>ownerId</c>, and commits
+    /// (the C3 same-transaction lane — <c>SaveChangesAsync</c> is the
+    /// witness the commit runs on the success path).
+    /// </summary>
+    [Fact]
+    public async Task NotesController_NoteEditSave_Owner_Redirect_CommitsBodyRevision()
+    {
+        const string actor = "subj-pn-owner";
+        const string noteId = "n-owner-note";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var store = Substitute.For<IDocumentStore>();
+        var session = Substitute.For<IDocumentSession>();
+        store.LightweightSession().Returns(session);
+
+        var controller = Build(notes, store, subjectId: actor);
+        var result = await controller.NoteEditSave(noteId, "my new body");
+
+        // C3 — the redirect-after-write (back to /notes) + the commit.
+        Assert.IsType<RedirectResult>(result);
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await notes.Received(1).UpdateNoteBodyAsync(
+            actor, noteId, "my new body", Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/edit</c> (the C-M37·2 non-leaky-404 split):
+    /// a caller with no read standing (no <c>SubjectId</c> — a
+    /// <c>GlobalAdmin</c> included) gets a non-leaky
+    /// <see cref="NotFoundResult"/>, and the controller does **not** call
+    /// the seam's <see cref="IPersonalNoteService.UpdateNoteBodyAsync"/>
+    /// (the "operator has no read standing" precedent — the controller
+    /// returns the 404 before delegating any write to the seam).
+    /// </summary>
+    [Fact]
+    public async Task NotesController_NoteEditSave_NonOwner_404_NoWrite()
+    {
+        const string noteId = "n-someone-elses-note";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var controller = Build(notes, subjectId: null);
+        var result = await controller.NoteEditSave(noteId, "my new body");
+
+        Assert.IsType<NotFoundResult>(result);
+        await notes.DidNotReceive().UpdateNoteBodyAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/delete</c> (the D7 / F4 lane — a dangling
+    /// note is still removable): the owner deletes → the controller returns
+    /// a <see cref="RedirectResult"/>, calls the seam's
+    /// <see cref="IPersonalNoteService.DeleteNoteAsync"/> with the actor's
+    /// <c>SubjectId</c> as the <c>ownerId</c>, and commits.
+    /// </summary>
+    [Fact]
+    public async Task NotesController_NoteDelete_Owner_Redirect_Commits()
+    {
+        const string actor = "subj-pn-owner";
+        const string noteId = "n-owner-note";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var store = Substitute.For<IDocumentStore>();
+        var session = Substitute.For<IDocumentSession>();
+        store.LightweightSession().Returns(session);
+
+        var controller = Build(notes, store, subjectId: actor);
+        var result = await controller.NoteDelete(noteId);
+
+        // C3 — the redirect-after-write + the commit. DeleteNoteAsync
+        // returns the default enum value (Deleted) under NSubstitute's
+        // auto-substitution, so the success branch (commit + redirect) runs.
+        Assert.IsType<RedirectResult>(result);
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await notes.Received(1).DeleteNoteAsync(
+            actor, noteId, Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/delete</c> (the C-M37·2 non-leaky-404 split):
+    /// a caller with no read standing (no <c>SubjectId</c> — a
+    /// <c>GlobalAdmin</c> included) gets a non-leaky
+    /// <see cref="NotFoundResult"/>, and the controller does **not** call
+    /// the seam's <see cref="IPersonalNoteService.DeleteNoteAsync"/>.
+    /// </summary>
+    [Fact]
+    public async Task NotesController_NoteDelete_NonOwner_404_NoWrite()
+    {
+        const string noteId = "n-someone-elses-note";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var controller = Build(notes, subjectId: null);
+        var result = await controller.NoteDelete(noteId);
+
+        Assert.IsType<NotFoundResult>(result);
+        await notes.DidNotReceive().DeleteNoteAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/move</c> (the D6 folder-tree lane): the owner
+    /// moves the note into a folder → the controller returns a
+    /// <see cref="RedirectResult"/>, calls the seam's
+    /// <see cref="IPersonalNoteService.MoveNoteToFolderAsync"/> with the
+    /// actor's <c>SubjectId</c> as the <c>ownerId</c>, and commits.
+    /// </summary>
+    [Fact]
+    public async Task NotesController_NoteMoveSave_Owner_Redirect_Commits()
+    {
+        const string actor = "subj-pn-owner";
+        const string noteId = "n-owner-note";
+        const string folderId = "f-owner-folder";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var store = Substitute.For<IDocumentStore>();
+        var session = Substitute.For<IDocumentSession>();
+        store.LightweightSession().Returns(session);
+
+        var controller = Build(notes, store, subjectId: actor);
+        var result = await controller.NoteMoveSave(noteId, folderId);
+
+        Assert.IsType<RedirectResult>(result);
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await notes.Received(1).MoveNoteToFolderAsync(
+            actor, noteId, folderId, Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/folders/new</c> (the D6 folder-create lane): the owner
+    /// creates a folder → the controller returns a
+    /// <see cref="RedirectResult"/>, calls the seam's
+    /// <see cref="IPersonalNoteService.CreateFolderAsync"/> with the actor's
+    /// <c>SubjectId</c> as the <c>ownerId</c> + a null <c>parentId</c> (the
+    /// new folder is created at the root — the D6 depth ≤ 2 pin), and commits.
+    /// </summary>
+    [Fact]
+    public async Task NotesController_FolderNewSave_Owner_Redirect_Commits()
+    {
+        const string actor = "subj-pn-owner";
+        const string name = "My folder";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var store = Substitute.For<IDocumentStore>();
+        var session = Substitute.For<IDocumentSession>();
+        store.LightweightSession().Returns(session);
+
+        var controller = Build(notes, store, subjectId: actor);
+        var result = await controller.FolderNewSave(name);
+
+        Assert.IsType<RedirectResult>(result);
+        await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await notes.Received(1).CreateFolderAsync(
+            actor, name, null, Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /notes/folders/{folderId}/delete</c> (the C-M37·2 non-leaky-
+    /// 404 split + the D6 lane — a folder's deletion moves its notes to the
+    /// root, the note bodies are never lost): a caller with no read standing
+    /// (no <c>SubjectId</c> — a <c>GlobalAdmin</c> included) gets a non-leaky
+    /// <see cref="NotFoundResult"/>, and the controller does **not** call the
+    /// seam's <see cref="IPersonalNoteService.DeleteFolderAsync"/>.
+    /// </summary>
+    [Fact]
+    public async Task NotesController_FolderDelete_NonOwner_404_NoWrite()
+    {
+        const string folderId = "f-someone-elses-folder";
+
+        var notes = Substitute.For<IPersonalNoteService>();
+        var controller = Build(notes, subjectId: null);
+        var result = await controller.FolderDelete(folderId);
+
+        Assert.IsType<NotFoundResult>(result);
+        await notes.DidNotReceive().DeleteFolderAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
     // ── Harness ──────────────────────────────────────────────────────────
 
     /// <summary>

@@ -1,0 +1,71 @@
+@model Kumunita.Web.Controllers.NoteMoveForm
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Move note";
+
+    // Build the flat folder list (root first, then children — the D6 depth
+    // ≤ 2 pin). The depth is rendered as a visual indent (the M17 shape).
+    var roots = Model.Folders.Where(f => f.ParentId is null)
+                             .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+    var children = Model.Folders.Where(f => f.ParentId is not null)
+                                .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+}
+@* M37 (ADR 0167 D6) — the note move form (the folder tree is a personal
+   tree, bounded in depth ≤ 2: root → child → grandchild). The owner's own
+   note (C-M37·2 — a personal read: zero AccessAudit rows). A non-owner
+   (a GlobalAdmin included) gets a non-leaky 404 (the controller's gate).
+   The note's current FolderId pre-selects the active folder (the D6
+   "the note's FolderId is the owner's folder id" pin). A "No folder"
+   option (value="") moves the note back to the root (FolderId = null —
+   the D6 "a folder's deletion moves its notes to the root" shape,
+   re-applied to an explicit move-out). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="pn.note.move">Move</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        <form method="post" action="@($"/notes/@Model.Note.Id/move")">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="note-folder">
+                    <kw-l key="pn.note.move">Move</kw-l>
+                </label>
+                @* The "no folder" (root) option (D6 — a note's FolderId of
+                   null is the root of the owner's tree). Plain text: the
+                   pn.* closed set is pinned at 29 keys (the §kw-l parity
+                   pin) and has no dedicated "unfiled" key, so this label
+                   is intentionally not a kw-l key. The folder names are
+                   user-supplied and are Html.Encode'd to prevent injection
+                   (the _GrantPickers.cshtml precedent). *@
+                <select class="form-select" id="note-folder" name="folderId">
+                    @Html.Raw($"<option value=\"\"{(Model.Note.FolderId is null ? " selected" : string.Empty)}>&mdash; (no folder) &mdash;</option>")
+                    @foreach (var root in roots)
+                    {
+                        @Html.Raw($"<option value=\"{Html.Encode(root.Id)}\"{(Model.Note.FolderId == root.Id ? " selected" : string.Empty)}>{Html.Encode(root.Name)}</option>")
+                    }
+                    @if (children.Count > 0)
+                    {
+                        @foreach (var child in children)
+                        {
+                            @Html.Raw($"<option value=\"{Html.Encode(child.Id)}\"{(Model.Note.FolderId == child.Id ? " selected" : string.Empty)}>&#160;&#160;&#8627;&#8627; {Html.Encode(child.Name)}</option>")
+                        }
+                    }
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <kw-l key="common.save">Save</kw-l>
+                </button>
+                <a class="btn btn-secondary" href="/notes">
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

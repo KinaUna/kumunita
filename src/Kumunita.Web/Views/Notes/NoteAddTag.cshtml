@@ -1,0 +1,53 @@
+@model Kumunita.Core.PersonalNotes.NoteRow
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Add tag";
+}
+@* M37 (ADR 0167 D5) — the add-tag form (tags are author-set, free-form,
+   per-note; the tag set is normalized on write — lowercase, trimmed,
+   deduped, sorted — the M26 Tag doc's Name normalization shape, the
+   idempotency witness). A tag is NOT a platform-wide Tag doc (the M26
+   tag lane is a shared vocabulary; M37's tags are personal labels —
+   different shapes, different surfaces, different invariants). The
+   owner's own note (C-M37·2 — a personal read). A non-owner (a GlobalAdmin
+   included) gets a non-leaky 404 (the controller's gate). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="pn.note.tag.add">Add tag</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        @if (Model.Tags.Count > 0)
+        {
+            <div class="mb-3 d-flex flex-wrap gap-1">
+                @foreach (var tag in Model.Tags)
+                {
+                    <span class="badge bg-secondary">@tag</span>
+                }
+            </div>
+        }
+        <form method="post" action="@($"/notes/@Model.Id/tags")">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="note-tag">
+                    <kw-l key="pn.note.tag.add">Add tag</kw-l>
+                </label>
+                <input class="form-control" id="note-tag" name="tag" type="text"
+                       maxlength="80" placeholder="…" />
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <kw-l key="common.add">Add</kw-l>
+                </button>
+                <a class="btn btn-secondary" href="/notes">
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

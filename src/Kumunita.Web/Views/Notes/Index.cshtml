@@ -140,7 +140,10 @@
                                        not U05 POST actions). *@
                                     <span class="pn-folder-controls d-inline-flex gap-1">
                                         <a class="btn btn-sm btn-outline-secondary" href="/notes/folders/@folder.Id/rename"><kw-l key="pn.folder.rename">Rename</kw-l></a>
-                                        <a class="btn btn-sm btn-outline-secondary" href="/notes/folders/@folder.Id/delete"><kw-l key="pn.folder.delete">Delete</kw-l></a>
+                                        <form method="post" action="@($"/notes/folders/@folder.Id/delete")" style="margin:0;" onsubmit="return confirm('Delete this folder? Its notes will be moved to the unfiled area.');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="pn.folder.delete">Delete</kw-l></button>
+                                    </form>
                                     </span>
                                 </h3>
                             }
@@ -233,7 +236,10 @@
                                                     <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/move"><kw-l key="pn.note.move">Move</kw-l></a>
                                                     <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/tags"><kw-l key="pn.note.tag.add">Add tag</kw-l></a>
                                                     <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/tags/remove"><kw-l key="pn.note.tag.remove">Remove tag</kw-l></a>
-                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/delete"><kw-l key="pn.note.delete">Delete</kw-l></a>
+                                                    <form method="post" action="@($"/notes/@row.Id/delete")" style="margin:0;" onsubmit="return confirm('Delete this note? This cannot be undone.');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="pn.note.delete">Delete</kw-l></button>
+                                </form>
                                                 </div>
                                             </li>
                                         }

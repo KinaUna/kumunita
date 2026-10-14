@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Security.Claims;
 using Kumunita.Core.Localization;
 using Kumunita.Core.PersonalNotes;
@@ -393,6 +394,357 @@ public sealed class NotesController(
         await session.SaveChangesAsync();
         return Ok(new { deleted = true });
     }
+
+    // ── Per-row note controls (the /notes list's edit / move / tag / delete) ──
+    //
+    // These actions implement the per-row controls rendered in
+    // Views/Notes/Index.cshtml (edit / move / add-tag / remove-tag / delete).
+    // Each follows the same C-M37·2 non-leaky-404 + zero-audit shape as the
+    // existing routes: the controller never re-derives access, the frozen
+    // IPersonalNoteService seam is the sole reader/writer, and a non-owner
+    // (a GlobalAdmin included) gets a non-leaky 404 (the ADR 0105 "operator
+    // has no read standing" precedent). The controller commits in its own
+    // fresh IDocumentSession (the C3 same-transaction lane —
+    // PersonalNoteService never commits internally; the caller owns the
+    // single write).
+
+    /// <summary>
+    /// <c>GET /notes/{noteId}/edit</c> — the note body edit form (D4: the
+    /// body's new revision, the <c>Modified</c> timestamp is the witness).
+    /// 404 when the note does not exist or the caller is not the owner
+    /// (C-M37·2 non-leaky 404).
+    /// </summary>
+    [HttpGet("/notes/{noteId}/edit")]
+    public async Task<IActionResult> NoteEdit(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var note = await notes.GetNoteAsync(actorId, noteId);
+            return View(note);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/edit</c> — save the note body (D4).
+    /// 404 when the note does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpPost("/notes/{noteId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NoteEditSave(string noteId, string? body)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.UpdateNoteBodyAsync(actorId, noteId, body ?? string.Empty, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /notes/{noteId}/move</c> — the note move form (D6: the
+    /// folder tree is a personal tree, bounded in depth). 404 when the
+    /// note does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpGet("/notes/{noteId}/move")]
+    public async Task<IActionResult> NoteMove(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var note = await notes.GetNoteAsync(actorId, noteId);
+            var list = await notes.ListNotesAsync(actorId);
+            return View(new NoteMoveForm(note, list.Folders));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/move</c> — move the note to (or from) a
+    /// folder (D6). 404 when the note or folder does not exist or the
+    /// caller is not the owner.
+    /// </summary>
+    [HttpPost("/notes/{noteId}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NoteMoveSave(string noteId, string? folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.MoveNoteToFolderAsync(actorId, noteId, folderId, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /notes/{noteId}/tags</c> — the add-tag form (D5: tags are
+    /// author-set, free-form, per-note; normalized on write). 404 when the
+    /// note does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpGet("/notes/{noteId}/tags")]
+    public async Task<IActionResult> NoteAddTag(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var note = await notes.GetNoteAsync(actorId, noteId);
+            return View(note);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/tags</c> — add a tag to the note (D5).
+    /// 404 when the note does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpPost("/notes/{noteId}/tags")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NoteAddTagSave(string noteId, string? tag)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(tag))
+            return Redirect($"/notes/{noteId}/tags");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.AddTagAsync(actorId, noteId, tag, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /notes/{noteId}/tags/remove</c> — the remove-tag form (D5).
+    /// 404 when the note does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpGet("/notes/{noteId}/tags/remove")]
+    public async Task<IActionResult> NoteRemoveTag(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var note = await notes.GetNoteAsync(actorId, noteId);
+            return View(note);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/tags/remove</c> — remove a tag from the
+    /// note (D5). 404 when the note does not exist or the caller is not
+    /// the owner.
+    /// </summary>
+    [HttpPost("/notes/{noteId}/tags/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NoteRemoveTagSave(string noteId, string? tag)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(tag))
+            return Redirect($"/notes/{noteId}/tags/remove");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.RemoveTagAsync(actorId, noteId, tag, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/{noteId}/delete</c> — delete the note (D7 / F4: a
+    /// dangling note is still removable). 404 when the note does not exist
+    /// or the caller is not the owner.
+    /// </summary>
+    [HttpPost("/notes/{noteId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> NoteDelete(string noteId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        var status = await notes.DeleteNoteAsync(actorId, noteId, session);
+        if (status == NoteDeleteStatus.NotNoted)
+            return NotFound();
+        await session.SaveChangesAsync();
+        TempData["info"] = await T("common.done");
+        return Redirect("/notes");
+    }
+
+    // ── Folder-tree controls (the /notes list's new / rename / delete) ──
+
+    /// <summary>
+    /// <c>GET /notes/folders/new</c> — the new-folder form (D6: the folder
+    /// tree is a personal tree, bounded in depth ≤ 2). 404 when the caller
+    /// has no read standing.
+    /// </summary>
+    [HttpGet("/notes/folders/new")]
+    public IActionResult FolderNew()
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        return View();
+    }
+
+    /// <summary>
+    /// <c>POST /notes/folders/new</c> — create a folder (D6). 404 when the
+    /// caller has no read standing. Redirects back to the form when the
+    /// name is empty.
+    /// </summary>
+    [HttpPost("/notes/folders/new")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderNewSave(string? name)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(name))
+            return Redirect("/notes/folders/new");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.CreateFolderAsync(actorId, name.Trim(), null, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // D6 depth violation or name conflict — 400.
+            return BadRequest();
+        }
+    }
+
+    /// <summary>
+    /// <c>GET /notes/folders/{folderId}/rename</c> — the rename-folder form
+    /// (D6). 404 when the folder does not exist or the caller is not the
+    /// owner.
+    /// </summary>
+    [HttpGet("/notes/folders/{folderId}/rename")]
+    public async Task<IActionResult> FolderRename(string folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        try
+        {
+            var list = await notes.ListNotesAsync(actorId);
+            var folder = list.Folders.FirstOrDefault(f => f.Id == folderId);
+            if (folder is null) return NotFound();
+            return View(folder);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/folders/{folderId}/rename</c> — rename a folder (D6).
+    /// 404 when the folder does not exist or the caller is not the owner.
+    /// </summary>
+    [HttpPost("/notes/folders/{folderId}/rename")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderRenameSave(string folderId, string? name)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        if (string.IsNullOrWhiteSpace(name))
+            return Redirect($"/notes/folders/{folderId}/rename");
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.RenameFolderAsync(actorId, folderId, name.Trim(), session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            // D6 name conflict — 400.
+            return BadRequest();
+        }
+    }
+
+    /// <summary>
+    /// <c>POST /notes/folders/{folderId}/delete</c> — delete a folder
+    /// (D6: the folder's notes are moved to the root; the note bodies are
+    /// never lost). 404 when the folder does not exist or the caller is
+    /// not the owner.
+    /// </summary>
+    [HttpPost("/notes/folders/{folderId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> FolderDelete(string folderId)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId)) return NotFound();
+        await using var session = store.LightweightSession();
+        try
+        {
+            await notes.DeleteFolderAsync(actorId, folderId, session);
+            await session.SaveChangesAsync();
+            TempData["info"] = await T("common.done");
+            return Redirect("/notes");
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
 }
 
 /// <summary>
@@ -412,3 +764,10 @@ public sealed class NoteUpdateRequest
 {
     public string? Body { get; init; }
 }
+
+/// <summary>
+/// The form model for <c>GET /notes/{noteId}/move</c> (the folder picker):
+/// the note (for the current-folder pre-select + the 404 witness) + the
+/// owner's folder tree (the D6 personal tree, bounded in depth ≤ 2).
+/// </summary>
+public sealed record NoteMoveForm(NoteRow Note, IReadOnlyList<FolderRow> Folders);

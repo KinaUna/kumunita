@@ -1,0 +1,42 @@
+@model Kumunita.Core.PersonalNotes.NoteRow
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Edit note";
+}
+@* M37 (ADR 0167 D4) — the note body edit form (the D4 body-revision shape:
+   the body is never mutated in place; edit is a new revision, the Modified
+   timestamp is the witness — the M14 / M16 author-only edit-lane shape).
+   The owner's own note (C-M37·2 — a personal read: zero AccessAudit rows,
+   zero CanSeeAsync passes). A non-owner (a GlobalAdmin included) gets a
+   non-leaky 404 (the controller's gate — the SubjectId check). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="pn.note.edit">Edit</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        <form method="post" action="@($"/notes/@Model.Id/edit")">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="note-body">
+                    <kw-l key="pn.note.body_label">Your note</kw-l>
+                </label>
+                <textarea class="form-control" id="note-body" name="body" rows="8"
+                          placeholder="…">@Model.Body</textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <kw-l key="common.save">Save</kw-l>
+                </button>
+                <a class="btn btn-secondary" href="/notes">
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
