@@ -2382,11 +2382,36 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
 
-            // ── M37 (ADR 0167) — the personal-note surface: the U04 _NoteButton
-            // references these two keys; the full 24-key pn.* block (the §kw-l
-            // list, locked in the design doc) is registered by U05.
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface, no admin toggle). The full 24-key pn.* block — the
+            // §kw-l closed list (locked in the design doc, U00's source of
+            // truth). U04 registered pn.note.attach + pn.note.attached for the
+            // _NoteButton; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notes",
+            ["pn.list.title"]               = "Your notes",
+            ["pn.list.empty"]               = "No notes yet.",
+            ["pn.list.degraded"]            = "No longer available",
+            ["pn.list.kind.post"]           = "Posts",
+            ["pn.list.kind.grouppost"]      = "Group posts",
+            ["pn.list.kind.event"]          = "Events",
+            ["pn.list.kind.page"]           = "Pages",
+            ["pn.list.kind.project"]        = "Projects",
+            ["pn.list.kind.todo"]           = "To-dos",
+            ["pn.list.kind.board"]          = "Boards",
+            ["pn.list.kind.document"]       = "Documents",
+            ["pn.list.kind.directory"]      = "People",
+            ["pn.note.edit"]                = "Edit",
+            ["pn.note.delete"]              = "Delete",
+            ["pn.note.move"]                = "Move",
+            ["pn.note.tag.add"]             = "Add tag",
+            ["pn.note.tag.remove"]          = "Remove tag",
             ["pn.note.attach"]              = "Note",
             ["pn.note.attached"]            = "Noted.",
+            ["pn.folder.new"]               = "New folder",
+            ["pn.folder.rename"]            = "Rename folder",
+            ["pn.folder.delete"]            = "Delete folder",
+            ["pn.folder.empty"]             = "No notes in this folder yet.",
 
             // ── M21 (ADR 0122) — document management: the /documents feed +
             // detail + upload form (D5 standing, D6 download, D7 Deny → 404).
@@ -5074,10 +5099,35 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
 
-            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
-            // the full 24-key pn.* block is registered by U05).
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notizen",
+            ["pn.list.title"]               = "Deine Notizen",
+            ["pn.list.empty"]               = "Noch keine Notizen.",
+            ["pn.list.degraded"]            = "Nicht mehr verfügbar",
+            ["pn.list.kind.post"]           = "Beiträge",
+            ["pn.list.kind.grouppost"]      = "Gruppenbeiträge",
+            ["pn.list.kind.event"]          = "Veranstaltungen",
+            ["pn.list.kind.page"]           = "Seiten",
+            ["pn.list.kind.project"]        = "Projekte",
+            ["pn.list.kind.todo"]           = "Aufgaben",
+            ["pn.list.kind.board"]          = "Boards",
+            ["pn.list.kind.document"]       = "Dokumente",
+            ["pn.list.kind.directory"]      = "Personen",
+            ["pn.note.edit"]                = "Bearbeiten",
+            ["pn.note.delete"]              = "Löschen",
+            ["pn.note.move"]                = "Verschieben",
+            ["pn.note.tag.add"]             = "Tag hinzufügen",
+            ["pn.note.tag.remove"]          = "Tag entfernen",
             ["pn.note.attach"]              = "Notiz",
             ["pn.note.attached"]            = "Notiert.",
+            ["pn.folder.new"]               = "Neuer Ordner",
+            ["pn.folder.rename"]            = "Ordner umbenennen",
+            ["pn.folder.delete"]            = "Ordner löschen",
+            ["pn.folder.empty"]             = "Noch keine Notizen in diesem Ordner.",
 
             // ── M21 (ADR 0122) — Dokumentverwaltung: die /documents-Feed- +
             // Detail- + Upload-Oberfläche (D5 Standing, D6 Download, D7
@@ -7659,10 +7709,35 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
 
-            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
-            // the full 24-key pn.* block is registered by U05).
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Notes",
+            ["pn.list.title"]               = "Tes notes",
+            ["pn.list.empty"]               = "Aucune note pour l'instant.",
+            ["pn.list.degraded"]            = "Non plus disponible",
+            ["pn.list.kind.post"]           = "Publications",
+            ["pn.list.kind.grouppost"]      = "Publications de groupe",
+            ["pn.list.kind.event"]          = "Événements",
+            ["pn.list.kind.page"]           = "Pages",
+            ["pn.list.kind.project"]        = "Projets",
+            ["pn.list.kind.todo"]           = "À faire",
+            ["pn.list.kind.board"]          = "Tableaux",
+            ["pn.list.kind.document"]       = "Documents",
+            ["pn.list.kind.directory"]      = "Personnes",
+            ["pn.note.edit"]                = "Modifier",
+            ["pn.note.delete"]              = "Supprimer",
+            ["pn.note.move"]                = "Déplacer",
+            ["pn.note.tag.add"]             = "Ajouter un tag",
+            ["pn.note.tag.remove"]          = "Retirer un tag",
             ["pn.note.attach"]              = "Note",
             ["pn.note.attached"]            = "Noté.",
+            ["pn.folder.new"]               = "Nouveau dossier",
+            ["pn.folder.rename"]            = "Renommer le dossier",
+            ["pn.folder.delete"]            = "Supprimer le dossier",
+            ["pn.folder.empty"]             = "Aucune note dans ce dossier pour l'instant.",
 
             // ── M21 (ADR 0122) — gestion des documents : la liste /documents +
             // la page détail + le formulaire de dépôt (D5 standing, D6
@@ -10229,10 +10304,35 @@ public static class KnownTranslationKeys
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
 
-            // ── M37 (ADR 0167) — the personal-note surface (U04 _NoteButton;
-            // the full 24-key pn.* block is registered by U05).
+            // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
+            // core surface). The full 24-key pn.* block — the §kw-l closed
+            // list (locked in the design doc). U04 registered pn.note.attach +
+            // pn.note.attached; U05 registers the remaining 22 to complete the
+            // closed set (the parity test pins the count + the names × 4 langs).
+            ["pn.nav"]                      = "Noter",
+            ["pn.list.title"]               = "Dine noter",
+            ["pn.list.empty"]               = "Ingen noter endnu.",
+            ["pn.list.degraded"]            = "Ikke længere tilgængelig",
+            ["pn.list.kind.post"]           = "Indlæg",
+            ["pn.list.kind.grouppost"]      = "Gruppeindlæg",
+            ["pn.list.kind.event"]          = "Begivenheder",
+            ["pn.list.kind.page"]           = "Sider",
+            ["pn.list.kind.project"]        = "Projekter",
+            ["pn.list.kind.todo"]           = "Opgaver",
+            ["pn.list.kind.board"]          = "Brætter",
+            ["pn.list.kind.document"]       = "Dokumenter",
+            ["pn.list.kind.directory"]      = "Kontaktliste",
+            ["pn.note.edit"]                = "Redigér",
+            ["pn.note.delete"]              = "Slet",
+            ["pn.note.move"]                = "Flyt",
+            ["pn.note.tag.add"]             = "Tilføj tag",
+            ["pn.note.tag.remove"]          = "Fjern tag",
             ["pn.note.attach"]              = "Noter",
             ["pn.note.attached"]            = "Noteret.",
+            ["pn.folder.new"]               = "Ny mappe",
+            ["pn.folder.rename"]            = "Omdøb mappe",
+            ["pn.folder.delete"]            = "Slet mappe",
+            ["pn.folder.empty"]             = "Ingen noter i denne mappe endnu.",
 
             // ── M21 (ADR 0122) — dokumenthåndtering: /documents-feed +
             // detalje + upload-formular (D5 standing, D6 download, D7

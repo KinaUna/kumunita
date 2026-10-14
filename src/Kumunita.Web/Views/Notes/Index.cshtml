@@ -1,0 +1,260 @@
+@model Kumunita.Core.PersonalNotes.NoteListResult
+@using Kumunita.Core.PersonalNotes
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Kumunita.Core.SurfaceLabels.ISurfaceLabelsService SurfaceLabels
+@{
+    ViewData["Title"] = "Notes";
+
+    // M29 (ADR 0152) — the surface header label (the same M17 Bookmarks/Index
+    // shape): one resolver, one value, so a rename is never "nav says X,
+    // header says Y." A non-blank admin label wins; otherwise the pn.nav
+    // kw-l key resolves in the viewer's effective language. Best-effort:
+    // GetLabelAsync never throws (a missing row / store degrades to the kw-l
+    // floor), so a null/absent service only degrades to the raw kw-l floor.
+    string _surfaceTitle = "Notes";
+    if (SurfaceLabels is not null)
+    {
+        try
+        {
+            string surfaceLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+            _surfaceTitle = await SurfaceLabels.GetLabelAsync("notes", "pn.nav", surfaceLang);
+        }
+        catch
+        {
+            // A resolution failure must never blank the header (the kw-l floor).
+        }
+    }
+
+    // The closed TargetKind set (D1 — the exact vocabulary the existing
+    // *ToAuditableResource adapters already emit). Rendered in this canonical
+    // order; a kind with no notes is skipped.
+    string[] _kinds =
+    {
+        "post", "grouppost", "event", "page", "project",
+        "todo", "board", "document", "directory",
+    };
+
+    // Builds the note "buckets" for one kind (design doc §2.2 — the
+    // NoteListResult / NoteGroup / FolderRow shapes). The owner's folder tree
+    // (D6 — depth ≤ 2: root → child, never a grandchild) is the nesting
+    // container: one bucket per folder (root first, then children, ordered by
+    // Name — the (OwnerId, ParentId, Name) unique-index tree), each carrying
+    // the kind's note groups that live in that folder (possibly empty — the
+    // pn.folder.empty state). A final unfiled bucket (group.FolderId == null)
+    // holds the notes not nested under any folder. The note row renders
+    // ONCE below (the single rendering path).
+    (FolderRow? Folder, IReadOnlyList<NoteGroup> Groups)[] Buckets(string kind)
+    {
+        var kindGroups = Model.Groups.Where(g => g.Kind == kind).ToList();
+        var roots = Model.Folders
+            .Where(f => f.ParentId is null)
+            .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+        var children = Model.Folders
+            .Where(f => f.ParentId is not null)
+            .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+        var list = new List<(FolderRow? Folder, IReadOnlyList<NoteGroup> Groups)>();
+        foreach (var folder in roots.Concat(children))
+        {
+            var groups = kindGroups.Where(x => x.FolderId == folder.Id).ToList();
+            list.Add((folder, groups));
+        }
+        var unfiled = kindGroups.Where(x => x.FolderId is null).ToList();
+        list.Add((null, unfiled));
+        return list.ToArray();
+    }
+}
+@* M37 (ADR 0167) — the personal-note list surface (D6: a standing core
+   surface, no admin toggle; the M17 Bookmarks/Index.cshtml shape re-used,
+   extended with the owner's folder tree + the note body + the tag chips).
+   The owner's own notes (C-M37·2 — a personal read: zero AccessAudit rows,
+   zero CanSeeAsync passes — the controller's sole reader is the frozen
+   IPersonalNoteService.ListNotesAsync seam). Grouped by the closed
+   TargetKind set (D1), nested under the owner's folder tree (D6 — depth ≤ 2).
+   The D7 degraded row (C-M37·4 / the named trade) renders the closed
+   <span> carrying exactly one static pn.list.degraded string — no <a> tag,
+   no title, no TargetId — AND THE BODY REMAINS VISIBLE to the owner (D4,
+   "content, not pointer"). The per-row controls (edit / move / tag / delete)
+   render identically for degraded and non-degraded rows (the D7 pin — none
+   of them require the target's own read seam; they are keyed on the note's
+   own id + the owner's own tree — the U05 constraint: rendered as links,
+   the write lanes are the frozen Core seam, NOT new POST actions). *@
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>@_surfaceTitle</h1>
+                </div>
+            </div>
+        </header>
+
+        @if (Model.Groups.Count == 0)
+        {
+            <div class="p-4 text-muted"><kw-l key="pn.list.empty">No notes yet.</kw-l></div>
+        }
+        else
+        {
+            @foreach (var kind in _kinds)
+            {
+                if (Model.Groups.All(g => g.Kind != kind))
+                {
+                    continue; // a kind with no notes is skipped
+                }
+
+                var kindBuckets = Buckets(kind);
+
+                <section class="mb-4">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                        <h2 class="mb-0"><kw-l key="pn.list.kind.@kind">@kind</kw-l></h2>
+                        @* The folder-tree write affordance (pn.folder.new —
+                           the D6 tree control). Rendered as a link (the U05
+                           constraint: the folder write lane is the frozen Core
+                           seam — CreateFolderAsync — not a U05 POST action). *@
+                        <a class="btn btn-sm btn-outline-secondary" href="/notes/folders/new">
+                            <kw-l key="pn.folder.new">New folder</kw-l>
+                        </a>
+                    </div>
+
+                    @foreach (var bucket in kindBuckets)
+                    {
+                        bool hasBucketNotes =
+                            bucket.Groups.Any(g => g.Items.Count > 0);
+
+                        <div class="pn-folder mb-3 @(bucket.Folder is null ? "border-0 ps-0" : "border-start ps-2")"
+                             data-folder-id="@(bucket.Folder?.Id ?? null)"
+                             data-parent-id="@(bucket.Folder?.ParentId ?? null)">
+                            @if (bucket.Folder is not null)
+                            {
+                                var folder = bucket.Folder;
+                                <h3 class="mb-1 d-flex align-items-center gap-2">
+                                    @folder.Name
+                                    @* The per-folder controls (pn.folder.rename /
+                                       pn.folder.delete — the D6 tree controls).
+                                       Rendered as links (the U05 constraint — the
+                                       folder write lanes are the frozen Core seam,
+                                       not U05 POST actions). *@
+                                    <span class="pn-folder-controls d-inline-flex gap-1">
+                                        <a class="btn btn-sm btn-outline-secondary" href="/notes/folders/@folder.Id/rename"><kw-l key="pn.folder.rename">Rename</kw-l></a>
+                                        <a class="btn btn-sm btn-outline-secondary" href="/notes/folders/@folder.Id/delete"><kw-l key="pn.folder.delete">Delete</kw-l></a>
+                                    </span>
+                                </h3>
+                            }
+
+                            @if (hasBucketNotes)
+                            {
+                                <ul class="pn-note-list list-unstyled p-0 m-0">
+                                    @foreach (var group in bucket.Groups)
+                                    {
+                                        @foreach (var row in group.Items)
+                                        {
+                                            <li class="pn-note d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                                <div class="flex-grow-1">
+                                                    @if (row.Degraded)
+                                                    {
+                                                        @* D7 / C-M37·4 — the closed
+                                                           degraded label: exactly one
+                                                           static string, no <a> tag,
+                                                           no title, no TargetId.
+                                                           The row's entire leak
+                                                           surface is this single kw-l
+                                                           string + the author's own
+                                                           body (the named trade). *@
+                                                        <h3 class="pn-note-title text-muted mb-1">
+                                                            <span><kw-l key="pn.list.degraded">No longer available</kw-l></span>
+                                                        </h3>
+                                                    }
+                                                    else
+                                                    {
+                                                        <h3 class="pn-note-title mb-1">
+                                                            <a href="@row.Link">@row.Title</a>
+                                                        </h3>
+                                                    }
+
+                                                    @* The body — the D4 "content,
+                                                       not pointer" pin: visible
+                                                       always, even on a degraded
+                                                       row (the named trade). Stored
+                                                       as raw text, Markdown-rendered
+                                                       on read through the one
+                                                       MarkdownRenderer (the ADR
+                                                       0031 shape). *@
+                                                    @if (!string.IsNullOrWhiteSpace(row.Body))
+                                                    {
+                                                        <div class="pn-note-body markdown mt-1">@Html.Raw(MarkdownRenderer.RenderHtml(row.Body))</div>
+                                                    }
+
+                                                    @* The tag chips (D5 — the
+                                                       author-set, free-form,
+                                                       normalized-on-write tag set;
+                                                       the IReadOnlyList<string>
+                                                       shape — NOT a platform-wide
+                                                       Tag doc). *@
+                                                    @if (row.Tags.Count > 0)
+                                                    {
+                                                        <div class="pn-note-tags mt-1 d-flex flex-wrap gap-1">
+                                                            @foreach (var tag in row.Tags)
+                                                            {
+                                                                <span class="badge bg-secondary">@tag</span>
+                                                            }
+                                                        </div>
+                                                    }
+
+                                                    <div class="text-muted small mt-1">
+                                                        <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                                                        @* The Modified timestamp (the D4 body-revision witness).
+                                                           Rendered as a plain "Modified" tooltip + the kw-dt
+                                                           date — NOT a pn.* closed key (the §kw-l 24-key set is
+                                                           closed; no pn.note.modified key exists). *@
+                                                        @if (row.Modified is not null)
+                                                        {
+                                                            <span class="ms-2" title="Modified"><kw-dt dt="@row.Modified" format="g"></kw-dt></span>
+                                                        }
+                                                    </div>
+                                                </div>
+
+                                                @* The per-row controls (edit / move
+                                                   / tag / delete — the pn.note.*
+                                                   kw-l keys). Rendered as links (the
+                                                   U05 constraint: links, not new POST
+                                                   actions — the write lanes are the
+                                                   frozen Core seam: UpdateNoteBodyAsync
+                                                   / MoveNoteToFolderAsync / AddTagAsync
+                                                   / RemoveTagAsync / DeleteNoteAsync).
+                                                   Rendered identically for degraded and
+                                                   non-degraded rows (the D7 pin — none
+                                                   require the target's own read seam). *@
+                                                <div class="pn-note-controls d-flex gap-1 flex-wrap">
+                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/edit"><kw-l key="pn.note.edit">Edit</kw-l></a>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/move"><kw-l key="pn.note.move">Move</kw-l></a>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/tags"><kw-l key="pn.note.tag.add">Add tag</kw-l></a>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/tags/remove"><kw-l key="pn.note.tag.remove">Remove tag</kw-l></a>
+                                                    <a class="btn btn-sm btn-outline-secondary" href="/notes/@row.Id/delete"><kw-l key="pn.note.delete">Delete</kw-l></a>
+                                                </div>
+                                            </li>
+                                        }
+                                    }
+                                </ul>
+                            }
+                            else if (bucket.Folder is not null)
+                            {
+                                @* The empty-folder state (pn.folder.empty — the
+                                   D6 tree; the folder exists but has no notes for
+                                   this kind). The unfiled bucket shows no empty
+                                   state (a kind with no unfiled notes simply
+                                   renders no unfiled block). *@
+                                <div class="pn-folder-empty text-muted small">
+                                    <kw-l key="pn.folder.empty">No notes in this folder yet.</kw-l>
+                                </div>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+        }
+    </div>
+</div>

@@ -19,6 +19,17 @@ namespace Kumunita.Web.Controllers;
 /// 404-vs-403 split, with the M37 D2 personal-read shape (a note is a
 /// personal-by-id record, never an audience decision).
 /// <list type="bullet">
+/// <item><c>GET /notes</c> — the owner's own note list (the D2 personal
+/// read, C-M37·2: zero <c>AccessAudit</c> rows, zero <c>CanSeeAsync</c>
+/// passes — the ADR 0105 "operator has no read standing" precedent). The
+/// caller's <c>SubjectId</c> is the <c>ownerId</c>; a caller with no read
+/// standing (no <c>SubjectId</c> — a <c>GlobalAdmin</c> included) gets a
+/// non-leaky **404** (C-M37·2 — that 404 commits no <c>AccessAudit</c>
+/// row). The seam's <c>ListNotesAsync(ownerId)</c> is the sole reader
+/// (C-M37·1 — the controller never re-derives access); the view receives
+/// the <c>NoteListResult</c> verbatim (the groups keyed by the closed
+/// <c>TargetKind</c> set, the owner's folder tree, the D7 degraded rows —
+/// design doc §2.2 / §2.4).</item>
 /// <item><c>POST /notes/attach</c> — the D3 write-lane (the
 /// <see cref="IPersonalNoteService.CreateNoteAsync"/> seam re-runs the
 /// target's own frozen <c>CanAsync(Read)</c> before the row is created;
@@ -92,6 +103,53 @@ public sealed class NotesController(
         var lang = await EffectiveLanguageCode.ResolveAsync(
             HttpContext?.Request, localization, translationProvider);
         return await translationProvider.GetAsync(key, lang);
+    }
+
+    /// <summary>
+    /// <c>GET /notes</c> — the owner's own note list (the D2 personal read,
+    /// C-M37·2: zero <c>AccessAudit</c> rows, zero <c>CanSeeAsync</c>
+    /// passes — the ADR 0105 / M6-inbox "operator has no read standing"
+    /// precedent). The caller's <see cref="KumunitaPrincipal.SubjectId"/> is
+    /// the <c>ownerId</c>; a caller with no read standing (no
+    /// <c>SubjectId</c>) gets a non-leaky 404 (C-M37·2 — the "operator has
+    /// no read standing" gate; that 404 commits no <c>AccessAudit</c> row).
+    /// The seam's <c>ListNotesAsync(ownerId)</c> is the sole reader
+    /// (C-M37·1 — the controller never re-derives access); the view
+    /// receives the <see cref="NoteListResult"/> verbatim (the groups
+    /// keyed by the closed <c>TargetKind</c> set, the owner's folder tree,
+    /// the D7 degraded rows — design doc §2.2 / §2.4).
+    /// <para>
+    /// **D2 / C-M37·2:** the <see cref="AuthorizeAttribute"/> on the class
+    /// is a convenience pre-gate only — never the source of truth (the
+    /// <c>SubjectId</c> check is the gate; the seam's <c>ListNotesAsync</c>
+    /// is the sole reader).
+    /// </para>
+    /// </summary>
+    [HttpGet("/notes")]
+    public async Task<IActionResult> Index()
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+        {
+            // C-M37·2 — the "operator has no read standing" gate (the ADR
+            // 0105 precedent): a caller with no <c>SubjectId</c> has no
+            // read standing over any note list. A non-leaky 404 — **no**
+            // <c>AccessAudit</c> row is committed, and the seam's
+            // <c>ListNotesAsync</c> is **not** called (the sole-reader pin —
+            // C-M37·1: the controller never re-derives access, and a caller
+            // with no read standing has no read to delegate).
+            return NotFound();
+        }
+
+        // C-M37·1 / C-M37·2 — the seam is the sole reader (the personal
+        // read, zero audit rows). The controller never re-derives access;
+        // the seam's <c>ListNotesAsync</c> loads the owner's own rows by
+        // the identity predicate <c>OwnerId == ownerId</c> and resolves the
+        // D7 degraded rows via a pure, non-auditing doc load. The view
+        // receives the <see cref="NoteListResult"/> verbatim (the
+        // grouped-by-<c>TargetKind</c> rows + the owner's folder tree).
+        var result = await notes.ListNotesAsync(actorId);
+        return View(result);
     }
 
     /// <summary>

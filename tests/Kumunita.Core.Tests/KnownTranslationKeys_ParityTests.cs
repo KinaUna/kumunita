@@ -272,4 +272,79 @@ public class KnownTranslationKeys_ParityTests
         Assert.Equal(d4Keys.OrderBy(k => k).ToList(),
             registryPlatformKeys.OrderBy(k => k).ToList());
     }
+
+    // ── M37 U05 — the personal-note pn.* closed set (ADR 0167 §kw-l) ────────
+    // The M37 design doc §kw-l locks the exact 24-key pn.* closed set
+    // (U00's source of truth). U04 registered the two _NoteButton keys
+    // (pn.note.attach + pn.note.attached); U05 registered the remaining 22 to
+    // complete the closed set. This test pins the count (24) + the exact
+    // names, each present in all four language registries (en/de/fr/da) with
+    // a non-empty value. The M17 parity-test precedent (the about.* /
+    // footer.platform.* closed-set shape re-used).
+
+    [Fact(DisplayName = "M37: the 24 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
+    public void KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages()
+    {
+        // The ADR 0167 §kw-l closed contract — exactly 24 keys (the exact
+        // names locked in the design doc §kw-l; U05's source of truth).
+        var pnKeys = new[]
+        {
+            "pn.nav",
+            "pn.list.title",
+            "pn.list.empty",
+            "pn.list.degraded",
+            "pn.list.kind.post",
+            "pn.list.kind.grouppost",
+            "pn.list.kind.event",
+            "pn.list.kind.page",
+            "pn.list.kind.project",
+            "pn.list.kind.todo",
+            "pn.list.kind.board",
+            "pn.list.kind.document",
+            "pn.list.kind.directory",
+            "pn.note.edit",
+            "pn.note.delete",
+            "pn.note.move",
+            "pn.note.tag.add",
+            "pn.note.tag.remove",
+            "pn.note.attach",
+            "pn.note.attached",
+            "pn.folder.new",
+            "pn.folder.rename",
+            "pn.folder.delete",
+            "pn.folder.empty",
+        };
+
+        Assert.True(pnKeys.Length == 24,
+            "the pn.* closed set must be exactly 24 keys");
+        Assert.True(new HashSet<string>(pnKeys).Count == pnKeys.Length,
+            "the pn.* closed set must have no duplicate names");
+
+        foreach (var key in pnKeys)
+        {
+            foreach (var (label, dict) in new[]
+            {
+                ("en", KnownTranslationKeys.EnValues),
+                ("de", KnownTranslationKeys.DeValues),
+                ("fr", KnownTranslationKeys.FrValues),
+                ("da", KnownTranslationKeys.DaValues),
+            })
+            {
+                Assert.True(dict.ContainsKey(key),
+                    $"M37 §kw-l key '{key}' is not registered in the {label} dictionary");
+                Assert.False(string.IsNullOrWhiteSpace(dict[key]),
+                    $"M37 §kw-l key '{key}' has an empty {label} value");
+                Assert.Contains(key, KnownTranslationKeys.AllKeys);
+            }
+        }
+
+        // The list is closed: every pn.* key in the registry is one of the 24
+        // contract keys (no drift in either direction — the parity pin).
+        var registryPnKeys =
+            KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("pn.")).ToList();
+        Assert.True(registryPnKeys.Count == 24,
+            "the registry's pn.* key set is not the closed 24-key §kw-l set");
+        Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
+            registryPnKeys.OrderBy(k => k).ToList());
+    }
 }
