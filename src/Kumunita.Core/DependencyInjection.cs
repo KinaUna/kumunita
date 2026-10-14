@@ -502,6 +502,21 @@ public static class ServiceCollectionExtensions
             // already-composed IUserInfoService.
             sp.GetRequiredService<IIdentityService>()));
 
+        // M37 (ADR 0167, plan U02): the personal-notes service seam (bounded
+        // context Kumunita.Core.PersonalNotes — a personal-by-id record, D2).
+        // The same "AddTransient with the store injected" shape as
+        // IBookmarkService above. U02 ships the 8 note methods; the 4
+        // folder-tree methods are U03. Composes **only** frozen seams
+        // (C-M37·1): the frozen IAuthorizationService (the D3 check only) +
+        // the owning surfaces' read seams (the D7 resolution). **No**
+        // INotificationService (§deferred — the nudge lane is its own ADR).
+        services.AddTransient<PersonalNotes.IPersonalNoteService>(sp => new PersonalNotes.PersonalNoteService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Events.IEventService>(),
+            sp.GetRequiredService<Projects.IProjectService>()));
+
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"
         // arrow: the Notification + NotificationPreference documents, the
