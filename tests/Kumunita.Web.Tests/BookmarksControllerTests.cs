@@ -87,6 +87,11 @@ public sealed class BookmarksControllerTests
         "bm.button.bookmarked",
         "bm.toggle.bookmarked",
         "bm.toggle.removed",
+        "bm.folder.new",
+        "bm.folder.rename",
+        "bm.folder.delete",
+        "bm.folder.empty",
+        "bm.bookmark.move",
     ];
 
     // ── 1 — F3_OwnerList_Loads_Their_Rows_And_NoAuditRow_Commits ─────────
@@ -122,7 +127,8 @@ public sealed class BookmarksControllerTests
             [
                 new BookmarkRow("event", "e-1", "A visible event", "/events/e-1", false, new DateTimeOffset(2026, 9, 18, 9, 0, 0, TimeSpan.Zero)),
             ]),
-        ]);
+        ],
+        []);
         bookmarks.ListAsync(Arg.Any<string>()).Returns(result);
 
         var controller = Build(bookmarks, subjectId: actor);
@@ -352,7 +358,7 @@ public sealed class BookmarksControllerTests
             .Where(k => k.StartsWith("bm.", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(BmKeys.ToHashSet(StringComparer.Ordinal), actualBmKeys);
-        Assert.Equal(14, actualBmKeys.Count);
+        Assert.Equal(19, actualBmKeys.Count);
 
         // (3) All four registries (en / de / fr / da) carry the same closed
         // set (the §kw-l parity pin — the U04 / U05 units consume the full

@@ -2381,6 +2381,11 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendment) — the redirect-back flash toast keys.
             ["bm.toggle.bookmarked"]        = "Bookmarked.",
             ["bm.toggle.removed"]           = "Bookmark removed.",
+            ["bm.folder.new"]               = "New folder",
+            ["bm.folder.rename"]            = "Rename folder",
+            ["bm.folder.delete"]            = "Delete folder",
+            ["bm.folder.empty"]             = "No bookmarks in this folder yet.",
+            ["bm.bookmark.move"]            = "Move",
 
             // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
             // core surface, no admin toggle). The full 24-key pn.* block — the
@@ -5103,6 +5108,11 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 Amendment) — Flash-Toast-Schlüssel.
             ["bm.toggle.bookmarked"]        = "Gemerkt.",
             ["bm.toggle.removed"]           = "Lesezeichen entfernt.",
+            ["bm.folder.new"]               = "Neuer Ordner",
+            ["bm.folder.rename"]            = "Ordner umbenennen",
+            ["bm.folder.delete"]            = "Ordner löschen",
+            ["bm.folder.empty"]             = "Noch keine Lesezeichen in diesem Ordner.",
+            ["bm.bookmark.move"]            = "Verschieben",
 
             // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
             // core surface). The full 24-key pn.* block — the §kw-l closed
@@ -7718,6 +7728,11 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 amendement) — clés du toast de redirection.
             ["bm.toggle.bookmarked"]        = "Signeté.",
             ["bm.toggle.removed"]           = "Signet retiré.",
+            ["bm.folder.new"]               = "Nouveau dossier",
+            ["bm.folder.rename"]            = "Renommer le dossier",
+            ["bm.folder.delete"]            = "Supprimer le dossier",
+            ["bm.folder.empty"]             = "Aucun signet dans ce dossier pour l'instant.",
+            ["bm.bookmark.move"]            = "Déplacer",
 
             // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
             // core surface). The full 24-key pn.* block — the §kw-l closed
@@ -10318,6 +10333,11 @@ public static class KnownTranslationKeys
             // Obs-2 (ADR 0118 ændring) — flash-toast-nøgler.
             ["bm.toggle.bookmarked"]        = "Bogmærket.",
             ["bm.toggle.removed"]           = "Bogmærke fjernet.",
+            ["bm.folder.new"]               = "Ny mappe",
+            ["bm.folder.rename"]            = "Omdøb mappe",
+            ["bm.folder.delete"]            = "Slet mappe",
+            ["bm.folder.empty"]             = "Ingen bogmærker i denne mappe endnu.",
+            ["bm.bookmark.move"]            = "Flyt",
 
             // ── M37 (ADR 0167) — the personal-note surface (D6: a standing
             // core surface). The full 24-key pn.* block — the §kw-l closed

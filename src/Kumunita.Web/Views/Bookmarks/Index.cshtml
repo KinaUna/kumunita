@@ -1,4 +1,5 @@
 @model Kumunita.Core.Bookmarks.BookmarkListResult
+@using Kumunita.Core.Bookmarks
 @using Kumunita.Web.Security
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
@@ -25,6 +26,39 @@
         {
             // A resolution failure must never blank the header (the kw-l floor).
         }
+    }
+
+    // The closed TargetKind set (D1 — the exact vocabulary the existing
+    // *ToAuditableResource adapters already emit). Rendered in this canonical
+    // order; a kind with no bookmarks is skipped (the M37 Notes/Index shape).
+    string[] _kinds = { "post", "event", "todo", "announcement", "page" };
+
+    // Builds the bookmark "buckets" for one kind (ADR 0168 D2 — the M37
+    // Buckets shape re-applied). The owner's folder tree (D2 — depth ≤ 2:
+    // root → child, never a grandchild) is the nesting container: one bucket
+    // per folder (root first, then children, ordered by Name — the
+    // (OwnerId, ParentId, Name) unique-index tree), each carrying the kind's
+    // bookmark groups that live in that folder (possibly empty — the
+    // bm.folder.empty state). A final unfiled bucket (group.FolderId == null)
+    // holds the bookmarks not nested under any folder.
+    (FolderRow? Folder, IReadOnlyList<BookmarkGroup> Groups)[] Buckets(string kind)
+    {
+        var kindGroups = Model.Groups.Where(g => g.Kind == kind).ToList();
+        var roots = Model.Folders
+            .Where(f => f.ParentId is null)
+            .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+        var children = Model.Folders
+            .Where(f => f.ParentId is not null)
+            .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+        var list = new List<(FolderRow? Folder, IReadOnlyList<BookmarkGroup> Groups)>();
+        foreach (var folder in roots.Concat(children))
+        {
+            var groups = kindGroups.Where(x => x.FolderId == folder.Id).ToList();
+            list.Add((folder, groups));
+        }
+        var unfiled = kindGroups.Where(x => x.FolderId is null).ToList();
+        list.Add((null, unfiled));
+        return list.ToArray();
     }
 }
 @* M17 (ADR 0118) — the personal-pin surface (D6: a standing core surface).
@@ -54,58 +88,133 @@
         }
         else
         {
-            @foreach (var group in Model.Groups)
+            @foreach (var kind in _kinds)
             {
-                <section class="mb-4">
-                    @* The group's bm.list.kind.<kind> label — the dynamic-key
-                       idiom (the same helper-mapped closed-code-set label the
-                       M16 Inventory List view's ownerKind badge uses): the
-                       KwLRegistryConsistencyTests scan skips keys containing
-                       '@', so bm.list.kind.@(group.Kind) is the house pattern
-                       for the closed TargetKind set's label. *@
-                    <h2><kw-l key="bm.list.kind.@(group.Kind)">@group.Kind</kw-l></h2>
-                    <ul class="airy-ann-list list-unstyled p-0 m-0">
-                        @foreach (var row in group.Items)
-                        {
-                            <li class="airy-ann-row d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                                <div>
-                                    @if (row.Degraded)
-                                    {
-                                        @* D5 / C-M17·5 — the closed degraded
-                                           label: exactly one static string, no
-                                           <a> tag, no title, no TargetId. The
-                                           row's entire leak surface is this
-                                           single kw-l string. *@
-                                        <h3 class="airy-ann-title text-muted">
-                                            <span><kw-l key="bm.list.degraded">No longer available</kw-l></span>
-                                        </h3>
-                                    }
-                                    else
-                                    {
-                                        <h3 class="airy-ann-title">
-                                            <a href="@row.Link">@row.Title</a>
-                                        </h3>
-                                        <div class="text-muted small">
-                                            <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
-                                        </div>
-                                    }
-                                </div>
+                if (Model.Groups.All(g => g.Kind != kind))
+                {
+                    continue; // a kind with no bookmarks is skipped
+                }
 
-                                @* The per-row unbookmark control — rendered
-                                   identically for degraded and non-degraded
-                                   rows (the D5 pin: unbookmark on a degraded
-                                   row still works — the row is keyed on the
-                                   owner's own Bookmark row, not the target's
-                                   id, so the unbookmark needs no target read
-                                   at all — D5 / F4). *@
-                                <form method="post" action="@($"/bookmarks/{row.TargetKind}/{row.TargetId}/remove")"
-                                      style="margin:0;">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg><kw-l key="bm.list.unbookmark">Remove</kw-l></button>
-                                </form>
-                            </li>
-                        }
-                    </ul>
+                var kindBuckets = Buckets(kind);
+
+                <section class="mb-4">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                        @* The group's bm.list.kind.<kind> label — the dynamic-key
+                           idiom (the same helper-mapped closed-code-set label the
+                           M16 Inventory List view's ownerKind badge uses): the
+                           KwLRegistryConsistencyTests scan skips keys containing
+                           '@', so bm.list.kind.@kind is the house pattern for
+                           the closed TargetKind set's label. *@
+                        <h2 class="mb-0"><kw-l key="bm.list.kind.@kind">@kind</kw-l></h2>
+                        @* The folder-tree write affordance (bm.folder.new —
+                           the ADR 0168 D2 tree control, the M37 Notes/Index
+                           shape re-applied). Rendered as a link (the write
+                           lane is the frozen Core seam —
+                           CreateFolderAsync — not a new POST action). *@
+                        <a class="btn btn-sm btn-outline-secondary" href="/bookmarks/folders/new">
+                            <kw-l key="bm.folder.new">New folder</kw-l>
+                        </a>
+                    </div>
+
+                    @foreach (var bucket in kindBuckets)
+                    {
+                        bool hasBucketBookmarks =
+                            bucket.Groups.Any(g => g.Items.Count > 0);
+
+                        <div class="bm-folder mb-3 @(bucket.Folder is null ? "border-0 ps-0" : "border-start ps-2")"
+                             data-folder-id="@(bucket.Folder?.Id ?? null)"
+                             data-parent-id="@(bucket.Folder?.ParentId ?? null)">
+                            @if (bucket.Folder is not null)
+                            {
+                                var folder = bucket.Folder;
+                                <h3 class="mb-1 d-flex align-items-center gap-2">
+                                    @folder.Name
+                                    @* The per-folder controls (bm.folder.rename /
+                                       bm.folder.delete — the ADR 0168 D2 tree
+                                       controls, the M37 Notes/Index shape
+                                       re-applied). Rendered as links (the write
+                                       lanes are the frozen Core seam —
+                                       RenameFolderAsync / DeleteFolderAsync —
+                                       not new POST actions). *@
+                                    <span class="bm-folder-controls d-inline-flex gap-1">
+                                        <a class="btn btn-sm btn-outline-secondary" href="/bookmarks/folders/@folder.Id/rename"><kw-l key="bm.folder.rename">Rename</kw-l></a>
+                                        <form method="post" action="@($"/bookmarks/folders/@folder.Id/delete")" style="margin:0;" onsubmit="return confirm('Delete this folder? Its bookmarks will be moved to the unfiled area.');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="bm.folder.delete">Delete</kw-l></button>
+                                    </form>
+                                    </span>
+                                </h3>
+                            }
+
+                            @if (hasBucketBookmarks)
+                            {
+                                <ul class="airy-ann-list list-unstyled p-0 m-0">
+                                    @foreach (var group in bucket.Groups)
+                                    {
+                                        @foreach (var row in group.Items)
+                                        {
+                                            <li class="airy-ann-row d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                                <div>
+                                                    @if (row.Degraded)
+                                                    {
+                                                        @* D5 / C-M17·5 — the closed degraded
+                                                           label: exactly one static string, no
+                                                           <a> tag, no title, no TargetId. The
+                                                           row's entire leak surface is this
+                                                           single kw-l string. *@
+                                                        <h3 class="airy-ann-title text-muted">
+                                                            <span><kw-l key="bm.list.degraded">No longer available</kw-l></span>
+                                                        </h3>
+                                                    }
+                                                    else
+                                                    {
+                                                        <h3 class="airy-ann-title">
+                                                            <a href="@row.Link">@row.Title</a>
+                                                        </h3>
+                                                        <div class="text-muted small">
+                                                            <span><kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                                                        </div>
+                                                    }
+                                                </div>
+
+                                                @* The per-row controls (move / unbookmark) —
+                                                   rendered identically for degraded and
+                                                   non-degraded rows (the D5 pin: unbookmark
+                                                   on a degraded row still works — the row is
+                                                   keyed on the owner's own Bookmark row, not
+                                                   the target's id, so the unbookmark needs no
+                                                   target read at all — D5 / F4). The move
+                                                   control is the ADR 0168 D2 tree control —
+                                                   the M37 Notes per-row "move" shape
+                                                   re-applied; it is keyed on the bookmark's
+                                                   own TargetKind + TargetId (the frozen
+                                                   MoveBookmarkToFolderAsync seam). *@
+                                                <div class="d-flex gap-1 flex-wrap">
+                                                    <a class="btn btn-outline-secondary btn-sm" href="@($"/bookmarks/{row.TargetKind}/{row.TargetId}/move")"><kw-l key="bm.bookmark.move">Move</kw-l></a>
+                                                    <form method="post" action="@($"/bookmarks/{row.TargetKind}/{row.TargetId}/remove")"
+                                                        style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5h8v11l-4-3-4 3z"/></svg><kw-l key="bm.list.unbookmark">Remove</kw-l></button>
+                                                    </form>
+                                                </div>
+                                            </li>
+                                        }
+                                    }
+                                </ul>
+                            }
+                            else if (bucket.Folder is not null)
+                            {
+                                @* The empty-folder state (bm.folder.empty — the
+                                   ADR 0168 D2 tree; the folder exists but has no
+                                   bookmarks for this kind). The unfiled bucket
+                                   shows no empty state (a kind with no unfiled
+                                   bookmarks simply renders no unfiled block). *@
+                                <div class="bm-folder-empty text-muted small">
+                                    <kw-l key="bm.folder.empty">No bookmarks in this folder yet.</kw-l>
+                                </div>
+                            }
+                        </div>
+                    }
                 </section>
             }
         }

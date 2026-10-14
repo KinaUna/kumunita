@@ -107,4 +107,59 @@ public interface IBookmarkService
     /// </para>
     /// </summary>
     Task<bool> IsBookmarkedAsync(string ownerId, string targetKind, string targetId);
+
+    // ── Folder-tree methods (ADR 0168 — the M37 folder-tree shape re-applied
+    //    to the bookmark surface; the §deferred "bookmark folders" lane
+    //    from m17-bookmarks-design.md, now settled). The depth ≤ 2 pin, the
+    //    (OwnerId, ParentId, Name) unique index, the owner-only pin, and the
+    //    "deletion moves bookmarks to the root" invariant are the M37
+    //    C-M37·6 pin, re-applied (D2). ──────────────────────────────────
+
+    /// <summary>
+    /// Creates a folder in the owner's bookmark tree (ADR 0168 D2 — the M37
+    /// D6 shape re-applied). The depth ≤ 2 pin: if a parent is given it
+    /// must itself be a root. The <c>(OwnerId, ParentId, Name)</c> unique
+    /// index is the witness (a sibling already holding the name under this
+    /// parent is the no-op — returns the existing row). A foreign / absent
+    /// parent throws <see cref="KeyNotFoundException"/> (non-leaky 404).
+    /// A depth violation throws <see cref="InvalidOperationException"/>
+    /// (the Web layer maps it to 400).
+    /// </summary>
+    Task<FolderRow> CreateFolderAsync(
+        string ownerId, string name, string? parentId, IDocumentSession session);
+
+    /// <summary>
+    /// Renames a folder within the owner's tree (ADR 0168 D2). The
+    /// <c>(OwnerId, ParentId, Name)</c> unique index is re-checked (a
+    /// sibling already holding the new name under the same parent throws
+    /// <see cref="InvalidOperationException"/>). A non-owner or missing
+    /// folder throws <see cref="KeyNotFoundException"/>.
+    /// </summary>
+    Task<FolderRow> RenameFolderAsync(
+        string ownerId, string folderId, string newName, IDocumentSession session);
+
+    /// <summary>
+    /// Deletes a folder and moves its bookmarks to the root
+    /// (<c>FolderId = null</c>) — ADR 0168 D2; the bookmark rows are never
+    /// lost (they are re-parented, not deleted). Child folders are
+    /// recursively deleted (their bookmarks move to the root too). A
+    /// non-owner or missing folder throws <see cref="KeyNotFoundException"/>.
+    /// Returns <see cref="BookmarkFolderDeleteResult.BookmarksMoved"/> on a
+    /// leaf folder, <see cref="BookmarkFolderDeleteResult.FoldersDeleted"/>
+    /// when child folders were also removed.
+    /// </summary>
+    Task<BookmarkFolderDeleteResult> DeleteFolderAsync(
+        string ownerId, string folderId, IDocumentSession session);
+
+    /// <summary>
+    /// Moves a bookmark to (or from) a folder in the owner's tree
+    /// (ADR 0168 D2 — the M37 MoveNoteToFolderAsync shape re-applied). The
+    /// bookmark and the folder are in the same owner's tree; a foreign or
+    /// absent folder throws <see cref="KeyNotFoundException"/> (non-leaky
+    /// 404). A non-owner or missing bookmark throws
+    /// <see cref="KeyNotFoundException"/>.
+    /// </summary>
+    Task<BookmarkRow> MoveBookmarkToFolderAsync(
+        string ownerId, string targetKind, string targetId, string? folderId,
+        IDocumentSession session);
 }

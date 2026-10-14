@@ -22,4 +22,10 @@ public sealed class Bookmark
     public string TargetKind { get; set; } = string.Empty;    // closed set: post | event | todo | announcement | page
     public string TargetId { get; set; } = string.Empty;      // the target's doc id
     public DateTimeOffset Created { get; set; }               // never mutated (D4)
+    // ADR 0168 D2 — the owner's folder id (the M37 NoteFolder shape
+    // re-applied to the bookmark surface): null = the bookmark sits at the
+    // root of the owner's tree; a folder's deletion moves its bookmarks to
+    // the root (the bookmark is never lost). A bookmark cannot live in
+    // another resident's folder (C-M17·6 — the M37 C-M37·6 pin re-applied).
+    public string? FolderId { get; set; }
 }

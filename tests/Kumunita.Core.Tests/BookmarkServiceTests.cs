@@ -523,6 +523,16 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
             ct);
     }
 
+    private static async Task<IReadOnlyList<BookmarkFolder>> Folders(IDocumentStore store, string owner)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await Marten.QueryableExtensions.ToListAsync(
+            s.Query<BookmarkFolder>()
+                .Where(f => f.OwnerId == owner),
+            ct);
+    }
+
     private static async Task<IReadOnlyList<AccessAudit>> AllAudits(IDocumentStore store)
     {
         var ct = TestContext.Current.CancellationToken;
@@ -630,5 +640,190 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         // Verify the row was created.
         var rows = await Bookmarks(store, adminId);
         Assert.Single(rows, b => b.TargetKind == "announcement" && b.TargetId == annId);
+    }
+
+    // ── Folder-tree tests (ADR 0168 D2 — the M37 C_M37_6_* pin re-applied to
+    //    the bookmark surface) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// C_M17_6_FolderTree_DepthBounded_UniqueName (ADR 0168 D2 — the M37
+    /// C_M37_6_FolderTree_DepthBounded_UniqueName pin re-applied): a folder
+    /// tree is a personal tree, bounded in depth (≤ 2: a new folder's parent
+    /// must be a root), unique in name within the owner's tree (the
+    /// (OwnerId, ParentId, Name) unique index is the witness), and a foreign
+    /// parent / a non-root parent is a non-leaky 404 / depth violation.
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_FolderTree_DepthBounded_UniqueName()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm176-owner";
+
+        // Root folder, then a child under it (depth ≤ 2 — both allowed).
+        var root = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", null, s));
+        var child = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Deep", root.Id, s));
+        Assert.NotNull(root.Id);
+        Assert.NotNull(child.Id);
+
+        // A depth violation: a new folder whose parent is a non-root (a child)
+        // would open the tree past the bound (the ADR 0168 "arbitrary-depth
+        // folder tree" forbid) — throws InvalidOperationException.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunInSession(store, s => bm.CreateFolderAsync(owner, "TooDeep", child.Id, s)));
+
+        // A foreign parent is a non-leaky 404 (KeyNotFoundException).
+        const string other = "u-cm176-other";
+        var otherRoot = await RunInSession(store, s => bm.CreateFolderAsync(other, "Other", null, s));
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.CreateFolderAsync(owner, "X", otherRoot.Id, s)));
+
+        // The (OwnerId, ParentId, Name) unique index is the witness: a
+        // same-name, same-parent folder is the no-op (returns the existing
+        // row — one row, not a new one).
+        var dupRoot = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", null, s));
+        Assert.Equal(root.Id, dupRoot.Id);
+
+        // A different parent with the same name is allowed (the index is
+        // keyed on all three).
+        var sameNameUnderChild = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Work", root.Id, s));
+        Assert.NotEqual(root.Id, sameNameUnderChild.Id);
+    }
+
+    /// <summary>
+    /// C_M17_6_FolderDeletion_MovesBookmarksToRoot_BookmarksSurvive (ADR
+    /// 0168 D2 — the M37 C_M37_6_FolderDeletion_MovesNotesToRoot_BodiesSurvive
+    /// pin re-applied): a folder's deletion MOVES its bookmarks to the root
+    /// (FolderId = null) — the bookmark rows are never lost (re-parented, not
+    /// deleted); child folders are recursively deleted (their bookmarks move
+    /// to the root too).
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_FolderDeletion_MovesBookmarksToRoot_BookmarksSurvive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm176b-owner";
+        const string postId = "cm176b-post";
+        const string otherPostId = "cm176b-post2";
+
+        await PlantVisiblePost(store, postId, owner);
+        await PlantVisiblePost(store, otherPostId, owner);
+
+        // Plant two root folders + one child.
+        var root = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Archive", null, s));
+        var child = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Old", root.Id, s));
+
+        // Plant a bookmark in the root folder and one in the child.
+        var rootBm = await RunInSession(store, s => bm.ToggleAsync(owner, "post", postId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, rootBm.Status);
+        var childBm = await RunInSession(store, s => bm.ToggleAsync(owner, "post", otherPostId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, childBm.Status);
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", postId, root.Id, s));
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", otherPostId, child.Id, s));
+
+        // Delete the root folder — it has a child, so the outcome is
+        // FoldersDeleted (child recursively deleted).
+        var result = await RunInSession(store, s => bm.DeleteFolderAsync(owner, root.Id, s));
+        Assert.Equal(BookmarkFolderDeleteResult.FoldersDeleted, result);
+
+        // Both folders (root + child) are physically removed.
+        var folders = await Folders(store, owner);
+        Assert.DoesNotContain(folders, f => f.Id == root.Id);
+        Assert.DoesNotContain(folders, f => f.Id == child.Id);
+
+        // Both bookmarks are moved to the root (FolderId = null) — the bookmark
+        // rows are never lost (the D2 pin: folder deletion is a re-parent, not
+        // a bookmark removal).
+        var bookmarks = await Bookmarks(store, owner);
+        Assert.Equal(2, bookmarks.Count);
+        foreach (var b in bookmarks)
+        {
+            Assert.Null(b.FolderId);   // moved to the root
+        }
+        Assert.Equal("post", bookmarks.First(x => x.TargetId == postId).TargetKind);
+        Assert.Equal("post", bookmarks.First(x => x.TargetId == otherPostId).TargetKind);
+    }
+
+    /// <summary>
+    /// C_M17_6_BookmarkCannotLiveInAnotherResidentFolder (ADR 0168 D2 — the
+    /// M37 C_M37_6_NoteCannotLiveInAnotherResidentFolder pin re-applied): a
+    /// bookmark cannot live in another resident's folder (a foreign folder is
+    /// a non-leaky 404 on the move).
+    /// </summary>
+    [Fact]
+    public async Task C_M17_6_BookmarkCannotLiveInAnotherResidentFolder()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string ownerA = "u-cm176c-ownerA";
+        const string ownerB = "u-cm176c-ownerB";
+        const string postId = "cm176c-post";
+
+        await PlantVisiblePost(store, postId, ownerA);
+        var bmRow = await RunInSession(store, s => bm.ToggleAsync(ownerA, "post", postId, s));
+        Assert.Equal(BookmarkToggleStatus.Bookmarked, bmRow.Status);
+
+        // Owner B's folder.
+        var folderB = await RunInSession(store, s => bm.CreateFolderAsync(ownerB, "B's folder", null, s));
+        Assert.NotNull(folderB.Id);
+
+        // Owner A cannot move their bookmark into Owner B's folder (non-leaky 404).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.MoveBookmarkToFolderAsync(ownerA, "post", postId, folderB.Id, s)));
+
+        // And a non-owner cannot move Owner A's bookmark at all (non-leaky 404).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => bm.MoveBookmarkToFolderAsync(ownerB, "post", postId, null, s)));
+    }
+
+    /// <summary>
+    /// F1_ListGroupsUnderFolderTree (ADR 0168 D2 — the M37 ListNotesAsync
+    /// shape re-applied): the owner's list groups bookmarks by (TargetKind,
+    /// FolderId), with the unfiled bucket (FolderId = null) and the owner's
+    /// folder tree carried in the result (the Folders list, with the
+    /// BookmarkCount per folder).
+    /// </summary>
+    [Fact]
+    public async Task F1_ListGroupsUnderFolderTree()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, bm) = Services(store);
+        const string owner = "u-cm17f1-owner";
+        const string post1 = "cm17f1-post1";
+        const string post2 = "cm17f1-post2";
+
+        await PlantVisiblePost(store, post1, owner);
+        await PlantVisiblePost(store, post2, owner);
+        await RunInSession(store, s => bm.ToggleAsync(owner, "post", post1, s));
+        await RunInSession(store, s => bm.ToggleAsync(owner, "post", post2, s));
+
+        var folder = await RunInSession(store, s => bm.CreateFolderAsync(owner, "Read later", null, s));
+        await RunInSession(store, s => bm.MoveBookmarkToFolderAsync(owner, "post", post1, folder.Id, s));
+        // post2 stays unfiled (root).
+
+        var result = await bm.ListAsync(owner);
+
+        // The "post" kind has TWO groups: one for the folder, one unfiled.
+        var postGroups = result.Groups.Where(g => g.Kind == "post").ToList();
+        Assert.Equal(2, postGroups.Count);
+
+        // The folder group carries one item (post1) + the folder id.
+        var folderGroup = postGroups.First(g => g.FolderId == folder.Id);
+        Assert.Single(folderGroup.Items);
+        Assert.Equal(post1, folderGroup.Items[0].TargetId);
+        Assert.Equal(folder.Id, folderGroup.Items[0].FolderId);
+
+        // The unfiled group carries one item (post2), FolderId = null.
+        var unfiledGroup = postGroups.First(g => g.FolderId is null);
+        Assert.Single(unfiledGroup.Items);
+        Assert.Equal(post2, unfiledGroup.Items[0].TargetId);
+        Assert.Null(unfiledGroup.Items[0].FolderId);
+
+        // The owner's folder tree is carried in the result, with the correct
+        // BookmarkCount (1 — post1).
+        var folderRow = result.Folders.First(f => f.Id == folder.Id);
+        Assert.Equal("Read later", folderRow.Name);
+        Assert.Equal(1, folderRow.BookmarkCount);
     }
 }

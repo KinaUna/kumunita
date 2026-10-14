@@ -1,0 +1,72 @@
+@model Kumunita.Web.Controllers.BookmarkMoveForm
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Move bookmark";
+
+    // Build the flat folder list (root first, then children — the ADR 0168
+    // D2 depth ≤ 2 pin). The depth is rendered as a visual indent (the
+    // M37 NoteMove shape re-applied).
+    var roots = Model.Folders.Where(f => f.ParentId is null)
+                             .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+    var children = Model.Folders.Where(f => f.ParentId is not null)
+                                .OrderBy(f => f.Name, StringComparer.Ordinal).ToList();
+}
+@* ADR 0168 D2 — the bookmark move form (the folder tree is a personal tree,
+   bounded in depth ≤ 2: root → child → grandchild — the M37 NoteMove shape
+   re-applied to the bookmark surface). The owner's own bookmark (C-M17·2 — a
+   personal read: zero AccessAudit rows). A non-owner (a GlobalAdmin
+   included) gets a non-leaky 404 (the controller's gate). The bookmark's
+   current FolderId pre-selects the active folder (the D2 "the bookmark's
+   FolderId is the owner's folder id" pin). A "No folder" option (value="")
+   moves the bookmark back to the root (FolderId = null — the D2 "a folder's
+   deletion moves its bookmarks to the root" shape, re-applied to an
+   explicit move-out). *@
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="bm.bookmark.move">Move</kw-l></h1>
+                </div>
+            </div>
+        </header>
+        <form method="post" action="@($"/bookmarks/{Model.Bookmark.TargetKind}/{Model.Bookmark.TargetId}/move")">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="bookmark-folder">
+                    <kw-l key="bm.bookmark.move">Move</kw-l>
+                </label>
+                @* The "no folder" (root) option (D2 — a bookmark's FolderId of
+                   null is the root of the owner's tree). Plain text: the
+                   bm.* closed set has no dedicated "unfiled" key, so this
+                   label is intentionally not a kw-l key. The folder names
+                   are user-supplied and are Html.Encode'd to prevent
+                   injection (the _GrantPickers.cshtml precedent). *@
+                <select class="form-select" id="bookmark-folder" name="folderId">
+                    @Html.Raw($"<option value=\"\"{(Model.Bookmark.FolderId is null ? " selected" : string.Empty)}>&mdash; (no folder) &mdash;</option>")
+                    @foreach (var root in roots)
+                    {
+                        @Html.Raw($"<option value=\"{Html.Encode(root.Id)}\"{(Model.Bookmark.FolderId == root.Id ? " selected" : string.Empty)}>{Html.Encode(root.Name)}</option>")
+                    }
+                    @if (children.Count > 0)
+                    {
+                        @foreach (var child in children)
+                        {
+                            @Html.Raw($"<option value=\"{Html.Encode(child.Id)}\"{(Model.Bookmark.FolderId == child.Id ? " selected" : string.Empty)}>&#160;&#160;&#8627;&#8627; {Html.Encode(child.Name)}</option>")
+                        }
+                    }
+                </select>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <kw-l key="common.save">Save</kw-l>
+                </button>
+                <a class="btn btn-secondary" href="/bookmarks">
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>

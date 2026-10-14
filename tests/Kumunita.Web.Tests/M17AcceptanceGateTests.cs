@@ -66,7 +66,8 @@ public sealed class M17AcceptanceGateTests
                     [
                         new BookmarkRow(kind, id, "Visible post", $"/posts/{id}", false, new DateTimeOffset(2026, 9, 30, 8, 0, 0, TimeSpan.Zero)),
                     ]),
-                ]));
+                ],
+                []));
 
         // The remove returns Removed (the row is physically deleted —
         // D4: no IsDeleted, removal is physical).
@@ -211,7 +212,7 @@ public sealed class M17AcceptanceGateTests
         // rows — the personal-read shape (C-M17·2).
         bookmarks
             .ListAsync(actor)
-            .Returns(new BookmarkListResult([]));
+            .Returns(new BookmarkListResult([], []));
 
         var store = Substitute.For<Marten.IDocumentStore>();
         var session = Substitute.For<Marten.IDocumentSession>();

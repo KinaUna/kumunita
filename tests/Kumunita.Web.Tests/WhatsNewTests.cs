@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.61.0 entry (M37 Personal notes) — 0.60.0 (Events↔boards) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.62.0 entry (Bookmark folders) — 0.61.0 (M37 Personal notes) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,12 +69,16 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The M37 Personal-notes milestone (ADR 0167 — a private
+        // slides down. The Bookmark-folders lane (ADR 0168 — the M17 §deferred
+        // "bookmark folders" question, now settled: a personal folder tree
+        // over the bookmark surface, the M37 notes folder-tree shape
+        // re-applied) is now the newest shipped (the 0.62.0 entry), so it is
+        // the head; the M37 Personal-notes milestone (ADR 0167 — a private
         // note a resident attaches to any content entity, organizable into a
-        // personal folder tree + free author-set tags, author-only) is now
-        // the newest shipped (the 0.61.0 entry), so it is the head; the
-        // Events↔boards lane (the Kanban-board↔event linkage) 0.60.0 entry
-        // slides one row back; the ONB onboarding walk-through lane 0.59.0
+        // personal folder tree + free author-set tags, author-only) 0.61.0
+        // entry slides one row back; the Events↔boards lane (the
+        // Kanban-board↔event linkage) 0.60.0 entry slides two rows back; the
+        // ONB onboarding walk-through lane 0.59.0
         // entry slides two rows back; the M36 @mentions milestone (ADR 0165)
         // 0.58.0 entry slides three rows back; the M35 kiosk-mode milestone
         // (ADR 0164) 0.57.0 entry slides four rows back; the home upcoming
@@ -93,21 +97,27 @@ public sealed class WhatsNewTests
         // escalation) 0.48.0 entry fourteen rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.61.0" && head.Date == "2026-10-14",
-            "The M37 Personal-notes 0.61.0 (2026-10-14) entry must be the head of the registry; got "
+            head.Version == "0.62.0" && head.Date == "2026-10-14",
+            "The Bookmark-folders 0.62.0 (2026-10-14) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("personal notes", StringComparison.OrdinalIgnoreCase)),
-            "The 0.61.0 head entry must name the M37 Personal-notes capability.");
+            head.Changes.Any(c => c.Contains("bookmark", StringComparison.OrdinalIgnoreCase)),
+            "The 0.62.0 head entry must name the Bookmark-folders capability.");
 
-        // The Events↔boards lane entry (0.60.0) slides one row back.
+        // The M37 Personal-notes entry (0.61.0) slides one row back.
+        var personalNotes = WhatsNew.All.Single(v => v.Version == "0.61.0");
+        Assert.True(
+            personalNotes.Changes.Any(c => c.Contains("personal notes", StringComparison.OrdinalIgnoreCase)),
+            "The 0.61.0 entry must name the M37 Personal-notes capability.");
+
+        // The Events↔boards lane entry (0.60.0) slides two rows back.
         var eventsBoards = WhatsNew.All.Single(v => v.Version == "0.60.0");
         Assert.True(
             eventsBoards.Changes.Any(c => c.Contains("board", StringComparison.OrdinalIgnoreCase)
                                          && c.Contains("event", StringComparison.OrdinalIgnoreCase)),
             "The 0.60.0 entry must name the Events ↔ boards linkage capability.");
 
-        // The ONB onboarding walk-through entry slides two rows back.
+        // The ONB onboarding walk-through entry slides three rows back.
         var onb = WhatsNew.All.Single(v => v.Version == "0.59.0");
         Assert.True(
             onb.Changes.Any(c => c.Contains("onboarding", StringComparison.OrdinalIgnoreCase)),
