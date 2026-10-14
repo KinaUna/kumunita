@@ -1480,6 +1480,110 @@ body.kmb-nav-rail-mode {
   --kmb-rail-w: 68px;
   overflow-x: hidden;
 }
+
+/* --- Rail label expander (variant C) ------------------------------------
+   The .kmb-rail-expander button toggles body.kmb-rail-expanded (rail-expander.ts).
+   Expanded: the rail widens (the --kmb-rail-w variable the content-shift
+   margin reads), each section's .kmb-rail-label appears beside its icon, the
+   hover-tip is hidden (redundant), and the buttons switch from a centered
+   46×46 icon box to a full-width icon+label row. The base 46×46 .kmb-rail-btn
+   and the 56px/68px --kmb-rail-w values are untouched — the expanded state is
+   a higher-specificity override (two body classes), so it wins the cascade at
+   every width. */
+body.kmb-nav-rail-mode.kmb-rail-expanded {
+  --kmb-rail-w: 212px;
+}
+.kmb-rail-expander {
+  flex: none;
+  width: 40px;
+  height: 30px;
+  margin-bottom: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--kmb-border);
+  border-radius: 8px;
+  color: var(--kmb-ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.kmb-rail-expander:hover,
+.kmb-rail-expander:focus {
+  background: var(--kmb-tint-a);
+  color: #1c4532;
+}
+/* The expander chevron (the inline SVG) is the animated affordance: on
+   expand it rotates 180° (pointing left = "collapse") and slides toward the
+   rail's right edge; on contract it reverses back to the original (right)
+   position and rotates 180° the other way. transform-origin sits at the icon
+   centre so the rotation reads as a spin, and the 0.35s cubic-bezier gives a
+   smooth ease. The base (collapsed) state is the identity (no transform). */
+.kmb-rail-expander svg {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-expander svg {
+  transform: translateX(4px) rotate(180deg);
+}
+.kmb-rail-label {
+  display: none;
+  min-width: 0;
+}
+/* Expanded: left-align the whole rail (logo + expander + items) to one edge
+   so they share a left margin instead of the rail's default centre column.
+   The item buttons already carry their own 0.75rem left padding (the icon
+   column); the logo (centred by the rail's align-items:center) is offset the
+   same 0.75rem so the 52px logo starts at the same left edge as the item
+   icons, and the expander chip's chevron is left-aligned + padded to the same
+   edge (so its animated rest position sits in the icon column). No rail-level
+   padding is added — that would double up on the buttons' own padding. The
+   collapsed rail is untouched (it keeps the centred column). */
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail {
+  align-items: flex-start;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-brand {
+  margin-left: 0.75rem;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-expander {
+  justify-content: flex-start;
+  padding-left: 0.75rem;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-btn {
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-label {
+  display: inline;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+body.kmb-nav-rail-mode.kmb-rail-expanded .kmb-rail-tip {
+  display: none !important;
+}
+
+/* --- Navbar variant B: inline section icons ------------------------------
+   The top-row nav links (and the "More ▾" dropdown items) carry a small
+   inline SVG (the .kmb-nav-icon) beside their text, mirroring the icon rail.
+   The icon is an inline replaced element, so vertical-align: -0.15em centres
+   it against the surrounding text baseline (no display change on the link —
+   keeping .nav-link / .dropdown-item as Bootstrap renders them, which also
+   keeps the collapsed ≤575.98px full-width rows intact). These are
+   display-only — they never change the link target or the e2e-frozen
+   selectors. */
+.nav-link .kmb-nav-icon,
+.dropdown-item .kmb-nav-icon {
+  margin-right: 0.4rem;
+  vertical-align: -0.15em;
+}
+
 .kmb-rail {
   position: fixed;
   top: 0; left: 0; bottom: 0;
@@ -2317,6 +2421,9 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 }
 @media (prefers-reduced-motion: reduce) {
   .reply-highlight { animation: none; background-color: rgba(13, 110, 253, 0.10); box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.20); }
+  /* Rail expander affordance: drop the chevron rotate/slide transition (the
+     state still changes on click — only the motion is removed). */
+  .kmb-rail-expander svg { transition: none; }
 }
 /* --- Inline editor (IE U1) — the source is hidden by default (IE·1) ---
    Hiding is a CSS class (display: none), never `disabled` (which would

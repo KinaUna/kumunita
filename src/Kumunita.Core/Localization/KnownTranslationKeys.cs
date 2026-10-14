@@ -2772,6 +2772,11 @@ public static class KnownTranslationKeys
             ["a11y.close"]                   = "Close",
             ["a11y.toggle_nav"]              = "Toggle navigation",
             ["a11y.primary_nav"]             = "Primary",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Toggle navigation labels",
             ["a11y.pagination"]              = "Pagination",
             ["a11y.pinned_announcement"]     = "Pinned announcement",
             ["a11y.banner_read_more"]        = "Read this announcement in full",
@@ -5492,6 +5497,11 @@ public static class KnownTranslationKeys
             ["a11y.close"]                   = "Schließen",
             ["a11y.toggle_nav"]              = "Navigation umschalten",
             ["a11y.primary_nav"]             = "Primär",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Navigationstexte umschalten",
             ["a11y.pagination"]              = "Paginierung",
             ["a11y.pinned_announcement"]     = "Angepinnte Ankündigung",
             ["a11y.banner_read_more"]        = "Diese Ankündigung in vollem Umfang lesen",
@@ -8109,6 +8119,11 @@ public static class KnownTranslationKeys
                 "conservées.",
             ["pl.todo.assignee_remove_confirm"] = "Retirer l'assignation de cette tâche ?",
             ["pl.todo.move_confirm"]         = "Déplacer cette tâche sur un autre tableau ? Elle ne sera plus sur ce tableau.",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Basculer les libellés de navigation",
             ["pl.todo.delete_confirm"]       = "Supprimer cette tâche et ses sous-tâches ? Cela ne peut pas être annulé.",
             ["inv.item.delete_confirm"]      = "Supprimer cet article ? Cela ne peut pas être annulé.",
             ["a11y.close"]                   = "Fermer",
@@ -10706,6 +10721,11 @@ public static class KnownTranslationKeys
                 "Slet denne bane? Dens kort kommer af dette board — to-dos'ene selv beholdes.",
             ["pl.todo.assignee_remove_confirm"] = "Fjern den tildelte fra denne to-do?",
             ["pl.todo.move_confirm"]         = "Flyt denne to-do til et andet board? Den er ikke længere på dette board.",
+            // The rail expander (variant C): toggles each section's text
+            // label beside its icon. One button; the aria-label covers both
+            // directions (show/hide), so the state is carried by
+            // aria-expanded, not the label.
+            ["a11y.rail_expand"]             = "Skift navigationstekster",
             ["pl.todo.delete_confirm"]       = "Slet denne to-do og dens underafgørelser? Det kan ikke fortrydes.",
             ["inv.item.delete_confirm"]      = "Slet dette element? Det kan ikke fortrydes.",
             ["a11y.close"]                   = "Luk",
