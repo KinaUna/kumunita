@@ -436,6 +436,131 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal(before, after);
     }
 
+    // ── 13 — C_M37_6_FolderTree_DepthBounded_UniqueName (D6 / C-M37·6) ───
+
+    [Fact]
+    public async Task C_M37_6_FolderTree_DepthBounded_UniqueName()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-c6-owner";
+
+        // Depth bound (D6): root → child is the whole tree.
+        var root = await RunInSession(store, s => svc.CreateFolderAsync(owner, "Work", null, s));
+        var child = await RunInSession(store, s => svc.CreateFolderAsync(owner, "Deep", root.Id, s));
+        Assert.Equal(root.Id, child.ParentId); // the child hangs under the root
+
+        // A grandchild would open the tree past the depth ≤ 2 bound — refused
+        // (the Web layer maps InvalidOperationException to 400 — the depth is
+        // violated), and nothing is committed.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => RunInSession(store, s => svc.CreateFolderAsync(owner, "TooDeep", child.Id, s)));
+        var foldersAfterReject = await Folders(store, owner);
+        Assert.DoesNotContain(foldersAfterReject, f => f.Name == "TooDeep");
+
+        // Unique name within the owner's tree (D6): the (OwnerId, ParentId,
+        // Name) unique index is the witness. A same-name, same-parent folder
+        // is a no-op (one row — returns the existing row); the same name
+        // under a *different* parent is a fresh row.
+        var dupRoot = await RunInSession(store, s => svc.CreateFolderAsync(owner, "Work", null, s));
+        Assert.Equal(root.Id, dupRoot.Id); // no-op — the existing root, not a new one
+
+        var sameNameUnderRoot =
+            await RunInSession(store, s => svc.CreateFolderAsync(owner, "Work", root.Id, s));
+        Assert.NotEqual(root.Id, sameNameUnderRoot.Id); // same name, different parent — a new row
+        Assert.Equal(root.Id, sameNameUnderRoot.ParentId);
+
+        // The (OwnerId, ParentId, Name) unique index is the DB witness: the
+        // two "Work" rows differ only by ParentId, so both are allowed.
+        var folders = await Folders(store, owner);
+        Assert.Equal(3, folders.Count); // Work(root) + Deep(child) + Work(under root)
+    }
+
+    // ── 14 — C_M37_6_FolderDeletion_MovesNotesToRoot_BodiesSurvive (D6) ──
+
+    [Fact]
+    public async Task C_M37_6_FolderDeletion_MovesNotesToRoot_BodiesSurvive()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string owner = "u-c6b-owner";
+
+        var root = await RunInSession(store, s => svc.CreateFolderAsync(owner, "Archive", null, s));
+        var child = await RunInSession(store, s => svc.CreateFolderAsync(owner, "Old", root.Id, s));
+
+        // Plant two notes — one in the root folder, one in the child — each
+        // with its own body.
+        await Plant(store, new PersonalNote
+        {
+            Id = "c6b-note-root", OwnerId = owner, TargetKind = "post",
+            TargetId = "c6b-p1", Body = "body in root folder",
+            FolderId = root.Id, Created = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new PersonalNote
+        {
+            Id = "c6b-note-child", OwnerId = owner, TargetKind = "post",
+            TargetId = "c6b-p2", Body = "body in child folder",
+            FolderId = child.Id, Created = DateTimeOffset.UtcNow,
+        });
+
+        // Delete the root folder — it has a child, so the outcome is
+        // FoldersDeleted (child recursively deleted).
+        var result = await RunInSession(store, s => svc.DeleteFolderAsync(owner, root.Id, s));
+        Assert.Equal(FolderDeleteResult.FoldersDeleted, result);
+
+        // Both folders (root + child) are physically removed.
+        var folders = await Folders(store, owner);
+        Assert.DoesNotContain(folders, f => f.Id == root.Id);
+        Assert.DoesNotContain(folders, f => f.Id == child.Id);
+
+        // BOTH notes survive at the root — the note bodies are never lost
+        // (the D6 pin: folder deletion is a re-parent, not a note removal).
+        var notes = await Notes(store, owner);
+        var rootNote = Assert.Single(notes, n => n.Id == "c6b-note-root");
+        var childNote = Assert.Single(notes, n => n.Id == "c6b-note-child");
+        Assert.Null(rootNote.FolderId);    // moved to the root
+        Assert.Null(childNote.FolderId);   // moved to the root (from the child)
+        Assert.Equal("body in root folder", rootNote.Body);   // body survives
+        Assert.Equal("body in child folder", childNote.Body); // body survives
+    }
+
+    // ── 15 — C_M37_6_NoteCannotLiveInAnotherResidentFolder (D6 / C-M37·6) ──
+
+    [Fact]
+    public async Task C_M37_6_NoteCannotLiveInAnotherResidentFolder()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string ownerA = "u-c6c-ownerA";
+        const string ownerB = "u-c6c-ownerB";
+
+        // Owner A's folder.
+        var folderA = await RunInSession(store, s => svc.CreateFolderAsync(ownerA, "A's folder", null, s));
+
+        // Owner B's note, sitting at the root of B's tree.
+        await Plant(store, new PersonalNote
+        {
+            Id = "c6c-noteB", OwnerId = ownerB, TargetKind = "post",
+            TargetId = "c6c-p", Body = "b's body",
+            FolderId = null, Created = DateTimeOffset.UtcNow,
+        });
+
+        // Owner B cannot move their note into owner A's folder (D6 / C-M37·6
+        // — a note cannot live in another resident's folder). A non-leaky
+        // 404 (KeyNotFoundException).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s => svc.MoveNoteToFolderAsync(ownerB, "c6c-noteB", folderA.Id, s)));
+
+        // The note is unchanged — still at the root of B's tree, body intact.
+        var after = (await Notes(store, ownerB)).First(n => n.Id == "c6c-noteB");
+        Assert.Null(after.FolderId);
+        Assert.Equal("b's body", after.Body);
+
+        // Owner A's folder is intact — no leak, no cross-owner mutation.
+        var aFolders = await Folders(store, ownerA);
+        Assert.Contains(aFolders, f => f.Id == folderA.Id);
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()
@@ -507,6 +632,14 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         await using var s = store.QuerySession();
         return await Marten.QueryableExtensions.ToListAsync(
             s.Query<PersonalNote>().Where(n => n.OwnerId == owner), ct);
+    }
+
+    private static async Task<IReadOnlyList<NoteFolder>> Folders(IDocumentStore store, string owner)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await Marten.QueryableExtensions.ToListAsync(
+            s.Query<NoteFolder>().Where(f => f.OwnerId == owner), ct);
     }
 
     private static async Task<IReadOnlyList<AccessAudit>> AllAudits(IDocumentStore store)
