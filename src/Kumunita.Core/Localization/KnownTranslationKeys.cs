@@ -1058,7 +1058,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Groups",
-            ["groups.lead"]           = "The communities you own or belong to.",
+            ["groups.lead"]           = "The groups you own or belong to.",
             ["groups.create"]         = "Create a group",
             ["groups.empty"]          = "No groups yet.",
             ["groups.back_all"]       = "← All groups",
@@ -3876,7 +3876,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Gruppen",
-            ["groups.lead"]           = "Die Gemeinschaften, die du betreibst oder denen du angehörst.",
+            ["groups.lead"]           = "Die Gruppen, die du betreibst oder denen du angehörst.",
             ["groups.create"]         = "Gruppe erstellen",
             ["groups.empty"]          = "Noch keine Gruppen.",
             ["groups.back_all"]       = "← Alle Gruppen",
@@ -6487,7 +6487,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Groupes",
-            ["groups.lead"]           = "Les communautés que tu gères ou auxquelles tu appartiens.",
+            ["groups.lead"]           = "Les groupes que tu gères ou auxquels tu appartiens.",
             ["groups.create"]         = "Créer un groupe",
             ["groups.empty"]          = "Pas encore de groupes.",
             ["groups.back_all"]       = "← Tous les groupes",
@@ -9098,7 +9098,7 @@ public static class KnownTranslationKeys
 
             // ── groups (Index / Detail / New / PostDetail) ──────────────────
             ["groups.title"]          = "Grupper",
-            ["groups.lead"]           = "De fællesskaber, du ejer eller tilhører.",
+            ["groups.lead"]           = "De grupper, du ejer eller tilhører.",
             ["groups.create"]         = "Opret en gruppe",
             ["groups.empty"]          = "Ingen grupper endnu.",
             ["groups.back_all"]       = "← Alle grupper",
