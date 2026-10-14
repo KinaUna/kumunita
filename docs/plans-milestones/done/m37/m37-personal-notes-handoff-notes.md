@@ -88,4 +88,118 @@ The unit plan's *Deliverables* prose describes the `attach` action mapping `Note
 - **(f) The Web deliverables U06's Web.Tests gate will cover:** the `/notes` list view + the `pn.nav` nav entry (top-nav + rail) + the `GET /notes` action (all compile green via the build gate; the Web.Tests run was green as insurance — **Total: 1049, Errors: 0, Failed: 0, Skipped: 1** — the 1 skip is the pre-existing `ImproveHarnessTests` pwsh-on-PATH skip). **Exit gate (the unit plan's named gate):** `dotnet build Kumunita.slnx -c Debug` green (0 errors, 29 warnings — all pre-existing, none in U05's files) + `dotnet exec tests/Kumunita.Core.Tests/bin/Debug/net10.0/Kumunita.Core.Tests.dll` green (**Total: 1514, Errors: 0, Failed: 0, Skipped: 2** — the 2 skips are pre-existing M32 supersedure; the 1514 count is U03's 1513 + U05's 1 new parity test).
 
 ## U06 — Close (the three acceptance gate tests + the six-member close flip)
-_U06 appends this section when it completes._
+
+- **(a) The three acceptance gate tests (the design doc §gate, verbatim):**
+  `tests/Kumunita.Web.Tests/M37AcceptanceGateTests.cs` —
+  `ClosedLoop_AttachListEditBodyAddTagMoveToFolderDeleteReAttach_NoOp_OneRow_OneCreated`
+  (C-M37·4 / F1 — the closed loop: attach → list → edit body → add tag →
+  create folder → move to folder → delete → re-attach no-op, one row, one
+  `Created`);
+  `NonOwner_ListAndAttachAndHasNote_404_NoAuditRow` (C-M37·2 / F3 — a
+  `GlobalAdmin` who is not the owner gets a non-leaky **404** on `GET /notes`
+  / `POST /notes/attach` / `GET /notes/has/...`, and **no** `AccessAudit`
+  row commits on any of the three — the ADR 0105 "operator has no read
+  standing" precedent);
+  `OwnerList_ZeroAuditRows_ZeroCanSeeAsyncPasses_WriteLaneIsTargetOwnDecision`
+  (C-M37·2 / C-M37·3 — the owner's `GET /notes` load commits **zero**
+  `AccessAudit` rows and runs **zero** `CanSeeAsync` passes over the note
+  rows; the D3 write-lane check is the **target's own** frozen `Read`
+  decision — one decision, the target's own row, not a note row).
+  **Pure NSubstitute seam tests** (the same harness shape as
+  `M17AcceptanceGateTests` / `NotesControllerTests`) — no database, no
+  Testcontainers. **All three green.**
+
+- **(b) The six-member close flip (D9 — the M36·10 / M35·11 "last
+  milestone, no successor" framing, re-applied):**
+  1. `src/Kumunita.Web/Milestones.cs` — M37 `StatusNext` → `StatusDone`;
+     **no** `M38` row added (M37 is the **last** milestone on the roadmap).
+  2. `tests/Kumunita.Web.Tests/MilestonesTests.cs` — re-pinned to the
+     **"last milestone, no successor"** pin (M37 → done, **no** successor to
+     promote; the `M37_Is_The_Single_InProgress_Milestone_And_The_Last`
+     test is replaced with `M37_Is_The_Last_Milestone_With_No_Successor`
+     asserting `inProgress` is empty + `Milestones.All.Last().Id == "M37"`
+     + `StatusDone`; the shipped-set loop gains M37).
+  3. `README.md` — the M37 Roadmap row flips to done (the M17 bookmarks /
+     drafts shape + the ADR 0167 close-flip description + the "M37 is the
+     last milestone on the roadmap" pin) + the M37 **Status** line is
+     appended to the README `## Status` section (after the M35 row, before
+     the "(see the Roadmap below)" line).
+  4. `docs/STATUS.md` — the M37 "next is M37" tail flips to done: the
+     `**M36 is the last milestone on the roadmap**` sentence is replaced
+     with the M37 done paragraph + the `**M37 is the last milestone on the
+     roadmap**` sentence (the M36·10 / M35·11 framing, re-applied).
+  5. `docs/ARCHITECTURE.md` — the value-chain table's "Milestone status"
+     paragraph gains the M37 row (the M37 done paragraph describing the
+     bounded context + the seam + the Web surface + the `kw-l` registry +
+     the `WhatsNew` sixth member) + the `**M37 is the last milestone on the
+     roadmap**` sentence (the M36·10 / M35·11 framing, re-applied).
+  6. `src/Kumunita.Web/WhatsNew.cs` — the **required sixth member** (ADR
+     0110): the M37 version entry `0.61.0 / 2026-10-14` (newest-first; the
+     M36 entry shape re-used — the "last milestone, no successor" pin is
+     named in the entry). `WhatsNewTests.The_ONB_OnboardingWALK_Entry_Is_Shipped`
+     re-pinned to the new head (0.61.0) with the Events↔boards 0.60.0
+     entry sliding one row back + the ONB 0.59.0 entry sliding two rows
+     back. **All green.**
+
+- **(c) The M37 milestone ships here (all green):** `dotnet build
+  Kumunita.slnx -c Debug` green (0 errors, 8 pre-existing warnings) +
+  `dotnet exec tests/Kumunita.Web.Tests/bin/Debug/net10.0/Kumunita.Web.Tests.dll`
+  green (**Total: 1052, Errors: 0, Failed: 0, Skipped: 1** — the 1 skip is
+  the pre-existing `ImproveHarnessTests` pwsh-on-PATH skip). The 3 gate
+  tests + the 18 §2.5 Core tests (U02's 15 + U03's 3, already green) + the
+  3 U04 Web tests (already green) + U05's 1 parity test (already green) +
+  the 6-member close flip — all green.
+
+- **(d) Drift observed:**
+  - The unit plan's `Deliverables` prose names `PUT /notes/{id}` /
+    `POST /notes/{id}/tags` / `POST /notes/{id}/move` / `DELETE /notes/{id}`
+    HTTP routes for the per-row write lanes (edit body / add tag / move to
+    folder / delete). The **frozen** `IPersonalNoteService` (U02/U03) is
+    the source of truth: the per-row write lanes are the **frozen Core
+    seam** methods (`UpdateNoteBodyAsync` / `AddTagAsync` /
+    `RemoveTagAsync` / `MoveNoteToFolderAsync` / `DeleteNoteAsync`), not
+    new Web routes. The Web layer (U04/U05) ships **only** the
+    `GET /notes` / `POST /notes/attach` / `GET /notes/has/{targetKind}/{targetId}`
+    routes. The gate test (a) drives the per-row write lanes **directly
+    against the substituted `IPersonalNoteService`** (the frozen Core seam)
+    and the attach / list / has-note routes through the
+    `NotesController` (the frozen Web surface). The controller's
+    `SaveChangesAsync` commit count is the **2 attach calls** (the C3
+    same-transaction lane — the controller commits, the service never does);
+    the direct Core-seam calls are exercised against the substituted seam
+    and do not go through the controller's commit path. **No** new Web
+    `POST` / `PUT` / `DELETE` controller actions were added to satisfy the
+    prose (the unit plan's "don't" list explicitly forbids this). The
+    frozen Core seam is the source of truth, and this deviation is
+    recorded here (the U03 / U04 drift-pause precedent, re-applied).
+
+### U06 — Drift pause (frozen-shape deviation; recorded + proceeded)
+
+The unit plan's `Deliverables` prose describes the per-row write lanes as
+**Web routes** (`PUT /notes/{id}` / `POST /notes/{id}/tags` /
+`POST /notes/{id}/move` / `DELETE /notes/{id}`). The **frozen**
+`IPersonalNoteService` (shipped U02/U03) is the source of truth: the
+per-row write lanes are the **frozen Core seam** methods
+(`UpdateNoteBodyAsync` / `AddTagAsync` / `RemoveTagAsync` /
+`MoveNoteToFolderAsync` / `DeleteNoteAsync`), not new Web routes. The Web
+layer (U04/U05) ships **only** the `GET /notes` / `POST /notes/attach` /
+`GET /notes/has/{targetKind}/{targetId}` routes. The gate test (a) drives
+the per-row write lanes **directly against the substituted
+`IPersonalNoteService`** (the frozen Core seam) and the attach / list /
+has-note routes through the `NotesController` (the frozen Web surface).
+**No** new Web `POST` / `PUT` / `DELETE` controller actions were added to
+satisfy the prose (the unit plan's "don't" list explicitly forbids this).
+The frozen Core seam is the source of truth, and this deviation is
+recorded here (the U03 / U04 drift-pause precedent, re-applied). No
+interface, ADR 0167, or design-doc change was made.
+
+---
+
+**M37 is closed.** The `in-progress/` folder is **empty** — all of M37's
+plans + the register + the handoff note live in `done/m37/`. The `Milestones`
+roadmap is **fully shipped** (every entry is `StatusDone`; M37 is the last
+entry — no `M38` to promote). The `MilestonesTests` pin is the **"last
+milestone, no successor"** assertion (the M36·10 / M35·11 framing,
+re-applied). The `WhatsNew` registry head is `0.61.0` (M37 Personal notes,
+2026-10-14). The design doc, ADR 0167, and the register are all in their
+final, locked state.
