@@ -324,7 +324,7 @@
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5 8 2.5l5.5 5v6h-11z"/></svg>@_navHome</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 5.5h10v5H3z"/><path d="m3 5.5 5 3.5 5-3.5"/></svg>@_navAnnouncements</a>
+                                <a class="nav-link text-dark @(activeNav == "announcements" ? "active" : null)" href="/announcements"><svg class="kmb-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>@_navAnnouncements</a>
                             </li>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
@@ -427,7 +427,7 @@
                         <span class="kmb-rail-tip">@_navHome</span>
                     </a>
                     <a class="kmb-rail-btn @(activeNav == "announcements" ? "active" : null)" href="/announcements">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M3 5.5h10v5H3z"/><path d="m3 5.5 5 3.5 5-3.5"/></svg>
+                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.5 10 3v10l-7.5-3.5z"/><path d="M2.5 7.5H1v4h1.5z"/><path d="M12 5.2a4 4 0 0 1 0 5.6"/><path d="M13.8 3.8a6.5 6.5 0 0 1 0 8.4"/></svg>
                         <span class="visually-hidden">@_navAnnouncements</span>
                         <span class="kmb-rail-label">@_navAnnouncements</span>
                         <span class="kmb-rail-tip">@_navAnnouncements</span>
