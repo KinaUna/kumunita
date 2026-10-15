@@ -2062,6 +2062,32 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
     }
 
     /// <inheritdoc />
+    public async Task SetProfileFirstDayOfWeekAsync(string subjectId, int? firstDayOfWeek, string actorBy)
+    {
+        // ADR 0169 — the resident's first-day-of-week preference write lane.
+        // Mirrors SetProfilePageSizeAsync exactly (the C-MED·8 single
+        // write-lane shape): the self-scope check happens at the Web boundary
+        // (the owner is the actor); this lane writes Profile.FirstDayOfWeek
+        // only. One session, one SaveChangesAsync (C3); no audit row (a
+        // Profile field write — the UpsertProfileAsync shape, "not an access
+        // decision"). Fail closed on a missing profile (never load-or-create,
+        // the SetProfilePageSizeAsync pin). Strong consistency (C4): the new
+        // value is live on the very next GetProfileAsync call. Stored as-is
+        // (resolved to the Monday default on the read path by
+        // WeekAnchor.Resolve — the ADR 0019 "store, resolve on read" posture;
+        // a display preference is never a fail-closed gate).
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.FirstDayOfWeek = firstDayOfWeek;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetProfileHideHomeIntroAsync(string subjectId, bool hideHomeIntro, string actorBy)
     {
         // ADR 0149 D1 — the resident's hide-home-intro preference write lane.

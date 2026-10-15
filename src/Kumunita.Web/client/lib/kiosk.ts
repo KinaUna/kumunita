@@ -51,6 +51,49 @@
   const viewIntervalSec = parseInt(stage.getAttribute('data-view-interval') || '0', 10);
   const refreshIntervalSec = parseInt(stage.getAttribute('data-refresh-interval') || '0', 10);
 
+  // ── The display mode (the ADR 0164 amendment "full page vs. full screen"
+  //    pin, display-only, M35·4). "fullscreen" → the view renders a
+  //    .kmb-kiosk-fullscreen-btn button the user clicks to enter the browser's
+  //    Fullscreen API (the board's .kanban-fullscreen-toggle / calendar's
+  //    requestFullscreen precedent — the browser hides its own chrome and the
+  //    stage owns the whole monitor). "fullpage" (the default) → the stage
+  //    fills the browser viewport (the view's inline CSS handles that).
+  //    requestFullscreen needs a user gesture (a top-level page load is not
+  //    one), so the button is the gesture surface. The ✕ exit link (top-right)
+  //    still works in both modes; the browser's Esc also exits full screen.
+  const displayMode = (stage.getAttribute('data-display-mode') || 'fullpage').toLowerCase();
+  if (displayMode === 'fullscreen') {
+    const fsBtn = stageEl.querySelector<HTMLElement>('.kmb-kiosk-fullscreen-btn');
+    const fsClose = stageEl.querySelector<HTMLElement>('.kmb-kiosk-fullscreen-close');
+
+    if (fsBtn && typeof (stageEl as HTMLElement).requestFullscreen !== 'function') {
+      // The Fullscreen API is unavailable (Safari iOS, etc.) — hide the button
+      // (the display degrades to full-page, the ADR 0104 chrome-hide shape).
+      fsBtn.hidden = true;
+    } else if (fsBtn) {
+      fsBtn.addEventListener('click', () => {
+        void (stageEl as HTMLElement).requestFullscreen?.();
+      });
+    }
+
+    if (fsClose) {
+      fsClose.addEventListener('click', () => {
+        void (document as Document).exitFullscreen?.();
+      });
+    }
+
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = document.fullscreenElement === stageEl;
+      if (fsBtn) {
+        fsBtn.setAttribute('aria-pressed', String(isFs));
+        fsBtn.classList.toggle('kmb-kiosk-fs-active', isFs);
+      }
+      if (fsClose) {
+        fsClose.hidden = !isFs;
+      }
+    });
+  }
+
   // The per-slide meta (U04's contract): one .kmb-kiosk-slide-meta per slide,
   // in order, each carrying data-index / data-href / data-denied / data-label.
   // The meta array is the indexed source of truth for hrefs/denied/label

@@ -211,6 +211,30 @@ public interface IUserInfoService
     Task SetProfilePageSizeAsync(string subjectId, int? pageSize, string actorBy);
 
     /// <summary>
+    /// Set (or clear, with null) the resident's
+    /// <see cref="Profile.FirstDayOfWeek"/> first-day-of-week preference
+    /// (ADR 0169) — the day (the <see cref="System.DayOfWeek"/> ordinal,
+    /// 0 = Sunday … 6 = Saturday) that weeks anchor on across the day-of-week
+    /// selectors (the Quiet-hours / Guardian time-limit pickers) and the
+    /// events calendar's week + month columns. Mirrors
+    /// <see cref="SetProfilePageSizeAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary
+    /// (the owner is the actor); this lane writes <c>Profile.FirstDayOfWeek</c>
+    /// only. One session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// The value is resolved on the read path
+    /// (<see cref="Query.WeekAnchor.Resolve"/>): a <c>null</c> / out-of-range
+    /// value resolves to the platform default, Monday. Strong consistency
+    /// (invariant C4): the new value is live on the very next
+    /// <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task SetProfileFirstDayOfWeekAsync(string subjectId, int? firstDayOfWeek, string actorBy);
+
+    /// <summary>
     /// Set the resident's <see cref="Profile.HideHomeIntro"/> flag (ADR 0149,
     /// D1) — whether the home page hides the two top intro sections ("Intro:
     /// what Kumunita is and does" + "What Kumunita does") so a signed-in

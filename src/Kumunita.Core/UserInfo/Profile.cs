@@ -320,6 +320,29 @@ public sealed class Profile
     /// </summary>
     public int? PageSize { get; set; }
 
+    // ADD (ADR 0169; ADR 0004 §B.1 additive — another additive Profile field,
+    // the PageSize / TimeZone single-write-lane shape):
+    /// <summary>
+    /// The resident's **first-day-of-week preference** (ADR 0169) — the day a
+    /// week is anchored on, expressed as the <see cref="System.DayOfWeek"/>
+    /// ordinal (0 = Sunday … 6 = Saturday). <c>null</c> means the resident has
+    /// not set a value, so the platform default — <b>Monday</b>
+    /// (<see cref="System.DayOfWeek.Monday"/> = 1) — applies: "preference if
+    /// present", the same resolution order as <see cref="TimeZone"/> /
+    /// <see cref="DateFormat"/>. This is a pure *display* preference — it
+    /// reorders the day-of-week selectors on the Quiet-hours / Guardian
+    /// time-limit surfaces and re-anchors the events calendar's week + month
+    /// columns; it never touches authorization or data. Written only by the
+    /// owner-scope
+    /// <see cref="IUserInfoService.SetProfileFirstDayOfWeekAsync"/> lane (the
+    /// <see cref="IUserInfoService.SetProfilePageSizeAsync"/> single-write-lane
+    /// shape — the self-scope check happens at the Web boundary); read by the
+    /// settings + calendar + guardian surfaces per request. An *additive*
+    /// field (ADR 0004 §B.1), like <see cref="PageSize"/>: delta-detected,
+    /// idempotent, no re-seed, no EF migration.
+    /// </summary>
+    public int? FirstDayOfWeek { get; set; }
+
     // ADD (ADR 0149 D1; ADR 0004 §B.1 additive — the 13th additive Profile
     // field after AvatarId, TimeZone, DateFormat, EmailLanguage, Bio, TagIds,
     // OnboardingCompletedAt, MessagingOptIn, MessagingRestricted,

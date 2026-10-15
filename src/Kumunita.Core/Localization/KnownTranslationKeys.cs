@@ -685,6 +685,12 @@ public static class KnownTranslationKeys
                 "Pick how dates and times are shown to you. Your choice is saved on your account — " +
                 "it takes effect the next time you load a page, and never affects other residents.",
             ["settings.dateformat_label"]        = "Your date & time format",
+            // ADR 0169 — the resident's first-day-of-week preference (the
+            // date-format section's sibling on the Date & time format page):
+            // the radio-group heading + its explanatory note.
+            ["settings.dateformat_firstday_label"]  = "First day of week",
+            ["settings.dateformat_firstday_note"]   =
+                "The day your calendar week starts on, and the day shown at the top of your day-of-week lists. Defaults to Monday.",
             ["settings.dateformat_default_marker"] = "— platform default",
             ["settings.dateformat_default_note"] = "The platform default is ",
             ["settings.dateformat_default_tail"] =
@@ -2866,6 +2872,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk display",
             ["kiosk.settings.view_interval"] = "Change view every (seconds)",
             ["kiosk.settings.refresh_interval"] = "Refresh content every (seconds)",
+            ["kiosk.settings.display_mode"] = "Display mode",
+            ["kiosk.settings.display_mode.full_page"] = "Full page (fill the browser window)",
+            ["kiosk.settings.display_mode.full_screen"] = "Full screen (the whole monitor)",
+            ["kiosk.settings.display_mode.hint"] = "Full page fills your browser window; full screen also hides the browser's tabs and address bar (a user gesture is needed to enter it).",
         };
 
     // ─────────────────────────────────────────────────────────────────────
@@ -3552,6 +3562,9 @@ public static class KnownTranslationKeys
                 "Wähle, wie dir Datum und Zeit angezeigt werden. Deine Auswahl wird in deinem Konto gespeichert — " +
                 "sie wird beim nächsten Seitenaufruf wirksam und betrifft nie andere Anwohner:innen.",
             ["settings.dateformat_label"]        = "Dein Datum- und Zeitformat",
+            ["settings.dateformat_firstday_label"]  = "Erster Wochentag",
+            ["settings.dateformat_firstday_note"]   =
+                "Der Tag, an dem deine Kalenderwoche beginnt, und der Tag oben in deinen Tageslisten. Standardmäßig Montag.",
             ["settings.dateformat_default_marker"] = "— Plattform-Vorgabe",
             ["settings.dateformat_default_note"] = "Die Plattform-Voreinstellung ist ",
             ["settings.dateformat_default_tail"] =
@@ -5579,6 +5592,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk-Anzeige",
             ["kiosk.settings.view_interval"] = "Ansicht wechseln alle (Sekunden)",
             ["kiosk.settings.refresh_interval"] = "Inhalt aktualisieren alle (Sekunden)",
+            ["kiosk.settings.display_mode"] = "Anzeigemodus",
+            ["kiosk.settings.display_mode.full_page"] = "Vollseite (Browserfenster füllen)",
+            ["kiosk.settings.display_mode.full_screen"] = "Vollbild (der ganze Monitor)",
+            ["kiosk.settings.display_mode.hint"] = "Vollseite füllt dein Browserfenster; Vollbild blendet zusätzlich die Browser-Tabs und die Adressleiste aus (zum Betreten ist eine Benutzeraktion erforderlich).",
         };
 
     /// <summary>
@@ -6172,6 +6189,9 @@ public static class KnownTranslationKeys
                 "Choisis le format de date et d'heure que la plateforme t'affiche. Ton choix est enregistré sur ton compte — " +
                 "il prend effet au prochain chargement de page, et n'affecte jamais les autres habitants.",
             ["settings.dateformat_label"]        = "Ton format de date et d'heure",
+            ["settings.dateformat_firstday_label"]  = "Premier jour de la semaine",
+            ["settings.dateformat_firstday_note"]   =
+                "Le jour où commence ta semaine de calendrier, et le jour placé en tête de tes listes de jours. Lundi par défaut.",
             ["settings.dateformat_default_marker"] = "— défaut de la plateforme",
             ["settings.dateformat_default_note"] = "Le défaut de la plateforme est ",
             ["settings.dateformat_default_tail"] =
@@ -8206,6 +8226,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Affichage du kiosque",
             ["kiosk.settings.view_interval"] = "Changer de vue toutes les (secondes)",
             ["kiosk.settings.refresh_interval"] = "Actualiser le contenu toutes les (secondes)",
+            ["kiosk.settings.display_mode"] = "Mode d'affichage",
+            ["kiosk.settings.display_mode.full_page"] = "Page entière (remplir la fenêtre du navigateur)",
+            ["kiosk.settings.display_mode.full_screen"] = "Plein écran (tout le moniteur)",
+            ["kiosk.settings.display_mode.hint"] = "Page entière remplit votre fenêtre de navigateur ; plein écran masque aussi les onglets et la barre d'adresse du navigateur (une action de l'utilisateur est nécessaire pour l'activer).",
         };
 
     /// <summary>
@@ -8797,6 +8821,9 @@ public static class KnownTranslationKeys
                 "Vælg, hvordan datoer og tidspunkter vises for dig. Dit valg gemmes på din konto — " +
                 "det træder i kraft næste gang, du indlæser en side, og påvirker aldrig andre beboere.",
             ["settings.dateformat_label"]        = "Dit dato- og tidsformat",
+            ["settings.dateformat_firstday_label"]  = "Første ugedag",
+            ["settings.dateformat_firstday_note"]   =
+                "Den dag, din kalenderuge starter på, og den dag, der vises øverst i dine dagslister. Mandag som standard.",
             ["settings.dateformat_default_marker"] = "— platformstandard",
             ["settings.dateformat_default_note"] = "Plattformens standard er ",
             ["settings.dateformat_default_tail"] =
@@ -10807,6 +10834,10 @@ public static class KnownTranslationKeys
             ["kiosk.settings.title"]         = "Kiosk-display",
             ["kiosk.settings.view_interval"] = "Skift visning hver (sekunder)",
             ["kiosk.settings.refresh_interval"] = "Opdater indhold hver (sekunder)",
+            ["kiosk.settings.display_mode"] = "Visningstilstand",
+            ["kiosk.settings.display_mode.full_page"] = "Hele siden (fyld browservinduet)",
+            ["kiosk.settings.display_mode.full_screen"] = "Fuldskærm (hele monitoren)",
+            ["kiosk.settings.display_mode.hint"] = "Hele siden fylder dit browservindue; fuldskærm skjuler også browserens faner og adressefelt (det kræver en brugerhandling at aktivere).",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

@@ -555,9 +555,21 @@
                         <kw-l key="guardian.timelimit.days_label">Days of week</kw-l>
                     </label>
                     <select class="form-select" name="daysOfWeek" id="tlDays" multiple size="7">
-                        @for (var d = 0; d < 7; d++)
+                        @{
+                            // ADR 0169 — order the days to lead with the child's
+                            // first day of the week (the Detail action's
+                            // ViewData["ChildFirstDayOfWeek"], resolved to the
+                            // Monday default when the child has not set one),
+                            // matching the child's own week. Localized day names
+                            // via the effective language (the Quiet.cshtml
+                            // DayName idiom). The posted value is still the 0…6
+                            // ordinal (value unchanged); only the order moves.
+                            var _tlFirstDay = (int)(ViewData["ChildFirstDayOfWeek"] ?? Kumunita.Core.Query.WeekAnchor.Default);
+                            var _tlDayFmt = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat;
+                        }
+                        @foreach (var d in Kumunita.Core.Query.WeekAnchor.OrderDays(_tlFirstDay))
                         {
-                            <option value="@d" selected="@(_tlDays.Contains(d) ? "selected" : null)">@d</option>
+                            <option value="@d" selected="@(_tlDays.Contains(d) ? "selected" : null)">@_tlDayFmt.GetDayName((System.DayOfWeek)d)</option>
                         }
                     </select>
                 </div>

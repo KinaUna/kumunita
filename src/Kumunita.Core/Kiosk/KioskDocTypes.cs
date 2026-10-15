@@ -9,9 +9,10 @@ namespace Kumunita.Core;
 /// <see cref="SiteContentDocTypes"/> / <see cref="SurfaceLabelsDocTypes"/> /
 /// <see cref="EscalationDocTypes"/> for the new
 /// <c>Kumunita.Core.Kiosk</c> context (M35·1). The
-/// <see cref="KioskPlaylist"/> singleton has the conventional <c>string</c>
-/// <c>Id</c> identity (fixed to the sentinel <c>"kiosk"</c>, the
-/// <c>SiteContent</c> / <c>LocaleSettings</c> shape, ADR 0005 B), so no
+/// <see cref="KioskPlaylist"/> doc has the conventional <c>string</c>
+/// <c>Id</c> identity (the acting resident's subject id — one row per
+/// resident, the ADR 0164 amendment; the <c>LocaleSettings</c> per-user
+/// shape, ADR 0005 B), so no
 /// non-default convention or business-key index is needed — only the explicit
 /// <c>Schema.For</c> makes the doc visible to Marten (the
 /// SiteContentDocTypes / SurfaceLabelsDocTypes / EscalationDocTypes
@@ -22,6 +23,12 @@ namespace Kumunita.Core;
 /// **no** new doc type beyond <see cref="KioskPlaylist"/>; the M5
 /// <c>Projects</c> + M4 <c>Events</c> contexts are **untouched**).
 /// </para>
+/// The <see cref="KioskPlaylist"/> is now a **per-resident** row (the ADR
+/// 0164 amendment — one row per signed-in user, keyed on the user's subject
+/// id, rather than the one shared GlobalAdmin singleton); the doc's identity
+/// is still the conventional <c>string</c> <c>Id</c>, so the registration is
+/// unchanged.
+/// <para>
 /// Idempotent: calling twice is safe — Marten's <c>Schema.For&lt;T&gt;()</c>
 /// returns the same document mapping each time, and the delta is applied
 /// idempotently by <c>ApplyAllConfiguredChangesToDatabaseAsync()</c> at boot

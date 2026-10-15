@@ -509,6 +509,15 @@ public sealed class EventController : Controller
             ? parsed.Date
             : nowInZone.Date;
 
+        // ADR 0169 — the viewer's first-day-of-week preference (a *display* input
+        // only, never an access input — C-DWM·3): the day the week + month grids
+        // anchor on. Resolved to the Monday default (WeekAnchor.Default = 1) when
+        // the viewer has not set one, so the default view is byte-identical to the
+        // pre-preference ISO Monday-start shape (C-DWM·5 / the pinned calendar
+        // tests). A read, not a decision — the CanSeeAsync gate already ran.
+        var viewerProfile = await userInfo.GetProfileAsync(actorId);
+        var firstDay = Kumunita.Core.Query.WeekAnchor.Resolve(viewerProfile?.FirstDayOfWeek);
+
         // Per-view window (ADR 0064 §6.2 step 3): each bound = the window's
         // first/last day's zone-local midnight → UTC instant (the anchor's
         // local midnight is a display anchor, not a stored value — a
@@ -535,31 +544,58 @@ public sealed class EventController : Controller
             }
             case "week":
             {
-                // Week (F2, C-DWM·5): the anchor's ISO **Monday-start** week —
-                // Monday = anchor minus ((int)DayOfWeek + 6) % 7 days;
-                // [mondayLocalStartUtc, mondayLocalStartUtc + 7d); WindowDays
-                // = the 7 days monday .. monday+6 (Monday-first).
-                var monday = anchorDate.AddDays(-(((int)anchorDate.DayOfWeek + 6) % 7));
-                windowStartLocal = monday;
-                windowEndLocalExclusive = monday.AddDays(7);
-                windowDays = Enumerable.Range(0, 7).Select(n => monday.AddDays(n)).ToList();
+                // Week (F2, C-DWM·5): the anchor's week anchored on the viewer's
+                // first day (ADR 0169; the Monday-start ISO shape when unset — the
+                // offset below reduces to ((int)DayOfWeek + 6) % 7 for firstDay =
+                // Monday, so the default is byte-identical). WindowDays = the 7
+                // days from the anchor's week-start through +6.
+                int WeekOffset(DateTime d) => ((int)d.DayOfWeek - firstDay + 7) % 7;
+                var weekStart = anchorDate.AddDays(-WeekOffset(anchorDate));
+                windowStartLocal = weekStart;
+                windowEndLocalExclusive = weekStart.AddDays(7);
+                windowDays = Enumerable.Range(0, 7).Select(n => weekStart.AddDays(n)).ToList();
                 break;
             }
             default:
             {
                 // Month (F3): the anchor's calendar month —
                 // [1stLocalStartUtc, 1stLocalStartUtc + DaysInMonth);
-                // WindowDays = the 5–6 full weeks covering the month,
-                // starting on the Monday on or before the 1st (D4).
+                // WindowDays = the weeks covering the month, starting on the
+                // first day of the viewer's week on or before the 1st (D4).
+                //
+                // ADR 0169 — honor the viewer's first-day preference, but keep
+                // the **Monday default byte-identical** to the pre-preference
+                // shape (the pinned Calendar_ViewMonth_WindowIsAnchorCalendarMonth
+                // test asserts the original grid Monday + count, so the default
+                // path is the original formula verbatim — note the original's
+                // trailing pad is `1 + (6 − dow)` *without* a %7, a ragged
+                // trailing week). A non-Monday first day (the only opt-in value
+                // is Sunday) uses the same anchor-on-the-1st + trailing-next-
+                // first-day shape with the preference's offset.
+                int WeekOffset(DateTime d) => ((int)d.DayOfWeek - firstDay + 7) % 7;
                 var monthStart = new DateTime(anchorDate.Year, anchorDate.Month, 1);
                 var daysInMonth = DateTime.DaysInMonth(anchorDate.Year, anchorDate.Month);
-                var gridMonday = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
-                var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
-                var gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                DateTime gridStart, gridEndExclusive;
+                if (firstDay == Kumunita.Core.Query.WeekAnchor.Default)
+                {
+                    // The original Monday-start month grid, verbatim (C-DWM·4).
+                    gridStart = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
+                    var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                    gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                }
+                else
+                {
+                    // The opt-in (Sunday) week anchor: grid starts on the first
+                    // day of the viewer's week on/before the 1st, ends on the
+                    // first day of the week after the month's last day.
+                    gridStart = monthStart.AddDays(-WeekOffset(monthStart));
+                    var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                    gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - WeekOffset(monthEndInclusive)) % 7));
+                }
                 windowStartLocal = monthStart;
                 windowEndLocalExclusive = monthStart.AddDays(daysInMonth);
                 windowDays = new List<DateTime>();
-                for (var d = gridMonday; d < gridEndExclusive; d = d.AddDays(1))
+                for (var d = gridStart; d < gridEndExclusive; d = d.AddDays(1))
                     windowDays.Add(d);
                 break;
             }

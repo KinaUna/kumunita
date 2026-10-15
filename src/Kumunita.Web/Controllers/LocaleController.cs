@@ -264,6 +264,12 @@ public sealed class LocaleController(
             DateFormat = BuildDateFormatSection(subject, currentDf,
                 defaultFmt: await localization.GetDefaultDateFormatAsync()),
 
+            // ADR 0169 — the first-day-of-week preference (the DateFormat
+            // section's sibling on the Date & time format page). Resolved here
+            // (a null / out-of-range stored value → the Monday default), so the
+            // view's radio group always pre-selects a concrete day.
+            FirstDayOfWeek = Kumunita.Core.Query.WeekAnchor.Resolve(profile?.FirstDayOfWeek),
+
             // The items-per-page section: the resident's saved override (or
             // null = platform default), pre-selected; the picker offers the
             // PageSizer Min..Max range in steps of 5.
@@ -499,7 +505,7 @@ public sealed class LocaleController(
     /// </summary>
     [HttpPost("/settings/dateformat")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveDateFormat(string? format, string? customFormat, string? clear)
+    public async Task<IActionResult> SaveDateFormat(string? format, string? customFormat, string? firstDayOfWeek = null, string? clear = null)
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
@@ -521,13 +527,26 @@ public sealed class LocaleController(
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next request resolves to the instance default).
                 await userInfo.SetProfileDateFormatAsync(subject, null, subject);
-                TempData["info"] = await FlashAsync("settings.dateformat_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(chosen))
             {
                 await userInfo.SetProfileDateFormatAsync(subject, chosen, subject);
-                TempData["info"] = await FlashAsync("settings.dateformat_flash_set");
             }
+
+            // ADR 0169 — the first-day-of-week preference is a **separate**
+            // concern from the date-format `clear` (a "reset date format" must
+            // not touch the resident's week anchor). Write it only when the
+            // main form posted a valid day (the radio group always does); the
+            // reset form (clear=1) omits it, so the preference is left
+            // untouched. Choosing the Monday default here is how a resident
+            // resets the preference (the "preference if present" shape).
+            if (int.TryParse(firstDayOfWeek, out var fd) && fd is >= 0 and <= 6)
+            {
+                await userInfo.SetProfileFirstDayOfWeekAsync(subject, fd, subject);
+            }
+
+            TempData["info"] = await FlashAsync(
+                clear == "1" ? "settings.dateformat_flash_reset" : "settings.dateformat_flash_set");
         }
         catch (KeyNotFoundException)
         {
@@ -769,6 +788,15 @@ public sealed class LocaleController(
         /// when the caller has no subject (the public quick picker renders the
         /// language section only).</summary>
         public DateFormatSettings? DateFormat { get; init; }
+
+        /// <summary>ADR 0169 — the resident's first-day-of-week preference,
+        /// resolved to the <see cref="System.DayOfWeek"/> ordinal to pre-select
+        /// (0 = Sunday … 6 = Saturday). The value is resolved on the way in
+        /// (a <c>null</c> / out-of-range stored value resolves to the platform
+        /// default — Monday, <see cref="Kumunita.Core.Query.WeekAnchor.Default"/>).
+        /// Rendered as the "First day of week" radio group on the Date &amp;
+        /// time format page (the DateFormatSettings' sibling).</summary>
+        public int FirstDayOfWeek { get; init; } = Kumunita.Core.Query.WeekAnchor.Default;
 
         /// <summary>The email &amp; notification language section (ADR 0061),
         /// or <c>null</c> when the caller has no subject (the public quick

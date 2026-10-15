@@ -61,7 +61,7 @@ public sealed class WhatsNewTests
             "Duplicate versions found: " + string.Join(", ", dupes));
     }
 
-    [Fact(DisplayName = "The newest-first head is the 0.62.0 entry (Bookmark folders) — 0.61.0 (M37 Personal notes) slides one row back")]
+    [Fact(DisplayName = "The newest-first head is the 0.65.0 entry (First day of week) — 0.64.0 (Kiosk display mode) slides one row back")]
     public void The_ONB_OnboardingWALK_Entry_Is_Shipped()
     {
         // Pin the version-registry head (the required sixth close-flip member,
@@ -69,42 +69,61 @@ public sealed class WhatsNewTests
         // entry is caught by the build instead of silently losing the
         // "What's new" announcement of the close. The head is newest-first:
         // when a milestone ships it becomes the head and the previous head
-        // slides down. The Bookmark-folders lane (ADR 0168 — the M17 §deferred
-        // "bookmark folders" question, now settled: a personal folder tree
-        // over the bookmark surface, the M37 notes folder-tree shape
-        // re-applied) is now the newest shipped (the 0.62.0 entry), so it is
-        // the head; the M37 Personal-notes milestone (ADR 0167 — a private
-        // note a resident attaches to any content entity, organizable into a
-        // personal folder tree + free author-set tags, author-only) 0.61.0
-        // entry slides one row back; the Events↔boards lane (the
-        // Kanban-board↔event linkage) 0.60.0 entry slides two rows back; the
-        // ONB onboarding walk-through lane 0.59.0
-        // entry slides two rows back; the M36 @mentions milestone (ADR 0165)
-        // 0.58.0 entry slides three rows back; the M35 kiosk-mode milestone
-        // (ADR 0164) 0.57.0 entry slides four rows back; the home upcoming
-        // events & to-dos lane (ADR 0163) 0.56.0 entry slides five rows back;
-        // the M34 (analytics history) milestone (ADR 0162) 0.55.0 entry
-        // slides six rows back; the ADR 0161 page-translation-standing lane
-        // (the editor can translate their own page + the /admin/platform
-        // translation surface) 0.54.0 entry seven rows back; the NESTED
-        // nested-help-guides lane (ADR 0160, the UG guide tree's second
-        // level) 0.53.0 entry eight rows back; the ESC
-        // escalation-authorization lane (ADR 0159) 0.52.0 entry nine rows
-        // back; the LBL-2 surface-label-translation lane (ADR 0158) 0.51.0
-        // entry ten rows back; the SITE-2 hero-translation lane (ADR 0157)
-        // 0.50.0 entry eleven rows back; the M33 (storage metrics history)
-        // 0.49.0 entry twelve rows back; the M32 (issue submission &
-        // escalation) 0.48.0 entry fourteen rows back.
+        // slides down. The Kiosk display-mode lane (ADR 0164 amendment —
+        // full page vs. full screen, the KioskDisplayMode enum + the
+        // KioskPlaylist.DisplayMode field + the /settings/kiosk picker + the
+        // /kiosk stage's data-display-mode + the enter/exit-fullscreen
+        // buttons) is now the newest shipped (the 0.64.0 entry), so it is the
+        // head; the Kiosk per-resident move (ADR 0164 amendment) 0.63.0
+        // entry slides one row back; the Bookmark-folders lane (ADR 0168)
+        // 0.62.0 entry slides two rows back; the M37 Personal-notes milestone
+        // (ADR 0167) 0.61.0 entry slides three rows back; the Events↔boards
+        // lane 0.60.0 entry slides four rows back; the ONB
+        // onboarding walk-through lane 0.59.0 entry slides five rows back;
+        // the M36 @mentions milestone (ADR 0165) 0.58.0 entry slides six
+        // rows back; the M35 kiosk-mode milestone (ADR 0164) 0.57.0 entry
+        // slides seven rows back; the home upcoming events & to-dos lane
+        // (ADR 0163) 0.56.0 entry slides eight rows back; the M34
+        // (analytics history) milestone (ADR 0162) 0.55.0 entry slides nine
+        // rows back; the ADR 0161 page-translation-standing lane 0.54.0 entry
+        // ten rows back; the NESTED nested-help-guides lane (ADR 0160)
+        // 0.53.0 entry eleven rows back; the ESC escalation-authorization
+        // lane (ADR 0159) 0.52.0 entry twelve rows back; the LBL-2
+        // surface-label-translation lane (ADR 0158) 0.51.0 entry thirteen
+        // rows back; the SITE-2 hero-translation lane (ADR 0157) 0.50.0 entry
+        // fourteen rows back; the M33 (storage metrics history) 0.49.0 entry
+        // fifteen rows back; the M32 (issue submission & escalation)
+        // 0.48.0 entry sixteen rows back.
         var head = WhatsNew.All[0];
         Assert.True(
-            head.Version == "0.62.0" && head.Date == "2026-10-14",
-            "The Bookmark-folders 0.62.0 (2026-10-14) entry must be the head of the registry; got "
+            head.Version == "0.65.0" && head.Date == "2026-10-15",
+            "The first-day-of-week 0.65.0 (2026-10-15) entry must be the head of the registry; got "
                 + head.Version + " / " + head.Date + ".");
         Assert.True(
-            head.Changes.Any(c => c.Contains("bookmark", StringComparison.OrdinalIgnoreCase)),
-            "The 0.62.0 head entry must name the Bookmark-folders capability.");
+            head.Changes.Any(c => c.Contains("first day of week", StringComparison.OrdinalIgnoreCase)),
+            "The 0.65.0 head entry must name the first-day-of-week capability.");
 
-        // The M37 Personal-notes entry (0.61.0) slides one row back.
+        // The Kiosk display-mode entry (0.64.0) slides one row back.
+        var kioskDisplayMode = WhatsNew.All.Single(v => v.Version == "0.64.0");
+        Assert.True(
+            kioskDisplayMode.Changes.Any(c => c.Contains("display mode", StringComparison.OrdinalIgnoreCase)
+                                              && c.Contains("kiosk", StringComparison.OrdinalIgnoreCase)),
+            "The 0.64.0 entry must name the Kiosk display-mode (full page vs. full screen) capability.");
+
+        // The Kiosk per-resident entry (0.63.0) slides two rows back.
+        var kioskPerResident = WhatsNew.All.Single(v => v.Version == "0.63.0");
+        Assert.True(
+            kioskPerResident.Changes.Any(c => c.Contains("kiosk", StringComparison.OrdinalIgnoreCase)
+                                              && c.Contains("per-resident", StringComparison.OrdinalIgnoreCase)),
+            "The 0.63.0 entry must name the Kiosk per-resident capability.");
+
+        // The Bookmark-folders entry (0.62.0) slides one row back.
+        var bookmarkFolders = WhatsNew.All.Single(v => v.Version == "0.62.0");
+        Assert.True(
+            bookmarkFolders.Changes.Any(c => c.Contains("bookmark", StringComparison.OrdinalIgnoreCase)),
+            "The 0.62.0 entry must name the Bookmark-folders capability.");
+
+        // The M37 Personal-notes entry (0.61.0) slides two rows back.
         var personalNotes = WhatsNew.All.Single(v => v.Version == "0.61.0");
         Assert.True(
             personalNotes.Changes.Any(c => c.Contains("personal notes", StringComparison.OrdinalIgnoreCase)),

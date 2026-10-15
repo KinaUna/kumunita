@@ -3,7 +3,7 @@ namespace Kumunita.Core.Kiosk;
 /// <summary>
 /// One entry in the ordered kiosk playlist (M35·2 — the **5-member ceiling**,
 /// no field outside this set, ADR 0164 D1). A **value object** nested in the
-/// <see cref="KioskPlaylist"/> singleton (not a standalone Marten doc — the
+/// <see cref="KioskPlaylist"/> row (not a standalone Marten doc — the
 /// <see cref="KioskPlaylist"/> is the only registered doc type, M35·1 / M35·9).
 /// <para>
 /// The optional members are **kind-conditional** (a <c>null</c> means

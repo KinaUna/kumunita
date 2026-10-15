@@ -1988,6 +1988,8 @@ public static class FirstBootSeeder
              "[Change password](change-password).\n" +
              "- **My data** — export or import your own content as a portable " +
              "archive. See [My data](my-data).\n" +
+             "- **Kiosk** — configure your own full-screen display at /kiosk. " +
+             "See [Kiosk](kiosk).\n" +
              "- **Delete account** — the permanent end. See " +
              "[Deleting an account](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
@@ -2194,6 +2196,33 @@ public static class FirstBootSeeder
              "plain file you can keep, back up, or hand to the new instance. It " +
              "is your own copy of your own work, separate from the platform's " +
              "backups (the operator's job).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "The **kiosk** is a full-page / full-screen display at " +
+             "**/kiosk** that automatically cycles through a list of your " +
+             "surfaces — a board, the calendar, the to-dos — on a set interval, " +
+             "and refreshes each view's content on a separate, faster interval. " +
+             "It is meant for a wall display, a TV, or a spare screen: sign in " +
+             "once, open **/kiosk**, and it runs on its own.\n\n" +
+             "**It is yours.** Each signed-in user has their **own** kiosk " +
+             "playlist (saved on your account, like your other settings), so " +
+             "what your **/kiosk** shows depends only on your choice — not on " +
+             "anyone else's. A view you could not see on its own page is simply " +
+             "skipped on the kiosk (the kiosk never shows you more than you " +
+             "could already see).\n\n" +
+             "**To set it up.** Open **Settings → Kiosk**. Choose the views to " +
+             "cycle through, top to bottom (pick a view in an empty slot to add " +
+             "one; set a slot to *—* to remove it; move a slide to a different " +
+             "slot to reorder). For a board slide, pick which board; for the " +
+             "calendar, pick day / week / month. Set the two cadences: how " +
+             "often the view *changes*, and how often the current view's " +
+             "content *refreshes*. Click **Save playlist**.\n\n" +
+             "**To see it run.** Open **/kiosk** (signed in as you) on the " +
+             "screen. It advances to the next slide on the view cadence and " +
+             "reloads each slide's content on the refresh cadence, forever — " +
+             "until you sign out.\n\n" +
+             "**Empty playlist.** A kiosk with no slides shows an empty " +
+             "message — configure one in **Settings → Kiosk** first.\n"),
             ("members", "Group members",
              "## Group members\n\n" +
              "The **Members** tab of a group is where the group's people live — " +
@@ -2397,6 +2426,10 @@ public static class FirstBootSeeder
             ["messaging"]       = "settings",
             ["change-password"] = "settings",
             ["my-data"]         = "settings",
+            // M35 (ADR 0164 amendment) — the per-resident kiosk playlist
+            // editor (Settings → Kiosk, /settings/kiosk) + its /kiosk display
+            // guide; a sub-page of the settings guide.
+            ["kiosk"]           = "settings",
 
             // Group detail (the /groups/{id} tabs: Feed · Members · Settings).
             // The <c>groups</c> guide covers the Feed tab; the other two tabs
@@ -3138,6 +3171,8 @@ public static class FirstBootSeeder
              "- **Meine Daten** — exportiere oder importiere deinen eigenen " +
              "Inhalt als portierbares Archiv. Siehe " +
              "[Meine Daten](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosk** — deine eigene Vollbild-Anzeige auf /kiosk einrichten. " +
+             "Siehe [Kiosk](kiosk).\n" +
              "- **Konto löschen** — der dauerhafte Schluss. Siehe " +
              "[Konto löschen](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
@@ -3369,6 +3404,42 @@ public static class FirstBootSeeder
              "sichern, archivieren oder an die neue Instanz übergeben kannst. " +
              "Es ist eine eigene Kopie deiner Arbeit, getrennt von den " +
              "Sicherungen der Plattform (die Verantwortung des Betreibers).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "Der **Kiosk** ist eine Vollbild-Anzeige unter **/kiosk**, " +
+             "die automatisch im Wechsel deine Oberflächen zeigt — ein Board, " +
+             "den Kalender, die Aufgaben — im Abstand eines Zeitraums, und " +
+             "dabei den Inhalt jeder Ansicht in einem kürzeren, schnelleren " +
+             "Abstand aktualisiert. Er ist für eine Wandanzeige, einen " +
+             "Fernseher oder einen leeren Bildschirm gedacht: einmal " +
+             "anmelden, **/kiosk** öffnen, und er läuft von allein.\n\n" +
+             "**Er ist deiner.** Jede angemeldete Person hat ihre " +
+             "**eigene** Kiosk-Wiedergabeliste (auf deinem Konto " +
+             "gespeichert, wie deine anderen Einstellungen), also zeigt " +
+             "dein **/kiosk** nur das an, was *du* gewählt hast — nicht, " +
+             "was andere gewählt haben. Eine Ansicht, die du auf ihrer " +
+             "eigenen Seite nicht sehen könntest, wird im Kiosk einfach " +
+             "übersprungen (der Kiosk zeigt dir nie mehr als du ohnehin " +
+             "sehen könntest).\n\n" +
+             "**Einrichten.** Öffne **Einstellungen → Kiosk**. Wähle die " +
+             "Ansichten, die im Wechsel gezeigt werden, von oben nach unten " +
+             "(in einem leeren Platz eine Ansicht wählen, um sie " +
+             "hinzuzufügen; einen Platz auf *—* setzen, um sie zu " +
+             "entfernen; eine Folie in einen anderen Platz verschieben, um " +
+             "die Reihenfolge zu ändern). Bei einer Board-Ansicht wählst " +
+             "du, welches Board; beim Kalender wählst du Tag / Woche / " +
+             "Monat. Setze die beiden Abstände: wie oft die Ansicht " +
+             "*wechselt* und wie oft der Inhalt der aktuellen Ansicht " +
+             "*aktualisiert* wird. Klicke auf **Wiedergabeliste " +
+             "speichern**.\n\n" +
+             "**Ansehen, wie er läuft.** Öffne auf dem Bildschirm " +
+             "**/kiosk** (angemeldet als du). Er geht im Abstand des " +
+             "Ansichts-Wechsels zur nächsten Folie und lädt den Inhalt " +
+             "jeder Folie im Aktualisierungs-Abstand nach — immer " +
+             "weiter, bis du dich abmeldest.\n\n" +
+             "**Leere Wiedergabeliste.** Ein Kiosk ohne Folien zeigt eine " +
+             "Leer-Meldung — richte vorher unter **Einstellungen → Kiosk** " +
+             "eine ein.\n"),
             ("members", "Gruppenmitglieder",
              "## Gruppenmitglieder\n\n" +
              "Der **Mitglieder**-Tab einer Gruppe ist, wo die Leute der Gruppe " +
@@ -4253,6 +4324,8 @@ public static class FirstBootSeeder
              "- **Mes données** — exporter ou importer ton propre contenu " +
              "sous forme d'archive portable. Voir " +
              "[Mes données](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosque** — configure ton propre affichage plein écran sur /kiosk. " +
+             "Voir [Kiosque](kiosk).\n" +
              "- **Supprimer le compte** — la fin permanente. Voir " +
              "[Supprimer un compte](/pages/system/help/deleting-an-account).\n"),
             ("todos", "Tâches",
@@ -4509,6 +4582,40 @@ public static class FirstBootSeeder
              "instance. C'est une copie que tu gardes de ton travail, " +
              "séparée des sauvegardes de la plateforme (la " +
              "responsabilité du porteur).\n"),
+            ("kiosk", "Kiosque",
+             "## Kiosque\n\n" +
+             "Le **kiosque** est un affichage plein écran sous **/kiosk** " +
+             "qui passe automatiquement d'une surface à l'autre — un " +
+             "tableau, le calendrier, les tâches — à un intervalle réglé, " +
+             "et qui actualise le contenu de chaque vue à un intervalle " +
+             "séparé, plus court. Il est pensé pour un écran mural, une " +
+             "télévision ou un écran libre : connecte-toi une fois, ouvre " +
+             "**/kiosk**, et il tourne tout seul.\n\n" +
+             "**C'est le tien.** Chaque personne connectée a sa **propre** " +
+             "playliste de kiosque (enregistrée sur ton compte, comme tes " +
+             "autres réglages), donc ton **/kiosk** ne montre que ce que " +
+             "*toi* tu as choisi — pas ce que les autres ont choisi. Une " +
+             "vue que tu ne pourrais pas voir sur sa propre page est " +
+             "simplement ignorée par le kiosque (il ne te montre jamais " +
+             "plus que ce que tu pourrais déjà voir).\n\n" +
+             "**Pour le régler.** Ouvre **Paramètres → Kiosque**. Choisis " +
+             "les vues qui défilent, de haut en bas (choisir une vue dans " +
+             "un emplacement vide pour l'ajouter ; mettre un emplacement " +
+             "à *—* pour l'enlever ; déplacer une diapositive vers un " +
+             "autre emplacement pour la réordonner). Pour une vue de " +
+             "tableau, choisis quel tableau ; pour le calendrier, choisis " +
+             "jour / semaine / mois. Réglé les deux cadences : la " +
+             "fréquence à laquelle la vue *change* et la fréquence à " +
+             "laquelle le contenu de la vue actuelle *se met à jour*. " +
+             "Clique sur **Enregistrer la playliste**.\n\n" +
+             "**Pour le voir en marche.** Ouvre **/kiosk** sur l'écran " +
+             "(connecté sous ton compte). Il passe à la diapositive " +
+             "suivante à la cadence de changement de vue et recharge le " +
+             "contenu de chaque diapositive à la cadence de mise à " +
+             "jour — indéfiniment, jusqu'à ce que tu te déconnectes.\n\n" +
+             "**Playliste vide.** Un kiosque sans diapositives affiche un " +
+             "message vide — règle-en une d'abord sous **Paramètres → " +
+             "Kiosque**.\n"),
             ("members", "Membres du groupe",
              "## Membres du groupe\n\n" +
              "L'onglet **Membres** d'un groupe est où vivent les gens du " +
@@ -5386,6 +5493,8 @@ public static class FirstBootSeeder
              "- **Mine data** — eksportér eller importer dit eget indhold som " +
              "et portabelt arkiv. Se " +
              "[Mine data](/pages/system/help/settings/my-data).\n" +
+             "- **Kiosk** — indstil din egen fuldskærms-visning på /kiosk. " +
+             "Se [Kiosk](kiosk).\n" +
              "- **Slet konto** — den varige afslutning. Se " +
              "[Slet en konto](/pages/system/help/deleting-an-account).\n"),
             ("todos", "To-dos",
@@ -5614,6 +5723,37 @@ public static class FirstBootSeeder
              "— en almindelig fil, du kan gemme, sikre eller overdrage til den " +
              "nye instans. Det er din egen kopi af dit eget arbejde, adskilt fra " +
              "platformens sikkerhedskopier (operatørens ansvar).\n"),
+            ("kiosk", "Kiosk",
+             "## Kiosk\n\n" +
+             "**Kiosken** er en fuldskærms-visning på **/kiosk**, der " +
+             "automatisk skifter imellem dine overflader — et board, " +
+             "kalendarium, opgaver — i et fast interval, og opdaterer " +
+             "hvert syns indhold i et kortere, hurtigere interval. Den er " +
+             "tænkt til et væggeskærm, en TV eller en ledig skærm: log " +
+             "ind én gang, åbn **/kiosk**, og den kører for sig selv.\n\n" +
+             "**Den er din.** Hver logget bruger har sin **egen** " +
+             "kiosk-liste (gemt på din konto, som dine andre " +
+             "indstillinger), så hvad din **/kiosk** viser afhænger kun af, " +
+             "hvad *du* har valgt — ikke hvad andre har valgt. En syn, du " +
+             "ikke kunne se på dens egen side, springes simpelthen over i " +
+             "kiosken (kiosken viser dig aldrig mere end du allerede kunne " +
+             "se).\n\n" +
+             "**Indstil den.** Åbn **Indstillinger → Kiosk**. Vælg de " +
+             "syns, der skiftes imellem, fra top til bund (vælg en syn i " +
+             "et tomt felt for at tilføje den; sæt et felt til *—* for at " +
+             "fjerne den; flyt et slide til et andet felt for at " +
+             "genordne). For et board-vælg, hvilket board; for " +
+             "kalendarium, vælg dag / uge / måned. Indstil de to " +
+             "intervaller: hvor ofte synet *skifter*, og hvor ofte det " +
+             "aktuelle syns indhold *opdateres*. Klik på **Gem " +
+             "liste**.\n\n" +
+             "**Se den køre.** Åbn **/kiosk** på skærmen (logget ind som " +
+             "dig). Den går til det næste slide i synskifte-intervallet " +
+             "og genindlæser hvert slides indhold i " +
+             "opdateringsintervallet — videre og videre, indtil du logger " +
+             "ud.\n\n" +
+             "**Tom liste.** En kiosk uden slides viser en tom-melding — " +
+             "indstil én først under **Indstillinger → Kiosk**.\n"),
             ("members", "Gruppemedlemmer",
              "## Gruppemedlemmer\n\n" +
              "**Medlemmer**-fanen i en gruppe er, hvor gruppens " +
@@ -5868,6 +6008,7 @@ public static class FirstBootSeeder
              "  - [Messaging](/pages/system/help/settings/messaging) — resident-to-resident messages\n" +
              "  - [Change password](/pages/system/help/settings/change-password) — set a new sign-in password\n" +
              "  - [My data](/pages/system/help/settings/my-data) — export or import your own content\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — configure your own full-screen /kiosk display\n" +
              "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
              "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
              "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
@@ -5994,6 +6135,7 @@ public static class FirstBootSeeder
              "  - [Nachrichten](/pages/system/help/settings/messaging) — Nachrichten zwischen Bewohner:innen\n" +
              "  - [Passwort ändern](/pages/system/help/settings/change-password) — Ein neues Anmeldepasswort setzen\n" +
              "  - [Meine Daten](/pages/system/help/settings/my-data) — deinen eigenen Inhalt exportieren oder importieren\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — deine eigene Vollbild-Anzeige auf /kiosk einrichten\n" +
              "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
              "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
              "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
@@ -6125,6 +6267,7 @@ public static class FirstBootSeeder
              "  - [Messagerie](/pages/system/help/settings/messaging) — Les messages entre résidents\n" +
              "  - [Changer le mot de passe](/pages/system/help/settings/change-password) — Définir un nouveau mot de passe\n" +
              "  - [Mes données](/pages/system/help/settings/my-data) — exporter ou importer ton propre contenu\n" +
+             "  - [Kiosque](/pages/system/help/settings/kiosk) — configure ton propre affichage plein écran sur /kiosk\n" +
              "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
              "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
              "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
@@ -6253,6 +6396,7 @@ public static class FirstBootSeeder
              "  - [Beskeder](/pages/system/help/settings/messaging) — Beskeder mellem beboere\n" +
              "  - [Skift adgangskode](/pages/system/help/settings/change-password) — Sæt en ny login-adgangskode\n" +
              "  - [Mine data](/pages/system/help/settings/my-data) — eksportér eller importer dit eget indhold\n" +
+             "  - [Kiosk](/pages/system/help/settings/kiosk) — indstil din egen fuldskærms-visning på /kiosk\n" +
              "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
              "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
              "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +

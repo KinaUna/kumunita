@@ -215,3 +215,115 @@ successor). U10 flips this to `Accepted` at the close.
   M35 inverts to "new context + reused read seams").
 - ADR 0163 — home upcoming events & to-dos (the "display, not data" precedent
   M35 shares for its signed-in display surface).
+
+## Amendment (2026-10-15) — per-resident playlist, moved out of admin
+
+The original decision was a **single GlobalAdmin-set** `KioskPlaylist`
+singleton (`Id = "kiosk"`) for one **shared** wall display, configured only at
+`/admin/kiosk` (the `[Authorize(Roles = GlobalAdmin)]` gate, `Via = Admin`
+audit row). A product decision has since moved the kiosk into the per-resident
+settings surface — a signed-in user should be able to configure **their own**
+`/kiosk` display. The following parts of this ADR are amended; the rest of the
+decision (the `Kiosk` bounded context, the `KioskPlaylist` / `KioskView` doc
+shapes, the `IKioskService` 2-method seam, the `GET /kiosk` +
+`GET /kiosk/slide` display, the `kiosk.ts` state machine, and the closed
+`kiosk.*` `kw-l` key set) is unchanged.
+
+- **Per-resident, not a shared singleton.** `KioskPlaylist.Id` is now the
+  **acting resident's subject id** (one row per user — the `LocaleSettings`
+  per-user preference shape, ADR 0004 §B.1), not the fixed `"kiosk"` sentinel.
+  The `SingletonId` constant is removed. The `/kiosk` display resolves the
+  **viewer's** playlist, and `/kiosk/slide` resolves the viewer's row. A
+  resident who has not configured one sees the `kiosk.empty` shape (the
+  M35-8 floor, unchanged).
+- **`IKioskService` keyed by actor.** `GetPlaylistAsync` now takes an
+  `actorId` argument (loads that resident's row). `SavePlaylistAsync` upserts
+  the row **keyed on `actorId`**.
+- **Settings surface: `/settings/kiosk`, any signed-in user.** The GlobalAdmin
+  gate is dropped — `KioskController.SettingsGet` / `SettingsPost` are now
+  `[Authorize]`d (class-level, no role), matching the `/settings/*` resident
+  convention. The M35-7 403 pin is replaced by a "no role gate" pin.
+- **Audit row: `Via = Owner`.** `KioskService.SavePlaylistAsync` now writes the
+  `kiosk.save` row with `Via = AccessVia.Owner` (the acting resident writes
+  their own playlist — the `timezone.set-default` per-resident standing, not
+  the `Admin` surface) and `TargetId = actorId`.
+- **Settings tabs + admin pointer.** The kiosk editor gains a tab in the
+  `/settings` strip (`_SettingsTabs.cshtml`), and the `/admin/platform` kiosk
+  row now points at `/settings/kiosk` (every resident configures their own).
+- **Retired address.** `GET /admin/kiosk` is kept as a redirect to
+  `/settings/kiosk` (the `/settings/email-language` → tab redirect precedent,
+  ADR 0080) so a saved link / bookmark / already-open old tab lands the user on
+  the new page rather than 404ing.
+- **Help.** A new resident guide `Kiosk` (nested under `settings`,
+  `GuideParentMap`) documents the per-resident `/settings/kiosk` + `/kiosk`
+  surface.
+- **Docs sync.** README roadmap + `STATUS.md` + the `WhatsNew` registry (a new
+  version row) reflect the per-resident move (the ADR 0110 sixth close-flip
+  member).
+
+## Amendment (2026-10-15) — display mode: full page vs. full screen
+
+The original M35 display hid the page chrome and let the stage fill the
+viewport, but in practice (a) some of the chrome the layout renders — the
+onboarding banner, the what's-new toast, and in the variant-C nav the icon-rail
++ topbar — was **not** in the chrome-hide list, so the `/kiosk` display still
+showed chrome above the stage; and (b) a resident operating a **wall-display
+TV** wanted the kiosk to own the **whole monitor** (the browser's tabs and
+address bar hidden too), not just the browser's window. This amendment makes
+the display **true full-page** and adds a **per-resident display-mode choice**.
+
+The bounded context, the `KioskPlaylist` / `KioskView` doc shapes (the
+5-member `KioskPlaylist` ceiling now includes `DisplayMode` — the original
+4-member ceiling is extended additively), the 2-method `IKioskService` seam
+(`SavePlaylistAsync` gains a `displayMode` parameter), the `GET /kiosk` +
+`GET /kiosk/slide` display, the `kiosk.ts` state machine, and the one
+`kiosk.save` audit row are **unchanged in shape** — this is an **additive
+delta**, the per-resident shape preserved.
+
+- **True full-page.** The `/kiosk` display's chrome-hide list is extended to
+  **every** chrome element the layout renders (both nav variants: the `.navbar`
+  row and the `.kmb-rail` + `.kmb-topbar` pair; plus the onboarding banner,
+  the what's-new toast, the flash toast, the pinned-announcement, the guest
+  notice, and the footer), and the stage is stretched to fill the browser
+  viewport edge-to-edge (the ADR 0104 `body.kmb-page-expanded` chrome-hide
+  idiom, applied in the view's inline `<style>`). The per-slide chrome (inside
+  the iframe) is already hidden by the layout's `body.kmb-embed` rules (the
+  `Sec-Fetch-Dest: iframe` signal) — unchanged.
+- **`KioskDisplayMode` enum + `KioskPlaylist.DisplayMode`.** A new
+  `KioskDisplayMode` enum (`FullPage` | `FullScreen`) and a new
+  `KioskPlaylist.DisplayMode` member (the 5-member ceiling), **display-only,
+  never an access input** (M35·4 — a display preference, not an authorization
+  input). Default `FullPage` (a fresh row is the in-browser full-page shape).
+- **`IKioskService.SavePlaylistAsync` gains `displayMode`.** The
+  `SavePlaylistAsync` seam now takes the `displayMode` and persists it with the
+  row (the upsert shape is unchanged; the read returns it).
+- **Settings surface: the display-mode picker.** `GET/POST /settings/kiosk`
+  gains a **Display mode** picker (`kiosk.settings.display_mode` +
+  `.display_mode.full_page` + `.display_mode.full_screen` +
+  `.display_mode.hint` kw-l key set × en/de/fr/da — the closed `kiosk.*` key
+  set is extended from 8 to 12). The controller parses the form value and, on a
+  blank / invalid value, falls back to `FullPage` (a display preference is not
+  a validation gate — the M35·4 "display-only" precedent: the two interval
+  floors remain the only hard validations). The one `kiosk.save` audit row is
+  unchanged (still `Via = Owner`, keyed on the resident).
+- **`/kiosk` display: `data-display-mode` + the FullScreen buttons.** The
+  `#kiosk-stage` declares `data-display-mode` (`fullpage` / `fullscreen`). For
+  `Full screen`, the view renders an **enter-fullscreen button** (the board's
+  `.kanban-fullscreen-toggle` / calendar's `requestFullscreen` precedent — a
+  **user gesture** is required to enter the browser's Fullscreen API, so the
+  display degrades to `Full page` where the gesture is unavailable — Safari iOS
+  / the API's absence) + an **exit-fullscreen close** (shown only while
+  full-screen) + the `:fullscreen` stage rules (the stage owns the whole
+  monitor, edge to edge). The `✕` exit link (top-right, always) still exits the
+  kiosk itself; the browser's `Esc` also exits full screen.
+- **Tests.** The `KioskServiceTests` upsert pin now saves + reads back a
+  non-default `DisplayMode` (the round-trip pin); the `KioskControllerTests`
+  save-lane pin adds the `DisplayMode` form field + the `Arg.Any` / pinned
+  `KioskDisplayMode.FullScreen` delegation; the `KioskControllerTests`
+  chrome-hide string-pin is extended to the new chrome-hide selectors +
+  `data-display-mode`.
+- **Docs sync.** README roadmap + the `WhatsNew` registry (a new `0.64.0`
+  version row) + this ADR reflect the display-mode lane (the ADR 0110 sixth
+  close-flip member). The `Milestones.cs` / `MilestonesTests.cs` roadmap
+  order + shape are unchanged (M35 is still `Done` — the display-mode is a
+  refinement of the already-shipped M35 surface, not a new milestone).

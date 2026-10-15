@@ -48,6 +48,16 @@ public sealed class KioskDisplayViewModel
     /// default is <c>10</c>.</summary>
     public int RefreshIntervalSeconds { get; init; } = 10;
 
+    /// <summary>The display mode (display-only, never an access input — M35·4;
+    /// the ADR 0164 amendment "full page vs. full screen" pin):
+    /// <see cref="Kumunita.Core.Kiosk.KioskDisplayMode.FullPage"/> fills the
+    /// browser viewport; <see cref="Kumunita.Core.Kiosk.KioskDisplayMode.FullScreen"/>
+    /// requests the browser's Fullscreen API (the stage owns the whole monitor,
+    /// the M35 "shared physical display" question). The <see cref="Kumunita.Core.Kiosk.KioskPlaylist"/>
+    /// default is <c>FullPage</c> (entering true full-screen needs a user
+    /// gesture, so the display degrades to full-page where it is unavailable).</summary>
+    public KioskDisplayMode DisplayMode { get; init; } = KioskDisplayMode.FullPage;
+
     /// <summary>True when at least one slide is configured (false → the view
     /// renders the <c>kiosk.empty</c> message — M35-8 FACE).</summary>
     public bool HasSlides => Slides.Count > 0;

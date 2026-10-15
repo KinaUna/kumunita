@@ -3,8 +3,10 @@ namespace Kumunita.Web.Models;
 using Kumunita.Core.Kiosk;
 
 /// <summary>
-/// M35 (ADR 0164) — the <c>GET /admin/kiosk</c> / <c>POST /admin/kiosk</c>
-/// GlobalAdmin settings model (U05). The playlist editor binds to the
+/// M35 (ADR 0164) — the <c>GET /settings/kiosk</c> / <c>POST
+/// /settings/kiosk</c> per-resident settings model (U05, ADR 0164 amendment —
+/// any signed-in user edits their own playlist, not a GlobalAdmin-shared
+/// singleton). The playlist editor binds to the
 /// <see cref="Views"/> ordered list (list position = the slide order, M35·2),
 /// and the two interval pickers bind to the <c>ViewIntervalSeconds</c>
 /// (slide-advance cadence, <c>&gt;= 5</c>) + <c>RefreshIntervalSeconds</c>
@@ -13,20 +15,21 @@ using Kumunita.Core.Kiosk;
 /// <para>
 /// The <see cref="Boards"/> is the **board picker seed** — the frozen M5
 /// <c>IProjectService.ListBoardsAsync</c> seam (M35·3 / M35·9 — reused, not
-/// re-shape), resolved for the **signed-in GlobalAdmin** on the GET (a read —
-/// the surface's own audit; the picker offers only the boards the GlobalAdmin
-/// can already see, so the kiosk cannot name a board the GlobalAdmin cannot
+/// re-shape), resolved for the **signed-in resident** on the GET (a read —
+/// the surface's own audit; the picker offers only the boards the resident
+/// can already see, so the kiosk cannot name a board the resident cannot
 /// see — a leak-prevention guard, not a new access branch).
 /// </para>
 /// <para>
-/// **GlobalAdmin-only** (M35-7 FACE): the class-level gate on
-/// <c>KioskController.SettingsGet</c> / <c>SettingsPost</c> is
-/// <c>[Authorize(Roles = GlobalAdmin)]</c>; the service
+/// **Any signed-in user** (ADR 0164 amendment — per-resident): the class gate
+/// on <c>KioskController.SettingsGet</c> / <c>SettingsPost</c> is
+/// <c>[Authorize]</c> (a resident edits their own playlist); the service
 /// (<see cref="IKioskService.SavePlaylistAsync"/>) owns the single
-/// <c>kiosk.save</c> <c>AccessAudit</c> row + the upsert (M35·5), and the
-/// controller opens the <c>IDocumentSession</c> and passes it in (the M3
-/// same-transaction precedent). **No** new <c>AccessAction</c> /
-/// <c>AccessVia</c> / <c>Decide()</c> branch (M35·1 / M35·3).
+/// <c>kiosk.save</c> <c>AccessAudit</c> row (<c>Via = Owner</c>) + the
+/// per-resident upsert (M35·5), and the controller opens the
+/// <c>IDocumentSession</c> and passes it in (the M3 same-transaction
+/// precedent). **No** new <c>AccessAction</c> / <c>Decide()</c> branch
+/// (M35·1 / M35·3).
 /// </para>
 /// </summary>
 public sealed class KioskSettingsViewModel
@@ -48,6 +51,14 @@ public sealed class KioskSettingsViewModel
     /// <c>&lt; ViewIntervalSeconds</c>; the <see cref="KioskPlaylist"/>
     /// default is <c>10</c>.</summary>
     public int RefreshIntervalSeconds { get; set; } = 10;
+
+    /// <summary>The display mode (display-only, never an access input — M35·4;
+    /// the ADR 0164 amendment "full page vs. full screen" pin). The resident
+    /// picks <see cref="KioskDisplayMode.FullPage"/> (fill the browser
+    /// viewport) or <see cref="KioskDisplayMode.FullScreen"/> (the browser's
+    /// Fullscreen API — the stage owns the whole monitor). The
+    /// <see cref="KioskPlaylist"/> default is <c>FullPage</c>.</summary>
+    public KioskDisplayMode DisplayMode { get; set; } = KioskDisplayMode.FullPage;
 
     /// <summary>The board picker's options — seeded from the **frozen** M5
     /// <c>IProjectService.ListBoardsAsync</c> (M35·3 / M35·9 — reused, not

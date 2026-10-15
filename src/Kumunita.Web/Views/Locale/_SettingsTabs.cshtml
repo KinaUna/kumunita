@@ -29,10 +29,16 @@
         // their authored content to a *.kumunita archive, or import one back.
         ("nav.my_data",              "My data",           "/account/portability"),
         ("nav.delete_account",       "Delete account",    "/account/delete"),
+        // M35 (ADR 0164 amendment) — the per-resident kiosk playlist editor,
+        // moved out of /admin/kiosk so any signed-in user can configure their
+        // own /kiosk display (the KioskController.SettingsGet / SettingsPost).
+        ("kiosk.settings.title",     "Kiosk",             "/settings/kiosk"),
     };
     var activeLabel = (controller, action) switch
     {
         ("Guardian", _)                   => "Children",
+        ("Kiosk",    "SettingsGet")       => "Kiosk",
+        ("Kiosk",    "SettingsPost")      => "Kiosk",
         ("Account",  "ChangePassword")    => "Change password",
         // M27 (ADR 0148) — the UserPortability index (the /account/portability
         // "My data" page, the resident's backup/restore surface).

@@ -28,10 +28,12 @@ namespace Kumunita.Web.Tests;
 /// <see cref="KioskController"/> surface: the <c>GET /kiosk</c> chrome-hidden
 /// display (the M35·3 / M35·6 signed-in first-slide render + the M35-6
 /// anonymous→sign-in gate), the <c>GET /kiosk/slide</c> denied shape (the
-/// M35-5 no-leak / no-404 FACE), the <c>GET /admin/kiosk</c> GlobalAdmin gate
-/// (the M35-7 403 FACE), the <c>POST /admin/kiosk</c> save-lane (the M35·5
+/// M35-5 no-leak / no-404 FACE), the <c>GET /settings/kiosk</c> per-resident
+/// settings gate (the ADR 0164 amendment — any signed-in user, no role
+/// restriction), the <c>POST /settings/kiosk</c> save-lane (the M35·5
 /// delegation to the service that owns the single <c>kiosk.save</c> audit row
-/// + the upsert), and the M35·6 additive-only pin (the board / calendar /
+/// (Via = Owner) + the per-resident upsert), and the M35·6 additive-only pin
+/// (the board / calendar /
 /// todos surfaces render **unchanged** — the kiosk frames them, it does not
 /// re-author them).
 /// <para>
@@ -66,9 +68,9 @@ public class KioskControllerTests
         var (controller, kiosk, projects, _, _) = Build(role: Member);
 
         // A configured playlist (one Board slide) the signed-in viewer can see:
-        kiosk.GetPlaylistAsync(Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
         {
-            Id = KioskPlaylist.SingletonId,
+            Id = Subject,
             Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
             ViewIntervalSeconds = 40,
             RefreshIntervalSeconds = 12,
@@ -91,7 +93,7 @@ public class KioskControllerTests
         // The two intervals project through (M35·4 display-only):
         Assert.Equal(40, model.ViewIntervalSeconds);
         Assert.Equal(12, model.RefreshIntervalSeconds);
-        await kiosk.Received(1).GetPlaylistAsync(Arg.Any<CancellationToken>());
+        await kiosk.Received(1).GetPlaylistAsync(Subject, Arg.Any<CancellationToken>());
         await projects.Received(1).GetBoardAsync("board-1", Subject, Arg.Any<CancellationToken>());
 
         // The chrome-hidden layout renders (the ADR 0104 body.kmb-page-expanded
@@ -140,9 +142,9 @@ public class KioskControllerTests
     {
         var (controller, kiosk, projects, _, _) = Build(role: Member);
 
-        kiosk.GetPlaylistAsync(Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
+        kiosk.GetPlaylistAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new KioskPlaylist
         {
-            Id = KioskPlaylist.SingletonId,
+            Id = Subject,
             Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-x" }],
         });
         // The viewer may NOT read this board — the frozen seam's deny signal
@@ -163,31 +165,45 @@ public class KioskControllerTests
     }
 
     // ── Pin 10 ────────────────────────────────────────────────────────────
-    // M35·2 / M35-7 (FACES M35-7): a NON-GlobalAdmin (a signed-in resident)
-    // gets a 403 on /admin/kiosk — the [Authorize(Roles = GlobalAdmin)] gate
-    // on the settings actions. Asserted via the attribute (the house idiom —
-    // the M33 M33_7_NonGlobalAdmin_Denied shape).
+    // M35·2 (ADR 0164 amendment — per-resident): the settings surface is
+    // [Authorize]d (any signed-in user edits their OWN playlist) with **no
+    // role restriction** — the GlobalAdmin gate from the original M35-7 pin is
+    // gone (the playlist is no longer a shared GlobalAdmin singleton). The
+    // sign-in gate is the class-level [Authorize] (pinned in the M35-6
+    // M35_3_Anonymous test); the settings methods carry **no** method-level
+    // [Authorize(Roles = ...)] gate (a Member may save their own kiosk).
 
     [Fact]
-    public void M35_7_NonGlobalAdmin_AdminKiosk_403()
+    public void M35_7_Settings_Authorized_NoRoleGate()
     {
-        // The gate (M35-7): [Authorize(Roles = GlobalAdmin)] on the settings
-        // surface — a Member is NOT in the role set, so the effect is a 403.
-        var attr = typeof(KioskController).GetMethod(nameof(KioskController.SettingsGet))!
-            .GetCustomAttribute<AuthorizeAttribute>();
-        Assert.NotNull(attr);
-        Assert.Equal(GlobalAdmin, attr!.Roles);
-        Assert.DoesNotContain(Member, (attr!.Roles ?? string.Empty).Split(',', StringSplitOptions.TrimEntries));
+        // The sign-in gate (ADR 0164 amendment): the class-level [Authorize]
+        // (any signed-in resident edits their own playlist) carries NO role
+        // set — the M35_3_Anonymous test pins its presence; here we pin that
+        // the settings surface adds no method-level role restriction (the
+        // original M35-7 GlobalAdmin gate is removed).
+        var getMethod = typeof(KioskController).GetMethod(nameof(KioskController.SettingsGet))!;
+        Assert.True(
+            getMethod.GetCustomAttribute<AuthorizeAttribute>() is null,
+            "GET /settings/kiosk is any signed-in user (per-resident, ADR 0164 amendment) — no method-level [Authorize(Roles = ...)] gate; the class-level [Authorize] (no roles) is the sign-in gate.");
 
-        // The same gate binds the POST lane (M35-7 — the write is GlobalAdmin-only):
-        var postAttr = typeof(KioskController).GetMethod(nameof(KioskController.SettingsPost))!
-            .GetCustomAttribute<AuthorizeAttribute>();
-        Assert.NotNull(postAttr);
-        Assert.Equal(GlobalAdmin, postAttr!.Roles);
+        // The same: the POST lane has no method-level role gate either —
+        // any signed-in user saves their own playlist.
+        var postMethod = typeof(KioskController).GetMethod(nameof(KioskController.SettingsPost))!;
+        Assert.True(
+            postMethod.GetCustomAttribute<AuthorizeAttribute>() is null,
+            "POST /settings/kiosk is any signed-in user (per-resident, ADR 0164 amendment) — no method-level [Authorize(Roles = ...)] gate; the class-level [Authorize] (no roles) is the sign-in gate.");
+
+        // And the class gate itself (the sign-in requirement) has NO roles:
+        var classAttr = typeof(KioskController).GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(classAttr);
+        Assert.True(
+            string.IsNullOrEmpty(classAttr!.Roles),
+            "The KioskController [Authorize] gate is role-free — a Member may configure their own kiosk (ADR 0164 amendment).");
     }
 
     // ── Pin 11 ────────────────────────────────────────────────────────────
-    // M35·5 / M35-1 (FACES M35-7): a GlobalAdmin POSTs /admin/kiosk → the
+    // M35·5 / M35-1 (ADR 0164 amendment — per-resident): a signed-in resident
+    // POSTs /settings/kiosk → the
     // controller parses the form, opens the caller's session, and delegates to
     // SavePlaylistAsync (the service owns the ONE kiosk.save audit row + the
     // upsert — the M35·5 pin, pinned in the Core KioskServiceTests) and
@@ -206,10 +222,11 @@ public class KioskControllerTests
         // pin) returns the saved row:
         kiosk.SavePlaylistAsync(
                 Arg.Any<IReadOnlyList<KioskView>>(), 60, 30,
+                Arg.Any<KioskDisplayMode>(),
                 Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>())
             .Returns(new KioskPlaylist
             {
-                Id = KioskPlaylist.SingletonId,
+                Id = Subject,
                 Views = [new KioskView { Kind = KioskViewKind.Board, BoardId = "board-1" }],
                 ViewIntervalSeconds = 60,
                 RefreshIntervalSeconds = 30,
@@ -220,6 +237,7 @@ public class KioskControllerTests
         {
             ["ViewIntervalSeconds"]    = new StringValues("60"),
             ["RefreshIntervalSeconds"] = new StringValues("30"),
+            ["DisplayMode"]            = new StringValues("FullScreen"),
             ["Views[0].Kind"]          = new StringValues("Board"),
             ["Views[0].BoardId"]       = new StringValues("board-1"),
         });
@@ -227,16 +245,24 @@ public class KioskControllerTests
         var action = await controller.SettingsPost(TestContext.Current.CancellationToken);
 
         // The success path (not the sub-floor redirect-back): the redirect +
-        // the saved confirmation:
-        Assert.IsType<RedirectToActionResult>(action);
+        // the saved confirmation. The redirect MUST be the action-name overload
+        // resolving SettingsGet's /settings/kiosk attribute route — NOT a string
+        // URL passed to RedirectToAction(string), which ASP.NET Core treats as an
+        // *action name* and renders to /Kiosk/%2Fsettings%2Fkiosk (a 404). Pinning
+        // the action name is what keeps that regression caught.
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(KioskController.SettingsGet), redirect.ActionName);
         Assert.NotNull(controller.TempData["info"]);
 
         // The controller delegated the single write to the service with the
-        // parsed form (one Board view + the two intervals + the caller's
-        // session) — the service commits the one kiosk.save audit row + the
-        // upsert (M35·5, pinned in KioskServiceTests):
+        // parsed form (one Board view + the two intervals + the parsed
+        // DisplayMode + the caller's session) — the service commits the one
+        // kiosk.save audit row + the upsert (M35·5, pinned in KioskServiceTests).
+        // The DisplayMode is pinned to FullScreen (the form value) to verify
+        // the amendment's display-mode parse (M35·4 display-only):
         await kiosk.Received(1).SavePlaylistAsync(
             Arg.Any<IReadOnlyList<KioskView>>(), 60, 30,
+            KioskDisplayMode.FullScreen,
             Arg.Any<string>(), Arg.Any<IDocumentSession>(), Arg.Any<CancellationToken>());
     }
 
@@ -298,7 +324,7 @@ public class KioskControllerTests
         // ITempDataDictionaryFactory + IModelMetadataProvider from DI
         // (AddControllers normally wires them), so register the real MVC
         // service set here. The success path's
-        // RedirectToAction("/admin/kiosk") merely CONSTRUCTS a
+        // RedirectToAction("/settings/kiosk") merely CONSTRUCTS a
         // RedirectToActionResult (Url is only touched when the result is
         // executed, which this test never does), so no Url helper is needed:
         var services = new ServiceCollection();
@@ -321,7 +347,7 @@ public class KioskControllerTests
         // ITempDataDictionaryFactory from RequestServices:
         services.AddTransient<ITempDataDictionaryFactory, TempDataDictionaryFactory>();
         services.AddSingleton(Substitute.For<IModelMetadataProvider>());
-        // The success-path RedirectToAction("/admin/kiosk") resolves
+        // The success-path RedirectToAction("/settings/kiosk") resolves
         // IUrlHelperFactory from RequestServices (ControllerBase.get_Url).
         // .NET 10's IUrlHelper (Microsoft.AspNetCore.Mvc.IUrlHelper) methods
         // return System.String (the older UrlValue type is gone), so a plain
@@ -395,7 +421,7 @@ public class KioskControllerTests
     /// <see cref="Microsoft.AspNetCore.Mvc.Controller.TempData"/> property
     /// (which lazily resolves <c>ITempDataProvider</c> from
     /// <see cref="HttpContext.RequestServices"/>) works in the direct-construction
-    /// harness. The M35 <c>POST /admin/kiosk</c> lane writes
+    /// harness. The M35 <c>POST /settings/kiosk</c> lane writes
     /// <c>TempData["info"]</c> on success; without a registered provider the
     /// property's <c>GetRequiredService</c> would throw (a test-harness gap, not
     /// a production concern — a real deployment always carries the provider via
