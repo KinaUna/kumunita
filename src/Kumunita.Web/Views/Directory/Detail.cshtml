@@ -24,6 +24,14 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
+        @* M37 (ADR 0167) — the note-attach affordance, on ONE right-aligned row
+           at the TOP of the parent column (just below the nav bar, to the
+           right). The M17 bookmark closed set does not include "directory",
+           so there is no M17 sibling on this surface. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _pn = ("directory", avatarSubject ?? string.Empty, $"/directory/{avatarSubject}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="@Url.Action("Index", "Directory")" class="btn btn-link p-0">
                 <kw-l key="directory.detail_back">&larr; Back to the directory</kw-l>
@@ -50,19 +58,6 @@
                 <span class="badge text-bg-success"><kw-l key="directory.detail_verified">Verified</kw-l></span>
             }
         </div>
-
-        @* M37 (ADR 0167) — the note-attach affordance (D1 closed TargetKind set:
-           "directory" — the M37 closed set's vocabulary; the M17 bookmark closed set
-           does not include "directory", so there is no M17 sibling on this surface).
-           The partial resolves the F1 witness via the seam's HasNoteAsync — zero
-           audit, no target read (C-M37·2). The D3 write-lane visibility check runs
-           in the seam at POST (C-M37·3). The kw-l keys referenced (pn.note.attach /
-           pn.note.attached) are registered by U05 — U04 references them but does not
-           register them. The target id is the resident's SubjectId — the same value
-           the directory list's rows link through (the stable URL contract, the M2
-           register's pin at DirectoryController.ProjectDetail). *@
-        @{ var _pn = ("directory", avatarSubject ?? string.Empty, $"/directory/{avatarSubject}"); }
-        <partial name="_NoteButton" model="@_pn" />
 
         @*
           M9 amendment (ADR 0139) — the "Send a message" button: rendered only

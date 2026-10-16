@@ -49,6 +49,19 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* M17 (ADR 0118) + M37 (ADR 0167) — the bookmark toggle and the
+           personal-note button, on ONE right-aligned row at the TOP of the
+           parent column (just below the nav bar, to the right), OUTSIDE the
+           main card. Each partial still carries its own d-flex wrapper + the
+           bootstrap modal, so they only need to be side-by-side here. D2 /
+           C-M17·2 pin holds: the label is static per render — this view does
+           not load the owner's bookmark list to decide it. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
+            <partial name="_BookmarkButton" model="@_bm" />
+            @{ var _pn = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="/projects/todos" class="btn btn-link p-0"><kw-l key="projects.todo.back">← Back to to-dos</kw-l></a>
         </p>
@@ -370,20 +383,6 @@
 
         <div class="card mb-4">
             <div class="card-body">
-                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                   set: "todo"). D2 / C-M17·2 pin: the label is static per render —
-                   this view does not load the owner's bookmark list to decide it.
-                   Placed at the top-right of the main card. *@
-                @{ var _bm = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
-                <partial name="_BookmarkButton" model="@_bm" />
-                @* M37 (ADR 0167) — the note-attach affordance (D1 closed TargetKind set:
-                   "todo"). The partial resolves the F1 witness via the seam's
-                   HasNoteAsync — zero audit, no target read (C-M37·2). The D3 write-
-                   lane visibility check runs in the seam at POST (C-M37·3). The kw-l
-                   keys referenced (pn.note.attach / pn.note.attached) are registered
-                   by U05 — U04 references them but does not register them. *@
-                @{ var _pn = ("todo", Model.Todo.Id, $"/projects/todos/{Model.Todo.Id}"); }
-                <partial name="_NoteButton" model="@_pn" />
                 @* ADR 0088 — user-added translations of the to-do (the ADR 0059
                    chip-swap: the original + one variant per translation, the
                    td-swap JS shows the viewer's current-language variant

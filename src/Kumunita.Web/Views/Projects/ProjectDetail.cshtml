@@ -38,6 +38,14 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* M37 (ADR 0167) — the note-attach affordance, on ONE right-aligned row
+           at the TOP of the parent column (just below the nav bar, to the
+           right). The M17 bookmark closed set does not include "project",
+           so there is no M17 sibling on this surface. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _pn = ("project", Model.Id, $"/projects/{Model.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
            idiom) — the project detail is part of the /projects section; placed
            at the top of the page (above the back link) so the strip sits
@@ -48,17 +56,6 @@
         <p>
             <a href="/projects" class="btn btn-link p-0 kanban-back"><kw-l key="pl.index.title">Projects</kw-l></a>
         </p>
-
-        @* M37 (ADR 0167) — the note-attach affordance (D1 closed TargetKind set:
-           "project" — the M37 closed set's vocabulary; the M17 bookmark closed set
-           does not include "project", so there is no M17 sibling on this surface).
-           The partial resolves the F1 witness via the seam's HasNoteAsync — zero
-           audit, no target read (C-M37·2). The D3 write-lane visibility check runs
-           in the seam at POST (C-M37·3). The kw-l keys referenced (pn.note.attach /
-           pn.note.attached) are registered by U05 — U04 references them but does not
-           register them. *@
-        @{ var _pn = ("project", Model.Id, $"/projects/{Model.Id}"); }
-        <partial name="_NoteButton" model="@_pn" />
 
         <header class="airy-head">
             <div class="head-row">

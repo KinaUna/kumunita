@@ -49,6 +49,21 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
+        @* M17 (ADR 0118) + M37 (ADR 0167) — the bookmark toggle and the
+           personal-note button. Gathered onto ONE right-aligned row at the
+           TOP of the parent column (just below the nav bar, to the right),
+           OUTSIDE the main card. Each partial still carries its own d-flex
+           wrapper + the bootstrap modal, so they only need to be side-by-side
+           here; the d-flex justify-content-end gap-2 row pushes the cluster to
+           the right edge of the column. D2 / C-M17·2 pin holds: the label is
+           static per render — this view does not load the owner's bookmark
+           list to decide it. *@
+        <div class="d-flex justify-content-end gap-2 mb-2">
+            @{ var _bm = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
+            <partial name="_BookmarkButton" model="@_bm" />
+            @{ var _pn = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
+            <partial name="_NoteButton" model="@_pn" />
+        </div>
         <p>
             <a href="/announcements" class="btn btn-link p-0">
                 <kw-l key="announcements.detail_back">&larr; Back to the announcements</kw-l>
@@ -304,18 +319,6 @@
 
         <div class="card">
             <div class="card-body">
-                @* M17 (ADR 0118) — the bookmark toggle button (the D1 closed TargetKind
-                   set: "announcement"). D2 / C-M17·2 pin: the label is static per
-                   render — this view does not load the owner's bookmark list to
-                   decide it. Placed at the top-right of the main card. *@
-                @{ var _bm = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
-                <partial name="_BookmarkButton" model="@_bm" />
-                @* M37 (ADR 0167) — the personal-note button (the D1 closed TargetKind
-                   set now includes "announcement"). The button opens a Bootstrap
-                   modal where the user can add / edit / delete their note without
-                   leaving the page. *@
-                @{ var _pn = ("announcement", Model.Id, $"/announcements/{Model.Id}"); }
-                <partial name="_NoteButton" model="@_pn" />
                 @* TD (ADR 0027) — the authored-in language is the first,
                    default-visible variant; each added translation is a hidden
                    variant; the chip row is a selector that swaps them. The
@@ -327,7 +330,7 @@
                        (ADR 0027) are unchanged either way. *@
                     <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                          @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                        <h1 class="mb-1">
+                        <h4 class="mb-0">
                             @if (string.IsNullOrWhiteSpace(Model.Title))
                             {
                                 <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
@@ -336,7 +339,7 @@
                             {
                                 @Model.Title
                             }
-                        </h1>
+                        </h4>
                         @* The full body (the /announcements list shows the
                            first 250 characters and links here). Rendered
                            through the one MarkdownRenderer (R·1). *@
@@ -354,7 +357,7 @@
                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                             @if (!string.IsNullOrWhiteSpace(t.Title))
                             {
-                                <h1 class="mb-1">@t.Title</h1>
+                                <h4 class="mb-0">@t.Title</h4>
                             }
                             <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" /></div>
                         </div>
