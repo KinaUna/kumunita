@@ -648,6 +648,12 @@ html[data-kmb-theme='dark'] {
     border-color: #3d4a42;
     --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
   }
+  /* Unchecked checkboxes on the dark canvas: the light-mode mid green would
+     read as a washed-out outline against #0f1a14. Re-pin to a brighter
+     dark-green edge (~3:1) so the "off" box is clearly present. */
+  html:not([data-kmb-theme='light']) .form-check-input:not(:checked):not(:focus) {
+    border-color: #4e6357 !important;
+  }
 }
 
 /* ---- Forest dark patches (explicit-dark scope) ----------------------------
@@ -869,6 +875,12 @@ html[data-kmb-theme='dark'] .form-switch .form-check-input:not(:checked):not(:fo
   --bs-form-check-bg: #2a3a30;
   border-color: #3d4a42;
   --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%28230, 236, 231, 0.65%29'/%3e%3c/svg%3e");
+}
+/* Unchecked checkboxes on the dark canvas: re-pin the light-mode mid green
+   to a brighter dark-green edge (~3:1) so the "off" box reads clearly.
+   !important because the light rule below it in the file wins the tie. */
+html[data-kmb-theme='dark'] .form-check-input:not(:checked):not(:focus) {
+  border-color: #4e6357 !important;
 }
 
 /* --- Base ----------------------------------------------------------------- */
@@ -2159,6 +2171,13 @@ body.kmb-nav-rail-mode.kmb-page-fullbleed .kmb-topbar {
 .form-check-input:checked {
   background-color: #1c4532;
   border-color: #1c4532;
+}
+/* Unchecked checkboxes: Bootstrap leaves the border at --bs-border-color
+   (#dde3dd — ~1.2:1 against the #fbfaf7 canvas), which reads as almost
+   invisible. Pin a mid green (the light .kmb-hover-border) so the "off"
+   box has a visible edge in light mode (the dark theme re-pins it below). */
+html:not([data-kmb-theme='dark']) .form-check-input:not(:checked):not(:focus) {
+  border-color: #a3b2a8;
 }
 .form-check-input:focus {
   border-color: #1c4532;
