@@ -203,6 +203,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Status is a free-text label (a string, not a fixed list). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.",
             ["projects.todo.assignee"]       = "Assignee",
             ["projects.todo.unassigned"]     = "Unassigned",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status and assignee are settable by the creator, the assignee, or a GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Clear status",
+            ["projects.todo.assign_picker"] = "Assign to…",
+            ["projects.todo.assign_apply"]  = "Apply",
+            ["projects.todo.status_apply"]  = "Set status",
             ["projects.todo.assign"]         = "Assign",
             ["projects.todo.unassign"]       = "Unassign",
             ["projects.todo.assign_to"]      = "Assign to…",
@@ -3118,6 +3128,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Der Status ist ein freier Text (eine Zeichenkette, keine feste Liste). Eine Aufgabe zuzuweisen gibt diesem Bewohner Handhabung darüber — Anzeige + Handhabung, nie eine Zugangsgrenze.",
             ["projects.todo.assignee"]       = "Zugewiesen an",
             ["projects.todo.unassigned"]     = "Nicht zugewiesen",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status und Zuweisung können vom Ersteller, dem Zugewiesenen oder einem GlobalAdmin geändert werden.",
+            ["projects.todo.clear_status"]  = "Status löschen",
+            ["projects.todo.assign_picker"] = "Zuweisen an…",
+            ["projects.todo.assign_apply"]  = "Übernehmen",
+            ["projects.todo.status_apply"]  = "Status setzen",
             ["projects.todo.assign"]         = "Zuweisen",
             ["projects.todo.unassign"]       = "Zuweisung aufheben",
             ["projects.todo.assign_to"]      = "Zuweisen an…",
@@ -5838,6 +5858,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Le statut est un texte libre (une chaîne de caractères, pas une liste fixe). Assigner une tâche donne à ce résident un droit d'intervention sur elle — affichage + intervention, jamais une limite d'accès.",
             ["projects.todo.assignee"]       = "Assignée à",
             ["projects.todo.unassigned"]     = "Non assignée",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Le statut et l'assignation peuvent être modifiés par le créateur, l'assigné ou un GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Effacer le statut",
+            ["projects.todo.assign_picker"] = "Assigner à…",
+            ["projects.todo.assign_apply"]  = "Appliquer",
+            ["projects.todo.status_apply"]  = "Définir le statut",
             ["projects.todo.assign"]         = "Assigner",
             ["projects.todo.unassign"]       = "Retirer l'assignation",
             ["projects.todo.assign_to"]      = "Assigner à…",
@@ -8487,6 +8517,16 @@ public static class KnownTranslationKeys
             ["projects.todo.status_assignee_hint"] = "Status er en fri tekstlabel (en streng, ikke en fast liste). Tildeling af en opgave giver denne beboer håndtering af den — visning + håndtering, aldrig en adgangsbegrænsning.",
             ["projects.todo.assignee"]       = "Tildelt til",
             ["projects.todo.unassigned"]     = "Ikke tildelt",
+            // The to-do detail card's status / assign controls (below the
+            // body — the detail-page mutation lane): the hint under the
+            // assign picker, the "clear status" option, and the apply
+            // buttons (the closed-key registry +
+            // KnownTranslationKeys_ParityTests enforce the × 4).
+            ["projects.todo.mutation_hint"] = "Status og tildeling kan ændres af opretteren, den tildelte eller en GlobalAdmin.",
+            ["projects.todo.clear_status"]  = "Ryd status",
+            ["projects.todo.assign_picker"] = "Tildel til…",
+            ["projects.todo.assign_apply"]  = "Anvend",
+            ["projects.todo.status_apply"]  = "Sæt status",
             ["projects.todo.assign"]         = "Tildel",
             ["projects.todo.unassign"]       = "Fjern tildeling",
             ["projects.todo.assign_to"]      = "Tildel til…",

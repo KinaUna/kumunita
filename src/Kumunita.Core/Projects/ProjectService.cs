@@ -1643,6 +1643,49 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// **Set the to-do's status** (the detail page's status change lane —
+    /// the <see cref="UpdateTodoRequest"/> <c>Status</c> field surfaced as a
+    /// standalone write; the <see cref="SetTodoProjectAsync"/> lane shape,
+    /// verbatim, minus the target guard — a status is a stored string, not an
+    /// association). Sets <see cref="TodoItem.Status"/> to
+    /// <paramref name="status"/> (<c>null</c> = clear — the
+    /// <see cref="AssignTodoAsync"/> null-clears rule). Standing
+    /// (server-side, C3): **creator ∪ assignee ∪ GlobalAdmin** over the
+    /// **to-do** (C-M5·6, the <see cref="CheckTodoStanding"/> shape). A
+    /// missing / soft-deleted id is <see cref="KeyNotFoundException"/> (404);
+    /// a denied actor is <see cref="UnauthorizedAccessException"/> (403).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped. One <see cref="AccessAudit"/> row (<c>todo.set_status</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task<TodoItem> SetTodoStatusAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? status, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to set a to-do's status.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to set.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to set.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6).
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        todo.Status = status;                             // `null` = clear the status.
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        session.Store(AccessAuditFactory.SingleTarget(actorId, "todo.set_status", TargetKindTodo, todo.Id, StandingMatrix.AuditVia(actorId, todo.AuthorId)));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return todo;
+    }
+
+    /// <summary>
     /// The **claim** standing (ADR 0073 — the C3 server-side re-check): a
     /// to-do may be claimed iff it is **unassigned** (<see
     /// cref="TodoItem.AssigneeId"/> null) **and** the actor holds a

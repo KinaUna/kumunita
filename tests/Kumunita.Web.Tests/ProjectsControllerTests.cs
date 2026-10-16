@@ -501,6 +501,74 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(await deniedController.AssignPost(todoId, assignee));
     }
 
+    // ── 8x — Todo_SetStatus_StandingGranted ─────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/status</c>: the controller passes the
+    /// posted <c>status</c> to the seam's
+    /// <see cref="IProjectService.SetTodoStatusAsync"/> verbatim (a blank
+    /// value is normalized to <c>null</c> = clear) and redirects to the
+    /// to-do's detail on success; the service's
+    /// <see cref="UnauthorizedAccessException"/> maps to a clean
+    /// <see cref="ForbidResult"/> (the C3 403), and a
+    /// <see cref="KeyNotFoundException"/> maps to a clean
+    /// <see cref="NotFoundResult"/> (the C3 404).
+    /// </summary>
+    [Fact]
+    public async Task Todo_SetStatus_StandingGranted()
+    {
+        const string actor = "subj-status-actor";
+        const string todoId = "todo-status";
+        var updated = new TodoItem
+        {
+            Id = todoId, Title = "Statused", AuthorId = actor, Status = "in-progress",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.SetTodoStatusAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), "in-progress", Arg.Any<CancellationToken>())
+            .Returns(updated);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.TodoSetStatus(todoId, "in-progress");
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
+        Assert.Equal("Status updated.", controller.TempData["info"] as string);
+        await projects.Received(1).SetTodoStatusAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(), "in-progress", Arg.Any<CancellationToken>());
+
+        // A blank choice posts null (the clear intent) — the controller
+        // normalizes the whitespace to the seam's null-clears rule.
+        var clearProjects = Substitute.For<IProjectService>();
+        clearProjects.SetTodoStatusAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>())
+            .Returns(new TodoItem { Id = todoId, AuthorId = actor, Created = default });
+        var clearController = Build(clearProjects, subjectId: actor);
+        var clearResult = await clearController.TodoSetStatus(todoId, "   ");
+        var clearRedirect = Assert.IsType<RedirectResult>(clearResult);
+        Assert.Equal("Status cleared.", clearController.TempData["info"] as string);
+        await clearProjects.Received(1).SetTodoStatusAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(), null, Arg.Any<CancellationToken>());
+
+        // The C3 403 split: a refused status change is a clean ForbidResult.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.SetTodoStatusAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), "done", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.TodoSetStatus(todoId, "done"));
+
+        // The C3 404 split: a missing to-do is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.SetTodoStatusAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), "done", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<TodoItem>(new KeyNotFoundException("no to-do")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.TodoSetStatus(todoId, "done"));
+    }
+
     // ── 8a — Todo_Assign_ReturnUrl_BoardTarget (ADR 0074) ──────────────────
 
     /// <summary>

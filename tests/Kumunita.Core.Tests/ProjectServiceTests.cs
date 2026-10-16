@@ -3647,6 +3647,159 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(AccessVia.Owner, row.Via);
     }
 
+    // ── SetTodoStatusAsync (the to-do detail's status lane, 3 pinned tests) ──
+
+    /// <summary>
+    /// **Pin 1** — the **standing matrix** (C-M5·6, the
+    /// <see cref="ProjectService.CheckTodoStanding"/> shape): creator,
+    /// assignee, and GlobalAdmin each **allowed**; an outsider (not the
+    /// creator, not the assignee, no elevated role) **refused** with
+    /// <see cref="UnauthorizedAccessException"/> (403) and **nothing written**
+    /// (the standing is re-checked **server-side** — the Web
+    /// <c>[Authorize]</c> is a pre-gate only).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoStatusAsync_AllowsCreatorAssigneeAndGlobalAdmin_RefusesOutsider()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-sts-p1-creator";
+        const string assignee = "u-sts-p1-assignee";
+        const string otherAuthor = "u-sts-p1-other-author";
+        const string outsider = "u-sts-p1-outsider";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        // to-do A — creator standing: the creator is its AuthorId.
+        await Plant(store, new TodoItem
+        {
+            Id = "sts-p1-todo-creator", AuthorId = creator, Title = "Creator to-do",
+            Created = at, Audience = null,
+        });
+        // to-do B — assignee standing: the actor is its AssigneeId (the creator
+        // is a third party, isolating the assignee branch).
+        await Plant(store, new TodoItem
+        {
+            Id = "sts-p1-todo-assignee", AuthorId = otherAuthor, AssigneeId = assignee,
+            Title = "Assignee to-do", Created = at, Audience = null,
+        });
+        // to-do C — GlobalAdmin standing only: neither creator nor assignee, so
+        // the GlobalAdmin branch is the only thing that grants it.
+        await Plant(store, new TodoItem
+        {
+            Id = "sts-p1-todo-admin", AuthorId = otherAuthor, AssigneeId = assignee,
+            Title = "Admin to-do", Created = at, Audience = null,
+        });
+
+        // Creator (Owner branch) → allowed; Status written.
+        var byCreator = await svc.SetTodoStatusAsync(
+            "sts-p1-todo-creator", creator, MemberRoles, KanbanStatuses.InProgress,
+                TestContext.Current.CancellationToken);
+        Assert.Equal(KanbanStatuses.InProgress, byCreator.Status);
+
+        // Assignee (the ADR 0067 collaborator branch) → allowed.
+        var byAssignee = await svc.SetTodoStatusAsync(
+            "sts-p1-todo-assignee", assignee, MemberRoles, KanbanStatuses.Done,
+                TestContext.Current.CancellationToken);
+        Assert.Equal(KanbanStatuses.Done, byAssignee.Status);
+
+        // GlobalAdmin (the ADR 0017 override branch) → allowed.
+        var byAdmin = await svc.SetTodoStatusAsync(
+            "sts-p1-todo-admin", "u-sts-p1-admin", GlobalAdminRoles, KanbanStatuses.Cancelled,
+                TestContext.Current.CancellationToken);
+        Assert.Equal(KanbanStatuses.Cancelled, byAdmin.Status);
+
+        // Outsider (a member, neither creator nor assignee) → refused (403),
+        // nothing written on the to-do.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoStatusAsync("sts-p1-todo-creator", outsider, MemberRoles, KanbanStatuses.Done, TestContext.Current.CancellationToken));
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("sts-p1-todo-creator", TestContext.Current.CancellationToken))!;
+            // The allowed creator write above is still the stored value — the
+            // refused outsider write left it untouched.
+            Assert.Equal(KanbanStatuses.InProgress, reloaded.Status);
+        }
+    }
+
+    /// <summary>
+    /// **Pin 2** — a <c>null</c> <paramref name="status"/> **clears** the
+    /// status (the <see cref="AssignTodoAsync"/> null-clears rule) and stamps
+    /// <see cref="TodoItem.Modified"/>; a known status code is stored
+    /// verbatim.
+    /// </summary>
+    [Fact]
+    public async Task SetTodoStatusAsync_NullClearsTheStatus_ValueIsStoredVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-sts-p2-creator";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        await Plant(store, new TodoItem
+        {
+            Id = "sts-p2-todo", AuthorId = creator, Title = "A to-do",
+            Status = KanbanStatuses.InProgress, Created = at, Audience = null,
+        });
+
+        // The creator (standing satisfied) may set a known code verbatim ...
+        var ok = await svc.SetTodoStatusAsync(
+            "sts-p2-todo", creator, MemberRoles, KanbanStatuses.Done,
+                TestContext.Current.CancellationToken);
+        Assert.Equal(KanbanStatuses.Done, ok.Status);
+        Assert.NotNull(ok.Modified);
+
+        // ... and a null clears the status (the assignee's null-clears rule).
+        var cleared = await svc.SetTodoStatusAsync(
+            "sts-p2-todo", creator, MemberRoles, null,
+                TestContext.Current.CancellationToken);
+        Assert.Null(cleared.Status);
+        Assert.NotNull(cleared.Modified);
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("sts-p2-todo", TestContext.Current.CancellationToken))!;
+            Assert.Null(reloaded.Status);
+        }
+    }
+
+    /// <summary>
+    /// **Pin 3** — the write commits **atomically with exactly one**
+    /// <see cref="AccessAudit"/> row (<c>todo.set_status</c>,
+    /// <c>TargetKind = "todo"</c>) — the C3 audit pin. The row's
+    /// <c>Via</c> is <see cref="AccessVia.Owner"/> for the creator (the
+    /// <see cref="ProjectService"/> <c>StandingMatrix.AuditVia</c> shape).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoStatusAsync_CommitsOneAccessAuditRowWithTheWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-sts-p3-creator";
+        var at = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+
+        await Plant(store, new TodoItem
+        {
+            Id = "sts-p3-todo", AuthorId = creator, Title = "A to-do", Created = at,
+            Audience = null,
+        });
+
+        await svc.SetTodoStatusAsync("sts-p3-todo", creator, MemberRoles, KanbanStatuses.NotStarted, TestContext.Current.CancellationToken);
+
+        // The write landed ...
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("sts-p3-todo", TestContext.Current.CancellationToken))!;
+            Assert.Equal(KanbanStatuses.NotStarted, reloaded.Status);
+        }
+
+        // ... and exactly one audit row for the to-do, with the locked action
+        // string + target kind, the creator's <see cref="AccessVia.Owner"/>.
+        var audits = await TodoAuditRows(store, "sts-p3-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_status");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("sts-p3-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch

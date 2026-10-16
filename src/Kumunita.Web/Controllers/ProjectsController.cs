@@ -933,6 +933,18 @@ public sealed class ProjectsController : Controller
             OriginalLanguageCode: result.Todo.LanguageCode,
             Blocker: result.Blocker,
             Comments: commentRows,
+            // The **status / assign** display pin (the <see cref="TodoRow
+            // .CanClaim"/> convenience-mirror shape — the real gate is the
+            // service's server-side re-check in the set-status / assign
+            // lanes, C-M5·6): creator ∪ assignee ∪ GlobalAdmin over the
+            // to-do. A read-allowed stranger sees the detail but not the
+            // mutation controls (the Claim / Assign-to-me dropdown items
+            // remain their own, separately-gated affordances).
+            CanUpdate: !string.IsNullOrEmpty(actorId)
+                && (string.Equals(result.Todo.AuthorId, actorId, StringComparison.Ordinal)
+                    || (result.Todo.AssigneeId is { Length: > 0 }
+                        && string.Equals(result.Todo.AssigneeId, actorId, StringComparison.Ordinal))
+                    || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)),
             EventId: eventId,
             EventTitle: eventTitle,
             EventLinkPath: eventLinkPath,
@@ -1455,6 +1467,50 @@ public sealed class ProjectsController : Controller
         return Redirect(Url is { } url && url.IsLocalUrl(returnUrl)
             ? returnUrl!
             : $"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/status</c> — the **status** write lane
+    /// (the to-do detail's "change status" control). A **standalone** form
+    /// POST (its own small form on the detail card — **not** the main M5
+    /// update form, whose frozen <see cref="Kumunita.Core.Projects
+    /// .UpdateTodoRequest"/> is untouched). Sets the to-do's
+    /// <see cref="Kumunita.Core.Projects.TodoItem.Status"/> through the
+    /// <see cref="IProjectService.SetTodoStatusAsync"/> seam (the
+    /// <c>set-project</c> lane shape, verbatim, minus the target guard —
+    /// a status is a stored string, not an association); a blank choice
+    /// posts <c>null</c> = **clear** the status (the
+    /// <see cref="AssignTodoAsync"/> null-clears rule). **Creator ∪ assignee
+    /// ∪ GlobalAdmin** over the to-do — the service's server-side standing
+    /// re-check (C-M5·6; the ADR 0006-D split) is the enforcement; the
+    /// controller does no standing math. A missing to-do is 404, a denied
+    /// actor 403 (the C3 split).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/status")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TodoSetStatus(string id, [FromForm] string? status)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetTodoStatusAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(status) ? null : status,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(status) ? "Status cleared." : "Status updated.";
+        return Redirect($"/projects/todos/{id}");
     }
 
     /// <summary>

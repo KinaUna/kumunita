@@ -306,6 +306,22 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     Task<TodoItem> ClaimTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
     /// <summary>
+    /// **Set the to-do's status** (the detail page's status change lane —
+    /// the <see cref="UpdateTodoRequest"/> <c>Status</c> field surfaced as a
+    /// standalone write). Sets <see cref="TodoItem.Status"/> to
+    /// <paramref name="status"/> (<c>null</c> = clear — the same rule
+    /// <see cref="AssignTodoAsync"/> applies to the assignee). Standing
+    /// (server-side, C3): **creator ∪ assignee ∪ GlobalAdmin** (C-M5·6, the
+    /// <see cref="ProjectService.CheckTodoStanding"/> shape). A missing /
+    /// soft-deleted id is <see cref="KeyNotFoundException"/> (404); a denied
+    /// actor is <see cref="UnauthorizedAccessException"/> (403).
+    /// <c>AuthorId</c> / <c>Created</c> preserved untouched; <c>Modified</c>
+    /// stamped. One <see cref="AccessAudit"/> row (<c>todo.set_status</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    Task<TodoItem> SetTodoStatusAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? status, CancellationToken ct = default);
+
+    /// <summary>
     /// Add a subtask — a new <see cref="TodoItem"/> with <c>ParentId =
     /// parentTodoItemId</c> (the sole hierarchy mechanism — C-M5·7); the
     /// subtask is a full to-do (its own status / assignee / placements) and its
