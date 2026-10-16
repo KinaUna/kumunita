@@ -107,72 +107,7 @@
                     </button>
                 </form>
             }
-            @* The action surface (ADR 0082) — one ⋮ dropdown, the ADR 0069 /
-               ADR 0071 todo/board idiom. Edit is a plain link; translation
-               add / edit each open a Bootstrap modal (ADR 0071 "Add subtask"
-               shape); translation remove is a confirm form inside the menu.
-               The service's write-lane re-check at POST is the real gate —
-               the same standing rules the inline surface used (CanEdit,
-               CanTranslate, missingLanguages) are the only gates. *@
-            @if (Model.CanEdit || Model.CanTranslate)
-            {
-                <div class="dropdown ms-auto">
-                    <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                            data-bs-toggle="dropdown" aria-expanded="false"
-                            aria-label="@(ariaActionsFor.Replace("{0}", Model.Title))">⋮</button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        @if (Model.CanEdit)
-                        {
-                            <li>
-                                <a class="dropdown-item text-dark" href="/announcements/@Model.Id/edit">
-                                    <kw-l key="announcements.edit_button">Edit</kw-l>
-                                </a>
-                            </li>
-                        }
-
-                        @* ADR 0048 — translation edit + remove (the
-                           inline <details> blocks are now modal/menu items). *@
-                        @if (Model.CanTranslate)
-                        {
-                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
-                            {
-                                <li>
-                                    <button type="button" class="dropdown-item text-dark"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="@($"#ann-trans-edit-{existing.LanguageCode}")">
-                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                    </button>
-                                </li>
-                            }
-                            @foreach (var lang in missingLanguages)
-                            {
-                                <li>
-                                    <button type="button" class="dropdown-item text-dark"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="@($"#ann-trans-add-{lang.Code}")">
-                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                    </button>
-                                </li>
-                            }
-                            <li><hr class="dropdown-divider" /></li>
-                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
-                            {
-                                <li>
-                                    <form method="post" action="@($"/announcements/{Model.Id}/translations/remove")"
-                                          data-confirm="@confirmRemoveTrans" style="margin:0;">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                        </button>
-                                    </form>
-                                </li>
-                            }
-                        }
-                    </ul>
-                </div>
-
-                @* ADR 0071 modal shape — one modal per language the
+            @* ADR 0071 modal shape — one modal per language the
                    standing-holder may edit or add. The rich editor is
                    self-wired at module load (class-based, no dependency on
                    the containing element) so it works inside a modal.
@@ -314,7 +249,6 @@
                         </div>
                     }
                 }
-            }
         </div>
 
         <div class="card">
@@ -324,41 +258,148 @@
                    variant; the chip row is a selector that swaps them. The
                    title + body are the announcement's toggle scope. *@
                 <div data-td-group="announcement">
-                    @* Original variant — default-visible unless ADR 0049
+                    @* Title row — the title (the shared fallback heading,
+                       td-variant-shared) on the left; the ⋮ actions dropdown
+                       (ADR 0082) on the right, INSIDE the card — the
+                       community-posts (Posts/Detail) idiom, so the action
+                       surface sits in the top-right corner of the card rather
+                       than in the badge row above it. The dropdown is NOT a
+                       .td-variant, so it stays put on a translation swap. The
+                       dedicated per-translation titles render in their own
+                       .td-variant-title blocks below. *@
+                    <div class="d-flex align-items-start justify-content-between gap-3 mb-2">
+                        <div class="min-w-0">
+                            @* Authored-in title — the SHARED FALLBACK heading
+                               (td-variant-shared). Default-visible unless ADR 0049
+                               auto-selects a translation of it into the viewer's
+                               language (originalHidden); it also stays the heading
+                               for any translation that has no title of its own.
+                               The swap + return path (ADR 0027) are unchanged either
+                               way. *@
+                            <div class="td-variant td-variant-shared" data-td-variant="@Model.OriginalLanguageCode"
+                                 @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                                <h4 class="mb-0">
+                                    @if (string.IsNullOrWhiteSpace(Model.Title))
+                                    {
+                                        <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
+                                    }
+                                    else
+                                    {
+                                        @Model.Title
+                                    }
+                                </h4>
+                            </div>
+                            @* One dedicated title per user-added translation
+                               (only when it has one) — td-variant-title, shown in
+                               place of the shared heading for that language; the
+                               matching one shows first if ADR 0049 selects it over
+                               the original. A translation with no title has NO
+                               dedicated container — the shared heading stays. *@
+                            @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                if (!string.IsNullOrWhiteSpace(t.Title))
+                                {
+                                    bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                                    <div class="td-variant td-variant-title" data-td-variant="@t.LanguageCode"
+                                         @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                        <h4 class="mb-0">@t.Title</h4>
+                                    </div>
+                                }
+                            }
+                        </div>
+
+                        @* The action surface (ADR 0082) — one ⋮ dropdown, the ADR 0069 /
+                           ADR 0071 todo/board idiom. Edit is a plain link; translation
+                           add / edit each open a Bootstrap modal (ADR 0071 "Add subtask"
+                           shape); translation remove is a confirm form inside the menu.
+                           The service's write-lane re-check at POST is the real gate —
+                           the same standing rules the inline surface used (CanEdit,
+                           CanTranslate, missingLanguages) are the only gates. *@
+                        @if (Model.CanEdit || Model.CanTranslate)
+                        {
+                            <div class="dropdown flex-shrink-0">
+                                <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false"
+                                        aria-label="@(ariaActionsFor.Replace("{0}", Model.Title))">⋮</button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    @if (Model.CanEdit)
+                                    {
+                                        <li>
+                                            <a class="dropdown-item text-dark" href="/announcements/@Model.Id/edit">
+                                                <kw-l key="announcements.edit_button">Edit</kw-l>
+                                            </a>
+                                        </li>
+                                    }
+
+                                    @* ADR 0048 — translation edit + remove (the
+                                       inline <details> blocks are now modal/menu items). *@
+                                    @if (Model.CanTranslate)
+                                    {
+                                        @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#ann-trans-edit-{existing.LanguageCode}")">
+                                                    <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </li>
+                                        }
+                                        @foreach (var lang in missingLanguages)
+                                        {
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#ann-trans-add-{lang.Code}")">
+                                                    <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                                </button>
+                                            </li>
+                                        }
+                                        <li><hr class="dropdown-divider" /></li>
+                                        @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <li>
+                                                <form method="post" action="@($"/announcements/{Model.Id}/translations/remove")"
+                                                      data-confirm="@confirmRemoveTrans" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        }
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+
+                    @* Original variant's body (default-visible unless ADR 0049
                        auto-selects a translation of it into the viewer's
-                       language (originalHidden); the swap + return path
-                       (ADR 0027) are unchanged either way. *@
+                       language — originalHidden — in which case the matching
+                       dedicated title + body below show instead). The title now
+                       lives in the title row above as td-variant-shared. *@
                     <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
                          @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
-                        <h4 class="mb-0">
-                            @if (string.IsNullOrWhiteSpace(Model.Title))
-                            {
-                                <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
-                            }
-                            else
-                            {
-                                @Model.Title
-                            }
-                        </h4>
                         @* The full body (the /announcements list shows the
                            first 250 characters and links here). Rendered
                            through the one MarkdownRenderer (R·1). *@
                         <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(Model.Body, Model.AuthorSubjectId)" /></div>
                     </div>
 
-                    @* One variant per user-added translation — hidden by
-                       default, EXCEPT the one matching the viewer's current
-                       language, which ADR 0049 shows first (in place of the
-                       original); the rest stay hidden behind their chip. *@
+                    @* One body per user-added translation — hidden by default,
+                       EXCEPT the one matching the viewer's current language, which
+                       ADR 0049 shows first (in place of the original); the rest
+                       stay hidden behind their chip. The translation's TITLE is no
+                       longer here — it lives on the title row above as a dedicated
+                       td-variant-title, so the swap JS hides the shared fallback
+                       heading in its place (the Posts/Detail idiom). *@
                     @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                     {
                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                         <div class="td-variant" data-td-variant="@t.LanguageCode"
                              @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
-                            @if (!string.IsNullOrWhiteSpace(t.Title))
-                            {
-                                <h4 class="mb-0">@t.Title</h4>
-                            }
                             <div class="mb-3 rc-body"><partial name="_MentionRenderer" model="new MentionBodyModel(t.Body, Model.AuthorSubjectId)" /></div>
                         </div>
                     }
