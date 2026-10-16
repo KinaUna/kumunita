@@ -94,115 +94,17 @@
                     <kw-l key="projects.todo.addressed_to">Addressed to</kw-l>: @string.Join(", ", Model.Todo.GroupNames)
                 </span>
             }
-            <div class="dropdown ms-auto">
-                <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
-                        data-bs-toggle="dropdown" aria-expanded="false"
-                        aria-label="@(ariaActionsFor.Replace("{0}", Model.Todo.Title))">⋮</button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    @if (Model.Todo.CanClaim)
-                    {
-                        <li>
-                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
-                            </form>
-                        </li>
-                    }
-                    @* ADR 0106 — "Assign to me" (the self-assign pick-up
-                       lane, the claim generalized): visible only when the
-                       to-do is **unassigned** and the actor is authenticated.
-                       Posts the assign route with the actor's own subject id.
-                       The service's self-assign allowance (Read-allowed +
-                       unassigned) is the server-side gate. *@
-                    @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
-                    {
-                        <li>
-                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
-                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
-                            </form>
-                        </li>
-                    }
-                    <li>
-                        <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
-                    </li>
-                    <li>
-                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")"
-                              data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
-                        </form>
-                    </li>
-                    <li>
-                        <button type="button" class="dropdown-item text-dark"
-                                data-bs-toggle="modal"
-                                data-bs-target="#subtask-modal">
-                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
-                        </button>
-                    </li>
-                    @* ADR 0082 — the translation add / edit / remove as
-                       dropdown items opening the modals below (replacing the
-                       prior inline <details> blocks): one "Edit" per existing
-                       translation + one "Add" per enabled-but-missing language
-                       (both open modals), then a "Remove" per existing.
-                       Server-side gate on CanTranslate (the ADR 0088
-                       translator lane); the items are localized (the ADR 0015
-                       kw-l tags — the same posts.translation_* keys the
-                       Community-post and Project surfaces use). *@
-                    @if (Model.CanTranslate)
-                    {
-                        @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
-                        {
-                            <li>
-                                <button type="button" class="dropdown-item text-dark"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="@($"#todo-trans-edit-{existing.LanguageCode}")">
-                                    <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                </button>
-                            </li>
-                        }
-                        @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
-                        {
-                            <li>
-                                <button type="button" class="dropdown-item text-dark"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="@($"#todo-trans-add-{lang.Code}")">
-                                    <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
-                                </button>
-                            </li>
-                        }
-                        @if (Model.Translations is { Count: > 0 })
-                        {
-                            <li><hr class="dropdown-divider" /></li>
-                            @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
-                            {
-                                <li>
-                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
-                                          data-confirm="@confirmRemoveTrans" style="margin:0;">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
-                                        </button>
-                                    </form>
-                                </li>
-                            }
-                        }
-                    }
-                    <li>
-                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
-                              data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
+        </div>
 
-            @* ADR 0071 — the Add-subtask modal (same convention as the Kanban
-               board card; the inline Title input is replaced). *@
-            <div class="modal fade" id="subtask-modal" tabindex="-1"
+        @* The to-do's ⋮ action surface now sits inside the card's title row
+           (below) — the community-posts idiom. The Add-subtask modal + the
+           translation add / edit modals (opened from that dropdown) are the
+           siblings rendered below; their ids are the data-bs-target references
+           its items use. *@
+
+        @* ADR 0071 — the Add-subtask modal (same convention as the Kanban
+           board card; the inline Title input is replaced). *@
+        <div class="modal fade" id="subtask-modal" tabindex="-1"
                  aria-labelledby="subtask-modal-label" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
@@ -384,10 +286,125 @@
                     </div>
                 }
             }
-        </div>
 
         <div class="card mb-4">
             <div class="card-body">
+                @* The to-do's ⋮ action surface (ADR 0082), now INSIDE the card
+                   (the community-posts idiom): a right-aligned row at the top of
+                   the card body. Assign / add-subtask / delete are plain POST
+                   forms; translation add / edit open the modals above; remove is
+                   a confirm form in the menu. The service's write-lane re-check
+                   at POST is the real gate (CanClaim / CanTranslate /
+                   CanUpdate / the self-assign allowance) — the same standing
+                   rules as before, only the presentation moved into the card. *@
+                <div class="d-flex justify-content-end">
+                    <div class="dropdown">
+                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="@(ariaActionsFor.Replace("{0}", Model.Todo.Title))">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.Todo.CanClaim)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            @* ADR 0106 — "Assign to me" (the self-assign pick-up
+                               lane, the claim generalized): visible only when the
+                               to-do is **unassigned** and the actor is authenticated.
+                               Posts the assign route with the actor's own subject id.
+                               The service's self-assign allowance (Read-allowed +
+                               unassigned) is the server-side gate. *@
+                            @if (string.IsNullOrWhiteSpace(Model.Todo.AssigneeId) && User?.Identity?.IsAuthenticated == true)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="assigneeId" value="@KumunitaPrincipal.SubjectId(User)" />
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.assign_to_me">Assign to me</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            <li>
+                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                            </li>
+                            <li>
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")"
+                                      data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                </form>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#subtask-modal">
+                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                </button>
+                            </li>
+                            @* ADR 0082 — the translation add / edit / remove as
+                               dropdown items opening the modals above (replacing the
+                               prior inline <details> blocks): one "Edit" per existing
+                               translation + one "Add" per enabled-but-missing language
+                               (both open modals), then a "Remove" per existing.
+                               Server-side gate on CanTranslate (the ADR 0088
+                               translator lane); the items are localized (the ADR 0015
+                               kw-l tags — the same posts.translation_* keys the
+                               Community-post and Project surfaces use). *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#todo-trans-edit-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @foreach (var lang in (Model.Languages ?? []).Where(l => (Model.Translations ?? []).All(x => !string.Equals(x.LanguageCode, l.Code, StringComparison.OrdinalIgnoreCase))))
+                                {
+                                    <li>
+                                        <button type="button" class="dropdown-item text-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="@($"#todo-trans-add-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </button>
+                                    </li>
+                                }
+                                @if (Model.Translations is { Count: > 0 })
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in (Model.Translations ?? []).OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/translations/remove")"
+                                                  data-confirm="@confirmRemoveTrans" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            }
+                            <li>
+                                <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
+                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
                 @* ADR 0088 — user-added translations of the to-do (the ADR 0059
                    chip-swap: the original + one variant per translation, the
                    td-swap JS shows the viewer's current-language variant

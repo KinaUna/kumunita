@@ -113,7 +113,14 @@
 
         <header class="airy-head">
             <div class="head-row">
-                <div>
+                @* flex:1 1 0 + min-w-0: the left column (title + description +
+                   author + tags + links) has a ZERO flex-basis and grows to fill
+                   the space left by the action cluster. A zero basis keeps the
+                   .head-row (flex-wrap:wrap) from wrapping the cluster under the
+                   title — the two stay on ONE line, with the cluster to the
+                   right of the title, across viewport widths (the left column's
+                   text simply wraps within its column). *@
+                <div class="min-w-0" style="flex:1 1 0">
                     @* ADR 0088 — user-added translations of the board (the
                        ADR 0059 chip-swap: the original + one variant per
                        translation; ADR 0049 auto-selects the viewer's
@@ -244,8 +251,16 @@
                    dropdown shape): delete board — a plain POST form to the
                    U08 route, CSRF-tokenized, redirect-after-POST. The cascade
                    is the service's (F2 / F8); the view renders what the
-                   service returns (C3). *@
-                <div class="d-flex align-items-center gap-2">
+                   service returns (C3). This cluster is a flex child of the
+                   .head-row (align-items:flex-end), so without an override it
+                   bottom-aligns against the tall left column (title + author +
+                   tags) and the ⋮ lands well below the title. align-self:
+                   flex-start pins it to the TOP of the row, and flex-shrink-0
+                   (with the left column's flex-grow-1 min-w-0) keeps the ⋮ +
+                   Full page / Full screen toggles on the SAME line as the
+                   title — to the right of it — the community detail-page
+                   idiom. *@
+                <div class="d-flex align-items-center gap-2 align-self-start flex-shrink-0">
                     @* The full-page expand toggle (expand-page.js's second
                        display mode, the full-screen sibling): keeps the page
                        in the normal viewport but hides the navbar / footer
