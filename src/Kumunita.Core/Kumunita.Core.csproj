@@ -7,6 +7,13 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.18.1" />
+    <!-- Security pin: MimeKit (pulled by MailKit 4.18.1) depends on
+         System.Security.Cryptography.Pkcs 10.0.0, which carries NU1902
+         (GHSA-2fmv-rv2c-59x7) and NU1903 (GHSA-846f-f764-76mx). Pinning the
+         patched 10.0.13 here forces the higher version across the whole
+         dependency graph and silences the advisory in every project that
+         transitively references Core (Web, Core.Tests, Web.Tests). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageReference Include="Marten" Version="9.50.2" />
     <!-- Raw parameterised SQL on the hand-rolled mt."AdminOverride" table
          (ConsumeBreakGlassAsync, the break-glass consume write). Matches the Npgsql
