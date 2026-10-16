@@ -493,6 +493,11 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Pages.IPageService>(),
             sp.GetRequiredService<Events.IEventService>(),
             sp.GetRequiredService<Projects.IProjectService>(),
+            // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
+            // page's own read (the /inventory/{id} surface's frozen
+            // IInventoryService.GetItemAsync); the M37 PersonalNotes
+            // "inventory" D3 shape re-applied to the M17 surface.
+            sp.GetRequiredService<Inventory.IInventoryService>(),
             // ADR 0118 D3/F2 (obs-4 amendment): the frozen IIdentityService,
             // used in-Core only to resolve the owner's real standing when the
             // bookmark target is an announcement — so the D3 write-lane check
@@ -520,6 +525,10 @@ public static class ServiceCollectionExtensions
             // BookmarkService shape, ADR 0118 D3/F2 obs-4 re-applied): the
             // detail page's own read + the owner's real standing.
             sp.GetRequiredService<Announcements.IAnnouncementService>(),
+            // ADR 0167 extension — the M16 Inventory detail page's own read
+            // (the /inventory/{id} surface's frozen IInventoryService
+            // .GetItemAsync); the M37 "inventory" D3 shape.
+            sp.GetRequiredService<Inventory.IInventoryService>(),
             sp.GetRequiredService<IIdentityService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service

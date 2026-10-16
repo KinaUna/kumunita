@@ -2,6 +2,7 @@ using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -60,12 +61,12 @@ public sealed class BookmarkService : IBookmarkService
     public static readonly IReadOnlySet<string> ClosedTargetKinds =
         new HashSet<string>(StringComparer.Ordinal)
         {
-            "post", "event", "todo", "announcement", "page", "project", "board",
+            "post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
-        ["post", "event", "todo", "announcement", "page", "project", "board"];
+        ["post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
@@ -74,6 +75,7 @@ public sealed class BookmarkService : IBookmarkService
     private readonly IPageService _pages;
     private readonly IEventService _events;
     private readonly IProjectService _projects;
+    private readonly IInventoryService _inventory;
     private readonly IIdentityService _identity;
 
     /// <summary>
@@ -97,6 +99,7 @@ public sealed class BookmarkService : IBookmarkService
         IPageService pages,
         IEventService events,
         IProjectService projects,
+        IInventoryService inventory,
         IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -106,6 +109,7 @@ public sealed class BookmarkService : IBookmarkService
         _pages = pages ?? throw new ArgumentNullException(nameof(pages));
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _projects = projects ?? throw new ArgumentNullException(nameof(projects));
+        _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
 
@@ -662,6 +666,22 @@ public sealed class BookmarkService : IBookmarkService
                 return path is null ? (null, null) : (page.Title, path);
             }
 
+            case "inventory":
+            {
+                var item = await s.LoadAsync<InventoryItem>(targetId).ConfigureAwait(false);
+                if (item is null || item.IsDeleted)
+                    return (null, null);
+                return (item.Name, $"/inventory/{targetId}");
+            }
+
+            case "directory":
+            {
+                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
+                if (profile is null || profile.Blocked)
+                    return (null, null);
+                return (profile.DisplayName, $"/directory/{targetId}");
+            }
+
             default:
                 return (null, null);
         }
@@ -838,6 +858,48 @@ public sealed class BookmarkService : IBookmarkService
 
                 var path = await BuildPagePathAsync(page.Id).ConfigureAwait(false);
                 return path is null ? (false, null, null) : (true, page.Title, path);
+            }
+
+            case "inventory":
+            {
+                // ADR 0118 amendment (2026-10-16) — the M16 Inventory detail
+                // page's own read, re-run: IInventoryService.GetItemAsync
+                // (the same call the /inventory/{id} detail page uses — the
+                // C-M17·3 pin: the target's own audit row commits, M17
+                // commits none of its own). KeyNotFoundException (404 on
+                // absent / soft-deleted / denied — the C-M3·4 non-leaky shape)
+                // degrades to Refused.
+                try
+                {
+                    var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, item.Name, $"/inventory/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
+            }
+
+            case "directory":
+            {
+                // The M37 PersonalNotes "directory" D3 shape re-applied:
+                // the profile read (GetProfileAsync — a pure read, the detail
+                // page's own projection) + the frozen CanAsync(Read) over the
+                // ProfileToAuditableResource (the C-M17·3 pin: the target's
+                // own audit row commits, M17 commits none of its own).
+                var profile = await _userInfo.GetProfileAsync(targetId).ConfigureAwait(false);
+                if (profile is null || profile.Blocked)
+                    return (false, null, null);
+                var decision = await _authz.CanAsync(
+                    actorId, AccessAction.Read, new ProfileToAuditableResource(profile))
+                    .ConfigureAwait(false);
+                if (!decision.Allowed)
+                    return (false, null, null);
+                return (true, profile.DisplayName, $"/directory/{targetId}");
             }
 
             default:

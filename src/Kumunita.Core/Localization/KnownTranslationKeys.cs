@@ -2387,6 +2387,11 @@ public static class KnownTranslationKeys
             // pn.list.kind.project / pn.list.kind.board labels (one label, one word).
             ["bm.list.kind.project"]        = "Projects",
             ["bm.list.kind.board"]          = "Boards",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventory",
+            ["bm.list.kind.directory"]      = "People",
             ["bm.list.unbookmark"]          = "Remove",
             ["bm.button.bookmark"]          = "Bookmark",
             ["bm.button.bookmarked"]        = "Bookmarked",
@@ -2426,6 +2431,10 @@ public static class KnownTranslationKeys
             ["pn.note.attach"]              = "Note",
             ["pn.note.attached"]            = "Noted.",
             ["pn.list.kind.announcement"]   = "Announcements",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventory",
             ["pn.note.body_label"]          = "Your note",
             ["pn.note.delete_confirm"]      = "Delete this note? This cannot be undone.",
             ["pn.note.add"]                 = "Add note",
@@ -5132,6 +5141,11 @@ public static class KnownTranslationKeys
             // pn.list.kind.project / pn.list.kind.board labels.
             ["bm.list.kind.project"]        = "Projekte",
             ["bm.list.kind.board"]          = "Boards",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventar",
+            ["bm.list.kind.directory"]      = "Personen",
             ["bm.list.unbookmark"]          = "Entfernen",
             ["bm.button.bookmark"]          = "Merken",
             ["bm.button.bookmarked"]        = "Gemerkt",
@@ -5170,6 +5184,10 @@ public static class KnownTranslationKeys
             ["pn.note.attach"]              = "Notiz",
             ["pn.note.attached"]            = "Notiert.",
             ["pn.list.kind.announcement"]   = "Ankündigungen",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventar",
             ["pn.note.body_label"]          = "Deine Notiz",
             ["pn.note.delete_confirm"]      = "Diese Notiz löschen? Dies kann nicht rückgängig gemacht werden.",
             ["pn.note.add"]                 = "Notiz hinzufügen",
@@ -7770,6 +7788,11 @@ public static class KnownTranslationKeys
             // pn.list.kind.project / pn.list.kind.board labels.
             ["bm.list.kind.project"]        = "Projets",
             ["bm.list.kind.board"]          = "Tableaux",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventaire",
+            ["bm.list.kind.directory"]      = "Personnes",
             ["bm.list.unbookmark"]          = "Retirer",
             ["bm.button.bookmark"]          = "Signeter",
             ["bm.button.bookmarked"]        = "Signeté",
@@ -7808,6 +7831,10 @@ public static class KnownTranslationKeys
             ["pn.note.attach"]              = "Note",
             ["pn.note.attached"]            = "Noté.",
             ["pn.list.kind.announcement"]   = "Annonces",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventaire",
             ["pn.note.body_label"]          = "Votre note",
             ["pn.note.delete_confirm"]      = "Supprimer cette note ? Cette action est irréversible.",
             ["pn.note.add"]                 = "Ajouter une note",
@@ -10393,6 +10420,11 @@ public static class KnownTranslationKeys
             // pn.list.kind.project / pn.list.kind.board labels.
             ["bm.list.kind.project"]        = "Projekter",
             ["bm.list.kind.board"]          = "Brætter",
+            // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2
+            // directory kinds join the closed set (the M37 PersonalNotes
+            // "directory" label is re-used; "inventory" is new to M17).
+            ["bm.list.kind.inventory"]      = "Inventar",
+            ["bm.list.kind.directory"]      = "Kontaktpersoner",
             ["bm.list.unbookmark"]          = "Fjern",
             ["bm.button.bookmark"]          = "Bogmærk",
             ["bm.button.bookmarked"]        = "Bogmærket",
@@ -10431,6 +10463,10 @@ public static class KnownTranslationKeys
             ["pn.note.attach"]              = "Noter",
             ["pn.note.attached"]            = "Noteret.",
             ["pn.list.kind.announcement"]   = "Meddelelser",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            ["pn.list.kind.inventory"]      = "Inventar",
             ["pn.note.body_label"]          = "Din note",
             ["pn.note.delete_confirm"]      = "Slet denne note? Dette kan ikke fortrydes.",
             ["pn.note.add"]                 = "Tilføj note",

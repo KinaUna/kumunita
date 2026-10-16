@@ -282,13 +282,14 @@ public class KnownTranslationKeys_ParityTests
     // a non-empty value. The M17 parity-test precedent (the about.* /
     // footer.platform.* closed-set shape re-used).
 
-    [Fact(DisplayName = "M37: the 29 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
+    [Fact(DisplayName = "M37: the 30 pn.* keys (ADR 0167 §kw-l) are registered in all four languages with non-empty values")]
     public void KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages()
     {
-        // The ADR 0167 §kw-l closed contract — exactly 29 keys (the original
+        // The ADR 0167 §kw-l closed contract — exactly 30 keys (the original
         // 24 + 5 new: pn.list.kind.announcement, pn.note.body_label,
         // pn.note.delete_confirm, pn.note.add, pn.note.view — the announcement
-        // lane + the note-modal keys).
+        // lane + the note-modal keys + pn.list.kind.inventory — the M16
+        // inventory kind joins the M37 closed set, ADR 0167 extension, 2026-10-16).
         var pnKeys = new[]
         {
             "pn.nav",
@@ -305,6 +306,10 @@ public class KnownTranslationKeys_ParityTests
             "pn.list.kind.document",
             "pn.list.kind.directory",
             "pn.list.kind.announcement",
+            // ADR 0167 extension (2026-10-16) — the M16 inventory kind joins
+            // the M37 closed set (the detail page's affordance surface now
+            // matches the M17 bookmark surface).
+            "pn.list.kind.inventory",
             "pn.note.edit",
             "pn.note.delete",
             "pn.note.move",
@@ -322,8 +327,8 @@ public class KnownTranslationKeys_ParityTests
             "pn.folder.empty",
         };
 
-        Assert.True(pnKeys.Length == 29,
-            "the pn.* closed set must be exactly 29 keys");
+        Assert.True(pnKeys.Length == 30,
+            "the pn.* closed set must be exactly 30 keys");
         Assert.True(new HashSet<string>(pnKeys).Count == pnKeys.Length,
             "the pn.* closed set must have no duplicate names");
 
@@ -345,12 +350,12 @@ public class KnownTranslationKeys_ParityTests
             }
         }
 
-        // The list is closed: every pn.* key in the registry is one of the 29
+        // The list is closed: every pn.* key in the registry is one of the 30
         // contract keys (no drift in either direction — the parity pin).
         var registryPnKeys =
             KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("pn.")).ToList();
-        Assert.True(registryPnKeys.Count == 29,
-            "the registry's pn.* key set is not the closed 29-key §kw-l set");
+        Assert.True(registryPnKeys.Count == 30,
+            "the registry's pn.* key set is not the closed 30-key §kw-l set");
         Assert.Equal(pnKeys.OrderBy(k => k).ToList(),
             registryPnKeys.OrderBy(k => k).ToList());
     }

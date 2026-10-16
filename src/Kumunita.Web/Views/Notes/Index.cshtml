@@ -32,10 +32,13 @@
     // The closed TargetKind set (D1 — the exact vocabulary the existing
     // *ToAuditableResource adapters already emit). Rendered in this canonical
     // order; a kind with no notes is skipped.
+    // The M16 inventory kind joined by the ADR 0167 extension (2026-10-16)
+    // — the detail page's affordance surface now matches the M17 bookmark
+    // surface.
     string[] _kinds =
     {
         "post", "grouppost", "event", "page", "project",
-        "todo", "board", "document", "directory", "announcement",
+        "todo", "board", "document", "directory", "announcement", "inventory",
     };
 
     // Builds the note "buckets" for one kind (design doc §2.2 — the

@@ -5,6 +5,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Bookmarks;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -393,14 +394,19 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     {
         // The ADR 0118 amendment (2026-10-16) added the project / board
         // kinds — the M37 PersonalNotes closed-set vocabulary already
-        // carried them; the M17 surface now matches. The set is now
-        // SEVEN kinds (was five at M17 ship, the M5 KanbanStatuses shape
-        // pin still holds: string, not enum, closed, drift-guarded).
+        // carried them; the M17 surface now matches. The ADR 0118 amendment
+        // (2026-10-16) also added the M16 inventory + M2 directory kinds —
+        // the M37 PersonalNotes "directory" closed-set vocabulary re-applied
+        // to the M17 surface, and the M16 inventory surface's own read
+        // (GetItemAsync) re-applied. The set is now NINE kinds (was five at
+        // M17 ship, seven after the project / board amendment, the M5
+        // KanbanStatuses shape pin still holds: string, not enum, closed,
+        // drift-guarded).
         var expected = new HashSet<string>(StringComparer.Ordinal)
-            { "post", "event", "todo", "announcement", "page", "project", "board" };
+            { "post", "event", "todo", "announcement", "page", "project", "board", "inventory", "directory" };
 
         Assert.Equal(expected, new HashSet<string>(BookmarkService.ClosedTargetKinds, StringComparer.Ordinal));
-        Assert.Equal(7, BookmarkService.ClosedTargetKinds.Count);
+        Assert.Equal(9, BookmarkService.ClosedTargetKinds.Count);
     }
 
     // ── ADR 0118 amendment (2026-10-16) — the project / board bookmark
@@ -765,7 +771,8 @@ public class BookmarkServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         var pages = new PageService(store);
         var events = new EventService(store, authz, userInfo);
         var projects = new ProjectService(store, authz, userInfo);
-        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, identity);
+        var inventory = new InventoryService(store, authz, userInfo);
+        var bm = new BookmarkService(userInfo, authz, store, announcements, pages, events, projects, inventory, identity);
         return (userInfo, authz, bm);
     }
 

@@ -297,3 +297,81 @@ target's own frozen `CanAsync(Read)` in the target's own transaction] +
 construction; a non-owner gets a non-leaky 404 and no audit row] + 0015
 [the `kw-l` registry — the closed `pn.*` key block × en/de/fr/da joins the
 `KnownTranslationKeys` registry].
+
+## Amendments
+
+### 2026-10-16 — The inventory kind joins the closed set (the M16 parity lane)
+
+The M16 Inventory surface (ADR 0117) ships the **inventory item** detail
+page — a content surface a resident can see, pin, and note. The M37
+PersonalNotes closed set already carried ten kinds (post / grouppost /
+event / page / project / todo / board / document / directory /
+announcement) — but **not** `inventory`. The M17 bookmark surface's
+2026-10-16 project / board amendment (ADR 0118) closed the gap for
+project / board; this amendment closes the same gap for the M17 surface
+**and** for the M37 surface on the inventory kind.
+
+The amendment (the M37 PersonalNotes D3 / D5 shape re-applied — no new
+seam, no new decision, no new `AccessAction` / `AccessVia` / `Decide()`
+branch / adapter; the existing frozen `IInventoryService.GetItemAsync`
+read is reused, **exactly** the category the existing `board` /
+`document` / `directory` branches already establish):
+
+- **`PersonalNoteService.ClosedTargetKinds` gains one kind**: `inventory`
+  (the closed set is now **eleven** — the M5 `KanbanStatuses`
+  string-not-enum shape pin holds: string, not enum, closed,
+  drift-guarded). `ClosedTargetKindsOrdered` gains the one in the same
+  canonical order (after `announcement`).
+- **`PersonalNoteService` gains a new constructor dependency**: the
+  frozen `IInventoryService` (the M16 Inventory detail page's own read —
+  the same category of composition as the already-composed
+  `IProjectService`). The `IPersonalNoteService` public signature is
+  unchanged (C-M37·1 holds — the composition detail does not cross the
+  frozen seam).
+- **`PersonalNoteService.ResolveTargetAsync`** (the D3 write-lane check)
+  gains one branch: the `inventory` branch re-runs the frozen
+  `IInventoryService.GetItemAsync(targetId, actorId)` read (the same
+  call the `/inventory/{id}` detail page uses — C-M37·3: the target's
+  own audit row commits, M37 commits none of its own). Catches
+  `KeyNotFoundException` (404 on absent / soft-deleted / denied — the
+  C-M3·4 non-leaky shape) and `UnauthorizedAccessException`, degrading to
+  `Refused` — the M37 404-not-403 Web mapping (the M16 create-gate
+  posture).
+- **`PersonalNoteService.ResolveForListAsync`** (the D5 list resolution,
+  the C-M37·2 pure non-auditing doc load) gains one branch: the
+  `inventory` branch loads the `InventoryItem` doc directly and degrades
+  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
+  `IsDraft` — D8a shape). Returns the target's `Name` + the canonical
+  detail URL (`/inventory/{id}`).
+- **The new `pn.list.kind.inventory` kw-l key** is registered in all
+  four language registries (en / de / fr / da) — the terminology matches
+  the M17 `bm.list.kind.inventory` label (one label, one word, across
+  all four languages). The closed `pn.*` key set grows from 29 to
+  **30 keys** (the
+  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
+  re-targets the count + the new key).
+- **`Views/Inventory/Detail.cshtml`** — the `_NoteButton` partial joins
+  the top-right affordance row (the `Projects/TodoDetail.cshtml`
+  ordering precedent: Bookmark first, Note second — the M17 surface's
+  same-day amendment adds the `_BookmarkButton` to the same row).
+- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
+  `inventory` (the list view now renders the new group when the owner
+  has noted one).
+- **`tests/Kumunita.Core.Tests/PersonalNoteServiceTests.cs`** — the
+  harness composes the `InventoryService` (so the new `inventory` branch
+  resolves).
+
+**The frozen surfaces are untouched** (C-M37·1 holds): the
+`IPersonalNoteService` public signature is unchanged; **no** new
+`AccessAction` / `AccessVia` / `Decide()` branch; **no** new method on
+`IAuthorizationService`. The only changes are in the **Core composition**
+(the two resolver switches gain one branch each — the same shape as the
+existing `board` / `document` / `directory` branches; the service gains
+a new `IInventoryService` constructor dependency), the **key registry**
+(one new `pn.list.kind.*` key × 4 languages), the **views** (the detail
+surface gains the existing `_NoteButton` partial; the list view's
+`_kinds` array gains one entry), and the **test harness** (the
+`InventoryService` composition). The drift-guard frozen list in the
+design doc is amended to count the closed set as **eleven kinds** (was
+ten) and to name `inventory` among the closed vocabulary. The §kw-l key
+list is amended to count **30 keys** (was 29).

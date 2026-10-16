@@ -49,16 +49,19 @@ namespace Kumunita.Web.Tests;
 /// calls the seam's <c>RemoveAsync</c> (the D5 pin — the unbookmark needs no
 /// target read at all, the row is keyed on the owner's own
 /// <see cref="Bookmark"/> row).</item>
-/// <item><b>BmKeys_AreTheClosedTwentyOneKeySet</b> — the §kw-l pin: the
+/// <item><b>BmKeys_AreTheClosedTwentyThreeKeySet</b> — the §kw-l pin: the
 /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
-/// registry contains **exactly** the 21 <c>bm.*</c> keys (the closed set,
+/// registry contains **exactly** the 23 <c>bm.*</c> keys (the closed set,
 /// the parity-test shape the U04 / U05 units depend on; the two
 /// <c>bm.toggle.*</c> flash keys were added by the obs-2 ADR 0118
 /// amendment, 2026-09-30; the ADR 0168 folder-tree block joined 2026-10-14;
 /// the two <c>bm.list.kind.project</c> / <c>bm.list.kind.board</c> labels
 /// joined by the ADR 0118 amendment, 2026-10-16 — the M37 PersonalNotes
 /// closed-set vocabulary already carried them; the M17 surface now
-/// matches).</item>
+/// matches; the two <c>bm.list.kind.inventory</c> /
+/// <c>bm.list.kind.directory</c> labels joined by the same ADR 0118
+/// amendment, 2026-10-16 — the M16 inventory + M2 directory kinds join
+/// the M17 surface).</item>
 /// </list>
 /// <para>
 /// **No database, no Testcontainers** — a pure NSubstitute seam test (the
@@ -70,14 +73,17 @@ namespace Kumunita.Web.Tests;
 public sealed class BookmarksControllerTests
 {
     /// <summary>
-    /// The closed 21-key <c>bm.*</c> set (design doc §kw-l, the exact names
+    /// The closed 23-key <c>bm.*</c> set (design doc §kw-l, the exact names
     /// the parity tests pin — the U04 / U05 units consume this set, never
     /// re-register a subset; the two <c>bm.toggle.*</c> flash keys are the
     /// obs-2 ADR 0118 amendment, 2026-09-30; the ADR 0168 folder-tree block
     /// joined 2026-10-14; the two <c>bm.list.kind.project</c> /
     /// <c>bm.list.kind.board</c> labels joined by the ADR 0118 amendment,
     /// 2026-10-16 — the M37 PersonalNotes closed-set vocabulary already
-    /// carried them; the M17 surface now matches).
+    /// carried them; the M17 surface now matches; the two
+    /// <c>bm.list.kind.inventory</c> / <c>bm.list.kind.directory</c> labels
+    /// joined by the same ADR 0118 amendment, 2026-10-16 — the M16
+    /// inventory + M2 directory kinds join the M17 surface).
     /// </summary>
     private static readonly string[] BmKeys =
     [
@@ -98,6 +104,11 @@ public sealed class BookmarksControllerTests
         // language registries).
         "bm.list.kind.project",
         "bm.list.kind.board",
+        // ADR 0118 amendment (2026-10-16) — the M16 inventory + M2 directory
+        // kinds join the closed set (the M37 PersonalNotes "directory" label
+        // is re-used; "inventory" is new to M17).
+        "bm.list.kind.inventory",
+        "bm.list.kind.directory",
         "bm.list.unbookmark",
         "bm.button.bookmark",
         "bm.button.bookmarked",
@@ -342,20 +353,22 @@ public sealed class BookmarksControllerTests
         await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
-    // ── 5 — BmKeys_AreTheClosedTwentyOneKeySet ──────────────────────────
+    // ── 5 — BmKeys_AreTheClosedTwentyThreeKeySet ──────────────────────────
 
     /// <summary>
     /// The §kw-l pin (the design doc §kw-l, the closed set): the
     /// <see cref="Kumunita.Core.Localization.KnownTranslationKeys.EnValues"/>
-    /// registry contains **exactly** the 21 <c>bm.*</c> keys (the original
+    /// registry contains **exactly** the 23 <c>bm.*</c> keys (the original
     /// 12 + the obs-2 flash pair (2026-09-30) + the ADR 0168 folder-tree
     /// block (2026-10-14) + the ADR 0118 amendment's two kind labels (2026-10-16)
     /// — the M37 PersonalNotes closed-set vocabulary already carried them;
-    /// the M17 surface now matches). All four registries (en / de / fr / da)
+    /// the M17 surface now matches + the ADR 0118 amendment's two inventory /
+    /// directory kind labels (2026-10-16) — the M16 inventory + M2 directory
+    /// kinds join the M17 surface). All four registries (en / de / fr / da)
     /// carry the same closed set.
     /// </summary>
     [Fact]
-    public void BmKeys_AreTheClosedTwentyOneKeySet()
+    public void BmKeys_AreTheClosedTwentyThreeKeySet()
     {
         var en = Kumunita.Core.Localization.KnownTranslationKeys.EnValues;
 
@@ -367,17 +380,20 @@ public sealed class BookmarksControllerTests
             Assert.False(string.IsNullOrWhiteSpace(en[key]), $"The '{key}' value must be non-empty.");
         }
 
-        // (2) The closed set is EXACTLY the 21 keys (the original 19 + the
+        // (2) The closed set is EXACTLY the 23 keys (the original 19 + the
         // two bm.list.kind.project / bm.list.kind.board labels added by the
         // ADR 0118 amendment, 2026-10-16 — the M37 PersonalNotes closed-set
-        // vocabulary already carried them; the M17 surface now matches) — no
-        // more (a twenty-second bm.* key is a drift event the U04 / U05
-        // units depend on), no less (missing one breaks the parity tests).
+        // vocabulary already carried them; the M17 surface now matches + the
+        // two bm.list.kind.inventory / bm.list.kind.directory labels added by
+        // the same ADR 0118 amendment, 2026-10-16 — the M16 inventory + M2
+        // directory kinds join the M17 surface) — no more (a twenty-fourth
+        // bm.* key is a drift event the U04 / U05 units depend on), no less
+        // (missing one breaks the parity tests).
         var actualBmKeys = en.Keys
             .Where(k => k.StartsWith("bm.", StringComparison.Ordinal))
             .ToHashSet(StringComparer.Ordinal);
         Assert.Equal(BmKeys.ToHashSet(StringComparer.Ordinal), actualBmKeys);
-        Assert.Equal(21, actualBmKeys.Count);
+        Assert.Equal(23, actualBmKeys.Count);
 
         // (3) All four registries (en / de / fr / da) carry the same closed
         // set (the §kw-l parity pin — the U04 / U05 units consume the full

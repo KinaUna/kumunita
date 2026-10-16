@@ -3,6 +3,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Documents;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -42,13 +43,13 @@ public sealed class PersonalNoteService : IPersonalNoteService
         new HashSet<string>(StringComparer.Ordinal)
         {
             "post", "grouppost", "event", "page", "project",
-            "todo", "board", "document", "directory", "announcement",
+            "todo", "board", "document", "directory", "announcement", "inventory",
         };
 
     // The closed set's canonical order (for group ordering in the list).
     private static readonly string[] ClosedTargetKindsOrdered =
         ["post", "grouppost", "event", "page", "project",
-         "todo", "board", "document", "directory", "announcement"];
+         "todo", "board", "document", "directory", "announcement", "inventory"];
 
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
@@ -56,6 +57,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
     private readonly IEventService _events;
     private readonly IProjectService _projects;
     private readonly IAnnouncementService _announcements;
+    private readonly IInventoryService _inventory;
     private readonly IIdentityService _identity;
 
     /// <summary>
@@ -75,6 +77,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         IEventService events,
         IProjectService projects,
         IAnnouncementService announcements,
+        IInventoryService inventory,
         IIdentityService identity)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -89,6 +92,7 @@ public sealed class PersonalNoteService : IPersonalNoteService
         // cross the IPersonalNoteService seam; the same composition
         // category as the already-composed IUserInfoService).
         _announcements = announcements ?? throw new ArgumentNullException(nameof(announcements));
+        _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
         _identity = identity ?? throw new ArgumentNullException(nameof(identity));
     }
 
@@ -799,6 +803,14 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 return (a.Title, $"/announcements/{targetId}");
             }
 
+            case "inventory":
+            {
+                var item = await s.LoadAsync<InventoryItem>(targetId).ConfigureAwait(false);
+                if (item is null || item.IsDeleted)
+                    return (null, null);
+                return (item.Name, $"/inventory/{targetId}");
+            }
+
             default:
                 return (null, null);
         }
@@ -990,6 +1002,30 @@ public sealed class PersonalNoteService : IPersonalNoteService
                 if (a is null)
                     return (false, null, null);
                 return (true, a.Title, $"/announcements/{targetId}");
+            }
+
+            case "inventory":
+            {
+                // ADR 0167 extension — the M16 Inventory detail page's own
+                // read, re-run: IInventoryService.GetItemAsync (the same
+                // call the /inventory/{id} detail page uses — the C-M37·3
+                // pin: the target's own audit row commits, M37 commits none
+                // of its own). KeyNotFoundException (404 on absent /
+                // soft-deleted / denied — the C-M3·4 non-leaky shape) and
+                // UnauthorizedAccessException both degrade to Refused.
+                try
+                {
+                    var item = await _inventory.GetItemAsync(targetId, actorId).ConfigureAwait(false);
+                    return (true, item.Name, $"/inventory/{targetId}");
+                }
+                catch (KeyNotFoundException)
+                {
+                    return (false, null, null);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return (false, null, null);
+                }
             }
 
             default:

@@ -236,6 +236,131 @@ surfaces have their own visibility world).
 
 ## Amendments
 
+### 2026-10-16 — The inventory / directory kinds join the closed set (the M16 / M2 parity lane)
+
+The M37 PersonalNotes closed set (ADR 0167) already carried the
+`directory` kind — a note attaches to **any** content entity, including a
+resident's directory page. The M17 surface, by contrast, still pinned the
+closed `TargetKind` set to seven kinds (post / event / todo /
+announcement / page / project / board) after the 2026-10-16 project /
+board amendment — the inventory detail surface had **no bookmark
+affordance** at all, and the directory detail surface had only the M37
+`_NoteButton` (the view comment explicitly noted "the M17 bookmark closed
+set does not include 'directory'").
+
+The amendment (the M37 PersonalNotes D3 / D5 shape re-applied to the M17
+surface — no new seam, no new decision, no new `AccessAction` /
+`AccessVia` / `Decide()` branch / adapter; the existing frozen
+`IInventoryService.GetItemAsync` read is reused for the inventory branch
+(the same call the `/inventory/{id}` detail page uses — C-M17·3: the
+target's own audit row commits, M17 commits none of its own) and the
+existing frozen `IUserInfoService.GetProfileAsync` + `IAuthorizationService`
+read is reused for the directory branch (the M37 PersonalNotes
+`directory` D3 shape re-applied verbatim)):
+
+- **`BookmarkService.ClosedTargetKinds` gains two kinds**: `inventory`
+  and `directory` (the closed set is now **nine** — the M5
+  `KanbanStatuses` string-not-enum shape pin holds: string, not enum,
+  closed, drift-guarded). `ClosedTargetKindsOrdered` gains the two in
+  the same canonical order (after `board`).
+- **`BookmarkService` gains a new constructor dependency**: the frozen
+  `IInventoryService` (the M16 Inventory detail page's own read — the
+  same category of composition as the already-composed
+  `IProjectService`). The `IBookmarkService` four-method public
+  signature is unchanged (C-M17·1 holds — the composition detail does
+  not cross the frozen seam).
+- **`BookmarkService.ResolveTargetAsync`** (the D3 write-lane check)
+  gains two branches: the `inventory` branch re-runs the frozen
+  `IInventoryService.GetItemAsync(targetId, actorId)` read (the same
+  call the `/inventory/{id}` detail page uses — C-M17·3); the `directory`
+  branch re-runs the frozen `IUserInfoService.GetProfileAsync(targetId)`
+  + `IAuthorizationService.CanAsync(Read, ProfileToAuditableResource)`
+  read (the M37 PersonalNotes `directory` D3 shape re-applied verbatim).
+  Both catch the non-visible / denied case, degrading to `Refused` — the
+  M17 404-not-403 Web mapping (the M16 create-gate posture).
+- **`BookmarkService.ResolveForListAsync`** (the D5 list resolution,
+  the C-M17·2 pure non-auditing doc load) gains two branches: the
+  `inventory` branch loads the `InventoryItem` doc directly and degrades
+  on `IsDeleted` (the ADR 0024 soft-delete flag; `InventoryItem` has no
+  `IsDraft` — D8a shape); the `directory` branch loads the profile
+  directly (via the already-composed `IUserInfoService.GetProfileAsync`)
+  and degrades on a blocked profile (the M37 PersonalNotes `directory`
+  list-resolution shape re-applied verbatim). Both return the target's
+  `Name` / `DisplayName` + the canonical detail URL (`/inventory/{id}` /
+  `/directory/{id}`).
+- **The two new `bm.list.kind.inventory` / `bm.list.kind.directory` kw-l
+keys** are registered in all four language registries (en / de / fr /
+da) — the `directory` label re-uses the M37 `pn.list.kind.directory`
+terminology; the `inventory` label is new to M17. The closed `bm.*` key
+set grows from 21 to **23 keys** (the
+`BmKeys_AreTheClosedTwentyThreeKeySet` pin re-targets the count + the
+two new keys).
+- **`Views/Inventory/Detail.cshtml`** — the `_BookmarkButton` +
+  `_NoteButton` partials join the top-right affordance row (the
+  `Projects/TodoDetail.cshtml` ordering precedent: Bookmark first, Note
+  second). The `Inventory` detail surface gains **both** affordances
+  (the M16 create-gate posture is the D3 write-lane check; the M37
+  PersonalNotes closed set already carried the `directory` kind, but the
+  `inventory` kind was absent — this amendment adds it to the M37
+  surface too, so the inventory detail page's note affordance is also
+  now live).
+- **`Views/Directory/Detail.cshtml`** — the `_BookmarkButton` partial
+  joins the existing top-right affordance row (which already carried
+  the `_NoteButton`). The partial's existing shape (the
+  `IsBookmarkedAsync` targeted personal read, the two-lane
+  Bookmark/Remove forms, the `returnUrl` hidden input) is unchanged —
+  no new partial, no new controller action, no new view model.
+- **`Views/Bookmarks/Index.cshtml`** — the `_kinds` closed-set array
+  gains `inventory` + `directory` (the list view now renders the two new
+  groups when the owner has pinned them).
+- **`Views/Notes/Index.cshtml`** — the `_kinds` closed-set array gains
+  `inventory` (the list view now renders the new group when the owner
+  has noted one).
+- **`PersonalNoteService`** — the M37 closed set gains the `inventory`
+  kind (the M16 Inventory detail page's own read, re-applied: the
+  `IInventoryService.GetItemAsync` branch in both `ResolveForListAsync`
+  and `ResolveTargetAsync` — the same shape as the existing `board` /
+  `document` / `directory` branches). A new constructor dependency on the
+  frozen `IInventoryService` joins the composition (the `IPersonalNoteService`
+  public signature is unchanged — C-M37·1 holds).
+- **`pn.list.kind.inventory` kw-l key** is registered in all four
+  language registries (en / de / fr / da) — the closed `pn.*` key set
+  grows from 29 to **30 keys** (the
+  `KnownTranslationKeys_PnKeys_RegisteredInAllFourLanguages` pin
+  re-targets the count + the new key).
+- **`tests/Kumunita.Core.Tests/BookmarkServiceTests.cs`** —
+  `TargetKind_IsTheClosedStringSet` re-pinned to the nine-kind set
+  (count 7 → 9); the harness composes the `InventoryService` (so the new
+  `InventoryItem` doc loads + `GetItemAsync` reads resolve).
+- **`tests/Kumunita.Core.Tests/PersonalNoteServiceTests.cs`** — the
+  harness composes the `InventoryService` (so the new `inventory` branch
+  resolves).
+- **`tests/Kumunita.Web.Tests/BookmarksControllerTests.cs`** —
+  `BmKeys_AreTheClosedTwentyThreeKeySet` re-targeted (count 21 → 23, the
+  two new keys added to the `BmKeys` array).
+
+**The frozen surfaces are untouched** (C-M17·1 / C-M37·1 hold): the
+`IBookmarkService` **four-method public signature is byte-identical**
+(`ListAsync` / `ToggleAsync` / `RemoveAsync` /
+`IsBookmarkedAsync` — the 2026-10-04 F1 amendment's shape is the
+reference); the `IPersonalNoteService` public signature is unchanged;
+**no** new `AccessAction` / `AccessVia` / `Decide()` branch; **no** new
+method on `IAuthorizationService`. The only changes are in the **Core
+composition** (the two resolver switches gain two branches each — the
+same shape as the existing `todo` / `event` / `board` branches; the two
+services gain a new `IInventoryService` constructor dependency), the
+**key registry** (two new `bm.list.kind.*` keys + one new
+`pn.list.kind.*` key × 4 languages), the **views** (the two detail
+surfaces gain the existing `_BookmarkButton` / `_NoteButton` partials;
+the two list views' `_kinds` arrays gain the new entries), and the
+**test pins** (the closed-set counts + the BmKeys / PnKeys counts
+re-targeted). The drift-guard frozen list in the design doc is amended
+to count the closed set as **nine kinds** (was seven after the
+project / board amendment) and to name `inventory` / `directory` among
+the closed vocabulary. The §kw-l key list is amended to count **23
+keys** (was 21 after the project / board amendment) for `bm.*` and
+**30 keys** (was 29) for `pn.*`.
+
 ### 2026-10-16 — The project / board kinds join the closed set (the M37 parity lane)
 
 The M37 PersonalNotes closed set (ADR 0167) already carried the

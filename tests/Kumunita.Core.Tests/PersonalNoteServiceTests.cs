@@ -3,6 +3,7 @@ using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Inventory;
 using Kumunita.Core.PersonalNotes;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Projects;
@@ -676,7 +677,8 @@ public class PersonalNoteServiceTests(PostgresFixture fixture) : IClassFixture<P
         var announcements = new AnnouncementService(store, userInfo);
         var identity = Substitute.For<IIdentityService>();
         identity.GetBySubjectAsync(Arg.Any<string>()).Returns((ThinPrincipal?)null);
-        var svc = new PersonalNoteService(userInfo, authz, store, events, projects, announcements, identity);
+        var inventory = new InventoryService(store, authz, userInfo);
+        var svc = new PersonalNoteService(userInfo, authz, store, events, projects, announcements, inventory, identity);
         return (userInfo, authz, svc);
     }
 
