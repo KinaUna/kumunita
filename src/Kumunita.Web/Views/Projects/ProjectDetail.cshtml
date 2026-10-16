@@ -34,6 +34,12 @@
         confirmRemoveTrans = await Translation.GetAsync("common.remove_translation_confirm", _kwL);
         ariaActionsFor     = await Translation.GetAsync("a11y.actions_for", _kwL);
     }
+    // Author monogram for the author footer band at the bottom of the
+    // description card (the fail-closed avatar sibling — the Directory
+    // pattern's initial).
+    string projectAuthorInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
 }
 
 <div class="row justify-content-center">
@@ -124,15 +130,10 @@
                             </div>
                         }
                     </div>
+                    @* Author + created/modified moved to the author footer
+                       band at the BOTTOM of the description card (the
+                       community Posts/Detail.cshtml pattern). *@
                     <div class="text-muted small mt-1">
-                        @Model.AuthorDisplayName
-                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
-                        <kw-dt dt="@Model.Created" format="g"></kw-dt></span>
-                        @if (Model.Modified is not null)
-                        {
-                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
-                            <kw-dt dt="@Model.Modified" format="g"></kw-dt></span>
-                        }
                         @if (Model.StartAt is not null)
                         {
                             <span> · <kw-l key="pl.project.start_date">Start</kw-l>
@@ -434,6 +435,28 @@
                     </div>
                 }
             }
+
+            @* Author footer band (the community Posts/Detail.cshtml pattern):
+               the author sits at the BOTTOM of the card, below the body / 
+               description variants, as its own band — the <img> links the 
+               audited serving lane (GET /profile/avatar/{subjectId}), the 
+               monogram sibling on its fail-closed 404. *@
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.AuthorId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@projectAuthorInitial</span>
+                </span>
+                <span>
+                    @Model.AuthorDisplayName · <kw-l key="projects.todo.created">Created</kw-l>
+                    <kw-dt dt="@Model.Created" format="g"></kw-dt>
+                    @if (Model.Modified is not null)
+                    {
+                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                        <kw-dt dt="@Model.Modified" format="g"></kw-dt></span>
+                    }
+                </span>
+            </div>
         </div>
 
 

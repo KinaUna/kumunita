@@ -45,6 +45,11 @@
     // code). Used by the ⋮ dropdown's translation add / edit / remove items.
     var langNames = (Model.Languages ?? []).ToDictionary(l => l.Code, l => l.NativeName);
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+    // Author monogram for the author footer band at the bottom of the card
+    // (the fail-closed avatar sibling — the Directory pattern's initial).
+    string todoAuthorInitial = !string.IsNullOrWhiteSpace(Model.Todo.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.Todo.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
 }
 
 <div class="row justify-content-center">
@@ -451,42 +456,10 @@
                    lanes (routes / form fields / server-side CanTranslate gate)
                    are unchanged — only the presentation moved. *@
 
-                @* The assignee avatar (the BoardDetail card pattern, the same
-                   fail-closed contract every other avatar <img> uses: the
-                   <img> links the audited serving lane (GET
-                   /profile/avatar/{subjectId}) and avatar.ts hides it on
-                   the 404 it fails closed to, showing the monogram sibling). *@
-                @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeId))
-                {
-                    string assigneeInitial = !string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName)
-                        ? char.ToUpperInvariant(Model.Todo.AssigneeDisplayName.TrimStart()[0]).ToString()
-                        : string.Empty;
-                    <div class="mb-2">
-                        <span class="d-inline-flex align-items-center">
-                            <img class="avatar avatar-sm" src="/profile/avatar/@Model.Todo.AssigneeId" alt=""
-                                 data-avatar-fallback>
-                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
-                        </span>
-                    </div>
-                }
-                <div class="text-muted small mt-2 mb-3">
-                    @Model.Todo.AuthorDisplayName
-                    @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
-                    {
-                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
-                    }
-                    else
-                    {
-                        <span> · <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
-                    }
-                    <span> · <kw-l key="projects.todo.created">Created</kw-l>
-                    <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
-                    @if (Model.Todo.Modified is not null)
-                    {
-                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
-                        <kw-dt dt="@Model.Todo.Modified" format="g"></kw-dt></span>
-                    }
-                </div>
+                @* The author + assignee line (previously above the title, with
+                   the assignee's avatar) moved to the author footer band at the
+                   BOTTOM of the card (the community Posts/Detail.cshtml
+                   pattern) — see the band below the body. *@
 
                 @* U08 (ADR 0086 §3.9) — the Project link (D9): the to-do's
                    project association (F3) rendered as a link to the project
@@ -747,6 +720,38 @@
                 {
                     <p class="text-body-tertiary mb-0"><kw-l key="projects.todo.no_body">No body — this to-do is title-only.</kw-l></p>
                 }
+            </div>
+
+            @* Author footer band (the community Posts/Detail.cshtml pattern):
+               the author sits at the BOTTOM of the card, below the body, as
+               its own band — the <img> links the audited serving lane (GET
+               /profile/avatar/{subjectId}), the monogram sibling on its
+               fail-closed 404. The assignee line (previously above the
+               title) moves here with the author. *@
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.Todo.AuthorId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@todoAuthorInitial</span>
+                </span>
+                <span>
+                    @Model.Todo.AuthorDisplayName
+                    @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
+                    {
+                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
+                    }
+                    else
+                    {
+                        <span> · <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
+                    }
+                    <span> · <kw-l key="projects.todo.created">Created</kw-l>
+                    <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
+                    @if (Model.Todo.Modified is not null)
+                    {
+                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                        <kw-dt dt="@Model.Todo.Modified" format="g"></kw-dt></span>
+                    }
+                </span>
             </div>
         </div>
 
